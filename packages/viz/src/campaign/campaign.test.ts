@@ -129,11 +129,18 @@ function requireProfile(id: string): DispatcherProfile {
 }
 
 /**
- * Run a stage exactly as `dev/campaignPanel.ts` does: two arms, the stage's own seeds.
+ * Run a stage: two arms, the stage's own tuning seeds.
  *
  * `edit` is W6's player move — an **edited weight vector** instead of a dropdown choice. It goes
  * through the same `batchRequestForStage` the panel calls, so the suite cannot exercise a second
  * version of what a stage run with an edit is.
+ *
+ * **This is one half of a judgement and no longer the whole of one.** GitHub issue #255's second
+ * half split the judged seed set from the tuning seed set, so a stage is *cleared* only on a
+ * holdout batch as well — see {@link playToVerdict} and `judge.ts`'s docstring. Every case below
+ * that used to read `verdict.cleared` and meant *"did this batch meet its bars"* now reads
+ * `verdict.metOnTuningSeeds`, which is that question with its own name; the cases that meant
+ * *"is this stage won"* run both batches.
  */
 function playStage(
   stage: CampaignStage,
@@ -151,6 +158,42 @@ function playStage(
   const result = runBatch(batchRequestForStage(stage, candidateProfileId, edit), resourcesFor(stage));
   const report = batchReport(result);
   return { result, report, verdict: judgeStage({ stage, published: publishedFor(stage), result, report }) };
+}
+
+/**
+ * The whole judgement: the tuning batch, and — only when it met every bar — the holdout batch.
+ *
+ * The second batch is skipped when the first did not meet its bars, and that is arithmetic rather
+ * than an optimisation with a cost: `cleared` requires **both** halves, so a stage that missed a
+ * bar on the runs the player made is refused whatever the holdout says, and running fifty more
+ * replications to learn nothing would double the cost of every sweep in this file.
+ */
+function playToVerdict(
+  stage: CampaignStage,
+  candidateProfileId: string,
+  edit?: EditedVector,
+): {
+  result: BatchResult;
+  report: BatchReport;
+  verdict: StageReport;
+} {
+  const tuning = playStage(stage, candidateProfileId, edit);
+  if (!tuning.verdict.metOnTuningSeeds) return tuning;
+  const holdoutResult = runBatch(
+    batchRequestForStage(stage, candidateProfileId, edit, 'holdout'),
+    resourcesFor(stage),
+  );
+  const holdout = { result: holdoutResult, report: batchReport(holdoutResult) };
+  return {
+    ...tuning,
+    verdict: judgeStage({
+      stage,
+      published: publishedFor(stage),
+      result: tuning.result,
+      report: tuning.report,
+      holdout,
+    }),
+  };
 }
 
 /* -------------------------------------------------------------------------- *
@@ -514,14 +557,46 @@ describe('a stage judges only the changes it offered', () => {
  * 5 — the honesty rules, over real batches
  * -------------------------------------------------------------------------- */
 
-describe('stage 1, played — the bar reproduces and standing still clears nothing', () => {
+/**
+ * **The first stage that carries a count goal, derived — and it stopped being stage 1.**
+ *
+ * This block was *"stage 1, played"* and every clause in it needed a count goal: the bar
+ * reproducing, the shipped setting scoring exactly level against its own bar, and the refusal to
+ * judge against a bar that does not reproduce. GitHub issue #255 took stage 1's away — with an
+ * honest reporting window all five of its per-run kinds measure `50/50, 50/50`, so R12 makes every
+ * one of them a fact for the briefing and `data/campaign.json` declares `beat-the-baseline` alone
+ * there.
+ *
+ * Repointed at a **derived** stage rather than at stage 2 by name, for this file's own reason: a
+ * subject written down is a subject that goes stale silently, and the three clauses below would
+ * have gone on passing over an empty loop. The derivation is asserted to find one, so a campaign
+ * with no count goal anywhere reds this rather than skipping it.
+ */
+function firstStageWithCountGoals(): CampaignStage {
+  const found = campaign.stages.find((candidate) =>
+    candidate.goals.some((goal) => goal.kind !== 'beat-the-baseline'),
+  );
+  if (found === undefined) throw new Error('no shipped stage declares a count goal');
+  return found;
+}
+
+describe('a stage played — the bar reproduces and standing still clears nothing', () => {
   let stage: CampaignStage;
   let unchanged: ReturnType<typeof playStage>;
 
   beforeAll(() => {
-    stage = stageAt(0);
+    stage = firstStageWithCountGoals();
     unchanged = playStage(stage, stage.dispatcher.startingProfileId);
-  }, 120_000);
+  }, 300_000);
+
+  it('has a count goal to be about — the premise, asserted rather than assumed', () => {
+    /*
+     * Three cases below iterate the count goals, and an empty list would make all three pass
+     * without measuring anything. That is the shape this file keeps finding, so the premise is a
+     * case of its own.
+     */
+    expect(stage.goals.filter((goal) => goal.kind !== 'beat-the-baseline').length).toBeGreaterThan(0);
+  });
 
   it('reproduces the published bar by running the shipped setting as its own arm', () => {
     for (const goal of unchanged.verdict.goals) {
@@ -531,6 +606,14 @@ describe('stage 1, played — the bar reproduces and standing still clears nothi
   });
 
   it('clears nothing when nothing was changed — W3’s liveness control, on a scoreboard', () => {
+    /*
+     * `metOnTuningSeeds` rather than `cleared`, and the difference matters here more than
+     * anywhere else in this file: `cleared` is `false` on an unvalidated batch whatever the goals
+     * said, so asserting it would have made this control pass without measuring anything. What is
+     * being controlled is that an unchanged setting does not meet its own bars, and that is the
+     * field with that meaning.
+     */
+    expect(unchanged.verdict.metOnTuningSeeds).toBe(false);
     expect(unchanged.verdict.cleared).toBe(false);
     const comparison = unchanged.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
     expect(comparison?.met).toBe(false);
@@ -605,6 +688,7 @@ describe('stage 1, played — the bar reproduces and standing still clears nothi
       expect(goal.sentence).toContain('not judged');
       expect(goal.note).toContain('a bar that does not reproduce is not a bar');
     }
+    expect(played.verdict.metOnTuningSeeds).toBe(false);
     expect(played.verdict.cleared).toBe(false);
   }, 120_000);
 
@@ -736,12 +820,32 @@ describe('stage 5, played — the credential is named, and the lesson is that it
    * Written as a **search with a stated floor** rather than a pinned profile id: which profile
    * clears is a measurement that will move again, and a test naming one would be re-pinned every
    * time without anybody re-reading the claim. What may not move is that at least one does.
+   *
+   * ## The clear now has to survive the holdout, and that moved which profile it is
+   *
+   * Issue #255's second half. Judged on the tuning batch alone, **six** of the thirteen meet every
+   * bar here — `eta`, `energy-aware`, `fairness-first`, `capacity-aware`, `predictive-balanced`,
+   * `auction`. Run again on the stage's declared holdout seeds, **one** survives:
+   * `predictive-balanced`. Every one of the other five is beaten on a count goal it met on the
+   * seeds it was measured on — `eta` loses `deliver-everyone`, `no-divergence` *and*
+   * `answer-the-demand` there.
+   *
+   * That is what the holdout is for and it is the case for the split in one line: five of six
+   * apparent clears on this stage were a fit to fifty passenger populations. It also means the
+   * measurement `docs/33` § 3.1 publishes — *stage 5 clears under `eta`* — was taken under the old
+   * judge and no longer names the same profile; that table is a published number pinned to a run,
+   * and this is the run that moved it.
+   *
+   * Still a search with a floor, for the reason above, and still expressed as *at least one*. The
+   * floor is what makes DC-3's question — *is this campaign winnable at all?* — a measurement.
    */
-  it('clears from the dropdown — the measured answer to whether a stage can be won', () => {
+  it('clears from the dropdown, on the holdout seeds too — whether a stage can be won', () => {
     const clears = [];
+    const metOnTuning = [];
     for (const profile of config.dispatcherProfiles.profiles) {
-      const attempt = playStage(stage, profile.id);
+      const attempt = playToVerdict(stage, profile.id);
       const rows = attempt.report.comparisons[0]?.rows ?? [];
+      if (attempt.verdict.metOnTuningSeeds) metOnTuning.push(profile.id);
       if (!attempt.verdict.cleared) continue;
       clears.push(profile.id);
       // The clear is the shape `beat-the-baseline` describes and not an accident of an empty
@@ -749,10 +853,21 @@ describe('stage 5, played — the credential is named, and the lesson is that it
       expect(rows.filter((row) => row.favours === 'candidate').length).toBeGreaterThan(0);
       expect(rows.filter((row) => row.favours === 'baseline')).toEqual([]);
       for (const goal of attempt.verdict.goals) expect(goal.met, goal.sentence).toBe(true);
+      // And the same again on the runs it was not tuned against, which is what cleared it.
+      expect(attempt.verdict.holdout?.held).toBe(true);
+      for (const goal of attempt.verdict.holdout?.goals ?? []) {
+        expect(goal.met, goal.sentence).toBe(true);
+      }
       /* R2 survives the good news: the headline still says what the number is about. */
       expect(attempt.verdict.headline).toContain('not a ranking of dispatchers');
     }
     expect(clears.length, 'no shipped profile clears stage 5 from the dropdown').toBeGreaterThan(0);
+    /*
+     * The gate is measured rather than asserted to be free: if the holdout ever stopped removing
+     * anybody, the split would have become decoration on this stage and the sentence above would
+     * be describing a rule that no longer bites.
+     */
+    expect(clears.length).toBeLessThan(metOnTuning.length);
   }, 3_000_000);
 
   it('opens the dial the lesson needs and refuses a profile that changes anything else', () => {
@@ -796,7 +911,7 @@ describe('stage 4, played — a setting that buys one thing by spending another'
       const behind = rows.filter((row) => row.favours === 'baseline').length;
       // Nothing clears this stage from the dropdown any more, and that is asserted rather than
       // assumed: the day something does, this fails and the claim above gets re-read.
-      expect(played.verdict.cleared, `${profile.id} clears stage 4`).toBe(false);
+      expect(played.verdict.metOnTuningSeeds, `${profile.id} meets every bar on stage 4`).toBe(false);
       if (ahead === 0 || behind === 0) continue;
       witnesses += 1;
       const comparison = played.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
@@ -832,10 +947,17 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
     values: { 'weights.waitTime': 1, 'weights.loadFactor': 2.25 },
   };
 
-  it('clears — three goals, and the comparison resolves for the candidate on two measures', () => {
+  it('meets every bar on the seeds it was tuned on — three goals, two measures ahead', () => {
+    /*
+     * **`metOnTuningSeeds`, and this case is the reason that field has a name.** It used to read
+     * `cleared`, and what it was measuring was never *"this stage is won"*: it was *"this vector,
+     * swept on these fifty traces, wins on these fifty traces"*. Issue #255's second half made the
+     * difference visible by making it decide something, and the case below is the other half of
+     * the same measurement.
+     */
     const stage = stageAt(1);
     const played = playStage(stage, stage.dispatcher.startingProfileId, EDIT);
-    expect(played.verdict.cleared).toBe(true);
+    expect(played.verdict.metOnTuningSeeds).toBe(true);
     for (const goal of played.verdict.goals) {
       expect(goal.met, goal.sentence).toBe(true);
     }
@@ -845,6 +967,76 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
     /* R2 survives the good news, as it does on stage 4. */
     expect(played.verdict.headline).toContain('not a ranking of dispatchers');
   }, 300_000);
+
+  /**
+   * **The exploit, and the gate that closes it — `docs/33` § 7 O7, GitHub issue #255.**
+   *
+   * This vector was found by sweeping `weights.loadFactor` on stage 2's **tuning** seeds until the
+   * stage cleared, which is the shortcut the difficulty curve names as its largest open question:
+   * *"a curve whose intended solution is `tune until the judged seeds clear` is a curve with a
+   * shortcut in it, and the shortcut is invisible to every rule above."* It is the only measured
+   * witness of that shortcut in the tree, and it is the one this gate has to stop.
+   *
+   * Played through the shipped constructors, both batches, exactly as `dev/campaignPanel.ts` will
+   * once it grows the second run: it meets every bar on the seeds it was tuned against, and the
+   * stage is **not cleared**, because on fifty passenger populations it has never seen it loses
+   * `long-waits-under` (41 against a bar of 45) and is beaten on three measures.
+   *
+   * The two halves are asserted separately on purpose. *Not cleared* alone would also be produced
+   * by a gate that refused everything — by a holdout batch that failed to reproduce its bars, say,
+   * or by an input nobody supplied — so the case pins that the holdout half was **judged**
+   * (`reproduced` is `true` on every count goal there) and that what refused it is a goal it
+   * actually missed.
+   */
+  it('**is refused on the holdout seeds**, which is the overfitting gate doing its job', () => {
+    const stage = stageAt(1);
+    const played = playToVerdict(stage, stage.dispatcher.startingProfileId, EDIT);
+
+    expect(played.verdict.metOnTuningSeeds).toBe(true);
+    expect(played.verdict.cleared).toBe(false);
+
+    const holdout = played.verdict.holdout;
+    expect(holdout, 'the holdout batch was never run, so nothing was validated').toBeDefined();
+    if (holdout === undefined || holdout === null) return;
+    expect(holdout.seed).toBe(stage.holdoutSeeds.seed);
+    expect(holdout.held).toBe(false);
+
+    // Judged, not refused: every count goal's bar reproduced on the holdout half of the table.
+    const counts = holdout.goals.filter((goal) => goal.kind !== 'beat-the-baseline');
+    expect(counts.length).toBeGreaterThan(0);
+    for (const goal of counts) expect(goal.reproduced, goal.sentence).toBe(true);
+
+    // And it is a goal it missed rather than a goal nobody could answer.
+    const missed = holdout.goals.filter((goal) => goal.met === false);
+    expect(missed.map((goal) => goal.kind).sort()).toEqual(['beat-the-baseline', 'long-waits-under']);
+    expect(holdout.goals.filter((goal) => goal.met === null)).toEqual([]);
+
+    // The player is told which of the two seed sets refused it, in the headline, in words.
+    expect(played.verdict.headline).toContain('Not cleared');
+    expect(played.verdict.headline).toContain(stage.holdoutSeeds.name);
+    expect(played.verdict.headline).toContain('not a ranking of dispatchers');
+
+    /*
+     * **And the same batch judged with no holdout at all is refused too, with the other reason.**
+     *
+     * Free — it is the tuning batch that has already run, judged a second time — and it is the
+     * only place in this suite where *met every bar, and no second batch was supplied* can be
+     * reached, because reaching it needs an arm that actually meets every bar. Without it the
+     * unvalidated branch would be asserted nowhere and could be deleted with every other case
+     * still green.
+     */
+    const unvalidated = judgeStage({
+      stage,
+      published: publishedFor(stage),
+      result: played.result,
+      report: played.report,
+    });
+    expect(unvalidated.metOnTuningSeeds).toBe(true);
+    expect(unvalidated.holdout).toBeNull();
+    expect(unvalidated.cleared).toBe(false);
+    expect(unvalidated.headline).toContain('Not cleared');
+    expect(unvalidated.headline).toContain('the runs this setting was tuned against');
+  }, 600_000);
 
   it('runs a profile `data/` does not contain, and the report names the thing that ran', () => {
     // The claim W6 actually makes. `data/dispatcher-profiles.json` has no `collective-edited`, so
@@ -879,9 +1071,21 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
      * This is asserted rather than mentioned because the alternative — a suite that records the
      * clear and not the failure to generalise — would be publishing the flattering half of a
      * measurement, and § 11 W6's *"a stage cleared on an edited vector"* would read as a stronger
-     * result than it is. **The campaign judges on the tuning seeds, so a live weight editor makes
-     * overfitting them the dominant strategy**, and nothing in the shipped surface says so. That is
-     * a finding about the campaign, not about this vector.
+     * result than it is.
+     *
+     * **What this case is now, and what it stopped being.** Its closing sentence used to be *"the
+     * campaign judges on the tuning seeds, so a live weight editor makes overfitting them the
+     * dominant strategy, and nothing in the shipped surface says so"* — a finding about the
+     * campaign, and `docs/33` § 7's **O7**. Issue #255's second half closed it, and the closure is
+     * the case above, which plays this vector through both batches and watches the gate refuse it.
+     *
+     * What survives here is a different and still-live claim: **a batch run on the wrong seed set
+     * is refused rather than scored.** The stage below has its two sets swapped, so the runs are
+     * the holdout's and the published counts read are the tuning set's — and every count goal comes
+     * back `null` with `reproduced: false`. That is the guard that catches a campaign quietly
+     * running a different configuration from the one its goals were measured on, and it is checked
+     * on the field that has that meaning rather than on `cleared`, which an unvalidated batch
+     * makes `false` whatever the goals said.
      */
     const stage = stageAt(1);
     const onHoldout: CampaignStage = {
@@ -890,6 +1094,7 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
       holdoutSeeds: stage.seeds,
     };
     const played = playStage(onHoldout, stage.dispatcher.startingProfileId, EDIT);
+    expect(played.verdict.metOnTuningSeeds).toBe(false);
     expect(played.verdict.cleared).toBe(false);
     const rows = played.report.comparisons[0]?.rows ?? [];
     expect(rows.filter((row) => row.favours === 'baseline').length).toBeGreaterThan(0);
@@ -900,7 +1105,10 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
      */
     const counts = played.verdict.goals.filter((goal) => goal.kind !== 'beat-the-baseline');
     expect(counts.length).toBeGreaterThan(0);
-    for (const goal of counts) expect(goal.met).toBeNull();
+    for (const goal of counts) {
+      expect(goal.met).toBeNull();
+      expect(goal.reproduced).toBe(false);
+    }
   }, 300_000);
 
   it('refuses an edited vector that leaves the dimensions this stage opened', () => {
@@ -996,6 +1204,7 @@ describe('stage 6, played — three goals survive the escalators, and the bars s
     }
     const comparison = unchanged.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
     expect(comparison?.met).toBe(false);
+    expect(unchanged.verdict.metOnTuningSeeds).toBe(false);
     expect(unchanged.verdict.cleared).toBe(false);
   });
 
@@ -1026,13 +1235,19 @@ describe('stage 6, played — three goals survive the escalators, and the bars s
       const rows = played.report.comparisons[0]?.rows ?? [];
       return {
         id: profile.id,
-        cleared: played.verdict.cleared,
+        /*
+         * `metOnTuningSeeds`, not `cleared`: `cleared` is `false` on an unvalidated batch whatever
+         * the goals said, so this sweep would have gone on passing without measuring anything.
+         * What it asserts is that no shipped profile *meets stage 6's bars at all*, which is the
+         * stronger of the two claims and the one that was true when this case was written.
+         */
+        cleared: played.verdict.metOnTuningSeeds,
         for: rows.filter((row) => row.favours === 'candidate').length,
         against: rows.filter((row) => row.favours === 'baseline').length,
       };
     });
     for (const outcome of outcomes) {
-      expect(outcome.cleared, `${outcome.id} clears stage 6 from the dropdown`).toBe(false);
+      expect(outcome.cleared, `${outcome.id} meets every bar on stage 6`).toBe(false);
     }
     // Not vacuous: somebody does resolve ahead on something, so the refusal is `beat-the-baseline`
     // asking for a dominating move rather than the comparison being dead.

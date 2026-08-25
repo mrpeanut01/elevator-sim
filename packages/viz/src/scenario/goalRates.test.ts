@@ -159,9 +159,16 @@ const M30_COLUMNS = [
   'long-waits-under',
 ] as const;
 
-/** `"**4/50, 9/50**"` → `{ text: '4/50, 9/50', bold: true }`; footnote marks are dropped. */
+/**
+ * `"**4/50, 9/50**"` → `{ text: '4/50, 9/50', bold: true }`; footnote marks are dropped.
+ *
+ * The marks are listed rather than matched by a class, so a *new* mark is a red suite until
+ * somebody adds it here — a cell carrying an unrecognised footnote would otherwise compare a
+ * different string from the one the table prints. `§` joined `†` and `‡` with GitHub issue #255,
+ * which took `†` — *unjudgeable, the reporting window served nobody* — out of the table entirely.
+ */
 function readCell(raw: string): { readonly text: string; readonly bold: boolean } {
-  const trimmed = raw.trim().replace(/[†‡]/gu, '').trim();
+  const trimmed = raw.trim().replace(/[†‡§]/gu, '').trim();
   const bold = trimmed.startsWith('**') && trimmed.endsWith('**');
   return { text: (bold ? trimmed.slice(2, -2) : trimmed).trim(), bold };
 }

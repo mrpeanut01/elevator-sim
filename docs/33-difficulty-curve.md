@@ -226,7 +226,15 @@ Measured over the ten shipped stages, the two forms disagree on **three** of the
 #200's AC3. Its testable form:
 
 > **DC-2.** For every campaign stage `s`: `∀ p ∈ admitted(s)` — the shipped dispatcher profiles the
-> stage admits — `judgeStage(...).cleared === false`.
+> stage admits — `judgeStage(...).metOnTuningSeeds === false`.
+
+**`metOnTuningSeeds`, not `cleared`, and the field is the rule rather than a detail of it.** GitHub
+issue **#255** split the judged seed set from the tuning seed set: `cleared` now requires a second
+batch over the stage's holdout seeds as well, so a DC-2 written over `cleared` would be satisfied by
+a sweep that never ran that batch — a gate that passes because nothing was asked. What DC-2 is about
+is whether the dropdown can *meet a stage's bars at all*, and that is the field with that meaning.
+The stronger question — whether a dropdown move survives the holdout too — is answered by DC-2's
+own measurement and reported beside it in § 3.1.
 
 **DC-2 without a companion is satisfied by having no dropdown**, and three shipped stages satisfy it
 that way today: stages 8 and 10 admit **exactly one** profile — the stage's own baseline, the
@@ -268,29 +276,30 @@ with the reason, on `honesty.test.ts`'s precedent, and **the register is checked
 directions**: a stage in the register must actually have no clearing witness, and a stage with a
 witness may not be in it. A register that can only grow is decoration.
 
-**On which seeds the witness must clear, and the finding that forces the question.** DC-3 asks for a
-clear on the stage's **own judged seeds**, because that is what the product judges and therefore what
-*winnable* means to a player. It does **not** ask for a clear on the holdout set, and that is not a
-softening — it is a refusal to specify something the shipped campaign cannot deliver, stated with the
-measurement attached:
+**On which seeds the witness must clear — rewritten, because the product changed underneath it.**
+This clause used to read *"DC-3 asks for a clear on the stage's **own judged seeds** … it does not
+ask for a clear on the holdout set"*, and it said so as a refusal to specify something the shipped
+campaign could not deliver. GitHub issue **#255** delivered it. `campaign/judge.ts` now clears a
+stage only when every goal is met on the tuning batch **and** on a second batch over
+`stage.holdoutSeeds`, judged against that seed set's own published counts, with the second batch's
+master seed checked rather than taken on the caller's word. So:
 
-> **DC-3b.** Each witness's behaviour on the stage's **holdout** seed set is recorded beside it and
-> is not required to clear. A witness that clears on the tuning seeds and is beaten on the holdout is
-> registered as exactly that.
+> **DC-3b.** Each witness must clear on the stage's **holdout** seed set as well as on its tuning
+> seeds, because that is what `cleared` now means. A vector that meets every bar on the seeds it was
+> tuned on and is beaten on the holdout is **not a witness** — it is the shortcut O7 named, and the
+> register records it as a stage with no witness rather than as a witness with a caveat.
 
-The one witness that exists is that case. `campaign.test.ts` plays stage 2's authored vector and
-pins **both halves**: it clears on the tuning seeds, and on the stage's declared holdout seeds the
-same vector is **beaten by the shipped setting on three measures** and `beat-the-baseline` resolves
-against it — with a sensitivity that says what it is, since `2.2`, `2.25` and `2.3` clear and `2.35`
-does not. That suite states the consequence in its own words: *"the campaign judges on the tuning
-seeds, so a live weight editor makes overfitting them the dominant strategy, and nothing in the
-shipped surface says so."*
+**The one witness that existed is that case, and it no longer clears.** `campaign.test.ts` plays
+stage 2's authored vector — `weights.waitTime: 1`, `weights.loadFactor: 2.25`, found by sweeping
+`loadFactor` on the stage's own tuning seeds — through both batches and pins both halves: it meets
+every bar on the tuning seeds, and on the declared holdout seeds it loses `long-waits-under` (41
+against a published bar of 45) and is **beaten on three measures** with `beat-the-baseline`
+resolving against it. `cleared` is `false`. The sensitivity that says what it is still holds:
+`2.2`, `2.25` and `2.3` met the tuning bars and `2.35` did not.
 
-**That is a finding about the campaign's difficulty rather than about one vector**, and it is this
-document's § 7 **O7**. A curve whose intended solution is *tune until the judged seeds clear* is a
-curve with a shortcut in it, and the shortcut is invisible to every rule above, because every rule
-above judges on the same seeds the player tunes against. DC-3b makes the shortcut visible in the
-register; it does not close it.
+So **stage 2 has no registered witness either**, and § 3.1's DC-3 row reads *ten of ten* rather
+than nine. That is a worse-looking campaign and a truer one: the vector that used to stand there was
+a fit to fifty passenger populations, and O7 is the reason it stood there at all.
 
 ### 2.5 Why the three rules together are the closed form
 
@@ -337,7 +346,7 @@ Read against §§ 2.2–2.4, the same 130 cells give the three rules directly:
 | **DC-1** — some admitted profile fails a non-comparative goal | 1–7 | **8, 9, 10** |
 | **DC-2** — no admitted profile clears the stage | 1, 2, 4, 6, 8, 9, 10 | **3, 5, 7** |
 | **DC-2b** — at least two admitted profiles differ from the baseline | 1–7 | **8, 9, 10** |
-| **DC-3** — a witness edited vector clears the stage on its judged seeds | 2 (`campaign.test.ts` carries one, and it is **beaten on the holdout** — DC-3b) | **the other nine have none registered** |
+| **DC-3** — a witness edited vector clears the stage on its judged seeds | **none** | **all ten.** Stage 2's authored vector met every bar on the tuning seeds and is refused on the holdout under the post-#255 judge (§ 2.4), so the one witness that existed is not one |
 
 **DC-1 and DC-2b fail on the same three stages**, which is not a coincidence and is the whole reason
 DC-2b exists: stages 8 and 10 admit only their own baseline and stage 9 admits one other profile, so
@@ -363,6 +372,41 @@ superseded:
 
 **None of the four is a defect this lane fixes.** They are reported, per this lane's brief and per
 `CLAUDE.md`'s rule that a published number is pinned to the run that produced it.
+
+#### 3.1a Correction — two rows of the tables above were measured on a tree that has moved
+
+GitHub issue **#255** landed both halves of the campaign's measurement integrity: the campaign path
+now sets a reporting window, and a stage is judged on a seed set the player did not tune against.
+Both move numbers this section published, and they are corrected here rather than silently rewritten
+into the tables, because the tables are a record of what a named run produced.
+
+**Stage 1's row is no longer *all four rules hold*, and the cause is the window.** § 3.2 says this
+stage teaches because *"`nearest-car` fails `answer-the-demand` where the shipped `collective` meets
+it"*. `answer-the-demand` is `personsPer5Min >= offeredPer5Min`, and it was being read over the
+demand template's five-minute band on a building with about a dozen arrivals in the whole 900 s run
+— so what varied was **where the band fell**, not how the building was dispatched. Re-measured over
+the window the experiment matrix declares for `garden-apartments`, the shipped setting scores
+**50/50 on the tuning seeds and 50/50 on the holdout**, which R12 makes a fact for the briefing
+rather than a goal; so do the other four per-run kinds. `data/campaign.json` therefore declares
+`beat-the-baseline` alone on stage 1, and **stage 1 joins 8, 9 and 10 as a DC-1 breach**: there is
+no non-comparative goal left for any admitted profile to fail. That is a content obligation for the
+campaign rebalance — **C1 now names four stages, not three** — and it is a defect the fix *revealed*
+rather than one it caused. § M30 of `docs/10` carries the moved cells.
+
+**Stage 5's named clearer has moved again, and the cause is the seed split.** § 3.1's table records
+`eta` as the profile that clears stage 5 from the dropdown. Swept again over all thirteen shipped
+profiles, both batches, under the post-#255 judge: **six** meet every bar on the tuning seeds —
+`eta`, `energy-aware`, `fairness-first`, `capacity-aware`, `predictive-balanced`, `auction` — and
+**one** clears, `predictive-balanced`. `eta` loses `deliver-everyone`, `no-divergence` *and*
+`answer-the-demand` on the holdout. Five of six apparent clears on this stage were a fit to fifty
+passenger populations, which is the case for the split stated as a measurement rather than as an
+argument. The **DC-2 breach stands** — a shipped dropdown profile still clears stage 5 — and only
+its name changed. `campaign.test.ts` pins the sweep and asserts that the holdout removes somebody,
+so a split that stopped biting would be red rather than quietly decorative.
+
+**Neither correction re-runs the other eight stages**, so the DC-1, DC-2 and DC-2b columns above are
+otherwise as measured. A full re-sweep under the new judge is the § 6 sweep's job and is the reason
+row 2 of § 6.3 now names `metOnTuningSeeds`.
 
 ### 3.2 The curve, stage by stage
 
@@ -394,7 +438,7 @@ expressible as demand or fabric or as a stage's `editable` list**, and none is a
 
 | | obligation | why | permitted by |
 |---|---|---|---|
-| **C1** | Stages 8, 9 and 10 must fail a non-comparative goal under some admitted profile | DC-1. Today every admitted profile meets every count goal on all three, so the only thing a player can miss is `beat-the-baseline`, and standing still misses that everywhere | DC-R1: demand or fabric on `chancery-house`, `crown-hotel` and `st-jude-hospital`. Note that `chancery-house` is measured elsewhere in the tree as the building whose *six 5 m/s cars never produce a wait over a minute* at any plausible rate, so its pressure has to come from fabric or from zoning rather than from demand |
+| **C1** | Stages **1**, 8, 9 and 10 must fail a non-comparative goal under some admitted profile | DC-1. Today every admitted profile meets every count goal on all four, so the only thing a player can miss is `beat-the-baseline`, and standing still misses that everywhere. **Stage 1 joined this list with GitHub issue #255** and not by anybody changing it: its only count goal was `answer-the-demand` read over a five-minute band, which measured where the band fell rather than how the building was dispatched, and over the honest window all five of its per-run kinds are `50/50, 50/50`. See § 3.1a | DC-R1: demand or fabric on `garden-apartments`, `chancery-house`, `crown-hotel` and `st-jude-hospital`. Note that `chancery-house` is measured elsewhere in the tree as the building whose *six 5 m/s cars never produce a wait over a minute* at any plausible rate, so its pressure has to come from fabric or from zoning rather than from demand; and `garden-apartments` has a **hard rate ceiling** — the residential profile's `max` is `7`, which DC-R1 forbids exceeding — so its pressure has to come from fabric too |
 | **C2** | Stages 3, 5 and 7 must stop clearing from the dropdown | DC-2 | DC-R1 — the demand or the fabric moves, never the goal |
 | **C3** | The same three stages must admit at least two non-control profiles | DC-2b, and it is C1's other half rather than a second job: both breaches have one cause | a scope change to each stage's `editable` list; not a difficulty change, so DC-R1 does not bind it |
 | **C4** | Every stage names a witness vector that clears it | DC-3 | W6, already built |
@@ -788,12 +832,12 @@ under the shipped default dispatcher, on an ordinary day. Per cell: `grownBuildi
 | # | red when | rule |
 |---|---|---|
 | 1 | a stage clears every **non-comparative** goal under every admitted profile | DC-1 |
-| 2 | any admitted shipped profile clears any stage | DC-2 |
+| 2 | any admitted shipped profile meets every bar on any stage (`metOnTuningSeeds`) | DC-2 |
 | 3 | a stage admits fewer than two non-control profiles | DC-2b |
 | 4 | a stage's registered witness does not clear | DC-3 |
 | 5 | a stage has no witness **and** is not in `OUTSTANDING` | DC-3 |
 | 6 | a stage is in `OUTSTANDING` **and** its witness clears | DC-3 — the register in both directions |
-| 6b | a witness's recorded holdout behaviour does not reproduce | DC-3b — a recorded measurement that stops reproducing is a stale published number |
+| 6b | a witness clears the tuning batch and not the holdout batch | DC-3b — post-#255 that is not a caveat on a witness, it is the absence of one |
 | 7 | a contract's day-1 miss rate is outside `[1/3, 2/3]` | DC-4 |
 | 8 | a contract's miss rate falls between day 1, 5, 10 and 20 | DC-5 |
 | 9 | the contract order is not non-decreasing in day-1 miss rate | DC-6 |
@@ -865,7 +909,8 @@ excluding zero at 50–200 replications under common random numbers, and it stop
 | **O4** | Whether stages 8, 9 and 10 should widen their `editable` lists or change their `teaches` | DC-2b says they must do one; which one is a content decision |
 | **O5** | The trip-budget row | ungraded today, so it moves no verdict and § 1.4 leaves it varying by tier. **The moment it is graded it falls under DC-R1** |
 | **O6** | Endless rush | `docs/32` § 1.4 records it as unshipped. A demand ramp with no ceiling is the one mode whose whole content is a difficulty curve, and it has none here because it has no code |
-| **O7** | **The campaign judges on the seeds the player tunes against** | § 2.4's DC-3b. Every rule in this document judges a stage on its own tuning seeds, because that is what the product does — so *tune until the judged seeds clear* is a shortcut none of them can see. The one measured witness takes it: it clears on the tuning seeds and is beaten on the holdout. Closing it means judging on the holdout, which is a change to `campaign/judge.ts` and to what every published count in `data/scenario-goals.json` is a count of. **It is the largest open question here and it is deliberately not answered by a specification lane** |
+| **O8** | **The second batch has no shipped caller** | O7's residual. `campaign/judge.ts` asks for a holdout batch and `campaign/stageRun.ts` builds the request for it; `dev/campaignPanel.ts` runs one batch and hands over one, so every stage it judges comes back *not validated* — the refusal is honest and it is not a verdict a player can act on. Wiring the panel to run both is a lane of its own, and until it lands the gate is enforced in the suite and refused in the product |
+| **O7** | ~~The campaign judges on the seeds the player tunes against~~ — **CLOSED**, GitHub issue **#255** | It was closed the way this row said it would have to be: by judging on the holdout. `campaign/judge.ts` clears a stage only when every goal is met on the tuning batch **and** on a second batch over `stage.holdoutSeeds`, against that seed set's own published counts — so `data/scenario-goals.json`'s `holdout` block, which had been validated, published, quoted in the briefing and read by nothing that could change a verdict, is now half of what a bar is. The seed is checked rather than named, so the tuning batch handed over twice is refused. **The one measured witness no longer clears** (§ 2.4), which is the closure showing its work. What is *not* closed and is now O8: `dev/campaignPanel.ts` runs one batch, so the shipped Campaign tab cannot supply the second one and reports the stage as unvalidated until it is wired |
 
 ---
 

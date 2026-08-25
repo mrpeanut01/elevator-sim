@@ -42,7 +42,12 @@ import type { PublishedGoalRates, PublishedScenario } from '../scenario/publishe
 
 import { judgeStage, type StageReport } from './judge.js';
 import { parseCampaign, type CampaignContext } from './parse.js';
-import { batchRequestForStage } from './stageRun.js';
+import {
+  batchRequestForStage,
+  stageReplicationSeed,
+  stageSeedSetOf,
+  type StageSeedSet,
+} from './stageRun.js';
 import type { Campaign, CampaignStage } from './types.js';
 
 let config: LoadedConfig;
@@ -126,16 +131,26 @@ function goalWords(): readonly string[] {
 }
 
 describe('the headline is a tally of verdicts, not a goal claim', () => {
-  it('counts goals rather than seeds — `0 of 2 goals reached over 0 runs`', () => {
-    const stage = stageAt(0);
-    expect(stage.goals).toHaveLength(2);
+  it('counts goals rather than seeds — `0 of N goals reached over 0 runs`', () => {
+    /*
+     * **The stage with the most goals**, derived rather than pinned to stage 1. It was stage 1
+     * and `0 of 2`; issue #255's regeneration took stage 1 down to a single goal — its four count
+     * kinds all measure `50/50, 50/50` once the reporting window is honest — and a case whose
+     * whole point is that the two numerals are *goals* is worth making on a stage that has more
+     * than one of them.
+     */
+    const stage = [...campaign.stages].sort((left, right) => right.goals.length - left.goals.length)[0];
+    expect(stage, 'the shipped campaign declares no stages').toBeDefined();
+    if (stage === undefined) return;
+    expect(stage.goals.length).toBeGreaterThan(1);
+    const total = String(stage.goals.length);
     const result = emptyResult(stage);
     const report = batchReport(result);
     expect(report.replications).toBe(0);
 
     const verdict = judgeStage({ stage, published: publishedFor(stage), result, report });
     expect(verdict.replications).toBe(0);
-    expect(verdict.headline).toContain('0 of 2 goals reached over 0 runs');
+    expect(verdict.headline).toContain(`0 of ${total} goals reached over 0 runs`);
 
     /*
      * `honesty/surfaces.ts` sets `goal.rateShown` from exactly this pattern. It matches here, on a
@@ -174,11 +189,30 @@ describe('the headline is a tally of verdicts, not a goal claim', () => {
     let cleared: StageReport | undefined;
     for (const profile of config.dispatcherProfiles.profiles) {
       const attempt = runBatch(batchRequestForStage(stage, profile.id), resourcesFor(stage));
+      const report = batchReport(attempt);
+      const onTuning = judgeStage({
+        stage,
+        published: publishedFor(stage),
+        result: attempt,
+        report,
+      });
+      /*
+       * The second batch, and only when the first met every bar. A stage clears on the holdout
+       * seeds as well since issue #255, so a search that ran one batch would find no cleared
+       * verdict at all and this case would have nothing to check the headline of — and the
+       * skip is arithmetic rather than a shortcut, because `cleared` needs both halves.
+       */
+      if (!onTuning.metOnTuningSeeds) continue;
+      const holdoutResult = runBatch(
+        batchRequestForStage(stage, profile.id, undefined, 'holdout'),
+        resourcesFor(stage),
+      );
       const verdict = judgeStage({
         stage,
         published: publishedFor(stage),
         result: attempt,
-        report: batchReport(attempt),
+        report,
+        holdout: { result: holdoutResult, report: batchReport(holdoutResult) },
       });
       if (verdict.cleared) {
         cleared = verdict;
@@ -206,4 +240,129 @@ describe('the headline is a tally of verdicts, not a goal claim', () => {
       expect(/\b\d+ of \d+ runs\b/.test(goal.sentence), goal.sentence).toBe(true);
     }
   }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The judged seed set — GitHub issue #255, `docs/33` § 7 O7
+ * -------------------------------------------------------------------------- */
+
+/** Every replication seed one of a stage's two sets derives, through the shipped derivation. */
+function replicationSeedsOf(stage: CampaignStage, which: StageSeedSet): readonly string[] {
+  const set = stageSeedSetOf(stage, which);
+  return Array.from({ length: set.replications }, (_, index) =>
+    stageReplicationSeed(stage, index, which).toString(),
+  );
+}
+
+describe('a stage is judged on seeds the player could not have tuned against', () => {
+  /**
+   * **Disjointness, derived from the two sets rather than read off two literals.**
+   *
+   * The master seeds differing is not the property that matters — `replicationSeed` is a hash, and
+   * two master seeds that differ could in principle derive an overlapping list. What matters is
+   * that no run in the judged sample is a run in the tuning sample, so that is what is taken: both
+   * lists, through the same derivation the batches use, intersected.
+   *
+   * It is also asserted **inside** each set. A set that derived the same seed twice would be two
+   * replications that are one run, which deflates every variance in the batch while looking
+   * entirely normal — `experiments`' own `replicationSeeds` refuses that case for the same reason,
+   * and this is the campaign-shaped version of the same question.
+   */
+  it('derives two disjoint samples on every shipped stage', () => {
+    expect(campaign.stages.length).toBeGreaterThan(0);
+    for (const stage of campaign.stages) {
+      const tuning = replicationSeedsOf(stage, 'tuning');
+      const holdout = replicationSeedsOf(stage, 'holdout');
+      expect(tuning.length).toBe(stage.replications);
+      expect(holdout.length).toBe(stage.replications);
+      expect(new Set(tuning).size, `${stage.id}: a tuning seed is derived twice`).toBe(tuning.length);
+      expect(new Set(holdout).size, `${stage.id}: a holdout seed is derived twice`).toBe(
+        holdout.length,
+      );
+
+      const shared = new Set(tuning);
+      expect(
+        holdout.filter((seed) => shared.has(seed)),
+        `${stage.id}: the judged sample contains runs the player tuned against`,
+      ).toEqual([]);
+    }
+  });
+
+  it('would notice a holdout set that is the tuning set — the guard on the guard', () => {
+    /*
+     * Every assertion above is an empty intersection, and an empty intersection is also what a
+     * broken derivation produces. So the derivation is shown to be able to find a collision:
+     * point a stage's holdout set at its own tuning seed and every one of the fifty overlaps.
+     *
+     * `parse.ts` already refuses this at load, on the same derived-seed comparison; this is that
+     * refusal's premise checked where the judging happens.
+     */
+    const stage = stageAt(0);
+    const collided: CampaignStage = { ...stage, holdoutSeeds: stage.seeds };
+    const tuning = new Set(replicationSeedsOf(collided, 'tuning'));
+    expect(replicationSeedsOf(collided, 'holdout').filter((seed) => tuning.has(seed))).toHaveLength(
+      stage.replications,
+    );
+  });
+
+  it('runs each batch over the set it names', () => {
+    /*
+     * The seam: two disjoint lists are worth nothing if both batches are built from the same one.
+     * Asserted through the shipped constructor, on both sets, over every stage.
+     */
+    for (const stage of campaign.stages) {
+      const tuning = batchRequestForStage(stage, 'collective', undefined, 'tuning');
+      const holdout = batchRequestForStage(stage, 'collective', undefined, 'holdout');
+      /*
+       * Against the **stage's own declared fields**, not against `stageSeedSetOf` — routing both
+       * sides of the assertion through the accessor would make it true of an accessor that
+       * returned the tuning set for both, which is the one regression this case is for.
+       */
+      expect(tuning.seed).toBe(stage.seeds.seed);
+      expect(holdout.seed).toBe(stage.holdoutSeeds.seed);
+      expect(holdout.seed).not.toBe(tuning.seed);
+      // And the two batches differ in the seed and in nothing else.
+      expect({ ...holdout, seed: tuning.seed }).toEqual(tuning);
+      // The default is the batch the player runs, so no caller acquired a holdout by omission.
+      expect(batchRequestForStage(stage, 'collective').seed).toBe(stage.seeds.seed);
+    }
+  });
+
+  it('refuses a second batch that is not the holdout set, naming both seeds', () => {
+    /*
+     * **The mechanism, and the reason the split is a property of the runs rather than of an
+     * argument's name.** A caller that handed `judgeStage` the tuning batch twice would otherwise
+     * clear a stage on the sample it was tuned against while every downstream assertion said it
+     * had been validated. The seed is checked, so that call is refused with both seeds printed.
+     */
+    const stage = stageAt(0);
+    const result = emptyResult(stage);
+    const asTuning: BatchResult = { ...result, seed: stage.seeds.seed };
+    const verdict = judgeStage({
+      stage,
+      published: publishedFor(stage),
+      result,
+      report: batchReport(result),
+      holdout: { result: asTuning, report: batchReport(asTuning) },
+    });
+    expect(verdict.holdout?.held).toBe(false);
+    expect(verdict.holdout?.sentence).toContain(stage.seeds.seed);
+    expect(verdict.holdout?.sentence).toContain(stage.holdoutSeeds.seed);
+    expect(verdict.cleared).toBe(false);
+
+    /*
+     * And a batch that *is* the holdout set is accepted as one, so the check is not refusing
+     * everything: it is judged, and it fails on its goals rather than on its seed.
+     */
+    const asHoldout: BatchResult = { ...result, seed: stage.holdoutSeeds.seed };
+    const judged = judgeStage({
+      stage,
+      published: publishedFor(stage),
+      result,
+      report: batchReport(result),
+      holdout: { result: asHoldout, report: batchReport(asHoldout) },
+    });
+    expect(judged.holdout?.sentence).not.toContain('validates nothing');
+    expect(judged.holdout?.goals.length).toBe(stage.goals.length);
+  });
 });
