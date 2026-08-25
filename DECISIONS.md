@@ -25066,7 +25066,9 @@ the commit that adds it. An issue closed while its entry still stands fails too 
 direction that catches a lane after it lands, and the reason `AGENT_STATUS.md` already says a register
 keeping a closed absence is decoration.
 
-**What was measured.** 26 entries across six registers, **0** naming an issue. The two neighbouring
+**What was measured.** **27** entries across six registers, **0** naming an issue — *26* when the
+audit reported it, and 27 when `buildNotes.test.ts` counted the arrays at runtime rather than
+extracting them from the source text. The corrected figure is the one this decision is about. The two neighbouring
 registers that are empty — `screens.ts#UNBUILT_REASONS` and `honesty.test.ts#OUTSTANDING` — are empty
 because each has a mechanism that made somebody empty it.
 
