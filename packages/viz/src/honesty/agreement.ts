@@ -235,7 +235,11 @@ function hostBindingsFor(view: AgreementView): EverydayHostBindings {
  * The states
  * -------------------------------------------------------------------------- */
 
-/** The days a pair is driven on — the two `surfaces.ts#shiftBundleOf` closes, for the same reason. */
+/**
+ * The days a pair is driven on — the two `surfaces.ts#shiftBundleOf` closes, and for one of its
+ * reasons: two days keep **two points of the bar-hardening ladder** in the corpus, so a pair whose
+ * figure moves with the day is compared at two magnitudes rather than at one.
+ */
 const AGREEMENT_DAYS: readonly number[] = Object.freeze([1, 4]);
 
 /**
@@ -253,7 +257,16 @@ export function agreementViews(
 ): readonly AgreementView[] {
   const base = initialState(resources, BigInt(context.case.simSeed));
   const buildingId = context.case.buildingId;
-  const day = wholeDayFor(resources.trafficProfiles, buildingConfigOf(resources, [], buildingId));
+  /*
+   * Resolved through the state's own saved list rather than through the loaded entries alone, which
+   * is the lookup `runHorizonOf`'s three callers all make. It is `[]` on an `initialState` today,
+   * so the two are the same call — and they must stay the same call, because a harness that looked
+   * the building up differently from the shells would be building a state neither of them is in.
+   */
+  const day = wholeDayFor(
+    resources.trafficProfiles,
+    buildingConfigOf(resources, base.savedBuildings, buildingId),
+  );
   const views: AgreementView[] = [];
   for (const dayNumber of AGREEMENT_DAYS) {
     const state: ViewerState = {
