@@ -16,7 +16,7 @@
  * which is a way of testing the double.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 
 import { issuedChallengeFor } from '../challenge/schedule.js';
 import { challengeScoreOf, type SeedResult } from '../challenge/submission.js';
@@ -57,6 +57,12 @@ async function fixture(): Promise<{
   let clock = 1_770_000_000_000;
   const sql = new PgliteSql();
   const store = await Store.open({ sql, now: () => clock });
+  // Every fixture is a whole PostgreSQL, and this file builds one per test. Closed when the test
+  // finishes rather than at the end of the `it`, so a failing assertion does not leak the instance:
+  // the #254 lane saw three session tests fail once under heavy parallel load with un-closed
+  // instances outstanding and could not reproduce it in six runs, which is what an accumulating
+  // resource looks like from the outside.
+  onTestFinished(async () => store.close());
   const make = async (name: string): Promise<string> => {
     const created = await store.createUser({
       email: `${name}@example.test`,
@@ -603,6 +609,7 @@ async function racedFixture(fires: (text: string) => boolean): Promise<{ store: 
     await store?.deleteUser(ada);
   });
   store = await Store.open({ sql, now: () => 1_770_000_000_000 });
+  onTestFinished(async () => store?.close());
   const created = await store.createUser({
     email: 'raced@example.test',
     displayName: 'Raced',
@@ -682,6 +689,7 @@ async function contendedFixture(options: {
     async () => options.contend(inner),
   );
   const store = await Store.open({ sql, now: () => 1_770_000_000_000 });
+  onTestFinished(async () => store.close());
   const created = await store.createUser({
     email: 'raced@example.test',
     displayName: 'Raced',

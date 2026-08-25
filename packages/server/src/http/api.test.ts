@@ -22,7 +22,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 
 import { runSimulation } from '@elevator-sim/core';
 
@@ -1131,6 +1131,11 @@ async function racedServer(options: {
     now: () => clock,
     mailer: box,
   });
+  // Each of these is a whole in-process PostgreSQL. Registered here rather than left to a trailing
+  // `close()` in the test body, because a failing assertion skips the trailing call and the
+  // instance outlives the run — which is the shape of the flake the #254 lane saw once and could
+  // not reproduce.
+  onTestFinished(async () => (app as Server).close());
   const ask = async (
     method: string,
     path: string,
@@ -1206,7 +1211,6 @@ describe('an account deleted underneath a request that is not a submission', () 
     // A new account, because the old one is gone: the link the player was promised is a link to
     // something that exists.
     expect(String((bodyOf(redeemed)['user'] as Record<string, unknown>)['id'])).not.toBe(id);
-    await raced.app.close();
   }, 60_000);
 
   it('calls a link whose account is gone invalid, rather than already used', async () => {
@@ -1229,7 +1233,6 @@ describe('an account deleted underneath a request that is not a submission', () 
     const response = await raced.ask('POST', '/api/auth/redeem', { body: { token: second } });
     expect(response.status).toBe(400);
     expect(bodyOf(response)['error']).toBe('link-invalid');
-    await raced.app.close();
   }, 60_000);
 
   it('answers a link whose account vanishes at the session write as an invalid link', async () => {
@@ -1250,7 +1253,6 @@ describe('an account deleted underneath a request that is not a submission', () 
     expect(response.status, JSON.stringify(response.body)).toBe(400);
     expect(bodyOf(response)['error']).toBe('link-invalid');
     expect(JSON.stringify(response.body)).not.toMatch(/foreign key|constraint|fkey/u);
-    await raced.app.close();
   }, 60_000);
 });
 
@@ -1284,6 +1286,5 @@ describe('two players reaching for the same name at the same moment', () => {
     expect(response.status, JSON.stringify(response.body)).toBe(409);
     expect(bodyOf(response)['error']).toBe('name-taken');
     expect(JSON.stringify(response.body)).not.toMatch(/duplicate key|constraint|users_display_name/u);
-    await raced.app.close();
   }, 60_000);
 });
