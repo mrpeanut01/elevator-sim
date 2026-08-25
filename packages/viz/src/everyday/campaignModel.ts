@@ -569,6 +569,21 @@ export function calendarView(input: CampaignInput): CalendarView {
   };
 }
 
+/**
+ * The half-sentence after a calendar cell's day number.
+ *
+ * **`works` says the works are booked and stops there — GitHub issue #264.** It used to say *"a car
+ * out of service"*, and no campaign day has ever taken one: `RecordRunOptions.outOfServiceCarIds`
+ * has no writer under `campaign/`, none in any `everyday/campaign*` module, and none in
+ * `everyday/host.ts#runCampaignDay`, which patches the building and the dispatcher and starts the
+ * run. That is the *assertion* half of § D227's class rather than the refusal half, and it is the
+ * worse one: a player who reasons correctly from it attributes a bad day to a missing car instead of
+ * to their dispatcher, which is the diagnosis this game exists to teach.
+ *
+ * Withdrawn rather than hedged. *A car may be out* on a day where none ever is would be the same
+ * claim with more words. What is left is the part `economy.test.ts` and `campaignModel.test.ts`
+ * already hold: the money is gone, and the nights are spoken for.
+ */
 function tipSuffix(mark: CalendarCell['mark']): string {
   switch (mark) {
     case 'today':
@@ -576,7 +591,7 @@ function tipSuffix(mark: CalendarCell['mark']): string {
     case 'due':
       return ' · a decision is due';
     case 'works':
-      return ' · works, a car out of service';
+      return ' · works are booked';
     case 'flagged':
       return ' · a crowd is booked';
     case 'cleared':
@@ -1012,15 +1027,29 @@ export const CONTRACT_COPY = Object.freeze({
   purseKitNote:
     'Kit belongs to the building, so a contract you lose takes it with it — and a tower left as built ' +
     'starts missing days on its own, while one in good condition renews on better terms.',
+  /*
+   * **The second half used to say *"The lift is out for the peak on each of those days"*, and it was
+   * not true of any run — GitHub issue #264.** See {@link tipSuffix} for the mechanism and for why
+   * the sentence is withdrawn rather than hedged. What replaces it is the cost the works genuinely
+   * carry, which is time: the nights are spoken for and the kit is not live until they are done.
+   */
   shopSub:
-    'Pick a level, then pick the nights it goes in on the month above. The lift is out for the peak on ' +
-    'each of those days.',
+    'Pick a level, then pick the nights it goes in on the month above. Those nights are spoken for — ' +
+    'nothing else can go in on them, and the kit is live the day after the last.',
   termsHeading: 'What clears the week',
   shaftHeading: 'The shaft decision',
+  /*
+   * *"You hand back two cars for eight days you still have to clear"* went the same way and for the
+   * same reason (issue #264). It was the most expensive instance of the claim rather than the most
+   * visible: § 8.4's whole decision is priced off it, so a player reasoning correctly from a cost
+   * the run does not charge declines the purchase the month is built around. The trade that is
+   * actually modelled is the one left standing — eight of the twenty days gone before the kit is
+   * live, so buying late buys nothing.
+   */
   shaftBody:
-    'A fourth car is 34 units and eight nights. Buy it in week two and you hand back two cars for eight ' +
-    'days you still have to clear, in exchange for a fortnight of a building that finally works. Buy it ' +
-    'in week four and you have paid for something you never get to use.',
+    'A fourth car is 34 units and eight nights. Buy it in week two and it is live with a fortnight ' +
+    'left to use it, which is what pays for the eight days it takes to go in. Buy it in week four ' +
+    'and you have paid for something you never get to use.',
   shaftBody2:
     'The alternative is four cheap things that each shave a second. They will out-perform the shaft this ' +
     'month and leave the building exactly as short as it was.',
@@ -1031,11 +1060,11 @@ export const CONTRACT_COPY = Object.freeze({
   cancel: 'cancel',
 } as const);
 
-/** § 8.3's month-grid legend. */
+/** § 8.3's month-grid legend. The `⚒` entry says *booked*, never *a car out* — issue #264. */
 export const MONTH_LEGEND: readonly string[] = Object.freeze([
   'cleared',
   'missed',
-  'works, a car out',
+  'works booked',
   'to come',
 ]);
 
@@ -1224,12 +1253,17 @@ export function contractView(input: CampaignInput): ContractView | undefined {
               : state === 'bookable'
                 ? '+'
                 : '';
+    /*
+     * Neither arm claims a car — issue #264, and {@link tipSuffix} carries the argument. The offer
+     * arm names the day the kit goes live instead, which is `worksDayLine`'s own arithmetic and the
+     * thing a player is actually choosing between when they pick one night over another.
+     */
     const tip =
       state === 'bookable' && pendingTier !== undefined
-        ? `book ${pendingTier.name} — ${String(pendingTier.nights)} ${pendingTier.nights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, a car out for each following peak`
+        ? `book ${pendingTier.name} — ${String(pendingTier.nights)} ${pendingTier.nights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, live on day ${String(index + 1 + pendingTier.nights)}`
         : `day ${String(index + 1)}${
             state === 'works'
-              ? ' · works, a car out of service'
+              ? ' · works are booked'
               : state === 'missed'
                 ? ' · missed'
                 : state === 'cleared'
@@ -1276,13 +1310,20 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       prompt:
         pendingTier === undefined
           ? undefined
-          : `Pick the night ${pendingTier.name} goes in. ${String(pendingTier.nights)} ${pendingTier.nights === 1 ? 'night' : 'nights'} of works, and a car is out for the peak on each of those days.`,
+          : `Pick the night ${pendingTier.name} goes in. ${String(pendingTier.nights)} ${pendingTier.nights === 1 ? 'night' : 'nights'} of works, and it is live the day after the last of them.`,
       cancel: CONTRACT_COPY.cancel,
       booked,
+      /*
+       * **The absence is stated here, where the player meets the cost — issue #264.** This line
+       * used to read *"N peaks run a car short"*, which was the claim's most concrete form: a count
+       * of peaks, each said to be a car down, on days that run with every lift. The count is real
+       * and the money is real; the car is not, and § D227's first direction — *a control that
+       * writes nothing must say so* — is why the sentence says so rather than going quiet.
+       */
       worksCost:
         worksDays.length === 0
           ? undefined
-          : `${String(worksDays.length)} ${worksDays.length === 1 ? 'peak runs' : 'peaks run'} a car short, for ${String(committedUnits(tower))} units of kit that stays with the building.`,
+          : `${String(worksDays.length)} ${worksDays.length === 1 ? 'night' : 'nights'} of works booked, for ${String(committedUnits(tower))} units of kit that stays with the building. The works take no car out of service — a booking moves the purse and this grid, not the day you run.`,
       legend: MONTH_LEGEND,
     },
     purse: {
