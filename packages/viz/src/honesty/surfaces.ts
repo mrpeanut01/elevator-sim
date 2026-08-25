@@ -122,6 +122,7 @@ import {
   RUSH_PRIMARY_REFUSAL,
   RUSH_SCREEN_COPY,
   rushBandViews,
+  rushBarModel,
   rushDrivingLine,
   rushFactViews,
   rushGeneratedRangeLine,
@@ -7497,6 +7498,14 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * drawn once, somewhere a reader goes looking.
      */
     'everyday/rushScreenModel.ts#RUSH_PRIMARY_REFUSAL',
+    /*
+     * The § 3.3 refinement itself, which this adapter's docstring has claimed to drive since it was
+     * written and did not: while `BarPrimary.inert` was a `boolean` the refinement produced no text
+     * at all, so the derivation never found it and the claim cost nothing. GitHub issue #262 moved
+     * the refusal *onto* the cell the shell draws, which makes the refinement a text producer — so
+     * the sentence is now true, and it is checked.
+     */
+    'everyday/rushScreenModel.ts#rushBarModel',
     'everyday/rushScreenModel.ts#RUSH_BANDS',
     'everyday/rushScreenModel.ts#RUSH_BESTS',
     'everyday/rushScreenModel.ts#rushBandViews',
@@ -7538,6 +7547,17 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       });
     }
     seeds.push({ field: 'rush.primary.refusal', text: RUSH_PRIMARY_REFUSAL, role: 'reason' });
+    /*
+     * The resolved § 3.3 row, as the shell draws it. The reason and the label are seeded from the
+     * refinement rather than from the constant beside it, so a lane that marks this primary dead
+     * with some other sentence is swept on the commit that does it.
+     */
+    {
+      const bar = rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' }));
+      seeds.push({ field: 'rush.bar.primary', text: bar.primary.label, role: 'label' });
+      seeds.push({ field: 'rush.bar.primary.inert', text: bar.primary.inert ?? '', role: 'reason' });
+      seeds.push({ field: 'rush.bar.note', text: bar.note ?? '', role: 'prose' });
+    }
     seeds.push({ field: 'rush.holdLine.figure', text: rushHoldLineFigure(), role: 'label' });
     seeds.push({ field: 'rush.generated', text: rushGeneratedRangeLine(), role: 'prose' });
     seeds.push({ field: 'rush.opening', text: rushOpeningLine(), role: 'prose' });

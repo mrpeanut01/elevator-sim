@@ -187,7 +187,13 @@ describe('what the screen refuses, and where the refusal sits', () => {
   it('marks the § 3.3 primary inert and leaves every other cell the table’s', () => {
     const base = actionBarFor({ screen: 'rush', ctx: 'rush' });
     const refined = rushBarModel(base);
-    expect(refined.primary.inert).toBe(true);
+    /*
+     * **The reason is the cell, and the table's note is left alone.** `shell.ts#drawBar` draws an
+     * inert primary's own sentence *in place of* the note, so this refinement does not have to
+     * overwrite § 3.3's cell to stop *"Nothing to set up. It ends when it ends."* appearing beside
+     * a dead button — which is what GitHub issue #262 measured on the deployed build.
+     */
+    expect(refined.primary.inert).toBe(RUSH_PRIMARY_REFUSAL);
     expect(refined.primary.label).toBe(base.primary.label);
     expect(refined.note).toBe(base.note);
     expect(refined.leave).toEqual(base.leave);

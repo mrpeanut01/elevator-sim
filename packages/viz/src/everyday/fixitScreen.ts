@@ -525,6 +525,14 @@ function mountFixit(
     button.setAttribute('aria-pressed', spec.selected ? 'true' : 'false');
     button.disabled = !spec.selectable;
     const refused = !spec.selectable;
+    /*
+     * The reason on the control, and it is the row's **own** state line rather than a second
+     * sentence: a refused row already says `short by 4 u` under its name, so a new string here
+     * would be a second place for the same fact to go stale (§ D227). What this adds is that the
+     * fact is reachable from the button as a button — GitHub issue #262's rule applied to the one
+     * remaining dead control in this shell that had no `title`.
+     */
+    if (refused) button.title = spec.stateLine;
     button.style.cssText = [
       'text-align:left',
       `cursor:${refused ? 'not-allowed' : 'pointer'}`,
@@ -606,13 +614,23 @@ function mountFixit(
       line.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap';
       const minus = el(doc, 'button', 'everyday-fixit-step-down', '−');
       const plus = el(doc, 'button', 'everyday-fixit-step-up', '+');
-      for (const [button, enabled, label] of [
-        [minus, row.canStepDown, COPY.stepDown],
-        [plus, !row.atBudget, COPY.stepUp],
+      /*
+       * The fourth cell is **why the step refuses**, and it is separate from the third on purpose:
+       * `aria-label` names what the control would do (*Rated speed — return one step*) and a
+       * player looking at a grey button is asking why it will not. Before GitHub issue #262's
+       * sweep both `−` buttons shipped dead with the first sentence and not the second — measured
+       * on the shipped build, three of this screen's forty-one buttons were disabled and none of
+       * them said why. The budget cap has a sentence on the row already (§ 10.3's `at the budget`);
+       * this puts it on the control too, which is where it is pressed.
+       */
+      for (const [button, enabled, label, why] of [
+        [minus, row.canStepDown, COPY.stepDown, COPY.nothingToReturn],
+        [plus, !row.atBudget, COPY.stepUp, COPY.noBudgetLeft],
       ] as const) {
         button.type = 'button';
         button.setAttribute('aria-label', `${row.label} — ${label}`);
         button.disabled = !enabled;
+        if (!enabled) button.title = why;
         button.style.cssText = [
           'width:26px',
           'height:24px',

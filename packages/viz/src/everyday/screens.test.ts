@@ -222,6 +222,42 @@ describe('the router', () => {
     }
   });
 
+  it('never resolves a dead primary without a reason on it — over the whole registry', () => {
+    /*
+     * **GitHub issue #262's defect, made unrepresentable and then checked anyway.**
+     *
+     * `BarPrimary.inert` used to be a `boolean`, and the eight sites that set it split evenly:
+     * four happened to put a reason in the row's `note`, four left § 3.3's table cell in place. On
+     * the Endless rush setup that cell reads *"Nothing to set up. It ends when it ends."*, which
+     * beside a button nobody can press reads as confirmation — and the sentence that explained the
+     * refusal was 184 px below the fold at 1280 × 720.
+     *
+     * The type now carries the sentence, so the reasonless state cannot be constructed. This case
+     * is the half a type cannot do: it asks the **registry** for every screen's resolved row in
+     * every run context, and requires a dead primary's reason to be a sentence rather than a
+     * space, a repeat of the label it sits on, or an unsubstituted `⟨…⟩` marker. A screen
+     * registered tomorrow with a dead primary and a blank reason fails here on the commit that
+     * registers it.
+     *
+     * The refinements are asked without a mount, which is deliberate rather than a limitation:
+     * unmounted is the state in which a screen has the *least* to say, and it is exactly where the
+     * campaign, bench and fixit rows used to go dead in silence.
+     */
+    for (const screen of EVERYDAY_SCREENS) {
+      const module = screenModuleFor(screen);
+      for (const ctx of RUN_CONTEXTS) {
+        const model = module?.bar?.({ screen, ctx }) ?? actionBarFor({ screen, ctx });
+        const reason = model.primary.inert;
+        if (reason === undefined) continue;
+        const where = `${screen} · ${ctx}`;
+        expect(reason.trim(), `${where}: a dead primary with a blank reason`).not.toBe('');
+        expect(reason.trim().length, `${where}: the reason is not a sentence`).toBeGreaterThan(10);
+        expect(reason, `${where}: the reason only repeats the label`).not.toBe(model.primary.label);
+        expect(/[⟨⟩]/.test(reason), `${where}: the reason draws a placeholder`).toBe(false);
+      }
+    }
+  });
+
   it('names every screen for a heading, in § 4’s words', () => {
     for (const screen of EVERYDAY_SCREENS) {
       expect(SCREEN_NAMES[screen].trim(), screen).not.toBe('');

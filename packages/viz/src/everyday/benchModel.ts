@@ -76,6 +76,12 @@ export const BENCH_COPY = Object.freeze({
     'have no measured operating point in this build, so they are not offered. An invented one ' +
     'would be a test whose answer nobody has checked.',
   noTests: 'No tests ticked. Pick at least one.',
+  /**
+   * Why the § 3.3 primary cannot be pressed while the suite is in flight — `BarPrimary.inert`'s
+   * sentence, not a status line. The matrix's own cells report progress; this answers the other
+   * question a dead button raises (GitHub issue #262).
+   */
+  runningSuite: 'The suite is running. Every cell finishes before another can start.',
   repsHeading: 'DAYS PER DISPATCHER, PER TEST',
   /** §12.1's honest note about the low end. Drawn whenever the chosen budget is under thirty. */
   repsBelowThirty:

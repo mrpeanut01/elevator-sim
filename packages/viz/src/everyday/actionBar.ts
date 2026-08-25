@@ -93,13 +93,27 @@ export interface BarPrimary {
   readonly variants: readonly string[];
   readonly dangerVariants?: readonly string[];
   /**
-   * Resolved-state inertness: the primary genuinely cannot act right now, and the shell draws it
-   * disabled. **Never authored in {@link ACTION_BAR_ROWS}** — § 3.3 has no inert primary cell —
-   * it is set only by a screen's `bar()` refinement for a state the table cannot know, e.g. the
-   * fixit screen's synchronous pair mid-run (`everyday/fixitScreenModel.ts#fixitBarModel`).
-   * Absent means pressable.
+   * Resolved-state inertness — **and the reason, in the same field**. Present means the primary
+   * genuinely cannot act right now and this sentence says why; absent means pressable.
+   *
+   * **It carries the reason rather than a `true` because a dead button with no reason is the
+   * defect this field kept producing.** GitHub issue #262 measured the Endless rush setup screen
+   * on the deployed build: the primary drawn at full amber, `title: null`,
+   * `aria-describedby: null`, the note beside it reading *"Nothing to set up. It ends when it
+   * ends."* — which next to a dead button reads as confirmation — and the one sentence that
+   * explained it 184 px below the fold at 1280 × 720. Four of the eight sites that set this field
+   * happened to put a reason in the row's `note`; four did not, and nothing could tell them apart
+   * because `true` says nothing. A `string` makes the reasonless state unrepresentable, and
+   * `shell.ts#drawBar` draws it in the pinned bar — which is above the fold at every height by
+   * construction — and points the control at it with `title` and `aria-describedby`.
+   *
+   * **Never authored in {@link ACTION_BAR_ROWS}** — § 3.3 has no inert primary cell — it is set
+   * only by a screen's `bar()` refinement for a state the table cannot know, e.g. the fixit
+   * screen's synchronous pair mid-run (`everyday/fixitScreenModel.ts#fixitBarModel`).
+   * `screens.test.ts` asserts over the registry that every resolved inert primary carries a
+   * non-empty sentence, so a screen registered tomorrow fails on the commit that registers it.
    */
-  readonly inert?: boolean | undefined;
+  readonly inert?: string | undefined;
 }
 
 /** The § 3.3 row, resolved for a state and ready to draw. */

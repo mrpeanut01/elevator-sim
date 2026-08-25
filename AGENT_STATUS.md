@@ -449,6 +449,24 @@ Named on screen in the products' own registers rather than only here:
 - **No rush engine.** No demand template ramps without a ceiling, so § 9's climbing stream cannot be
   generated; the setup screen's primary is inert with the reason on the control, and § 9.3's result
   screen is deliberately unbuilt rather than printing invented figures.
+
+  **That sentence was false for as long as it has stood here, and it is true as of GitHub issue
+  #262's fix rather than corrected into something smaller.** The reason was on the *screen* — a
+  paragraph 184 px below the fold at 1280 × 720 — and on no control: the primary carried
+  `title: null`, `aria-describedby: null`, full primary amber at `opacity: .6`, and the note beside
+  it read *"Nothing to set up. It ends when it ends."*, which next to a dead button reads as
+  confirmation. It is recorded rather than quietly reworded because this register is where a reader
+  goes to find out whether the screen is honest, and a claim that was aspirational for four waves is
+  worth more as a caught one than as a tidy one.
+
+  **The class was eight sites wide, not one.** `BarPrimary.inert` was a `boolean`, so four of the
+  eight `bar()` refinements that set it happened to put a reason in the row's note and four did not,
+  and nothing could tell them apart. The field now carries the sentence, which makes the reasonless
+  state unrepresentable; `shell.ts#drawBar` draws it in the **pinned** bar — above the fold at every
+  height by construction — and binds it to the button with `title` and `aria-describedby`;
+  `screens.test.ts` asserts it over the whole registry, so a screen registered tomorrow fails on the
+  commit that registers it. The bench's bar gained a reason it never had: its `mountedBench` handle
+  carried a `ready` bit, and now carries `benchFieldRefusal`/`benchTestsRefusal`'s own sentence.
 - **The daily board needs a server.** The ladder beside it is live because a rating is measured on
   this device; the board's tab carries § 12.2's labelled unavailable state.
 - **No campaign day is filed yet** from § 8's screens — running one is wired end to end, but marking

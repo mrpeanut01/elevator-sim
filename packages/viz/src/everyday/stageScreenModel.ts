@@ -718,7 +718,7 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
   if (refusal === undefined) return base;
   return {
     ...base,
-    primary: { ...base.primary, inert: true },
+    primary: { ...base.primary, inert: refusal },
     note: refusal,
   };
 }

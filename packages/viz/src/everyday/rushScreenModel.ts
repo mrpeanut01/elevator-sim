@@ -525,5 +525,5 @@ export function rushDrivingLine(name: string): string {
  * never had it.
  */
 export function rushBarModel(base: ActionBarModel): ActionBarModel {
-  return { ...base, primary: { ...base.primary, inert: true } };
+  return { ...base, primary: { ...base.primary, inert: RUSH_PRIMARY_REFUSAL } };
 }
