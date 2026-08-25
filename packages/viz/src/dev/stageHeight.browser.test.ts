@@ -29,7 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { MIN_FOOTER_PX, MIN_HEADER_PX } from '../render/layout.js';
 
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage } from './browserTier.test-helper.js';
 
 /**
  * The smallest floor pitch worth calling legible, in canvas pixels — the same **12 px** that
@@ -93,7 +93,7 @@ async function measureStage(
 }
 
 async function loadAt(width: number, height: number): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width, height } });
+  const page = await openPage(browser, { viewport: { width, height } });
   // Midtown by deep link, fixed seed: the tallest shipped tower, and the audit's own building.
   await page.goto(`${origin}/?building=midtown-office&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(

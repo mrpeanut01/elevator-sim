@@ -47,7 +47,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * registered project is wholly gated by asking which project's every file imports that module, and
  * turns an unexpectedly gated tier in CI into a red run.
  */
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, reopenEngineerMenu } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -110,9 +110,16 @@ afterAll(async () => {
   await server?.close();
 });
 
-/** Everything the page said or threw, so a failure names the cause rather than the symptom. */
+/**
+ * Everything the page said, so a failure names the cause rather than the symptom.
+ *
+ * **What it no longer carries is what the page *threw*.** This file held the tier's first
+ * page-error collector and one of only three; `openPage` and `browserTier.test-helper.ts`'s hooks
+ * now watch every page of every file, on the same channel and the same window, and
+ * `browserTier.test.ts` forbids a file declaring a second — GitHub issue #268. The console stays
+ * here, because it is a different channel and only this file reads it.
+ */
 interface Loaded {
-  readonly errors: readonly string[];
   readonly consoleErrors: readonly string[];
   readonly painted: boolean;
   readonly distinctColours: number;
@@ -143,10 +150,8 @@ interface Loaded {
 }
 
 async function load(): Promise<Loaded> {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  const errors: string[] = [];
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
   const consoleErrors: string[] = [];
-  page.on('pageerror', (error: Error) => errors.push(`${error.name}: ${error.message}`));
   page.on('console', (message: ConsoleMessage) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
@@ -213,7 +218,6 @@ async function load(): Promise<Loaded> {
   );
   await page.close();
   return {
-    errors,
     consoleErrors,
     painted: measured.painted,
     distinctColours: measured.distinct,
@@ -230,13 +234,6 @@ describe.skipIf(!HAS_BROWSER)('the viewer boots', () => {
     loaded = await load();
   }, 120_000);
 
-  it('throws nothing on the load path', () => {
-    // The obvious assertion, and **not** the one that catches the defect this tier exists for —
-    // see the next test. Kept because a throw that escapes `main()`'s handler would surface here
-    // and nowhere else.
-    expect(loaded.errors, 'the page threw while loading').toEqual([]);
-  });
-
   it('draws the stage', () => {
     /*
      * § D220 § 5 clause 1, and **the assertion that does the work** — watched failing by putting
@@ -245,11 +242,18 @@ describe.skipIf(!HAS_BROWSER)('the viewer boots', () => {
      *     × draws the stage
      *       AssertionError: the stage canvas is one flat colour (1)
      *
-     * The measurement that surprised me: *throws nothing on the load path* **still passed**. The
-     * `ReferenceError` never reaches the page, because `main()`'s own last-resort handler catches
-     * it and writes a sentence into `#status`. So a browser tier built around uncaught errors would
-     * have been green over the same dead product the node suite was green over — the error handling
-     * is *good*, and it is precisely what hides the failure from an error-shaped check.
+     * The measurement that surprised me: *throws nothing on the load path* — this file's own
+     * page-error case, which stood here until GitHub issue #268 replaced it with a gate over the
+     * whole tier — **still passed**. The `ReferenceError` never reaches the page, because `main()`'s
+     * own last-resort handler catches it and writes a sentence into `#status`. So a browser tier
+     * built around uncaught errors would have been green over the same dead product the node suite
+     * was green over — the error handling is *good*, and it is precisely what hides the failure from
+     * an error-shaped check.
+     *
+     * **That measurement is now the tier-wide gate's caveat**, and it is written out in full where
+     * that gate lives (`browserTier.test-helper.ts`) rather than only here, because a caveat one
+     * file away from the check it qualifies is a caveat nobody meets. The gate adds real signal and
+     * is not a health check: a page that fails quietly by design passes it.
      *
      * That is the argument for reading the bitmap rather than the console: the only thing a caught
      * boot failure cannot fake is a drawn frame.
@@ -260,13 +264,15 @@ describe.skipIf(!HAS_BROWSER)('the viewer boots', () => {
 
   it('does not report that it failed to start', () => {
     // `main()`'s last-resort handler prepends this. It is the sentence a reader saw instead of the
-    // product, so it is asserted by its own words rather than only through the throw above.
+    // product, so it is asserted by its own words rather than only through a throw — which, as the
+    // case above records, that handler is precisely what stops from ever arriving.
     expect(loaded.status).not.toContain('The viewer did not start');
   });
 
   it('logs no console error', () => {
     // Weaker than the throw and worth keeping separate: a failed `fetch` of `data/` is reported here
-    // and not as a page error, and it is the other way this page dies without an exception.
+    // and not as a page error, and it is the other way this page dies without an exception. The
+    // tier's shared gate (GitHub issue #268) reads `pageerror` only, so this channel stays here.
     expect(loaded.consoleErrors).toEqual([]);
   });
 

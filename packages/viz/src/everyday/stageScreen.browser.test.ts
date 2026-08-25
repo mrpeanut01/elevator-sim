@@ -54,6 +54,7 @@ import {
   CHROMIUM,
   HAS_BROWSER,
   enterEverydayStage,
+  openPage,
 } from '../dev/browserTier.test-helper.js';
 import { ACTION_BAR_ROWS } from './actionBar.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
@@ -116,7 +117,7 @@ afterAll(async () => {
  * that does not care takes the default, which is what they all took before it was a parameter.
  */
 async function coldLoad(buildingId = 'garden-apartments'): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
   await page.goto(`${origin}?building=${buildingId}&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,

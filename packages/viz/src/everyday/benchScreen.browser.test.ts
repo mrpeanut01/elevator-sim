@@ -22,7 +22,7 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CHROMIUM, HAS_BROWSER } from '../dev/browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, openPage } from '../dev/browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -48,7 +48,7 @@ afterAll(async () => {
 });
 
 async function openBench(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
