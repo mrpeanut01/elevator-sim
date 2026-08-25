@@ -671,35 +671,21 @@ describe('a works day takes no car out of service (issue #264)', () => {
     }
   });
 
-  it('registers the one sibling sentence this lane does not own', () => {
-    /*
-     * `campaign/economy.ts`'s shop tier prose makes the same claim — *"Eight nights with two cars
-     * out."* on `shafts` level 1 — and lives one directory over, in the package this lane owns only
-     * if the works day needs a **writer** there. It does not; it needs the same withdrawal.
-     *
-     * A ghost check in both directions, `honesty.test.ts`'s `OUTSTANDING` shape: it fails when the
-     * sentence is fixed, because a registered finding that has been fixed must stop being
-     * registered or the register becomes decoration — and it fails if a second tier acquires the
-     * claim, because a register that only knows about the instance it was written for is a list.
-     *
-     * **The sentence is matched exactly rather than by {@link CAR_IS_AWAY}, and that is a finding
-     * rather than a preference.** A first draft used the pattern and stayed green with *"Eight
-     * nights with two cars out."* deleted, because the tier's **other** sentence — *"The tower
-     * stops being one car short."* — matches it too. That one is a different claim about a
-     * different moment (what the building is like once the kit is in, GitHub issue #181's subject,
-     * not this one's), and a register that cannot tell them apart cannot be closed by fixing
-     * either.
-     */
-    const shafts = SHOP.find((category) => category.id === 'shafts')!;
-    const fourth = shafts.tiers.find((tier) => tier.name === 'A fourth car')!;
-    expect(
-      fourth.effect,
-      'campaign/economy.ts no longer claims a works day takes a car out — delete this register entry',
-    ).toContain('Eight nights with two cars out.');
-    expect(
-      shafts.tiers.filter((tier) => tier.effect.includes('cars out')).map((tier) => tier.name),
-      'a second shop tier has acquired the works-day claim — register it or withdraw it',
-    ).toEqual(['A fourth car']);
-  });
+  /*
+   * **The register entry that stood here is deleted — GitHub issue #272.**
+   *
+   * It held `campaign/economy.ts`'s `shafts` level 1, whose prose made this same claim one directory
+   * over: *"Eight nights with two cars out."* The lane that found it could not fix it and registered
+   * it instead, with a ghost check failing in both directions — when the sentence was fixed, and
+   * when a second tier acquired it.
+   *
+   * The sentence is withdrawn and the entry is gone with it, because **a registered finding that
+   * has been fixed must stop being registered or the register becomes decoration.** What replaced
+   * it is not a second register but a sweep: `campaign/economy.test.ts` § *no shop tier promises a
+   * car the works never take* reads every tier of every category, so the next line copied out of the
+   * design handoff by hand fails there rather than being noticed by somebody. The check above — the
+   * one that says nothing under `campaign/` or `everyday/campaign*` writes `outOfServiceCarIds` — is
+   * still what decides whether either sentence may come back.
+   */
 });
 
