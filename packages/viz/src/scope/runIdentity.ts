@@ -414,17 +414,37 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
      * cars, which is what lets this stop one step short of rebuilding the run plan.
      */
     const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+    const building =
+      authored === undefined
+        ? undefined
+        : commissionedBuilding(
+            authored,
+            state.commissioning,
+            commissionableClasses(specsWithSaved(resources, state.savedClasses)),
+          );
+    /*
+     * **And the cars today has already taken go in with them — GitHub issue #272.** This call used
+     * to pass no `spokenForCarIds`, which was correct only because `shiftRunConfigOf` passed a set
+     * that was always empty: every shipped event declares `carsOutOfService: 0`, so the two
+     * reservations agreed by accident. The run's set now carries the day's *incident* cars and the
+     * player's holds as well, and without this line the ask reserved a car the patch had stepped
+     * past — `garden-apartments` / `moving-week`, whose two-car bank has `move-in`'s derate standing
+     * on its only spare, so the caption reserved none and this printed *"reserves at least one car
+     * out of passenger service"* about it. Six cells over the whole shipped space, and issue #264's
+     * own shape arriving through a second door.
+     *
+     * The **event** rather than a set of ids built here, because a second site answering *which
+     * cars are taken?* is what produced the defect in the first place. `calendarAsks` derives it
+     * from `events.ts#eventCarChoice` — the same function `shiftRunPatch` uses — so the ask and the
+     * patch cannot pick differently, and this predicate still needs nothing it did not already have:
+     * no traffic profile, no demand base, no resolved fabric.
+     */
     const clauses = calendarAsks({
       day: today,
       ...calendarAskInputOf(resources, state, authored),
-      building:
-        authored === undefined
-          ? undefined
-          : commissionedBuilding(
-              authored,
-              state.commissioning,
-              commissionableClasses(specsWithSaved(resources, state.savedClasses)),
-            ),
+      building,
+      event: scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx),
+      playerHeldCarIds: state.outOfServiceCarIds,
     })
       .map((ask) => askClause(ask, today.shift))
       .filter((clause): clause is string => clause !== null);

@@ -52,6 +52,7 @@ import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
 import { commissionedBuilding } from '../commissioning/building.js';
 import { commissionableClasses } from '../commissioning/types.js';
 import { recordRun } from '../record/recordRun.js';
+import { runIdentityIssues } from '../scope/runIdentity.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 
@@ -155,12 +156,14 @@ function planWith(state: ViewerState, period: CalendarPeriod | null): Plan {
     templateVariesMix: template === 'lunch-two-way',
   });
 
-  const spokenForCarIds = [
-    ...state.outOfServiceCarIds,
-    ...patch.outOfServiceCarIds,
-    ...patch.incidents.map((incident) => `${incident.car.bankId}-${incident.car.carId}`),
-  ];
-
+  /*
+   * **The event and the player's holds, exactly as `shiftRunConfigOf` passes them — GitHub issue
+   * #272.** This harness used to build the spoken-for list itself, out of three spread elements, and
+   * the list it built was **correct** while `shiftRunConfigOf`'s was not. A harness that builds a
+   * better input than the product does is not a stricter test, it is a test of something else — and
+   * the one assertion that would have caught it ran only with no period at all. Neither builds a
+   * list now; `calendarPatch` derives it.
+   */
   const calendar = calendarPatch({
     day: calendarDay,
     building: grown,
@@ -168,7 +171,8 @@ function planWith(state: ViewerState, period: CalendarPeriod | null): Plan {
     demandTemplateId: template,
     demandTemplates: RESOURCES.trafficProfiles.demandTemplates,
     runLengthS: state.shiftLengthS,
-    spokenForCarIds,
+    event,
+    playerHeldCarIds: state.outOfServiceCarIds,
   });
 
   const withEvents = withIncidents(calendar.building, patch.incidents, state.shiftLengthS);
@@ -242,6 +246,47 @@ describe('the instrument reproduces the builder it stands in for', () => {
       recordRun(shipped.config, { recordDecisions: false, outOfServiceCarIds: shipped.outOfServiceCarIds }),
     );
     expect(controlLegs(state)).toBe(direct);
+  });
+
+  /**
+   * **The same assertion with a period on the state, over every shipped period — GitHub issue #272.**
+   *
+   * The one above is the only place the harness and `shiftRunConfigOf` were ever compared, and it
+   * ran with `state.calendar === null`. So it compared the two builders on the one input for which
+   * the calendar contributes nothing, and every period below was measured by the harness alone.
+   * `RISKS.md` R26 in one sentence: a suite built from fixtures cannot tell *the mechanism is
+   * correct* from *the mechanism is reached*.
+   *
+   * What it missed was a whole ask. `shiftRunConfigOf` handed `calendarPatch`
+   * `spokenForCarIds: patch.outOfServiceCarIds` — always `[]`, because every shipped event declares
+   * `carsOutOfService: 0` — while {@link planWith} built the set the field's own docstring
+   * describes, the whole-shift holds **and** the incident cars. On `moving-week` day 1 the two
+   * therefore reserved different cars: the harness reserved `main-C`, the product reserved `main-D`,
+   * which is the very car `move-in`'s derate stands down and hands back at 1 200 s of an 1 800 s
+   * shift.
+   *
+   * The period goes on the **state** here rather than only into the harness, because that is the
+   * only way the shipped builder ever sees one: `planWith` reads `shiftRunConfigOf` for everything
+   * the calendar cannot touch and applies the period itself, so a period passed to it alone never
+   * reaches the code under test.
+   */
+  it('with a period on the state, produces exactly the run shiftRunConfigOf produces', () => {
+    for (const id of CALENDAR_PERIOD_IDS) {
+      const period = periodOnDays(CALENDAR_PERIODS[id], 1, 7);
+      const state = monday();
+      const shipped = shiftRunConfigOf(RESOURCES, { ...state, calendar: period });
+      const direct = legsOfRun(
+        recordRun(shipped.config, {
+          recordDecisions: false,
+          outOfServiceCarIds: shipped.outOfServiceCarIds,
+        }),
+      );
+      // The cars first, because that is the axis that drifted and a leg diff does not name it.
+      expect(planWith(state, period).outOfServiceCarIds, `${id}: cars`).toEqual(
+        shipped.outOfServiceCarIds,
+      );
+      expect(legsWith(state, period), `${id}: legs`).toBe(direct);
+    }
   });
 
   it('measures a day whose own scheduled event changes nothing', () => {
@@ -640,13 +685,19 @@ describe('what a period will not do', () => {
       demandTemplateId: 'rise-and-fall',
       demandTemplates: RESOURCES.trafficProfiles.demandTemplates,
       runLengthS: 1800,
-      spokenForCarIds: ['main-B', 'main-C', 'main-D'],
+      // Three of the four already held by the player, so there is no fourth to reserve.
+      playerHeldCarIds: ['main-B', 'main-C', 'main-D'],
     });
     expect(patch.outOfServiceCarIds).toEqual([]);
     expect(patch.withheld[0] ?? '').toContain('could reserve 0');
   });
 
-  it('steps over a car another part of the day has taken', () => {
+  it('steps over the car the day’s own event has taken', () => {
+    /*
+     * `move-in` stands one car down for the first two thirds of the shift, and `carsToDerate` picks
+     * `main-D` by the same total order the reservation uses. The period must reserve the next one
+     * down — anything else is a car the incident's return event hands back to passengers mid-shift.
+     */
     const day = calendarDayFor(CALENDAR_PERIODS['moving-week'], 1, 0);
     const patch = calendarPatch({
       day,
@@ -655,10 +706,112 @@ describe('what a period will not do', () => {
       demandTemplateId: 'rise-and-fall',
       demandTemplates: RESOURCES.trafficProfiles.demandTemplates,
       runLengthS: 1800,
-      spokenForCarIds: ['main-D'],
+      event: SHIFT_EVENTS['move-in'],
     });
     expect(patch.outOfServiceCarIds).toEqual(['main-C']);
     expect(patch.withheld).toEqual([]);
+  });
+
+  it('reserves the same car the event leaves alone, and says so on the ordinary day', () => {
+    // The negative control for the assertion above: with no event taking a car, the period reserves
+    // the first one the order offers. Without this, `main-C` above could be the only answer this
+    // function ever gives.
+    const day = calendarDayFor(CALENDAR_PERIODS['moving-week'], 1, 0);
+    const patch = calendarPatch({
+      day,
+      building: building(),
+      split: office,
+      demandTemplateId: 'rise-and-fall',
+      demandTemplates: RESOURCES.trafficProfiles.demandTemplates,
+      runLengthS: 1800,
+      event: SHIFT_EVENTS.ordinary,
+    });
+    expect(patch.outOfServiceCarIds).toEqual(['main-D']);
+    expect(patch.withheld).toEqual([]);
+  });
+
+  /**
+   * **The same claim, on the shipped builder rather than on `calendarPatch` — GitHub issue #272.**
+   *
+   * The assertion above is the mechanism and it has been correct since it was written. What was
+   * never tested is whether the product reaches it: `shiftRunConfigOf` passed
+   * `spokenForCarIds: patch.outOfServiceCarIds`, which is `[]` on every day this build can produce,
+   * so the reservation and `move-in`'s derate both picked `main-D` by the same total order.
+   *
+   * Measured before the fix, on `midtown-office` / `moving-week` / day 1 / 1 800 s:
+   *
+   * ```
+   * outOfServiceCarIds: ["main-D"]
+   * serviceEvents:      [{atS: 0, main-D, out-of-service}, {atS: 1200, main-D, in-service}]
+   * calendarLine:       "Moving week · Monday — mix toward floor-to-floor, 1 car reserved"
+   * main-D: 114 legs, first boardedAt 1207.5 s
+   * ```
+   *
+   * A hundred and fourteen passengers rode the car the caption says the movers have all day.
+   *
+   * Asserted three ways, because two of them are documents and only the third is the run: no
+   * `in-service` event may name a reserved car, no leg may be carried by one, and the caption has to
+   * be making the claim in the first place — a version of this test whose period reserved nothing
+   * would pass by saying nothing, which is § D163's *description rather than a gate*.
+   */
+  it('does not hand a reserved car back to passengers mid-shift', () => {
+    const state = {
+      ...monday(),
+      calendar: periodOnDays(CALENDAR_PERIODS['moving-week'], 1, 7),
+    };
+    const shipped = shiftRunConfigOf(RESOURCES, state);
+
+    // The caption makes the claim, and the incident is really scheduled. Without both, the rest is
+    // vacuous.
+    expect(shipped.calendarLine).toContain('1 car reserved');
+    expect(shipped.outOfServiceCarIds).toHaveLength(1);
+    const reserved = shipped.outOfServiceCarIds[0] ?? '';
+    const events = shipped.config.building.serviceEvents ?? [];
+    expect(events.length, 'the day schedules an incident at all').toBeGreaterThan(0);
+
+    expect(
+      events.filter((event) => `${event.bankId}-${event.carId}` === reserved),
+      `no service event may name the reserved car ${reserved}`,
+    ).toEqual([]);
+
+    const run = recordRun(shipped.config, {
+      recordDecisions: false,
+      outOfServiceCarIds: shipped.outOfServiceCarIds,
+    });
+    expect(
+      run.recording.legs.filter((leg) => leg.carId === reserved).length,
+      `legs carried by the reserved car ${reserved}`,
+    ).toBe(0);
+  });
+
+  /**
+   * **The third source of the spoken-for set: the player's own holds — GitHub issue #272.**
+   *
+   * `dev/main.ts` lets a reader hold a car out of service, and that car is not free for the movers
+   * either. The failure here is quieter than the incident one and it is the same false sentence: a
+   * reservation that lands on a car the player already held publishes *"1 car reserved"* over a run
+   * in which **no further car** left passenger service, so the caption charges the period for
+   * something the player did.
+   *
+   * `main-C` is chosen because it is exactly the car the fix reserves when nothing else is held —
+   * the assertion above pins that — so this is the collision rather than a car picked to avoid one.
+   * The measurement is the count: the period's *one* reserved car has to be one **more** car out.
+   */
+  it('does not reserve a car the player is already holding', () => {
+    const period = periodOnDays(CALENDAR_PERIODS['moving-week'], 1, 7);
+    const held = ['main-C'];
+    const plain = shiftRunConfigOf(RESOURCES, { ...monday(), calendar: period });
+    expect(plain.outOfServiceCarIds, 'the car this test collides with').toEqual(held);
+
+    const shipped = shiftRunConfigOf(RESOURCES, {
+      ...monday(),
+      calendar: period,
+      outOfServiceCarIds: held,
+    });
+    expect(shipped.calendarLine).toContain('1 car reserved');
+    expect(shipped.withheld).toEqual([]);
+    // One reserved car means one more car out, not the same one counted twice.
+    expect(shipped.outOfServiceCarIds).toEqual(['main-B', 'main-C']);
   });
 });
 
@@ -784,10 +937,15 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
       runLengthS,
       templateChosenByPlayer,
       building: grownBuilding(fabricOf(buildingId, shafts), 1),
+      // The day's event goes into `shared` too — GitHub issue #272. Both functions decide
+      // `goodsCars` by reserving against a real bank, and the cars the event has already taken are
+      // part of that reservation; a caller that could hand them different events does not exist
+      // here either.
+      event: scheduledEventFor(period, 1, 0),
     };
     return {
       asks: calendarAsks(shared),
-      patch: calendarPatch({ ...shared, split: office, spokenForCarIds: [] }),
+      patch: calendarPatch({ ...shared, split: office }),
     };
   }
 
@@ -909,26 +1067,99 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
     }
   });
 
-  it('no shipped event holds a car for the whole shift, which is what lets calendarAsks omit the spoken-for set', () => {
+  it('no shipped event holds a car for the whole shift, which is one half of the spoken-for set', () => {
     /*
-     * `CalendarReservationInput.spokenForCarIds` is optional and `scope/runIdentity.ts` does not
-     * pass it, so `calendarAsks` reserves against a building nothing else has taken. That is exactly
-     * what `shiftRunConfigOf` computes — it hands `calendarPatch` the day's **whole-shift** holds,
-     * `ShiftRunPatch.outOfServiceCarIds`, and every shipped event declares `carsOutOfService: 0`.
-     *
      * Pinned over the event table rather than stated, because a sentence saying *the set is always
      * empty* is the shape issue #264 was: an event that held a car would make the ask claim a
      * reservation the patch stepped past, and this turns red on the commit that adds one instead of
-     * on the day somebody re-reads a docstring. The fix then is a field, not a rewrite — thread
-     * `spokenForCarIds` through the way `calendarPatch` already takes it.
+     * on the day somebody re-reads a docstring.
      *
-     * `derate` is deliberately **not** asserted zero: `move-in` schedules one, it is an incident on
-     * the building rather than a `recordRun` hold, and `shiftRunConfigOf` does not put it in
-     * `spokenForCarIds` either. The two functions agree about that day because they agree about the
-     * argument, which is the property this is protecting.
+     * **This used to be the whole argument and is now one third of it — GitHub issue #272.** The
+     * title said *"which is what lets `calendarAsks` omit the spoken-for set"*, and the body went
+     * on: *"`shiftRunConfigOf` does not put [the derate] in `spokenForCarIds` either. The two
+     * functions agree about that day because they agree about the argument."* Both sentences were
+     * true and the second was a defect being described as a property — the product agreed with
+     * `calendarAsks` by passing a set that was always empty, and the movers' car was handed back at
+     * 1 200 s because of it. The set now has three sources and this assertion covers one; the other
+     * two are swept below.
      */
     for (const id of Object.keys(SHIFT_EVENTS) as (keyof typeof SHIFT_EVENTS)[]) {
       expect(SHIFT_EVENTS[id].effect.carsOutOfService, id).toBe(0);
     }
+  });
+
+  /**
+   * **The caption and the refusal agree about the whole shipped space, through the shipped builder —
+   * GitHub issue #272.**
+   *
+   * The agreement above is `calendarAsks` against `calendarPatch` on one input, which is the
+   * mechanism. This is whether the product reaches it, and the two are different questions —
+   * `RISKS.md` R26. It drives `dev/state.ts#shiftRunConfigOf` for the caption and
+   * `scope/runIdentity.ts#runIdentityIssues` for the refusal, on the same `ViewerState`, and
+   * requires them to say the same thing about whether a car left passenger service.
+   *
+   * **A first version of this compared the two pure functions and would have measured nothing.**
+   * They share one derivation now (`calendar.ts#spokenForCarsOf`), so feeding both the same event
+   * makes them agree by construction; a sweep that cannot fail is § D163's *description rather than
+   * a gate*. Only the shipped path can disagree, because only it has two callers that must each
+   * remember to pass the event.
+   *
+   * It is what caught this lane's own residual. Correcting the run's spoken-for set without
+   * correcting `runIdentity.ts`'s left six cells disagreeing — `garden-apartments` / `moving-week`,
+   * days 1–6, a two-car bank whose only spare is `move-in`'s derate, so the caption reserved none
+   * while the refusal claimed *"reserves at least one car out of passenger service"*. That is issue
+   * #264's own shape arriving through a second door, and it existed for exactly as long as the two
+   * halves of the fix were apart.
+   *
+   * Days 1, 6 and 7 rather than all seven: `moving-week`'s Saturday is its `goodsCars: 2` override
+   * and its Sunday is the `goodsCars: 0` one, so the three reach the period's base shift and both of
+   * its overrides. `scope/runIdentity.test.ts` covers the commissioned-down fabric on the building
+   * where it bites; this one covers every shipped building as authored.
+   */
+  it('agrees with the run plan about every shipped building, period and day', () => {
+    /*
+     * Quoted from `scope/runIdentity.ts`'s own clause rather than imported: `askClause` builds it
+     * inline and exports nothing, and a test that reached for the private string would be asserting
+     * against an implementation detail. `scope/runIdentity.test.ts` holds the same constant for the
+     * same reason, and if the wording moves both go red — which is correct, because the wording is
+     * what a player reads.
+     */
+    const GOODS_CLAUSE = 'reserves at least one car out of passenger service';
+    const found: string[] = [];
+    const verdicts: boolean[] = [];
+
+    for (const entry of RESOURCES.entries) {
+      for (const id of CALENDAR_PERIOD_IDS) {
+        for (const day of [1, 6, 7]) {
+          const state: ViewerState = {
+            ...baseState(),
+            buildingId: entry.config.id,
+            shiftLengthS: 1800,
+            week: { ...baseState().week, day, dayIdx: day - 1 },
+            calendar: periodOnDays(CALENDAR_PERIODS[id], 1, 7),
+          };
+          const plan = shiftRunConfigOf(RESOURCES, state);
+          const message =
+            runIdentityIssues(state, RESOURCES, 'ranked').find(
+              (issue) => issue.key === 'viewer.calendar',
+            )?.message ?? '';
+
+          const captionReserves = plan.calendarLine.includes('reserved');
+          const refusalClaims = message.includes(GOODS_CLAUSE);
+          verdicts.push(captionReserves);
+          if (captionReserves !== refusalClaims) {
+            found.push(
+              `${entry.config.id} · ${id} · day ${String(day)}: caption ${String(captionReserves)}, refusal ${String(refusalClaims)}`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(found).toEqual([]);
+    // The sweep has to have reached a cell that reserves and one that does not, or an empty `found`
+    // is a matrix that measured nothing.
+    expect(verdicts, 'no cell reserved a car').toContain(true);
+    expect(verdicts, 'every cell reserved a car').toContain(false);
   });
 });
