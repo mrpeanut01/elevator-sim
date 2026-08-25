@@ -688,9 +688,16 @@ function openTomorrowPatch(week: WeekState): Partial<ViewerState> {
 /**
  * The whole authored day the standing selection may run, or `undefined`.
  *
- * One expression, read by the two things that must not disagree: {@link dayPatchFor}, which sets
- * the run up, and {@link horizonOf}, which decides what today's goals ask of it. A second copy of
- * this lookup is how a ten-hour run comes to be graded against a thirty-minute ceiling.
+ * **This used to say it was read by two things and it now has one caller** — {@link dayPatchFor},
+ * which sets the run up — and the correction is the whole of what the sentence was warning about.
+ * It said: *one expression, read by the two things that must not disagree … a second copy of this
+ * lookup is how a ten-hour run comes to be graded against a thirty-minute ceiling.* Right about the
+ * mechanism, wrong about where to look. The second thing was {@link horizonOf}, and while these two
+ * agreed inside this file the **Engineer** shell was reading no expression at all: its rail graded
+ * the same run against 230 s while this product's rail graded it against 460. So the lookup moved
+ * to `shift/dayLength.ts#runHorizonOf`, one directory down, where both shells reach it and neither
+ * owns it — and the warning is kept here rather than deleted, because a lookup that stays inside
+ * one shell is how it happened.
  */
 function dayFor(b: EverydayHostBindings): WholeDay | undefined {
   const state = b.state();
