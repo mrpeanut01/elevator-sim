@@ -655,3 +655,120 @@ describe('an account deleted underneath a submission', () => {
     ).rejects.not.toBeInstanceOf(NoSuchUserError);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The other four races, found by deriving the enumeration rather than reading
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A store whose one account exists, and a competing statement that runs inside a chosen gap.
+ *
+ * {@link racedFixture}'s sibling. That one races a *deletion*, which is the case #254 made
+ * reachable; this one races **another caller doing the same thing**, which was always reachable and
+ * which `concurrency.test.ts` derives three more instances of. The competing statement runs on the
+ * database underneath `RacingSql`, so it does not come back through the one-shot gate.
+ *
+ * Armed by hand, because the fixture's own `createUser` would otherwise spend the shot on itself.
+ */
+async function contendedFixture(options: {
+  readonly fires: (text: string) => boolean;
+  readonly contend: (sql: PgliteSql) => Promise<void>;
+}): Promise<{ store: Store; sql: PgliteSql; ada: string; arm: () => void }> {
+  let armed = false;
+  const inner = new PgliteSql();
+  const sql = new RacingSql(
+    inner,
+    (text) => armed && options.fires(text),
+    async () => options.contend(inner),
+  );
+  const store = await Store.open({ sql, now: () => 1_770_000_000_000 });
+  const created = await store.createUser({
+    email: 'raced@example.test',
+    displayName: 'Raced',
+    displayNameChosen: true,
+  });
+  if (!created.ok) throw new Error(created.reason);
+  return {
+    store,
+    sql: inner,
+    ada: created.user.id,
+    arm: () => {
+      armed = true;
+    },
+  };
+}
+
+/** One `users` row, written straight past the store. */
+const INSERT_USER =
+  'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) VALUES ($1, $2, $3, $4, $5)';
+
+describe('two callers doing the same thing at the same moment', () => {
+  it('reports a lost race for an address as a taken address, not as a constraint violation', async () => {
+    // Both requests read the address, both find nothing, both insert. `createPlayer`'s own comment
+    // — "Lost a race to another request for the same address: that account is the right answer" —
+    // described a branch that only the *sequential* path could reach until this was mapped.
+    const { store, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('INSERT INTO users'),
+      contend: async (inner) => {
+        await inner.query(INSERT_USER, ['winner', 'contested@example.test', 'Winner', true, 1_770_000_000_000]);
+      },
+    });
+    arm();
+    expect(
+      await store.createUser({ email: 'contested@example.test', displayName: 'Loser', displayNameChosen: true }),
+    ).toMatchObject({ ok: false, reason: 'email-taken' });
+  });
+
+  it('tells a lost name apart from a lost address, by asking which one is now taken', async () => {
+    // `users` has two unique keys and only one of them is the address, so the mapping cannot read a
+    // constraint name — it asks the database the question actually being asked. § D358's rule, on
+    // the site where the discriminator matters most.
+    const { store, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('INSERT INTO users'),
+      contend: async (inner) => {
+        await inner.query(INSERT_USER, ['winner', 'other@example.test', 'Contested', true, 1_770_000_000_000]);
+      },
+    });
+    arm();
+    expect(
+      await store.createUser({ email: 'fresh@example.test', displayName: 'Contested', displayNameChosen: true }),
+    ).toMatchObject({ ok: false, reason: 'name-taken' });
+  });
+
+  it('reports a rename that lost to another rename as a taken name', async () => {
+    // `setDisplayName`'s docstring already claimed the unique index "is what makes the guarantee
+    // true under two players renaming to the same thing at once, which the check alone cannot
+    // promise". It made the data true and handed the caller a raw `23505`.
+    const { store, ada, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('UPDATE users'),
+      contend: async (inner) => {
+        await inner.query(INSERT_USER, ['winner', 'grace@example.test', 'Grace', true, 1_770_000_000_000]);
+      },
+    });
+    arm();
+    expect(await store.setDisplayName(ada, 'Grace')).toMatchObject({ ok: false, reason: 'name-taken' });
+  });
+
+});
+
+describe('an account deleted underneath a write that never read it', () => {
+  it('fails createLoginToken as a missing account, not as a raw constraint violation', async () => {
+    // The pair a read-then-write scan inside `store/` cannot see: the read is one frame up, in
+    // `requestLink`, and this method is a bare `INSERT` into a table with a key to `users`.
+    const { store, ada } = await racedFixture((text) => text.startsWith('INSERT INTO login_tokens'));
+    const failure = store.createLoginToken({ jti: 'jti-raced', userId: ada, expiresAtMs: 1_770_000_060_000 });
+    await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
+    await expect(failure).rejects.toThrow('createLoginToken: no such user');
+    await expect(failure).rejects.not.toThrow(/foreign key|constraint|fkey/u);
+  });
+
+  it('fails createSession the same way, at the worst possible moment', async () => {
+    // `redeemLink` has already spent the link by the time it gets here, so an unexplained failure
+    // costs the player the link as well as the session.
+    const { store, ada } = await racedFixture((text) => text.startsWith('INSERT INTO sessions'));
+    const failure = store.createSession('session-raced', ada);
+    await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
+    await expect(failure).rejects.toThrow('createSession: no such user');
+    await expect(failure).rejects.not.toThrow(/foreign key|constraint|fkey/u);
+  });
+});

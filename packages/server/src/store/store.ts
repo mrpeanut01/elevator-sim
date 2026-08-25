@@ -206,6 +206,21 @@ function isForeignKeyViolation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23503';
 }
 
+/**
+ * Whether a driver error is PostgreSQL's uniqueness violation.
+ *
+ * `23505`, for {@link isForeignKeyViolation}'s reason and with the same rule about what may be read
+ * from it: **the SQLSTATE, never the constraint name.** `users` carries two unique keys and only one
+ * of them is the address; `entries` carries a primary key and a natural key. Which one fired is
+ * answered by asking the database what is now taken, not by matching `users_email_key` — a name
+ * PostgreSQL generates and nothing here declares.
+ *
+ * Module-private, like its neighbour: nothing outside this file has a driver error in its hand.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505';
+}
+
 /* -------------------------------------------------------------------------- *
  * The store
  * -------------------------------------------------------------------------- */
@@ -253,6 +268,19 @@ export class Store {
    *
    * Returns a discriminated result rather than throwing, because "this address already has an
    * account" is an ordinary outcome of a registration form and not an exceptional one.
+   *
+   * **And it returns it whether the loser lost by a second or by a microsecond** (#266). The two
+   * reads above the insert are a check-then-act against `users_email_key` and the
+   * `LOWER(display_name)` index: two requests for the same unknown address both pass them and both
+   * insert, and the loser used to throw PostgreSQL's own sentence — straight past `createPlayer`'s
+   * branch for exactly that case, whose comment reads *"Lost a race to another request for the same
+   * address: that account is the right answer"*. That branch was reachable only by the sequential
+   * path, which is the one that is not a race.
+   *
+   * **Which key fired is settled by asking the database**, per {@link isUniqueViolation}. An
+   * unexplained `23505` — neither address nor name taken — is re-thrown rather than labelled, on
+   * {@link Store.#asOwnerError}'s principle: a mapping that answers a question it did not verify is
+   * a worse failure than an unmapped one.
    */
   async createUser(input: {
     readonly email: string;
@@ -273,11 +301,18 @@ export class Store {
       displayNameChosen: input.displayNameChosen,
       createdAtMs: this.#now(),
     };
-    await this.#sql.query(
-      'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) ' +
-        'VALUES ($1, $2, $3, $4, $5)',
-      [user.id, user.email, user.displayName, user.displayNameChosen, user.createdAtMs],
-    );
+    try {
+      await this.#sql.query(
+        'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) ' +
+          'VALUES ($1, $2, $3, $4, $5)',
+        [user.id, user.email, user.displayName, user.displayNameChosen, user.createdAtMs],
+      );
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      if ((await this.userByEmail(email)) !== undefined) return { ok: false, reason: 'email-taken' };
+      if ((await this.#userByName(input.displayName)) !== undefined) return { ok: false, reason: 'name-taken' };
+      throw error;
+    }
     return { ok: true, user };
   }
 
@@ -311,6 +346,15 @@ export class Store {
    * Checked with {@link #userByName} before the write **and** guarded by the unique index behind it.
    * The check gives the caller a civil refusal; the index is what makes the guarantee true under two
    * players renaming to the same thing at once, which the check alone cannot promise.
+   *
+   * **That last sentence used to be half true, and #266 is the other half.** The index made the
+   * *data* true and handed the *caller* a raw `23505`, which `http/api.ts` could only answer with a
+   * `500` — for a condition whose word is already in this method's return type. The constraint path
+   * now returns what the pre-check returns. It is the more dangerous shape of the stale claim
+   * `DECISIONS.md` § D227 records: a sentence that describes a guarantee the code keeps by crashing.
+   *
+   * A deletion racing the rename needs nothing added: `rowCount === 0` and the re-read's `undefined`
+   * both already answer `no-such-user`, which is the write arbitrating rather than a second check.
    */
   async setDisplayName(
     id: string,
@@ -318,10 +362,21 @@ export class Store {
   ): Promise<{ readonly ok: true; readonly user: UserRow } | { readonly ok: false; readonly reason: 'name-taken' | 'no-such-user' }> {
     const clash = await this.#userByName(displayName);
     if (clash !== undefined && clash.id !== id) return { ok: false, reason: 'name-taken' };
-    const result = await this.#sql.query(
-      'UPDATE users SET display_name = $2, display_name_chosen = TRUE WHERE id = $1',
-      [id, displayName],
-    );
+    let result;
+    try {
+      result = await this.#sql.query(
+        'UPDATE users SET display_name = $2, display_name_chosen = TRUE WHERE id = $1',
+        [id, displayName],
+      );
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      // Asked rather than assumed, for `createUser`'s reason. An `UPDATE` that sets only the name
+      // can collide with one of `users`' three unique keys, but *that* is a fact about this
+      // statement rather than about the error, and the error is not going to say which.
+      const taken = await this.#userByName(displayName);
+      if (taken !== undefined && taken.id !== id) return { ok: false, reason: 'name-taken' };
+      throw error;
+    }
     if (result.rowCount === 0) return { ok: false, reason: 'no-such-user' };
     const user = await this.userById(id);
     return user === undefined ? { ok: false, reason: 'no-such-user' } : { ok: true, user };
@@ -366,13 +421,23 @@ export class Store {
    *
    * Takes the token's `jti` and never the token. The distinction is the whole point: a database that
    * held the mailed string would be a database whose backup is a pile of working account keys.
+   *
+   * **It reads nothing, and it is still a check-then-act** (#266). The read is one frame up:
+   * `requestLink` finds or creates the account and then calls this, and a deletion in that gap
+   * breaks `login_tokens_user_id_fkey`. That is why the enumeration this issue asked for is over
+   * every member that *writes* rather than over the read-then-write pairs a scan of this file can
+   * see — a pair whose halves are in two files is invisible to the narrower question.
    */
   async createLoginToken(input: LoginTokenRow): Promise<void> {
-    await this.#sql.query('INSERT INTO login_tokens (jti, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
-      input.jti,
-      input.userId,
-      input.expiresAtMs,
-    ]);
+    try {
+      await this.#sql.query('INSERT INTO login_tokens (jti, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
+        input.jti,
+        input.userId,
+        input.expiresAtMs,
+      ]);
+    } catch (error) {
+      throw await this.#asOwnerError(error, input.userId, 'createLoginToken');
+    }
   }
 
   /**
@@ -399,13 +464,26 @@ export class Store {
 
   /* ------------------------------------------------------------- sessions */
 
+  /**
+   * Open a session for an account that exists.
+   *
+   * {@link createLoginToken}'s shape, one route along and with more at stake (#266): `redeemLink`
+   * reads the account, checks the address inside the signature against it, and then writes here —
+   * and by that point the link has **already been spent**, so a deletion landing in the gap used to
+   * cost the player an unexplained `500` and the link both. Mapped, so the route answers what it
+   * already answers when the read itself comes back empty.
+   */
   async createSession(token: string, userId: string): Promise<SessionRow> {
     const row: SessionRow = { token, userId, expiresAtMs: this.#now() + SESSION_TTL_MS };
-    await this.#sql.query('INSERT INTO sessions (token, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
-      row.token,
-      row.userId,
-      row.expiresAtMs,
-    ]);
+    try {
+      await this.#sql.query('INSERT INTO sessions (token, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
+        row.token,
+        row.userId,
+        row.expiresAtMs,
+      ]);
+    } catch (error) {
+      throw await this.#asOwnerError(error, userId, 'createSession');
+    }
     return row;
   }
 
