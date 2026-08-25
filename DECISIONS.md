@@ -25031,3 +25031,156 @@ already says so, *"filed rather than done, so the next person meets a decision i
 divergence"*.
 
 ---
+
+---
+
+## D362 — the corpus can ask whether two surfaces agree, and it is a register rather than an axis
+
+**Date: 2026-08-25 · Owner: orchestrator · Lane: FIX-269 · Closes: #269**
+
+**Decision.** A tenth property, `surfaces-disagree`. It takes one state, drives a **declared pair** of
+adapters — each side through **its own shell's expression** — and compares a named figure. Two
+clauses: both sides say the same thing, and **both sides say something**, because one screen dropping
+a figure the other publishes would score green under equality alone.
+
+**The finding is worth more than the property, and it is why the design is what it is.**
+`honesty/surfaces.ts#shiftBundleOf` computes `goalsForDay(day)` **once** and hands the one array to
+both rail adapters. A cross-surface check read off the rendered corpus would therefore have agreed
+**by construction** while the shipped shells published 460 s and 230 s — the obvious implementation of
+this issue would have been green and worthless. That is [`RISKS.md`](RISKS.md) **R26** arriving in the
+*instrument* rather than in a screen, and it is R26's second recorded instance.
+
+**Two of the three candidate pairs are tautologies, measured rather than assumed.** The Day report's
+delta block and the week card format one `Observations` that `outcomeOf` copies verbatim — and
+[§ D334](#d334)'s `suppressed-mean` finding there was **not** two derivations disagreeing but one
+sheet pairing a withheld figure against another arm at another seed, which R3 already catches. The
+stage's live rail and its sheet are two formatters over one object. The real contract next door —
+`boardedLegs`, a step-series fold, against `servedLegs`, a leg scan — is genuinely independent and is
+recorded `not-built-here` with what it needs.
+
+**It is a register and must not become a general equality check.** Six pairs are refused with a
+classification: a live fold against a filed sheet contradicts `docs/10` R6 outright; the tuning batch
+against the hold-out batch is disjoint **on purpose** ([§ D355](#d355), [§ D360](#d360)); and the
+worst-wait goal against the report's cell is an **inequality**, so equality there would go red on all
+eight buildings.
+
+**Watched red against [§ D359](#d359)'s own reverted call site** — 5 of 6 cases, the sixth being the
+building with no authored day, which cannot produce the disagreement. Costs **0.019 s cold** over the
+whole always-on tier and needs no simulation, because every figure is a function of the state rather
+than of a recording.
+
+**The surfaces column moves +2 in both tiers and that is not two new screens** — it is the two sides
+of the declared pair, which must carry the shipped expression's id or a violation could not name which
+surface disagreed. Asserted in both directions in `honesty.test.ts`, because this is R38's shape on
+the row corrected for R38 one wave earlier.
+
+---
+
+## D363 — AD-S17, the rest bar: a car that is standing still is legible, and it says only that
+
+**Date: 2026-08-25 · Owner: orchestrator · Lane: FIX-PARK-VISIBLE · Closes: #260**
+
+**Decision.** The direction slot draws `▲`, `▼`, and nothing when `direction === 0`. That hole becomes
+a third state: a flat bar in the arrow's own position on **both** renderers, whose **length** is how
+long the car has stood. Onset and saturation are `WAIT_BANDS`' own ends, so a lift crosses into
+*standing still* as the first waiter leaves *breezy* and saturates where that person would be *eyeing
+the stairs* — one banding, no second ramp.
+
+**It says *standing still*, never *parked*.** *Parked* is a claim about the dispatcher's intent, and
+asserting it would be a stated mechanism nothing measured.
+
+**The defect was worse than filed.** `idle.parkingStrategy` is settable in the Engineer editor
+(`dev/dispatcherEditor.ts`, `dev/familyControls.ts`, `authoring/`) and **the stage showed no
+consequence of it whatsoever** — not a missing mark on a new lesson, an existing control with no
+visible effect. No `FrameCar` field and no `core` change was needed; `docs/34` § 10 priced this
+*"Large or medium"* and it landed as neither.
+
+**What it does not do is stated where a reader meets it.** It makes **waiting** legible. It does not
+make *waiting in the wrong place* legible — that is a two-place reading needing the crowd on screen at
+the same instant, and on `garden-apartments` landings are empty ~91 % of the hour with no 60 s wait at
+all on 16 of 20 seeds. What is owed is specified rather than implied: a rail sentence naming both
+places as now-facts, a Day-report retrospective, and `docs/34` § 9.4's conclusion that this lesson
+belongs on `vertical-city` rather than the tutorial building.
+
+**Contrast measured and pinned, not eyeballed** — 8.36:1 Casual, 6.39:1 Engineer-dark over the worst
+of sixteen composited grounds, 4.40:1 light. `terracotta` and `sun` were refused on a design ground:
+painting *standing still* in an alarm colour would assert it is wrong.
+
+**#260 closes with the sweep widened rather than the entries deleted.** `KNOWN_STALE` is
+`Object.freeze([])` and `render/viewportClaims.test.ts` now guards all of `packages/viz/src` with no
+exemptions. What governs `#landing-select` is **which tab is open** and **a default of `none`** — and
+**no replacement width is named**, because inventing one is the same defect with new wording. The
+docstring's conclusion survives on a *stronger* support: a width rule hid the control on some screens;
+a default of `none` hides the fact on all of them.
+
+---
+
+## D364 — the movers' car is spoken for by one expression, and no caller lists taken cars
+
+**Date: 2026-08-25 · Owner: orchestrator · Lane: FIX-272 · Closes: #272**
+
+**Decision.** `shift/calendar.ts#spokenForCarsOf` is the one answer to *which cars are already taken*,
+and it draws on three sources: the event's whole-shift holds, **the cars its incident schedules**, and
+the player's own holds. `shift/events.ts#eventCarChoice` is extracted from `shiftRunPatch`'s body with
+the choices unmoved, so the run builder and the refusal predicate cannot pick different cars.
+
+**The middle source was the missing half and is the dangerous one**: a hold merely overlaps the shift,
+while an **incident puts the car back**. Measured on the shipped path —
+`midtown-office`/`moving-week`/day 1/1 800 s — `main-D` carried **114 legs, every one boarded at or
+after 1 200 s**, the instant the incident returns it. The calendar said *"1 car reserved"* and the
+event said the movers had a car; a player planned for a three-lift building and got a four-lift one
+for the last third, with figures describing a tower the game never mentioned.
+
+**The seam's shape was forced by an instrument, not chosen.** Exporting `carRuntimeId` to remove three
+private copies of `${bankId}-${carId}` turned `honesty/derive.test.ts` red in three places: the hyphen
+reads to its scanner as a phrase, and `NOT_PLAYER_FACING` excludes `calendarAsks` **by name for that
+exact chain** — so moving the helper emptied a live exclusion into a ghost. `eventCarChoice` returns
+`CarRef`s precisely so it can be shared without carrying the string, and `incidents.ts` ends
+byte-identical to base.
+
+**The new harness-vs-shipped gate caught this lane's own residual**, which is the point of building it.
+The old comparison ran only with `state.calendar === null` — the one input for which the calendar
+contributes nothing. With a period on the state, six cells disagreed on
+`garden-apartments`/`moving-week`: a two-car bank whose only spare is `move-in`'s derate, so the
+caption reserved none while the refusal claimed a car was out. #264's shape through a second door,
+closed on the same commit rather than registered.
+
+**`campaign/economy.ts:297` is withdrawn on FIX-CLAIMS' reasoning** — no campaign day takes a car out,
+`outOfServiceCarIds` has no writer under `campaign/`, `everyday/campaign*` or `host.ts#runCampaignDay`
+— and **its register entry is deleted on the commit that made it stop reproducing**. What replaced it
+is a sweep over every tier of every category, narrower than `CAR_IS_AWAY` and asserted against both
+strings so a sweep matching nothing fails.
+
+**No published figure moved**, verified rather than assumed: `packages/experiments`, `packages/server`
+and `packages/cli` contain zero references to `shift/calendar`, `CALENDAR_PERIODS` or `calendarPatch`.
+
+---
+
+## D365 — four stale claims, and the one whose label was stale too
+
+**Date: 2026-08-25 · Owner: orchestrator · Lane: FIX-STALE · Closes: #261**
+
+**Decision.** `docs/10` § M30's bucket totals are **derived from the table**, denominator included.
+They published *17 / 29 / 4* over a table holding *16 / 32 / 2* — and **the bucket's name was stale as
+well**: no cell has an `unjudgeable` rate class. Both withheld cells are there because the two seed
+sets disagree about the *kind* of answer, a different route to `not-shippable`. **A corrected digit
+under the old label would have sent readers hunting four runs that served nobody**, which is why
+correcting a number is not the work.
+
+**`modes.ts:40` and `boot.ts:49` describe the same retired hand-off from opposite ends** — one named
+the mode, the other the surface — and #261's proposed narrow reading is refuted mechanically:
+`EverydayRoute` has no `'handoff'` arm, and `dismissEngineerMenu` has no caller outside its own module
+(filed as #273). **Two more survivors** at `boot.ts:68` and `:113`, because that file's own heading has
+said *"there is no hand-off now"* for a wave while three paragraphs below described one.
+
+**`UX.md`'s real edge is 1340 px**, and `RS-01`/`RS-02` moved together because shifting either alone
+overlaps or gaps. Two findings while checking: RS-01's contents clause is drawn at **every** width, so
+it never distinguished the band it was written to describe; and RS-02's *"per-car status list
+collapses"* is implemented by **no** width rule — struck rather than annotated.
+
+**The guard's own first draft had a false negative and it is kept as a case.** A 400-character window
+accepting a bare *"no longer"* passed the original stale sentence, because the Campaign row two lines
+below says a tile *"no longer waits on anything"* about something else. Markers narrowed, window cut
+to 300, and the false negative asserted **not** to match.
+
+---
