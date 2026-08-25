@@ -223,10 +223,10 @@ export const GOAL_BARS = Object.freeze({
  *
  * **The default stays, and stays optional, and `honesty/surfaces.ts` is right to call this bare.**
  * Its corpus sweeps periods and nothing else: both spaces bound a case at `maxDurationS` — 900 s
- * always-on, 1 800 s deep — and `shiftPlanOf` writes `windowStartS: null`, so no case in either
- * tier is a whole authored day. Passing `'whole-day'` there would have the honesty tier publish a
- * 460 s ceiling over a 900 s run, which is the tier manufacturing the disagreement it exists to
- * find. What the default may never again mean is *a product surface has not been told*.
+ * always-on, 1 800 s deep — and `honesty/surfaces.ts#planFor` writes `windowStartS: null`, so no
+ * case in either tier is a whole authored day. Passing `'whole-day'` there would have the honesty
+ * tier publish a 460 s ceiling over a 900 s run, which is the tier manufacturing the disagreement it
+ * exists to find. What the default may never again mean is *a product surface has not been told*.
  *
  * Pure in its arguments, so the same day of the same week over the same kind of run always asks the
  * same thing.
