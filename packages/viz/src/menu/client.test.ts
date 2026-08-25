@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CLIENT_FAILURES,
   claimedMetricsOf,
   createClient,
   type Transport,
@@ -160,6 +161,77 @@ describe('the leaderboard client', () => {
     if (result.ok) return;
     expect(result.code).toBe('invalid-address');
     expect(result.issues).toEqual(['an email address is required']);
+  });
+
+  it('puts the reason on screen when a refusal carries issues and no detail', async () => {
+    /*
+     * **Measured before it was fixed** — GitHub issue #267, which asked what a player actually sees
+     * when a post is refused and said the answer would decide which fix was adequate.
+     *
+     * Driven end to end with the real gate's real wording: `http/api.ts` answers a shape error with
+     * `{ error: 'invalid-submission', issues: [...] }` and **no `detail`**, and `dev/main.ts` shows
+     * `result.detail` and nothing else. So a player who finished a ten-hour Everyday day, pressed
+     * post and was refused read *"The server refused that request."* — while the response in their
+     * browser said which lengths the server takes.
+     *
+     * Not the silent failure the issue feared, and not adequate either: a refusal a player cannot
+     * act on. The duration case is closed on the server, but every other shape refusal — a bad
+     * seed, an out-of-range rate, a window running off the end of a day — went through this same
+     * hole, which is why the fix is here rather than on the one route.
+     */
+    const { transport } = scripted({
+      status: 400,
+      body: {
+        error: 'invalid-submission',
+        issues: ['durationS must be one of 300, 900, 1800, 3600, 7200'],
+      },
+    });
+    const result = await createClient('https://x', transport).submit('t', {
+      run: {
+        buildingId: 'midtown-office',
+        dispatcherProfileId: 'eta',
+        demandTemplateId: 'office-day',
+        arrivalRatePctPop5min: null,
+        durationS: 36_000,
+        windowStartS: 0,
+        seed: '1',
+      },
+      claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // The sentence a player reads names the cause, rather than the bare fallback.
+    expect(result.detail).toContain('durationS must be one of');
+    expect(result.detail).not.toBe(CLIENT_FAILURES.refused);
+    // And the structured list is still there for a form that wants to place them per field.
+    expect(result.issues).toEqual(['durationS must be one of 300, 900, 1800, 3600, 7200']);
+  });
+
+  it('shows every issue, not the first, because the gate reports them all on purpose', async () => {
+    const { transport } = scripted({
+      status: 400,
+      body: { error: 'invalid-submission', issues: ['seed must be 1–20 decimal digits', 'awtS must be a non-negative number'] },
+    });
+    const result = await createClient('https://x', transport).boards();
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.detail).toContain('seed must be');
+    expect(result.detail).toContain('awtS must be');
+  });
+
+  it('keeps the server’s detail when a route sends both, and the fallback when it sends neither', async () => {
+    // The ordering, and the case that must NOT change: `detail` is the sentence written for a
+    // player and outranks a field list written for a form. And a 4xx with nothing in it still gets
+    // the fallback that deliberately says nothing about why.
+    const both = scripted({ status: 422, body: { error: 'x', detail: 'The wording that wins.', issues: ['ignored'] } });
+    const chosen = await createClient('https://x', both.transport).boards();
+    expect(chosen.ok).toBe(false);
+    if (!chosen.ok) expect(chosen.detail).toBe('The wording that wins.');
+
+    const neither = scripted({ status: 500, body: {} });
+    const bare = await createClient('https://x', neither.transport).boards();
+    expect(bare.ok).toBe(false);
+    if (!bare.ok) expect(bare.detail).toBe(CLIENT_FAILURES.refused);
   });
 
   it('refuses a 2xx whose shape it does not understand', async () => {
