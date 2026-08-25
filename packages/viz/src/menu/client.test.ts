@@ -44,6 +44,9 @@ import {
   updateForm,
   withNotice,
 } from './account.js';
+import { parseBuilding, parseTrafficProfiles } from '@elevator-sim/core/browser';
+import { wholeDayFor } from '../shift/dayLength.js';
+import { LONGEST_OFFERED_RUN_S } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * A transport that records what it was asked for
@@ -643,6 +646,34 @@ describe('the client’s rules are the server’s rules', () => {
   const serverSource = (relative: string): string =>
     readFileSync(fileURLToPath(new URL(`../../../server/src/${relative}`, import.meta.url)), 'utf8');
 
+  /**
+   * Every whole-day length a player can reach, derived the way the product derives it.
+   *
+   * The building set comes **off disk** rather than from a list written here, for the reason
+   * `deadCode.test.ts` gives about its own nineteen directories: a building added to `data/` with a
+   * day the server refuses is exactly the regression this case exists to catch, and a hand-written
+   * list would not see it. `wholeDayFor` is the shipped derivation, not a restatement of it — so
+   * this reads the same records, applies the same peak-split rule and returns the same periods
+   * `dev/state.ts` would run.
+   *
+   * A `Set`, because five office towers share one `office-day` and the assertion is about distinct
+   * lengths rather than about how many buildings reach each.
+   */
+  function wholeDayLengthsFromShippedData(): ReadonlySet<number> {
+    const dataUrl = new URL('../../../../data/', import.meta.url);
+    const read = (path: string): unknown =>
+      JSON.parse(readFileSync(fileURLToPath(new URL(path, dataUrl)), 'utf8')) as unknown;
+    const trafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
+    const buildingsDir = fileURLToPath(new URL('buildings/', dataUrl));
+    const lengths = new Set<number>();
+    for (const entry of readdirSync(buildingsDir)) {
+      if (!entry.endsWith('.json')) continue;
+      const day = wholeDayFor(trafficProfiles, parseBuilding(read(`buildings/${entry}`)));
+      if (day !== undefined) lengths.add(day.periodS);
+    }
+    return lengths;
+  }
+
   /*
    * The mirror is now an **absence**, and the direction of the risk is why it is asserted at all.
    *
@@ -697,6 +728,82 @@ describe('the client’s rules are the server’s rules', () => {
     // The length bound too: 254 on the server, and a client that used 200 would refuse addresses
     // that work.
     expect(serverSource('http/api.ts')).toContain('trimmed.length > 254');
+  });
+
+  /*
+   * **The run length, and the one case in this block where the risk runs the other way** — GitHub
+   * issue #267.
+   *
+   * Every case above guards against a *client* rule stricter than the server's. This one guards
+   * against a **server** rule stricter than the client, because that is the direction this seam has
+   * now failed in twice. `submissionIssues` refuses a `durationS` outside `ACCEPTED_DURATIONS_S`
+   * with a 400, so a length the client can produce and the server will not take is a player who
+   * finished a run and cannot post it. A server *looser* than the client costs nothing — it is a
+   * board nobody reaches — which is why only one direction is asserted.
+   *
+   * **Why the check is a derivation rather than a constant.** § D286 closed this mismatch once, by
+   * deleting the client's *offer* of a ten-hour run, and `LONGEST_OFFERED_RUN_S` still correctly
+   * bounds what is offered. § D356 then made the same length reachable **without** an offer: the
+   * Everyday day is the period the matching record declares, so `wholeDayFor` reads `data/` and
+   * returns a length nobody picked from a list. A test that asserted the server's list contains
+   * 36 000 would pin two literals to each other and would still pass on the day `data/` moved the
+   * period — which is the failure mode, not a hypothetical. So this runs the client's **own**
+   * derivation over the **shipped** `data/` and requires the answer to be a length the server takes.
+   *
+   * Read out of the server's source text rather than imported, for this block's stated reason:
+   * `viz` may not depend on `server`. That is not a stylistic rule here — it was **measured** while
+   * this case was being written. A scratch test that imported `submission.ts` directly made
+   * `tsc -b` emit `submission.js` beside the source, outside `rootDir`, and vitest then resolved
+   * `./submission.js` to that stale emit for the whole package — so the server's tests were briefly
+   * running against a compiled copy of a previous edit and a deliberate mutation came back green.
+   */
+  it('accepts every whole-day length the client can actually derive', () => {
+    const source = serverSource('leaderboard/submission.ts');
+    const lengths = wholeDayLengthsFromShippedData();
+
+    // A positive control first: a derivation that answers nothing would make the loop below vacuous,
+    // which is the shape of a harness reporting "no failures" because it read nothing.
+    expect(lengths.size, 'no building derives a whole day — the sweep proves nothing').toBeGreaterThan(0);
+
+    for (const seconds of lengths) {
+      // Matched with an optional numeric separator, because `36_000` and `36000` are the same
+      // number and the repository writes the first. Anchored on the constant's name so a bare
+      // occurrence of the digits somewhere else in the file cannot satisfy it.
+      const digits = String(seconds);
+      const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/gu, '_');
+      expect(
+        source,
+        `the client can derive a ${digits} s day and the server's ACCEPTED_DURATIONS_S must take it`,
+      ).toMatch(new RegExp(String.raw`WHOLE_DAY_S\s*=\s*(${digits}|${grouped})\b`, 'u'));
+    }
+
+    /*
+     * **And the constant must be in the set, which is a second claim rather than a restatement.**
+     *
+     * Found by mutation: deleting `WHOLE_DAY_S` from `ACCEPTED_DURATIONS_S` leaves its declaration
+     * untouched, so the loop above still passed against a server that refused every whole day. A
+     * check that survives the defect it is named for is decoration.
+     */
+    // `export const`, not a bare mention: the name also appears in a `{@link}` a few lines above,
+    // and an unanchored match read that docstring and then ran on to the *next* declaration's
+    // semicolon — a green-for-the-wrong-reason that this mutation caught by luck.
+    const declaration = /export const ACCEPTED_DURATIONS_S[^=]*=([\s\S]*?);/u.exec(source)?.[1];
+    expect(declaration, 'ACCEPTED_DURATIONS_S is no longer declared where this test can read it').toBeDefined();
+    expect(declaration, 'the whole day is declared and then left out of the accepted set').toContain('WHOLE_DAY_S');
+  });
+
+  it('leaves § D286’s bound on what is OFFERED exactly where it was', () => {
+    /*
+     * The other half of the same issue, and the one a fix for it could most easily have broken.
+     *
+     * Making a whole day **postable** must not make one **offered**: § D286 deleted
+     * `FREE_PLAY_DURATIONS_S` and put `LONGEST_OFFERED_RUN_S = 7200` in its place, and that bound is
+     * load-bearing rather than decorative — without it the guard § D282 left standing becomes a
+     * tautology, since every template can be run over the whole of itself. `menu.test.ts` asserts
+     * what the bound *does*; this asserts that widening the server did not quietly move it.
+     */
+    expect(LONGEST_OFFERED_RUN_S).toBe(7200);
+    expect(Math.max(...wholeDayLengthsFromShippedData())).toBeGreaterThan(LONGEST_OFFERED_RUN_S);
   });
 });
 
