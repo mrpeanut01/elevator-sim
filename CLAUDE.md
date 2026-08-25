@@ -84,8 +84,23 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **569 184** | **606** | **49** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **710 048** | **4 710** | **50** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **569 663** | **606** | **51** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **710 660** | **4 710** | **52** | **0** | **green**, and the register is empty |
+
+  **Re-measured 2026-08-25 after wave C integrated**, both tiers, one sitting. Cases, simulations and
+  failures unmoved; strings **+479** and **+612**.
+
+  **The surfaces column moved +2 in each tier and it is not two new screens.** They are the two sides
+  of [§ D362](DECISIONS.md)'s declared pair, which must carry the shipped expression's id or a
+  violation could not name *which* surface disagreed. `honesty.test.ts` asserts that in both
+  directions, because this is R38's shape on the row corrected for R38 one wave earlier — and the
+  deep tier's one-surface lead over always-on survives it, which is how a real move would have been
+  told apart from this one.
+
+  **A tenth property landed** — `surfaces-disagree`, the only one that is not a predicate over a
+  single surface's strings. It exists because § D359's defect was invisible to the other nine: each
+  screen was internally honest while the product was incoherent. It costs 0.019 s cold over the whole
+  always-on tier and needs no simulation.
 
   **Re-measured 2026-08-25 on the integrated tree, both tiers, in one sitting** — after wave B's ten
   lanes had merged and never once on a branch. Strings moved **+2 776** and **+3 954**; cases and
