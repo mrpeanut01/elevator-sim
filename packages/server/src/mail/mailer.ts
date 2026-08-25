@@ -93,15 +93,35 @@ export class OutboxMailer implements Mailer {
  * Written as a function of the link rather than of the token, so no caller is tempted to build the
  * URL twice and get the two copies out of step — the link in the mail is the only one there is.
  *
- * Two sentences in the body are load-bearing rather than decorative, and § D241 records why.
+ * Three things in the body are load-bearing rather than decorative. § D241 records why for the
+ * first two; the third is issue #254's, and it is a correction rather than an addition.
  *
  * **"If you did not ask for this, ignore it."** This endpoint is unauthenticated and creates an
  * account for an address that does not have one, so somebody who never used this product can
- * receive this mail because a stranger typed their address. The message has to be readable as
- * *nothing has happened* by a person who has no idea what Elevator Sim is.
+ * receive this mail because a stranger typed their address. The message has to be readable by a
+ * person who has no idea what Elevator Sim is, and it has to tell them the truth about what asking
+ * for a link did.
  *
  * **The minutes are named.** A link that has quietly expired and a link that never worked look
  * identical to a reader, and the difference is whether asking for another one helps.
+ *
+ * ## **What ignoring it does not undo**, which is the sentence that used to say the opposite
+ *
+ * The reassurance read: *"Nothing has been set up in your name that this link expiring does not
+ * undo."* That is not what happens. `http/api.ts`'s `requestLink` writes a `users` row **before**
+ * it mails anything — § D241 makes account creation the *request* rather than a later step, so
+ * that asking for a display name only when the address is new cannot become an enumeration
+ * oracle — and the link expiring sweeps `login_tokens` and touches `users` not at all. So the
+ * address stayed, with no horizon and no erasure path, and the message told the one person who had
+ * never asked for any of it that nothing had happened.
+ *
+ * It is corrected rather than softened, and the correction names the state of the product rather
+ * than a mechanism: `DELETE /api/me` now exists (issue #254), and **no shipped screen calls it**.
+ * `packages/viz/src/menu/client.ts` reaches `GET /api/me` and `POST /api/me/display-name` and
+ * nothing else. So the mail states the absence, which is the honest half of that acceptance
+ * criterion, and **the day a screen offers deletion this sentence is wrong again** — a stated
+ * absence has to be un-stated by whoever removes it, or it becomes the stale refusal `CLAUDE.md`
+ * calls the more dangerous half.
  */
 export function signInMessage(to: string, link: string, validForMinutes: number): Message {
   return Object.freeze({
@@ -115,8 +135,12 @@ export function signInMessage(to: string, link: string, validForMinutes: number)
       `It works once and expires ${String(validForMinutes)} minutes after it was sent. Opening it`,
       'signs this browser in; there is no password to remember and none to lose.',
       '',
-      'If you did not ask to sign in, ignore this message. Nothing has been set up in your name',
-      'that this link expiring does not undo, and nobody can use it but the person reading it.',
+      'If you did not ask to sign in, ignore this message. The link expires, it works only once,',
+      'and nobody can use it but the person reading it.',
+      '',
+      'One thing ignoring it does not undo: asking for a link is what creates the account, so this',
+      'address is stored here from now on — one row, used to send this mail and for nothing else.',
+      'Deleting that account is something the server can do and no screen offers yet.',
     ].join('\n'),
   });
 }

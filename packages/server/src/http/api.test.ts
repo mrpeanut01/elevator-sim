@@ -661,6 +661,116 @@ describe('a board', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * Erasing an account
+ * -------------------------------------------------------------------------- */
+
+describe('deleting an account', () => {
+  it('refuses a caller who is not signed in, and touches nothing while refusing', async () => {
+    const bystander = await signIn();
+    // No token at all, a token that was never issued, and a real token with one character added —
+    // the third because a prefix comparison would accept it and a lookup will not.
+    const refusals = [
+      await call('DELETE', '/api/me'),
+      await call('DELETE', '/api/me', { token: 'not-a-session-token' }),
+      await call('DELETE', '/api/me', { token: `${bystander.token}x` }),
+    ];
+    for (const response of refusals) {
+      expect(response.status, JSON.stringify(response.body)).toBe(401);
+      expect(bodyOf(response)['error']).toBe('not-signed-in');
+    }
+    expect((await call('GET', '/api/me', { token: bystander.token })).status).toBe(200);
+  });
+
+  it('cannot be pointed at somebody else, however the request tries to name them', async () => {
+    const victim = await signIn();
+    /*
+     * Every way a caller could name an account other than the one their session names. The route
+     * reads none of them — the id comes off the session and from nowhere else — so this is not
+     * three checks being exercised, it is three arguments that do not exist. A route that compared
+     * a supplied id against the session's would pass this too, and would be one forgotten branch
+     * away from not passing it; a route with nothing to compare cannot acquire that branch.
+     *
+     * A fresh attacker each time, because a successful deletion spends the caller's own account.
+     */
+    const attempts: readonly { body?: unknown; query?: Record<string, string> }[] = [
+      { body: { userId: victim.id } },
+      { body: { id: victim.id, email: victim.email } },
+      { query: { userId: victim.id } },
+    ];
+    for (const attempt of attempts) {
+      const attacker = await signIn();
+      const response = await call('DELETE', '/api/me', { token: attacker.token, ...attempt });
+      // 200 rather than 400: the request is well-formed and the field is simply never read.
+      expect(response.status, JSON.stringify(attempt)).toBe(200);
+      // The victim is untouched...
+      expect((await call('GET', '/api/me', { token: victim.token })).status, JSON.stringify(attempt)).toBe(200);
+      // ...and the caller's *own* account is gone, which is what stops a route that quietly did
+      // nothing at all from passing the line above.
+      expect((await call('GET', '/api/me', { token: attacker.token })).status, JSON.stringify(attempt)).toBe(401);
+    }
+
+    // And an id in the path is not a route. `DELETE /api/me/<id>` is spelled out because it is the
+    // shape somebody would reach for when adding an admin deletion later, and it must not already
+    // half-exist.
+    const byPath = await call('DELETE', `/api/me/${victim.id}`, { token: (await signIn()).token });
+    expect(byPath.status).toBe(404);
+    expect((await call('GET', '/api/me', { token: victim.token })).status).toBe(200);
+  });
+
+  it('erases the account, its board entry and its session, observed through the API alone', async () => {
+    const account = await signIn();
+    const named = bodyOf(await call('GET', '/api/me', { token: account.token }))['user'] as Record<string, unknown>;
+    const displayName = String(named['displayName']);
+
+    // Its own board — a rate no other test posts at — so the assertions below are about this
+    // account's row rather than about where it happened to rank among everybody else's.
+    const posted = await call('POST', '/api/scores', {
+      token: account.token,
+      body: honest({ ...RUN, arrivalRatePctPop5min: 7 }),
+    });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+    const configHash = String(bodyOf(posted)['configHash']);
+    const before = await call('GET', '/api/board', { query: { configHash, metric: 'awtS' } });
+    expect(JSON.stringify(bodyOf(before)['entries'])).toContain(displayName);
+
+    const deleted = await call('DELETE', '/api/me', { token: account.token });
+    expect(deleted.status, JSON.stringify(deleted.body)).toBe(200);
+
+    // The session is a row in one of the tables the cascade takes, so the token that authorised the
+    // deletion is refused by the very next request.
+    expect((await call('GET', '/api/me', { token: account.token })).status).toBe(401);
+    // The board entry went with it. `store.test.ts` proves this against every child table the
+    // schema declares; this is the same fact observed where a player would notice it.
+    const after = await call('GET', '/api/board', { query: { configHash, metric: 'awtS' } });
+    expect(JSON.stringify(bodyOf(after)['entries'])).not.toContain(displayName);
+
+    // And the row is gone rather than flagged: asking for a link at the same address again creates
+    // a **new** account, which `createUser` could not do while the old one still held the address.
+    await call('POST', '/api/auth/request-link', { body: { email: account.email } });
+    const mail = await lastLink();
+    expect(mail.to).toBe(account.email);
+    const again = await call('POST', '/api/auth/redeem', { body: { token: mail.token } });
+    expect(again.status, JSON.stringify(again.body)).toBe(200);
+    expect((bodyOf(again)['user'] as Record<string, unknown>)['id']).not.toBe(account.id);
+  }, 60_000);
+
+  it('says what it removed, and does not claim anything about the other store', async () => {
+    const account = await signIn();
+    const detail = String(bodyOf(await call('DELETE', '/api/me', { token: account.token }))['detail']);
+    // The player is told what goes, because a board entry disappearing is not obviously part of
+    // "delete my account" until somebody says so.
+    for (const named of [/address/iu, /board/iu, /session/iu, /sign-in link/iu]) {
+      expect(detail, String(named)).toMatch(named);
+    }
+    // `docs/26` § 3.3: telemetry is a second store reached by a second request holding a different
+    // key, and the server never holds the join. A response that spoke for it would be claiming a
+    // relationship this design exists not to have — and there is no telemetry in this tree to
+    // speak for anyway.
+    expect(detail).not.toMatch(/telemetry|analytics|everything we hold|all your data/iu);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * Refusing to boot
  * -------------------------------------------------------------------------- */
 

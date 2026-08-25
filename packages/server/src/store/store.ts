@@ -278,6 +278,38 @@ export class Store {
     return user === undefined ? { ok: false, reason: 'no-such-user' } : { ok: true, user };
   }
 
+  /**
+   * Erase an account, and with it everything in this database that points at one.
+   *
+   * **One statement, and the cascade is the rest of it.** Every table that references `users` —
+   * `sessions`, `login_tokens`, `entries` and `challenge_entries` — declares
+   * `user_id … REFERENCES users (id) ON DELETE CASCADE`, so the child rows go inside the same
+   * statement as the parent rather than in four more that could fail halfway and leave an account
+   * half-erased. Four hand-written deletes here would also be a second place that has to be widened
+   * the day a fifth table references `users`, and the day it is not widened is the day erasure
+   * quietly stops being erasure. So the derivation is left to the database, and `store.test.ts`
+   * reads the foreign keys **out of `pg_constraint`** rather than writing the four names down again.
+   *
+   * **It takes an id and never an address.** `http/api.ts`'s `deleteAccount` reads that id off the
+   * session and the route accepts no other identity, so there is no argument here a request could
+   * supply — the one place this could have become a way to erase somebody else.
+   *
+   * **The caller's own session is one of the rows this removes**, so the token that authorised the
+   * deletion stops authorising anything in the same statement. That is the point rather than a side
+   * effect: an account that is gone must not have a working key.
+   *
+   * Returns nothing, unlike {@link consumeLoginToken}, whose `rowCount` **is** its answer. Here the
+   * caller has already authenticated the account into existence, so a `false` could only mean a
+   * concurrent second deletion — and the right response to that is the same as to the first. A
+   * boolean nobody branches on is an invitation to branch on it.
+   *
+   * A decision number is owed for this and for the route above it; the argument is here and in
+   * `http/api.ts`.
+   */
+  async deleteUser(id: string): Promise<void> {
+    await this.#sql.query('DELETE FROM users WHERE id = $1', [id]);
+  }
+
   /* -------------------------------------------------------- sign-in links */
 
   /**

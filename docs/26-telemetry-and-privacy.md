@@ -38,11 +38,18 @@ starting state is a posture about a different repository. Verified 2026-08-24.
 | 3 | **No IP address is persisted anywhere** | `clientIp` reaches exactly one consumer — `limiters.perCaller.charge(...)` in `packages/server/src/http/api.ts` — which is an in-memory `FixedWindowLimiter`. It is never handed to `Store` | never written |
 | 4 | **The server writes no request log** | the only `console.*` calls outside tests are two boot lines and one fatal in `packages/server/src/main.ts` | no access log |
 | 5 | **A third-party tracker is already forbidden at the policy level** | `packages/viz/staticwebapp.config.json` ships `connect-src 'self'`, widened only to a declared API origin ([`docs/16-static-site-deployment.md`](16-static-site-deployment.md) § 4) | one origin, or none |
-| 6 | **There is no way to delete an account** | `grep -rn deleteUser packages/server/src` and `grep -rn 'DELETE FROM users' packages/server/src` | **0 matches** — see § 5.3 |
+| 6 | ~~**There is no way to delete an account**~~ — **closed 2026-08-24**, see below | `grep -rn deleteUser packages/server/src` and `grep -rn 'DELETE FROM users' packages/server/src` | was **0 matches**; now `Store.deleteUser` and `DELETE /api/me` — see § 5.3 |
 
 Facts 2 to 5 are the posture this repository already has without having written one down, and this
-document's first job is to **not contradict them**. Fact 6 is the one that is wrong today, and § 5.3
-states it as a finding rather than fixing it, because `packages/server` is not this lane's to change.
+document's first job is to **not contradict them**.
+
+**Fact 6 was the one that was wrong, and it is the one that has since moved.** It is struck through
+rather than deleted, because a measurement table whose rows are silently rewritten when the tree
+changes is a table nobody can use to date a claim: what § 0 recorded on 2026-08-24 is what was true
+on 2026-08-24, and the correction belongs beside it. GitHub issue #254 built the route this document
+said was owed; § 5.3 is rewritten from *the gap this document found and does not close* to what
+closed it, and § 5.1's `Deleted by` column no longer reads **nothing**. Both greps now match, so
+re-running them reproduces the correction rather than the fact.
 
 ---
 
@@ -237,6 +244,14 @@ never referenced the account anyway.
 This is the one place where the two stores are named in the same sentence, and it is a client
 behaviour rather than a server one. That is the whole trick.
 
+**The first of those two requests now exists and the second does not.** `DELETE /api/me` — one
+authenticated route, the account named by the session token and by nothing else the request can
+carry — landed for issue #254 (§ 5.3). It deletes the account and the four tables that cascade off
+it, and **says nothing about telemetry in its response**, which is this section's shape rather than
+an omission: a route that spoke for the other store would be claiming exactly the join this design
+exists not to hold. There is no telemetry endpoint to be the second request, because there is no
+telemetry (§ 0, fact 1). When there is one, it is a second route.
+
 ### 3.4 `sessionId`
 
 128 random bits per session, in memory only, never written to `localStorage`. It groups a batch's
@@ -329,7 +344,7 @@ is immediate, the server half is a request that can fail and a horizon that cann
 | **Consent state** | one `localStorage` slot | until cleared | the player |
 | **Sessions** (existing) | `sessions` table | **30 days** — `SESSION_TTL_MS` | deleted on the way past by `Store.userForSession`, and by `POST /api/logout` |
 | **Sign-in links** (existing) | `login_tokens` | **15 minutes** — `LOGIN_TTL_MS` | swept inside `Store.consumeLoginToken` |
-| **Accounts and board entries** (existing) | `users`, `entries`, `challenge_entries` | **no horizon today** | **nothing** — § 5.3 |
+| **Accounts and board entries** (existing) | `users`, `entries`, `challenge_entries` | **no horizon today** | `DELETE /api/me`, at the player's request — § 5.3. Still no horizon: an account nobody deletes is kept |
 
 **Why 90 days.** `docs/26 K4` needs a 7-day return window plus the cohort's own day, and a KPI is
 read as a trend rather than a point, so a quarter is the shortest horizon over which a
@@ -356,25 +371,52 @@ sweeps, so an abandoned instance retains until it is next written to. The second
 **the sweep also runs at boot**, beside the `CREATE TABLE IF NOT EXISTS` that `bootstrap.ts` already
 applies. A Container App at `minReplicas: 0` boots often, which for once is an advantage.
 
-### 5.3 The gap this document found and does not close
+### 5.3 The gap this document found, and what closed it
 
-**There is no way to delete an account** (§ 0, fact 6). `Store` has no `deleteUser`, and no route
-calls one. A player who asked for a sign-in link once has an email address in `users` with no
-horizon and no erasure path.
+**The finding, as it stood.** There was no way to delete an account (§ 0, fact 6). `Store` had no
+`deleteUser` and no route called one, so a player who asked for a sign-in link once had an email
+address in `users` with no horizon and no erasure path. This section recorded it rather than fixing
+it, because the lane writing the posture could not write server code and a posture that quietly
+required some was a posture that would have shipped as prose.
 
-Three things make this smaller than it looks, and none of them makes it fine:
+**What closed it (2026-08-24, GitHub issue #254).** `DELETE /api/me` in
+`packages/server/src/http/api.ts`, over `Store.deleteUser` — one authenticated route, one statement,
+and the cascade for the rest. The three mitigations this section listed all held, and the middle one
+turned out to be exactly as described:
 
-- the schema is already built for it — `sessions`, `login_tokens`, `entries` and
-  `challenge_entries` all declare `user_id … REFERENCES users (id) ON DELETE CASCADE`, so the
-  erasure is one statement and the cascade is already correct;
+- the schema was already built for it — `sessions`, `login_tokens`, `entries` and
+  `challenge_entries` all declare `user_id … REFERENCES users (id) ON DELETE CASCADE`, verified by
+  reading `pg_constraint` rather than by reading the schema text, and all four carry
+  `confdeltype = 'c'`;
 - the address is stored normalised and for one purpose, and is never logged (§ 0, facts 2 and 4);
 - `packages/server`'s own docstrings say the deployed database *"has never held an account"*.
 
-**It is recorded here and owned elsewhere.** This lane may not write server code, and a privacy
-posture that quietly required one is a posture that would have shipped as prose. The fix is an
-authenticated route that deletes the caller's own `users` row and lets the cascade do the rest, with
-its own test; it belongs to whoever owns `packages/server`, and it should land before an account is
-offered to a recruited cohort rather than after.
+Four things about the route are load-bearing here rather than in its own docstring, because they are
+what makes it agree with this document:
+
+- **The account is named by the session token and by nothing else the request can carry** — no path
+  segment, no query parameter, no body field. Not a check that a supplied id matches the session's:
+  an argument that does not exist cannot be got wrong on a later branch. `api.test.ts` sends one
+  anyway, three ways, and requires the named account to survive.
+- **It claims nothing about telemetry** (§ 3.3). Erasure spans two stores as two independent
+  requests, and a response that spoke for the other one would be asserting the join this design
+  exists not to hold.
+- **The test that matters derives the child tables from the catalog**, not from a list written
+  beside it. A hand-written list of four tables stops being erasure the day a fifth is added, and
+  nothing would say so.
+- **No shipped screen calls it.** The route is reachable from `curl` and from nothing a player can
+  press; `packages/viz/src/menu/client.ts` reaches `GET /api/me` and `POST /api/me/display-name` and
+  no third route. That is stated in the sign-in mail — the one player-facing surface
+  `packages/server` owns, and the surface on which the account is offered — and it is what a viewer
+  lane owes before a cohort is recruited (§ 11).
+
+**A decision number is owed** for the route and for the store method; the argument is in
+`packages/server/src/http/api.ts`'s `deleteAccount` and `store.ts`'s `Store.deleteUser`.
+
+**No retention horizon came with it, and that is deliberate rather than forgotten.** An account
+nobody deletes is kept; the route is a player's request, not a sweep. A horizon over `users` would
+mean deleting the board entries of somebody who simply has not played this quarter, which is a
+different decision from the one issue #254 asked for and is not taken here.
 
 ### 5.4 What makes an aggregate safe to keep forever
 
@@ -793,8 +835,14 @@ prevent.
 - **The visible-trouble threshold and dwell** (`docs/26 K1`) belong to the stage and are owed by M2.
   Until they exist, `charter S1` has a schema and no constant.
 - **The control registry** (`controlKey`) is owed by M2 with the controls.
-- **The account erasure route** (§ 5.3) is owed by whoever owns `packages/server`, and should land
-  before an account is offered to a recruited cohort.
+- ~~**The account erasure route** (§ 5.3) is owed by whoever owns `packages/server`~~ — **landed
+  2026-08-24** (issue #254). What is still owed is **a surface that reaches it**: the route exists
+  and no shipped screen calls it, so the absence is stated in the sign-in mail rather than being
+  offered as a control. That belongs to whoever owns `packages/viz/src/everyday/settingsScreen.ts`,
+  and it is the half that still has to land before an account is offered to a recruited cohort
+  (#205) — a route a cohort cannot press is not an erasure path for that cohort. **When it is
+  wired, the mail's sentence stops being true and must go**, which is this repository's stale-refusal
+  rule pointed at a sentence this document asked for.
 - **`CHARTER_PROGRAMME.md` § M4's *S1 through S5*** (§ 9.5) is a milestone-page correction this lane
   does not own.
 - **The minimum aggregate cell size** (§ 5.4) is declared before the first KPI table is published,
