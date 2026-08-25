@@ -540,8 +540,10 @@ describe('every browser-tier file names a port of its own — the trap this tier
  *
  * 1. **Every file that launches a browser opens its pages through `openPage`.** Written this way
  *    round on purpose: *"at least one file uses the helper"* is non-vacuity, and this is coverage.
- *    Every one of the tier's 26 files launches a Chromium, and a file that launched one and drove
- *    no watched page would be a file whose pages throw into nothing.
+ *    The set is read off the project like everything else here — *26 of 26 launch a Chromium* is
+ *    what it measured when this was written, and is not a number anything below counts from. A
+ *    file that launched one and drove no watched page would be a file whose pages throw into
+ *    nothing.
  * 2. **No file mints a page itself.** `.newPage(` on any receiver, and `.newContext(` with it —
  *    a context is the other way to reach a `Page`, and closing one door while leaving the other
  *    open is the shape of a guard that reads as total and is not.
@@ -608,14 +610,14 @@ describe('the tier collects page errors in one place — GitHub issue #268', () 
 
   it('lets no file keep a page-error collector of its own', async () => {
     const tiers = browserTiers(await registeredProjects());
-    const private_: string[] = [];
+    const collectors: string[] = [];
     for (const tier of tiers) {
       for (const path of tier.files) {
-        if (PRIVATE_COLLECTOR.test(readSource(path))) private_.push(shortly(path));
+        if (PRIVATE_COLLECTOR.test(readSource(path))) collectors.push(shortly(path));
       }
     }
     expect(
-      private_,
+      collectors,
       'these files listen on `pageerror` themselves. Three did before GitHub issue #268 — ' +
         'boot, dispatcherFamilies and dispatcherStrip — and the other twenty-three had no ' +
         'collector at all, which is the asymmetry that made the tier report green over a throwing ' +
