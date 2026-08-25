@@ -11,6 +11,11 @@
  * it; the model marks it inert because the climbing stream is not built, and the prototype's
  * dispatcher select is not drawn for the reason `rushDrivingLine`'s docstring gives. So this mount
  * has nothing to listen to and nothing to redraw — which is why it takes no host subscription.
+ *
+ * **The refusal about that inert primary is not on this screen**, and since GitHub issue #262 it is
+ * not drawn here at all: `rushScreenModel.ts#rushBarModel` substitutes it into the § 3.3 bar, which
+ * is the element § 3.1 pins. See the comment where the paragraph used to be, halfway down `mount`,
+ * for the measurement that moved it and for why nothing replaced it.
  */
 
 import { actionBarFor } from './actionBar.js';
@@ -24,7 +29,6 @@ import {
   rushHoldLineFigure,
   rushOpeningLine,
   RUSH_BESTS,
-  RUSH_PRIMARY_REFUSAL,
   RUSH_SCREEN_COPY as COPY,
 } from './rushScreenModel.js';
 import {
@@ -119,18 +123,23 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   paper.append(bandsBlock);
 
   /*
-   * **The primary's refusal stays; the register does not.**
+   * **The refusal is not drawn here any more, and the block that used to be is why** — GitHub
+   * issue #262.
    *
-   * The block that used to sit here drew `RUSH_ABSENCES` above this sentence. Per GitHub issue
-   * #207 the register is on the settings screen with the other five
-   * (`everyday/buildNotes.ts`), and what is left on this screen is the one line that belongs to a
-   * control a player can press: the start button is disabled, and this says why, beside it. That
-   * is the rule the issue asks for in both directions — the reason is on the control, and it is
-   * not repeated anywhere else on this screen.
+   * A `.everyday-rush-refusal` paragraph sat at the foot of this column, and the comment above it
+   * claimed *"the reason is on the control ... and it is not repeated anywhere else on this
+   * screen"*. The second half was true. The first half was a claim about a paragraph 905 px down a
+   * 720 px viewport, at the bottom of a column the player has to scroll — and 3 443 px down the
+   * 667 px viewport `docs/31-support-matrix.md`'s shortest supported row names. The control it was
+   * supposedly on had no `title`, no `aria-label` and no `aria-describedby`.
+   *
+   * `rushScreenModel.ts#rushBarModel` puts it in the § 3.3 bar instead, which is the element § 3.1
+   * pins and the only one that cannot go below a fold. The *"not repeated anywhere else"* rule is
+   * unchanged and is the reason nothing replaced this paragraph: one constant, one place on
+   * screen. Do not draw a second copy here to make the column end on something — that is the
+   * drift the rule exists to prevent, and the sentence would be the one a player has already read
+   * in the bar.
    */
-  const refusal = el(doc, 'p', 'everyday-rush-refusal', RUSH_PRIMARY_REFUSAL);
-  refusal.style.cssText = `margin-top:22px;border:1px solid ${C.rule};border-radius:${String(R.tile)}px;background:${C.cardSunk};padding:14px 16px;max-width:660px;font-size:12.5px;line-height:1.5;color:${C.terracotta}`;
-  paper.append(refusal);
 
   /* ------------------------------------------------------------------ ink */
   const ink = el(doc, 'div', 'everyday-rush-aside');
@@ -206,12 +215,13 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
 /**
  * The registry row. Registering the setup screen retires `UNBUILT_REASONS.rush` — the sentence that
  * said *the rush needs held time and a setup screen, and neither exists* — and the half of it that
- * is still true moves onto the primary, which is where a refusal about a missing engine belongs
- * once the screen in front of it is real.
+ * is still true moves onto the primary's own row in the bar, which is where a refusal about a
+ * missing engine belongs once the screen in front of it is real. It took GitHub issue #262 to make
+ * that sentence describe a place a player can read rather than one they would have to scroll to.
  */
 export const RUSH_SCREEN: EverydayScreenModule = {
   key: 'rush',
   mount,
-  /* Start from the table's own row and edit one cell — `screens.ts`'s rule for a `bar()`. */
+  /* Start from the table's own row and edit its inert cells — `screens.ts`'s rule for a `bar()`. */
   bar: (state) => rushBarModel(actionBarFor(state)),
 };
