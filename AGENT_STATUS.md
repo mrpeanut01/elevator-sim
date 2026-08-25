@@ -55,6 +55,28 @@ tier read as a mostly-green one. The run is also twenty seconds faster, because 
 five collisions had been standing each other up and retrying. Both halves of the new guard were
 mutation-tested rather than assumed.
 
+**The wave-B integration point, measured on `integration/m2-wave-b` after five merges.** Both tiers,
+one host, one sitting:
+
+| tier | files | tests | wall clock |
+|---|---|---|---|
+| non-browser (`core`·`experiments`·`server`·`cli`·`viz`) | **418 passed** | **8 623 passed, 11 skipped** | 901 s |
+| `viz-browser`, **default parallelism** | **26 passed** | **154 passed, 0 skipped** | 62–65 s, twice |
+
+The browser figure is the one that matters and it is deliberately taken at **default parallelism**
+rather than serially. M2-MEASURE measured that same tier at **19 failed files / 75 failed tests** on
+`000852a`, against **1 failed / 0 failed tests** serially — so a serial green here would have proved
+nothing. Two consecutive runs on **10 cores at load 17.75–21.64**, roughly twice oversubscribed and
+at least as contended as the run that failed, returned zero. That is [#263](https://github.com/mrpeanut01/elevator-sim/issues/263)'s first
+acceptance criterion, and the issue is deliberately **left open**: absence of a load-dependent
+failure is not proof of its removal, CI has not spoken, and the tier still does not fail on an
+unhandled page error — both runs emitted `dev/dom.ts:115`'s `removeChild` throw and stayed green.
+
+The eleven skips are unmoved and are the same eleven the programme baseline recorded: deep-tier
+opt-ins behind `describe.skipIf` in `packages/experiments`, which GitHub issue #163 reports have
+never run in CI. **The browser tier's six skips are gone**, and that is a different number entirely —
+they were a file that never ran, not an opt-in.
+
 **Three product-owner calls were taken on 2026-08-24 and they set this wave's shape.** Merge and
 deploy #253 immediately, rather than stacking further on the branch. The longer day is **Everyday
 only** — campaign stage runs keep their length, so `data/scenario-goals.json` moves for the window
