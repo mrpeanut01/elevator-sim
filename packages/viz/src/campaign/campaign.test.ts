@@ -31,6 +31,7 @@ import { admitProfile } from './dimensions.js';
 import { evidenceFrom, failStateCounts, failStateReports } from './failStates.js';
 import { judgeStage, type StageReport } from './judge.js';
 import { batchRequestForStage, demonstrationConfigFor, stageReplicationSeed } from './stageRun.js';
+import { runStageToVerdict } from './stageSequence.js';
 import { editableIdsOf, parseCampaign, playerFacingStrings, validateCampaign, type CampaignContext } from './parse.js';
 import { FAIL_STATES, type Campaign, type CampaignStage } from './types.js';
 import { PROBABILITY_WORDS, playerSafeDescription, probabilityWordIn } from './words.js';
@@ -163,37 +164,31 @@ function playStage(
 /**
  * The whole judgement: the tuning batch, and — only when it met every bar — the holdout batch.
  *
- * The second batch is skipped when the first did not meet its bars, and that is arithmetic rather
- * than an optimisation with a cost: `cleared` requires **both** halves, so a stage that missed a
- * bar on the runs the player made is refused whatever the holdout says, and running fifty more
- * replications to learn nothing would double the cost of every sweep in this file.
+ * **The sequence is `campaign/stageSequence.ts`'s, not this file's.** It used to be written out
+ * here, which is the same defect `playStage` avoids one level down: a suite carrying its own copy
+ * of what the panel does keeps passing while the panel drifts, and it did — `dev/campaignPanel.ts`
+ * ran one batch for a whole wave while this function ran two. The skip is stated there too, and it
+ * is arithmetic rather than an optimisation with a cost: `cleared` requires **both** halves, so a
+ * stage that missed a bar on the runs the player made is refused whatever the holdout says, and
+ * running fifty more replications to learn nothing would double the cost of every sweep in this
+ * file.
  */
-function playToVerdict(
+async function playToVerdict(
   stage: CampaignStage,
   candidateProfileId: string,
   edit?: EditedVector,
-): {
+): Promise<{
   result: BatchResult;
   report: BatchReport;
   verdict: StageReport;
-} {
-  const tuning = playStage(stage, candidateProfileId, edit);
-  if (!tuning.verdict.metOnTuningSeeds) return tuning;
-  const holdoutResult = runBatch(
-    batchRequestForStage(stage, candidateProfileId, edit, 'holdout'),
-    resourcesFor(stage),
-  );
-  const holdout = { result: holdoutResult, report: batchReport(holdoutResult) };
-  return {
-    ...tuning,
-    verdict: judgeStage({
-      stage,
-      published: publishedFor(stage),
-      result: tuning.result,
-      report: tuning.report,
-      holdout,
-    }),
-  };
+}> {
+  return runStageToVerdict({
+    stage,
+    published: publishedFor(stage),
+    candidateProfileId,
+    edit,
+    run: (request) => runBatch(request, resourcesFor(stage)),
+  });
 }
 
 /* -------------------------------------------------------------------------- *
@@ -839,11 +834,11 @@ describe('stage 5, played — the credential is named, and the lesson is that it
    * Still a search with a floor, for the reason above, and still expressed as *at least one*. The
    * floor is what makes DC-3's question — *is this campaign winnable at all?* — a measurement.
    */
-  it('clears from the dropdown, on the holdout seeds too — whether a stage can be won', () => {
+  it('clears from the dropdown, on the holdout seeds too — whether a stage can be won', async () => {
     const clears = [];
     const metOnTuning = [];
     for (const profile of config.dispatcherProfiles.profiles) {
-      const attempt = playToVerdict(stage, profile.id);
+      const attempt = await playToVerdict(stage, profile.id);
       const rows = attempt.report.comparisons[0]?.rows ?? [];
       if (attempt.verdict.metOnTuningSeeds) metOnTuning.push(profile.id);
       if (!attempt.verdict.cleared) continue;
@@ -988,9 +983,9 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
    * (`reproduced` is `true` on every count goal there) and that what refused it is a goal it
    * actually missed.
    */
-  it('**is refused on the holdout seeds**, which is the overfitting gate doing its job', () => {
+  it('**is refused on the holdout seeds**, which is the overfitting gate doing its job', async () => {
     const stage = stageAt(1);
-    const played = playToVerdict(stage, stage.dispatcher.startingProfileId, EDIT);
+    const played = await playToVerdict(stage, stage.dispatcher.startingProfileId, EDIT);
 
     expect(played.verdict.metOnTuningSeeds).toBe(true);
     expect(played.verdict.cleared).toBe(false);
