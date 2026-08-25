@@ -210,9 +210,23 @@ export const GOAL_BARS = Object.freeze({
  * **`'period'` is the default and that is a decision rather than a convenience.** Three of the
  * eight shipped buildings have no authored day and never will until one is written for their crowd,
  * so a slice is the majority case, and every published figure in this repository was graded as one.
- * The default also keeps two callers this lane may not edit — `dev/leftRail.ts` and `dev/main.ts` —
- * compiling and grading a slice exactly as before; **they are not yet horizon-aware, and that is a
- * named gap rather than a silent one.** See the lane report and this module's colocated test.
+ *
+ * **The named gap the default was covering is closed, and what it cost is worth recording.** This
+ * paragraph used to end by saying `dev/leftRail.ts` and `dev/main.ts` were *"not yet horizon-aware,
+ * and that is a named gap rather than a silent one"*. A named gap is still a gap: while it stood,
+ * an Everyday player running the whole authored day was told by the Everyday rail that today asked
+ * for a worst wait inside **460 s** and by the Engineer rail — the same run, one door away — that
+ * it asked for **230 s**, which is the disagreement `TEST_MATRIX.md` T1 forbids outright. Both
+ * shells now derive the argument from `shift/dayLength.ts#runHorizonOf`, which is one expression in
+ * a directory both of them import, and `everyday/host.test.ts` drives the two call paths against
+ * each other rather than against two literals.
+ *
+ * **The default stays, and stays optional, and `honesty/surfaces.ts` is right to call this bare.**
+ * Its corpus sweeps periods and nothing else: both spaces bound a case at `maxDurationS` — 900 s
+ * always-on, 1 800 s deep — and `shiftPlanOf` writes `windowStartS: null`, so no case in either
+ * tier is a whole authored day. Passing `'whole-day'` there would have the honesty tier publish a
+ * 460 s ceiling over a 900 s run, which is the tier manufacturing the disagreement it exists to
+ * find. What the default may never again mean is *a product surface has not been told*.
  *
  * Pure in its arguments, so the same day of the same week over the same kind of run always asks the
  * same thing.

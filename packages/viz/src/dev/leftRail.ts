@@ -78,6 +78,7 @@ import type { ViewMode } from '../mode/types.js';
 import { MOOD_GLYPH, buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { contractById } from '../shift/contracts.js';
 import { scheduledEventFor } from '../shift/calendar.js';
+import { runHorizonOf } from '../shift/dayLength.js';
 import {
   PENDING_DISPLAY,
   bestLineFor,
@@ -99,7 +100,7 @@ import type { BrowserResources } from './data.js';
 import {el, fill, keyedFill, setHidden, setStyle, setText } from './dom.js';
 import type { HonestyElements, MoodElements, ShiftElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
-import { disclosureOf, type ViewerState } from './state.js';
+import { buildingConfigOf, disclosureOf, type ViewerState } from './state.js';
 
 /**
  * The elements this mount owns — a structural subset of `Elements`, so the shell passes its whole
@@ -639,23 +640,36 @@ function shareColor(pct: number): string {
  *
  * ## Why a function, and why this file
  *
- * This shell has **two** callers of `shift/goals.ts#goalsForDay` — {@link drawShift} and
+ * `shift/goals.ts#goalsForDay` takes the day and *what kind of run today is*, and the second
+ * argument is the one a caller can forget: forgetting it compiles, draws, and grades a ten-hour run
+ * against a thirty-minute ceiling. This shell has **two** callers of it — {@link drawShift} and
  * `dev/main.ts#closeShift`, the rail the player watches and the sheet it files — and two surfaces
  * publishing different bars for one run is exactly the disagreement `TEST_MATRIX.md` T1 forbids.
  * So the shell asks the question once, here, and both read the answer.
  *
  * It lives in this file rather than in a neutral one because `dev/main.ts` imports this module and
  * this module never imports it, so this is the one seam of the two that can hold a shared
- * derivation without a cycle.
+ * derivation without a cycle. The derivation it delegates to is **not** here:
+ * `shift/dayLength.ts#runHorizonOf` is the expression the *other* shell reads too, and the whole
+ * point of it living there is that `everyday/host.ts` and this file cannot answer it differently.
+ * Nothing in this function is a second copy of that lookup, and writing one here would be the
+ * defect it exists to close.
  *
  * Pure in its two arguments and exported for the reason every decision in this file is: there is no
  * jsdom here, so a decision made inside a DOM write is a decision no test can reach.
  */
 export function shiftGoalsOf(
   state: ViewerState,
-  _resources: BrowserResources,
+  resources: BrowserResources,
 ): readonly ShiftGoal[] {
-  return goalsForDay(state.week.day);
+  return goalsForDay(
+    state.week.day,
+    runHorizonOf(
+      resources.trafficProfiles,
+      buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+      state,
+    ),
+  );
 }
 
 export interface GoalRow {

@@ -135,7 +135,7 @@ import {
 } from '../mode/plainLevers.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { runsWholeDay, wholeDayFor, wholeDayRun, type WholeDay } from '../shift/dayLength.js';
+import { runHorizonOf, wholeDayFor, wholeDayRun, type WholeDay } from '../shift/dayLength.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { ShapedDayReport } from '../shift/report.js';
@@ -741,12 +741,22 @@ function dayPatchFor(b: EverydayHostBindings): Partial<ViewerState> {
  * report describing a run that has not happened. `runsWholeDay` is the same predicate
  * `shiftDemandTemplateId` asks, so the template the run resolves against and the bar it is judged
  * by cannot disagree.
+ *
+ * **The predicate is `shift/dayLength.ts#runHorizonOf`'s and no longer this file's**, which is the
+ * correction to {@link dayFor}'s warning rather than a tidy-up of it. That warning said a second
+ * copy of the lookup is how a ten-hour run comes to be graded against a thirty-minute ceiling, and
+ * it was right about the mechanism and wrong about where to look: the Engineer shell had no copy at
+ * all, so its rail graded this product's whole day against 230 s while this one graded it against
+ * 460. One expression in a directory both shells import is the only shape that can hold, because
+ * `dev/` may not import this one — see `runHorizonOf`'s docstring for the whole argument.
  */
 function horizonOf(b: EverydayHostBindings): RunHorizon {
-  const day = dayFor(b);
-  if (day === undefined) return 'period';
   const state = b.state();
-  return runsWholeDay(day, state.shiftLengthS, state.windowStartS) ? 'whole-day' : 'period';
+  return runHorizonOf(
+    b.resources.trafficProfiles,
+    buildingConfigOf(b.resources, state.savedBuildings, state.buildingId),
+    state,
+  );
 }
 
 /**
