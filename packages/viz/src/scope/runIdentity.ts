@@ -405,14 +405,26 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
      * throwing, because this predicate exists to describe states naming a building
      * `data/buildings/` does not ship. `shiftRunConfigOf` throws on exactly those, which is why the
      * run plan is not consulted here even though it knows the answer for a shipped building.
+     *
+     * **And the fabric goes in with them — GitHub issue #264.** `goodsCars` is decided by reserving
+     * against a real bank, so the building this hands over has to be the one the run is built on:
+     * commissioned, through the same `commissionedBuilding` the fabric arm above calls and
+     * `shiftRunConfigOf` calls before it grows the building. Growth and a period's population factor
+     * touch floors and never banks, so the commissioned config and the grown one offer the same
+     * cars, which is what lets this stop one step short of rebuilding the run plan.
      */
+    const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
     const clauses = calendarAsks({
       day: today,
-      ...calendarAskInputOf(
-        resources,
-        state,
-        buildingConfigOf(resources, state.savedBuildings, state.buildingId),
-      ),
+      ...calendarAskInputOf(resources, state, authored),
+      building:
+        authored === undefined
+          ? undefined
+          : commissionedBuilding(
+              authored,
+              state.commissioning,
+              commissionableClasses(specsWithSaved(resources, state.savedClasses)),
+            ),
     })
       .map((ask) => askClause(ask, today.shift))
       .filter((clause): clause is string => clause !== null);
@@ -559,9 +571,16 @@ function askClause(ask: CalendarAsk, shift: CalendarShift): string | null {
        * `calendarPatch`'s `reserveCars` may reserve fewer — it never empties a bank, so
        * `moving-week`'s Saturday asks Garden Apartments' two-car bank for two and gets one. This
        * function has no building and cannot know which happened, and *"reserves 2 cars"* on a day
-       * that reserved one is a refusal with a false number in it. *At least one* is true of every
-       * case a shipped building can produce, and `shift/calendar.ts#calendarAsks` names the single
-       * case it would not be true of, with the assertion that pins it.
+       * that reserved one is a refusal with a false number in it.
+       *
+       * **`at least one` is now true because the ask is decided from the reservation** — GitHub
+       * issue #264. It used to be true because `calendarAsks` decided `goodsCars` from the period's
+       * declaration and every bank in `data/buildings/` has two cars, which is a true statement
+       * about the wrong population: `commissioning/choices.ts#shaftChoices` offers a one-shaft bank,
+       * `shiftRunConfigOf` commissions the building before the calendar sees it, and on that fabric
+       * this clause was printed about a day whose own `withheld` line said it reserved none.
+       * `shift/calendar.ts#calendarAsks` now shares `calendarPatch`'s own reservation, so the axis
+       * is named only when a car actually left passenger service.
        */
       return 'reserves at least one car out of passenger service';
   }

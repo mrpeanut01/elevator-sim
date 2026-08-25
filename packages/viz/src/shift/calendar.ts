@@ -815,10 +815,7 @@ export function calendarPatch(input: CalendarPatchInput): CalendarPatch {
   }
 
   /* --- the goods cars -------------------------------------------------- */
-  const reserved =
-    shift.goodsCars > 0
-      ? reserveCars(building, shift.goodsCars, input.spokenForCarIds ?? [])
-      : { ids: [] as readonly string[], shortfall: 0 };
+  const reserved = reservationDecision(shift, building, input.spokenForCarIds);
   if (reserved.shortfall > 0) {
     withheld.push(
       `${day.name}: asked to reserve ${String(shift.goodsCars)} car(s) for the day and could ` +
@@ -899,6 +896,34 @@ function biasDecision(
 }
 
 /**
+ * Which cars today's period actually reserves — {@link templateDecision}'s third sibling, and the
+ * one that took a defect to acquire (GitHub issue #264).
+ *
+ * The other two were extracted so {@link calendarAsks} could ask *did this reach the run?* without
+ * building a patch. This one was **not**, and `calendarAsks` decided `goodsCars` from
+ * `shift.goodsCars > 0` — the period's *declaration* — while {@link calendarPatch} decided it from
+ * a reservation against a real bank. The two disagree exactly when no car is free, and what a
+ * player then met was `scope/runIdentity.ts` refusing their run because the calendar *"reserves at
+ * least one car out of passenger service"* on a day whose own `withheld` line said it could reserve
+ * none.
+ *
+ * `building` is `undefined` for a state naming a building this build does not ship, which is the
+ * one case {@link CalendarAskInput}'s caller cannot resolve. It reserves nothing, and that is the
+ * honest answer rather than a conservative one: `dev/state.ts#shiftRunConfigOf` **throws** on such a
+ * state, so there is no run for the clause to be about, and `runIdentityIssues` already refuses it
+ * by name under `viewer.buildingId`. The one thing this may not do is put a claim it cannot check
+ * into a refusal.
+ */
+function reservationDecision(
+  shift: CalendarShift,
+  building: BankedConfig | undefined,
+  spokenForCarIds: readonly string[] | undefined,
+): { readonly ids: readonly string[]; readonly shortfall: number } {
+  if (shift.goodsCars <= 0 || building === undefined) return { ids: [], shortfall: 0 };
+  return reserveCars(building, shift.goodsCars, spokenForCarIds ?? []);
+}
+
+/**
  * A field of {@link CalendarShift} that changes the run, minus the two that cannot.
  *
  * `eventId` is excluded because {@link scheduledEventFor} already owns *which event is today* and
@@ -926,6 +951,39 @@ export interface CalendarAskInput {
   readonly runLengthS: number;
   /** Whether the player chose the running template themselves. A period does not overrule them. */
   readonly templateChosenByPlayer?: boolean | undefined;
+}
+
+/**
+ * The fabric half of {@link calendarAsks}' inputs — GitHub issue #264.
+ *
+ * **A second interface rather than two more fields on {@link CalendarAskInput}**, and the reason is
+ * a caller: `dev/state.ts#calendarAskInputOf` returns `Omit<CalendarAskInput, 'day'>` and is called
+ * by `shiftRunConfigOf` **before** it knows which cars the day's event has taken, so it cannot
+ * answer these. Widening the four-input value would have forced it to guess, which is the shape of
+ * the defect this closes rather than a fix for it.
+ */
+export interface CalendarReservationInput {
+  /**
+   * The building the run is built on — commissioned, as `shiftRunConfigOf` commissions it — or
+   * `undefined` when the state names one this build does not ship.
+   *
+   * **Not optional, because the version of this that guessed is what shipped the defect.** A
+   * `goodsCars` ask decided without a building is decided from the period's declaration, and a
+   * period declaring a car it cannot get is exactly the case the refusal was wrong about. An
+   * explicit `undefined` is a caller saying *I have no building*, which this answers by claiming
+   * nothing; an absent field would be a caller who never thought about it.
+   */
+  readonly building: BankedConfig | undefined;
+  /**
+   * Runtime car ids already spoken for today, as {@link CalendarPatchInput.spokenForCarIds}.
+   *
+   * Optional here and absent at the only caller, which is a **narrower** claim than it looks and is
+   * pinned rather than assumed: `shiftRunConfigOf` hands `calendarPatch` the day's *whole-shift*
+   * holds, `SHIFT_EVENTS` declares `carsOutOfService: 0` on all five, so the set is empty on every
+   * day this build can produce. `calendar.test.ts` asserts that over the event table, so an event
+   * that holds a car turns it red rather than turning this sentence stale.
+   */
+  readonly spokenForCarIds?: readonly string[] | undefined;
 }
 
 /**
@@ -985,24 +1043,36 @@ export interface CalendarAskInput {
  *   #shiftDemandTemplateId` deliberately does not consult the calendar), so the server would replay
  *   a different template than the one the run was configured with.
  *
- * ## The one residual, named rather than left to be discovered
+ * ## The residual that was named here, and was reachable — GitHub issue #264
  *
- * `goodsCars` is the one ask decided without consulting the building, and it is therefore the one
- * that can be wrong. `calendarPatch`'s `reserveCars` never empties a bank, so a period may reserve
- * **fewer** cars than it asked for — `moving-week`'s Saturday asks Garden Apartments' two-car bank
- * for two and gets one — and on a bank holding a single car it would reserve **none**.
+ * This paragraph used to say that `goodsCars` is *"the one ask decided without consulting the
+ * building"*, that a bank holding a single car would therefore make it wrong, and that **no shipped
+ * building raises it** — every bank in `data/buildings/` declares at least two cars, asserted from
+ * disk so that a one-car bank landing tomorrow would turn the assertion red rather than the
+ * paragraph stale.
  *
- * The first half costs nothing, because the refusal `scope/runIdentity.ts` builds from this
- * deliberately names no count: *"reserves at least one car out of passenger service"* is true of
- * one car and of two. The second half would be a refusal naming a reservation that did not happen,
- * which is the § D227 shape at its smallest. No shipped building raises it — every bank in
- * `data/buildings/` declares at least two cars, which `calendar.test.ts` asserts **from disk**
- * rather than from memory, so a one-car bank landing tomorrow turns that assertion red rather than
- * this paragraph stale.
+ * Every clause of that was true, and the conclusion was wrong, because **`data/buildings/` is not
+ * the set of banks a run can have.** `commissioning/choices.ts#shaftChoices` offers
+ * `max(1, current − 1)` upward, so the fabric screen takes Garden Apartments' two-car bank down to
+ * one, and `shiftRunConfigOf` commissions the building before the calendar ever sees it. On that
+ * fabric `moving-week` asks for a goods car, gets none, reports it in {@link CalendarPatch.withheld}
+ * — *"asked to reserve 1 car(s) for the day and could reserve 0"* — and `calendarLine` correctly
+ * omits the clause, while `scope/runIdentity.ts` went on refusing the run because the calendar
+ * *"reserves at least one car out of passenger service"*. Two sentences about one day, contradicting
+ * each other, on the surface that must never accuse somebody of something they did not do.
+ *
+ * So `goodsCars` is no longer decided from the declaration: {@link CalendarReservationInput} carries
+ * the fabric and {@link reservationDecision} is shared with {@link calendarPatch}, exactly as
+ * {@link templateDecision} and {@link biasDecision} already were. **This strictly strengthens the
+ * gate in both directions** rather than softening it — a period whose reservation is withheld
+ * changed nothing about the run through that axis, so falling silent is the same correct answer
+ * `calendarPatch` gives, and the run stays refused on whatever else the period moved. The
+ * assertion in `calendar.test.ts` that reads `data/buildings/` from disk stays, because it is a
+ * true and useful statement about the authored fabric; what has gone is the inference from it.
  *
  * Pure in its input, like everything else in this module.
  */
-export function calendarAsks(input: CalendarAskInput): readonly CalendarAsk[] {
+export function calendarAsks(input: CalendarAskInput & CalendarReservationInput): readonly CalendarAsk[] {
   const { day } = input;
   if (day === null) return [];
 
@@ -1024,7 +1094,8 @@ export function calendarAsks(input: CalendarAskInput): readonly CalendarAsk[] {
     populationFactor: shift.populationFactor !== 1,
     splitBias: bias.kind === 'applied',
     demandTemplateId: template.kind === 'applied',
-    goodsCars: shift.goodsCars > 0,
+    // The reservation, not the declaration — issue #264, and the section above carries the argument.
+    goodsCars: reservationDecision(shift, input.building, input.spokenForCarIds).ids.length > 0,
     eventId: false,
     note: false,
   };
@@ -1141,6 +1212,19 @@ function populationOf(config: {
   return expandFloors(config).reduce((sum, floor) => sum + floor.population, 0);
 }
 
+/**
+ * The least this module needs of a building to decide which cars a period can reserve.
+ *
+ * Structural rather than `BuildingConfig`, for `incidents.ts#BankedBuilding`'s own reason: it is
+ * called with the **commissioned and grown** config inside {@link calendarPatch} and with the
+ * commissioned one from {@link calendarAsks}' caller, and the rule that picks a car has to be the
+ * same rule in both places or the refusal and the caption disagree about the day (issue #264).
+ * Neither growth nor a period's population factor touches a bank, so the two see the same cars.
+ */
+export interface BankedConfig {
+  readonly banks: readonly { readonly id: string; readonly cars: readonly { readonly id: string }[] }[];
+}
+
 /** The id `Simulation` gives a car at run time, and the one `outOfServiceCarIds` is matched on. */
 function carRuntimeId(car: CarRef): string {
   return `${car.bankId}-${car.carId}`;
@@ -1159,7 +1243,7 @@ function carRuntimeId(car: CarRef): string {
  * shortfall is reported rather than papered over.
  */
 function reserveCars(
-  building: { readonly banks: readonly { readonly id: string; readonly cars: readonly { readonly id: string }[] }[] },
+  building: BankedConfig,
   count: number,
   spokenFor: readonly string[],
 ): { readonly ids: readonly string[]; readonly shortfall: number } {
