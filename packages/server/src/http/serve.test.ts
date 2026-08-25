@@ -16,6 +16,7 @@
  * `ServeOptions.siteOrigin` for why the fix is a redirect rather than a rebuild.
  */
 
+import { readFileSync } from 'node:fs';
 import { request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -256,6 +257,60 @@ describe('a request target that is not a URL is answered, not dropped', () => {
 
     expect(answer).toMatch(/^HTTP\/1\.1 400 /u);
     expect(answer).toContain('bad-request');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The preflight
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Every method `api.ts` actually routes, read out of its own `switch`.
+ *
+ * **Derived rather than listed, because a list here is the thing that goes stale.** The preflight
+ * and the router are two places that have to agree about what this server answers, and nothing
+ * made them agree until this test: `DELETE /api/me` shipped while `access-control-allow-methods`
+ * still read `GET, POST, OPTIONS`, which is a route that works from `curl` and from nothing a
+ * browser can do. `api.test.ts` cannot see it — that file calls `handle()` with no browser in
+ * front of it — so this is the only place the disagreement is observable.
+ *
+ * Source-reading, in `viz/src/menu/client.test.ts`'s idiom. It is a weaker instrument than driving
+ * the code and it is the right one here, because the question is *what does the router claim to
+ * serve* rather than *what does it do*.
+ */
+const ROUTED_METHODS = new Set(
+  [...readFileSync(new URL('./api.ts', import.meta.url), 'utf8').matchAll(/case '([A-Z]+) \/api\//gu)].map(
+    (match) => match[1] ?? '',
+  ),
+);
+
+describe('the preflight names every method the API routes', () => {
+  it('finds the routes it is supposed to be reading, so a broken match cannot pass', () => {
+    // The guard that stops a regex which quietly matched nothing from satisfying both directions
+    // below by having nothing to compare.
+    expect(ROUTED_METHODS.size).toBeGreaterThanOrEqual(3);
+    expect([...ROUTED_METHODS]).toContain('DELETE');
+  });
+
+  it('allows exactly those methods, no more and no fewer', async () => {
+    const port = await listening({ allowOrigin: SITE });
+    const answer = await ask(port, '/api/me', { method: 'OPTIONS' });
+    expect(answer.status).toBe(204);
+
+    const allowed = String(answer.headers['access-control-allow-methods'] ?? '')
+      .split(',')
+      .map((method) => method.trim())
+      .filter((method) => method.length > 0);
+
+    // `OPTIONS` is the preflight itself and is answered by the transport rather than routed, so it
+    // is the one method that may appear here without a `case` behind it.
+    expect(allowed).toContain('OPTIONS');
+    expect(
+      [...allowed].filter((method) => method !== 'OPTIONS').sort(),
+      'the preflight and the router disagree: a method the API answers but the preflight omits is ' +
+        'unreachable from a browser, and one the preflight names but the API does not route is an ' +
+        'advertisement for a 404',
+    ).toEqual([...ROUTED_METHODS].sort());
   });
 });
 
