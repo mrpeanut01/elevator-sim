@@ -63,6 +63,12 @@ one host, one sitting:
 | non-browser (`core`·`experiments`·`server`·`cli`·`viz`) | **418 passed** | **8 623 passed, 11 skipped** | 901 s |
 | `viz-browser`, **default parallelism** | **26 passed** | **154 passed, 0 skipped** | 62–65 s, twice |
 
+**That 154 became 151 later in the wave and the row is left as measured**, because it dates a run.
+#268's gate folded three hand-rolled page-error collectors into one shared check, so three duplicate
+cases went away while the check itself moved from 3 files to 26 — **fewer tests covering more.** The
+figure to carry forward is **151**, and the reason it moved is the reason a bare count is a poor
+summary of a tier.
+
 The browser figure is the one that matters and it is deliberately taken at **default parallelism**
 rather than serially. M2-MEASURE measured that same tier at **19 failed files / 75 failed tests** on
 `000852a`, against **1 failed / 0 failed tests** serially — so a serial green here would have proved

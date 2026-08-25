@@ -46,8 +46,11 @@ beforeAll(async () => {
   server = await createServer({
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
-    // A port of its own, and `strictPort: false` so it moves rather than throws — the three files
-    // in this project run concurrently and would otherwise fight over one port.
+    // A port of its own, and `strictPort: false` so it moves rather than throws — the files in this
+    // project run concurrently and would otherwise fight over one port. It said *three* for as long
+    // as three was true; the tier is **26** files now, and the rule is no longer kept by anybody
+    // counting: `browserTier.test.ts` derives it — every file names a port, none says `port: 0`, and
+    // no two name the same one. That third clause found eleven files across five collisions.
     server: { port: 5191, strictPort: false },
     logLevel: 'error',
   });
