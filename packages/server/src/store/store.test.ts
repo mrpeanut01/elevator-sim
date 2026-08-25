@@ -22,7 +22,8 @@ import { issuedChallengeFor } from '../challenge/schedule.js';
 import { challengeScoreOf, type SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
 import { PgliteSql } from './pglite.test-helper.js';
-import { SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
+import { RacingSql } from './racingSql.test-helper.js';
+import { NoSuchUserError, SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
 
 const RUN: SubmittedRun = Object.freeze({
   buildingId: 'garden-apartments',
@@ -587,5 +588,70 @@ describe('deleting an account', () => {
     // The route above this has already authenticated, so this can only be a concurrent second
     // deletion — and the answer to that is the answer to the first one.
     await expect(store.deleteUser('nobody')).resolves.toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The race that deletion made reachable
+ * -------------------------------------------------------------------------- */
+
+/** A store whose one account is deleted the instant `fires` matches, and that account's id. */
+async function racedFixture(fires: (text: string) => boolean): Promise<{ store: Store; ada: string }> {
+  let store: Store | undefined;
+  let ada = '';
+  const sql = new RacingSql(new PgliteSql(), fires, async () => {
+    await store?.deleteUser(ada);
+  });
+  store = await Store.open({ sql, now: () => 1_770_000_000_000 });
+  const created = await store.createUser({
+    email: 'raced@example.test',
+    displayName: 'Raced',
+    displayNameChosen: true,
+  });
+  if (!created.ok) throw new Error(created.reason);
+  ada = created.user.id;
+  return { store, ada };
+}
+
+describe('an account deleted underneath a submission', () => {
+  it('fails recordEntry as a missing account, not as a raw constraint violation', async () => {
+    const { store, ada } = await racedFixture((text) => text.startsWith('INSERT INTO entries'));
+    // The pre-check passes — the account is there when `recordEntry` looks — and the row is gone by
+    // the time the insert runs. Before this was mapped, what came out was PostgreSQL's own
+    // sentence, naming the constraint and the table, as an unhandled rejection.
+    const failure = store.recordEntry({ configHash: 'raced', userId: ada, run: RUN, measured: metrics(10) });
+    await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
+    await expect(failure).rejects.toThrow('recordEntry: no such user');
+    await expect(failure).rejects.not.toThrow(/foreign key|constraint|entries_user_id_fkey/u);
+  });
+
+  it('fails recordChallengeEntry the same way, because it has the same shape', async () => {
+    const { store, ada } = await racedFixture((text) => text.startsWith('INSERT INTO challenge_entries'));
+    await store.issueChallenge(issuedChallengeFor(0));
+    const failure = store.recordChallengeEntry({
+      challengeId: issuedChallengeFor(0).id,
+      dataHash: 'data-1',
+      userId: ada,
+      dispatcherProfileId: 'collective',
+      score: challengeScore(20),
+    });
+    await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
+    await expect(failure).rejects.toThrow('recordChallengeEntry: no such user');
+  });
+
+  it('does not call a missing challenge a missing account', async () => {
+    const { store, ada } = await fixture();
+    // `challenge_entries` references two tables and only one of them is the account. The mapping
+    // asks the database whether the *owner* went away rather than reading a generated constraint
+    // name, so the other foreign key has to still come out as itself.
+    await expect(
+      store.recordChallengeEntry({
+        challengeId: 'never-issued-0',
+        dataHash: 'data-1',
+        userId: ada,
+        dispatcherProfileId: 'collective',
+        score: challengeScore(25),
+      }),
+    ).rejects.not.toBeInstanceOf(NoSuchUserError);
   });
 });

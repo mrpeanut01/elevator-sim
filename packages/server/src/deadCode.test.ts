@@ -107,6 +107,10 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   ['newSessionToken', 'server/src/http/api.ts', 'import'],
   ['signInMessage', 'server/src/http/api.ts', 'import'],
   ['normaliseEmail', 'server/src/http/api.ts', 'import'],
+  // Issue #254. `deleteUser` made a `users` row able to disappear under a submission, so the
+  // check-then-act in `recordEntry` acquired a losing branch; the class is how `submit` tells
+  // that outcome from a server failure without matching on a message.
+  ['NoSuchUserError', 'server/src/http/api.ts', 'import'],
   ['signInUrlFor', 'server/src/bootstrap.ts', 'same file'],
   ['SIGN_IN_FRAGMENT_KEY', 'server/src/bootstrap.ts', 'same file'],
   ['bearerOf', 'server/src/http/serve.ts', 'same file'],

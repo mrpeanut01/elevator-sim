@@ -31,6 +31,7 @@ import { bootstrap, UnsafeConfigurationError, type Server } from '../bootstrap.j
 import { configFor, metricsOf } from '../leaderboard/verify.js';
 import { OutboxMailer } from '../mail/mailer.js';
 import { PgliteSql } from '../store/pglite.test-helper.js';
+import { RacingSql } from '../store/racingSql.test-helper.js';
 import type { ApiRequest, ApiResponse } from './api.js';
 import type { Submission, SubmittedRun } from '../leaderboard/submission.js';
 
@@ -752,6 +753,69 @@ describe('deleting an account', () => {
     const again = await call('POST', '/api/auth/redeem', { body: { token: mail.token } });
     expect(again.status, JSON.stringify(again.body)).toBe(200);
     expect((bodyOf(again)['user'] as Record<string, unknown>)['id']).not.toBe(account.id);
+  }, 60_000);
+
+  it('answers 401 rather than 500 when it happens under a submission in flight', async () => {
+    /*
+     * The race `DELETE /api/me` made reachable, driven end to end. `store.test.ts` proves the store
+     * raises `NoSuchUserError`; this proves the route turns it into an answer rather than into an
+     * unhandled rejection through the `Api` interface `bootstrap` exports.
+     *
+     * Its own server, because `RacingSql` has to be underneath the store from the moment it opens
+     * and the shared one is already running. Its own outbox for the same reason.
+     */
+    let raced: Server | undefined;
+    let accountId = '';
+    const sql = new RacingSql(
+      new PgliteSql(),
+      (text) => text.startsWith('INSERT INTO entries'),
+      // Exactly the gap: the submission has authenticated, verified a whole simulation, and is
+      // about to write. A player pressing delete during a verification lands precisely here.
+      async () => {
+        await raced?.store.deleteUser(accountId);
+      },
+    );
+    const outbox = new OutboxMailer(join(scratch, 'raced-outbox.jsonl'));
+    const app = await bootstrap({
+      dataDir: DATA_DIR,
+      sql,
+      env: { ELEVATOR_SIM_SECRET: SECRET },
+      publicOrigin: 'https://elevator.example',
+      now: () => clock,
+      mailer: outbox,
+    });
+    raced = app;
+
+    const ask = async (method: string, path: string, options: { body?: unknown; token?: string } = {}) =>
+      app.api({
+        method,
+        path,
+        query: new Map(),
+        body: options.body,
+        token: options.token,
+        clientIp: '198.51.100.251',
+      });
+
+    await ask('POST', '/api/auth/request-link', { body: { email: 'raced@example.test' } });
+    const message = (await outbox.delivered()).at(-1);
+    const link = /https:\/\/\S+/u.exec(message?.body ?? '')?.[0] ?? '';
+    const token = new URLSearchParams(new URL(link).hash.slice(1)).get('sign-in') ?? '';
+    const session = bodyOf(await ask('POST', '/api/auth/redeem', { body: { token } }));
+    accountId = String((session['user'] as Record<string, unknown>)['id']);
+
+    const response = await ask('POST', '/api/scores', {
+      token: String(session['token']),
+      body: honest(),
+    });
+    // Not a 500, and not a rejection. The caller stopped existing; nothing failed on the server.
+    expect(response.status, JSON.stringify(response.body)).toBe(401);
+    expect(bodyOf(response)['error']).toBe('not-signed-in');
+    // And the detail says the run was not posted, because the other reading — posted, then erased —
+    // is the one a player would assume and it is wrong.
+    expect(String(bodyOf(response)['detail'])).toMatch(/nothing was posted/u);
+    // PostgreSQL's own sentence must not reach a caller: it names the constraint and the table.
+    expect(JSON.stringify(response.body)).not.toMatch(/foreign key|constraint|fkey/u);
+    await app.close();
   }, 60_000);
 
   it('says what it removed, and does not claim anything about the other store', async () => {

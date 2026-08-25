@@ -92,6 +92,7 @@ import { configHashOf, submissionIssues, type ResolvedDataFacts, type Submission
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
 import {
   BOARD_METRICS,
+  NoSuchUserError,
   normaliseEmail,
   type BoardMetric,
   type ChallengeEntryRow,
@@ -669,13 +670,19 @@ async function submit(
   }
 
   const configHash = configHashOf(submission.run, facts);
-  const entry = await deps.store.recordEntry({
-    configHash,
-    userId: user.id,
-    run: submission.run,
-    // The **server's** figures. The claim is compared and then discarded; it is never what ranks.
-    measured: verification.measured,
-  });
+  let entry: EntryRow;
+  try {
+    entry = await deps.store.recordEntry({
+      configHash,
+      userId: user.id,
+      run: submission.run,
+      // The **server's** figures. The claim is compared and then discarded; it is never what ranks.
+      measured: verification.measured,
+    });
+  } catch (error) {
+    if (error instanceof NoSuchUserError) return accountVanished();
+    throw error;
+  }
   return { status: 201, body: { configHash, entry: publicEntry(entry) } };
 }
 
@@ -821,14 +828,20 @@ async function submitChallenge(
   }
 
   const dataHash = challengeDataHashOf(target, facts);
-  const entry = await deps.store.recordChallengeEntry({
-    challengeId: target.id,
-    dataHash,
-    userId: user.id,
-    dispatcherProfileId: submission.dispatcherProfileId,
-    // The **server's** aggregate over the **server's** runs. The claim is compared and discarded.
-    score: verification.score,
-  });
+  let entry: ChallengeEntryRow;
+  try {
+    entry = await deps.store.recordChallengeEntry({
+      challengeId: target.id,
+      dataHash,
+      userId: user.id,
+      dispatcherProfileId: submission.dispatcherProfileId,
+      // The **server's** aggregate over the **server's** runs. The claim is compared and discarded.
+      score: verification.score,
+    });
+  } catch (error) {
+    if (error instanceof NoSuchUserError) return accountVanished();
+    throw error;
+  }
   return { status: 201, body: { challengeId: target.id, dataHash, entry: publicChallengeEntry(entry) } };
 }
 
@@ -896,6 +909,35 @@ async function challengeBoard(deps: ApiDeps, request: ApiRequest): Promise<ApiRe
 /* -------------------------------------------------------------------------- *
  * Shared
  * -------------------------------------------------------------------------- */
+
+/**
+ * The account was there when the request authenticated and is not there now.
+ *
+ * **Reachable only since `DELETE /api/me` landed, and only by the account's own owner.** A
+ * verification is a whole simulation, so the gap between {@link authenticate} and the write is
+ * seconds rather than microseconds; a player who deletes their account while a submission is
+ * verifying lands here. Nothing about it is cross-account — a session cannot delete anybody else —
+ * so this is a robustness answer rather than a security one.
+ *
+ * **401 rather than 409 or 500.** A `500` is what this used to be, and it was a lie: nothing failed
+ * on the server, the caller stopped existing. A `409` would invite a retry into a state that cannot
+ * come back. `401` is exactly what the *next* request would get, since the session went with the
+ * account, and `not-signed-in` is the code every client already handles by dropping its session —
+ * which is the correct thing for it to do here.
+ *
+ * The detail says the run was not posted, because the alternative reading — that it was posted and
+ * then erased — is the one a player would otherwise assume, and it is wrong: the insert never
+ * landed.
+ */
+function accountVanished(): ApiResponse {
+  return {
+    status: 401,
+    body: {
+      error: 'not-signed-in',
+      detail: 'That account was deleted while this run was being verified, so nothing was posted.',
+    },
+  };
+}
 
 async function authenticate(deps: ApiDeps, request: ApiRequest): Promise<UserRow | undefined> {
   return request.token === undefined ? undefined : deps.store.userForSession(request.token);
