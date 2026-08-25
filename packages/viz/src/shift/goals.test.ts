@@ -29,6 +29,7 @@ import {
   WAKE_UP_ARRIVALS,
   type DayOutcome,
   type GoalObservations,
+  type ShiftGoal,
 } from './types.js';
 
 function observations(overrides: Partial<GoalObservations> = {}): GoalObservations {
@@ -140,6 +141,108 @@ describe('the bars harden with the day, and then stop', () => {
     // `persist/validate.ts` checks restored readings' `reads` against this list, and a saved
     // week that closed an odd day under the old build carries an `abandoned` reading.
     expect(GOAL_OBSERVATION_IDS).toContain('abandoned');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The horizon — `ISSUE_VERIFICATION_FINDINGS.md` § AB
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A goal measured over thirty minutes is not a goal over ten hours, and **exactly one of the four
+ * knows it**.
+ *
+ * Every expectation below is derived from the other arm rather than transcribed from a table, so
+ * the ladder can be re-tuned without touching this block, and a second bar quietly acquiring a
+ * horizon allowance fails here rather than passing silently. `WORST_WAIT_WHOLE_DAY_FACTOR` carries
+ * the measurement, the mechanism, and the refutation of the assumption that both maxima grow.
+ */
+describe('what a whole day asks, against what a slice asks', () => {
+  const barOf = (goals: readonly ShiftGoal[], id: string): number =>
+    goals.find((goal) => goal.id === id)?.bar ?? Number.NaN;
+
+  it('moves the worst-wait ceiling and moves nothing else', () => {
+    for (let day = 1; day <= 30; day += 1) {
+      const slice = goalsForDay(day, 'period');
+      const whole = goalsForDay(day, 'whole-day');
+
+      // The same four tests, in the same order, reading the same observations. A day is a longer
+      // run, not a different brief.
+      expect(whole.map((goal) => goal.id)).toEqual(slice.map((goal) => goal.id));
+      expect(whole.map((goal) => goal.reads)).toEqual(slice.map((goal) => goal.reads));
+      expect(whole.map((goal) => goal.compare)).toEqual(slice.map((goal) => goal.compare));
+
+      // Two shares and one maximum are horizon-blind, and the queue's flatness is measured rather
+      // than assumed — see `WORST_WAIT_WHOLE_DAY_FACTOR` for the four cells it was measured on.
+      for (const id of ['carry', 'minute', 'queue']) {
+        expect(barOf(whole, id), `day ${String(day)} ${id}`).toBe(barOf(slice, id));
+      }
+      expect(barOf(whole, 'worst-wait'), `day ${String(day)}`).toBe(
+        barOf(slice, 'worst-wait') * GOAL_BARS.worstWholeDayFactor,
+      );
+    }
+  });
+
+  it('defaults to the slice, which is what three shipped crowds and every published figure ran', () => {
+    for (const day of [1, 4, 12, 50]) {
+      expect(goalsForDay(day)).toEqual(goalsForDay(day, 'period'));
+    }
+  });
+
+  it('still hardens and still floors, because the allowance scales the ladder rather than replacing it', () => {
+    const early = goalsForDay(2, 'whole-day');
+    const late = goalsForDay(8, 'whole-day');
+    expect(barOf(late, 'worst-wait')).toBeLessThan(barOf(early, 'worst-wait'));
+    // The floor is the ladder's floor carrying the same allowance — never the raw 150 s, which
+    // would hand a ten-hour day the difficulty change this argument exists to prevent.
+    expect(barOf(goalsForDay(50, 'whole-day'), 'worst-wait')).toBe(
+      GOAL_BARS.worstMinS * GOAL_BARS.worstWholeDayFactor,
+    );
+  });
+
+  it('keeps the ceiling under the abandonment horizon, so it still subsumes the retired goal', () => {
+    // The same argument the slice arm is held to, re-asked of the looser bar: if a whole day's
+    // ceiling ever reached 900 s it would stop being the stricter test of the tail, and the
+    // retirement of the odd-day `abandoned` goal would stop being sound.
+    for (let day = 1; day <= 30; day += 1) {
+      expect(barOf(goalsForDay(day, 'whole-day'), 'worst-wait')).toBeLessThan(900);
+    }
+  });
+
+  it('puts the bar it actually grades in the label, on both horizons', () => {
+    // § D227 at the scale of a sentence: a whole day judged at 460 s may not print 230 s.
+    for (const goal of goalsForDay(1, 'whole-day')) {
+      expect(goal.label, goal.id).toContain(String(goal.bar));
+    }
+    const worst = goalsForDay(1, 'whole-day').find((goal) => goal.id === 'worst-wait');
+    expect(worst?.label).not.toContain(
+      String(barOf(goalsForDay(1, 'period'), 'worst-wait')),
+    );
+  });
+
+  it('grades a wait the slice bar would have missed and the day’s bar does not', () => {
+    /*
+     * The measured consequence, as a reading rather than as a number. Secure Tower's median worst
+     * wait over the whole day is 310 s against a slice ceiling of 230 s — 9 of 10 seeds missing a
+     * bar that 4 of 10 missed on the slice, on a run nobody made worse. Held here at the boundary
+     * so the allowance is load-bearing rather than decorative.
+     */
+    const observations: GoalObservations = {
+      arrived: 400,
+      carryPct: 100,
+      minutePct: 100,
+      peakQueue: 0,
+      abandoned: 0,
+      worstWaitS: 310,
+      worstWaitIsCensored: false,
+    };
+    const worstOn = (over: 'period' | 'whole-day') => {
+      const goal = goalsForDay(1, over).find((entry) => entry.id === 'worst-wait');
+      if (goal === undefined) throw new Error('no worst-wait goal');
+      return readGoal(goal, observations).state;
+    };
+    expect(worstOn('period')).toBe('missed');
+    expect(worstOn('whole-day')).toBe('met');
   });
 });
 
