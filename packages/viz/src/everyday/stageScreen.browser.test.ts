@@ -56,6 +56,7 @@ import {
   enterEverydayStage,
 } from '../dev/browserTier.test-helper.js';
 import { ACTION_BAR_ROWS } from './actionBar.js';
+import { STAGE_SPEEDS } from './stageScreenModel.js';
 import { EVERYDAY_COLORS } from './tokens.js';
 
 /**
@@ -69,6 +70,18 @@ import { EVERYDAY_COLORS } from './tokens.js';
 const LEAVE_TOWER = ACTION_BAR_ROWS.find(
   (row) => row.screen === 'stage' && row.ctx === 'daily',
 )?.leave.label;
+
+/**
+ * **The fastest rung, derived rather than counted** — three cases below press it so the clock moves
+ * inside a twenty-second wait, and what they want is *the top of the ladder*, not a position.
+ *
+ * They were written as a literal `4`, which was the top of a five-rung ladder and stopped being the
+ * top when GitHub issue #257 added two rungs below it. Nothing failed — index 4 is a real rung and
+ * still moves the clock — which is the whole problem with a positional reference: it goes on
+ * passing while it stops meaning what it said. Reading the length is the same move
+ * `LEAVE_TOWER` above makes for a label.
+ */
+const TOP_SPEED_INDEX = STAGE_SPEEDS.length - 1;
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -342,16 +355,24 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     expect(size.backing).toBe(Math.round(size.css * size.dpr));
     expect(await canvasHasPaint(page)).toBe(true);
 
-    /* § 4.6: the day opens at the player's default speed, which is 1× until a setting exists. */
+    /*
+     * § 4.6: the day opens at the player's default speed, which is `30×` until a setting exists.
+     *
+     * **The chip's words moved and the pacing did not** — GitHub issue #257 renamed this rung from
+     * `1×` to `30×` because 30 simulated seconds per real second is what it has always run at, and
+     * `1×` now names the true 1:1 rung at the bottom of the ladder. The multiplier this case is
+     * about is unchanged; only the face of the button is. The pure half owns the *reason* the
+     * default is 30 (`stageScreenModel.ts`); what is checked here is that the page opens on it.
+     */
     const pressed = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>('.everyday-stage-speed')]
         .filter((button) => button.getAttribute('aria-pressed') === 'true')
         .map((button) => button.textContent),
     );
-    expect(pressed).toEqual(['1×']);
+    expect(pressed).toEqual(['30×']);
 
     /* And the playhead was at the *start*: playing only ever takes the clock forward from it. */
-    await page.click('.everyday-stage-speed[data-speed-index="4"]');
+    await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
     await page.click('.everyday-stage-play');
     await page.waitForFunction(
       (from) => document.querySelector('.everyday-stage-clock')?.textContent !== from,
@@ -429,8 +450,9 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
   it('plays, and the clock moves', async () => {
     const page = await coldLoad();
     await enterEverydayStage(page);
-    /* 30× so a second of real time is ten minutes of the day — the transport, not a metric. */
-    await page.click('.everyday-stage-speed[data-speed-index="4"]');
+    /* The top rung, so a second of real time is ten minutes of the day — the transport, not a
+       metric. */
+    await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
     await page.click('.everyday-stage-play');
     const opened = await page.textContent('.everyday-stage-clock');
     await page.waitForFunction(
@@ -450,7 +472,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     const page = await coldLoad();
     await enterEverydayStage(page);
     const opened = await page.textContent('.everyday-stage-clock');
-    await page.click('.everyday-stage-speed[data-speed-index="4"]');
+    await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
     await page.click('.everyday-stage-play');
     await page.waitForFunction(
       (from) => document.querySelector('.everyday-stage-clock')?.textContent !== from,
