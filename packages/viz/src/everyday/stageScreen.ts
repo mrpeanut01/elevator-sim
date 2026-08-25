@@ -63,6 +63,8 @@ import type { Frame, VizRecording } from '../contract/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { queueAt, type FloorQueue } from '../frame/overlay.js';
 import { observationsAt } from '../live/observations.js';
+// AD-S17 — one derivation of *standing still* for both stages; see `render/carRest.ts`.
+import { carRestsAt } from '../render/carRest.js';
 import {
   RACE_SAMPLE_INTERVAL_S,
   raceLaneOf,
@@ -80,6 +82,7 @@ import {
   stageBarModelOf,
   stageCarPaintOf,
   stageCarReadoutOf,
+  stageCarRestBarOf,
   stageCrowdCapOf,
   stageFilingLandsOn,
   stageGeometryOf,
@@ -275,6 +278,9 @@ function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput): void {
 
   /* --- The cars. --- */
   const carH = Math.max(9, Math.min(20, g.rowPitch * 0.86));
+  /* AD-S17. Derived once per paint from the record's own motions and door marks — never from a
+     field on the frame, and never from a motion the playhead has not reached. */
+  const restByCar = new Map(carRestsAt(recording, frame).map((rest) => [rest.carId, rest]));
   for (const car of frame.cars) {
     const column = g.columns.find((candidate) => candidate.carId === car.carId);
     if (column === undefined || column.outOfService) continue;
@@ -324,6 +330,30 @@ function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput): void {
       ctx.fillStyle = C.terracotta;
       ctx.font = `600 9px ${TYPE.mono}`;
       ctx.fillText(readout.direction, column.centreX, y - 10);
+    } else {
+      /*
+       * **AD-S17 — the rest bar.** The third state of the slot above, and the only mark in this
+       * cutaway that says a lift is doing nothing.
+       *
+       * `docs/34` § 9.2 is the whole argument for it: a parking fault is *"the product's most-used
+       * fault family"* and *"has no mark on the stage"*, because an idle car is a stationary car
+       * with `direction === 0` and is pixel-identical to any empty car that happens to be stopped.
+       * Campaign stage 1 asks the player to reason about where the lifts wait; this is the first
+       * thing on the screen that shows them waiting.
+       *
+       * `inkSoft` rather than `ink`, and neither `terracotta` nor `sun`: the car's own body is
+       * `ink`, so a bar in it would read as part of the car rather than as a mark about it, and an
+       * alarm colour would make the stage assert that standing still is *wrong* — which is the
+       * player's conclusion to reach and not the renderer's to draw. `inkSoft` on the well's
+       * `paper` is the same family one rung down, measured at **7.86:1** in
+       * `stageScreenModel.test.ts`, and it is the only ink in this cutaway that no other mark uses.
+       */
+      const rest = restByCar.get(car.carId);
+      if (rest !== undefined) {
+        const bar = stageCarRestBarOf({ bodyWidth, fill: rest.fill });
+        ctx.fillStyle = C.inkSoft;
+        ctx.fillRect(bodyX + bar.x, y + bar.y, bar.width, bar.height);
+      }
     }
   }
 }

@@ -46,6 +46,7 @@ import {
 import { DAY_START_S, drawSky, isNight, type SkyBand, type SkyRamp } from './sky.js';
 import { drawAlarmRule, drawRiderLane, figureClearancePx } from './riderFigures.js';
 import { fillRoundedRect } from './shapes.js';
+import { REST_BAR_THICKNESS_PX, carRestsAt, restBarWidthPx } from './carRest.js';
 import * as tokens from './tokens.js';
 
 /**
@@ -1453,6 +1454,9 @@ function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { frame, layout } = input;
   const byCar = new Map(frame.cars.map((car) => [car.carId, car]));
   const outOfService = new Set(input.recording.outOfServiceCarIds);
+  // AD-S17. One derivation for both renderers — `render/carRest.ts` says why it is *standing still*
+  // rather than *parked*, and why that distinction is not pedantry.
+  const restByCar = new Map(carRestsAt(input.recording, frame).map((rest) => [rest.carId, rest]));
   for (const column of layout.columns) {
     const car = byCar.get(column.carId);
     if (car === undefined) continue;
@@ -1509,6 +1513,36 @@ function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     if (car.direction !== 0) {
       ctx.fillStyle = car.direction === 1 ? theme.waitingUp : theme.waitingDown;
       ctx.fillText(car.direction === 1 ? '▲' : '▼', column.x + w + 6, centreY);
+    } else {
+      /*
+       * **AD-S17 — the rest bar.** The third state of a slot that had two.
+       *
+       * `docs/34` § 3.1 records the hole this fills: *"Where the cars are, and which way they are
+       * moving — car body at its height, `▲`/`▼` beside it, **and nothing at all when
+       * `direction === 0`**."* A car that has stood in one place for two minutes was drawn exactly
+       * like a car that levelled a second ago, which is why § 9.2 calls the product's most-used
+       * fault family undrawable.
+       *
+       * It is drawn **in the arrow's own slot**, at the arrow's own centre, so the three states are
+       * one channel: up, down, and neither. A mark somewhere else on the car would be a second
+       * thing to learn before the first could be read. Its *length* is how long — `restBarWidthPx`
+       * — which is `docs/28` AD-A1's second channel and AD-S7's own trick, so the state survives
+       * greyscale, a screenshot and a reader who cannot separate the two arrow greens.
+       *
+       * Capped at the arrow's footprint rather than the car's, because that is the room this slot
+       * has on a 35-car elevation.
+       */
+      const rest = restByCar.get(column.carId);
+      if (rest !== undefined) {
+        const barWidth = restBarWidthPx(rest.fill, REST_BAR_SLOT_PX);
+        ctx.fillStyle = theme.textDim;
+        ctx.fillRect(
+          column.x + w + 6 - barWidth / 2,
+          centreY - REST_BAR_THICKNESS_PX / 2,
+          barWidth,
+          REST_BAR_THICKNESS_PX,
+        );
+      }
     }
 
     // KB-15b: the overload alarm carries a glyph, at every floor pitch, on every building. It is
@@ -1533,6 +1567,17 @@ function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
 
 /** How much of a car's width the doors open to — design `:2078`, `cw * 0.86`. */
 const DOOR_GAP_FRACTION = 0.86;
+/**
+ * The width the rest bar grows into on this stage — the `▲`/`▼` glyph's own advance.
+ *
+ * `FONT` is 12 px monospace, whose advance is 0.6 em, so a glyph in this slot is about 7.2 px wide
+ * and the arrow already overhangs its column by a few pixels. Nine is that footprint rounded up
+ * once: wide enough that the bar's shortest and longest states are distinguishable, narrow enough
+ * that `vertical-city`'s 35 columns do not put one bank's mark on the next bank's shaft. The Casual
+ * cutaway's slot is the car's whole width, because its slot is above the car rather than beside it
+ * — one rule, two rooms.
+ */
+const REST_BAR_SLOT_PX = 9;
 /** The occupant count's face — design `:2083`. */
 const OCCUPANT_FONT = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
 /** The service badge's face — design `:2108`. */
