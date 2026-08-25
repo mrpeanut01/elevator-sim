@@ -100,7 +100,7 @@ import {
 
 import { SHIFT_EVENTS, eventFor } from './events.js';
 import { scaledBuilding } from './growth.js';
-import { carsToDerate, type CarRef } from './incidents.js';
+import { carRuntimeId, carsToDerate } from './incidents.js';
 import { weekdayOf, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -671,12 +671,20 @@ export interface CalendarPatchInput {
    */
   readonly templateChosenByPlayer?: boolean | undefined;
   /**
-   * Runtime car ids already spoken for today — the day's whole-shift holds and the cars any incident
-   * has scheduled.
+   * Runtime car ids already spoken for today — the day's whole-shift holds, the cars any incident
+   * has scheduled, and the player's own holds.
    *
    * Without it a goods car and a move-in derate pick the **same** car by the same total order, and
    * the incident's return-to-service event would put the movers' car back in passenger service
    * halfway through the shift. The reservation steps down the same order instead.
+   *
+   * **Build it with `events.ts#spokenForCarIdsOf` and never by hand — GitHub issue #272.** The
+   * sentence above described the field correctly from the day it was written and the shipped caller
+   * passed `ShiftRunPatch.outOfServiceCarIds` alone, which is `[]` on every day this build can
+   * produce; the only place the correct set existed was `calendar.test.ts`'s harness. So the suite
+   * exercised a configuration the product could not make, and the docstring saying what the field is
+   * for is what a reader trusted instead of a run. There is one expression now, and both callers use
+   * it.
    */
   readonly spokenForCarIds?: readonly string[] | undefined;
 }
@@ -977,11 +985,23 @@ export interface CalendarReservationInput {
   /**
    * Runtime car ids already spoken for today, as {@link CalendarPatchInput.spokenForCarIds}.
    *
-   * Optional here and absent at the only caller, which is a **narrower** claim than it looks and is
-   * pinned rather than assumed: `shiftRunConfigOf` hands `calendarPatch` the day's *whole-shift*
-   * holds, `SHIFT_EVENTS` declares `carsOutOfService: 0` on all five, so the set is empty on every
-   * day this build can produce. `calendar.test.ts` asserts that over the event table, so an event
-   * that holds a car turns it red rather than turning this sentence stale.
+   * Optional here and **passed by the only caller — which it was not, and that is GitHub issue
+   * #272's residual rather than its subject.**
+   *
+   * It used to be omitted on a claim that was pinned rather than assumed: `shiftRunConfigOf` handed
+   * `calendarPatch` the day's *whole-shift* holds, `SHIFT_EVENTS` declares `carsOutOfService: 0` on
+   * all five, so the set was empty on every day this build could produce and the two functions
+   * agreed by construction. Every clause of that was true and it was **a defect being described as a
+   * property**: the product agreed with this function by passing a set that was always empty, and
+   * the movers' car was handed back to passengers at 1 200 s because of it.
+   *
+   * Correcting the run's set made the omission bite, and the fix was a field rather than a rewrite —
+   * `scope/runIdentity.ts` now passes `events.ts#eventSpokenForCarIds`, which derives from the same
+   * `eventCarChoice` `shiftRunPatch` uses. Measured over every shipped building × period × day ×
+   * one-shaft commissioning, the gap in between was **six cells**, all `garden-apartments` /
+   * `moving-week`: a two-car bank whose only spare is `move-in`'s derate, so the patch reserved none
+   * and said so in `withheld` while this function reserved `main-B`. `calendar.test.ts` sweeps that
+   * space and expects an empty disagreement list, which is where the next one will show up.
    */
   readonly spokenForCarIds?: readonly string[] | undefined;
 }
@@ -1223,11 +1243,6 @@ function populationOf(config: {
  */
 export interface BankedConfig {
   readonly banks: readonly { readonly id: string; readonly cars: readonly { readonly id: string }[] }[];
-}
-
-/** The id `Simulation` gives a car at run time, and the one `outOfServiceCarIds` is matched on. */
-function carRuntimeId(car: CarRef): string {
-  return `${car.bankId}-${car.carId}`;
 }
 
 /**

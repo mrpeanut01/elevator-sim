@@ -81,7 +81,7 @@ import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
-import { shiftRunPatch, baseDemandOf } from '../shift/events.js';
+import { shiftRunPatch, baseDemandOf, spokenForCarIdsOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
@@ -1395,13 +1395,22 @@ export function shiftRunConfigOf(
    *
    * Before the incidents because the schedule has to be written onto the building the calendar
    * returns, so one parse-and-resolve covers both edits rather than two.
+   *
+   * **`spokenForCarIdsOf` rather than `patch.outOfServiceCarIds` — GitHub issue #272.** This line
+   * used to pass the event's whole-shift holds alone, which is `[]` on every day this build can
+   * produce, so the paragraph above described a mechanism the product did not reach: on
+   * `midtown-office` / `moving-week` / day 1 the reservation and `move-in`'s derate both picked
+   * `main-D`, the schedule returned it at 1 200 s of an 1 800 s shift, and 114 people rode the car
+   * the caption reserved for the movers. `calendar.test.ts`'s harness built the right set all along
+   * and was never compared against this one on a day with a period. It is one expression now, in
+   * `shift/events.ts`, and the harness calls it too.
    */
   const calendar = calendarPatch({
     day: calendarDay,
     building: grown,
     split: patch.demand.directionalSplit ?? baseOf(resources, authored, demand).split,
     ...askInput,
-    spokenForCarIds: patch.outOfServiceCarIds,
+    spokenForCarIds: spokenForCarIdsOf(patch, state.outOfServiceCarIds),
   });
 
   const outOfServiceCarIds = [
