@@ -946,6 +946,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Chooses a horizon, and authors nothing — `shiftReportWindowFor`\'s case one entry up, ' +
+        'and the same scanner artefact. `runHorizonOf` answers *which of the two kinds of run this ' +
+        'state is*, and both of its values are members of `shift/types.ts#RunHorizon`: `period`, ' +
+        'and `whole-day`, which is derived **only** because the hyphen reads to the two-adjacent-' +
+        'words scanner as a phrase. Nothing it returns is shown to anybody. What a player reads is ' +
+        'the **bar** `shift/goals.ts#goalsForDay` builds from it, and `goalsForDay` is driven ' +
+        'already — so putting this in an adapter would be a coverage claim for prose that does not ' +
+        'exist. That its answer is *right* is not a string question either, and is asserted in ' +
+        '`shift/dayLength.test.ts` against the template the same state resolves to, on four ' +
+        'buildings across three windows. **The exclusion is load-bearing in a second way**: this ' +
+        'is the one expression both shells read, and the defect it closed was the Everyday rail ' +
+        'and the Engineer rail grading one run against different ceilings — so the thing worth ' +
+        'checking here was never its literals, and `everyday/host.test.ts` checks it by giving ' +
+        'both shells one state and requiring one set of bars.',
+      ids: ['shift/dayLength.ts#runHorizonOf'],
+    },
+    {
+      reason:
         'Returns the *facts* about why a goal cannot be judged and deliberately authors none of ' +
         'the words. Derived only because its literals are goal-kind ids and `GoalJudgement` keys, ' +
         'which the two-adjacent-words scanner reads as phrases. Carrying a sentence here would ' +
