@@ -51,6 +51,9 @@ export type { HonestyCampaignOptions, HonestyCampaignResult } from './campaign.j
 
 export { checkAll, PROPERTY_CHECKS } from './properties.js';
 
+export { agreementViews, checkSurfacesAgree, renderAgreements, AGREED_FIGURES } from './agreement.js';
+export type { AgreedFigure, AgreementSide, AgreementView } from './agreement.js';
+
 export {
   batchRequestFor,
   comparisonConfigFor,

@@ -504,6 +504,7 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 
 import type { WaitBandBasis } from '../live/types.js';
 
+import { renderAgreements } from './agreement.js';
 import { withheldStates, type WithheldState } from './generate.js';
 import type {
   HonestyCase,
@@ -4633,7 +4634,7 @@ const RIGHT_RAIL: SurfaceAdapter = {
  * reconstructing it here is the alternative to widening their signatures for a test's convenience.
  * Every field is the shipped one: the same `data/` documents, the same resolved buildings.
  */
-function browserResourcesOf(context: HonestyContext): BrowserResources {
+export function browserResourcesOf(context: HonestyContext): BrowserResources {
   return {
     elevatorSpecs: context.elevatorSpecs as ElevatorSpecs,
     trafficProfiles: context.trafficProfiles,
@@ -10080,10 +10081,20 @@ export function coveredDeclarations(): ReadonlySet<string> {
   return covered;
 }
 
-/** Render every surface, in order. Never throws for a surface that has nothing to say. */
+/**
+ * Render every surface, in order. Never throws for a surface that has nothing to say.
+ *
+ * **Plus the cross-surface readings, which are not an adapter and must not be one.** Every entry
+ * in {@link SURFACE_ADAPTERS} answers *what does this one surface say?*, and `honesty.test.ts`
+ * asserts each of them produced strings under **its own id**. A declared pair produces readings
+ * under **two** ids — the two shipped expressions being compared — so it would break that
+ * assertion, and the assertion is right: an adapter is a surface, and a pair is a claim about two.
+ * See `agreement.ts` for the register and § D359 for the defect that needed a new shape.
+ */
 export function renderAll(context: HonestyContext): readonly RenderedText[] {
   const texts: RenderedText[] = [];
   for (const adapter of SURFACE_ADAPTERS) texts.push(...adapter.render(context));
+  texts.push(...renderAgreements(context, browserResourcesOf(context)));
   return texts;
 }
 

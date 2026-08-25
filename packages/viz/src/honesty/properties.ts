@@ -38,6 +38,7 @@ import { observationsAt } from '../live/observations.js';
 import type { LiveObservations } from '../live/types.js';
 import { GOAL_JUDGEMENT, GOAL_KINDS } from '../scenario/goals.js';
 import { MIN_SEEDS_PER_GOAL } from '../scenario/published.js';
+import { checkSurfacesAgree } from './agreement.js';
 import { PLAYER_FACING_SURFACES, type HonestyContext } from './surfaces.js';
 import type {
   HonestyProperty,
@@ -1449,9 +1450,16 @@ export const PROPERTY_CHECKS: Readonly<
   'whole-run-figure-early': checkWholeRunFigureEarly,
   'withheld-figure-published': checkWithheldFigure,
   'internal-notation': checkInternalNotation,
+  /*
+   * The tenth, and the only one that is not a predicate over one surface's strings — it joins two
+   * surfaces' readings of one figure on one state. It lives in `agreement.ts` because its register
+   * is the load-bearing half: a pair inferred rather than declared is a comparison nobody argued
+   * for. See that module's docstring for why § D359's defect needed a property of a new shape.
+   */
+  'surfaces-disagree': checkSurfacesAgree,
 });
 
-/** Check all nine against one case's rendered strings. */
+/** Check all ten against one case's rendered strings. */
 export function checkAll(
   context: HonestyContext,
   texts: readonly RenderedText[],

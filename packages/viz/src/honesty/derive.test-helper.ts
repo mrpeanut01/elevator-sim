@@ -230,6 +230,39 @@ export async function deriveTextProducers(
   return producers.sort((a, b) => a.id.localeCompare(b.id));
 }
 
+/**
+ * Every **exported** declaration under `packages/viz/src`, as `<module>#<export>`.
+ *
+ * {@link deriveTextProducers} answers *what reaches a player*, which is the question the surface
+ * partition is about. `agreement.ts#AGREED_FIGURES` asks a different one: its sides name shipped
+ * expressions that are not text producers at all — `dev/leftRail.ts#shiftGoalsOf` composes a goal
+ * out of imports and authors no literal of its own — so a both-directions check on that register
+ * needs the wider set.
+ *
+ * It is the wider set of the **same** scan rather than a second scanner: the walk, the comment
+ * blanking and the `DECLARATION` pattern are shared, which is why a rename that the surface
+ * partition would catch is a rename this catches too. What it deliberately does **not** do is
+ * resolve re-exports — a barrel line is not a declaration, and `docs/05`'s standing requirement is
+ * emphatic that a re-export looks exactly like a caller and is not one.
+ */
+export async function deriveExportedDeclarations(
+  root: string = VIZ_SRC,
+): Promise<ReadonlySet<string>> {
+  const ids = new Set<string>();
+  for (const path of await walk(root)) {
+    const module = relative(root, path).split('\\').join('/');
+    if (module.endsWith('.test.ts') || module.endsWith('.test-helper.ts')) continue;
+    const code = blankComments(await readFile(path, 'utf8'));
+    for (const match of code.matchAll(DECLARATION)) {
+      if (match[1] === undefined) continue;
+      const name = match[2];
+      if (name === undefined || name === '') continue;
+      ids.add(`${module}#${name}`);
+    }
+  }
+  return ids;
+}
+
 /** One authored prose string, wherever in the package it was written. */
 export interface ProseLiteral {
   readonly module: string;

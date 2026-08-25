@@ -386,6 +386,49 @@ export const notationOnPlayerSurface: TextFault = (texts) =>
   );
 
 /**
+ * T1 / § D359 — one shell's rail publishing a ceiling the other shell's rail does not.
+ *
+ * The defect verbatim, at the smallest edit that produces it: the Everyday side of the declared
+ * pair keeps its state, its day and its three other bars, and its **worst-wait ask alone** moves to
+ * the whole-day ceiling. That is exactly what `goalsForDay` did when one of its four callers passed
+ * the horizon and the others did not — 460 s on one rail, 230 s on the other, about one run.
+ *
+ * The numeral is taken from the string rather than restated: `WORST_WAIT_WHOLE_DAY_FACTOR` lives in
+ * `shift/goals.ts` and a fault carrying its own copy would go stale the day the factor moves, which
+ * is the class of defect this repository counts. Doubling the bar is enough — the property compares
+ * what a player reads, and any change to either side's rendering is a disagreement.
+ */
+export const railsDisagreeOnTodaysAsk: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.agreement?.side === 'right',
+    (text) => ({
+      ...text,
+      text: text.text.replace(/inside (\d+(?:\.\d+)?) s/, (whole, bar: string) => {
+        const doubled = Number(bar) * 2;
+        return Number.isFinite(doubled) ? `inside ${String(doubled)} s` : whole;
+      }),
+    }),
+  );
+
+/**
+ * The same property's **other** clause: one screen publishes the figure and the other says nothing.
+ *
+ * A distinct fault rather than a variant, because a check that only compared *present* pairs would
+ * call this a pass — and it is the disagreement in its starkest form. A player who reads a ceiling
+ * on one rail and finds no ceiling on the other is not being shown a narrower screen; they are
+ * being left to guess which of the two the run is graded against.
+ *
+ * Drops the reading rather than blanking it, because `renderAgreements` already skips an empty
+ * string and a blanked side would leave the pair unpaired for the wrong reason.
+ */
+export const oneRailSaysNothing: TextFault = (texts) => {
+  const index = texts.findIndex((text) => text.agreement?.side === 'left');
+  if (index < 0) return texts;
+  return [...texts.slice(0, index), ...texts.slice(index + 1)];
+};
+
+/**
  * One fault per property, so the suite can iterate rather than list.
  *
  * Three of them carry a second, and in every case because the property has two halves a fault for
@@ -431,4 +474,14 @@ export const FAULTS: Readonly<Record<HonestyProperty, readonly { readonly name: 
       { name: 'withheldFigureStale', fault: withheldFigureStale },
     ],
     'internal-notation': [{ name: 'notationOnPlayerSurface', fault: notationOnPlayerSurface }],
+    /*
+     * The fifth pair, and the same argument a fifth time: the property forbids two things and one
+     * of them is invisible to a fault for the other. `railsDisagreeOnTodaysAsk` makes the two
+     * shells publish different ceilings, which is § D359 verbatim; `oneRailSaysNothing` makes one
+     * shell publish nothing at all, which a check comparing only present pairs would score green.
+     */
+    'surfaces-disagree': [
+      { name: 'railsDisagreeOnTodaysAsk', fault: railsDisagreeOnTodaysAsk },
+      { name: 'oneRailSaysNothing', fault: oneRailSaysNothing },
+    ],
   });
