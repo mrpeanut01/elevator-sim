@@ -109,16 +109,18 @@ programme thesis against this and amended it. **The problem Fix a building poses
 wrong*. It is *what to do about it, with less money than the obvious answer costs*.**
 
 **And the player never sees a run.** Fix a building has **no stage**. Its symptom is a sentence
-printed on a static schematic band, and the second half of that sentence is a figure — *"a 341 s
-mean wait to board, on one car for nine dense floors"*. `everyday/actionBar.ts` gives the `fixit`
-row no timeline; nothing in the mode plays a day.
+printed on a static schematic band — and in **2 of the 18 shipped cases** that sentence carries a raw
+figure (`zoning-starves-the-top`: *"a 341 s mean wait to board, on one car for nine dense floors"*;
+`car-park-nobody-serves`: *"a 322 s worst wait beside an empty hoistway"*). `everyday/actionBar.ts`
+gives the `fixit` row no timeline; nothing in the mode plays a day. **The other sixteen symptom
+sentences describe something that happens in a picture the mode never draws**, which § 7 is about.
 
 So on the four constraints this specification is written against, the exemplar mode scores:
 
 | constraint | Fix a building today |
 |---|---|
 | 1 — the engine can produce it | **Passes**, entirely. Every axis is a real config patch through `parseBuilding` + `resolveBuilding` |
-| 2 — the symptom is visible before a figure | **Fails.** There is nothing to watch, and two of the case's own `symptom` strings lead with a number |
+| 2 — the symptom is visible before a figure | **Fails.** There is nothing to watch, and 2 of 18 `symptom` strings put a raw figure in the sentence |
 | 3 — comprehensible without vocabulary | **Passes**, and better than anything else in the product. *"You can see the shuttles from the window — all eight of them, sat at the ground floor"* |
 | 4 — no dishonest comparison | **Passes.** Same seed both runs, an 80 % bar rather than a subtraction, and the basis line printed under every result |
 
@@ -414,5 +416,296 @@ the stage may not reach through the façade to it.
 
 This is the change with the best ratio of play value to cost in this document: it takes Today's
 tower's fourth beat from *stated* to *drawn*, and the drawing is two SVG polylines that already exist.
+
+---
+
+## 5. Campaign — *the building fills up every night, and your money does not*
+
+### 5.1 The problem
+
+> **What cleared the building on Monday does not clear it on Friday. You have a purse, a works
+> night, and a shop full of defensible things to buy. Only some of them are the thing that is
+> actually wrong.**
+
+`docs/32` § 1.2 gives Campaign beat **3, by pricing it** — *the only container that makes a change
+cost something and persist past the day.* The problem statement above is that sentence turned into a
+predicament, and the pressure that produces it is already built: `shift/growth.ts` grows the building
+by `1 + 0.11 × (day − 1)` as **a real edit to a real `BuildingConfig` put back through
+`parseBuilding` and `resolveBuilding`**, because *"a growth factor that only reached the tenant count
+in the header would be … a lying one."*
+
+**And today the mode poses none of it**, for the reason GitHub issue #181 records in four verified
+breaks: closing a day records nothing, the wear clock is frozen at zero, the `build` select writes a
+field no run reads, and — the one that matters here — **nothing bought reaches a run.** `fittedLevel`
+and `bookedLevel` are display-only; `host.runCampaignDay` writes `buildingId` and `dispatcherId` and
+nothing else. A player books faster doors, watches the purse fall, and runs a day identical to the
+one before it.
+
+> **The design verdict is that Campaign's problem is the right problem and its wiring is absent.**
+> Nothing below asks for a new mechanic. It asks for the shop to reach the run (#181), and then for
+> three things the mode does not have even once it does.
+
+### 5.2 The symptom, before any figure
+
+Campaign has the **best-drawn symptom in the product and does not use it as one.**
+
+> **`PM-CA1` — Today's event is shown before it is described.** `shift/events.ts` ships five events
+> writing real engine fields, and `events.test.ts` already asserts each one changes the run *in the
+> way the event claims* — a car genuinely idle, a directional mix genuinely swung, a rate genuinely
+> raised (`docs/32` `GD19`). One of those five is the most legible mark either renderer draws: **a car
+> out of service** is a shaft dimmed to `0.32` behind an `OOS` pill on the Engineer stage, and a
+> **dashed empty well with `OUT OF SERVICE` rotated down it** on the Casual cutaway. The day should
+> open on the building with the hole in it, and the brief should confirm what the player has already
+> seen. Today the order is the other way round.
+
+> **`PM-CA2` — Growth has a visual antecedent nobody has claimed, and the Casual stage is missing
+> it.** `render/canvas.ts#drawFloors` paints a **lit window band** — up to six panes per floor, a
+> deterministic hash — driven by `recording.floors[].population` and the hour. Growth edits exactly
+> that field. **So the Engineer stage already lights up as the building fills, and no document says
+> so.** It is `charter P3` satisfied by accident, and it is the cheapest true sentence available to
+> the campaign's own copy: *there are more people in the building than there were on Monday, and you
+> can see them in the windows.* The Casual cutaway draws floor slabs and gutter labels and no
+> windows, so it has no equivalent — and that is the gap `PM-CA2` names. **Unverified**: whether the
+> band is legible at Casual row pitches; `docs/28` § 5.1's geometry is the place to settle it.
+
+> **`PM-CA3` — A works night is watched, not just paid for.** The purchase that reaches the run
+> (#181) reaches the *picture* too: a shaft bought is a well that appears, a car derated is a car
+> that moves differently, a service window is a shaft that goes dashed for a day. Every one of those
+> is in § 3.1's palette. **A purchase whose only visible consequence is the purse falling is the
+> economy this mode already has.**
+
+### 5.3 What the player changes
+
+| | control | writes | shipped? |
+|---|---|---|---|
+| Works night | the shop — fittings, shafts, doors, destination panels | **Nothing today.** #181 break 3 | **No** |
+| Career | difficulty tier | the purse `16 / 8 / 5 / 3`, the rate ladder, the miss allowance `6 / 3 / 1 / 0` — **stakes, never a bar**, per [§ D345](../DECISIONS.md) | Yes |
+| Day | dispatcher, the three group levers, the pattern rows | `SimulationConfig.dispatcherProfile`, `GroupLevers`, `authoring/patternSpec.ts#PATTERN_ROWS` | Yes |
+| Stage | the shipped interventions | `interventions[]` | Yes |
+
+> **`PM-CA4` — The shop needs `PM-b`, and the moment #181 lands is the moment it becomes possible to
+> get wrong.** Fix a building's five standing extras carry **no patch at all** and exist *so the
+> budget can be spent badly*; `docs/33` `DC-9` requires that a repair be inert only where the case
+> **declares** it inert, asserted on the legs in both directions. Campaign's shop has the opposite
+> problem today — every item is inert and none of them says so, which is
+> [§ D219](../DECISIONS.md)'s defect at the scale of a mode's whole economy, as #181 itself puts it.
+> **So the rule arrives with the wiring:** once the shop reaches a run, every item is swept against a
+> no-purchase control on the same seed, and an item that moves no leg is either removed or given the
+> sentence that says so. An item that is *defensible and useless* is good design; an item that is
+> silently useless is the thing this repository has recorded eleven times.
+
+### 5.4 How the player finds out whether they were right
+
+**Campaign is the only mode whose day verdict needs no second run at all, and that is worth saying
+plainly because it is a design asset rather than a limitation.** The four day goals
+(`shift/goals.ts#goalsForDay`) are **non-comparative count goals** read off the run's own numbers —
+`docs/33` § 2.2 names the kind — so the day is judged against a bar every player meets identically,
+with no comparison and therefore no opportunity for a dishonest one. `goalsForDay(day)` reads the day
+and nothing else; no difficulty tier reaches it.
+
+Three constraints keep it that way:
+
+1. **`docs/10` R12 binds every new bar.** *A single-run goal whose across-seed variance has not been
+   measured* is on `docs/10` § 5.5's never-build list. `docs/33` § 4.2 measured the shipped bars —
+   8 contracts × 4 days × 30 seeds — and any bar added later owes the same before it ships.
+2. **The works-night purchase gets the § D310 pairing**, not a subtraction: the day with the purchase
+   and the day without, same seed, paired by figure id, no arithmetic. A purchase is fabric or
+   dispatcher and never population, so the trace holds — **and that is a rule rather than an
+   observation.** A shop item that edited `floorPopulations` would silently break the shared crowd,
+   which is why `PM5`'s legs-identity assertion covers this pairing too.
+3. **A refusal is not a miss, and they may not share a colour.** `docs/32` `GD17` and its corollary:
+   a missed goal and a withheld mean are different kinds of thing, *"and a screen that renders both
+   in the same red is teaching the player that the product's honesty is their punishment."* Campaign
+   is the surface where that temptation is strongest, because it is the one keeping score.
+
+**Growth is what a day-over-day comparison may not be built on.** Two campaign days differ in
+population, so they are not the same crowd and nothing may be paired across them. The mode's
+difficulty mechanism and its comparison mechanism are in direct tension, and the resolution is that
+**Campaign compares within a day and never between days.** Between days it may say what happened —
+*Monday cleared, Friday did not* — which is two observations rather than a comparison.
+
+---
+
+## 6. Endless rush — *call it before the building does*
+
+### 6.1 The problem, which is the best one in the product and has no engine
+
+> **A stream that climbs and never stops. Your one job is to say when the building stopped coping —
+> and then to find out whether you called it early, late, or right.**
+
+`docs/32` § 1.4 and [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 3.4 both
+conclude that the rush **serves neither half of the loop**: no held crowd, so no counterfactual; and
+its output is a *where* rather than a *why*. `docs/32` `GD4` recommends demoting it to an instrument
+beside the bench. GitHub issue #220 asks for the climbing demand template, the held-time stage and
+the result screen, or a clean cut.
+
+**This document agrees with every word of that analysis and draws the opposite conclusion, on
+constraint 2.** The rush is the only mode in the product that satisfies `PM2` *for free*: there is
+nothing to explain, because the player watches the building lose. Every other mode is trying to
+manufacture a visible symptom; this one is made of nothing else.
+
+So the disposition proposed here is a fourth, beside `GD4`'s three:
+
+> **`PM-RU1` — The rush is the product's demonstration, and its game is a judgement call rather than
+> a configuration.** It serves neither half of the loop and it is not asked to. What it delivers is
+> `charter S1` — *a first-time player reaches a building in visible trouble within 90 seconds of
+> first load* — which is the criterion the tutorial building demonstrably cannot deliver (§ 9.3), and
+> it delivers it without a tutorial building having to be made hard, which GitHub issue #270 measured
+> as impossible within the legal axes.
+
+**The mechanic.** The stream climbs. One button: **`Call it`**. The player presses when they believe
+the building has stopped coping. The run then continues to its own end and the screen says where the
+queue actually began to diverge, and how far off the call was.
+
+Why this is a game and not a cutscene, against `PM6`: the press is the intervention, the symptom is
+the thing being judged, and the verdict is about the player rather than about a configuration. It
+needs no second run, no CRN and no interval, **because it makes no comparison between
+configurations** — which is why it is the one mode in this document whose honesty section is short.
+
+### 6.2 The symptom
+
+Everything in § 3.1, used at once and without a single new mark:
+
+- capsules accumulating at every landing and never clearing;
+- the wait bands walking up through `breezy → tapping-foot → checking-watch → taking-the-stairs`;
+- the queue rows degrading from glyphs to `+N` to `render/riderQueue.ts`'s log-scaled bar as the
+  landings pass 12 and then 40;
+- the alarm rule pulsing across the plot past `ALARM_STACK_DEPTH` = 24, and the Casual alarm strip
+  past `STAGE_ALARM_STANDING` = 40;
+- cars going from `room` through `carrying` to `at-design-load` and staying there;
+- the race strip's lane crossing its own dashed sixty-second line and not coming back.
+
+**That is the whole design.** The renderer is already a saturation instrument; nobody has pointed a
+mode at it.
+
+### 6.3 What the engine cannot do yet, exactly
+
+`docs/23` § 6 names the blocker precisely: *no demand template ramps without a ceiling.* The shipped
+templates in `data/traffic-profiles.json` are `rise-and-fall`, `constant-iso`, `lunch-two-way`,
+`shift-change`, `evening-egress`, `office-down-peak` and `office-day`, and a `DemandTemplate` carries
+`durationMin` plus an optional `phases: DemandPhaseRecord[]`, each
+`{ startMin, endMin, startIntensity, endIntensity, startSplit?, endSplit? }`.
+
+> **`PM-RU2` — The climbing stream is a template, authored in `data/`, and is therefore invariant 7
+> work rather than engine work.** A phase list whose `endIntensity` exceeds its `startIntensity` on
+> every phase, continuing past the profile's declared band, is expressible in the shipped schema.
+> **Two things it owes, and neither is optional:**
+> - **The departure from the cited band is declared where the number lives.** The residential profile
+>   declares `arrivalRatePctPop5min { min: 3, typical: 5, max: 7 }`; a ramp goes past it by design.
+>   `data/traffic-profiles.json` already carries the idiom for exactly this — the hospital profile's
+>   `$comment` marks its rate band **`DERIVED, not quoted from a table`** and its split **`NOT CITED,
+>   and stated as an assumption`**. A rush template writes its own such note. It is not a reference
+>   value and must not be dressed as one.
+> - **It may not be reachable from any judged surface.** A rate outside a profile's band is a
+>   demonstration, not a design case, and `CLAUDE.md`'s reference-data rule is what keeps the two
+>   apart.
+>
+> **Unverified**: whether `phases` alone gives a monotone ramp of arbitrary length, or whether the
+> intensity is renormalised over `durationMin` in a way that caps it. `traffic/generator.ts:757` and
+> `config/demandPhases.ts` are where that is settled, and it is settled by reading them rather than
+> by this document guessing.
+
+### 6.4 How the player finds out whether they were right
+
+**The rush's verdict is a fact about one run and must be published as one.**
+
+> **`PM-RU3` — The divergence point is a single-run figure and carries `docs/10` R12's obligation.**
+> *A single-run goal whose across-seed variance has not been measured* is on the never-build list.
+> Before *"you called it 90 s early"* is drawn, the across-seed spread of the divergence point at the
+> shipped template must be measured and published, exactly as `docs/33` § 4.2 did for the day goals.
+> If it is wide, the screen says the spread rather than the point.
+
+The saturation machinery to find the divergence point already exists and must be the one used:
+`summary.saturation` carries the verdict (`diverging-queue`) and the trend test that produced it.
+**A second definition of *when it broke*, computed in the viewer, would be a second statistics** —
+`charter` non-goal 7.
+
+**And the mode may not say *better*, because it never has two configurations to compare.** This is
+the one place in the product where that constraint costs nothing.
+
+### 6.5 What this leaves undecided
+
+`docs/32` `GD4` recommends the bench as the rush's home and explicitly does not decide it; `docs/23`
+§ 8 leaves the cut human. **`PM-RU1` does not overturn either** — it says that *if* the rush is
+built, its highest-value placement is minute one rather than hour three, because what it is good at
+is being seen. Where the tile lives is still the product owner's.
+
+---
+
+## 7. Fix a building — *the diagnosis stays given, and the case gets a stage*
+
+### 7.1 The problem, unchanged
+
+> **A tower with one thing wrong and a tenant who has written in. The cause is stated. The decision
+> is what to do about it, with less money than the obvious answer costs.**
+
+This document proposes **no change to the mode's problem**, and § 8.1 explains why the obvious
+change — making the player guess the fault — is refused.
+
+### 7.2 The symptom, and the finding that makes it nearly free
+
+**The mode already holds a complete recording of the building failing, and draws a diagram instead.**
+
+`everyday/fixitScreen.ts:335-343` runs the as-built configuration **when the case opens** —
+`session.asBuilt = recordRun(plan.asBuilt, { recordDecisions: false })`, synchronously, at the
+~0.5–1.5 s the module's own docstring prices it at — because `fixit/run.ts#figureValuesOf` computes
+the four opening figures from that run's legs. The docstring says it outright: *"The four figures —
+computed from the as-built run, never authored."*
+
+**So a full `VizRecording` of the failing morning exists on the screen, and four numbers are read out
+of it before it is dropped.** Constraint 2 for this mode costs a renderer mount and a transport, not
+a simulation.
+
+> **`PM-FB1` — The case opens on the as-built run, played, before the four figures.**
+> `GAMEPLAY_AND_NAVIGATION.md` § 10.1's order is complaint → schematic → figures → diagnosis. The
+> amendment is one item: complaint → **the building, running** → schematic with the failing band →
+> figures → diagnosis. The complaint already tells the player where to look (*"you can see the
+> shuttles from the window — all eight of them, sat at the ground floor"*), so the watching has a
+> subject from the first second, which is what a first-time player needs and what an unguided stage
+> does not give them.
+
+**The case authors have already written the shot list.** Of the eighteen shipped `symptom` strings,
+**sixteen describe something that happens in a picture** — *"three cars stand together below"*, *"the
+two bed cars pass the surgical floors without stopping"*, *"a landing crowd of hundreds, served one
+carload at a time"*, *"two cars standing doors-open twenty-five seconds at every stop"*. Two carry a
+raw figure instead (§ 1.2).
+
+> **`PM-FB2` — A `symptom` string names a sight, not a figure**, and `fixit/parse.ts` enforces it in
+> the shape it already enforces the other copy rules (no probability words, no engine identifier).
+> The two cases that fail it are `zoning-starves-the-top` and `car-park-nobody-serves`; both have a
+> sight available in their own diagnosis text. **The figure does not disappear — it is what the four
+> figure cards are for**, one item further down the page, which is `PM2`'s ordering applied inside a
+> screen rather than between screens.
+
+**What the stage cannot show, and why that is fine here.** Three of those sixteen sentences describe
+an *intent* rather than an event — a car passing without stopping, an express stopping below its
+zone, a deck declining to board. § 3.2 records that a car's committed stop list is not on `FrameCar`
+and that reading `VizShaft.motions` ahead of the playhead is `docs/28` § 4.4's refused foreshadowing.
+**The stage shows what happened; the diagnosis panel says why.** That division is exactly why this
+mode can afford to keep the diagnosis given.
+
+### 7.3 What the player changes
+
+Unchanged and already correct: four priced repairs, five inert standing extras, the full building
+editor (elevation grid, zones, shafts, machinery at 6 u per half a metre per second and 8 u per two
+places, **door dwell free**, where cars wait when idle, who drives), and a shaft at 34 u that is
+unaffordable in **0 of 18** cases. `docs/33` § 5.2's measurement of the catalogue — 18 cases × 5
+selections over 180 runs — is the record of what that choice is worth per case, and `DC-7` reorders
+it.
+
+### 7.4 How the player finds out whether they were right
+
+Unchanged, and it is the model the rest of this document borrows from: two runs sharing the traffic
+seed, three rows, four named outcomes, an 80 % categorical bar rather than a subtraction, and
+`BASIS_LINE` printed under every result.
+
+**One rule is added, because it is currently true by luck rather than by construction:**
+
+> **`PM-FB3` — A repair may not patch `floorPopulations`.** `fixit/run.ts#fixitRunPlanOf` says
+> *"everything the passenger trace is a function of — building id, seed, horizon, demand — comes off
+> the case and is identical between the two"*, and that holds because both sides carry the `asBuilt`
+> patch and **no shipped repair touches population**. `BuildingPatch.floorPopulations` exists and a
+> repair could legally use it, at which point the two runs would meet different crowds and the whole
+> basis would be gone silently. `fixit/parse.ts` refuses it, with the reason attached.
 
 ---
