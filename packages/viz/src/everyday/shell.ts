@@ -520,9 +520,65 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     }
   });
 
+  /**
+   * Every navigation in this shell lands here, and every one of them starts the new screen at its
+   * top.
+   *
+   * ## Why this is a product fix and not a test convenience
+   *
+   * It did not, and the omission is invisible on a desktop. `§ 4`'s menu is four tiles in a column;
+   * at `375×667` — the shortest viewport `docs/31-support-matrix.md` § 1 tier 2 actually drives —
+   * the third and fourth tiles are **below the fold**. A player scrolls to reach *Endless rush*,
+   * taps it, and the document keeps the scroll offset it had: they arrive on the rush screen
+   * already 76 px down it, with its heading off the top of their phone.
+   *
+   * Nothing reset it because nothing needed to while the tier only measured tall viewports. The
+   * browser tier's `puts the reason inside the viewport` case found it by asserting `scrollY === 0`
+   * before measuring — a guard written to make *its own* measurement honest, which then failed on
+   * CI and passed here, because the two Chromiums lay the menu out a few pixels differently and
+   * only one of them left the tile above the fold.
+   *
+   * **The tempting fix was to scroll the test back to the top**, which would have measured a page
+   * no player ever sees and buried a real defect under a green tier. `RISKS.md` R26's shape: the
+   * harness and the product disagreeing, and the harness being right.
+   *
+   * ## Which scroller, measured — and the one line that is not here
+   *
+   * At `375×667` the **document does not scroll at all** on this machine
+   * (`documentElement.scrollHeight - innerHeight === 0`); the overflow lives on `.everyday-screen`,
+   * which is scrollable by 334 px on the menu and 3 098 px on the rush screen. On CI's Chromium the
+   * document *does* overflow, which is why `window.scrollY` arrived at **76** there and 0 here.
+   *
+   * **The screen element needs no reset, and that was measured rather than assumed.** It is the
+   * same element across a navigation — a `data-` probe survives — but `dev/dom.ts#reconcile` drops
+   * every child before inserting the new ones, the container's `scrollHeight` collapses to its
+   * client height while it is empty, and the browser **clamps `scrollTop` to 0** on the way through.
+   * A `screenEl.scrollTop = 0` beside the line below was written, mutation-tested, and **deleted for
+   * doing nothing**: removing it changed no case, because the reconciler had already done it.
+   *
+   * So one line, for the one scroller that keeps its offset. `behavior` is left at its default: a
+   * smooth scroll here would animate on a playhead-tied redraw, which `docs/28` § 6's AD-M2 refuses,
+   * and it would race the browser tier's next measurement.
+   *
+   * ## What pins it, honestly
+   *
+   * **Not a case on this machine.** `standaloneScreens.browser.test.ts`'s
+   * *puts the reason inside the viewport* asserts the offset is zero before it measures, and that
+   * assertion is what found this — **it failed on both CI platforms and passes here**, because the
+   * condition it needs is a document that overflows and this machine's does not. A case written to
+   * bite locally was tried and deleted for asserting nothing: with the reconciler clamping, it
+   * passed with the fix removed.
+   *
+   * That is [§ D201](../../../../DECISIONS.md)'s lesson rather than a gap to paper over — a suite
+   * result is a claim about a **machine** as well as a commit, and the two-platform matrix is the
+   * judge here. Stated so the next reader does not delete this line for looking untested.
+   *
+   * A decision number is owed.
+   */
   function go(screen: EverydayScreen): void {
     state = { ...state, screen };
     draw();
+    doc.defaultView?.scrollTo(0, 0);
   }
 
   /**

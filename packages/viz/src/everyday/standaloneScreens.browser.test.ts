@@ -243,7 +243,17 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
       const box = await reasonBox(page, reason);
       const at = `${String(viewport.width)}×${String(viewport.height)}`;
       expect(box, `${at}: the reason is drawn nowhere`).not.toBeNull();
-      expect(box?.scrolled, `${at}: the case scrolled before measuring`).toBe(0);
+      /*
+       * Not a guard on the harness — a claim about the product, and the one that found the defect.
+       *
+       * `openRush` clicks the tile. At `375×667` the rush tile is below the fold, so the click
+       * scrolls it into view, and the page arrives on the new screen carrying that offset unless
+       * something resets it. `shell.ts#go` now does, for every navigation. This case failed on CI
+       * and passed here before that fix, because the two Chromiums lay the four-tile menu out a few
+       * pixels apart and only one left the tile above the fold — so the assertion is kept at the
+       * shortest supported viewport precisely because that is where it bites.
+       */
+      expect(box?.scrolled, `${at}: the page kept a scroll offset across navigation`).toBe(0);
       expect(box?.viewportHeight).toBe(viewport.height);
       /*
        * *"One constant, one place on screen"* — `rushScreen.ts`'s rule where its own refusal
