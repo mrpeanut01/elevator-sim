@@ -518,6 +518,116 @@ function honest(run: SubmittedRun = RUN): Submission {
   return { run, claimed: metricsOf(runSimulation(config).summary) };
 }
 
+/**
+ * A whole authored day, as `viz` derives it — GitHub issue #267.
+ *
+ * `chancery-house` rather than `midtown-office`, and the choice is measured rather than arbitrary:
+ * of the four office towers whose profile admits `office-day`, Midtown's whole day is **not
+ * quotable** (`awtIsValid: false`, AWT 291.28 at this seed), so it is refused 422 `awt-not-quotable`
+ * on its own merits and could never demonstrate the duration gate. Chancery replays in 407 ms with a
+ * quotable 10.48 s mean, which is the fastest honest fixture available.
+ *
+ * `windowStartS: 0` is not decoration. `core` refuses a `templateOverrides.durationS` refit on a
+ * phase-list record by name (§ D285/§ D356), so a whole day travels as a window over the record's own
+ * period or it throws.
+ */
+const WHOLE_DAY: SubmittedRun = Object.freeze({
+  buildingId: 'chancery-house',
+  dispatcherProfileId: 'eta',
+  demandTemplateId: 'office-day',
+  arrivalRatePctPop5min: null,
+  durationS: 36_000,
+  windowStartS: 0,
+  seed: '20260804',
+});
+
+describe('posting a whole authored day', () => {
+  /*
+   * **The end-to-end case for GitHub issue #267, and it is deliberately not a test of a constant.**
+   *
+   * § D286 closed this same mismatch on the client and it reappeared, because the fix lived on one
+   * side only: § D356 gave the Everyday day a length **derived from the record** rather than picked
+   * from a list, and `LONGEST_OFFERED_RUN_S` correctly kept bounding what is *offered* while saying
+   * nothing about what is *reachable*. A test asserting `ACCEPTED_DURATIONS_S` contains 36 000 would
+   * repeat that mistake in the other direction — it would pass on a server that accepts a length no
+   * client can produce, and fail to notice a client that starts producing one the server refuses.
+   *
+   * So this drives the real route: a run built the way `configFor` builds one, simulated by the
+   * shipped kernel, posted over the real API, and required to be **created**. Its partner is
+   * `menu/client.test.ts`'s *"accepts every whole-day length the client can actually derive"*, which
+   * runs the client's own `wholeDayFor` over the real `data/` and checks its answers against this
+   * server's source text. Between them the two packages cannot drift apart silently again.
+   */
+  it('accepts it, replays it, and ranks it', async () => {
+    const account = await signIn();
+    const truth = honest(WHOLE_DAY);
+    const posted = await call('POST', '/api/scores', { token: account.token, body: truth });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+  }, 120_000);
+
+  it('puts it on its own board, never against a slice of the same day', async () => {
+    /*
+     * The property that makes widening safe rather than a ranking bug, driven through the API so it
+     * is the *server's* digest being compared rather than a recomputation.
+     *
+     * `verify.test.ts` proves `configHashOf` separates the two lengths; this proves the route uses
+     * that digest to file the entry. A ten-hour run and a two-hour window over the same day, same
+     * building, same dispatcher and same seed are different measurements, and a board that mixed
+     * them would rank a rush hour against a whole working day and call one dispatcher better.
+     */
+    const account = await signIn();
+    const day = await call('POST', '/api/scores', { token: account.token, body: honest(WHOLE_DAY) });
+    expect(day.status, JSON.stringify(day.body)).toBe(201);
+
+    // Past the whole day's own cooldown, which is five reference replays rather than one.
+    clock += 60_000;
+    const slice = { ...WHOLE_DAY, durationS: 7_200 };
+    const posted = await call('POST', '/api/scores', { token: account.token, body: honest(slice) });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+
+    expect(bodyOf(day)['configHash']).not.toBe(bodyOf(posted)['configHash']);
+  }, 180_000);
+
+  it('charges what it costs — five reference replays, not one', async () => {
+    /*
+     * Widening what is postable without widening what it costs would have been the widening paying
+     * for itself out of the server's CPU budget. `MIN_SUBMIT_INTERVAL_MS`'s five seconds was sized
+     * against a 7 200-second replay — the docstring said so in as many words, and that sentence was
+     * made false by the line above that admits 36 000. A whole day is five such replays, so it
+     * charges five times the interval.
+     *
+     * Driven against the clock rather than by calling `cooldownForReplay`, because the constant is
+     * not the claim: the claim is that a second submission inside the charged window is refused.
+     */
+    const account = await signIn();
+    const at = clock;
+    const first = await call('POST', '/api/scores', { token: account.token, body: honest(WHOLE_DAY) });
+    expect(first.status, JSON.stringify(first.body)).toBe(201);
+
+    // Ten seconds clears a slice's five-second charge and must not clear a whole day's twenty-five.
+    clock = at + 10_000;
+    const tooSoon = await call('POST', '/api/scores', { token: account.token, body: honest(WHOLE_DAY) });
+    expect(tooSoon.status).toBe(429);
+    expect(bodyOf(tooSoon)['error']).toBe('too-many-submissions');
+
+    clock = at + 26_000;
+    const allowed = await call('POST', '/api/scores', { token: account.token, body: honest(WHOLE_DAY) });
+    expect(allowed.status, JSON.stringify(allowed.body)).toBe(201);
+  }, 180_000);
+
+  it('leaves a slice charging exactly what it charged before', async () => {
+    // The other half, and the reason the factor is floored at one: every length at or under the
+    // reference replay is unchanged, so nothing already shipping moved. `RUN` is 900 s.
+    const account = await signIn();
+    const truth = honest();
+    const at = clock;
+    expect((await call('POST', '/api/scores', { token: account.token, body: truth })).status).toBe(201);
+    clock = at + 6_000;
+    const second = await call('POST', '/api/scores', { token: account.token, body: truth });
+    expect(second.status, JSON.stringify(second.body)).toBe(201);
+  }, 120_000);
+});
+
 describe('posting a score', () => {
   it('is allowed by the session alone, because the session is proof of the address', async () => {
     // § D241 deleted `postingGate` with the password, and this is why that is not a weakening. The

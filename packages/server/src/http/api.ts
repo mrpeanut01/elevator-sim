@@ -171,29 +171,55 @@ const MAX_DISPLAY_NAME = 32;
  *
  * `submissionIssues` already keeps an *unauthenticated* shape error from commanding a simulation.
  * This is the authenticated counterpart, and it is needed for the same reason at a larger size: a
- * verification is a **whole 7 200-second run** at the longest accepted length, so one signed-in
- * account submitting in a loop is a CPU denial of service wearing a valid session.
+ * verification is a whole re-simulation, so one signed-in account submitting in a loop is a CPU
+ * denial of service wearing a valid session.
  *
  * Five seconds, which is far below any honest play rate — a player has to watch a run before they
- * can post it — and far above the cost of one replay. Since § D218 a submission can be worth more
- * than one replay, so this is the **unit** rather than the whole interval; {@link cooldownForSeeds}
- * is what a route actually charges.
+ * can post it — and far above the cost of one replay of {@link REFERENCE_REPLAY_S}. A submission can
+ * be worth more than one such replay — more seeds since § D218, and more *seconds* since a whole
+ * authored day became postable — so this is the **unit** rather than the whole interval;
+ * {@link cooldownForReplay} is what a route actually charges.
  */
 const MIN_SUBMIT_INTERVAL_MS = 5_000;
 
 /**
- * The cooldown a submission costs, in milliseconds — **one replay's worth per seed**.
+ * The run length {@link MIN_SUBMIT_INTERVAL_MS} was sized against, in simulated seconds.
+ *
+ * This used to be spelled *"the longest accepted length"* in the sentence above, and that phrasing
+ * is exactly what went stale: `ACCEPTED_DURATIONS_S` now also carries a whole authored day at
+ * 36 000 s, five times this. The number keeps its value and loses its claim to be the maximum —
+ * it is the **reference replay** the five seconds was measured against, and nothing more.
+ */
+const REFERENCE_REPLAY_S = 7_200;
+
+/**
+ * The cooldown a submission costs, in milliseconds — **one replay's worth per seed, per reference
+ * replay's worth of simulated time**.
  *
  * A single-run submission is one simulation and a challenge submission is one *per seed*, so a flat
  * interval sized for the first would let the second command five times the CPU at the same rate.
  * Derived from the seed count rather than written down twice, so `MAX_CHALLENGE_SEEDS` cannot be
  * raised without the cooldown rising with it.
  *
- * Twenty-five seconds for a five-seed challenge. Still far below any honest play rate — a player
- * has to watch five runs before they can post them — and still far above the cost of the replays.
+ * **The length is charged for the same reason and it did not used to be**, because until a whole
+ * authored day became postable every accepted length sat at or below {@link REFERENCE_REPLAY_S} and
+ * the factor was always one. A 36 000-second day is five reference replays of CPU — `§ D356` measured
+ * one at **9 200 ms** on `vertical-city` — so leaving the charge at five seconds would have let a
+ * single account command more simulation per second than the box can run, which is the denial of
+ * service this constant exists to prevent. Widening what is postable without widening what it costs
+ * would have been the widening paying for itself out of the server's budget.
+ *
+ * Derived rather than written down twice, exactly as the seed count is: `ACCEPTED_DURATIONS_S`
+ * cannot be raised without the cooldown rising with it.
+ *
+ * Twenty-five seconds for a five-seed challenge, and twenty-five for a whole day. Still far below
+ * any honest play rate — a player has to watch the runs before they can post them — and still far
+ * above the cost of the replays. Floored at one so every length at or under the reference charges
+ * exactly what it charged before: nothing already shipping moves.
  */
-function cooldownForSeeds(seedCount: number): number {
-  return MIN_SUBMIT_INTERVAL_MS * Math.max(1, seedCount);
+function cooldownForReplay(seedCount: number, durationS: number): number {
+  const replays = Math.max(1, seedCount) * Math.max(1, durationS / REFERENCE_REPLAY_S);
+  return MIN_SUBMIT_INTERVAL_MS * replays;
 }
 
 /**
@@ -655,7 +681,10 @@ async function submit(
   // After the cheap gate and before the expensive one. Checked here rather than at the top so a
   // player whose submission is malformed is told that, rather than being told to wait and then
   // told it was malformed anyway.
-  const limited = chargeCooldown(deps, user.id, nextSubmitMs, 1);
+  // The run's own length, not a constant: a whole authored day is five reference replays of CPU and
+  // is charged as such. Read off the submission, which `submissionIssues` has already bounded to
+  // `ACCEPTED_DURATIONS_S` two lines up — so this cannot be an arbitrary number a caller chose.
+  const limited = chargeCooldown(deps, user.id, nextSubmitMs, 1, submission.run.durationS);
   if (limited !== undefined) return limited;
 
   const facts = deps.factsFor(submission.run);
@@ -819,7 +848,9 @@ async function submitChallenge(
     };
   }
 
-  const limited = chargeCooldown(deps, user.id, nextSubmitMs, target.seeds.length);
+  // The challenge's own length, from the issued definition rather than from the request — a
+  // challenge fixes its run and `schedule.ts` has already checked it against `ACCEPTED_DURATIONS_S`.
+  const limited = chargeCooldown(deps, user.id, nextSubmitMs, target.seeds.length, target.config.durationS);
   if (limited !== undefined) return limited;
 
   const facts = deps.challengeFactsFor(target.config);
@@ -960,6 +991,8 @@ function chargeCooldown(
   userId: string,
   nextSubmitMs: Map<string, number>,
   seedCount: number,
+  /** The length of one replay, in simulated seconds — see {@link cooldownForReplay}. */
+  durationS: number,
 ): ApiResponse | undefined {
   const nowMs = deps.now();
   if (nowMs < (nextSubmitMs.get(userId) ?? Number.NEGATIVE_INFINITY)) {
@@ -971,7 +1004,7 @@ function chargeCooldown(
       },
     };
   }
-  nextSubmitMs.set(userId, nowMs + cooldownForSeeds(seedCount));
+  nextSubmitMs.set(userId, nowMs + cooldownForReplay(seedCount, durationS));
   return undefined;
 }
 

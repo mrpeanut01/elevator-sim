@@ -177,6 +177,20 @@ export interface FreePlaySelection {
  * *"when the slice control lands, this entry stops being the only way to reach `office-day` and may
  * well be dropped"* — which also closes the half-applied state it left behind, where the client
  * offered a ten-hour run the server's own `ACCEPTED_DURATIONS_S` would have refused on post.
+ *
+ * ## That last clause is history now, and reading it as current status is the trap
+ *
+ * The server **accepts** a ten-hour run today (GitHub issue #267): `ACCEPTED_DURATIONS_S` carries
+ * 36 000 beside the slice ladder, because § D356 made a whole authored day reachable again by
+ * **derivation** — the Everyday day is the period the matching record declares — and a bound on what
+ * is *offered* cannot see a derivation. So § D286's fix was on the client and the mismatch was
+ * between two packages, which is why it came back.
+ *
+ * **The bound below is unaffected and is not a proxy for that mismatch.** It bounds what is
+ * *offered*, which is the job the paragraphs above give it, and a whole day is still not offered:
+ * it is granted by a building's own record. Postable and offered are different words here.
+ * `menu/client.test.ts` asserts both halves — that this is still 7 200, and that every whole-day
+ * length `shift/dayLength.ts#wholeDayFor` can derive is one the server takes.
  */
 export const LONGEST_OFFERED_RUN_S = 7200;
 
