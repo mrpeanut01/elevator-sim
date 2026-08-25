@@ -35,6 +35,15 @@
  * one would make the mailbox round trip decorative and hand an account to anybody who could name an
  * address.
  *
+ * ## An account can be deleted, and until this route landed it could not
+ *
+ * {@link deleteAccount} answers `DELETE /api/me`: the caller's own account, named by the session
+ * token and by nothing else the request can carry, and the schema's cascade takes every table that
+ * references it. It is the counterpart of {@link requestLink}, which is what *creates* an
+ * account — asking for a sign-in link writes a `users` row whether or not the mail is ever read, so
+ * every address this server has ever been handed is in that table, and before this route there was
+ * no way out of it. `docs/26-telemetry-and-privacy.md` § 5.3 is where that gap was recorded.
+ *
  * ## Two boards, and they answer different questions
  *
  * `/api/board` is the **configuration** board of § D214 § 4: one configuration — dispatcher
@@ -83,6 +92,7 @@ import { configHashOf, submissionIssues, type ResolvedDataFacts, type Submission
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
 import {
   BOARD_METRICS,
+  NoSuchUserError,
   normaliseEmail,
   type BoardMetric,
   type ChallengeEntryRow,
@@ -281,6 +291,8 @@ export function createApi(deps: ApiDeps): Api {
         return logout(deps, request);
       case 'GET /api/me':
         return me(deps, request);
+      case 'DELETE /api/me':
+        return deleteAccount(deps, request, nextSubmitMs);
       case 'POST /api/me/display-name':
         return setDisplayName(deps, request);
       case 'POST /api/scores':
@@ -543,6 +555,82 @@ async function me(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
     : { status: 200, body: { user: publicUser(user) } };
 }
 
+/**
+ * Erase the caller's own account, and everything attached to it.
+ *
+ * ## The authorization rule is that there is nothing to get wrong
+ *
+ * The account this deletes is the one the **session token** names, and the route reads no other
+ * identity: no path segment, no query parameter, no body field. There is therefore no request a
+ * caller can compose that names somebody else's account — which is a stronger property than
+ * comparing a supplied id against the session's, because a comparison can be forgotten on a later
+ * branch and an argument that does not exist cannot be. `api.test.ts` sends one anyway — in a body,
+ * in a query string, and in the path — and requires the named account to survive all three, and the
+ * *caller's* account to be gone, so that a route which quietly did nothing could not pass either.
+ *
+ * ## Erasure spans two stores, and this route is one of them
+ *
+ * `docs/26-telemetry-and-privacy.md` § 3.3: telemetry rows never carry `users.id` and telemetry
+ * requests never carry a session token, so a player deleting their data sends **two independent
+ * requests** — this one, authenticated to the account, and one naming the `playerId` — because the
+ * client holds both keys at that moment and the server never has to hold the join. So this route
+ * deletes the account and every table that cascades off it — four today, and read out of
+ * `pg_constraint` by `store.test.ts` rather than counted anywhere — and **claims nothing about the
+ * other store**. There is no telemetry in this tree yet (§ 0, fact 1), so the second request has no
+ * endpoint to reach today; when it does, it is a second route rather than a second branch of this
+ * one, or the join this design exists to avoid would be back.
+ *
+ * ## What is deliberately not cleared, which is the half worth arguing
+ *
+ * The account's entry in `nextSubmitMs` goes, because it is an identifier of a deleted account
+ * sitting in this process's memory until a restart and there is no reason to keep it — a fresh id
+ * is a fresh budget anyway, since ids are UUIDs and never reused.
+ *
+ * The **sign-in link limiters do not**, and must not. {@link LINKS_PER_EMAIL} is keyed by the
+ * address, not the account, and its whole job is to bound how often an address can be mailed —
+ * clearing it on deletion would make *delete the account* the way to reset the budget that decides
+ * whether this endpoint is an email-bombing gadget, and a session costs exactly one mail. It
+ * expires on its own fifteen-minute window, which is a bound rather than a retention decision.
+ *
+ * {@link LINKS_PER_CALLER} is untouched for a plainer reason still: its key is an **IP address**,
+ * which was never the account's to erase and belongs to whoever is calling rather than to whoever
+ * signed in. Nothing about deleting an account should move a budget keyed on something an account
+ * does not own.
+ *
+ * ## 200, and the token is dead before the caller reads the answer
+ *
+ * The session that authorised this is a row in `sessions`, one of the four the cascade takes, so it
+ * stops working in the same statement. A second call with the same token gets the 401 an unknown
+ * token has always got, so trying it twice does not distinguish a deleted account from one that
+ * never existed.
+ *
+ * A decision number is owed; the argument is here and in `Store.deleteUser`.
+ */
+async function deleteAccount(
+  deps: ApiDeps,
+  request: ApiRequest,
+  nextSubmitMs: Map<string, number>,
+): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
+  if (user === undefined) {
+    return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to delete your account.' } };
+  }
+  await deps.store.deleteUser(user.id);
+  nextSubmitMs.delete(user.id);
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      // What was actually removed, named rather than summarised as "your data" — a player deciding
+      // whether to press this is entitled to know that their board entries go with the address.
+      detail:
+        'That account is gone: the address, the display name, every board and challenge entry ' +
+        'posted from it, every session and every outstanding sign-in link. The token that made ' +
+        'this request no longer works.',
+    },
+  };
+}
+
 /* --------------------------------------------------------------- leaderboard */
 
 async function submit(
@@ -587,13 +675,19 @@ async function submit(
   }
 
   const configHash = configHashOf(submission.run, facts);
-  const entry = await deps.store.recordEntry({
-    configHash,
-    userId: user.id,
-    run: submission.run,
-    // The **server's** figures. The claim is compared and then discarded; it is never what ranks.
-    measured: verification.measured,
-  });
+  let entry: EntryRow;
+  try {
+    entry = await deps.store.recordEntry({
+      configHash,
+      userId: user.id,
+      run: submission.run,
+      // The **server's** figures. The claim is compared and then discarded; it is never what ranks.
+      measured: verification.measured,
+    });
+  } catch (error) {
+    if (error instanceof NoSuchUserError) return accountVanished();
+    throw error;
+  }
   return { status: 201, body: { configHash, entry: publicEntry(entry) } };
 }
 
@@ -739,14 +833,20 @@ async function submitChallenge(
   }
 
   const dataHash = challengeDataHashOf(target, facts);
-  const entry = await deps.store.recordChallengeEntry({
-    challengeId: target.id,
-    dataHash,
-    userId: user.id,
-    dispatcherProfileId: submission.dispatcherProfileId,
-    // The **server's** aggregate over the **server's** runs. The claim is compared and discarded.
-    score: verification.score,
-  });
+  let entry: ChallengeEntryRow;
+  try {
+    entry = await deps.store.recordChallengeEntry({
+      challengeId: target.id,
+      dataHash,
+      userId: user.id,
+      dispatcherProfileId: submission.dispatcherProfileId,
+      // The **server's** aggregate over the **server's** runs. The claim is compared and discarded.
+      score: verification.score,
+    });
+  } catch (error) {
+    if (error instanceof NoSuchUserError) return accountVanished();
+    throw error;
+  }
   return { status: 201, body: { challengeId: target.id, dataHash, entry: publicChallengeEntry(entry) } };
 }
 
@@ -814,6 +914,35 @@ async function challengeBoard(deps: ApiDeps, request: ApiRequest): Promise<ApiRe
 /* -------------------------------------------------------------------------- *
  * Shared
  * -------------------------------------------------------------------------- */
+
+/**
+ * The account was there when the request authenticated and is not there now.
+ *
+ * **Reachable only since `DELETE /api/me` landed, and only by the account's own owner.** A
+ * verification is a whole simulation, so the gap between {@link authenticate} and the write is
+ * seconds rather than microseconds; a player who deletes their account while a submission is
+ * verifying lands here. Nothing about it is cross-account — a session cannot delete anybody else —
+ * so this is a robustness answer rather than a security one.
+ *
+ * **401 rather than 409 or 500.** A `500` is what this used to be, and it was a lie: nothing failed
+ * on the server, the caller stopped existing. A `409` would invite a retry into a state that cannot
+ * come back. `401` is exactly what the *next* request would get, since the session went with the
+ * account, and `not-signed-in` is the code every client already handles by dropping its session —
+ * which is the correct thing for it to do here.
+ *
+ * The detail says the run was not posted, because the alternative reading — that it was posted and
+ * then erased — is the one a player would otherwise assume, and it is wrong: the insert never
+ * landed.
+ */
+function accountVanished(): ApiResponse {
+  return {
+    status: 401,
+    body: {
+      error: 'not-signed-in',
+      detail: 'That account was deleted while this run was being verified, so nothing was posted.',
+    },
+  };
+}
 
 async function authenticate(deps: ApiDeps, request: ApiRequest): Promise<UserRow | undefined> {
   return request.token === undefined ? undefined : deps.store.userForSession(request.token);
