@@ -48,6 +48,7 @@ import {
   stageSeedSetOf,
   type StageSeedSet,
 } from './stageRun.js';
+import { runStageToVerdict } from './stageSequence.js';
 import type { Campaign, CampaignStage } from './types.js';
 
 let config: LoadedConfig;
@@ -161,7 +162,7 @@ describe('the headline is a tally of verdicts, not a goal claim', () => {
     expect(verdict.goals.every((goal) => goal.met === null)).toBe(true);
   });
 
-  it('names no goal kind and no goal label, cleared or not', () => {
+  it('names no goal kind and no goal label, cleared or not', async () => {
     const words = goalWords();
     // Both ways: a `GOAL_KINDS` that emptied would make every assertion below vacuous.
     expect(words.length).toBeGreaterThan(6);
@@ -188,31 +189,18 @@ describe('the headline is a tally of verdicts, not a goal claim', () => {
     const stage = stageAt(4);
     let cleared: StageReport | undefined;
     for (const profile of config.dispatcherProfiles.profiles) {
-      const attempt = runBatch(batchRequestForStage(stage, profile.id), resourcesFor(stage));
-      const report = batchReport(attempt);
-      const onTuning = judgeStage({
-        stage,
-        published: publishedFor(stage),
-        result: attempt,
-        report,
-      });
       /*
-       * The second batch, and only when the first met every bar. A stage clears on the holdout
-       * seeds as well since issue #255, so a search that ran one batch would find no cleared
-       * verdict at all and this case would have nothing to check the headline of — and the
-       * skip is arithmetic rather than a shortcut, because `cleared` needs both halves.
+       * Two batches, and the second only when the first met every bar — through
+       * `campaign/stageSequence.ts`, which is the sequence the Campaign tab runs. It was written
+       * out here, and a copy of the rule that decides whether a player cleared a stage is a copy
+       * that can drift from the surface: it did, for a whole wave, while the panel ran one batch.
+       * The skip is arithmetic rather than a shortcut, because `cleared` needs both halves.
        */
-      if (!onTuning.metOnTuningSeeds) continue;
-      const holdoutResult = runBatch(
-        batchRequestForStage(stage, profile.id, undefined, 'holdout'),
-        resourcesFor(stage),
-      );
-      const verdict = judgeStage({
+      const { verdict } = await runStageToVerdict({
         stage,
         published: publishedFor(stage),
-        result: attempt,
-        report,
-        holdout: { result: holdoutResult, report: batchReport(holdoutResult) },
+        candidateProfileId: profile.id,
+        run: (request) => runBatch(request, resourcesFor(stage)),
       });
       if (verdict.cleared) {
         cleared = verdict;
