@@ -223,3 +223,61 @@ a mode is allowed to show early is exactly the thing a player can be shown befor
 honesty rule and the pedagogy rule want the same screen.
 
 ---
+
+## 3. The palette — what a symptom can be made of today
+
+Every mode design below draws from this table and nothing else. It is an inventory of the shipped
+renderers, taken from `packages/viz/src/render/` (the Engineer stage, `drawScene`, whose single
+non-test caller is `dev/main.ts#drawStage`) and `packages/viz/src/everyday/stageScreen.ts`
+(`drawCutaway`, the Casual cutaway). **Two independent renderers exist**, which is
+[§ D299](../DECISIONS.md) § 3's decision working as intended, and a symptom must say which one it is
+for.
+
+### 3.1 Drawable today, on both stages
+
+| symptom | how it is drawn | driven by |
+|---|---|---|
+| **People standing at a floor** | Engineer: one glyph per rider, oldest first, `○ ◑ ● ◆` by wait band, then `+N`, then a log-scaled bar past 40 (`render/riderQueue.ts#planQueueRow`); plus head-and-body **rider figures** in the rider lane, bobbing (`render/riderFigures.ts#drawRiderLane`). Casual: one 4.5 px capsule per rider tinted by `stageInkFor(waitedS)`, capped at 26 with a `+N` chip | `frame/overlay.ts#queueAt`; band from `waitBandOf` |
+| **How long they have been standing** | Four bands, each carrying **shape, colour and bob amplitude** — never colour alone. Engineer bands come from `recording.summary`'s own thresholds; Casual's four rungs are `live/bands.ts#WAIT_BANDS` (`breezy`, `tapping-foot`, `checking-watch`, `taking-the-stairs`) | `t − arrivedAt` |
+| **A crowd deep enough to be an emergency** | Engineer: a pulsing alarm rule across the whole plot when a landing passes `ALARM_STACK_DEPTH` = 24. Casual: the alarm strip at `STAGE_ALARM_STANDING` = 40 standing | `FloorQueue.total`; `waitingNow` |
+| **Which way they want to go** | `▲n ▼n` per landing — **aggregate counts only** | `frame.landings[].waitingUp/.waitingDown` |
+| **A car being full** | Body colour in four load bands (`room` / `carrying` / `at-design-load` ≥ 0.8 / `overloaded` ≥ 1.1), the occupant number inside it, a `!` glyph past the alarm, and Casual's `riders/capacity` readout | `frame.cars[].loadFactor`, `.occupants` |
+| **Doors** | A continuous centre gap at `doorFraction`, a four-state glyph `▮ ◂▸ ▯ ▸◂`, and Casual's two amber leaves | `frame.cars[].doorFraction`, `.doorPhase` |
+| **A car out of service** | Engineer: the shaft dimmed to `0.32` and an `OOS` pill. Casual: the well drawn dashed and empty with rotated `OUT OF SERVICE` | `recording.outOfServiceCarIds` |
+| **Where the cars are, and which way they are moving** | Car body at its height, `▲`/`▼` beside it — **and nothing at all when `direction === 0`** | `frame.cars[].heightM`, `.direction` |
+| **Somebody getting on** | A relief mark `✓N` over a landing, five-second window | `FloorQueue.recentlyBoarded` |
+| **A call nobody ever answers** | `✗` on the landing | `SceneInput.unansweredCallFloorIds` |
+| **A landing that cannot ride** | `▩` on the landing, and `describeLockedOut` in the description | `SceneInput.lockedOutLandings` |
+| **The queue's history up to now** | The race strip's own lane: the average wait of the people standing *right now*, sampled to the playhead, with a dashed 60 s line (`live/raceStrip.ts`) | folds to `t` only |
+| **A mid-run intervention having happened** | A stamp under the header — `09:14 · parked the cars in the lobby` — which **disappears if the player scrubs back past it** (`live/interventions.ts#interventionStampOf`) | `RunInterventionConfig.atS` |
+| **All of the above, in words** | One deterministic paragraph, per-floor queue sentences busiest-first, one sentence per car, mood, suppression ground (`render/describeFrame.ts`). It is the canvas's `aria-label` and the live region | the same frame |
+
+### 3.2 Not drawable today, and what each would take
+
+Every mode design below that needs one of these says so and prices it.
+
+| absent symptom | why | what it would take |
+|---|---|---|
+| **A parked car, distinguishable from a stopped one** | `grep` for `park`/`idle` across `render/` and both stage screens returns nothing. An idle car is a stationary car with `direction === 0` and near-zero load — **pixel-identical to any empty car that happens to be stopped**. `PARK_CARS_LOBBY_LABEL` exists as a button with **no visual consequence of its own** | A frame field. `FrameCar` carries no idle state; the renderer cannot invent one. See § 8, which is about this row |
+| **A car passing a floor where somebody is waiting** | `FrameCar` carries `carId, bankId, label, heightM, floorId, direction, doorFraction, doorPhase, occupants, loadFactor` — **no stop list, no assigned calls, no destination set.** `VizShaft.motions` makes a future stop *derivable* and nothing renders it | Either a frame field, or a renderer that reads `motions` ahead of the playhead — the second is `docs/28` § 4.4's *foreshadowing*, **refused**, because it reads the future. The honest form is a mark on the **landing** at the moment of the pass, drawn from the past |
+| **Doors closing on somebody / a boarding refused for lack of room** | No such event exists in the contract. `VizLeg` has `arrivedAt, boardedAt, alightedAt, carId, bankId, refusedAt, assignedCarId, credentialGroup`, and `refusedAt` is credential refusal, used only negatively — `isWaitingAt` returns `false` and the rider silently vanishes | A contract field on `VizLeg`, and therefore a `core` change. **This is the most expensive item in the table and the one a designer will reach for first** |
+| **A rider giving up and walking away** | The band named `abandoned` is an **age**, not an outcome — `live/bands.ts` says so outright. `isWaitingAt` removes a rider on `boardedAt` or `refusedAt` and on nothing else, so **the stage keeps drawing somebody the Day report has already counted under `TOOK THE STAIRS`** | An `abandonedAt` on `VizLeg`. *Unverified*: whether the underlying simulation removes the rider — [`CLAUDE.md`](../CLAUDE.md) says patience is simulated and riders do leave, so this is likely a viewer-contract gap rather than an engine one. **The check that settles it: run a building with `sim.patience.distribution` set, and assert `queueAt` at the horizon does not still hold a leg the report counts as abandoned.** Named as a finding in § 11 |
+| **A rival lane on the Casual stage** | Refused correctly and out loud: `STAGE_NO_GHOST`. `dev/ghostRun.ts#ghostPlanOf` — the module that builds a rival on the same crowd — **is inside the Engineer shell's closure**, on the far side of a façade the stage may not reach through | A **provided port**, exactly the shape [§ D338](../DECISIONS.md) used for the Engineer swap: `everyday/swap.ts` provides a capability into the shell rather than letting the shell import it. See § 4.5 |
+| **Scrubbing on the Casual stage** | `mountStage` has play/pause and speed buttons and no timeline element; no `seek*` call exists there. The Engineer surface has the full transport, including click-to-scrub and ±1/±60 frame stepping | A timeline element wired to the `Playback` the screen already owns |
+
+### 3.3 The two things this palette makes obvious
+
+**The stage can already show a crowd better than it can show a lift.** Nine of the thirteen drawable
+rows are about people; the car's own behaviour is four states of fullness, a door fraction, a
+direction arrow, and nothing about intent. So a symptom phrased as *people are stacking up* is cheap
+and a symptom phrased as *the lift is doing the wrong thing* is expensive. **Every design below is
+phrased from the crowd's side**, and that is not a stylistic choice — it is the palette.
+
+**`docs/28` § 5.4 has already specified the four channels and named the gap.** `AD-S7` (the wait
+ramp gets height as a second channel), `AD-S8` (the landing's ground takes a wash of its deepest
+band), `AD-S9` (the alarm's threshold is building-relative or names itself), `AD-S10` (the race
+strip's duration lane is *"the most under-weighted element on the screen"*). **This document requires
+none of them and depends on all four.** A mode whose symptom is a queue is a mode whose symptom is
+4.5 px wide until `AD-S7` and `AD-S8` land.
+
+---
