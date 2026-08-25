@@ -37,7 +37,24 @@ can drive a browser is not a first-time tester, and § D349's split stands untou
 | FIX-257 | The speed ladder, and a true 1:1 | #257 | in flight |
 | FIX-CAMPAIGN-INTEGRITY | The campaign `reportWindow` **and** O7's hold-out seeds | #255 + O7 | in flight — **high risk, moves published pins** |
 | FIX-254 | The account-deletion route | #254 | in flight |
-| M2-MEASURE | The browser matrix, and the truth of all 22 `TEST_MATRIX.md` rows | M2 exit criteria | in flight — measurement only, changes no source |
+| M2-MEASURE | The browser matrix, and the truth of all 22 `TEST_MATRIX.md` rows | M2 exit criteria | **merged** |
+| FIX-HORIZON | One expression answers which horizon a run is | — | **merged** ([§ D359](DECISIONS.md)) |
+| FIX-O8 | The Campaign tab runs the hold-out batch | O8 | **merged** ([§ D360](DECISIONS.md)) |
+| FIX-268 | The tier fails on an unhandled page error | #259 AC4, #268 | **merged** |
+| FIX-267 | A whole day is postable, and the cooldown repriced with it | #267 | **merged** |
+| FIX-STAGE1 | The measurement that stage 1 cannot carry a goal, and the gate | #270 | **merged** — the gate only |
+| FIX-STAGE1B | The fabric route | #270 | **refused and preserved unmerged** on `fix/stage-1-fabric` |
+
+**One lane was deliberately not merged, and it is the most useful refusal of the wave.** FIX-STAGE1B
+did everything asked — one car, `eta` as baseline, DC-1 and DC-2 both holding — and then measured
+what it cost. **Two of stage 1's three editable dials go inert** (one car is one candidate for the
+argmin, so `weights.waitTime` and `weights.distanceTravelled` stop moving the legs), **78 tests fail
+across 32 files** including 352 published matrix figures and three golden digests, and the
+correctness oracle's premise fails with bunching structurally unmeetable on a one-car bank.
+
+A stage whose goal is failable and whose controls are inert is worse for a player than a stage with
+no goal, so the change was refused on a **player-facing** ground rather than a cost one. Branch,
+measurement and the three honest routes are preserved in [#270](https://github.com/mrpeanut01/elevator-sim/issues/270).
 
 **The tier-port lane was not scheduled; it fell out of measuring the baseline, and it is the most
 useful thing this wave has found so far.** `boot.browser.test.ts` is the file the other three notes
