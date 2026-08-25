@@ -64,6 +64,12 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   noteSolved: 'This one is settled. There are more buildings than you have afternoons.',
   /** `dev/fixitPanel.ts`'s relabel while the synchronous pair computes. */
   runningLabel: 'Running the day…',
+  /**
+   * Why the primary cannot be pressed while that pair computes — `BarPrimary.inert`'s sentence.
+   * The relabel says *what is happening*; a player looking at a dead button is asking *why can I
+   * not press this*, and those are different questions (GitHub issue #262).
+   */
+  runningWhy: 'The pair of days is being simulated. This finishes on its own.',
   loading: 'Loading the case file…',
   emptyFile: 'The case file holds no cases.',
   /** The machinery card's capital split when nothing bought steel — the prototype's own word. */
@@ -165,7 +171,11 @@ export function fixitBarModel(base: ActionBarModel, view: FixitBarView): ActionB
   if (view.running) {
     return {
       ...base,
-      primary: { ...base.primary, label: FIXIT_SCREEN_COPY.runningLabel, inert: true },
+      primary: {
+        ...base.primary,
+        label: FIXIT_SCREEN_COPY.runningLabel,
+        inert: FIXIT_SCREEN_COPY.runningWhy,
+      },
       note: FIXIT_SCREEN_COPY.noteReady,
     };
   }
@@ -182,7 +192,7 @@ export function fixitBarModel(base: ActionBarModel, view: FixitBarView): ActionB
     primary: {
       ...base.primary,
       label: (view.ran ? ranLabel : readyLabel) ?? base.primary.label,
-      ...(view.ready ? {} : { inert: true }),
+      ...(view.ready ? {} : { inert: FIXIT_SCREEN_COPY.loading }),
     },
     note: FIXIT_SCREEN_COPY.noteReady,
   };

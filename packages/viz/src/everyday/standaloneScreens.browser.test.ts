@@ -87,8 +87,24 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
     await page.close();
   });
 
-  it('draws `Start the rush` disabled, with the refusal on the control', async () => {
+  /**
+   * **GitHub issue #262, at the height it was measured at.**
+   *
+   * This case used to be called *with the refusal on the control* and asserted
+   * `.everyday-rush-refusal` — an element on the **screen**, which at 1280 × 720 sits 184 px below
+   * the fold while the full-amber primary is pinned at 675 and the note beside it reads *"Nothing
+   * to set up. It ends when it ends."*. A player at that viewport had a dead button, a sentence
+   * that sounds like confirmation, and no reason anywhere they could see. The test's own name was
+   * the claim that went stale first.
+   *
+   * So it is driven at **1280 × 720** — the shortest height the stylesheet has a block for
+   * (`docs/31-support-matrix.md` § 2's breakpoint table: 1339, 1179, 899, 767, 720) and the height
+   * #262 measured — and it asserts the reason is **inside the viewport**, by geometry, rather than
+   * that an element carrying it exists. Existence is what passed while the defect shipped.
+   */
+  it('draws `Start the rush` disabled, with the reason on the control and above the fold', async () => {
     const page = await coldLoad();
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.click('.everyday-mode[data-screen="rush"]');
     await page.waitForSelector('.everyday-rush');
 
@@ -99,8 +115,37 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
       true,
     );
     expect(await page.$('.everyday-bar-timeline')).toBeNull();
-    // And the reason is a sentence a player reads, not only a tooltip.
+    // The screen's own paragraph still says it — that half was never the defect.
     expect(await page.textContent('.everyday-rush-refusal')).toMatch(/not built/);
+
+    /* The control carries the reason: as a tooltip, and by `aria-describedby` — which must resolve
+       to a node that is actually in the document, since a description pointing at nothing reads as
+       a described control and describes nothing. */
+    const described = await page.$eval('.everyday-bar-primary', (button) => {
+      const id = button.getAttribute('aria-describedby');
+      const target = id === null ? null : document.getElementById(id);
+      const box = target?.getBoundingClientRect();
+      return {
+        title: (button as HTMLButtonElement).title,
+        id,
+        resolved: target !== null,
+        text: target?.textContent ?? '',
+        top: box?.top ?? Number.NaN,
+        bottom: box?.bottom ?? Number.NaN,
+      };
+    });
+    expect(described.title).toMatch(/not built/);
+    expect(described.resolved, `aria-describedby="${String(described.id)}" resolves`).toBe(true);
+    expect(described.text).toMatch(/not built/);
+
+    /* **Visible without scrolling, by geometry.** `scrollY` is 0 on a fresh screen, so the
+       client rectangle is the viewport rectangle. */
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    expect(described.top, 'the reason is above the top of the viewport').toBeGreaterThanOrEqual(0);
+    expect(described.bottom, 'the reason is below the fold at 720 px').toBeLessThanOrEqual(720);
+
+    /* And the sentence that read as confirmation is gone from beside the dead button. */
+    expect(await page.textContent('.everyday-bar-note')).not.toContain('Nothing to set up');
     await page.close();
   });
 });

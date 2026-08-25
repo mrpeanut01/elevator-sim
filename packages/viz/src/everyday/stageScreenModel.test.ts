@@ -403,9 +403,10 @@ describe('§ 3.3 — the stage row, refined', () => {
       { hasRun: true, dayClosed: true, recomputing: false },
     ]) {
       const bar = stageBarModelOf(state, flags);
-      /* Inert *and* explained. A disabled button with the table's note still under it would be
-         telling the player it stops a clock that is not running. */
-      expect(bar.primary.inert, JSON.stringify(flags)).toBe(true);
+      /* Inert *and* explained — and the explanation is on the primary itself, which is the cell
+         the shell draws and binds to the button. A disabled button with the table's note still
+         under it would be telling the player it stops a clock that is not running. */
+      expect(bar.primary.inert, JSON.stringify(flags)).toBe(bar.note);
       expect(bar.note, JSON.stringify(flags)).not.toBe('Stops the clock and writes the report.');
       expect((bar.note ?? '').length).toBeGreaterThan(10);
     }

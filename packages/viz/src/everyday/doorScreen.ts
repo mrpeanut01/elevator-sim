@@ -313,12 +313,11 @@ function doorBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
   const replay = dayOffset !== 0;
   const label = base.primary.variants[replay ? 1 : 0] ?? base.primary.label;
+  const pastDay = 'A past day can be read here, not re-opened.';
   return {
     ...base,
-    primary: { ...base.primary, label, inert: replay },
-    note: replay
-      ? 'A past day can be read here, not re-opened.'
-      : base.note,
+    primary: { ...base.primary, label, ...(replay ? { inert: pastDay } : {}) },
+    note: replay ? pastDay : base.note,
   };
 }
 

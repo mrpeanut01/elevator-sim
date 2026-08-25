@@ -505,10 +505,16 @@ function mountBench(
      */
     mountedBench = {
       ran: state.cells.length > 0,
-      ready:
-        !state.running &&
-        benchFieldRefusal(state.pickedIds) === undefined &&
-        benchTestsRefusal(state.tickedIds) === undefined,
+      /*
+       * **The refusal itself, not a `ready` bit.** It used to be a boolean, and the bar could
+       * therefore only draw a dead button — the screen's own refusal sat beside the field it was
+       * about while the control the player is actually pressing said nothing (GitHub issue #262).
+       * The three states are ordered by what a player would ask first: a suite in flight, then a
+       * field that cannot be compared, then no tests ticked.
+       */
+      refusal: state.running
+        ? COPY.runningSuite
+        : (benchFieldRefusal(state.pickedIds) ?? benchTestsRefusal(state.tickedIds)),
     };
     root.replaceChildren();
     const eyebrow = el(doc, 'div', undefined, COPY.eyebrow);
@@ -546,7 +552,7 @@ function mountBench(
  * The mounted screen's state, for the § 3.3 refinement the shell asks for outside the closure —
  * `workshopScreen.ts`'s `mountedHost` shape, and `fixitScreen.ts`'s before it.
  */
-let mountedBench: { ran: boolean; ready: boolean } | undefined;
+let mountedBench: { ran: boolean; refusal: string | undefined } | undefined;
 
 /**
  * § 3.3's bench row, refined.
@@ -554,7 +560,13 @@ let mountedBench: { ran: boolean; ready: boolean } | undefined;
  * Two refinements and nothing else. The primary picks between the guide's own two variants (*Run
  * the suite* / *Run the suite again*), and it is drawn **inert** while the field or the tests are
  * refused — a pressable button whose press does nothing is what `BarPrimary.inert` exists to
- * prevent, and the refusal itself is already on the screen beside the control it is about.
+ * prevent.
+ *
+ * **The reason travels with the inertness, and it did not used to.** This docstring said the
+ * refusal *"is already on the screen beside the control it is about"*, which was true of the field
+ * card and false of the bar: the pinned primary is the control a player presses, it is on screen
+ * at every height, and it carried no sentence at all. GitHub issue #262 measured the same defect
+ * on the rush setup. `BarPrimary.inert` now holds the refusal, so the bar draws it.
  */
 function benchBar(state: Parameters<NonNullable<EverydayScreenModule['bar']>>[0]): ReturnType<
   NonNullable<EverydayScreenModule['bar']>
@@ -564,7 +576,17 @@ function benchBar(state: Parameters<NonNullable<EverydayScreenModule['bar']>>[0]
   const label = (here?.ran === true ? base.primary.variants[1] : base.primary.variants[0]) ?? base.primary.label;
   return {
     ...base,
-    primary: { ...base.primary, label, inert: here === undefined ? true : !here.ready },
+    primary: {
+      ...base.primary,
+      label,
+      /* Not mounted yet: the shell can ask for a row before the screen exists, and a filled
+       * primary over no screen is the same dead control with no sentence. */
+      ...(here === undefined
+        ? { inert: 'The bench has not finished loading.' }
+        : here.refusal === undefined
+          ? {}
+          : { inert: here.refusal }),
+    },
   };
 }
 

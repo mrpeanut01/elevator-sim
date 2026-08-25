@@ -133,10 +133,17 @@ describe('the § 3.3 refinement', () => {
   it('relabels and inerts the primary while the pair computes, and inerts it before the file loads', () => {
     const running = fixitBarModel(FIXIT_BAR, view({ running: true }));
     expect(running.primary.label).toBe(COPY.runningLabel);
-    expect(running.primary.inert).toBe(true);
+    /*
+     * The reason, not a bit — `BarPrimary.inert` carries the sentence the shell draws in the bar
+     * and binds to the button (GitHub issue #262). The relabel and the reason are asserted as two
+     * different strings on purpose: *Running the day…* says what is happening, and a player
+     * looking at a control that will not press is asking why it will not.
+     */
+    expect(running.primary.inert).toBe(COPY.runningWhy);
+    expect(running.primary.inert).not.toBe(running.primary.label);
     const unready = fixitBarModel(FIXIT_BAR, view({ ready: false }));
-    expect(unready.primary.inert).toBe(true);
-    // A pressable state carries no inert bit at all — absent means pressable.
+    expect(unready.primary.inert).toBe(COPY.loading);
+    // A pressable state carries no inert cell at all — absent means pressable.
     expect(fixitBarModel(FIXIT_BAR, view({})).primary.inert).toBeUndefined();
   });
 });

@@ -149,7 +149,11 @@ describe('the availability flags describe this tree, not a remembered one', () =
       false,
     );
     expect(RUSH_PRIMARY_REFUSAL).toMatch(/not built/);
-    expect(rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' })).primary.inert).toBe(true);
+    /* The refusal is *on the control*, which is what this file's own rule says — so the assertion
+       is that the primary carries that sentence, not merely that it is dead (issue #262). */
+    expect(rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' })).primary.inert).toBe(
+      RUSH_PRIMARY_REFUSAL,
+    );
   });
 
   it('opens the campaign, now that all three of § 8’s screens exist beside its economy', () => {
