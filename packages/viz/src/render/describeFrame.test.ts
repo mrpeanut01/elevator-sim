@@ -221,8 +221,17 @@ describe('D10 — a call no car answers is said in words, not only drawn', () =>
    * The sighted half of this signal is `canvas.ts`'s `✗` on the landing and the count in the
    * banner. `KB-13` is the rule that the non-sighted reader is told the same thing, and it bites
    * hardest here: before `D10` the only surface for "no car answered this call in this run"
-   * anywhere in the viewer was the caption drawn for a landing picked out of a `<select>` that is
-   * dropped below 1280 px of viewport.
+   * anywhere in the viewer was the caption drawn for a landing picked out of a `<select>` **that
+   * defaults to `none`** — so the fact went unwritten unless the reader already suspected the
+   * floor.
+   *
+   * That clause used to end *"a `<select>` that is dropped below 1280 px of viewport"*, and it is
+   * **withdrawn** — issue #260. No such rule has existed since `22a1021`; the argument, and what
+   * does govern the control, is in `describeFrame.ts`'s `unansweredCallFloorIds` and in
+   * `render/canvas.ts`'s. The selection default is the support that survives, and it is the
+   * stronger one: a width rule hid the control on some screens, while `none` hides the fact on all
+   * of them. This file was registered as still asserting the withdrawn claim in
+   * `viewportClaims.test.ts#KNOWN_STALE`; that entry is deleted on this commit.
    *
    * Driven off a real run rather than a literal, so the sentence is asserted against a recording
    * the rest of this file also uses.

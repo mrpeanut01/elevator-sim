@@ -42,7 +42,32 @@ export interface DescribeFrameInput {
    *
    * Said in words for the reason the door phase and the overload are: the glyph is the sighted
    * half of a signal, and a fact this repository calls never-hideable cannot live only in a
-   * `<select>` that is dropped below 1280 px.
+   * `<select>` a reader has to guess a floor to reach.
+   *
+   * ## The viewport clause this paragraph used to carry — withdrawn, issue #260
+   *
+   * It said that `<select>` is *dropped below 1280 px*. **There is no such rule and there has not
+   * been one since `22a1021`**, which deleted `@media (max-width: 1279px) { .wide-only { display:
+   * none; } }` and the `.wide-only` class together. The sentence was true when it was written and
+   * outlived its mechanism by a month, which is what `CLAUDE.md` files under *a stated mechanism
+   * goes stale*. Issue #256 withdrew the same clause from `render/canvas.ts` and **registered this
+   * file and its test as still asserting it**, in `render/viewportClaims.test.ts#KNOWN_STALE`, with
+   * a check that goes red in both directions. The register entry is deleted on the commit that
+   * deletes this sentence, because a finding that has been repaired must stop being registered.
+   *
+   * **No replacement width is named here, because there is none to name.** Naming one would be the
+   * same defect in new wording. What actually governs the control is set out in full in
+   * `render/canvas.ts`'s own `unansweredCallFloorIds`, and none of it is a width: the `<select>`
+   * lives in `#panel-run`, so every other tab hides it outright, and it defaults to `none`, so the
+   * caption it captions is unwritten until the reader picks the floor. `viewportClaims.test.ts`
+   * pins the five widths the page does declare — 720, 767, 899, 1179, 1339 — and asserts that none
+   * of them reaches this element.
+   *
+   * **The conclusion is unchanged and better founded than when it was written**, which is the point
+   * of withdrawing a premise: the surviving support is *stronger* than the one that went. A width
+   * rule hid the **control** on narrow screens; a default of `none` hides the **fact** on every
+   * screen until the reader guesses which floor to ask about — which they would have to suspect in
+   * order to do. So the fact is said here, in words, for every reader.
    */
   readonly unansweredCallFloorIds?: readonly string[] | undefined;
   /**
