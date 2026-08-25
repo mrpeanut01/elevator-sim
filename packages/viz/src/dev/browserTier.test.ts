@@ -520,3 +520,107 @@ describe('every browser-tier file names a port of its own — the trap this tier
     expect(claimed.size, 'no ports were read, so the two cases above asserted nothing').toBeGreaterThan(0);
   });
 });
+
+/**
+ * **The page-error gate has one owner, and the choke point is derived** — GitHub issue #268.
+ *
+ * A decision number is owed; the argument is `browserTier.test-helper.ts`'s own section docstring,
+ * which measures what the tier was blind to. The one-line version: a page could raise an unhandled
+ * error on every case and the run stayed green, which is how issue #259 survived four encounters.
+ *
+ * ## Why this belongs here rather than in the helper
+ *
+ * The helper collects; it cannot make itself the *only* collector. That is the same asymmetry the
+ * clauses above exist for — the gate constants were one importable module for eleven waves before
+ * anything checked that every file went through it — so the enforcement lives where the derivation
+ * lives, in a project that always runs, reading the tier's files off disk.
+ *
+ * Three clauses, and the third is the one that stops this becoming *"six copies kept identical by
+ * a sentence"* a second time:
+ *
+ * 1. **Every file that launches a browser opens its pages through `openPage`.** Written this way
+ *    round on purpose: *"at least one file uses the helper"* is non-vacuity, and this is coverage.
+ *    Every one of the tier's 26 files launches a Chromium, and a file that launched one and drove
+ *    no watched page would be a file whose pages throw into nothing.
+ * 2. **No file mints a page itself.** `.newPage(` on any receiver, and `.newContext(` with it —
+ *    a context is the other way to reach a `Page`, and closing one door while leaving the other
+ *    open is the shape of a guard that reads as total and is not.
+ * 3. **No file attaches a `pageerror` listener of its own.** Three files did, and the other
+ *    twenty-three had nothing; the three were folded into the shared collector by this issue. A
+ *    private listener is not merely redundant — it is a second answer to *what counts as a page
+ *    error in this tier*, and the two answers drift in the direction nobody notices, because both
+ *    of them are green almost always.
+ *
+ * Clause 3 reads the **raw** source rather than `code()`, unlike its neighbours: `code()` strips
+ * string literals, so `page.on('pageerror', …)` survives it as `page.on(, …)` with the evidence
+ * removed. The cost is that a docstring writing that call verbatim would trip the clause, which is
+ * a trade worth making in this direction — prose can be rephrased, and a missed second collector
+ * cannot be noticed.
+ */
+describe('the tier collects page errors in one place — GitHub issue #268', () => {
+  /** How a tier file gets a `Page` without the helper. Both receivers, both routes. */
+  const MINTS_A_PAGE = /\.(newPage|newContext)\s*\(/u;
+
+  /** A collector of its own. Raw source — see the docstring above for why not `code()`. */
+  const PRIVATE_COLLECTOR = /\.on\(\s*['"]pageerror['"]/u;
+
+  it('opens every page through the shared collector, in every file that launches a browser', async () => {
+    const tiers = browserTiers(await registeredProjects());
+    expect(tiers.length, 'no browser tier was found, so this guard is watching nothing').toBeGreaterThan(0);
+
+    let watched = 0;
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        const source = code(readSource(path));
+        if (!source.includes('chromium.launch')) continue;
+        expect(
+          source.includes('openPage('),
+          `${shortly(path)} launches a browser and never calls openPage. Its pages raise their ` +
+            'unhandled errors into nothing, which is the state the whole tier was in before ' +
+            'GitHub issue #268 — two full runs carrying #259’s throw reported 0 failed. Replace ' +
+            '`browser.newPage(…)` with `openPage(browser, …)` from browserTier.test-helper.js; ' +
+            'there is nothing else to call, and nothing to remember to assert.',
+        ).toBe(true);
+        watched += 1;
+      }
+    }
+    expect(
+      watched,
+      'no file in the tier launches a browser, so this case asserted nothing about any of them',
+    ).toBeGreaterThan(0);
+  });
+
+  it('lets no file mint a page or a context of its own', async () => {
+    const tiers = browserTiers(await registeredProjects());
+    const minting: string[] = [];
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        if (MINTS_A_PAGE.test(code(readSource(path)))) minting.push(shortly(path));
+      }
+    }
+    expect(
+      minting,
+      'these files reach a page around the tier’s collector. `openPage` in ' +
+        'browserTier.test-helper.js takes exactly what `newPage` takes and attaches the listener ' +
+        'the gate reads; a page minted any other way throws into nothing and the run stays green.',
+    ).toEqual([]);
+  });
+
+  it('lets no file keep a page-error collector of its own', async () => {
+    const tiers = browserTiers(await registeredProjects());
+    const private_: string[] = [];
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        if (PRIVATE_COLLECTOR.test(readSource(path))) private_.push(shortly(path));
+      }
+    }
+    expect(
+      private_,
+      'these files listen on `pageerror` themselves. Three did before GitHub issue #268 — ' +
+        'boot, dispatcherFamilies and dispatcherStrip — and the other twenty-three had no ' +
+        'collector at all, which is the asymmetry that made the tier report green over a throwing ' +
+        'page. The shared gate covers every page of every file; a private one is a second answer ' +
+        'to the same question, and this repository has paid for that shape before.',
+    ).toEqual([]);
+  });
+});
