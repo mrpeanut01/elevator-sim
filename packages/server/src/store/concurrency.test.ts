@@ -88,7 +88,10 @@ const REMEDIES: Readonly<Record<string, readonly Remedy[]>> = Object.freeze({
         'the race could therefore never reach. A `23505` now returns the same discriminated result the ' +
         'sequential path returns, so that branch is reachable by the case it was written for. Which ' +
         'constraint fired is settled by asking the database whether the *address* is now taken, per ' +
-        '§ D358’s rule: `users` has two unique keys and only one of them is the address.',
+        '§ D358’s rule: `users` has two unique keys and only one of them is the address. The third ' +
+        'entry in the derived list is the primary key, which is a fresh `randomUUID` and cannot ' +
+        'collide with a row this store did not write; an unexplained `23505` is re-thrown rather ' +
+        'than labelled, so that case stays a server failure and reads as one.',
       player:
         'Before: `500 internal-error` on `POST /api/auth/request-link` — and a 500 where every other ' +
         'answer on that route is a uniform 202. After: the 202, and the link, because the account the ' +
@@ -267,7 +270,9 @@ const REMEDIES: Readonly<Record<string, readonly Remedy[]>> = Object.freeze({
         'fresh `randomUUID`, and the second violates the natural key. The conflict target is now the ' +
         'natural key and the row’s id comes back from `RETURNING`, so the database arbitrates and the ' +
         'pre-read is gone rather than merely guarded. `consumeLoginToken`’s docstring already argued ' +
-        'this shape: one statement, and exactly one caller can see it win.',
+        'this shape: one statement, and exactly one caller can see it win. What is left in the ' +
+        'derived list is the primary key, which the statement no longer arbitrates and cannot ' +
+        'collide on either — the id it inserts is a fresh `randomUUID`.',
       player:
         'Before: a double-tapped submit answered `500` on the losing request, having posted nothing ' +
         'for it. After: both are the same score on the same row, which is what a deterministic replay ' +
@@ -307,8 +312,9 @@ const REMEDIES: Readonly<Record<string, readonly Remedy[]>> = Object.freeze({
       remedy: 'arbitrated-by-the-write',
       because:
         '`UNIQUE (challenge_id, data_hash, user_id)` with the upsert conflicting on `id`, which is ' +
-        '`recordEntry`’s second defect exactly. Same remedy, and stated separately rather than by ' +
-        'reference because the two tables are different tables.',
+        '`recordEntry`’s second defect exactly. Same remedy, same residual primary key, and stated ' +
+        'separately rather than by reference because the two tables are different tables and the ' +
+        'natural keys are different natural keys.',
       player:
         'Before: `500` on the losing half of a double submission. After: one row, latest wins — which ' +
         'is what the docstring says a challenge entry is.',

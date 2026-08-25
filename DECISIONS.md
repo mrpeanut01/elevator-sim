@@ -24915,3 +24915,107 @@ carries *all N goals*, which is goals-against-goals and would re-create [§ D186
 from `context.batch`. Owed, and named rather than counted as coverage.
 
 ---
+
+## D361 — `Store` gains no transactions, and the enumeration that says so is derived
+
+**Date: 2026-08-25 · Owner: orchestrator · Lane: FIX-266 · Closes: #266**
+
+**Decision.** No transaction seam. Every write in `packages/server/src/store/` either **maps its
+constraint violation onto an answer the route already has a word for**, or **lets the write itself
+arbitrate**, and the choice is made per site with its own reason. The enumeration those choices are
+checked against is **derived from `store.ts` and its own `SCHEMA`**, not written down.
+
+**The enumeration finds five read-then-write pairs where the issue named two.**
+`packages/server/src/store/concurrency.test-helper.ts` reads every member of every class in the
+directory, follows `this.<member>(…)` calls transitively — and follows a statement *handed to* a
+member as a parameter, which `#userRow` is — and per write asks the schema what the database is
+entitled to raise. The pairs are `createUser`, `setDisplayName`, `userForSession`, `recordEntry` and
+`recordChallengeEntry`. § D358 knew the last two, because they are the two a reader looking for a
+*foreign-key* violation finds; the other three pre-check something else.
+
+**The set that carries a remedy is wider than that, and the two extras are the argument for
+deriving rather than reading.** `createSession` and `createLoginToken` read nothing and are
+check-then-acts anyway: the read is one frame up, in `redeemLink` and `requestLink`. **A pair whose
+halves sit in two files is invisible to a read-then-write scan of one directory.** So the remedied
+set is *every member that writes* — eleven — which the same scan computes and which takes no
+judgement. A member that only reads cannot be made to lie by a concurrent delete; it returns fewer
+rows, which is true. `concurrency.test.ts`'s `REMEDIES` is asserted against that set **in both
+directions**, and per site against the *risk categories* the schema derives, so a new writing
+member fails, a stale entry fails, and a risk the schema stops carrying fails.
+
+**No transactions, and the reason is not cost.** Two parts, and the second is the load-bearing one:
+
+1. **A transaction would not exist.** `PgSql.query` takes a connection from a pool per call, so a
+   `BEGIN` and its `COMMIT` issued as two `query` calls land on two connections. Making one real
+   means `Sql` grows `withTransaction`, one checked-out client threaded through every method — the
+   shape `sql.ts` deliberately does not have.
+2. **A transaction would not close any of these anyway.** Under `READ COMMITTED` the concurrent
+   `DELETE FROM users` still commits and the `INSERT` still fails the foreign key; a transaction
+   would roll back a single statement that has nothing to roll back. The lock that *would* close it,
+   `SELECT … FOR UPDATE`, buys the player a **worse** answer: the insert wins, the cascade then
+   erases it, and the player is told their score posted a moment before it is erased. **The mapping
+   tells a truer story than the lock.**
+
+And no site needs multi-statement atomicity today: `deleteUser` is one statement *because* the
+cascade is the rest of it, and `consumeLoginToken`'s second statement sweeps rows the first could
+not have accepted. **The trigger for reopening this is asserted rather than remembered** — no member
+may write to more than one table, and the failure message names this decision.
+
+**Three defects found that the issue did not describe, and one of them has nothing to do with
+deletion.**
+
+- **The upsert conflicted on the wrong key.** `recordEntry` promises one row per (board, player,
+  seed) and `recordChallengeEntry` one per (challenge, data, player); both named `ON CONFLICT (id)`,
+  the *primary* key. So the promise was kept by the `SELECT` above it rather than by the database,
+  and two submissions of one seed in flight together both read nothing, both mint a fresh
+  `randomUUID`, and the second violates the natural key. A double-tapped submit answered `500` and
+  posted nothing for the losing half. **This was reachable before `DELETE /api/me` existed** — it is
+  the class #266 is about, arriving by a route the issue did not anticipate. Fixed by conflicting on
+  the natural key with `RETURNING id`, and the pre-reads are **gone rather than guarded**:
+  `consumeLoginToken`'s docstring already argued that shape.
+- **`createPlayer`'s race branch was unreachable by the race it describes.** Its comment reads
+  *"Lost a race to another request for the same address: that account is the right answer"*, and
+  under an actual race `createUser` threw `23505` straight past it. Only the sequential path — the
+  one that is not a race — could produce `email-taken`.
+- **`redeemLink` called a link whose account had been deleted *already used*.** True-sounding, about
+  something that did not happen, and it sends the player to ask for another link, which works, so
+  they learn nothing. `consumeLoginToken`'s `rowCount` is still its answer; what the cascade changes
+  is what `false` **means**, and the route now asks which and says the true one.
+
+**What the player sees, before and after.** `POST /api/scores` was already `401` (§ D358).
+`POST /api/auth/request-link` was `500` — on the one route in this API whose entire design is a
+response that says nothing about the address — and is now the uniform `202` with a link that
+redeems, because per [§ D241](#d241) asking for a link on an address with no account is what
+*creates* one, so the route starts the account again. `POST /api/auth/redeem` was `500` at the
+session write, which is the worst moment in the flow because the link is already spent by then, and
+is now `link-invalid`. `POST /api/me/display-name` was `500` for the loser of two renames and is now
+`409 name-taken` — a word that was in the store's return type and had a `409` on that route the whole
+time; only the constraint path never reached it.
+
+**Which constraint fired is asked, never read off a name** — § D358's rule, and `users` is where it
+earns its keep: two unique keys and only one of them is the address. An unexplained `23505` is
+**re-thrown rather than labelled**, because a mapping that answers a question it did not verify is a
+worse failure than an unmapped one.
+
+**The scanner's limits are stated and two of them fail loudly.** It resolves calls within one file,
+and asserts the SQL-issuing files are exactly `['store.ts']`; it refuses a `query` whose argument it
+cannot read as a literal or as one of the member's own parameters; and it refuses a pass-through no
+caller hands a literal to. All three would otherwise report *fewer statements*, which reads as *less
+risk* — the one direction an audit may never fail in silently (R24). Six mutation tests drive it
+over spliced source, including a read reachable only by following two calls and a parameter binding.
+
+**The dead-code audit caught a raw NUL byte in the new scanner on its first run**, refused to scan
+it, and named the file. An audit instrument failing loudly inside another audit instrument is
+`deadCode.test-helper.ts`'s divergence 3 doing exactly what it was written for.
+
+**The flake the #254 lane saw once and could not reproduce in six runs reproduced here**, under
+three overlapping `vitest run --project server` processes: 11, 2 and 6 failures across three runs of
+the same green tree, all in `store.test.ts`. Every fixture in that file builds a whole in-process
+PostgreSQL and none closed one, so a full run left roughly forty-five outstanding. They are now
+closed by `onTestFinished` rather than by a trailing call in the test body, because a failing
+assertion skips a trailing call and leaks the instance — which is the state that makes the next
+failure more likely. **This is recorded as mitigation, not as a diagnosis**: the failures are load
+correlated and the leak is the only accumulating resource found, which is a hypothesis with
+evidence rather than a root cause.
+
+---
