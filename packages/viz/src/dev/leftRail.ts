@@ -91,13 +91,15 @@ import {
   type DayOutcome,
   type GoalObservations,
   type GoalReading,
+  type ShiftGoal,
   type WeekState,
 } from '../shift/types.js';
 
+import type { BrowserResources } from './data.js';
 import {el, fill, keyedFill, setHidden, setStyle, setText } from './dom.js';
 import type { HonestyElements, MoodElements, ShiftElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
-import { disclosureOf } from './state.js';
+import { disclosureOf, type ViewerState } from './state.js';
 
 /**
  * The elements this mount owns — a structural subset of `Elements`, so the shell passes its whole
@@ -630,6 +632,31 @@ function shareColor(pct: number): string {
 /* -------------------------------------------------------------------------- *
  * L5 — TODAY'S SHIFT
  * -------------------------------------------------------------------------- */
+
+/**
+ * What today asks of **this** state, on the Engineer side — the one expression the rail's rows and
+ * the filed sheet's goals are both built from.
+ *
+ * ## Why a function, and why this file
+ *
+ * This shell has **two** callers of `shift/goals.ts#goalsForDay` — {@link drawShift} and
+ * `dev/main.ts#closeShift`, the rail the player watches and the sheet it files — and two surfaces
+ * publishing different bars for one run is exactly the disagreement `TEST_MATRIX.md` T1 forbids.
+ * So the shell asks the question once, here, and both read the answer.
+ *
+ * It lives in this file rather than in a neutral one because `dev/main.ts` imports this module and
+ * this module never imports it, so this is the one seam of the two that can hold a shared
+ * derivation without a cycle.
+ *
+ * Pure in its two arguments and exported for the reason every decision in this file is: there is no
+ * jsdom here, so a decision made inside a DOM write is a decision no test can reach.
+ */
+export function shiftGoalsOf(
+  state: ViewerState,
+  _resources: BrowserResources,
+): readonly ShiftGoal[] {
+  return goalsForDay(state.week.day);
+}
 
 export interface GoalRow {
   /** `✓`, `×` or `·` — `GOAL_GLYPHS`. Never the only signal; {@link value} is the other. */
@@ -1232,7 +1259,11 @@ function drawShift(
   setText(ui.event, event.name);
   setText(ui.note, event.note);
 
-  const goals = goalRowsOf(readGoals(goalsForDay(week.day), observations), week.history, week.day);
+  const goals = goalRowsOf(
+    readGoals(shiftGoalsOf(state, view.resources), observations),
+    week.history,
+    week.day,
+  );
   surfaces.goals(
     goals
       .map((goal) => `${goal.label}=${goal.value}=${goal.was}=${String(goal.barPct)}`)

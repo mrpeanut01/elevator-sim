@@ -185,7 +185,7 @@ import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
-import { goalsForDay, readGoals } from '../shift/goals.js';
+import { readGoals } from '../shift/goals.js';
 import { dayReportOf, type DayReportInput, type ShapedDayReport } from '../shift/report.js';
 import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
@@ -221,7 +221,7 @@ import { mountBuildingEditor } from './buildingEditor.js';
 import { mountDispatcherEditor } from './dispatcherEditor.js';
 import { mountRuleEditor } from './ruleEditor.js';
 import { mountSelectorEditor } from './selectorEditor.js';
-import { mountLeftRail } from './leftRail.js';
+import { mountLeftRail, shiftGoalsOf } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
 import { APPLIED_SCHEMA, mountParameterForm, patienceFromCandidate } from './parameterForm.js';
 import { mountReport, runProgressOf } from './reportPanel.js';
@@ -5331,7 +5331,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // it records is *a sheet existed*, not *a write succeeded*.
     filedThisSitting = true;
     const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
-    const goals = goalsForDay(state.week.day);
+    /*
+     * The same expression the rail draws from — `dev/leftRail.ts#shiftGoalsOf`, and it is one
+     * function rather than two identical lines because the sheet this files and the rail the
+     * player watched it against must ask the day the same thing.
+     */
+    const goals = shiftGoalsOf(state, resources);
     const readings = readGoals(goals, observations);
     /*
      * The event the run was under, not the one the ordinary schedule would have given — GitHub
