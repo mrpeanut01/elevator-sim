@@ -389,7 +389,8 @@ export function traces(source: string): readonly Trace[] {
         steps.push({ at: m.index, value: { step: 'sql', statement: statementOf(text) } });
         continue;
       }
-      const parameter = member.params.indexOf(args[0]?.text.trim() ?? ' ');
+      const argument = args[0]?.text.trim();
+      const parameter = argument === undefined ? -1 : member.params.indexOf(argument);
       if (parameter !== -1) {
         steps.push({ at: m.index, value: { step: 'sql-from-parameter', parameter } });
         continue;
