@@ -56,7 +56,7 @@ import { randomUUID } from 'node:crypto';
 import type { IssuedChallenge } from '../challenge/schedule.js';
 import type { ChallengeScore, SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
-import type { Sql } from './sql.js';
+import type { Sql, SqlResult } from './sql.js';
 
 /* -------------------------------------------------------------------------- *
  * Rows
@@ -578,7 +578,7 @@ export class Store {
     } catch (error) {
       throw await this.#asOwnerError(error, input.userId, 'recordEntry');
     }
-    return { id: String(written.rows[0]?.['id']), ...draft };
+    return { id: idOf(written, 'recordEntry'), ...draft };
   }
 
   /**
@@ -741,7 +741,7 @@ export class Store {
     } catch (error) {
       throw await this.#asOwnerError(error, input.userId, 'recordChallengeEntry');
     }
-    return { id: String(written.rows[0]?.['id']), ...draft };
+    return { id: idOf(written, 'recordChallengeEntry'), ...draft };
   }
 
   /**
@@ -847,6 +847,22 @@ const CHALLENGE_COLUMN_OF: Readonly<Record<BoardMetric, string>> = Object.freeze
   ttdMeanS: 'mean_ttd_mean_s',
   pctOverLongWait: 'mean_pct_over_long_wait',
 });
+
+/**
+ * The `id` an upsert's `RETURNING` clause reported, or a loud failure.
+ *
+ * `INSERT … ON CONFLICT … DO UPDATE … RETURNING id` returns exactly one row on both branches, so
+ * the absent case is unreachable — and `String(undefined)` is the string `'undefined'`, which is a
+ * row identity a caller would carry away and a board would rank. An unreachable case that degrades
+ * into plausible nonsense is worth one line to make it stop.
+ */
+function idOf(result: SqlResult, where: string): string {
+  const id = result.rows[0]?.['id'];
+  if (typeof id !== 'string') {
+    throw new Error(`${where}: the upsert returned no id. RETURNING is the row's identity here.`);
+  }
+  return id;
+}
 
 function challengeEntryOf(row: Record<string, unknown>): ChallengeEntryRow {
   return Object.freeze({
