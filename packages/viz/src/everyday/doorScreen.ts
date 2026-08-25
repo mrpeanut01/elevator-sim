@@ -90,11 +90,19 @@ function mountDoor(
     const stepper = el(document_, 'div', 'everyday-door-stepper');
     stepper.style.cssText = `display:flex;align-items:center;gap:${String(GAP.block)}px`;
     stepper.append(
-      arrow(document_, '‹', 'everyday-door-back', view.stepper.backEnabled, () => {
-        dayOffset -= 1;
-        render();
-        context.refreshBar();
-      }),
+      arrow(
+        document_,
+        '‹',
+        'everyday-door-back',
+        'The day before this one',
+        'The week only goes back seven days.',
+        view.stepper.backEnabled,
+        () => {
+          dayOffset -= 1;
+          render();
+          context.refreshBar();
+        },
+      ),
     );
     const middle = el(document_, 'div');
     middle.style.cssText = 'text-align:center;min-width:0;flex:1';
@@ -113,11 +121,19 @@ function mountDoor(
     middle.append(label, kindRow);
     stepper.append(middle);
     stepper.append(
-      arrow(document_, '›', 'everyday-door-forward', view.stepper.forwardEnabled, () => {
-        dayOffset += 1;
-        render();
-        context.refreshBar();
-      }),
+      arrow(
+        document_,
+        '›',
+        'everyday-door-forward',
+        'The day after this one',
+        'Today is the last day there is — tomorrow has not happened.',
+        view.stepper.forwardEnabled,
+        () => {
+          dayOffset += 1;
+          render();
+          context.refreshBar();
+        },
+      ),
     );
     column.append(stepper);
 
@@ -256,16 +272,30 @@ function mountDoor(
     return column;
   }
 
+  /**
+   * One end of § 6.1's date stepper.
+   *
+   * **`name` and `why` are separate arguments and both are required**, because a glyph is not a
+   * name and *what this would do* is not *why it will not*. Before GitHub issue #262's sweep this
+   * drew a bare `›` with no `aria-label` and no `title`: a screen reader met a disabled button
+   * called "›", and a sighted player met a grey arrow that said nothing about the edge of the week
+   * it had reached. The name is on the control in both states; the reason only while it refuses,
+   * because a live control has none to give.
+   */
   function arrow(
     document_: Document,
     glyph: string,
     className: string,
+    name: string,
+    why: string,
     enabled: boolean,
     press: () => void,
   ): HTMLElement {
     const button = el(document_, 'button', className, glyph);
     button.type = 'button';
     button.disabled = !enabled;
+    button.setAttribute('aria-label', name);
+    if (!enabled) button.title = why;
     button.style.cssText = [
       'flex:none',
       'width:34px',
@@ -313,12 +343,11 @@ function doorBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
   const replay = dayOffset !== 0;
   const label = base.primary.variants[replay ? 1 : 0] ?? base.primary.label;
+  const pastDay = 'A past day can be read here, not re-opened.';
   return {
     ...base,
-    primary: { ...base.primary, label, inert: replay },
-    note: replay
-      ? 'A past day can be read here, not re-opened.'
-      : base.note,
+    primary: { ...base.primary, label, ...(replay ? { inert: pastDay } : {}) },
+    note: replay ? pastDay : base.note,
   };
 }
 

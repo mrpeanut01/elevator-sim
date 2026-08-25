@@ -1,7 +1,7 @@
 /**
  * **How long a car has been standing still** — the one fact the stage could not draw.
  *
- * `docs/34-problem-per-mode.md` § 3.2 records the gap and § 9 is the whole section about it:
+ * `docs/35-problem-per-mode.md` § 3.2 records the gap and § 9 is the whole section about it:
  * *"`grep` for `park`/`idle` across `render/` and both stage screens returns nothing. An idle car is
  * a stationary car with `direction === 0` and near-zero load — pixel-identical to any empty car that
  * happens to be stopped. `PARK_CARS_LOBBY_LABEL` exists as a button with no visual consequence of
@@ -31,7 +31,7 @@
  * rather than authored: a car crosses into *standing still* at the instant the first person standing
  * at a landing crosses out of *breezy*, and its mark reaches full length at the instant that person
  * would be *eyeing the stairs*. That is one banding painted on both halves of the tableau
- * `docs/34` § 9.4 asks for — *"cars stopped low, people standing high, both at once, both
+ * `docs/35` § 9.4 asks for — *"cars stopped low, people standing high, both at once, both
  * persistent"* — and it is why no second ramp is authored here (`docs/28` AD-S15).
  *
  * ## R6, and why this needs no gate

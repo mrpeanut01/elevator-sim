@@ -1704,7 +1704,7 @@ describe('the header subtitle', () => {
 /**
  * **A car that is standing still must not be drawn like a car that has just stopped.**
  *
- * `docs/34-problem-per-mode.md` § 3.2 is the finding this closes: *"an idle car is a stationary car
+ * `docs/35-problem-per-mode.md` § 3.2 is the finding this closes: *"an idle car is a stationary car
  * with `direction === 0` and near-zero load — **pixel-identical** to any empty car that happens to
  * be stopped."* That is a claim about what got painted, so it is checked on the transcript rather
  * than on a variable: every assertion below is about a `fillRect` the renderer either emitted or

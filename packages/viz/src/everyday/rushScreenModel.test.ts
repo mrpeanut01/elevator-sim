@@ -195,12 +195,15 @@ describe('what the screen refuses, and where the refusal sits', () => {
   it('marks the § 3.3 primary inert and puts the reason on its own row', () => {
     const base = actionBarFor({ screen: 'rush', ctx: 'rush' });
     const refined = rushBarModel(base);
-    expect(refined.primary.inert).toBe(true);
-    // The bar carries the reason, which is the one element § 3.1 pins above a fold.
-    expect(refined.note).toBe(RUSH_PRIMARY_REFUSAL);
-    // And the control says it too, which is all a screen module can reach of the AX tree.
-    expect(refined.primary.label).toBe(RUSH_SCREEN_COPY.primaryInertLabel);
-    expect(refined.primary.label).toMatch(/not built/);
+    /*
+     * **The reason is the cell, and the table's note is left alone.** `shell.ts#drawBar` draws an
+     * inert primary's own sentence *in place of* the note, so this refinement does not have to
+     * overwrite § 3.3's cell to stop *"Nothing to set up. It ends when it ends."* appearing beside
+     * a dead button — which is what GitHub issue #262 measured on the deployed build.
+     */
+    expect(refined.primary.inert).toBe(RUSH_PRIMARY_REFUSAL);
+    expect(refined.primary.label).toBe(base.primary.label);
+    expect(refined.note).toBe(base.note);
     expect(refined.leave).toEqual(base.leave);
     // § 3.3: *a rush has no timeline at all*. The row carries none, and the refinement adds none.
     expect(refined.timeline).toBeUndefined();
@@ -222,10 +225,20 @@ describe('what the screen refuses, and where the refusal sits', () => {
 
     const refined = rushBarModel(base);
     /*
-     * The half of #262 that is not about geometry: *Nothing to set up. It ends when it ends.* is
-     * true of a rush, and beside a button nobody can press it reads as confirmation.
+     * **The model leaves § 3.3's cells alone; the shell substitutes.** This assertion used to read
+     * `expect(refined.note).not.toBe(base.note)`, and it was true of a different fix for the same
+     * defect — one that overwrote the note here. Two sessions closed #262 independently and the
+     * merge is what caught the contradiction: under the resolved design the refusal rides on
+     * `primary.inert`, and `shell.ts#drawBar` draws it *in place of* the note, so a model that
+     * overwrote the cell would be deciding at the wrong layer and every other screen would need
+     * the same edit.
+     *
+     * The half of #262 that is not about geometry still holds, and is checked where it now lives:
+     * *"Nothing to set up. It ends when it ends."* is true of a rush and reads as confirmation
+     * beside a button nobody can press, so the shell prefers the reason over the table's note.
      */
-    expect(refined.note).not.toBe(base.note);
+    expect(refined.note).toBe(base.note);
+    expect(refined.primary.inert).toBe(RUSH_PRIMARY_REFUSAL);
     expect(refined.primary.variants).toEqual(base.primary.variants);
   });
 

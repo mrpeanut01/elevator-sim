@@ -467,7 +467,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
   /**
    * **AD-S17 — a lift that is standing still looks different from one that has just stopped.**
    *
-   * `docs/34-problem-per-mode.md` § 3.2 states the defect as a claim about pixels: *"an idle car is
+   * `docs/35-problem-per-mode.md` § 3.2 states the defect as a claim about pixels: *"an idle car is
    * a stationary car with `direction === 0` and near-zero load — **pixel-identical** to any empty
    * car that happens to be stopped"*, and § 9.2 calls it the reason the product's most-used fault
    * family has no mark on the stage. A claim about pixels is settled on pixels or not at all, so
@@ -507,7 +507,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
       ).toBe(0);
 
       /* The same day, played forward. `garden-apartments` is idle for most of its hour —
-         `docs/34` § 9.3 measures the landings empty about 91 % of the time — so a lift standing
+         `docs/35` § 9.3 measures the landings empty about 91 % of the time — so a lift standing
          past the 30 s onset is the ordinary state of this building rather than a contrived one. */
       const opened = await page.textContent('.everyday-stage-clock');
       await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
@@ -686,26 +686,29 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
    * which that stop has a written sheet behind it and is still not the step the flow has reached.
    * It is now the next stop with something to read, so it is a way to the account of the day, and
    * filed this way it is the only way to it from here.
+   *
+   * **The unfiled state is now a `<span>` rather than a `<button disabled>`**, and the assertions
+   * are indexed by the stop's own words rather than by position in the strip — both because of
+   * GitHub issue #262's sweep, which stopped drawing an unreachable breadcrumb stop as a control
+   * at all. A stop indexed by `nth(3)` was a stop identified by *how many buttons precede it*,
+   * which is a number that moves when a different stop lights. What #206 needs asserted is
+   * unchanged and is now said directly: before the file there is no way here, and after it there
+   * is a button with these words that goes to the sheet.
    */
   it('lights the report stop once the day behind it is filed, and it goes there', async () => {
     const page = await coldLoad();
     await enterEverydayStage(page);
-    const stop = page.locator('.everyday-bar-timeline button').nth(3);
-    expect(await stop.textContent()).toBe('4 How it went');
-    /* Unfiled: the sheet does not exist yet, so the stop is faint and inert — unchanged. */
-    expect(await stop.isDisabled()).toBe(true);
+    const strip = page.locator('.everyday-bar-timeline');
+    /* Unfiled: the sheet does not exist yet, so the stop is text and there is no way to press it. */
+    expect(await strip.locator('button', { hasText: '4 How it went' }).count()).toBe(0);
+    expect(await strip.textContent()).toContain('4 How it went');
 
     await page.evaluate(
       "import('/src/everyday/host.ts').then((module) => { module.EVERYDAY_HOST.current()?.closeDay(); return true; })",
     );
-    await page.waitForFunction(
-      () =>
-        document
-          .querySelectorAll('.everyday-bar-timeline button')[3]
-          ?.hasAttribute('disabled') === false,
-      undefined,
-      { timeout: 30_000 },
-    );
+    const stop = strip.locator('button', { hasText: '4 How it went' });
+    await stop.waitFor({ state: 'visible', timeout: 30_000 });
+    expect(await stop.isDisabled()).toBe(false);
 
     await stop.click();
     await page.waitForSelector('.everyday-report', { timeout: 15_000 });
@@ -770,8 +773,10 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
 
     await page.evaluate(`window.${ALIVE} = true`);
 
-    /* The daily strip's fourth stop, lit by the file above — #206's route to the sheet. */
-    await page.locator('.everyday-bar-timeline button').nth(3).click();
+    /* The daily strip's fourth stop, lit by the file above — #206's route to the sheet. Named by
+       its words rather than by position: since GitHub issue #262's sweep only a *live* stop is a
+       button, so an index into the strip's buttons is an index into a list that changes length. */
+    await page.locator('.everyday-bar-timeline button', { hasText: '4 How it went' }).click();
     await page.waitForSelector('.everyday-report', { timeout: 15_000 });
 
     /* § 3.3's report row names its linear parent `‹ The day`, and #206 made that cell a second way

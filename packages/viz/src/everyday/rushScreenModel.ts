@@ -598,13 +598,16 @@ export function rushDrivingLine(name: string): string {
  * never had it.
  */
 export function rushBarModel(base: ActionBarModel): ActionBarModel {
-  return {
-    ...base,
-    primary: {
-      ...base.primary,
-      label: RUSH_SCREEN_COPY.primaryInertLabel,
-      inert: true,
-    },
-    note: RUSH_PRIMARY_REFUSAL,
-  };
+  /*
+   * `inert` carries the sentence and nothing here repeats it.
+   *
+   * This resolved as a merge between two independent fixes for one defect (#262), and the other
+   * one is better: `shell.ts#drawBar` now takes a resolved-inert primary's own reason **over** the
+   * § 3.3 table note, names that node so the button can point at it with `aria-describedby`, and
+   * the type refuses a dead primary that ships without a reason — so every screen gets it, not
+   * just this one. This side's version set `note` and relabelled the button; both are dropped.
+   * `note` would now lose to `inertReason` anyway, and a second copy of the sentence on the label
+   * is the *"one constant, one place on screen"* rule this file's own refusal was written to keep.
+   */
+  return { ...base, primary: { ...base.primary, inert: RUSH_PRIMARY_REFUSAL } };
 }

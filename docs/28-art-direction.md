@@ -639,9 +639,9 @@ defect `live/bands.ts` exists to prevent ([§ D251](../DECISIONS.md)).
 
 > **LANDED.** `render/carRest.ts` is the derivation; `render/canvas.ts#drawCars` and
 > `everyday/stageScreenModel.ts#stageCarRestBarOf` are the two paints.
-> [`34-problem-per-mode.md`](34-problem-per-mode.md) § 3.2 and § 9 are the specification.
+> [`35-problem-per-mode.md`](35-problem-per-mode.md) § 3.2 and § 9 are the specification.
 
-**The gap this closes was the highest-value entry in `docs/34`'s absent column**, and it was absent
+**The gap this closes was the highest-value entry in `docs/35`'s absent column**, and it was absent
 in the literal sense: `grep` for `park` or `idle` across `render/` and both stage screens returned
 nothing. An idle car was *"pixel-identical to any empty car that happens to be stopped"*, and
 `PARK_CARS_LOBBY_LABEL` was a button with no visual consequence of its own. Campaign stage 1 teaches
@@ -650,7 +650,7 @@ family had no mark on the stage** and the player was asked to reason about somet
 showed. That is one concrete instance of `charter P3` failing, which
 [`22-charter.md`](22-charter.md) already records.
 
-**It is drawn in the direction glyph's own slot**, which `docs/34` § 3.1 records as carrying `▲`/`▼`
+**It is drawn in the direction glyph's own slot**, which `docs/35` § 3.1 records as carrying `▲`/`▼`
 and *"nothing at all when `direction === 0`"*. That hole is the whole design: a reader who has
 watched arrows come and go over a working lift meets the bar where the arrows were, so the three
 states are **one channel** — up, down, and a flat bar for neither. A mark anywhere else on the car
@@ -670,7 +670,7 @@ Casual cutaway above the car across its body.
 1. **It says *standing still*, never *parked*.** *Parked* is a claim about the dispatcher's
    intent — `idle.parkingStrategy` — and a renderer asserting it would be a stated mechanism nothing
    measured, which `CLAUDE.md` has a rule about. *No move in flight, doors shut, past thirty
-   seconds* is an observable a player can check by looking. `docs/34` § 9.4's `PM-PARK` prices the
+   seconds* is an observable a player can check by looking. `docs/35` § 9.4's `PM-PARK` prices the
    *intent* version as a `core` change and flags it unverified; this needs neither.
 2. **It is R6-clean by construction, not by a gate.** `t − restingSince` is the same shape as
    `t − arrivedAt`, which every rider capsule on both stages is already tinted by: a state at the
@@ -714,7 +714,7 @@ being made to agree rather than a preference.
 **What the mark does not carry, said here rather than discovered later.** It says *this lift is
 waiting, and has been for a while*. It does **not** say *in the wrong place* — that is a two-place
 reading, and it needs the crowd drawn at the same moment. On `garden-apartments` the crowd is usually
-absent: `docs/34` § 9.3 measures the landings empty about **91 %** of the hour and **no sixty-second
+absent: `docs/35` § 9.3 measures the landings empty about **91 %** of the hour and **no sixty-second
 wait at all on sixteen of twenty seeds**. So this mark supplies the half of § 9.4's tableau that was
 missing and cannot supply the other half, and the parking lesson still lands on the buildings § 9.4
 names — `vertical-city`, `three-cars-one-cars-work` — rather than on the tutorial one. A rail or

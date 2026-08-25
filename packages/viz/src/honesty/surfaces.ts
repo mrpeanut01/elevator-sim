@@ -7524,12 +7524,11 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      */
     'everyday/rushScreenModel.ts#RUSH_PRIMARY_REFUSAL',
     /*
-     * **The refinement joined this list on the merge that made it produce words** — GitHub issue
-     * #262. It used to edit one cell (`inert`) and author nothing, so `derive.test.ts` did not see
-     * a text producer and the docstring above claiming *"the rush's bar refinement"* was driven
-     * described a call nothing made. It now substitutes the § 3.3 note and the inert label, which
-     * is the same shape as `#fixitBarModel`, `#briefBarModel` and `#stageBarModelOf` — every one of
-     * which is covered by the adapter for its own screen — and `render` drives it below.
+     * The § 3.3 refinement itself, which this adapter's docstring has claimed to drive since it was
+     * written and did not: while `BarPrimary.inert` was a `boolean` the refinement produced no text
+     * at all, so the derivation never found it and the claim cost nothing. GitHub issue #262 moved
+     * the refusal *onto* the cell the shell draws, which makes the refinement a text producer — so
+     * the sentence is now true, and it is checked.
      */
     'everyday/rushScreenModel.ts#rushBarModel',
     'everyday/rushScreenModel.ts#RUSH_BANDS',
@@ -7574,14 +7573,16 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
     seeds.push({ field: 'rush.primary.refusal', text: RUSH_PRIMARY_REFUSAL, role: 'reason' });
     /*
-     * The § 3.3 row as the player meets it — issue #262 moved the refusal onto it. Seeded from the
-     * refinement's own return rather than from the two constants a second time, because what a
-     * reader sees is the *composition*: a `reason` standing beside a `label` that has to agree with
-     * it. Seeding the constants alone would pass while the row said `Start the rush`.
+     * The resolved § 3.3 row, as the shell draws it. The reason and the label are seeded from the
+     * refinement rather than from the constant beside it, so a lane that marks this primary dead
+     * with some other sentence is swept on the commit that does it.
      */
-    const rushBar = rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' }));
-    seeds.push({ field: 'rush.bar.note', text: rushBar.note ?? '', role: 'reason' });
-    seeds.push({ field: 'rush.bar.primary', text: rushBar.primary.label, role: 'label' });
+    {
+      const bar = rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' }));
+      seeds.push({ field: 'rush.bar.primary', text: bar.primary.label, role: 'label' });
+      seeds.push({ field: 'rush.bar.primary.inert', text: bar.primary.inert ?? '', role: 'reason' });
+      seeds.push({ field: 'rush.bar.note', text: bar.note ?? '', role: 'prose' });
+    }
     seeds.push({ field: 'rush.holdLine.figure', text: rushHoldLineFigure(), role: 'label' });
     seeds.push({ field: 'rush.generated', text: rushGeneratedRangeLine(), role: 'prose' });
     seeds.push({ field: 'rush.opening', text: rushOpeningLine(), role: 'prose' });

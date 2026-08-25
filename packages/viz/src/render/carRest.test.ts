@@ -22,7 +22,7 @@
  *
  * ## The mark this file is about is the only one on the stage that says a lift is idle
  *
- * `docs/34-problem-per-mode.md` § 3.2 records the absence it closes and § 9 is a whole section
+ * `docs/35-problem-per-mode.md` § 3.2 records the absence it closes and § 9 is a whole section
  * about it. Before it, an idle car was *"pixel-identical to any empty car that happens to be
  * stopped"*, and `PARK_CARS_LOBBY_LABEL` was a button with no visual consequence of its own.
  */
@@ -239,7 +239,7 @@ describe('restBarWidthPx — the magnitude channel, and the sizes that break it'
 describe('garden-apartments — the building the parking lesson is set on', () => {
   it('has cars standing still for most of the hour, and says so at the playhead', () => {
     /*
-     * `docs/34` § 9.3 measured the other half of this picture: landings are empty about **91 %** of
+     * `docs/35` § 9.3 measured the other half of this picture: landings are empty about **91 %** of
      * the hour on this building, and on 16 of 20 seeds nobody ever waits sixty seconds. The
      * consequence for a renderer is the point of this case — if the crowd is absent for nine tenths
      * of the run, the *cars* are what a player is looking at for nine tenths of the run, and until

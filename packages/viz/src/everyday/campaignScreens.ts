@@ -582,8 +582,12 @@ function withoutPlaceholders(base: ActionBarModel): ActionBarModel {
   const strip = (cell: string, plain: string): string => (cell.includes('⟨') ? plain : cell);
   return {
     ...base,
-    primary: { ...base.primary, label: strip(base.primary.label, 'Open a building'), inert: true },
-    note: base.note === undefined ? undefined : strip(base.note, 'No campaign is open.'),
+    primary: {
+      ...base.primary,
+      label: strip(base.primary.label, 'Open a building'),
+      inert: NO_CAMPAIGN,
+    },
+    note: base.note === undefined ? undefined : strip(base.note, NO_CAMPAIGN),
   };
 }
 
@@ -598,7 +602,7 @@ function towersBar(state: EverydayState): ActionBarModel {
     primary: {
       ...base.primary,
       label: open === undefined ? 'Open a building' : `Open ${view.rows.find((row) => row.towerId === open.id)?.name ?? 'a building'}`,
-      ...(open === undefined ? { inert: true } : {}),
+      ...(open === undefined ? { inert: NO_TOWER } : {}),
     },
     note: `${String(wanting)} of ${String(view.rows.length)} buildings want a decision.`,
   };
@@ -872,6 +876,20 @@ function mountBuilding(hostEl: HTMLElement, context: EverydayScreenContext): Mou
   };
 }
 
+/**
+ * Why the campaign bar's primary is dead before a career has been read — `BarPrimary.inert`'s
+ * sentence for {@link withoutPlaceholders}.
+ *
+ * It is the same state the note already described; it is repeated into `inert` rather than left to
+ * the note because `shell.ts#drawBar` reads the reason off the control, and a bar whose reason
+ * lives only in a cell nothing binds to the button is GitHub issue #262's defect.
+ */
+const NO_CAMPAIGN = 'No campaign is open.';
+
+/** Why *Send your answer* is dead until one of the desk's options is picked (§ 8.2). */
+const NO_ANSWER_PICKED =
+  'the options above are the answer — pick one, and this sends it';
+
 /** Drawn when the career holds no open tower — a sentence, never a blank region. */
 const NO_TOWER =
   'no building is open — pick one on All buildings, and this desk is about that one until you pick another';
@@ -887,7 +905,7 @@ function buildingBar(state: EverydayState): ActionBarModel {
   const [decideLabel, withThatLabel, sendLabel, chooseLabel, watchLabel] = base.primary.variants;
   const view = buildingView(campaignInputOf(liveHost));
   if (view === undefined) {
-    return { ...base, primary: { ...base.primary, inert: true }, note: NO_TOWER };
+    return { ...base, primary: { ...base.primary, inert: NO_TOWER }, note: NO_TOWER };
   }
   const [effectNote, travelNote] = base.noteVariants ?? [];
   if (view.need !== undefined) {
@@ -897,7 +915,7 @@ function buildingBar(state: EverydayState): ActionBarModel {
       primary: {
         ...base.primary,
         label: (picked === undefined ? chooseLabel : sendLabel) ?? base.primary.label,
-        ...(picked === undefined ? { inert: true } : {}),
+        ...(picked === undefined ? { inert: NO_ANSWER_PICKED } : {}),
       },
       note: picked?.effect ?? effectNote ?? travelNote,
     };

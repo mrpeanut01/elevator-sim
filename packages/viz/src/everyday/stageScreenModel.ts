@@ -721,7 +721,7 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
   if (refusal === undefined) return base;
   return {
     ...base,
-    primary: { ...base.primary, inert: true },
+    primary: { ...base.primary, inert: refusal },
     note: refusal,
   };
 }
@@ -1254,7 +1254,7 @@ const REST_BAR_SLOT_ABOVE_PX = 10;
  * **AD-S17 — the rest bar, on this stage** (`docs/28-art-direction.md` § 5.7).
  *
  * The cutaway draws `▲` or `▼` over a travelling car and, until now, **nothing at all** over one
- * that is standing — which `docs/34-problem-per-mode.md` § 3.2 lists as the highest-value absent
+ * that is standing — which `docs/35-problem-per-mode.md` § 3.2 lists as the highest-value absent
  * symptom in the product, because campaign stage 1 teaches parking and a parked car had no mark.
  * This is the third state of that one slot: up, down, and neither.
  *

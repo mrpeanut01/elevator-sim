@@ -194,7 +194,7 @@ mode is a claim about a run, and a claim about a run can be measured.
 **And the word *visibly* in that column is carried by nothing in this document, deliberately.**
 `DC-1` discharges it as *at least one non-comparative goal is not met*, which is a figure rather than
 a sight — the strongest testable form available to an instrument that measures runs.
-[`34-problem-per-mode.md`](34-problem-per-mode.md) is the document that carries the other half: what
+[`35-problem-per-mode.md`](35-problem-per-mode.md) is the document that carries the other half: what
 the player can **see** of each mode's problem before any figure names it, and what the two renderers
 can and cannot draw. Its `PM-TT2` adds a legibility clause on top of `DC-4` for exactly this reason,
 and its § 9.3 measures the building where the gap is widest.
@@ -794,7 +794,7 @@ three previous lanes were spent conflating them (§ 3.3a, § 3.3c, GitHub issue 
 
 - **the gameplay case** — a starting setting that is *visibly wrong* hands the player a building
   being served badly rather than a dispatcher to beat, which is what
-  [`34-problem-per-mode.md`](34-problem-per-mode.md) says every mode lacks and what **#208** is
+  [`35-problem-per-mode.md`](35-problem-per-mode.md) says every mode lacks and what **#208** is
   about;
 - **the DC-1 case** — it would give stage 1 the failable count goal § D355 took away.
 
@@ -923,20 +923,20 @@ chosen from thirteen well-tuned shipped profiles cannot express the first. § 3.
 is the reason this is not a DC-1 question at all — a count goal is *"here is a trap, do not fall
 into it"* and never *"here is a problem, fix it"* — so the sentence *the starting setting is the
 problem the player is handed* is a claim about `beat-the-baseline` and about what the player can
-**see**, which is `docs/34`'s subject and not this document's gate.
+**see**, which is `docs/35`'s subject and not this document's gate.
 
 **Three things measured elsewhere refuse the specific instance, and all three are about seeing.**
 
 1. **On this building, at day one, there is usually nothing to see.**
-   [`34-problem-per-mode.md`](34-problem-per-mode.md) § 9.3 measures `garden-apartments` under
+   [`35-problem-per-mode.md`](35-problem-per-mode.md) § 9.3 measures `garden-apartments` under
    `collective` at its own typical rate over 20 seeds: the landings are **empty about 91 % of the
    time**, and on **16 of 20 seeds no instant in the whole hour** has anybody who has been waiting
    sixty seconds. A starting setting cannot hand the player a visible problem on a building that
    does not display one.
-2. **A parked car has no mark on either renderer.** `docs/34` § 3.2 and § 9.2: an idle car is a
+2. **A parked car has no mark on either renderer.** `docs/35` § 3.2 and § 9.2: an idle car is a
    stopped car with `direction === 0` and near-zero load, pixel-identical to any empty car that
    happens to be standing there. The cars' *positions* are drawn, so *"all of them are up at the
-   top"* is weakly legible; *"and they are parked there on purpose"* is not drawn anywhere. `docs/34`
+   top"* is weakly legible; *"and they are parked there on purpose"* is not drawn anywhere. `docs/35`
    § 10 row 12 (`PM-PARK`) prices the fix as **large**, and it is a precondition for this proposal
    rather than a companion to it.
 3. **The tableau is inverted here.** `PM3` asks for cars stopped low and people standing high, both
@@ -948,7 +948,7 @@ problem the player is handed* is a claim about `beat-the-baseline` and about wha
 `asBuilt.patch.dispatcher.idle.parkingStrategy: "lobby"` — a deliberately wrong *dispatcher
 parameter* as the given state, on `vertical-city`, where eight shuttles standing at the street while
 sky-lobby queues build is a thing a player can point at, with a named complainant on floor 62
-attached to it. That is this proposal, built, in the mode `docs/34` § 9.4 says the parking lesson
+attached to it. That is this proposal, built, in the mode `docs/35` § 9.4 says the parking lesson
 should land in. **The campaign does not need a second authoring surface for it; what stage 1 needs
 is not to be the place it happens.**
 
@@ -1005,7 +1005,7 @@ both, which is what makes it a property of the campaign's rules rather than of e
    axes as well, not just this one.
 2. **A stage whose `editable` list can hold δ while the undo still fails something.** Requires (1)
    on this building; on another building it may already be true and nobody has measured it.
-3. **`PM-PARK`** — `docs/34` § 10 row 12, an idle state on `FrameCar` marked by both renderers. It
+3. **`PM-PARK`** — `docs/35` § 10 row 12, an idle state on `FrameCar` marked by both renderers. It
    does not touch DC-1 at all, and it is the whole of what would make a wrong starting setting
    *visible* rather than merely present. Until it lands, *"the player opens it and sees a building
    doing something visibly wrong"* is not a claim the renderers can support for a parking fault.
@@ -1209,7 +1209,7 @@ that is the whole of the governance § D348 pulled it in to provide.
 **One thing `DC-4`'s band cannot see, and where it is specified instead.** A day may miss a goal on a
 single rider at minute 41 and be invisible for the other fifty-nine minutes, which satisfies `DC-4`
 and satisfies nothing #208's AC2 asks for (*the failure is legible on the stage before the report
-explains it*). [`34-problem-per-mode.md`](34-problem-per-mode.md) `PM-TT2` states the additional
+explains it*). [`35-problem-per-mode.md`](35-problem-per-mode.md) `PM-TT2` states the additional
 clause — a landing holding somebody in the third wait band for at least 120 contiguous seconds — and
 its § 9.3 measures `garden-apartments` against it: at the shipped day-one configuration the landings
 are empty about **91 %** of the hour, and on **16 of 20 seeds** no instant exists at which anybody has

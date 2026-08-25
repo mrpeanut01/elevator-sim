@@ -129,6 +129,31 @@ export interface MountedEverydayScreen extends EverydayScreenHandle {
 const RAIL_WIDTH_PX = 212;
 
 /**
+ * The id `drawBar` puts on the bar's note **when that note is a dead primary's reason**, so the
+ * button can point at it with `aria-describedby`.
+ *
+ * A constant rather than a literal so the two writes cannot drift, and **not exported**: the
+ * browser tier asserts the binding by resolving whatever id the attribute names against the
+ * document, which is the assertion worth making — an `aria-describedby` naming an id that is not
+ * there is worse than none, since it reads as a described control and describes nothing. A test
+ * that imported the constant and compared it to itself would prove less.
+ *
+ * One id is enough: `drawBar` calls `bar.replaceChildren()` and builds at most one note per draw,
+ * so two can never be in the document at once.
+ */
+const BAR_REASON_ID = 'everyday-bar-reason';
+
+/**
+ * Why § 3.3's menu row draws `⌂ Modes` inert — *"Inert only on the menu"*, in the guide's words,
+ * and this is what that means to somebody looking at it.
+ *
+ * Here rather than in `actionBar.ts` because the table transcribes the guide and the guide says
+ * only that the cell is inert. Why it is inert is a fact about standing on the screen the cell
+ * names, which is the shell's to know.
+ */
+const MENU_LEAVE_REASON = 'You are on the main menu — this is the screen it goes to.';
+
+/**
  * Above every overlay the Engineer surface raises.
  *
  * `dev/main.ts` mounts its menu, Fix-a-building and watch overlays as *siblings* of `div.shell` at
@@ -994,7 +1019,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     leaveBtn.disabled = model.leave.inert;
     leaveBtn.style.cssText =
       BUTTON + (model.leave.inert ? `;color:${C.faint};cursor:default` : '');
-    if (!model.leave.inert) leaveBtn.addEventListener('click', requestLeave);
+    if (model.leave.inert) {
+      /*
+       * The one inert leave in § 3.3's table — the menu's own `⌂ Modes`, which cannot take you
+       * anywhere because you are on it. It shipped grey and silent; the sentence is the shell's
+       * rather than the table's because it is a fact about *being on* the row, not about the row.
+       */
+      leaveBtn.title = MENU_LEAVE_REASON;
+    } else leaveBtn.addEventListener('click', requestLeave);
     bar.append(leaveBtn);
 
     if (model.back !== undefined) {
@@ -1024,9 +1056,26 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
          */
         const live =
           !current && (reached || (index === model.timeline.step && nextStopIsLive(stop.screen)));
-        const step = el(doc, 'button', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`);
-        step.type = 'button';
-        step.disabled = !live;
+        /*
+         * **A stop you cannot go to is not a control, so it is not drawn as one.**
+         *
+         * Every stop used to be a `<button>` with `disabled = !live`, which put four dead buttons
+         * on the front door and five on All buildings — measured on the shipped build at
+         * 1280 × 720, nine of the fifteen disabled controls in the whole shell, none of them with
+         * a reason. Two things were wrong with that and only one of them is cosmetic. A disabled
+         * `<button>` is out of the tab order *and* announced as a button that cannot be pressed,
+         * so a screen-reader user was handed four broken controls where the sighted reader sees a
+         * breadcrumb. And a breadcrumb step is not refusing anything: *Brief* is not a button that
+         * will not work, it is the second stop of four, and there is no sentence that would make
+         * it a good dead control.
+         *
+         * So an unreachable stop is a `<span>`, the one you are on carries `aria-current="step"`,
+         * and only a stop that navigates is a button. This is the other half of GitHub issue
+         * #262's rule: a dead control says why, **or stops being a control**.
+         */
+        const step = live
+          ? el(doc, 'button', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`)
+          : el(doc, 'span', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`);
         step.style.cssText = [
           'border:0',
           'background:transparent',
@@ -1035,10 +1084,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           `color:${current ? C.ink : live ? C.label : C.ruleMid}`,
           'cursor:' + (live ? 'pointer' : 'default'),
         ].join(';');
-        if (live) {
+        if (step instanceof HTMLButtonElement) {
+          step.type = 'button';
           step.addEventListener('click', () => {
             go(stop.screen);
           });
+        } else if (current) {
+          /* Where you are, said once and to everybody — the colour above says it to one reader. */
+          step.setAttribute('aria-current', 'step');
         }
         strip.append(step);
         if (index < stops.length - 1) {
@@ -1054,10 +1107,31 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     spacer.style.cssText = 'flex:1';
     bar.append(spacer);
 
-    const noteText = refusing ? unbuiltReasonFor(state.screen) : model.note;
+    /*
+     * **A dead primary's reason replaces the note, and that ordering is the fix for issue #262.**
+     *
+     * Three sources, in falling priority: an unbuilt screen's refusal, a resolved-inert primary's
+     * own sentence (`BarPrimary.inert`), then § 3.3's table note. The middle one wins over the
+     * table because the table's note answers *what will this do* and a player looking at a button
+     * that will not press is asking *why will it not* — and answering the first question next to a
+     * dead control reads as confirmation. The rush setup is the measured case: *"Nothing to set up.
+     * It ends when it ends."* beside an inert `Start the rush`.
+     *
+     * The bar is pinned, so putting the sentence here is what makes it visible without scrolling —
+     * #262's own second criterion, and the half that no `aria-` attribute can supply.
+     */
+    const inertReason = refusing ? undefined : model.primary.inert;
+    const noteText = refusing ? unbuiltReasonFor(state.screen) : (inertReason ?? model.note);
+    let noteId: string | undefined;
     if (noteText !== undefined) {
       const note = el(doc, 'span', 'everyday-bar-note', noteText);
       note.style.cssText = `color:${C.warmGrey};font-size:12px;max-width:44ch;text-align:right`;
+      if (inertReason !== undefined) {
+        /* Named so the button can point at it; only when it *is* the reason, so a screen reader
+         * is never handed the table's note as an explanation of a control it does not explain. */
+        noteId = BAR_REASON_ID;
+        note.id = noteId;
+      }
       bar.append(note);
     }
 
@@ -1084,12 +1158,24 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       primaryBtn.disabled = true;
       primaryBtn.style.cssText = QUIET + ';cursor:not-allowed';
       primaryBtn.title = unbuiltReasonFor(state.screen);
-    } else if (model.primary.inert === true) {
-      /* A resolved-inert primary — a screen state in which the press genuinely cannot act, e.g.
-       * the fixit pair mid-run. Disabled rather than ignoring the click, so the button never
-       * looks pressable while doing nothing. */
+    } else if (model.primary.inert !== undefined) {
+      /*
+       * A resolved-inert primary — a screen state in which the press genuinely cannot act, e.g.
+       * the fixit pair mid-run. Disabled rather than ignoring the click, so the button never looks
+       * pressable while doing nothing, and **the reason travels with it**: drawn in the bar above
+       * (always on screen, because the bar is pinned), on the control as a `title`, and bound to
+       * the control by `aria-describedby` so a reader browsing the button is given the sentence
+       * rather than the table's note.
+       *
+       * `disabled` is kept rather than traded for `aria-disabled`, which would put the button back
+       * in the tab order at the cost of every `isDisabled()` assertion in the browser tier. #262
+       * names the tab-order half as belonging to #239's accessibility sweep, and this is the half
+       * that does not need it: the sentence is on the page for everyone, at every height.
+       */
       primaryBtn.disabled = true;
       primaryBtn.style.cssText += ';opacity:.6;cursor:default';
+      primaryBtn.title = model.primary.inert;
+      if (noteId !== undefined) primaryBtn.setAttribute('aria-describedby', noteId);
     } else if (state.screen === EVERYDAY_ROOT) {
       /* § 3.3's menu row: the primary plays the selected card. */
       primaryBtn.addEventListener('click', () => {
