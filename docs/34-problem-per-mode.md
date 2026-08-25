@@ -33,9 +33,17 @@ Three arguments for a new file rather than a section inside `docs/32`:
    text and a different review.
 2. **The numbered series would collide.** `docs/32` carries `GD1`–`GD20` and a contracts-touched
    register; `docs/33` carries `DC-R1`–`DC-R3` and `DC-1`–`DC-9`. This document needs its own series
-   and gets `PM1`–`PM7`. A third series inside `docs/32` would be the `S1`–`S10` collision
+   and gets one. A third series inside `docs/32` would be the `S1`–`S10` collision
    [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 8 already records, manufactured
    on purpose.
+
+   **The series, declared in full so nobody has to derive it.** `PM1`–`PM7` are the rules every mode
+   is held to (§ 2). `PM-a`, `PM-b`, `PM-c` are the three mechanisms Fix a building has and the
+   others should borrow (§ 1.4). The mode-scoped rules are `PM-TT1`–`PM-TT5` (Today's tower),
+   `PM-CA1`–`PM-CA4` (Campaign), `PM-RU1`–`PM-RU3` (Endless rush) and `PM-FB1`–`PM-FB3` (Fix a
+   building). Two stand alone because they belong to no single mode: **`PM-DOOR`** (§ 8.3, the
+   first-run sequence) and **`PM-PARK`** (§ 9.4, an idle state on the frame). Ordinals are
+   load-bearing from this commit and are not renumbered.
 3. **The gap it fills is between the two, and belongs to neither.** `docs/33` § 2.1 says every stage
    names a **failure mode** — *"what **visibly** goes wrong when the player does the obvious thing"* —
    and then discharges that word with `DC-1`, which asks only that *a non-comparative goal is not
