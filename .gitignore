@@ -67,3 +67,22 @@ pnpm-debug.log*
 # `npm run review` fails when any are present, so CI says so before a confusing red suite does.
 * 2.*
 * 2
+
+# Scratch harnesses — the first line of defence, and deliberately not the only one.
+#
+# The repository's convention is that a measurement harness is written, run, and deleted before the
+# commit. `measure-tmp.mjs` was committed anyway in `8d6d811`, carrying the header
+# `/* … Scratch file; not committed. */` and a `/home/user/...` worktree path from another machine,
+# so it could not run anywhere and nothing referenced it. It sat in the tree for a fortnight.
+#
+# These patterns would have caught that one at `git add -A`, which is `RISKS.md` R25's exact
+# mechanism. They are **not** the guard, because a pattern is silent by construction: it does not
+# fail, `git add -f` walks past it, and it has no effect on a file that is already tracked. The
+# guard is `packages/experiments/src/validation/scratchFiles.test.ts`, which reads the tracked set
+# and goes red. This is the cheap half that stops the common case before it needs the loud half.
+*-tmp.mjs
+*-tmp.js
+*.scratch.*
+/scratch/
+probe-*.mjs
+scrollprobe*.mjs
