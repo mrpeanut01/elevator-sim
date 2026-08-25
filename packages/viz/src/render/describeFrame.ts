@@ -26,7 +26,7 @@ import type { FloorQueue, OverlayMetrics } from '../frame/overlay.js';
 import { LOAD_ALARM, LOAD_FULL } from './overlay.js';
 import { formatClock, playheadHasReachedEnd, undeliveredAt } from './canvas.js';
 import { describeQueue } from './riderQueue.js';
-import { carRestsAt, restWords } from './carRest.js';
+import { carRestsAt } from './carRest.js';
 import type { BuildingMood } from './mood.js';
 // One home for a run's refusal, in every register — see {@link suppressionSentenceOf}.
 import { CASUAL_REFUSAL_REASON_SO_FAR } from '../mode/disclosure.js';
@@ -120,6 +120,34 @@ function loadWords(loadFactor: number): string {
 
 function directionWords(direction: number): string {
   return direction === 1 ? 'moving up' : direction === -1 ? 'moving down' : 'standing';
+}
+
+/**
+ * *standing still for 4 min 10 s* — AD-S17's text alternative, and `UX.md` KB-13.
+ *
+ * The sighted half of that signal is a rectangle in the direction glyph's slot, and a rectangle is
+ * nothing at all to a screen reader. `docs/28` AD-A1 forbids a state a player must distinguish from
+ * riding on one channel; for a non-sighted reader the drawn channel is not one of them, so the
+ * duration is spelled. {@link directionWords} already said *standing*; what it could not say is
+ * *for how long*, which is the whole of what the mark carries.
+ *
+ * **Private, and beside its two siblings for their reason.** `honesty/derive.test.ts` derives the
+ * player-facing text producers from the tree and any *exported* one that is in no adapter is red.
+ * `loadWords` and `directionWords` are not exported; neither is this. The surface `SURFACE_ADAPTERS`
+ * drives is {@link describeFrame} itself, and these three are how it speaks.
+ *
+ * Minutes and seconds rather than bare seconds: the figures this reaches run from 30 s to a whole
+ * quiet hour, and *"standing still for 2 940 seconds"* is a number a listener has to convert. The
+ * unit is named either way — `docs/28` AD-A5.
+ */
+function restWords(restedS: number): string {
+  const whole = Math.floor(restedS);
+  if (whole < 60) return `standing still for ${String(whole)} s`;
+  const minutes = Math.floor(whole / 60);
+  const seconds = whole % 60;
+  return seconds === 0
+    ? `standing still for ${String(minutes)} min`
+    : `standing still for ${String(minutes)} min ${String(seconds)} s`;
 }
 
 /**

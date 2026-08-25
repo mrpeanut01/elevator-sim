@@ -14,6 +14,12 @@
  *    on their own composited grounds, in **both** modes, and the figures are pinned rather than
  *    eyeballed. The arithmetic is `render/theme.test.ts`'s, verbatim.
  *
+ * The mark's **words** are not here, because they are not this module's: an exported declaration
+ * carrying authored prose is a player-facing text producer to `honesty/derive.test.ts`, and this
+ * file is a renderer's arithmetic. The duration clause is a private function in
+ * `render/describeFrame.ts`, beside `directionWords` and `loadWords`, and it is asserted through
+ * the paragraph it reaches in `describeFrame.test.ts`.
+ *
  * ## The mark this file is about is the only one on the stage that says a lift is idle
  *
  * `docs/34-problem-per-mode.md` § 3.2 records the absence it closes and § 9 is a whole section
@@ -40,7 +46,6 @@ import {
   carRestAt,
   carRestsAt,
   restBarWidthPx,
-  restWords,
 } from './carRest.js';
 
 let config: LoadedConfig;
@@ -224,16 +229,6 @@ describe('restBarWidthPx — the magnitude channel, and the sizes that break it'
      */
     expect(restBarWidthPx(0, 2.4)).toBe(REST_BAR_MIN_PX);
     expect(restBarWidthPx(1, 2.4)).toBe(REST_BAR_MIN_PX);
-  });
-});
-
-describe('restWords — the same fact for a reader who cannot see the bar', () => {
-  it('names its unit at every magnitude the mark reaches', () => {
-    expect(restWords(30)).toBe('standing still for 30 s');
-    expect(restWords(59.9)).toBe('standing still for 59 s');
-    expect(restWords(60)).toBe('standing still for 1 min');
-    expect(restWords(250)).toBe('standing still for 4 min 10 s');
-    expect(restWords(3600)).toBe('standing still for 60 min');
   });
 });
 

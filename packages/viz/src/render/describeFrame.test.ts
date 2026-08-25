@@ -24,6 +24,7 @@ import { describeQueue } from './riderQueue.js';
 import { buildingMood, moodObservationsOf } from './mood.js';
 import { recordRun } from '../record/recordRun.js';
 import { describeFrame } from './describeFrame.js';
+import { carRestsAt } from './carRest.js';
 import { LOAD_ALARM } from './overlay.js';
 
 let config: LoadedConfig;
@@ -404,6 +405,65 @@ describe('the mood is spoken, on the run whose statistics are refused', () => {
       expect(playheadHasReachedEnd(recording, frameAt(recording, t)), String(fraction)).toBe(
         !moodAt(recording, t).provisional,
       );
+    }
+  }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * AD-S17 — the rest bar, for a reader who cannot see it
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The drawn mark is a rectangle, and a rectangle is nothing to a screen reader.**
+ *
+ * `docs/28` AD-A1 forbids a state a player must distinguish from riding on one channel, and for a
+ * non-sighted reader the drawn channel is not one of them. The paragraph already said *standing*;
+ * what it could not say is *for how long*, which is the whole of what AD-S17 carries and the whole
+ * of what campaign stage 1's lesson turns on.
+ *
+ * Driven off a real run rather than a fixture, on the building the lesson is set on. Its lifts are
+ * idle for most of the hour (`docs/34` § 9.3 measures the landings empty about 91 % of the time),
+ * so the clause is the ordinary state of this building rather than a contrived one.
+ */
+describe('AD-S17 — a car standing still says how long, in words', () => {
+  it('replaces the bare “standing” with a duration once the car has stood', () => {
+    const { recording } = recordRun(breadthConfig(config, 'garden-apartments'));
+    const span = recording.endedAt - recording.startedAt;
+
+    /* At the very first instant nothing has stood for any time, so the old clause is what is said. */
+    const opening = describeFrame({ recording, frame: frameAt(recording, recording.startedAt) });
+    expect(opening).toContain('standing,');
+    expect(opening).not.toContain('standing still for');
+
+    /* And somewhere in the day a lift has stood long enough to say so. */
+    const said = Array.from({ length: 41 }, (_unused, index) =>
+      describeFrame({ recording, frame: frameAt(recording, recording.startedAt + (span * index) / 40) }),
+    ).filter((text) => text.includes('standing still for'));
+    expect(said.length, 'no frame of a mostly-idle building says a lift stood still').toBeGreaterThan(0);
+
+    /* The unit is named, and a minute is spoken as a minute — AD-A5. */
+    for (const text of said) {
+      expect(text).toMatch(/standing still for (?:\d+ s|\d+ min(?: \d+ s)?)/);
+    }
+  }, 300_000);
+
+  it('says it about the cars the mark is drawn over, and about no others', () => {
+    /*
+     * The paragraph and the picture must not drift — that is this module's whole reason for being a
+     * pure function of the same frame. So the set of cars whose clause carries a duration is
+     * asserted equal to the set the renderer marks, rather than merely non-empty.
+     */
+    const { recording } = recordRun(breadthConfig(config, 'garden-apartments'));
+    const span = recording.endedAt - recording.startedAt;
+    for (let index = 0; index <= 20; index += 1) {
+      const frame = frameAt(recording, recording.startedAt + (span * index) / 20);
+      const marked = new Set(carRestsAt(recording, frame).map((rest) => rest.carId));
+      const text = describeFrame({ recording, frame });
+      for (const car of frame.cars) {
+        const clause = text.slice(text.indexOf(`Car ${car.label} at floor`));
+        const said = clause.slice(0, clause.indexOf('.')).includes('standing still for');
+        expect(said, `${car.carId} at ${String(frame.simTimeS)}`).toBe(marked.has(car.carId));
+      }
     }
   }, 300_000);
 });

@@ -55,34 +55,43 @@ import type { Frame, FrameCar, VizRecording, VizShaft } from '../contract/types.
 import { WAIT_BANDS } from '../live/bands.js';
 
 /**
- * A band boundary, by id rather than by index.
+ * The two boundaries, taken from the ends of the ramp rather than by naming a band.
  *
- * Positional reads are how `stageScreen.browser.test.ts`'s `TOP_SPEED_INDEX` went stale without
- * failing: index 4 stayed a real rung and stopped being the top one. An id cannot drift under a
- * table that gains a member.
+ * `WAIT_BANDS` is *"the four bands, in ascending severity"*, which makes its two ends meaningful
+ * rather than positional: the calmest band's ceiling is *how long a wait can be before anybody
+ * would notice it*, and the worst band's floor is *how long before somebody would give up*. Both
+ * survive a table that gains a fifth band in the middle, which a numeric index would not — and both
+ * say what they mean without a band id, which keeps this module free of authored prose and
+ * therefore out of `honesty/derive.test.ts`'s producer set. A *renderer* is not a text surface, and
+ * a band id spelled here would make it look like one.
+ *
+ * Thrown rather than defaulted, because a silent fallback would draw a mark on a rule nobody chose.
  */
-function bandStartS(id: string): number {
-  const band = WAIT_BANDS.find((candidate) => candidate.id === id);
-  if (band === undefined) throw new Error(`live/bands.ts no longer defines the ${id} band`);
-  return band.fromS;
+function rampEnds(): { readonly onsetS: number; readonly fullS: number } {
+  const calmest = WAIT_BANDS[0];
+  const worst = WAIT_BANDS[WAIT_BANDS.length - 1];
+  if (calmest?.toS === undefined || worst === undefined) {
+    throw new Error('live/bands.ts no longer opens with a bounded band and close with an open one');
+  }
+  return { onsetS: calmest.toS, fullS: worst.fromS };
 }
 
 /**
- * When a still car starts carrying a mark — 30 s, `breezy`'s own ceiling.
+ * When a still car starts carrying a mark — 30 s, the calmest band's own ceiling.
  *
  * Below it a car is standing for an ordinary reason: it has just levelled, or its doors have just
  * shut and the next command has not arrived. `data/elevator-specs.json`'s slowest shipped hall-call
  * stop is `2.5 + 7 + 4.0 = 13.5 s` of door cycle, and the doors are open for all of it — so the
  * predicate below has already excluded the whole of it before this threshold is consulted.
  */
-export const CAR_REST_ONSET_S = bandStartS('tapping-foot');
+export const CAR_REST_ONSET_S = rampEnds().onsetS;
 
 /**
  * When the mark reaches its full length — 120 s, the rung at which a person standing at a landing
  * would be *eyeing the stairs*. A car still at rest past it draws the same full bar; the mark
  * saturates rather than growing without bound, because a length nobody can compare is not a channel.
  */
-export const CAR_REST_FULL_S = bandStartS('taking-the-stairs');
+export const CAR_REST_FULL_S = rampEnds().fullS;
 
 /** One car that is not doing anything, at one instant. */
 export interface CarRest {
@@ -213,23 +222,15 @@ export const REST_BAR_MIN_PX = 3;
 /** How thick the bar is drawn. One rule for both renderers, so the mark is one mark. */
 export const REST_BAR_THICKNESS_PX = 2.5;
 
-/**
- * *standing still for 4 min 10 s*, for the frame's text alternative — `UX.md` KB-13.
+/*
+ * **The words for this state are `render/describeFrame.ts`'s, and deliberately not this module's.**
  *
- * The sighted half of this signal is a rectangle, and a rectangle is nothing to a screen reader.
- * `docs/28` AD-A1 forbids a state that must be distinguished from carrying one channel, and for a
- * non-sighted reader the drawn channel is not one of them, so the duration is spelled.
+ * They were written here first, beside the geometry, and `honesty/derive.test.ts` was right to
+ * refuse it: an exported declaration carrying authored prose is a *player-facing text producer*,
+ * and one that is in no `SURFACE_ADAPTERS` entry is an unchecked surface. This file is a renderer's
+ * arithmetic — it draws a rectangle — so the honest fix is for it to author no prose at all rather
+ * than to acquire an adapter it does not need.
  *
- * Minutes and seconds rather than bare seconds: the figures this reaches are 30 s at one end and a
- * whole quiet hour at the other, and *"standing still for 2 940 seconds"* is a number a listener has
- * to convert. The unit is named either way — `docs/28` AD-A5.
+ * `describeFrame` is already a driven surface, and its own `directionWords` and `loadWords` are
+ * private functions there for exactly this reason. The duration clause joins them.
  */
-export function restWords(restedS: number): string {
-  const whole = Math.floor(restedS);
-  if (whole < 60) return `standing still for ${String(whole)} s`;
-  const minutes = Math.floor(whole / 60);
-  const seconds = whole % 60;
-  return seconds === 0
-    ? `standing still for ${String(minutes)} min`
-    : `standing still for ${String(minutes)} min ${String(seconds)} s`;
-}

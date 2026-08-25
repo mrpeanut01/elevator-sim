@@ -1531,8 +1531,15 @@ function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
        *
        * Capped at the arrow's footprint rather than the car's, because that is the room this slot
        * has on a 35-car elevation.
+       *
+       * **A withdrawn car is not marked**, which is the one place this renderer and the Casual
+       * cutaway had to be made to agree: `drawCutaway` skips an out-of-service column outright and
+       * draws no car at all in it. A car held out of service is standing still by construction, so
+       * the mark would be true and useless — and worse than useless, because it would put a second
+       * meaning on a channel whose whole value is that it means one thing. The `OOS` pill and the
+       * dimmed shaft already say why that car is not moving.
        */
-      const rest = restByCar.get(column.carId);
+      const rest = outOfService.has(column.carId) ? undefined : restByCar.get(column.carId);
       if (rest !== undefined) {
         const barWidth = restBarWidthPx(rest.fill, REST_BAR_SLOT_PX);
         ctx.fillStyle = theme.textDim;

@@ -679,11 +679,18 @@ Casual cutaway above the car across its body.
    rather than as an intention.
 3. **It survives the ladder at both ends**, which is § 6 and is why it is a **state** and not a cue.
    At `1×` the bar lengthens continuously and exactly, computed from the playhead like `doorFraction`
-   — no transition, so AD-M2 is untouched. At `600×` a whole door cycle falls between two frames, and
-   an event-shaped *"the car has parked"* flash would be invisible (AD-M3); a length that is simply
-   *true at every frame* is not. What it does at the top rung is what a state does: on
-   `garden-apartments` the lifts are idle for most of the hour, so the bars are present in most
-   frames and read as steady rather than as flicker.
+   — no transition, so AD-M2 is untouched, and the growth is legible: the ninety seconds between
+   onset and saturation are ninety real ones. At `600×` a whole door cycle falls between two frames,
+   so an event-shaped *"the car has parked"* flash would be invisible (AD-M3) while a length that is
+   simply true at every frame is not.
+
+   **Say what the top rung costs, rather than only what it does not.** Ten sim-seconds pass per
+   frame there, so a lift that rests for a minute carries a mark for about two frames and one that
+   rests for five minutes carries a steady one for thirty. On a busy building marks will appear and
+   vanish quickly — **and exactly as fast as the `▲`/`▼` in the same slot already do**, which have
+   flickered at that rate since the stage was drawn. The mark adds no new instability to the picture;
+   it inherits the one the channel has. On the buildings where the parking lesson is the point the
+   lifts are idle for most of the hour, so the bars there are steady at every rung.
 4. **Its contrast is measured on the ground it is drawn on** — AD-A2, and § D336's shape. The Casual
    bar is `inkSoft` on the well's `paper` at **8.36:1**. The Engineer bar is `textDim` over the shaft
    recess composited on a slab or not, over the mass, over both stops of all four sky ramps: **6.39:1
@@ -697,6 +704,12 @@ colour would be asserting that standing still is **wrong**, which is the player'
 and the renderer's job to make reachable. **Nor is it a dimming**, which is what a car held out of
 service already is — see § 3's inventory. A second meaning on one channel is how a picture stops
 having any.
+
+**And a withdrawn car carries no mark**, on the same rule read the other way. A car held out of
+service is standing still by construction, so marking it would be true and useless, and it would put
+a second meaning on the one channel whose value is that it has one. The Casual cutaway could not have
+drawn it anyway — it skips an out-of-service column outright — so this is also the two renderers
+being made to agree rather than a preference.
 
 **What the mark does not carry, said here rather than discovered later.** It says *this lift is
 waiting, and has been for a while*. It does **not** say *in the wrong place* — that is a two-place

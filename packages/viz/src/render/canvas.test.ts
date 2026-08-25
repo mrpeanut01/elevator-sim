@@ -1784,6 +1784,27 @@ describe('AD-S17 — the rest bar', () => {
     expect(widthAt(CAR_REST_FULL_S * 2)).toBe(full);
   });
 
+  it('never marks a car held out of service, which the other renderer cannot draw at all', () => {
+    /*
+     * The two stages had to be made to agree here. `drawCutaway` skips an out-of-service column
+     * outright — it draws no car in it — so an unguarded mark would exist on one stage and not the
+     * other for the same run. It would also be true and useless: a withdrawn car is standing still
+     * by construction, and the `OOS` pill and the dimmed shaft already say why.
+     */
+    const withdrawn: VizRecording = { ...RECORDING, outOfServiceCarIds: ['main-A'] };
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: withdrawn,
+      frame: standing(CAR_REST_FULL_S),
+      layout,
+      theme: DEFAULT_THEME,
+    });
+    expect(restBarsIn(ctx)).toHaveLength(0);
+    // And the same frame on the same building *is* marked once the car is back in service, so this
+    // is a guard rather than a mark that never draws.
+    expect(restBarsIn(draw(standing(CAR_REST_FULL_S)))).toHaveLength(1);
+  });
+
   it('is a second channel and not a colour — the mark survives a theme with one ink', () => {
     /*
      * `riderQueue.test.ts`'s colour-removal idiom, applied one mark over. Under a theme whose
