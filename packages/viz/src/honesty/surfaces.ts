@@ -4634,7 +4634,7 @@ const RIGHT_RAIL: SurfaceAdapter = {
  * reconstructing it here is the alternative to widening their signatures for a test's convenience.
  * Every field is the shipped one: the same `data/` documents, the same resolved buildings.
  */
-function browserResourcesOf(context: HonestyContext): BrowserResources {
+export function browserResourcesOf(context: HonestyContext): BrowserResources {
   return {
     elevatorSpecs: context.elevatorSpecs as ElevatorSpecs,
     trafficProfiles: context.trafficProfiles,
