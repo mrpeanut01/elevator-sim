@@ -58,8 +58,13 @@ import {
 } from '../campaign/failStates.js';
 import type { StageReport } from '../campaign/judge.js';
 import { editableIdsOf } from '../campaign/parse.js';
-import { runStageToVerdict } from '../campaign/stageSequence.js';
-import { demonstrationConfigFor, stageReplicationSeed } from '../campaign/stageRun.js';
+import { runStageToVerdict, type StageSequenceOutcome } from '../campaign/stageSequence.js';
+import {
+  demonstrationConfigFor,
+  stageReplicationSeed,
+  stageSeedSetOf,
+  type StageSeedSet,
+} from '../campaign/stageRun.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { applyControlEdit, controlsFor } from '../controls/controls.js';
 import {
@@ -652,6 +657,73 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     return true;
   }
 
+  /* ------------------------------------------------------------------ *
+   * The status line — and it now has two batches to account for
+   * ------------------------------------------------------------------ */
+
+  /**
+   * What the player is told while a batch runs, and which of the two it is.
+   *
+   * **A stage takes up to two batches, so the status line has to say so before the first one
+   * starts.** A surface that looked identical and took twice as long would be a worse product than
+   * the regression this replaced: the player's own model of *Run this stage* is one wait, and a
+   * second wait they were not told about reads as a hang. So the tuning line names the second
+   * batch as a *condition* — it follows only if every goal is met — rather than promising a run
+   * that usually will not happen.
+   *
+   * The seed sets are named, not described. `judge.ts`'s own sentences print
+   * `holdout-20260731 (seed 20260731)`, and a status line that invented a friendlier phrase for the
+   * same set would leave a player matching two names for one thing.
+   */
+  function openingLine(stage: CampaignStage, seedSet: StageSeedSet, total: number): string {
+    const seeds = stageSeedSetOf(stage, seedSet);
+    if (seedSet === 'tuning') {
+      return (
+        `running ${String(total)} replications on ${seeds.name} — both settings, the same ` +
+        `passengers… If every goal is met here, a second batch of ${String(total)} follows on ` +
+        `${stageSeedSetOf(stage, 'holdout').name}, because a stage is cleared on seeds it was not ` +
+        'tuned against.'
+      );
+    }
+    return (
+      `every goal met on the runs you made — now running ${String(total)} replications on ` +
+      `${seeds.name}, seeds this setting was not tuned against. This second batch decides whether ` +
+      'the stage is cleared; it adds no figure to the rows you are about to read.'
+    );
+  }
+
+  function progressLine(
+    stage: CampaignStage,
+    seedSet: StageSeedSet,
+    completed: number,
+    total: number,
+  ): string {
+    const done = `${String(completed)} of ${String(total)} replications on ${stageSeedSetOf(stage, seedSet).name}`;
+    return seedSet === 'tuning'
+      ? `${done} — the page is still yours while this runs.`
+      : `${done} — the second batch, on seeds you could not have tuned against.`;
+  }
+
+  /**
+   * The timing line, and — when the second batch did not happen — the reason it did not.
+   *
+   * A player who watched one batch on a surface that told them to expect two is owed the sentence
+   * saying which of the two things happened. `verdict.holdout === null` is exactly *the holdout
+   * batch was not run*, and it is never *the holdout batch held*.
+   */
+  function closingLine(stage: CampaignStage, outcome: StageSequenceOutcome, elapsedMs: number): string {
+    const per = `${String(outcome.report.replications)} replications per setting`;
+    const took = `${(elapsedMs / 1000).toFixed(1)} s`;
+    const tuning = stageSeedSetOf(stage, 'tuning').name;
+    if (outcome.verdict.holdout === null) {
+      return (
+        `${per} on ${tuning} in ${took}. The holdout batch was not run: a goal missed on the runs ` +
+        'you made cannot be recovered on seeds you did not tune against.'
+      );
+    }
+    return `${per} on ${tuning}, and again on ${stageSeedSetOf(stage, 'holdout').name} — ${took} for both batches.`;
+  }
+
   /**
    * One batch, on one worker, as a promise — so the sequence above it can be written as a
    * sequence rather than as a tree of nested message handlers.
@@ -661,13 +733,17 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    * run after it would never start. {@link abortRun} settles it, and the one rejection value it
    * uses is recognised by the caller so that *cancelled* never reaches the error line.
    */
-  function runOneBatch(request: BatchRequest): Promise<BatchResult> {
+  function runOneBatch(
+    stage: CampaignStage,
+    request: BatchRequest,
+    seedSet: StageSeedSet,
+  ): Promise<BatchResult> {
     return new Promise<BatchResult>((resolve, reject) => {
       const total = request.arms.length * request.replications;
       ui.progress.max = total;
       ui.progress.value = 0;
       ui.progress.hidden = false;
-      ui.status.textContent = `running ${String(total)} replications — both settings, the same passengers…`;
+      ui.status.textContent = openingLine(stage, seedSet, total);
 
       const next = new Worker(new URL('./batchWorker.ts', import.meta.url), { type: 'module' });
       worker = next;
@@ -680,7 +756,12 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         const message = event.data as BatchWorkerMessage;
         if (message.kind === 'progress') {
           ui.progress.value = message.progress.completed;
-          ui.status.textContent = `${String(message.progress.completed)} of ${String(message.progress.total)} replications — the page is still yours while this runs.`;
+          ui.status.textContent = progressLine(
+            stage,
+            seedSet,
+            message.progress.completed,
+            message.progress.total,
+          );
           return;
         }
         settle();
@@ -726,8 +807,8 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       published,
       candidateProfileId: ui.profile.value,
       edit: editFor(stage),
-      run: async (request) => {
-        const result = await runOneBatch(request);
+      run: async (request, seedSet) => {
+        const result = await runOneBatch(stage, request, seedSet);
         elapsedMs += result.elapsedMs;
         return result;
       },
@@ -736,7 +817,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         if (token !== runToken) return;
         setRunning(false);
         ui.progress.hidden = true;
-        ui.status.textContent = `${String(outcome.report.replications)} replications per setting in ${(elapsedMs / 1000).toFixed(1)} s.`;
+        ui.status.textContent = closingLine(stage, outcome, elapsedMs);
         draw(
           stage,
           outcome.verdict,
@@ -896,6 +977,76 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     );
   }
 
+  /**
+   * The goals, twice, with the batch each answer came from on the row that carries it.
+   *
+   * **The two batches are not interchangeable and this is where a surface could imply they are.**
+   * `judgeStage`'s `goals` are the **tuning** batch — the runs the player made — and they are what
+   * every goal row's sentence has always been, deliberately: feedback a player cannot see is not
+   * feedback, and a stage refused on a count they can go and look at is a stage they can play
+   * again. `holdout.goals` are the same goals over a sample they could not have tuned against, and
+   * they decide `cleared` and nothing else. Printing the two lists one after another with the same
+   * labels would be the confusion the whole split exists to prevent, so each list gets a caption
+   * naming its seed set and every holdout row carries the set on its own label — a reader who
+   * scrolled past the caption still knows which runs they are reading about.
+   *
+   * The holdout half is drawn whether it held or not. Drawing it only when it refused would report
+   * the unflattering half of a measurement and hide the other, which is the shape this repository
+   * refuses everywhere else; and a player who cleared a stage is owed the evidence that they
+   * cleared it on runs they had never seen.
+   */
+  function seedSetBlocks(stage: CampaignStage, verdict: StageReport): readonly HTMLElement[] {
+    const tuning = stageSeedSetOf(stage, 'tuning');
+    const holdoutSeeds = stageSeedSetOf(stage, 'holdout');
+    const nodes: HTMLElement[] = [
+      row(
+        'the runs you made',
+        `${String(verdict.goals.length)} goals, judged on ${tuning.name} (seed ${tuning.seed}) — ` +
+          'the seeds this setting was tuned against, and the batch every row below is about.',
+        'These are the counts to play against: a goal missed here is one you can go and look at. ' +
+          'Meeting all of them is half of clearing the stage.',
+        'figure-observation',
+      ),
+      ...verdict.goals.map((goal) => row(goal.label, goal.sentence, goal.note, goalClass(goal.met))),
+    ];
+
+    const holdout = verdict.holdout;
+    if (holdout === null) {
+      nodes.push(
+        row(
+          'the holdout seeds — not run',
+          `${holdoutSeeds.name} (seed ${holdoutSeeds.seed}) was not run, because a goal missed on ` +
+            'the runs above cannot be recovered on seeds this setting was not tuned against. A ' +
+            'stage is cleared on both batches or on neither, and nothing here was measured about ' +
+            'this one.',
+          undefined,
+          'figure-absent',
+        ),
+      );
+      return nodes;
+    }
+
+    nodes.push(
+      row(
+        holdout.held ? 'the runs you could not tune against' : 'the runs you could not tune against — refused',
+        holdout.sentence,
+        `A second batch of the same two settings over ${holdout.seedSetName}, run after the batch ` +
+          'above met every goal. It decides whether the stage is cleared and it changes no figure ' +
+          'above it: every row up to here is the batch you ran.',
+        holdout.held ? 'figure-observation' : 'figure-warning',
+      ),
+      ...holdout.goals.map((goal) =>
+        row(
+          `${goal.label} · on ${holdout.seedSetName}`,
+          goal.sentence,
+          goal.note,
+          goalClass(goal.met),
+        ),
+      ),
+    );
+    return nodes;
+  }
+
   function draw(
     stage: CampaignStage,
     verdict: StageReport,
@@ -907,9 +1058,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (report.budgetNote !== null) {
       ui.output.append(row('replication budget', report.budgetNote, undefined, 'figure-warning'));
     }
-    for (const goal of verdict.goals) {
-      ui.output.append(row(goal.label, goal.sentence, goal.note, goalClass(goal.met)));
-    }
+    ui.output.append(...seedSetBlocks(stage, verdict));
 
     ui.output.append(
       row(
