@@ -41,15 +41,23 @@ const SECRET = 'a'.repeat(48);
 let server: Server;
 let outbox: OutboxMailer;
 let scratch: string;
+/**
+ * The database under {@link server}, kept so one test can forge a state the API cannot reach.
+ *
+ * Used in exactly one place — the cooldown-clearing test below says why it needs raw SQL and why
+ * the state it builds cannot occur in production. Everything else drives the API.
+ */
+let storeSql: PgliteSql;
 /** Injected, so nothing here depends on what time the suite runs at. */
 let clock = 1_770_000_000_000;
 
 beforeAll(async () => {
   scratch = await mkdtemp(join(tmpdir(), 'elevator-server-'));
   outbox = new OutboxMailer(join(scratch, 'outbox.jsonl'));
+  storeSql = new PgliteSql();
   server = await bootstrap({
     dataDir: DATA_DIR,
-    sql: new PgliteSql(),
+    sql: storeSql,
     env: { ELEVATOR_SIM_SECRET: SECRET },
     publicOrigin: 'https://elevator.example',
     now: () => clock,
@@ -817,6 +825,54 @@ describe('deleting an account', () => {
     expect(JSON.stringify(response.body)).not.toMatch(/foreign key|constraint|fkey/u);
     await app.close();
   }, 60_000);
+
+  it('does not leave the deleted account holding a submission cooldown', async () => {
+    /*
+     * `deleteAccount` clears the account's entry in `nextSubmitMs`, which is an identifier of a
+     * deleted account sitting in this process's memory until a restart. Replacing that line with a
+     * no-op left all 265 tests green, so it was argued for at length in a docstring and pinned by
+     * nothing.
+     *
+     * **The state this builds cannot occur in production, and that is stated rather than hidden.**
+     * Account ids are `randomUUID()` and are never reused, so nothing a player can do reaches a
+     * second account with a first account's id — which is exactly why the leak is invisible from
+     * outside and why observing it needs raw SQL. What the test pins is the property the line
+     * exists for: *a deleted id carries no cooldown forward*. Forging id reuse is the only seam
+     * through which that is observable at all, and the alternative — exposing the closure's map so
+     * a test could read it — would be production surface added for a test's benefit.
+     *
+     * The clock is frozen throughout, in the shape the cooldown test above uses: `call` advances it
+     * ten seconds and `MIN_SUBMIT_INTERVAL_MS` is five, so without freezing the interval would have
+     * lapsed on its own and the test would pass whatever the line did.
+     */
+    const account = await signIn();
+    const at = clock;
+
+    const posted = await call('POST', '/api/scores', { token: account.token, body: honest() });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+    clock = at;
+
+    expect((await call('DELETE', '/api/me', { token: account.token })).status).toBe(200);
+    clock = at;
+
+    // The forged half: the same id, a fresh row. Straight to the database, because `createUser`
+    // mints its own id and no route can be asked for a particular one.
+    await storeSql.query(
+      'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) ' +
+        'VALUES ($1, $2, $3, $4, $5)',
+      [account.id, 'reborn@example.test', 'Reborn', true, at],
+    );
+    await server.store.createSession('reborn-session-token', account.id);
+    clock = at;
+
+    const again = await call('POST', '/api/scores', {
+      token: 'reborn-session-token',
+      body: honest(),
+    });
+    // 429 here would mean the deleted account's cooldown outlived it. Inside the interval, on a
+    // frozen clock, so nothing but the clearing line can produce a 201.
+    expect(again.status, JSON.stringify(again.body)).toBe(201);
+  }, 120_000);
 
   it('says what it removed, and does not claim anything about the other store', async () => {
     const account = await signIn();

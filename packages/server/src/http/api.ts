@@ -586,11 +586,16 @@ async function me(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
  * sitting in this process's memory until a restart and there is no reason to keep it — a fresh id
  * is a fresh budget anyway, since ids are UUIDs and never reused.
  *
- * The **sign-in link limiters do not**, and must not. Their key is the address (and the caller),
- * not the account, and their whole job is to bound how often an address can be mailed. Clearing
- * them on deletion would make *delete the account* the way to reset an anti-abuse budget, which is
- * a worse gadget than the one § D242 built them to stop. They expire on their own fifteen-minute
- * window, which is a bound rather than a retention decision.
+ * The **sign-in link limiters do not**, and must not. {@link LINKS_PER_EMAIL} is keyed by the
+ * address, not the account, and its whole job is to bound how often an address can be mailed —
+ * clearing it on deletion would make *delete the account* the way to reset the budget that decides
+ * whether this endpoint is an email-bombing gadget, and a session costs exactly one mail. It
+ * expires on its own fifteen-minute window, which is a bound rather than a retention decision.
+ *
+ * {@link LINKS_PER_CALLER} is untouched for a plainer reason still: its key is an **IP address**,
+ * which was never the account's to erase and belongs to whoever is calling rather than to whoever
+ * signed in. Nothing about deleting an account should move a budget keyed on something an account
+ * does not own.
  *
  * ## 200, and the token is dead before the caller reads the answer
  *
