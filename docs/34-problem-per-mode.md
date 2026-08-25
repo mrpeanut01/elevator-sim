@@ -986,6 +986,22 @@ somebody is visibly standing while a car is visibly still — which the data say
 `three-cars-one-cars-work` at 7 %pop/5 min, and is **not** `garden-apartments` on an ordinary day at
 its own typical rate.
 
+**That ordering has since been tested from the campaign's side and it held**, which is worth a
+pointer because the two lanes measured different things and agreed.
+[`33-difficulty-curve.md`](33-difficulty-curve.md) § 3.3e asks whether a campaign stage should
+*start* on an authored point of its own search space — a starting setting that is deliberately
+wrong, which is this section's tableau proposed as a game mechanic — and refuses it for stage 1 on
+two independent grounds. The first is § 9.3's measurement above, unchanged. The second is a
+structural one this document could not have found: an authored starting vector is either inside the
+stage's `editable` list, in which case selecting the unedited base profile from the dropdown is a
+one-click undo of the fault and the stage clears from the menu, or outside it, in which case
+`campaign/dimensions.ts#admitProfile` refuses **all thirteen** shipped profiles and there is no menu.
+Both horns are measured there. **The mechanism itself is not refused** — § 1.1's own exemplar
+already ships it, and naming it as a mechanism is the useful half: `sleeping-sky-lobby`'s
+`asBuilt.patch.dispatcher.idle.parkingStrategy: "lobby"` **is** a deliberately wrong dispatcher
+parameter authored as the given state, which is exactly what the campaign was asking for and already
+has a home.
+
 ---
 
 ## 10. Every code change this specification implies, listed and not built

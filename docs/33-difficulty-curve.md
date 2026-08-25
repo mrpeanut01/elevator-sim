@@ -777,6 +777,250 @@ player can now see, understand and fix is where the cars wait, and that arrives 
 `beat-the-baseline` rather than through anything DC-1 measures. A lane asked to make stage 1 teach
 should read this before optimising for the gate.
 
+### 3.3e Should a stage start on a *point* rather than on a profile? — refused, and the two cases behind it are answered separately
+
+§ 3.3c Result 2 closed a route with a sentence rather than with a measurement:
+
+> reaching that bar at all means putting a parking value on the stage's **baseline arm**, and no
+> field of `data/campaign.json` carries one … The axis is **not exhausted**; what is closed is
+> reaching it from `data/`.
+
+This section asks whether that field should exist — whether `campaign/types.ts#StageDispatcher`
+should carry an authored `EditedVector` beside `startingProfileId`, so that a stage starts on a
+**point of its own declared search space** rather than on one of the thirteen shipped profiles.
+
+**Two cases were put for it, and separating them is the first thing this section does**, because
+three previous lanes were spent conflating them (§ 3.3a, § 3.3c, GitHub issue **#270**):
+
+- **the gameplay case** — a starting setting that is *visibly wrong* hands the player a building
+  being served badly rather than a dispatcher to beat, which is what
+  [`34-problem-per-mode.md`](34-problem-per-mode.md) says every mode lacks and what **#208** is
+  about;
+- **the DC-1 case** — it would give stage 1 the failable count goal § D355 took away.
+
+**Verdict, stated before the evidence so it cannot be read as a hedge.** **The DC-1 case is
+refused on a measurement: the change does produce a failable count goal, and it breaches DC-2 or
+DC-2b — one or the other, unavoidably — in the same move.** The gameplay case is refused *for the
+campaign* and **not** as a mechanism: the mechanism already ships, in `data/fixit-cases.json`, on
+the mode whose building can actually show the fault. **A decision number is owed** (next free
+is D366).
+
+#### The re-measurement — § 3.3c's legal box reproduces cell for cell
+
+§ 3.3c's numbers were taken on a probe it says was *"not landed, because nothing in the shipped tree
+would call it"*, so they are not re-derivable from `main` and nothing here may lean on them
+untested. Re-measured on `integration/m2-wave-c`:
+
+| cell (baseline arm, `long-waits-under ≤ 10 %`) | § 3.3c | re-measured |
+|---|---|---|
+| `collective` at `null`, no edit — the shipped stage | 50 \| 50 | **50 \| 50** |
+| `collective` at `max` (7 %pop/5 min), no edit | 49 \| 50 | **49 \| 50** |
+| `fixed-floor` at the top, at `null` | 49 \| 49 | **49 \| 49** |
+| `predicted-demand`, at 6 | 48 \| 49 | **48 \| 49** |
+| `fixed-floor` at 4, at 6 | 49 \| 49 | **49 \| 49** |
+| `fixed-floor` at 5, at 6 | 49 \| 49 | **49 \| 49** |
+| `predicted-demand`, at `max` | 48 \| 49 | **48 \| 49** |
+| `fixed-floor` at 2, at `max` | 49 \| 49 | **49 \| 49** |
+| `fixed-floor` at 4, at `max` | 49 \| 49 | **49 \| 49** |
+| **`fixed-floor` at the top, at `max` — the widest cell in the legal box** | **46 \| 49** | **46 \| 49** |
+
+**Instrument, stated so the figures are re-derivable without the harness.** It is
+`scenario/measure.ts#measureScenario`'s own `runSeedSet` — the same
+`shift/reportWindow.ts#shiftReportWindowFor` (`garden-apartments` → `full-run`), the same
+`tuning-20260730` and `holdout-20260731` at 50 replications each, the same 900 s, the same
+`scenario/goals.ts#measureGoalRate` behind `asPerReplicationGoal` — with an `edit` on the single
+measured arm. That `edit` needs nothing new: `batch/types.ts#BatchArmRequest` already carries it and
+`batch/runBatch.ts` already resolves it through `controls/editedProfile.ts#resolveEditedProfile`.
+**Nothing in `packages/` was changed to take these numbers**, and the driver is ~70 lines outside
+it, run as `node <driver> <repo-root>` over a JSON list of cells.
+
+**The harness was validated before it was believed**, which is the only reason the agreement above
+counts for anything: at the shipped stage-1 configuration it returns **50 | 50**, which is what
+`data/scenario-goals.json` publishes for that scenario, and at 7 %pop/5 min under an unedited
+`collective` it returns **49 | 50**, which is § 3.3a's own cell. Two independent anchors, one from
+`data/` and one from a section this one is checking.
+
+**And the disposition is unchanged from § 3.3c's: the probe is still not landed.** That is now the
+**second** section of this document whose published figures come from an instrument the tree cannot
+run, and it is `RISKS.md` **R38**'s shape — a number nothing re-derives. It is tolerable only
+because the two anchors above are re-derivable from the shipped tree, and the fix is row 1 of the
+scoped change priced below.
+
+#### The DC-1 case: it works, and it breaks the campaign's other two rules in the same move
+
+Take the widest cell as the proposal makes it — stage 1 starting on `collective` **with the idle
+cars parked at the top floor**, at the residential profile's declared `max`. The bar a count goal is
+judged against is the baseline arm's own count (§ 3.3d), so the bars become **46** on the tuning
+seeds and **49** on the holdout. Measured, all five per-run kinds, both seed sets:
+
+| arm | `deliver-everyone` · `no-divergence` · `nobody-abandoned` · `answer-the-demand` | `long-waits-under` |
+|---|---|---|
+| **baseline** — `collective` + park at the top (the bar) | 50 \| 50 in every kind | **46 \| 49** |
+| `collective` as shipped — *put the parking back* | 50 \| 50 in every kind | 49 \| 50 |
+| `eta` | 50 \| 50 in every kind | 49 \| 50 |
+| `nearest-car` | 50 \| 50 in every kind | **41 \| 46** |
+
+**DC-1 is satisfied.** `nearest-car` scores below the bar on both halves — 41 against 46, and 46
+against 49 — so an admitted profile misses a non-comparative goal, which is the thing three lanes
+have gone looking for on this building and not found.
+
+**And then the same cell breaks DC-2.** Run as a stage — two arms, one seed set, `batch/report.ts`'s
+paired-t rows, which is what `campaign/judge.ts` reads `beat-the-baseline` off:
+
+| the player's dropdown move | tuning batch | holdout | `beat-the-baseline` |
+|---|---|---|---|
+| **`collective`** — the same base profile, unedited | ahead on average wait and door-to-door, nothing against | ahead on average wait, 95th-percentile wait and door-to-door | **met, both halves** |
+| **`eta`** | ahead on all three, nothing against | ahead on average wait and 95th-percentile wait | **met, both halves** |
+| `nearest-car` | **behind** on four rows | behind on two | not met |
+
+Both of the first two also meet every count goal (49 ≥ 46 and 50 ≥ 49). **So the stage clears from
+the dropdown, two ways**, and one of them is *select the profile the stage says it starts on* —
+which is to say the menu now contains a one-click undo of the fault. That is precisely #200's AC3.
+
+#### The dilemma is structural, and `admitProfile` decides which horn — not the author
+
+The obvious repair is to close `idle.parkingFloorIndex`, so the undo cannot be selected. Run
+through the shipped `campaign/dimensions.ts#admitProfile` against the edited baseline, over all
+thirteen profiles:
+
+| stage 1's `editable` list | admitted profiles | which rule breaks |
+|---|---|---|
+| **as shipped** (`idle.parkingFloorIndex` **closed**) | **none — all thirteen refused**, every one on *"also moves 1 dimension this stage does not open: `idle.parkingFloorIndex` (6 → —)"* | **DC-2b.** The dropdown is empty, `campaignPanel.ts#smallestAdmissibleChange` returns `undefined`, and the panel tells a first-time player that the weight editor is the only way to play — stage 8's and stage 10's shape, on the **first** screen anybody meets |
+| widened by `idle.parkingFloorIndex` | `nearest-car`, `eta`, `collective` | **DC-2.** Two of the three clear the stage, as measured above |
+
+Both horns are forced, and neither is a fact about this cell:
+
+> **An authored starting vector `P + δ` is either inside the stage's `editable` list or outside
+> it. Inside it, the shipped profile `P` is admitted and selecting it is *undo the fault*, which is
+> the dropdown clearing the stage. Outside it, every shipped profile moves a dimension the stage does
+> not open, so `admitProfile` refuses all thirteen and there is no dropdown at all.**
+
+The escape a reader will think of next — keep δ inside `editable` but pick a `P` whose undo still
+misses something — does not exist on this building: § 3.3a Result 1 and § 3.3c Result 1 both
+measure that four of the five per-run kinds are **50 | 50** in every legal cell, so there is no
+second goal for the undo to fail. It is closed for the same reason the demand axis was.
+
+#### And the prize is outside DC-4's band even where it works
+
+Say the numbers plainly rather than letting *"it would unblock DC-1"* carry the argument.
+`46 | 49` is **92 % and 98 %** of runs passing at the *bar*, and the failure a player can actually
+produce — `nearest-car` at `41 | 46` — is **82 % and 92 %**. DC-4 asks for the band `[1/3, 2/3]`.
+Every one of those four figures is between one and a half and three times the top of it.
+
+Compare what the fabric axis already buys on the same building for the same trouble: § 3.3a
+Result 7's one-car rebuild reads **31 | 32 — 62 % and 64 %** — inside the band on both seed sets,
+at the building's own demand, with no demand change at all. **This route is the more expensive way
+to reach a worse number**, and it needs the demand at its declared ceiling on top. (The fabric route
+is refused too, and for its own reasons — #270 measures that it makes two of stage 1's three
+shipped dials inert and breaks 78 tests. Neither route being available is the finding; it is not an
+argument for this one.)
+
+#### The gameplay case, which is the stronger one, and which is refuted on this building rather than in principle
+
+The premise is right and this section does not weaken it: *"here is a building being served badly,
+work out why"* is a better opening than *"here is a dispatcher, beat it"*, and a starting setting
+chosen from thirteen well-tuned shipped profiles cannot express the first. § 3.3d's structural note
+is the reason this is not a DC-1 question at all — a count goal is *"here is a trap, do not fall
+into it"* and never *"here is a problem, fix it"* — so the sentence *the starting setting is the
+problem the player is handed* is a claim about `beat-the-baseline` and about what the player can
+**see**, which is `docs/34`'s subject and not this document's gate.
+
+**Three things measured elsewhere refuse the specific instance, and all three are about seeing.**
+
+1. **On this building, at day one, there is usually nothing to see.**
+   [`34-problem-per-mode.md`](34-problem-per-mode.md) § 9.3 measures `garden-apartments` under
+   `collective` at its own typical rate over 20 seeds: the landings are **empty about 91 % of the
+   time**, and on **16 of 20 seeds no instant in the whole hour** has anybody who has been waiting
+   sixty seconds. A starting setting cannot hand the player a visible problem on a building that
+   does not display one.
+2. **A parked car has no mark on either renderer.** `docs/34` § 3.2 and § 9.2: an idle car is a
+   stopped car with `direction === 0` and near-zero load, pixel-identical to any empty car that
+   happens to be standing there. The cars' *positions* are drawn, so *"all of them are up at the
+   top"* is weakly legible; *"and they are parked there on purpose"* is not drawn anywhere. `docs/34`
+   § 10 row 12 (`PM-PARK`) prices the fix as **large**, and it is a precondition for this proposal
+   rather than a companion to it.
+3. **The tableau is inverted here.** `PM3` asks for cars stopped low and people standing high, both
+   at once and both persistent. This cell gives cars stopped *high* and, 91 % of the time, nobody
+   standing at all.
+
+**And the mechanism the gameplay case actually wants already ships, one mode over.**
+`data/fixit-cases.json`'s `sleeping-sky-lobby` starts the player on `collective` with
+`asBuilt.patch.dispatcher.idle.parkingStrategy: "lobby"` — a deliberately wrong *dispatcher
+parameter* as the given state, on `vertical-city`, where eight shuttles standing at the street while
+sky-lobby queues build is a thing a player can point at, with a named complainant on floor 62
+attached to it. That is this proposal, built, in the mode `docs/34` § 9.4 says the parking lesson
+should land in. **The campaign does not need a second authoring surface for it; what stage 1 needs
+is not to be the place it happens.**
+
+#### What it would have cost, priced so the refusal is not free
+
+Enumerated rather than estimated, because a refusal that has not counted the work is an opinion.
+**Fourteen non-test sites in six files**, from `grep -rn startingProfileId packages/viz/src`:
+
+| where | sites | what changes |
+|---|---|---|
+| `campaign/types.ts` | 1 | the field on `StageDispatcher` |
+| `campaign/parse.ts` | 4 (3 checks) | the profile-exists check, the `str()` read — and the one that matters, the cross-check at `:204` pinning the stage's arm to `published.dispatcherProfileId`. A starting **vector** needs the same pin or it becomes the one part of the baseline the bar is not tied to, which is the defect `checkConfiguration` exists to prevent |
+| `campaign/stageRun.ts` | 1 | the baseline arm gains `edit` — **and the argument against it, written in that function's own parameter docstring** (*"An edit on the baseline would move the bar and the run that is supposed to check it in the same step"*), has to be rewritten rather than deleted: it is answered by regenerating the bar with the vector, and the answer belongs where the objection is |
+| `campaign/brief.ts` | 1 | `:86`'s *"starting on collective"* becomes false the moment a vector rides on it — a stale player-facing sentence, § D227's class |
+| `dev/campaignPanel.ts` | 5 | `openingProfileFor`, `smallestAdmissibleChange`, `drawIntent`, `admissionNode`, `admitted` — **this is the half that makes it a design question.** All five compare against `profileById(startingProfileId)`; unfixed, the panel tells a player choosing the control *"both settings are collective — the two arms are the same system"* about a choice that changes the run. A shipped falsehood on the first screen |
+| `honesty/run.ts` | 1 | `:196` builds the demonstration replication from the unedited profile, so the honesty corpus would sweep **a run the product never makes** |
+
+Plus `data/campaign.json` (10 stages), and the measurement side that has to move with it or the bar
+is set by a different arm: `scenario/measure.ts#GoalScenario` and its `runSeedSet`,
+`scenario/candidates.ts`'s `stage()` helper and ten rows, `scenario/published.ts#PublishedScenario`,
+and a regeneration through `scenario/regenerate.test-helper.ts`.
+
+**Blast radius of that regeneration, estimated.** Small in rows and awkward in kind. If only stage 1
+gains a vector, only stage 1's records move — but `long-waits-under` moves **bucket**, from
+`configurationFacts` (`constant-pass 50 | 50`) to a shippable `goals` entry (`variable 46 | 49`), and
+`campaign/parse.ts` refuses a stage declaring a goal outside its measured bucket, so
+`data/campaign.json` has to declare the goal back that § D355 removed. The stage's `traffic` also
+has to move to `7`, which `checkConfiguration` pins to the published scenario. Four test surfaces
+follow: `campaign/campaign.test.ts`, `campaign/stageOneParking.test.ts`,
+`campaign/reportWindow.test.ts` and `campaign/difficultyCurve.test.ts` — whose `OUTSTANDING` register
+would have to lose stage 1, and whose both-directions check is what would go red if it did not.
+`scenario/goalRates.test.ts` re-derives the table and would follow the regeneration. Nine other
+stages, eight other buildings and every published interval in `experiments` are untouched, which is
+the one cheap thing about it.
+
+#### Verdict, and what would change it
+
+> **Refused. The DC-1 case is refused on a measurement — the change buys DC-1 and spends DC-2 or
+> DC-2b to do it, and the number it buys is 92 %/82 % against a band of [1/3, 2/3]. The gameplay
+> case is refused for the campaign only, and it is the half worth revisiting.**
+
+The two are not the same refusal and must not be quoted as one. § 2.5's closed form is why the first
+is decisive: *something must go wrong, the easy move must not fix it, and a real move must* — and a
+change that satisfies the first third by breaking the second has moved the breach rather than closed
+it. § 3.3a Result 7 predicted exactly this shape for the fabric route (*"DC-1 still breached, and
+DC-2 newly breached as well"*); it arrives here through a different door and it is now measured on
+both, which is what makes it a property of the campaign's rules rather than of either route.
+
+**Four things would change the answer, and only the first two change it for stage 1.**
+
+1. **A second per-run goal kind that moves on this building.** Four of five are `50 | 50` in every
+   legal cell of every sweep anybody has run here. That is what makes the undo unpunishable, and it
+   is #270's own route 2. **This is the highest-value one**: it would reopen the demand and parking
+   axes as well, not just this one.
+2. **A stage whose `editable` list can hold δ while the undo still fails something.** Requires (1)
+   on this building; on another building it may already be true and nobody has measured it.
+3. **`PM-PARK`** — `docs/34` § 10 row 12, an idle state on `FrameCar` marked by both renderers. It
+   does not touch DC-1 at all, and it is the whole of what would make a wrong starting setting
+   *visible* rather than merely present. Until it lands, *"the player opens it and sees a building
+   doing something visibly wrong"* is not a claim the renderers can support for a parking fault.
+4. **A different stage.** Everything above is measured on `garden-apartments`, which is *designed*
+   to be easy and is two matrix cells, three golden digests and two fixit cases besides. The
+   structural dilemma is general; the numbers are not, and a stage on a building whose menu
+   separates would have to be re-measured rather than inferred from these.
+
+**What is landed by this section: nothing but the section.** No source file, no test and no `data/`
+file was touched, and the register in `campaign/difficultyCurve.test.ts` still carries stage 1 with
+§ 3.3c's reason — correctly, because this section did not fix it either. **C1's stage-1 quarter now
+has three axes measured shut** — demand (§ 3.3a), parking-from-`data/` (§ 3.3c) and the starting
+vector (here) — and one axis measured open and refused for its consequences (fabric, § 3.3a Result 7
+and #270).
+
 ---
 
 ## 4. The week — Today's tower and the daily loop
