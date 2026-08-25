@@ -709,3 +709,273 @@ seed, three rows, four named outcomes, an 80 % categorical bar rather than a sub
 > basis would be gone silently. `fixit/parse.ts` refuses it, with the reason attached.
 
 ---
+
+## 8. The three design choices this lane was asked to question
+
+### 8.1 *"`garden-apartments` is deliberately easy, and that is the cause of #208 rather than a constraint around it. Is it the bug?"*
+
+**Verdict: the instinct is right and the target is wrong. The easiness is not a bug. The slot is.**
+And the reason is stronger than *the building is fine and the position is not* — it is that **the
+building's own stated justification argues against putting it first.**
+
+**First, a correction to the framing.** The prompt says verification *"treated the easiness as a
+deliberate decision to be protected."* [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md)
+§ S does not: it concludes *"the building is correct; **putting it in the tutorial slot is what
+produces the empty first session**"*, calls the fix *"a slot decision, not a data one"*, and lists
+three candidates. § AA is the one that files #208 as *"arguing against a deliberate design decision"*
+and routes it to the product owner. **That is where the word *deliberate* starts doing work it cannot
+do**: a decision being deliberate is a fact about how it was taken, never an argument that it is
+right. `CLAUDE.md`'s own working agreement is the same shape — *a phase is done when its stated
+acceptance criteria pass, not when the code exists*.
+
+**Second, the argument the contract makes against itself.** Contract `c1`'s brief reads: *"Nothing
+here is hard — **it exists so the seven that follow have something to be different from**."* That is
+a **contrastive** justification, and contrast has a precondition: the player has to still be holding
+the first term when the second arrives. A day-one session in which nothing is observed leaves nothing
+to be different **from**. The building is a perfectly good baseline for a reader comparing eight
+contracts on a page, and a baseline nobody experienced is not a baseline a player can use. **The
+stated reason for the easiness is a reason to place it second, not first.**
+
+**Third, two measurements say the building cannot be rescued in place.** GitHub issue #270 swept
+every legal axis — demand, demand shape, dispatcher, horizon — and found the knee at **25 %pop/5 min,
+3.6× the declared max of 7**, with four of the five goal kinds constant across rates 3–30 % and
+horizons 450–3 600 s; the fabric route (one car instead of two) makes two of stage 1's three editable
+dials **inert**, breaks 78 tests in 32 files, and fails the correctness oracle's premise. § 9.3 below
+measures the other half: at the shipped day-one configuration the landings are **empty about 91 % of
+the time**, and on **16 of 20 seeds no moment exists at which anybody has been waiting sixty
+seconds.**
+
+**So the bug is `CONTRACTS[0]` and campaign stage 1, and `data/buildings/garden-apartments.json`
+should not be touched** — its own file says so in capitals, it is two of the eight matrix cells,
+three golden digests and two fix cases. #270's route 1 (a different tutorial building, authored to be
+failable, with Garden left alone) and § 8.3's sequence are the two live options, and both are the
+product owner's.
+
+**One thing that is not settled and should be, because a shipped file already crosses the line the
+argument rests on.** § S and `docs/33` `W1` both foreclose one route by saying that raising Garden's
+rate past the residential profile's declared `max: 7` would invent a CIBSE-unsupported rate. The
+fixit case **`gym-on-the-top-floor` runs `garden-apartments` at `arrivalRatePctPop5min: 9.5`**, and
+`three-cars-one-cars-work` runs it at exactly `7`. Nothing validates a run's rate against the
+profile's band — `traffic/generator.ts:757` treats `arrivalRatePctPop5min` as an override that
+*"overrides every profile"*, and `TRAFFIC_PARAMETERS` declares its range as `[0, 25]`. **This is
+reported as a finding rather than as an accusation**: a study override and a player-facing case are
+plausibly different things, and the rate band is guidance for the `demandLevel` selector rather than
+a schema bound. But the foreclosure is currently carried by a sentence in two documents and by
+nothing in the code, and one shipped case sits outside it. **A decision is owed on whether the band
+binds player-facing content, and if it does, `gym-on-the-top-floor` is out of compliance.**
+
+### 8.2 *"The game gives numbers before symptoms. Should the first day be watched before it is scored?"*
+
+**Verdict: agree, and the shipped defect is worse than the question implies — the day is graded
+before it is *run*, not merely before it is read.**
+
+`everyday/today.ts` draws *"How hard this looks: **Comfortable**. 60 people per working car today.
+Comfortable is around 400"* on the brief. That is not a report arriving too early; it is a **verdict
+about a run that has not happened**, and its yardstick is `COMFORTABLE_PER_CAR = 400`, which that
+module's own docstring records as a **citation to the design prototype rather than a measurement**.
+It fails `PM2` twice: a figure before the symptom, and a whole-day claim at `t = 0`.
+
+**The honest objection, and the line that answers it.** A player dropped onto an unexplained stage
+does not know what to look at, and orientation is a real need.
+[`28-art-direction.md`](28-art-direction.md) § 4.3 has already drawn the line that resolves this, and
+it is exactly the right one: **configuration may be drawn in full at `t = 0`; outcome may not be
+drawn before `t` reaches it.** *Six floors, a hundred and twenty residents, two lifts* is the
+building and is permitted. *Comfortable* is a claim about the day and is not. So the answer is not
+*show less before the run* — it is *show the building before the run and the day after it*, which
+loses no orientation at all.
+
+`PM-TT1` is this verdict in rule form. It also gives `charter S1` its instrument: the criterion is
+*a building in visible trouble within 90 s*, and a brief that says the building is comfortable is the
+product actively spending those ninety seconds on the opposite claim.
+
+### 8.3 *"Fix a building is the fourth tile and should arguably be the front door."*
+
+**Verdict: partly disagree. #217's evidence about the mode is right; the conclusion drawn from it —
+*make it the default entry point* — costs the mode the thing that makes it good.** A third option
+gets what #217 wants and does not move a tile.
+
+**What is right, and it is a lot.** Two prior playtests independently called its first case the best
+moment in the product. `docs/23` § 4.1 disagreement 5 adds a structural reason #217 does not make:
+Fix a building is **the only shipped mode whose fifth beat is reachable** — in two of the other three
+the verdict exists and the player cannot navigate to it. And § 1 of this document confirms it is the
+only mode that poses a problem at all.
+
+**What the conclusion misses.** Fix a building's problem is *what to spend*, and a spending decision
+is only a decision to somebody who knows what the options are. Its first screen offers four priced
+repairs in a vocabulary — a shaft, door dwell, where idle cars wait, a zone redrawn by population —
+that a first-time player has met **nowhere**, and by design offers no help telling them apart:
+*"Nothing labels itself. The repair list does not mark which option is the diagnosed one."* The
+handoff is right that the guess-the-fault quiz was a comprehension test in the wrong place; a priced
+four-way choice over unfamiliar nouns, thirty seconds after first load, is the same test wearing a
+price list.
+
+**And the mode's own difficulty specification says the first case is where it is weakest.**
+`docs/33` `DC-7` orders the catalogue by forgiveness, descending, and puts a **band-A** case first —
+one where *three* of the offered repairs clear both bars and *"the case cannot be lost by choosing the
+wrong repair."* That is correct pedagogy and it is an admission: the first case is deliberately the
+one where the choice matters least. **A front door built on the case where the mode is least itself
+is a strange front door.**
+
+**The third option, and it settles four issues at once.**
+
+> **`PM-DOOR` — The first-ever session is a *sequence*, not a tile: ninety seconds of the rush's
+> climbing stream, then straight into a fix case.** The player watches a building lose — no
+> vocabulary, no options, nothing to get wrong, the one thing in the product that satisfies
+> constraint 2 for free (§ 6). Then a tenant writes in about a building, and now the four priced
+> repairs are answers to a question the player has felt. The four-tile menu is untouched.
+>
+> | issue | what the sequence discharges |
+> |---|---|
+> | **#208** AC1, AC2 | a building visibly failing inside 90 s, legible on the stage before any report explains it — **without** making the tutorial building hard, which #270 measured as impossible |
+> | **#210** | a guided first turn that teaches by playing rather than by reading, ending in a change and a verdict |
+> | **#217** AC2 | Fix a building is the first thing the player actually *plays*, which is #217's substance |
+> | **#220** | the climbing stream gets built, so the tile stops advertising a session that refuses |
+
+**Two constraints it must satisfy, named rather than assumed.**
+
+- **`charter` non-goal 10 — no entry-screen override that survives a reload.** A stored *seen the
+  intro* flag is that override wearing `localStorage`, and [§ D335](../DECISIONS.md) and
+  [§ D338](../DECISIONS.md) are explicit that a reload lands on the Everyday main menu whichever
+  world the player was in. **The sequence must therefore be a cover over the menu rather than a
+  destination instead of it** — `menuPanel.ts#coverShell`'s existing shape — and its condition must be
+  **derived from state the player produced** (an empty week, no filed day) rather than stored as a
+  flag. It is skippable, and skipping breaks nothing later, which is #210's AC3.
+- **[§ D350](../DECISIONS.md) reserves the position question for the product owner.** `PM-DOOR` is
+  offered as an argued option and is **not** a decision. What it claims is narrower and is worth
+  separating: **whichever tile is first, the first ninety seconds should be a run rather than a
+  menu**, and that claim is `PM2` rather than a positioning preference.
+
+---
+
+## 9. Is parking the right first lesson? — the comprehension question
+
+The concurrent lane is measuring whether `idle.parkingStrategy` separates arms on
+`garden-apartments`. **That is a different question from this one and its answer does not settle
+this one.** A lesson can be statistically detectable and pedagogically unreachable, and § 9.3
+measures that it is.
+
+### 9.1 The case for parking, and it is strong
+
+Four reasons, and they are the best case any candidate first lesson has:
+
+1. **The product already believes it.** Three of eighteen fix cases are parking faults —
+   `sleeping-sky-lobby`, `three-cars-one-cars-work`, `gym-on-the-top-floor` — and a fourth,
+   `cars-that-always-go-home`, is the same family. `data/buildings/garden-apartments.json`'s own
+   `$comment` says *"parking policy dominates here: traffic is sparse enough that idle car position
+   matters more than assignment cleverness."*
+2. **It needs no vocabulary at all.** The complaint text does the whole job: *"We are six floors with
+   three lifts and I still watch all three sit downstairs together."* That sentence contains no
+   lift-engineering word and states the entire problem. Compare a weight vector, which cannot be
+   stated at all without teaching what a cost term is.
+3. **It is spatial, and the stage is spatial.** A parking fault is a fact about *where things are*,
+   which is the one thing a cutaway elevation is unambiguously good at.
+4. **The fix is free, and that is the product's best lesson arriving first.** Both garden cases end
+   on it: *"Nothing was bought: the cars were always enough, parked one letting out of date."* A
+   first lesson that teaches *the answer was not more steel* is worth more than a first lesson that
+   teaches a parameter.
+
+### 9.2 The case against, and it is about seeing rather than about statistics
+
+**A parking fault's symptom is an absence, and absences are the hardest thing on this list to draw.**
+
+- **The thing that is wrong is what the building does when nothing is happening.** A player watching
+  a busy stretch sees cars moving and doors cycling, which is the lift working. The fault is only
+  legible in the quiet, which is the least eventful part of the picture.
+- **It is a two-place symptom.** *Waits over a minute for a car up, while three cars stand together
+  below* asks the player to hold two floors in mind at once and connect them, and on
+  `vertical-city` the two places are three hundred metres apart on a 100-floor elevation.
+- **And the decisive one: § 3.2 records that a parked car is not drawable.** `grep` for `park` or
+  `idle` across `render/` and both stage screens returns nothing. An idle car is a stationary car
+  with `direction === 0` and near-zero load — **pixel-identical to any empty car that happens to be
+  stopped.** `PARK_CARS_LOBBY_LABEL` is a button whose press has no visual consequence of its own.
+  **The product's most-used fault family has no mark on the stage.**
+
+### 9.3 The measurement — what a player watching the tutorial building actually sees
+
+**This is not the parking-arms measurement and does not overlap it.** It asks a question no lane has
+asked: *at the shipped day-one configuration, how much of the run has anything at a landing to look
+at?*
+
+**Instrument.** `packages/core`'s own `runSimulation` over the shipped `garden-apartments`, dispatcher
+`collective`, `durationS: 3600` (the contract's own authored hour), **no rate override** — the
+residential profile's own `typical`. Waiting intervals are taken from the run's passenger records
+under `packages/viz/src/frame/overlay.ts#isWaitingAt`'s exact predicate — half-open
+`[arrivedAt, boardedAt)`, right-continuous, minus `refusedAt` — and occupancy is the **exact measure
+of the interval union by sweep**, not a sample. 20 consecutive seeds, `20260810`–`20260829`, 827 legs.
+**The harness was validated against the repository's own selectors**: at 4 001 instants per building
+its count matched both `overlayAt(...).waitingNow` and `sum(queueAt(...).riders)` with a maximum
+discrepancy of **0**.
+
+| fraction of the hour with … | min | median | max |
+|---|---|---|---|
+| **at least one person waiting anywhere in the building** | 5.4 % | **9.0 %** | 16.3 % |
+| at least three waiting | 0.6 % | 2.1 % | 6.5 % |
+| at least five waiting | 0.0 % | 0.2 % | 2.5 % |
+| **at least one person who has already waited 60 s** | 0.0 % | **0.0 %** | 0.4 % |
+| time-averaged number of people waiting | 0.117 | **0.166** | 0.395 |
+
+**Long-wait exposure is exactly zero on 16 of the 20 seeds.** Eight legs of 827 ever waited sixty
+seconds or more. Unboarded legs: **zero, on every run.**
+
+**Read the fourth row twice.** It is not that a thirty-second glance is likely to miss the bad
+moment. **On sixteen of twenty first loads there is no bad moment to miss** — no instant in the whole
+hour at which anybody in the building has been waiting a minute. The landings are empty about
+**91 %** of the time and hold one person for most of the rest.
+
+That corroborates § S from the other side. § S swept 100 seeds at the same configuration and found a
+worst wait of 60 s or less on **91 of 100**; this sweep says the same fact as a fraction of the clock
+rather than as a maximum, which is the form a question about *watching* needs.
+
+**Contrast, with its caveat stated.** The same instrument on `midtown-office` under `collective` at
+1 800 s and its own typical rate: at least one person waiting **91.3 %** of the run (median), at least
+five waiting **86.4 %**, somebody past sixty seconds **82.8 %**, time-averaged queue **148.6**. **That
+configuration is saturated on 20 of 20 seeds** — `awtIsValid === false`, verdict `diverging-queue` —
+so it is an **upper bound on what a busy building looks like and not a model of a healthy one.** It is
+quoted for the order of magnitude between the two buildings, which is roughly a factor of ten on
+occupancy and *unbounded* on long-wait exposure, and for nothing else.
+
+**Four caveats that bound every figure above.** Abandonment is **off** — no `sim.patience` was passed,
+so nobody leaves and every occupancy figure is an over-estimate. No credential refusals — neither
+building declares `accessZones`, so that term of the predicate is inert. `durationS: 3600` is a **2×
+override of the `rise-and-fall` template's authored 30 minutes** and refits the shape's geometry, so
+this is a sixty-minute rise-and-fall rather than thirty minutes of demand and an idle hour; it is the
+shipped contract's own `shiftLengthS` and therefore the right thing to measure, but it is not the
+template's own duration. And 20 seeds is a description of a distribution, not an interval — **no
+claim above compares two configurations, so none is offered.**
+
+### 9.4 Verdict
+
+> **Parking is the right first *lesson* and the wrong first *symptom*, and `garden-apartments` is the
+> wrong stage for either.**
+
+Split into the three claims that make it up:
+
+1. **As a lesson, parking is the best candidate in the product**, for § 9.1's four reasons, and
+   nothing in § 9.3 touches that. *Where a car waits when it is doing nothing decides who waits* is
+   statable in one sentence by somebody who has never thought about lifts, and it is true.
+2. **As a symptom it is currently undrawable**, and that is a fact about `FrameCar` rather than about
+   parking. This is the single highest-value entry in § 3.2's absent column, because it is the only
+   one that blocks a *lesson the product has already committed to in four of its eighteen cases*.
+3. **On this building the symptom does not exist to be drawn.** 91 % empty landings and no
+   sixty-second wait at all on sixteen of twenty seeds is not a rendering problem.
+
+**What follows, and it is buildable.** `PM3` says design the tableau rather than the incident, and a
+parking fault has a genuinely good tableau available — **cars stopped low, people standing high, both
+at once, both persistent.** Two of its three elements already draw. The third is one frame field:
+
+> **`PM-PARK` — `FrameCar` gains an idle state, and the renderers mark it.** The mark is a state at
+> `t`, so it is `docs/10` R6-clean by construction and needs no new figure. **Unverified**: whether
+> `Simulation` can publish *idle* into the frame without ambiguity — a car stopped with its doors
+> open at a landing is not idle, and a car repositioning under `repositionDecisionFor` is neither
+> idle nor in service. **The check that settles it is naming the field on the simulation's own car
+> state that already distinguishes them**, and if none exists this is a `core` change and should be
+> priced as one rather than assumed. `dispatch/lifecycle.ts#parkingCandidates` and
+> `#repositionDecisionFor` are where to look.
+
+**And the ordering that follows for the game.** The parking lesson lands on the first building where
+somebody is visibly standing while a car is visibly still — which the data says is
+`sleeping-sky-lobby` on `vertical-city` (eight shuttles at the street, sky-lobby queues) or
+`three-cars-one-cars-work` at 7 %pop/5 min, and is **not** `garden-apartments` on an ordinary day at
+its own typical rate.
+
+---
