@@ -46,6 +46,7 @@ import {
   stageBarModelOf,
   stageCarPaintOf,
   stageCarReadoutOf,
+  stageCarRestBarOf,
   stageCrowdCapOf,
   stageFilingLandsOn,
   stageGeometryOf,
@@ -64,6 +65,7 @@ import {
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
 } from './stageScreenModel.js';
+import { restBarWidthPx } from '../render/carRest.js';
 
 /* -------------------------------------------------------------------------- *
  * § 4.6 — the transport
@@ -1053,5 +1055,64 @@ describe('what the stage says the day is about to do', () => {
     expect(stageOpeningLineOf({ recording, simTimeS: 0, dayStartS: 8.5 * 3600 })).toContain(
       head.next ?? 'nothing',
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * AD-S17 — the rest bar's geometry
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The plan, not the paint** — `stageCarPaintOf`'s split, applied to the mark beside it.
+ *
+ * GitHub issue #212's lesson is why this is a function with a test rather than four numbers in the
+ * mount: the door-fill inversion was arithmetic nothing could check without a canvas and it shipped
+ * for a wave. A bar whose whole magnitude channel is its *length* is that shape of claim exactly —
+ * a sign error would put the longest mark on the car that has just stopped, and the picture would
+ * still look plausible.
+ */
+describe('stageCarRestBarOf — where the mark lands and how big it gets', () => {
+  it('centres on the car and never spills past its body', () => {
+    for (const fill of [0, 0.5, 1]) {
+      const bar = stageCarRestBarOf({ bodyWidth: 30, fill });
+      expect(bar.x + bar.width / 2, `fill ${String(fill)} is centred`).toBeCloseTo(15, 6);
+      expect(bar.x).toBeGreaterThanOrEqual(0);
+      expect(bar.x + bar.width).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it('sits above the roof, clear of the riders/capacity readout', () => {
+    /*
+     * Body coordinates, so `(0, 0)` is the car's top-left and a negative `y` is above it. The
+     * readout is drawn at `y − 1.5` with a bottom baseline, so an 8.5 px face occupies roughly
+     * `y − 10` to `y − 1.5`; the bar's underside is at `y − 10`. A mark that overlapped a live
+     * figure would make the figure the thing that got harder to read.
+     */
+    const bar = stageCarRestBarOf({ bodyWidth: 30, fill: 1 });
+    expect(bar.y).toBeLessThan(0);
+    expect(bar.y + bar.height).toBeLessThanOrEqual(-10);
+  });
+
+  it('is longer the longer the car has stood, on every car width the product draws', () => {
+    // 2.4 px is `vertical-city`'s narrowest car; 222 px is `garden-apartments` on a wide viewport.
+    for (const bodyWidth of [2.4, 8, 30, 222]) {
+      const shortest = stageCarRestBarOf({ bodyWidth, fill: 0 }).width;
+      const longest = stageCarRestBarOf({ bodyWidth, fill: 1 }).width;
+      expect(longest, `body ${String(bodyWidth)} px`).toBeGreaterThanOrEqual(shortest);
+      // And it is a bar rather than a speck even where the car is a hairline.
+      expect(shortest).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('takes its length from render/carRest.ts rather than deciding one here', () => {
+    /*
+     * The two stages must not disagree about what the mark *means*. The Engineer bar and this one
+     * are two paints of one rule, exactly as a rider capsule here and the Engineer mood card are
+     * two paints of one banding — so the length is asserted against the shared function rather than
+     * against a literal.
+     */
+    for (const fill of [0, 0.25, 1]) {
+      expect(stageCarRestBarOf({ bodyWidth: 44, fill }).width).toBe(restBarWidthPx(fill, 44));
+    }
   });
 });
