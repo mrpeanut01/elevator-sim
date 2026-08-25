@@ -144,6 +144,16 @@ const RAIL_WIDTH_PX = 212;
 const BAR_REASON_ID = 'everyday-bar-reason';
 
 /**
+ * Why § 3.3's menu row draws `⌂ Modes` inert — *"Inert only on the menu"*, in the guide's words,
+ * and this is what that means to somebody looking at it.
+ *
+ * Here rather than in `actionBar.ts` because the table transcribes the guide and the guide says
+ * only that the cell is inert. Why it is inert is a fact about standing on the screen the cell
+ * names, which is the shell's to know.
+ */
+const MENU_LEAVE_REASON = 'You are on the main menu — this is the screen it goes to.';
+
+/**
  * Above every overlay the Engineer surface raises.
  *
  * `dev/main.ts` mounts its menu, Fix-a-building and watch overlays as *siblings* of `div.shell` at
@@ -947,7 +957,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     leaveBtn.disabled = model.leave.inert;
     leaveBtn.style.cssText =
       BUTTON + (model.leave.inert ? `;color:${C.faint};cursor:default` : '');
-    if (!model.leave.inert) leaveBtn.addEventListener('click', requestLeave);
+    if (model.leave.inert) {
+      /*
+       * The one inert leave in § 3.3's table — the menu's own `⌂ Modes`, which cannot take you
+       * anywhere because you are on it. It shipped grey and silent; the sentence is the shell's
+       * rather than the table's because it is a fact about *being on* the row, not about the row.
+       */
+      leaveBtn.title = MENU_LEAVE_REASON;
+    } else leaveBtn.addEventListener('click', requestLeave);
     bar.append(leaveBtn);
 
     if (model.back !== undefined) {
@@ -977,9 +994,26 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
          */
         const live =
           !current && (reached || (index === model.timeline.step && nextStopIsLive(stop.screen)));
-        const step = el(doc, 'button', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`);
-        step.type = 'button';
-        step.disabled = !live;
+        /*
+         * **A stop you cannot go to is not a control, so it is not drawn as one.**
+         *
+         * Every stop used to be a `<button>` with `disabled = !live`, which put four dead buttons
+         * on the front door and five on All buildings — measured on the shipped build at
+         * 1280 × 720, nine of the fifteen disabled controls in the whole shell, none of them with
+         * a reason. Two things were wrong with that and only one of them is cosmetic. A disabled
+         * `<button>` is out of the tab order *and* announced as a button that cannot be pressed,
+         * so a screen-reader user was handed four broken controls where the sighted reader sees a
+         * breadcrumb. And a breadcrumb step is not refusing anything: *Brief* is not a button that
+         * will not work, it is the second stop of four, and there is no sentence that would make
+         * it a good dead control.
+         *
+         * So an unreachable stop is a `<span>`, the one you are on carries `aria-current="step"`,
+         * and only a stop that navigates is a button. This is the other half of GitHub issue
+         * #262's rule: a dead control says why, **or stops being a control**.
+         */
+        const step = live
+          ? el(doc, 'button', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`)
+          : el(doc, 'span', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`);
         step.style.cssText = [
           'border:0',
           'background:transparent',
@@ -988,10 +1022,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           `color:${current ? C.ink : live ? C.label : C.ruleMid}`,
           'cursor:' + (live ? 'pointer' : 'default'),
         ].join(';');
-        if (live) {
+        if (step instanceof HTMLButtonElement) {
+          step.type = 'button';
           step.addEventListener('click', () => {
             go(stop.screen);
           });
+        } else if (current) {
+          /* Where you are, said once and to everybody — the colour above says it to one reader. */
+          step.setAttribute('aria-current', 'step');
         }
         strip.append(step);
         if (index < stops.length - 1) {

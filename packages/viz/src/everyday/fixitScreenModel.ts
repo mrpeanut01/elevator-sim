@@ -80,6 +80,10 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   atBudget: 'at the budget',
   stepUp: 'buy one more step',
   stepDown: 'return one step',
+  /** Why *return one step* refuses — nothing has been bought on this row yet. */
+  nothingToReturn: 'Nothing bought on this row yet, so there is nothing to give back.',
+  /** Why *buy one more step* refuses — § 10.3's budget cap, said on the control. */
+  noBudgetLeft: 'The repair budget will not stretch to another step on this row.',
 } as const);
 
 /** One case rail row, worded. `towerLine` comes through {@link buildingLineOf}. */
