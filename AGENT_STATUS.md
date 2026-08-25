@@ -77,6 +77,25 @@ opt-ins behind `describe.skipIf` in `packages/experiments`, which GitHub issue #
 never run in CI. **The browser tier's six skips are gone**, and that is a different number entirely —
 they were a file that never ran, not an opt-in.
 
+**The corpus, measured once after integration — and the surfaces column was a correction, not a
+move.** Both tiers on the integrated tree, 2026-08-25, one sitting:
+
+| tier | cases | strings | simulations | surfaces | failing cases |
+|---|---|---|---|---|---|
+| always-on | 49 | **569 184** | 606 | **49** | **0** |
+| deep | 60 | **710 048** | 4 710 | **50** | **0** |
+
+Strings **+2 776** and **+3 954**; cases and simulations unmoved. The surfaces column read 48 and 49
+and is now 49 and 50 — **and it is 49 on `000852a`, the commit the old row described.** The two
+surface *sets* were probed at base and at head and diffed: **identical**. Wave B added no surface;
+the figure had been stale since M2-GATE and #207. Published as a correction, because a changed number
+beside *"surfaces unmoved"* reads as *this wave added one* and sends the next reader hunting.
+
+**The § D343 check was run and is clean.** `honesty/properties.ts` untouched, `STANDARD_SPACE` /
+`DEEP_SPACE` / `maxDurationS` / `stageProbability` / `OUTSTANDING` unmoved. The whole of `honesty/`
+in forty-five commits is one 18-line classification entry. A gate held at zero by moving the gate
+looks identical in the summary line; only the diff separates them.
+
 **Three product-owner calls were taken on 2026-08-24 and they set this wave's shape.** Merge and
 deploy #253 immediately, rather than stacking further on the branch. The longer day is **Everyday
 only** — campaign stage runs keep their length, so `data/scenario-goals.json` moves for the window
