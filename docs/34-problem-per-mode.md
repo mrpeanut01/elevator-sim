@@ -12,7 +12,7 @@
 four front-door modes, **what problem the player meets, how they see it before they are told a
 number, what they can change, and how they find out whether they were right.**
 
-It was also asked to question the design where questioning it makes the game better. § 7 does that
+It was also asked to question the design where questioning it makes the game better. § 8 does that
 against three named choices and disagrees with one of them.
 
 ### 0.2 Where it sits, and why it is a new file rather than a section of the GDD
@@ -50,7 +50,7 @@ Three arguments for a new file rather than a section inside `docs/32`:
 one thing the player changes; the form the verdict takes. The rules `PM1`–`PM7` those are built on.
 
 **Does not decide.** The mode hierarchy and the front door — held for the product owner by
-[§ D350](../DECISIONS.md), and § 7.3 argues a position without taking one. Whether Endless rush is
+[§ D350](../DECISIONS.md), and § 8.3 argues a position without taking one. Whether Endless rush is
 cut — [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 8 leaves it human. Any
 difficulty number: `docs/33` `DC-4`'s band is the bar and this document does not re-derive it. Any
 visual encoding: [`28-art-direction.md`](28-art-direction.md) § 5 owns the stage's pixels and this
@@ -65,7 +65,7 @@ the defect this repository records most often.
 |---|---|
 | **Read off the code** | file and symbol named. `fixit/engine.ts#classifyOutcome`, `render/riderQueue.ts#planQueueRow`, `live/interventions.ts` |
 | **Cited from a document** | backticked path and section |
-| **Measured here** | § 8.3 only, and it names its instrument |
+| **Measured here** | § 9.3 only, and it names its instrument |
 | **Unverified** | said in those words, every time. Nine such claims are collected in § 11 |
 
 ---
@@ -258,7 +258,7 @@ Every mode design below that needs one of these says so and prices it.
 
 | absent symptom | why | what it would take |
 |---|---|---|
-| **A parked car, distinguishable from a stopped one** | `grep` for `park`/`idle` across `render/` and both stage screens returns nothing. An idle car is a stationary car with `direction === 0` and near-zero load — **pixel-identical to any empty car that happens to be stopped**. `PARK_CARS_LOBBY_LABEL` exists as a button with **no visual consequence of its own** | A frame field. `FrameCar` carries no idle state; the renderer cannot invent one. See § 8, which is about this row |
+| **A parked car, distinguishable from a stopped one** | `grep` for `park`/`idle` across `render/` and both stage screens returns nothing. An idle car is a stationary car with `direction === 0` and near-zero load — **pixel-identical to any empty car that happens to be stopped**. `PARK_CARS_LOBBY_LABEL` exists as a button with **no visual consequence of its own** | A frame field. `FrameCar` carries no idle state; the renderer cannot invent one. See § 9, which is about this row |
 | **A car passing a floor where somebody is waiting** | `FrameCar` carries `carId, bankId, label, heightM, floorId, direction, doorFraction, doorPhase, occupants, loadFactor` — **no stop list, no assigned calls, no destination set.** `VizShaft.motions` makes a future stop *derivable* and nothing renders it | Either a frame field, or a renderer that reads `motions` ahead of the playhead — the second is `docs/28` § 4.4's *foreshadowing*, **refused**, because it reads the future. The honest form is a mark on the **landing** at the moment of the pass, drawn from the past |
 | **Doors closing on somebody / a boarding refused for lack of room** | No such event exists in the contract. `VizLeg` has `arrivedAt, boardedAt, alightedAt, carId, bankId, refusedAt, assignedCarId, credentialGroup`, and `refusedAt` is credential refusal, used only negatively — `isWaitingAt` returns `false` and the rider silently vanishes | A contract field on `VizLeg`, and therefore a `core` change. **This is the most expensive item in the table and the one a designer will reach for first** |
 | **A rider giving up and walking away** | The band named `abandoned` is an **age**, not an outcome — `live/bands.ts` says so outright. `isWaitingAt` removes a rider on `boardedAt` or `refusedAt` and on nothing else, so **the stage keeps drawing somebody the Day report has already counted under `TOOK THE STAIRS`** | An `abandonedAt` on `VizLeg`. *Unverified*: whether the underlying simulation removes the rider — [`CLAUDE.md`](../CLAUDE.md) says patience is simulated and riders do leave, so this is likely a viewer-contract gap rather than an engine one. **The check that settles it: run a building with `sim.patience.distribution` set, and assert `queueAt` at the horizon does not still hold a leg the report counts as abandoned.** Named as a finding in § 11 |
@@ -279,5 +279,140 @@ band), `AD-S9` (the alarm's threshold is building-relative or names itself), `AD
 strip's duration lane is *"the most under-weighted element on the screen"*). **This document requires
 none of them and depends on all four.** A mode whose symptom is a queue is a mode whose symptom is
 4.5 px wide until `AD-S7` and `AD-S8` land.
+
+---
+
+## 4. Today's tower — *one press, and you have to spend it well*
+
+### 4.1 The problem
+
+> **You are given one morning and one instruction. The building will have one bad stretch in it. You
+> have to notice which stretch, and say the right thing into it.**
+
+Today's tower is ~3 minutes, one day, one score, one retry, and its fifth beat is social
+(`docs/32` § 1.2). [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 4 gives it
+beats **1 and 5** and no beat 3 or 4, on the ground that *the day does not come back*.
+
+**That ground is out of date, and the mechanism that changes it already ships.** A run is the record
+`{ seed, config, interventions[] }`. `live/interventions.ts` is the Everyday intervention control:
+`PARK_CARS_LOBBY_LABEL` (*"Park the cars in the lobby"*), `switchDispatcherLabelOf(name)`
+(*"Switch to …"*), a `RECOMPUTING_BEAT`, and `interventionStampOf`, which answers **for a playhead** —
+a player who scrubs back past their own press sees the stamp disappear, because at that instant it
+has not happened yet. `everyday/stageScreenModel.ts:572` mounts it. `INTERVENTION_KINDS` in
+`packages/core/src/sim/types.ts` declares three arms: `park-cars-lobby`, `switch-dispatcher`,
+`answer-incident`.
+
+So Today's tower can have **beat 3 on the stage** and **beat 4 for free**, and neither needs a new
+engine capability:
+
+- **Beat 3** is the press. It is not steering — [`16-change-scope-contract.md`](16-change-scope-contract.md)
+  is unamended and there is still no such thing as a mid-day change. The player **writes one
+  instruction into the day and the day is run again with the instruction in it**, which is the honest
+  description and also the better one: *you cannot drive a building, you can only tell it something.*
+- **Beat 4** is what falls out. The pressed day and the unpressed day differ in `interventions[]` and
+  in nothing else — same seed, same building, same demand — so they are the same crowd by
+  construction. That is common random numbers arriving without anybody having to build a batch.
+
+### 4.2 The symptom, before any figure
+
+> **`PM-TT1` — The mode opens on the stage, not on the plate.** Day one currently grades the building
+> before the player has watched anything: *"How hard this looks: Comfortable. 60 people per working
+> car today. Comfortable is around 400."* The copy is real and exact — `everyday/today.ts` computes
+> 120 ÷ 2 = 60 against `COMFORTABLE_PER_CAR = 400` — and **the 400 is a citation to the design
+> prototype rather than a measurement**, which that module's own docstring says. A difficulty verdict
+> delivered before the run is `PM2` inverted twice over: a figure before the symptom, and a whole-day
+> claim at `t = 0`. The plate is not deleted; it moves to where the player meets it **after** the
+> morning, or is reworded as configuration (*two lifts, a hundred and twenty residents*), which
+> `docs/28` § 4.3 permits in full at `t = 0` because it is the building rather than the run.
+
+> **`PM-TT2` — The day must contain a legible bad stretch, and *legible* is a stronger claim than
+> `DC-4`.** `docs/33` `DC-4` requires a contract's day 1 to miss at least one of the day's four goals
+> on **a third to two thirds** of seeds. Necessary, and not sufficient: a day can miss *worst wait
+> inside 230 s* on one rider at minute 41 and be invisible for the other fifty-nine minutes. So:
+>
+> **The day must hold, for at least 120 contiguous simulated seconds, a landing with somebody in the
+> third wait band or worse.** The third band is `checking-watch` on the Casual ladder
+> (`live/bands.ts#WAIT_BANDS`) and `long` on the Engineer one, both keyed to
+> `metrics.longWaitThresholdS` — so this is the product's own 60 s and not a new number. **120 s is a
+> design choice offered to be attacked**, and § 9.3 measures the building where it fails hardest.
+
+> **`PM-TT3` — The stamp is the antecedent of the report's own sentence.** The Day report already
+> carries `interventionLogOf` (`shift/report.ts:633`) in the player's words and on the same clock the
+> stage stamp reads. `charter P3`'s refusal test — *where on the stage would a player have seen
+> this?* — is answered by construction for every sentence the report makes about the press, because
+> the stamp and the log are one producer. **That is the one place in the product where `P3` already
+> holds, and it is the model for everywhere else.**
+
+**What the player sees, in thirty seconds.** The clock runs; capsules appear at a landing and stay;
+their colour and — after `docs/28` `AD-S7` — their height step up a band; the landing's ground washes
+with the deepest band present (`AD-S8`); the race strip's lane climbs towards the dashed sixty-second
+line. Nothing is announced. **The player says *"nobody is coming for those people"* and reaches for
+the button.** Not one word of that sentence is a lift-engineering word, which is constraint 3 met by
+the picture rather than by the copy.
+
+### 4.3 What the player changes
+
+| when | control | what it writes | shipped? |
+|---|---|---|---|
+| **During** | *Park the cars in the lobby* | `RunInterventionConfig { atS, change: { kind: 'park-cars-lobby' } }` — every idle car treated as though the profile had authored `idle.parkingStrategy: 'lobby'` from that instant, carried through `RepositionContext` rather than a second policy | **Yes** — `everyday/stageScreenModel.ts`, `dispatch/lifecycle.ts#repositionDecisionFor` |
+| **During** | *Switch to …* | `{ kind: 'switch-dispatcher' }`, the profile inline. **Weights only**; no stage setting switches, and `SWITCH_PINS_NOTE` says so on the control before the press | **Yes** |
+| **Before** | The three group levers — `parking` → `idle.parkingStrategy: 'lobby'`, `express` → `'zone-center'` (outranks parking), `dwell` ∈ `snappy \| normal \| patient` → six door parameters | `authoring/dispatcherSpec.ts#GroupLevers` | **Yes** |
+| **Before** | The dispatcher | `SimulationConfig.dispatcherProfile` | **Yes** |
+
+**One press is specified and not built, and it is the one this mode most wants.**
+`park-cars-lobby` is the *wrong verb* for two of the three shipped parking faults:
+`sleeping-sky-lobby` and `gym-on-the-top-floor` are both cured by parking cars **away from** the
+lobby. The vocabulary needs its opposite.
+
+> **`PM-TT4` — `INTERVENTION_KINDS` gains a `spread-cars` arm**, writing
+> `idle.parkingStrategy: 'zone-center'`, labelled in the same register (*"Spread the cars through the
+> building"*). One union member and one branch in `repositionDecisionFor`, on the existing
+> `park-cars-lobby` precedent — *"it changes no weight, no constraint and no stage-1–6 setting; only
+> where a car with nothing to do waits moves."* The words already exist one level up:
+> `RULE_ACTION_WORDS` ships `hold-at-lobby`, `park-at-floor` and **`spread-out`**, all three writing
+> `idle.parkingStrategy` and all three in the player's own language. The intervention row has two of
+> those three verbs and is missing the useful one.
+
+### 4.4 How the player finds out whether they were right
+
+**The § D310 pattern, unmodified.** Two sheets — the day as it ran without the press and the day as
+it ran with it — paired **by figure id**, with no subtraction, no ordering, no colour and no sum, so
+a withheld mean pairs as `withheld → withheld` rather than as a hole. Under it, one sentence in the
+`ONE_RUN_PROMISE` shape naming what saying *better* would take: *50 or more paired runs against the
+same passengers and an interval that excludes zero.*
+
+Three clauses make that honest rather than merely cautious:
+
+1. **The crowd identity is asserted, not assumed.** The two runs differ only in `interventions[]`, so
+   their legs must agree on `(passengerId, arrivedAt, originFloorId, destinationFloorId)` and may
+   differ only on `boardedAt`, `alightedAt` and `carId`. **A required test, not a remark** — it is
+   `fixit/run.ts`'s *"everything the passenger trace is a function of comes off the case and is
+   identical between the two"* asserted rather than argued, and it is what would catch a future
+   intervention arm that reached demand.
+2. **No verdict word.** *Fixed*, *better*, *improved*, *worse* are all refused. What the mode may say
+   is what the fixit engine says about a **named** quantity — *the queue at Level 4 cleared* — or the
+   strip's nothing-at-all. `docs/32` `GD2` binds the social half: *a board publishes what happened on
+   a day; it never publishes which dispatcher is better.*
+3. **The unpressed day is the run that was on screen at the press**, captured then rather than looked
+   up afterwards — § D310's own rule, for its own reason: the latest filed sheet is not always a
+   sheet of the latest run.
+
+### 4.5 The one thing this mode needs and does not have
+
+**A rival lane on the Casual stage.** `live/raceStrip.ts` draws two lanes; the Casual stage draws
+one, and says why out loud (`STAGE_NO_GHOST`): *"a ghost is a second run of the same crowd, and this
+screen cannot ask for one yet."* `dev/ghostRun.ts#ghostPlanOf` — the module that builds a rival by
+swapping exactly one field of the primary's config — **is inside the Engineer shell's closure**, and
+the stage may not reach through the façade to it.
+
+> **`PM-TT5` — `EverydayHost` gains a provided ghost port**, in the shape [§ D338](../DECISIONS.md)
+> used for the Engineer swap: `everyday/swap.ts` hands a capability *into* the shell rather than
+> letting the shell import across the boundary — precisely because `boot.ts` already imports
+> `dev/main.ts`, and closing that cycle is what produced this directory's last module-init
+> `undefined`. `STAGE_NO_GHOST` is deleted **only** on the commit that lands the port, per `PM7` and
+> per its own note that it is a *control's* refusal rather than a register entry.
+
+This is the change with the best ratio of play value to cost in this document: it takes Today's
+tower's fourth beat from *stated* to *drawn*, and the drawing is two SVG polylines that already exist.
 
 ---
