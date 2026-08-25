@@ -25008,14 +25008,26 @@ over spliced source, including a read reachable only by following two calls and 
 it, and named the file. An audit instrument failing loudly inside another audit instrument is
 `deadCode.test-helper.ts`'s divergence 3 doing exactly what it was written for.
 
-**The flake the #254 lane saw once and could not reproduce in six runs reproduced here**, under
-three overlapping `vitest run --project server` processes: 11, 2 and 6 failures across three runs of
-the same green tree, all in `store.test.ts`. Every fixture in that file builds a whole in-process
-PostgreSQL and none closed one, so a full run left roughly forty-five outstanding. They are now
-closed by `onTestFinished` rather than by a trailing call in the test body, because a failing
-assertion skips a trailing call and leaks the instance — which is the state that makes the next
-failure more likely. **This is recorded as mitigation, not as a diagnosis**: the failures are load
-correlated and the leak is the only accumulating resource found, which is a hypothesis with
-evidence rather than a root cause.
+**The flake the #254 lane saw once and could not reproduce in six runs reproduced here, and it is
+not what that lane suspected.** Reproduced deliberately by running three `vitest run --project
+server` processes at once: 11, 12 and 6 failures across three runs of the same green tree, every one
+of them in `store.test.ts`, and every one of them `Test timed out in 5000ms`.
+
+**Not a race, not an ordering problem, and not the un-closed PGlite instances the report named.**
+Those were real — every fixture in that file builds a whole in-process PostgreSQL and none closed
+one, so a full run left roughly forty-five outstanding — and they are now closed with
+`onTestFinished` rather than a trailing call, because a failing assertion skips a trailing call.
+**The timeouts survived that commit**, which is what says the leak was a second finding rather than
+the cause.
+
+The cause is that `vitest.config.ts` passes `SIMULATING_TIMEOUT_MS` to the `viz` project and nothing
+to `server`, so vitest's 5 000 ms default applies to a fixture that compiles and starts
+PostgreSQL-in-WebAssembly. That is issue #144's argument exactly, one package over: *"a test that
+runs a real simulation does not fit in it under load"*, and booting a database does not either. The
+file sets its own `vi.setConfig({ testTimeout: 300_000 })` with the measurement attached, because
+this lane's allowed paths do not include the root config. **The right home is the `server` project
+entry beside `viz`'s and it is owed** — `core` is in the same position and that file's own comment
+already says so, *"filed rather than done, so the next person meets a decision instead of a
+divergence"*.
 
 ---

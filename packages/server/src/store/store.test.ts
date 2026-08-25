@@ -16,7 +16,7 @@
  * which is a way of testing the double.
  */
 
-import { describe, expect, it, onTestFinished } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { issuedChallengeFor } from '../challenge/schedule.js';
 import { challengeScoreOf, type SeedResult } from '../challenge/submission.js';
@@ -24,6 +24,29 @@ import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js'
 import { PgliteSql } from './pglite.test-helper.js';
 import { RacingSql } from './racingSql.test-helper.js';
 import { NoSuchUserError, SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
+
+/**
+ * **Every test in this file boots a whole PostgreSQL, and vitest's default gives it five seconds.**
+ *
+ * The `server` project passes no `testTimeout`, so `vitest.config.ts`'s 5 000 ms default applies —
+ * the same ceiling issue #144 measured as a false red for `viz` and replaced there with 300 000 ms.
+ * Nothing about that argument is specific to simulating: `PgliteSql` compiles and starts
+ * PostgreSQL-in-WebAssembly per fixture, which fits inside five seconds on an idle machine and does
+ * not fit under load.
+ *
+ * **This is the flake the #254 lane saw once and could not reproduce in six runs.** Reproduced here
+ * by running three `vitest run --project server` processes at once: 11, 12 and 6 failures across
+ * three runs of the same green tree, every one of them `Test timed out in 5000ms`, every one of
+ * them in this file. It is not a race, not an ordering problem and not the un-closed instances the
+ * report suspected — those are closed one commit earlier and the timeouts survived it.
+ *
+ * Set for the file rather than annotated per test, because the annotation is a list and the list is
+ * the defect — `vitest.config.ts`'s own note on issue #144 makes that argument at length. **The
+ * right home is the `server` project entry in that file**, next to `viz`'s, and that is out of this
+ * lane's allowed paths; it is owed, and § D361 names it. `core` is in the same position and its
+ * config comment already says so.
+ */
+vi.setConfig({ testTimeout: 300_000, hookTimeout: 300_000 });
 
 const RUN: SubmittedRun = Object.freeze({
   buildingId: 'garden-apartments',
