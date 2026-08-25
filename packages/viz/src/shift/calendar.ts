@@ -770,8 +770,9 @@ export interface CalendarPatch {
  *
  * - after `grownBuilding`, because a period scales *today's* building rather than the shipped one;
  * - after `shiftRunPatch`, because {@link CalendarPatchInput.split} is the mix the run actually has
- *   once the day's event has spoken, and because the cars that event took are what
- *   {@link CalendarPatchInput.spokenForCarIds} steps over;
+ *   once the day's event has spoken. The cars that event took are stepped over rather than
+ *   re-derived from the patch: {@link CalendarPatchInput.event} goes in and this function asks
+ *   `events.ts#eventCarChoice` itself, so the order is a fact about the mix alone;
  * - **before** `withIncidents`, because the incident schedule is written onto the building this
  *   returns — so one `parseBuilding`/`resolveBuilding` covers both edits, and the existing
  *   *"nothing happened today"* identity check (`withEvents === grown`) still holds untouched, since
