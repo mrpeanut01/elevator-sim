@@ -24592,3 +24592,326 @@ one. A chip face nothing sweeps can lie indefinitely. Adding it was outside the 
 real fix for the class; until then this is a label pinned by one test rather than by the search.
 
 ---
+
+---
+
+## D355 — the campaign is judged on seeds the player could not tune against, and its window is the shift's
+
+**Date: 2026-08-24 · Owner: product owner (the split), orchestrator (the window) · Lane: FIX-CAMPAIGN-INTEGRITY · Closes: #255 and O7**
+
+**Decision.** Two halves, landed with **one** regeneration because #255's own advice was to sequence them rather than regenerate twice.
+
+**The window.** `campaign/stageRun.ts`'s two producers and `scenario/measure.ts` take `reportWindow` from
+**the same `shiftReportWindowFor` the shift path uses** — one source, not a second copy. The five-minute
+band was the wrong instrument, exactly as it was on the shift path before `e6a1a3d`.
+
+**The seed split.** A stage clears only when every goal is met on the tuning batch **and** on a second
+batch over `stage.holdoutSeeds`, judged against that seed set's own published counts. This is
+[`CLAUDE.md`](CLAUDE.md)'s *hold out traffic seeds* discipline, which the campaign layer had never
+enforced — so *tune until the judged seeds clear* was the dominant strategy and invisible to all nine
+of `docs/33`'s curve rules.
+
+**The seed is checked, not named.** `judgeStage` refuses a second batch whose master seed is not the
+holdout set's, printing both — so handing it the tuning batch twice cannot pass for a validation.
+
+**`judgeStage.result` stays the tuning batch, and every goal row's sentence still comes from it.**
+Feedback a player cannot see is not feedback. The holdout half decides `cleared` and nothing else.
+
+### The exploit is closed by measurement, not by argument
+
+`docs/33` § 2.4's one witness — stage 2's authored vector, found by sweeping `loadFactor` on the tuning
+seeds — reads `cleared=true` under the old rule. Played through both batches it reads `cleared=false`,
+**judged rather than refused**: every holdout bar reproduces, and it loses on `long-waits-under`
+(41 of 50 against a bar of 45) and on `beat-the-baseline`.
+
+### Three of seventy records moved, and the split moved none of them
+
+All three are stage 1 and all three are the **window**. `scenario/measure.ts` already ran both seed
+sets, so what the split changed is *which half is load-bearing*, not what is in the table.
+
+| goal | before | after |
+|---|---|---|
+| `answer-the-demand` | 38/50, 48/50 · `variable` | **50/50, 50/50** · configuration fact |
+| `deliver-everyone` | 1 and 2 **unmeasured** · `unjudgeable` | **50/50, 50/50** · configuration fact |
+| `long-waits-under` | 1 and 2 **unmeasured** · `unjudgeable` | **50/50, 50/50** · configuration fact |
+
+**One refused replication in fifty makes a whole rate `unjudgeable`**, which is how a five-minute band
+took two goals off a stage. And `answer-the-demand` is the one to read twice: over a five-minute band
+on a building with ~12 arrivals in the whole run, `personsPer5Min >= offeredPer5Min` was measuring
+**where the band fell**, not how the building was dispatched. 38/50 was noise with a denominator.
+
+### Two consequences, both recorded rather than absorbed
+
+**Stage 1 now has no failable goal.** `campaign/parse.ts` refuses a stage declaring a goal outside its
+measured bucket (R12), so the constant had to leave `data/campaign.json` — one element, no discretion.
+Stage 1 joins 8, 9 and 10 as a `docs/33` DC-1 breach. That is a defect the fix **revealed**, and giving
+the first stage a player meets something they can fail is content work for #234.
+
+**Five of six apparent stage-5 clearers were a fit to fifty passenger populations.** Re-swept over both
+batches: six of thirteen profiles meet every bar on the tuning seeds; **one clears** on the holdout.
+`eta` — the profile `docs/33` § 3.1 names — loses `deliver-everyone`, `no-divergence` and
+`answer-the-demand`. The DC-2 breach stands; only its name changed.
+
+### The issue's headline evidence is corrected
+
+#255 says *"seed 20260730 — the stage's own seed — is one of the two"*. True of a run **the campaign
+never makes**: `20260730` is a *master* seed and the batch runs `replicationSeed(20260730, i)`.
+Measured on the population the product actually runs, the tuning batch suppresses **1 of 50** and the
+holdout **2 of 50**, and **replication 0 — the run the fail-state report names — is not suppressed.**
+The defect is real; the headline instance is not one of its instances.
+
+---
+
+## D356 — the Everyday day is the whole day the record declares, and three of four goals did not move
+
+**Date: 2026-08-24 · Owner: product owner · Lane: FIX-DAY-LENGTH · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § AB**
+
+**Decision.** The Everyday daily loop runs the whole authored day where the building has one.
+**Campaign stage runs keep their length** — the owner's ruling was *Everyday day only* — so
+`data/scenario-goals.json` moves for [§ D355](#d355) and for nothing here.
+
+**`DEFAULT_SHIFT_LENGTH_S` does not move**, and it did not: it is still `1800` at `dev/state.ts:138`,
+verified by diff. It is *"the horizon every number in `docs/05-roadmap.md` was measured over"*, and a
+contract already declares its own length, so the day lengthens per contract and template while every
+figure measured over the default stays exactly where it is.
+
+**Nothing is offered to anybody, which is why this is not [§ D286](#d286) undone.** § D286 removed a
+*control* — `SHIFT_LENGTHS`' four narrative options and Free Play's five numeric ones, both writing one
+field. There is no option list here and no length a player picks. The length is the period the record
+declares, travelling as a **window** (`windowStartS: 0`, `windowEndS: periodS`) so the schedule is not
+rescaled, which was issue #81 and § D286's actual grievance. *"A part's length is the period it names"*
+is § D286's own sentence, honoured rather than routed around.
+
+**Which building may run which day is derived, not listed.** A day offers itself when some phase of it,
+at the day's own peak intensity, declares exactly the mix that building's traffic profile is designed
+around. `office-day`'s morning hold is `85/5/10`, which **is** both office profiles' `directionalSplit`
+→ five office towers admitted. `residential`, `hotel` and `hospital` match no phase and are excluded
+**structurally rather than by three skipped ids** — and that exclusion is load-bearing, because phase
+splits override the profile, so an office day on Garden Apartments would send 85 % of a residential
+tower **up** from the lobby at 09:00.
+
+### Three of four goals did not move, and the queue bar is the one to notice
+
+| goal | moved? | why |
+|---|---|---|
+| `carry` | no | a share is horizon-blind; measured identical on all four cells |
+| `minute` | no | a share. It gets *easier* over a day (Midtown 18 % → 55 %) — lulls serve instantly. **Not compensated**: nobody asked to make the day harder |
+| `queue` | **no — the assumption was refuted** | medians 216→229, 32→31, 25→**16**, 4→7. No direction, let alone a factor. Scaling it because *"both are maxima"* would have loosened a real test on no evidence |
+| `worst-wait` | **× 2**, floor 300 s | measured 1.84–2.07 across four buildings |
+
+**Why the worst-wait bar moved rather than standing.** Held at 230 s, Secure Tower day 1 goes
+**4 of 10 → 9 of 10 seeds missing something** on a run nobody made worse — outside `docs/33` DC-4's
+one-third-to-two-thirds band. That is a *silent difficulty change in the harder direction, chosen by
+nobody*. § D345 forbids a **tier** moving a bar; changing what a day asks of everybody is `docs/33`
+§ 4.4 W4's different thing.
+
+**Why the factor is `2` and not 1.95.** Four buildings give 1.84–2.07. A third decimal would claim
+precision four buildings do not support. It is a **step keyed on *is this a whole day***, not on
+seconds — a 7 200 s `constant-iso` is a longer *slice* and truncates its tail exactly as a short one
+does. Two points were measured; a curve through two points is a curve nobody measured.
+
+### Two claims in § AB are refuted by measurement
+
+**Cost is ×10, not ×20.** Measured ×10.3–10.7 on three buildings. A day is 20× the wall clock and not
+20× the demand: three peaks over a 0.25 inter-peak level.
+
+**`office-day` was not merely unreachable — it was unrunnable as the state was shaped.** `core` refuses
+a `templateOverrides.durationS` refit on a phase-list record **by name** ([§ D285](#d285)), and
+`shiftRunConfigOf` writes `durationS` exactly when `windowStartS` is `null`, so a day named without a
+window **throws**. Found by running it.
+
+### The cost, and the row to worry about
+
+| building | slice | whole day | legs |
+|---|---|---|---|
+| Garden Apartments | 18 legs · 32 ms | 190 · 38 ms | ×10.6 |
+| Midtown Office | 682 · 298 ms · 2.8 MB | 7 308 · 3 506 ms · 32.1 MB | ×10.7 |
+| Vertical City | 3 172 · 1 692 ms · 10.2 MB | 32 724 · **9 200 ms** · **145.5 MB** | ×10.3 |
+
+**145.5 MB is 2.5× the 57.3 MB `dev/shiftRunner.ts` measured `structuredClone` taking 1.6–2.3 s over**,
+and that clone sits between the worker and the frame that draws. **No measurement here was taken in a
+browser.** Recorded as a risk rather than resolved.
+
+---
+
+## D357 — a host is reconciled by one call at a time, and the nested draw wins
+
+**Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-259 · Closes: #259**
+
+**Decision.** `dev/dom.ts#reconcile` guards re-entrancy on the host: a nested call records its children
+and returns, and the call holding the host adopts them and writes again, bounded at eight passes.
+
+**The hazard is re-entrancy, not the live list.** `Array.from(host.childNodes)` guards a `childNodes`
+that mutates under the loop, and that guard is correct and is not this. Removing a node that holds
+focus blurs it **synchronously**; the blur reaches `renderMenu` and calls `reconcile` on the same host
+from inside `reconcile`'s own removal loop. Measured with a depth counter rather than inferred:
+`depth=1 host=menu-list` **never reaches its insert pass**, so `renderMenu` unwinds at line 482 and its
+`asModal`, `coverShell` and `restoreFocus` never run.
+
+**The obvious fix is wrong, and that is the entry's point.** A parentage check
+(`existing.parentNode === host`) stops the throw in one line. It leaves the outer loop running, so its
+insert pass **re-imposes the children computed before the menu closed** — the stale frame wins, and
+`renderMenu` hands `asModal`/`restoreFocus` a `controls` array from a screen that is no longer up.
+Today's throw accidentally leaves the *current* frame standing. **The cheap fix trades a loud,
+accidentally-right outcome for a quiet, wrong one**, and no test would have caught it. Pinned in
+`dom.test.ts`: `['row-closed']` under the guard, `['row-b','row-c']` under the parentage check.
+
+**Deferring was rejected on what it costs the tier**, not on the timer invariant — `viz/dev` is not
+`core/`. Every browser assertion that reads the DOM straight after an action becomes a race against a
+queue, and the fix for that is waits, which is how a tier starts being flaky.
+
+**The issue's reproduction was wrong and is corrected.** #259 named the click path; driving it produces
+**zero** page errors, because `mousedown` blurs the field *before* the redraw. The failing case is
+`starts it on Enter in the field, without a pointer at all`.
+
+**Why it survived: the tier does not fail on an unhandled page error.** Two full tier runs emitted this
+throw and reported 26 files and 154 tests passing. Filed as #268 with the measurement that makes it
+tractable — 15 pages across 15 files, one `newPage` each, three already hand-rolling a collector — and
+the caveat that must travel with it: `boot.browser.test.ts:217-232` records watching a **dead product
+stay green** under exactly that assertion.
+
+---
+
+## D358 — an account can be deleted, and a raced write against a deleted one is a domain error
+
+**Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-254, reviewed by REVIEW-254 · Closes: #254**
+
+**Decision.** One authenticated `DELETE /api/me` removes the caller's own account and lets the schema's
+cascade take the children. Erasure spans the two stores as **two independent requests**, per
+`docs/26` §§ 3.3 and 5.3 — the client holds both keys at the moment of deletion and the server never has
+to.
+
+**The authorization rule is that there is nothing to compare.** The id comes off the session; the route
+reads no path segment, query parameter or body field. That is stronger than checking a supplied id
+against the session's — a comparison can be forgotten on a later branch; an argument that does not exist
+cannot be. An independent reviewer attacked it with body `userId`/`id`/`user_id`/`userID`/`user.id`/
+`email`, prototype poisoning, query parameters, a victim's token in `?token=`, path suffixes,
+`X-HTTP-Method-Override`, and expired, logged-out, link-token and one-character-flipped sessions, over a
+real socket. **None reached another account.**
+
+**The cascade set is derived, not listed.** A test queries `pg_constraint` in the live database after
+the schema applies and asserts `confdeltype = 'c'` on every foreign key to `users`. Its bounds are
+stated rather than implied: it covers **direct** foreign keys only — a grandchild without its own
+cascade makes `DELETE FROM users` fail outright, and a table identifying a person with no foreign key
+is not reached at all. Four is the right set today, confirmed by reading the whole schema.
+
+**A raced write is a domain error, and the mapping asks the right question.** `recordEntry` and
+`recordChallengeEntry` read then write with no transaction, so a `POST /api/scores` racing a deletion
+leaked a raw Postgres foreign-key message past the store's own `no such user` guard — **the guard is the
+TOCTOU**. Both now raise `NoSuchUserError` from the pre-check *and* the constraint path, answered **401**:
+nothing failed on the server, the caller stopped existing, and it is the answer the next request gets
+anyway. The mapping **asks the database whether the owner went away** rather than reading a generated
+constraint name, because `challenge_entries` references two tables and only one is the account — without
+that discriminator a missing *challenge* is reported as a missing *account*.
+
+**No transactions were added.** A transaction-less `Store` is a design question rather than a lane's
+call, and it is filed as #266 with the general form: **adding a delete path makes every read-then-write
+in the tree newly reachable.** This class predates the route; only its trigger is new.
+
+**The sign-in mail carried a false erasure claim.** It said *"Nothing has been set up in your name that
+this link expiring does not undo."* `requestLink` writes the `users` row **before** it mails anything
+([§ D241](#d241)), and the link expiring sweeps `login_tokens` and touches `users` not at all — so a
+stranger whose address someone typed was told nothing had happened while their address sat in `users`
+with no horizon and no erasure path. It is the reassurance-shaped version of the gap #254 filed.
+
+**The rate limiters are deliberately not cleared**, and the reviewer endorsed the trade after driving it
+(the eleventh ask after deletion returns `429`, `retryInMs: 900000`). Clearing on delete would make
+`DELETE /api/me` a way to reset the budget whose job is bounding how much mail an address can be made to
+receive, and a session costs exactly one mail. The **per-caller** limiter is untouched for a different
+reason: its key is an IP, which was never the account's to erase.
+
+**AC3 is met on its second limb, and the route is reachable from no screen.** The absence is stated on
+the surface that offers the account — the sign-in mail — because per § D241 asking for a link is what
+creates it. `DELETE /api/me`'s only client is its own test, and that is said plainly rather than
+implied. The Settings-screen half is owed and named in `docs/26` § 11.
+
+**A published command was left alone rather than narrowed.** `docs/26` § 0 fact 1's grep stopped
+reproducing its published result because this branch added the word *telemetry* to prose. The command
+stands as published and is re-measured beside it: **narrowing a command until it gives its old answer is
+the defect that table exists to prevent.**
+
+---
+
+## D359 — one expression answers which horizon a run is, and both shells read it
+
+**Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-HORIZON**
+
+**Decision.** `shift/dayLength.ts#runHorizonOf(trafficProfiles, building, run)` is the one derivation of
+*which of the two kinds of run this state is*, and `everyday/host.ts`, `dev/leftRail.ts` and
+`dev/main.ts#closeShift` all read it.
+
+**The defect this closes was created by [§ D356](#d356) and caught before it shipped.** `goalsForDay`
+grew a horizon parameter and **one of its four callers passed it**, so after a whole-day run the
+Everyday rail graded against a 460 s worst-wait ceiling and the Engineer rail graded the same run
+against 230 s. `everyday/host.ts` had written the warning before the fact — *"a second copy of this
+lookup is how a ten-hour run comes to be graded against a thirty-minute ceiling"* — which is why the
+repair is one shared expression rather than a third copy. [`CLAUDE.md`](CLAUDE.md) forbids the shorter
+route anyway: `dev/main.ts` may not import the Everyday shell.
+
+**`honesty/surfaces.ts`'s bare call is correct and was not changed**, proven three ways rather than
+assumed: `STANDARD_SPACE` bounds a case at `maxDurationS: 900` and `DEEP_SPACE` at `1800`; `planFor`
+writes `windowStartS: null`, and a whole day is only expressible as `windowStartS: 0` with the record's
+own period because `core` refuses a `durationS` refit on a phase-list record ([§ D285](#d285)); and
+`honesty/run.ts` names no `demandTemplate` at all. Passing `'whole-day'` there would have the honesty
+tier publish a 460 s ceiling over a 900 s run — **the tier manufacturing the disagreement it exists to
+find.**
+
+**The finding underneath is worth more than the fix, and it is not *"the corpus should sweep both
+horizons"*.** A horizon axis would not have caught this: all nine `PROPERTY_CHECKS` are predicates over
+**one case's rendered strings**, and each surface was internally honest either way. **The corpus has no
+property that gives two surfaces one state and asks whether they agree** — filed as #269. § D334's
+`suppressed-mean` finding was the same shape, so the class is recurring rather than isolated.
+
+**One red was left standing rather than papered over, and the classification entry is the repair.**
+`runHorizonOf` reads to `derive.test-helper.ts` as a text producer, because the union tag `'whole-day'`
+is two adjacent alphabetic words. Three ways to make it green were refused and are recorded so nobody
+re-derives them: spelling the tag `'wholeDay'`, hiding the declaration behind a bare `export { … }` so
+the deriver reads it as unexported, and widening `goalsForDay` to take a boolean. **The first two make
+an honesty instrument miss something on purpose; the third distorts a type to satisfy a scanner.** It is
+the id/key case `NOT_PLAYER_FACING` already records four times, and `shiftReportWindowFor` one entry
+above it is the near-twin: chooses a window, authors nothing.
+
+---
+
+## D360 — the Campaign tab runs both batches, and the sequence is not in the panel
+
+**Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-O8 · Closes: O8**
+
+**Decision.** `campaign/stageSequence.ts#runStageToVerdict` runs the tuning batch, judges it, and — only
+when `metOnTuningSeeds` is `true` — runs the holdout batch and judges again with both halves. The panel
+calls it with a worker; the suites call it with `runBatch`.
+
+**It closes a regression [§ D355](#d355) merged knowingly.** The judge began requiring two batches while
+`dev/campaignPanel.ts` ran one, so every stage reported as unvalidated. That was an honest refusal and a
+**raised** bar — no stage that cleared before was refused on anything but merit — and the alternative
+was leaving the product certifying overfitting. It should not ship, and does not.
+
+**The sequence is not written in the panel, and the reason is testability rather than taste.**
+`boundaries.test.ts` confines the DOM to `dev/` and there is no jsdom, so nothing in `campaignPanel.ts`
+can be driven under Node and the tests this lane required would have been untestable there. **The
+extraction was already earned**: three copies of *run the tuning batch, then the holdout only if it met
+every bar* existed — `campaign.test.ts#playToVerdict`, `judge.test.ts`'s inline sweep, and none in the
+panel. `campaign/judge.ts` is untouched; nothing was relaxed to make a stage clear.
+
+**The skip is free and is asserted by what was asked for.** `cleared` needs both halves, so a stage that
+missed a bar is refused whatever the holdout says — a refused stage costs one batch instead of two.
+It is pinned by **the ledger of seed sets the runner was asked for**, never by reading `verdict.holdout`:
+a sequence that ran the holdout and discarded it would produce an identical verdict.
+
+**The two batches are distinguished on screen, and the second is announced as a condition.** *"If every
+goal is met here, a second batch of 100 follows on holdout-20260731, because a stage is cleared on seeds
+it was not tuned against"* — a condition rather than a promise, because most runs never reach it. The
+holdout block carries *"it decides whether the stage is cleared and it changes no figure above it"*, and
+**the holdout half is drawn whether it held or not**: showing only refusals would publish the
+unflattering half and hide the other. A skipped holdout renders as `figure-absent` naming the set and
+the reason; `holdout === null` is never drawn as *held*.
+
+**`StageHoldoutVerdict`'s sentences are player-facing and the search has never read one.** `run.ts`
+builds only the tuning batch, so `holdout.sentence`, its goal sentences and notes, and `headlineFor`'s
+**cleared** branch are unreachable in both tiers. The two edits are specified in the lane's report, with
+the two traps named: the holdout sentence must be `role: 'observation'` and not `role: 'goal'` — it
+carries *all N goals*, which is goals-against-goals and would re-create [§ D186](#d186)'s
+`goal-without-rate` false positive — and its `declaredCount` must come from the **holdout** batch, never
+from `context.batch`. Owed, and named rather than counted as coverage.
+
+---
