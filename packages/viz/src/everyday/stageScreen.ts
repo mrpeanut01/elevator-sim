@@ -345,8 +345,8 @@ function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput): void {
        * `ink`, so a bar in it would read as part of the car rather than as a mark about it, and an
        * alarm colour would make the stage assert that standing still is *wrong* — which is the
        * player's conclusion to reach and not the renderer's to draw. `inkSoft` on the well's
-       * `paper` is the same family one rung down, measured at **7.86:1** in
-       * `stageScreenModel.test.ts`, and it is the only ink in this cutaway that no other mark uses.
+       * `paper` is the same family one rung down, measured at **8.36:1** in
+       * `render/carRest.test.ts`, and it is the only ink in this cutaway that no other mark uses.
        */
       const rest = restByCar.get(car.carId);
       if (rest !== undefined) {

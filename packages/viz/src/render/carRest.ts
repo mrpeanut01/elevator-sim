@@ -71,7 +71,7 @@ function rampEnds(): { readonly onsetS: number; readonly fullS: number } {
   const calmest = WAIT_BANDS[0];
   const worst = WAIT_BANDS[WAIT_BANDS.length - 1];
   if (calmest?.toS === undefined || worst === undefined) {
-    throw new Error('live/bands.ts no longer opens with a bounded band and close with an open one');
+    throw new Error('live/bands.ts no longer opens with a bounded band and closes with an open one');
   }
   return { onsetS: calmest.toS, fullS: worst.fromS };
 }
