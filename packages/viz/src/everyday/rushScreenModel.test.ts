@@ -184,15 +184,49 @@ describe('§ 20.5’s hold line', () => {
 });
 
 describe('what the screen refuses, and where the refusal sits', () => {
-  it('marks the § 3.3 primary inert and leaves every other cell the table’s', () => {
+  /**
+   * **This case used to hold the defect in place** — GitHub issue #262.
+   *
+   * It asserted `refined.note === base.note` and `refined.primary.label === base.primary.label`,
+   * which is to say: it required the refinement to leave the reason off the control's own row. The
+   * screen drew the sentence 905 px down a 720 px viewport instead, and this case was green about
+   * it. So the three cells it now pins are the three the fix moves.
+   */
+  it('marks the § 3.3 primary inert and puts the reason on its own row', () => {
     const base = actionBarFor({ screen: 'rush', ctx: 'rush' });
     const refined = rushBarModel(base);
     expect(refined.primary.inert).toBe(true);
-    expect(refined.primary.label).toBe(base.primary.label);
-    expect(refined.note).toBe(base.note);
+    // The bar carries the reason, which is the one element § 3.1 pins above a fold.
+    expect(refined.note).toBe(RUSH_PRIMARY_REFUSAL);
+    // And the control says it too, which is all a screen module can reach of the AX tree.
+    expect(refined.primary.label).toBe(RUSH_SCREEN_COPY.primaryInertLabel);
+    expect(refined.primary.label).toMatch(/not built/);
     expect(refined.leave).toEqual(base.leave);
     // § 3.3: *a rush has no timeline at all*. The row carries none, and the refinement adds none.
     expect(refined.timeline).toBeUndefined();
+  });
+
+  /**
+   * The substitution is a **refinement**, not an edit to § 3.3's table.
+   *
+   * `ACTION_BAR_ROWS` still ships *Nothing to set up. It ends when it ends.* and *Start the rush*,
+   * and a lane that fixed #262 by rewriting the guide's own row would have changed what the table
+   * transcribes rather than what this state draws. Asserted from the resolved row rather than from
+   * a restated string, so a reworded § 3.3 cell moves this case with it.
+   */
+  it('leaves § 3.3’s own cells alone and substitutes over them', () => {
+    const base = actionBarFor({ screen: 'rush', ctx: 'rush' });
+    expect(base.note).toContain('Nothing to set up');
+    expect(base.primary.label).toBe('Start the rush');
+    expect(base.primary.inert).toBeUndefined();
+
+    const refined = rushBarModel(base);
+    /*
+     * The half of #262 that is not about geometry: *Nothing to set up. It ends when it ends.* is
+     * true of a rush, and beside a button nobody can press it reads as confirmation.
+     */
+    expect(refined.note).not.toBe(base.note);
+    expect(refined.primary.variants).toEqual(base.primary.variants);
   });
 
   it('names each absence rather than the feeling of one, and puts the reason on the control', () => {
