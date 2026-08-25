@@ -117,11 +117,28 @@ export class OutboxMailer implements Mailer {
  *
  * It is corrected rather than softened, and the correction names the state of the product rather
  * than a mechanism: `DELETE /api/me` now exists (issue #254), and **no shipped screen calls it**.
- * `packages/viz/src/menu/client.ts` reaches `GET /api/me` and `POST /api/me/display-name` and
- * nothing else. So the mail states the absence, which is the honest half of that acceptance
- * criterion, and **the day a screen offers deletion this sentence is wrong again** — a stated
- * absence has to be un-stated by whoever removes it, or it becomes the stale refusal `CLAUDE.md`
- * calls the more dangerous half.
+ * `packages/viz/src/menu/client.ts` reaches `GET /api/me` and `POST /api/me/display-name` and **no
+ * third route on `/api/me`** — it reaches a dozen routes in total, and an earlier draft of this
+ * sentence said *"and nothing else"*, which was a claim about the whole client rather than about
+ * the one path it is actually about. So the mail states the absence, which is the honest half of
+ * that acceptance criterion, and **the day a screen offers deletion this sentence is wrong again**
+ * — a stated absence has to be un-stated by whoever removes it, or it becomes the stale refusal
+ * `CLAUDE.md` calls the more dangerous half.
+ *
+ * **That obligation is now a run rather than this paragraph**, which is the same rule pointed at
+ * itself: `mailer.test.ts` asserts the sentence is in the body *and* that no shipped viz source
+ * reaches `/api/me` with a `DELETE`, so wiring the control turns this file red and hands the next
+ * lane the sentence it owes. Before that test, deleting these three lines left the suite green.
+ *
+ * ## What the address is actually for, which the first correction also got slightly wrong
+ *
+ * The draft said the row was *"used to send this mail and for nothing else"*. The address is more
+ * than the mail's destination: it is the **login identity** ({@link Store.userByEmail}), it travels
+ * inside the signed sign-in token so a link cannot be replayed against a different address
+ * (`accounts/credentials.ts`), it is returned by `GET /api/me` to its own owner, and it keys
+ * § D242's per-address mail budget. Every one of those is in service of signing in, so the true
+ * sentence is *"used to sign you in"* — narrower than the product's whole use of it would be if it
+ * had one, and wider than the single send the draft claimed.
  */
 export function signInMessage(to: string, link: string, validForMinutes: number): Message {
   return Object.freeze({
@@ -139,7 +156,7 @@ export function signInMessage(to: string, link: string, validForMinutes: number)
       'and nobody can use it but the person reading it.',
       '',
       'One thing ignoring it does not undo: asking for a link is what creates the account, so this',
-      'address is stored here from now on — one row, used to send this mail and for nothing else.',
+      'address is stored here from now on — one row, used to sign you in and for nothing else.',
       'Deleting that account is something the server can do and no screen offers yet.',
     ].join('\n'),
   });
