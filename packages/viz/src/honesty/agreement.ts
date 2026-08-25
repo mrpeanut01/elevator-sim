@@ -105,10 +105,15 @@ import type { HonestyViolation, RenderedText } from './types.js';
  * *Cost* section for why that is the design and not a shortcut.
  */
 export interface AgreementView {
-  /** `day1/period`, `day4/whole-day`. Stable, so a violation names a state a reader can rebuild. */
+  /**
+   * `day1/period`, `day4/whole-day`. Stable, so a violation names a state a reader can rebuild.
+   *
+   * The id is the whole of what a view declares about itself, deliberately: a prose `what` field
+   * sat here for one revision with no consumer but a test, which is the one-field-one-consumer rule
+   * `docs/10` § 1 states and the shape this repository counts. The two halves — which day, which
+   * horizon — are what a reader needs and are both in the id.
+   */
   readonly id: string;
-  /** What makes this state worth driving, in a sentence a violation can print. */
-  readonly what: string;
   readonly state: ViewerState;
   readonly resources: BrowserResources;
 }
@@ -256,16 +261,10 @@ export function agreementViews(
       buildingId,
       week: { ...base.week, day: dayNumber },
     };
-    views.push({
-      id: `day${String(dayNumber)}/period`,
-      what: `day ${String(dayNumber)} run as a slice of ${buildingId}'s demand`,
-      state,
-      resources,
-    });
+    views.push({ id: `day${String(dayNumber)}/period`, state, resources });
     if (day === undefined) continue;
     views.push({
       id: `day${String(dayNumber)}/whole-day`,
-      what: `day ${String(dayNumber)} run as the whole authored day (${day.templateId})`,
       state: { ...state, ...wholeDayRun(day) },
       resources,
     });
