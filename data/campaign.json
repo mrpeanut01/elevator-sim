@@ -7,9 +7,9 @@
       "name": "One shaft, low demand",
       "teaches": "a call, a car, a wait",
       "brief": [
-        "Garden Apartments is a small building with a gentle trickle of demand.",
-        "Watch a call appear at a landing, a car answer it, and the wait end \u2014 those three things are what every dispatcher in this simulator is made of.",
-        "Nothing here is hard. The stage exists so that the next six have something to be different from."
+        "Garden Apartments is a small building with a gentle trickle of demand. Watch a call appear at a landing, a car answer it, and the wait end \u2014 those three things are what every dispatcher in this simulator is made of.",
+        "There is so little traffic here that most of the wait is decided before anyone presses a button: between calls the two cars simply sit wherever the last passenger left them, which is rarely where the next one is standing.",
+        "You can tell them where to wait instead, and the ground floor is only the first guess \u2014 try a few and let the fifty runs say which one this building actually wants."
       ],
       "building": "garden-apartments",
       "traffic": {
@@ -23,7 +23,10 @@
           "ids": [
             "weights.waitTime",
             "weights.distanceTravelled",
-            "constraints.noDirectionReversal"
+            "constraints.noDirectionReversal",
+            "idle.parkingStrategy",
+            "idle.repositionThresholdS",
+            "idle.repositionEnergyWeight"
           ]
         }
       },
