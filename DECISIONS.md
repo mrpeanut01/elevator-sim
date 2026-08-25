@@ -24431,3 +24431,164 @@ file's own comment at `:60` predicted it would be.
 **notation, not truth**. *"the three cases run, but their Everyday screen is not built yet"* carries
 no section number, no filename and no identifier, so it passes the gate while being false. The two
 defect classes are disjoint and nothing in this repository reads the second.
+
+---
+
+## D351 — the Fix-a-building count is bound to `data/`, and a refusal carries no number
+
+**Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-217 · Closes: #217 AC3, AC4**
+
+**Decision.** Two rules, both narrow, both about where a number is allowed to live.
+
+**A count stated in prose is derived from the artefact that holds it.** `everyday/modes.ts` said
+*"eighteen"* at `:44` and *"three"* at `:129` about the same set of cases, and both sentences had been
+sitting there for waves. `modes.test.ts` now reads `data/fixit-cases.json`, maps the length to the
+word the docstring spells it in, and fails if the two part company. Eighteen was already right; *three*
+was a fossil of `docs/18`'s *"Three cases ship"*. **Nothing in the repository read either sentence**,
+which is why the file could contradict itself in two places at once.
+
+**A refusal string carries no count.** The stale sentence was *"the three cases run, but their
+Everyday screen is not built yet"*, and the corrected one is *"the cases run, …"* — matching its three
+siblings. A number inside a refusal is a second copy of a figure, and it sits in the one place no
+runtime assertion can reach: a branch that does not evaluate. `modes.test.ts` extracts the literals
+from the `unlessBuilt(` call sites themselves, so a fifth tile is covered without anyone remembering.
+
+**The call stays, and that is the load-bearing half.** Hard-coding `unavailable: undefined` would have
+satisfied AC3's wording — *"removed"* — and taken the derivation with it. `unlessBuilt` is the thing
+that fails on the commit `fixit` leaves the registry. The staleness was removed; the check was not.
+
+**Consequence.** [§ D350](#d350)'s correction to AC3's framing is now in the code as well as in the
+decision: the docstring says outright that no player ever read the string, and says why that makes it
+the milder half of § D227's class rather than the harmless one. A refusal a player can read tells them
+not to touch a thing that works; this one only misled a reader of the file — and it misled one into
+believing a shipped screen did not exist.
+
+---
+
+## D352 — the 1280 px viewport rule was true when written, and the correction says so
+
+**Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-256 · Closes: #256**
+
+**Decision.** `render/canvas.ts`'s claim that a selector is *"`wide-only` (dropped below 1280 px)"* is
+corrected to state what actually governs that selector's visibility, and `packages/viz/UX.md`'s
+`RS-02` loses the same boundary. **No replacement width is named**, because inventing one would be
+this defect with new wording.
+
+**The finding is the provenance, not the falsity.** Git pins it: `6073a2b` carried
+`@media (max-width: 1279px) { .wide-only { display: none } }` and three controls wearing the class;
+the docstring was written at `5e9e0d8` on 2026-07-28 and was **accurate**; `22a1021` on 2026-07-30
+deleted the rule and the class together in the wave-10 handoff rebuild. Nothing went red, so the prose
+outlived its mechanism by a month across four sites. **A stated mechanism does not have to be wrong
+when written to become the defect [`CLAUDE.md`](CLAUDE.md) names** — it only has to outlive the thing
+it describes, and nothing was watching.
+
+**The conclusion survives on a stronger support, and the docstring says which.** The docstring reasoned
+*from* the viewport rule *to* a shipped design decision — *a fact with one optional surface is a fact
+that is usually not shown, so it is drawn on the landing itself*. Two of its three supports are
+untouched: `docs/10` § 796 gates the landing selector to Advanced, and the contract lists a locked-out
+call among facts Basic may never hide. Selection-gating is **strictly stronger** than the rule it
+replaces — `wide-only` hid the control on narrow screens only, while a default of `none` hides the
+*fact* on every screen until the reader already guesses the floor. The conclusion is better founded
+now than when it was written, and that is stated rather than left for a reader to re-derive.
+
+**And the issue's own evidence was wrong in both directions, which is recorded because it will be
+copied.** #256 listed the breakpoints as 190, 640, 660, 720, 760, 1000, 1040, 1179, 1339, 1340. That is
+a grep of `max-width: ` and it **includes six element content widths that are not viewport rules** and
+**omits two real breakpoints, 767 and 899**. The actual set is **720, 767, 899, 1179, 1339** plus
+`dev/surfaces.ts#DRAWER_BREAKPOINT_PX = 1340`. `render/viewportClaims.test.ts` derives it from the
+stylesheet and asserts it both ways.
+
+**Two sites are registered rather than repaired**, and deliberately: `describeFrame.ts:45` and
+`describeFrame.test.ts:225` were outside the lane's allowed files, so they sit in `KNOWN_STALE` with a
+ghost check that goes red for whoever fixes them. `UX.md`'s `RS-01` inherits the same withdrawn
+boundary and is **not** registered, because its band and `RS-02`'s overlap and the two rows have to be
+settled together. Filed as [#260](https://github.com/mrpeanut01/elevator-sim/issues/260).
+
+---
+
+## D353 — the tier's `port: 0` mechanism, measured; and a derived check instead of a fifth note
+
+**Date: 2026-08-24 · Owner: orchestrator · Lane: TIER-PORT · Raised by: the wave-B baseline run**
+
+**Decision.** `boot.browser.test.ts` takes an explicit port with `strictPort: false`, like its
+twenty-five siblings — and the rule is moved out of prose into `dev/browserTier.test.ts`, which derives
+from the files themselves that **every tier file names a port, none says `port: 0`, and no two name the
+same one.**
+
+**The mechanism is measured, and the three notes that state it are all wrong the same way.**
+`compareLab`, `noteContrast` and `stageHeight` each say the inline port loses to `vite.config.ts`'s
+pinned `5174`. Resolving that exact config and reading it back reports `server.port = 0` and
+`strictPort = true`: **the inline port wins, and what is inherited is `strictPort`.** Vite then maps
+`port: 0` onto its own built-in default — **5173**, not the config's 5174 — and `strictPort: true`
+turns a busy 5173 into a throw rather than a step to the next free port. So the failure was never
+*"served somewhere else than we read"*; it is *"refused to serve at all"*.
+
+That correction is not cosmetic. A reader who believes the config's port wins concludes that pinning a
+different port here changes nothing, and leaves `port: 0` where it is — which is precisely what three
+readers did.
+
+**Why a derived check rather than a fourth repair.** The tier had met this trap three times. Each time
+one file was fixed and a note was written explaining it, and **each note cited `boot.browser.test.ts` by
+name** — the one file nobody repaired. The pattern converged everywhere except at the site it was
+learned from, because notes are not read and checks are run.
+
+**The third clause found a defect nobody had reported.** Eleven files across five collisions — `5191`,
+`5196`, `5198`, `5203`, and **`5201` shared by four files**. `strictPort: false` lets the losers move,
+so this never failed loudly; it failed quietly, and the fallbacks step onto `5202` and `5203`, which
+two more files declare. All five are resolved.
+
+**The defect presented as a skip, and that is the part worth carrying.** A suite that dies in
+`beforeAll` reports its cases **skipped**, not failed. Six cases had never run on this tier while it
+read as 25-of-26 passing with *"6 skipped"* — and a skip count is the number readers are trained to
+treat as benign. Recorded as [`RISKS.md`](RISKS.md) **R40**, which is R7's failure without anyone having
+to misreport anything.
+
+**Measured, before and after, one host, same command:** 25 files passed / 1 failed / 148 tests /
+6 skipped / 90.9 s → **26 / 0 / 154 / 0 / 70.4 s**. Both clauses of the guard were mutation-tested.
+[#263](https://github.com/mrpeanut01/elevator-sim/issues/263) stays open: the tier still does not fail
+on an unhandled page error, which is the same disease.
+
+---
+
+## D354 — the stage speed ladder is honest, and the default is a decision rather than a constant
+
+**Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-257 · Closes: #257 · Unblocks: #258**
+
+**Decision.** `STAGE_SPEEDS` gains a true 1:1 rung and every label is made equal to its multiplier.
+The ladder is `1× · 4× · 8× · 30× · 90× · 240× · 600×`, and **the default opening speed is 30**, stated
+as a decision.
+
+**Every one of the five old labels was false**, and there was no charitable reading to lose: read as
+absolute, all five were wrong; read as *relative to the `1×` rung*, `½×` ran at 0.27, `4×` at 3, `12×`
+at 8 and `30×` at 20 — only the datum survived, trivially. **No rung was removed** — all five old
+multipliers still ship under their true names, and two are added.
+
+**A sixth speed row was hiding in the fallback.** `stageSpeedAt` carried `{ label: '1×',
+simPerRealS: 30 }` as an unreachable default, read by no test and carrying the same lie. Typing the
+ladder as a non-empty tuple removed the need for it.
+
+**The default is 30 on three grounds.** It cannot be the honest `1×` — `rise-and-fall` is thirty real
+minutes at 1:1 and `office-day` is ten real hours, and [§ 4.6](docs/10-experience-layer-contract.md)'s
+rule that a day must never vanish in three seconds has a mirror. It is the **fastest rung inside
+[§ D344](#d344)'s `S ≤ 39` bound**, so the discrete-cue tier is what a player meets rather than
+something they go looking for. And it moves no picture: 30 is what this build has always opened at, so
+no screenshot or art-direction row needs re-measuring. `DEFAULT_STAGE_SPEED_INDEX` is a `findIndex`
+over the declared multiplier, so a rung inserted below the default cannot silently move it — #257's own
+defect class one level up.
+
+**Four rungs now sit inside `S ≤ 39` where there were two, and neither of those two was 1:1**, which is
+what unblocks [#258](https://github.com/mrpeanut01/elevator-sim/issues/258).
+
+**`docs/28` § 6's four motion rules were re-checked and all four stand**, three with a corrected rung
+name. **AD-M2's weak point is stated rather than papered over**: at the new `1×`, 200 ms of ease is
+0.2 simulated seconds and the lag argument is not forbidding. It survives on two grounds that were never
+about speed — a CSS transition is declared once and cannot ask the transport which rung is selected, so
+it must be legal at `600×` or nowhere; and the intervention-stamp argument holds at 1:1 exactly as at
+600×. The document names what would reopen it — a per-rung transition policy — and refuses it.
+
+**Why this survived nine waves of search, and it is the durable finding.** `STAGE_SPEEDS` is **not in
+the honesty corpus**: `honesty/surfaces.ts` drives fifteen other `stageScreenModel` exports and not this
+one. A chip face nothing sweeps can lie indefinitely. Adding it was outside the lane's scope and is the
+real fix for the class; until then this is a label pinned by one test rather than by the search.
+
+---

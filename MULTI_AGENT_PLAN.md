@@ -58,7 +58,8 @@ Two halves, both load-bearing, and they are the tie-breakers for every disagreem
    interface and **not** for numbers.
 6. [`DECISIONS.md`](DECISIONS.md) — **334 `## D<n>` headings carrying 332 distinct numbers**, D1–D341
    with the nine documented gaps (D44, D55, D78–D84) confirmed and no undocumented ones. Next free
-   number: **D342**. Allocated at integration, never inside a sub-agent.
+   number: **D355**. Allocated at integration, never inside a sub-agent — D342 adopted the charter,
+   D343–D350 ran the programme to the M2 gate, and D351–D354 are wave B's.
    Two headings share a number: `D125` is a preface plus its entry, which is deliberate, and **`D63`
    is a genuine collision** — two distinct decisions at `DECISIONS.md` lines 1888 and 1904, so a
    `§ D63` citation is ambiguous. `validation/citations.test.ts` asserts a `§ Dnnn` resolves to a
