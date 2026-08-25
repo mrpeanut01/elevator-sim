@@ -67,7 +67,7 @@ import {
   provenanceLineOf,
   shareLinkOf,
 } from '../dev/main.js';
-import type { ViewerState } from '../dev/state.js';
+import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import {
   CALENDAR_PERIODS,
   periodOnDays,
@@ -771,6 +771,131 @@ describe('a calendar period that names no event still changes the run — issue 
     const issues = runIdentityIssues(on(whole('moving-week')), RESOURCES, 'ranked');
     expect(issues.map((issue) => issue.message).join(' | ')).toContain(
       'the day schedules “Move-in day”',
+    );
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The goods car is claimed only where one was reserved — GitHub issue #264
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The refusal and the caption describe the same day, and are required to agree.**
+ *
+ * `askClause`'s `goodsCars` arm prints *"reserves at least one car out of passenger service"*, and
+ * the docstring it was written under argued that *at least one* is true of every case a shipped
+ * building can produce: `reserveCars` never empties a bank, `data/buildings/` declares at least two
+ * cars in every bank, and `calendar.test.ts` asserts that **from disk** so a one-car bank landing
+ * tomorrow turns the assertion red rather than the paragraph stale.
+ *
+ * The assertion is a true statement about the wrong population. **`data/buildings/` is not the set
+ * of banks a run can have**: `commissioning/choices.ts#shaftChoices` offers `max(1, current − 1)`
+ * upward, so the fabric screen takes Garden Apartments' two-car bank down to **one** under any
+ * constraint that admits `shafts`, and `shiftRunConfigOf` commissions the building before the
+ * calendar ever sees it. On that fabric `moving-week` asks for a goods car, gets none, and says so
+ * in `withheld` — *"asked to reserve 1 car(s) for the day and could reserve 0"* — while
+ * `calendarLine` correctly omits the clause and this refusal went on claiming it. Two sentences
+ * about one day, contradicting each other, on the surface whose own docstring says it *"must never
+ * accuse somebody of something they did not do"*.
+ *
+ * So the shape here is an **agreement** rather than a table of expected strings, for
+ * `calendar.test.ts`'s reason at the layer above: the caption is built from the patch, the refusal
+ * is built from the asks, and a hand-written expectation would agree with whichever of the two it
+ * was copied from. This one asks the shipped run plan what it did.
+ */
+describe('the goods-car refusal names a reservation that happened — issue #264', () => {
+  /** Garden Apartments' main bank at `shafts`, `moving-week` over the whole week, on `day`. */
+  function gardenWith(shafts: number, day: number): ViewerState {
+    const authored = RESOURCES.entries.find((entry) => entry.config.id === 'garden-apartments')?.config;
+    if (authored === undefined) throw new Error('garden-apartments is not loaded');
+    const classes = commissionableClasses(RESOURCES.elevatorSpecs);
+    const asBuilt = asBuiltChoices(authored, classes);
+    const main = asBuilt[0];
+    if (main === undefined) throw new Error('garden-apartments declares no bank');
+    return {
+      ...baseState(),
+      buildingId: 'garden-apartments',
+      shiftLengthS: 1800,
+      week: { ...baseState().week, day, dayIdx: day - 1 },
+      calendar: periodOnDays(CALENDAR_PERIODS['moving-week'], 1, 7),
+      commissioning: withBankChoice(asBuilt, { ...main, shafts }),
+    };
+  }
+
+  const GOODS_CLAUSE = 'reserves at least one car out of passenger service';
+
+  it('is silent on a fabric that leaves no car free, and the run plan is the witness', () => {
+    /*
+     * One shaft is a fabric a player reaches from the commissioning screen — `shaftChoices(2)`
+     * offers it — and it is the fabric on which the period's own `move-in` derate and its goods car
+     * are asking the same two-car bank for the same one free car. The run plan is the ground truth
+     * rather than a second reading of the calendar: `shiftRunConfigOf` is what the simulator is
+     * handed, and its `withheld` is the product saying, in its own words, that it reserved none.
+     */
+    const state = gardenWith(1, 1);
+    const plan = shiftRunConfigOf(RESOURCES, state);
+    expect(plan.building.banks.map((bank) => bank.cars.length)).toEqual([1]);
+    expect(plan.outOfServiceCarIds, 'the fixture reserved a car — it measures nothing').toEqual([]);
+    expect(plan.withheld.join(' | ')).toContain('could reserve 0');
+    // The caption built from the patch already omits it. The refusal is what disagreed.
+    expect(plan.calendarLine).not.toContain('reserved');
+
+    const calendar = runIdentityIssues(state, RESOURCES, 'ranked').find(
+      (issue) => issue.key === 'viewer.calendar',
+    );
+    expect(calendar?.message ?? '').not.toContain(GOODS_CLAUSE);
+  });
+
+  it('agrees with the caption on every fabric and day the shaft control offers', () => {
+    /*
+     * The matrix reaches both verdicts on the axis — `shaftChoices(2)` is `1 … 6`, and Sunday is
+     * the period's own override at `goodsCars: 0` — so an implementation that answered *always* or
+     * *never* fails here rather than passing half of it.
+     */
+    const verdicts: boolean[] = [];
+    for (const shafts of [1, 2, 3]) {
+      for (const day of [1, 6, 7]) {
+        const state = gardenWith(shafts, day);
+        const plan = shiftRunConfigOf(RESOURCES, state);
+        const message =
+          runIdentityIssues(state, RESOURCES, 'ranked').find((issue) => issue.key === 'viewer.calendar')
+            ?.message ?? '';
+        const claimed = message.includes(GOODS_CLAUSE);
+        expect(claimed, `${String(shafts)} shafts, day ${String(day)}`).toBe(
+          plan.calendarLine.includes('reserved'),
+        );
+        verdicts.push(claimed);
+      }
+    }
+    expect(verdicts, 'no cell claimed a goods car — the matrix measures one verdict').toContain(true);
+    expect(verdicts, 'every cell claimed a goods car — the matrix measures one verdict').toContain(
+      false,
+    );
+  });
+
+  it('claims nothing on a building this build does not ship, and names that instead', () => {
+    /*
+     * The one state whose fabric cannot be resolved, and the branch `reservationDecision` answers
+     * with an empty reservation. Silence is the honest answer rather than a conservative one: there
+     * is no run for the clause to be about — `shiftRunConfigOf` throws on this state — and the
+     * refusal a player gets is the building's own, by name.
+     *
+     * Pinned rather than argued, because a branch nothing drives is a branch that can be quietly
+     * changed into a claim.
+     */
+    const state: ViewerState = {
+      ...baseState(),
+      buildingId: 'a-tower-this-build-does-not-ship',
+      calendar: periodOnDays(CALENDAR_PERIODS['moving-week'], 1, 7),
+    };
+    const issues = runIdentityIssues(state, RESOURCES, 'ranked');
+    expect(issues.map((issue) => issue.key)).toContain('viewer.buildingId');
+    expect(
+      issues.find((issue) => issue.key === 'viewer.calendar')?.message ?? '',
+    ).not.toContain(GOODS_CLAUSE);
+    // And the period is still refused on what it did move, so nothing has been let through.
+    expect(issues.find((issue) => issue.key === 'viewer.calendar')?.message ?? '').toContain(
+      'pulls the mix',
     );
   });
 });

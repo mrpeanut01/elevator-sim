@@ -48,6 +48,9 @@ import { fileURLToPath } from 'node:url';
 import { parseBuilding, resolveBuilding, type BuildingConfig, type DemandTemplateId } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
+import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
+import { commissionedBuilding } from '../commissioning/building.js';
+import { commissionableClasses } from '../commissioning/types.js';
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
@@ -737,11 +740,42 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
   const RISE = 'rise-and-fall' as DemandTemplateId;
   const TWO_WAY = 'lunch-two-way' as DemandTemplateId;
 
+  /**
+   * The authored building, or the one a player commissioned to `shafts` — through the shipped
+   * `commissionedBuilding` rather than by editing a bank here.
+   *
+   * The point of the second arm is that it is **not** a fixture: `commissioning/choices.ts
+   * #shaftChoices` offers `max(1, current − 1)` and `dev/state.ts#shiftRunConfigOf` commissions
+   * before it grows, so a one-shaft Garden Apartments is a fabric a player reaches with one select.
+   * A hand-written config with one car would prove the code path and not the reachability, and
+   * reachability is the half issue #264 turned on.
+   */
+  function fabricOf(buildingId: string, shafts?: number): BuildingConfig {
+    const authored = authoredConfig(buildingId);
+    if (shafts === undefined) return authored;
+    const classes = commissionableClasses(RESOURCES.elevatorSpecs);
+    const asBuilt = asBuiltChoices(authored, classes);
+    const main = asBuilt[0];
+    if (main === undefined) throw new Error(`${buildingId} declares no bank`);
+    return commissionedBuilding(authored, withBankChoice(asBuilt, { ...main, shafts }), classes);
+  }
+
+  /**
+   * The two functions on **one** set of inputs, the fabric included — GitHub issue #264.
+   *
+   * The building used to go to `calendarPatch` alone, because `calendarAsks` decided `goodsCars`
+   * from the period's declaration. That is the defect: on a bank with no car free the two disagreed,
+   * and the agreement below could not see it because only one of them was ever shown a bank. The
+   * fabric is now part of `shared`, so a caller that could hand them different buildings does not
+   * exist here either.
+   */
   function bothWays(
     period: CalendarPeriod | null,
     running: DemandTemplateId,
     runLengthS: number,
     templateChosenByPlayer: boolean,
+    buildingId = 'midtown-office',
+    shafts?: number,
   ): { readonly asks: readonly string[]; readonly patch: ReturnType<typeof calendarPatch> } {
     const shared = {
       day: calendarDayFor(period, 1, 0),
@@ -749,15 +783,11 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
       demandTemplates: templates,
       runLengthS,
       templateChosenByPlayer,
+      building: grownBuilding(fabricOf(buildingId, shafts), 1),
     };
     return {
       asks: calendarAsks(shared),
-      patch: calendarPatch({
-        ...shared,
-        building: grownBuilding(authoredConfig('midtown-office'), 1),
-        split: office,
-        spokenForCarIds: [],
-      }),
+      patch: calendarPatch({ ...shared, split: office, spokenForCarIds: [] }),
     };
   }
 
@@ -792,6 +822,23 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
       {
         name: 'vacation under lunch-two-way',
         result: bothWays(periodOnDays(CALENDAR_PERIODS.vacation, 1, 7), TWO_WAY, 1800, false),
+      },
+      /*
+       * **A fabric with no car free — GitHub issue #264, and the row this matrix was missing.**
+       * `moving-week` asks a one-shaft bank for a goods car and `reserveCars` never empties a bank,
+       * so it gets none. Before the fix the ask said *yes* here and the patch said *no*, and the
+       * agreement below could not catch it because every row was run on a bank with a spare car.
+       */
+      {
+        name: 'moving-week on a bank commissioned down to one shaft',
+        result: bothWays(
+          periodOnDays(CALENDAR_PERIODS['moving-week'], 1, 7),
+          RISE,
+          1800,
+          false,
+          'garden-apartments',
+          1,
+        ),
       },
     ];
   }
@@ -833,12 +880,23 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
     expect(asks).not.toContain('note');
   });
 
-  it('the goods-car residual is unreachable on shipped data, asserted from disk', () => {
+  it('every authored bank has a spare car, asserted from disk', () => {
     /*
-     * `calendarAsks` decides `goodsCars` from the period alone, so it would name a reservation that
-     * did not happen on a bank with no car free. `carsToDerate` never empties a bank, so that needs
-     * a bank of **one** car — and `data/buildings/` has none. Read from disk rather than listed
-     * here, so the day one lands this turns red instead of the docstring turning false.
+     * **This assertion is unchanged and its old title was wrong — GitHub issue #264.** It used to
+     * be called *"the goods-car residual is unreachable on shipped data"*, on the argument that
+     * `calendarAsks` deciding `goodsCars` from the period alone could only be wrong on a bank with
+     * no car free, that `carsToDerate` never empties a bank, and that `data/buildings/` therefore
+     * had to declare a **one-car** bank before it could bite.
+     *
+     * Every clause of that was true and the conclusion was not, because `data/buildings/` is not
+     * the set of banks a run can have: `commissioning/choices.ts#shaftChoices` offers
+     * `max(1, current − 1)`, so a player takes Garden Apartments' two cars down to one and
+     * `shiftRunConfigOf` commissions the building before the calendar sees it. The residual was
+     * live on a fabric one select away, and `scope/runIdentity.test.ts` now measures it end to end.
+     *
+     * What the assertion actually says is worth keeping and is what it is renamed to: **the
+     * authored fabric always leaves a car to reserve**, which is why the shipped periods work
+     * as designed on a building nobody has edited.
      */
     const dir = fileURLToPath(new URL('../../../../data/buildings/', import.meta.url));
     const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
@@ -848,6 +906,29 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
       for (const bank of config.banks) {
         expect(bank.cars.length, `${file} · ${bank.id}`).toBeGreaterThanOrEqual(2);
       }
+    }
+  });
+
+  it('no shipped event holds a car for the whole shift, which is what lets calendarAsks omit the spoken-for set', () => {
+    /*
+     * `CalendarReservationInput.spokenForCarIds` is optional and `scope/runIdentity.ts` does not
+     * pass it, so `calendarAsks` reserves against a building nothing else has taken. That is exactly
+     * what `shiftRunConfigOf` computes — it hands `calendarPatch` the day's **whole-shift** holds,
+     * `ShiftRunPatch.outOfServiceCarIds`, and every shipped event declares `carsOutOfService: 0`.
+     *
+     * Pinned over the event table rather than stated, because a sentence saying *the set is always
+     * empty* is the shape issue #264 was: an event that held a car would make the ask claim a
+     * reservation the patch stepped past, and this turns red on the commit that adds one instead of
+     * on the day somebody re-reads a docstring. The fix then is a field, not a rewrite — thread
+     * `spokenForCarIds` through the way `calendarPatch` already takes it.
+     *
+     * `derate` is deliberately **not** asserted zero: `move-in` schedules one, it is an incident on
+     * the building rather than a `recordRun` hold, and `shiftRunConfigOf` does not put it in
+     * `spokenForCarIds` either. The two functions agree about that day because they agree about the
+     * argument, which is the property this is protecting.
+     */
+    for (const id of Object.keys(SHIFT_EVENTS) as (keyof typeof SHIFT_EVENTS)[]) {
+      expect(SHIFT_EVENTS[id].effect.carsOutOfService, id).toBe(0);
     }
   });
 });

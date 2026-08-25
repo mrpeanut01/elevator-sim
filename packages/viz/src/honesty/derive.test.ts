@@ -1037,6 +1037,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/profile.ts#createProfileStore',
       ],
     },
+    {
+      reason:
+        'The **id case**, and it is derived only because GitHub issue #264 gave it a call it did ' +
+        'not have. `calendarAsks` returns a list of `CalendarShift` field names — `goodsCars`, ' +
+        '`splitBias` — and authors no sentence at all; the scanner reaches it because deciding ' +
+        '`goodsCars` now means *reserving against a real bank* rather than reading the period’s ' +
+        'declaration, so the chain runs through `reserveCars` to `carRuntimeId`, whose ' +
+        '`${bankId}-${carId}` is a runtime **car id** and the hyphen is what the two-adjacent-' +
+        'words scanner reads as a phrase. `shift/calendar.ts#calendarPatch`’s own caller, ' +
+        '`dev/state.ts#shiftRunConfigOf`, is excluded above through the same chain and for the ' +
+        'same reason. What a player is *told* about a period is `calendarLine`’s caption, driven ' +
+        'by the shift surfaces, and the refusal these field names become is ' +
+        '`scope/runIdentity.ts#runIdentityIssues`’, excluded under its own name — the two are ' +
+        'required to agree in `scope/runIdentity.test.ts`, which is where issue #264’s defect is ' +
+        'measured rather than argued.',
+      ids: ['shift/calendar.ts#calendarAsks'],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));
