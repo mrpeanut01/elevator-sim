@@ -39,7 +39,7 @@ import {
   type CampaignCareer,
   type CampaignTower,
 } from '../campaign/career.js';
-import { CONTRACT_DAYS, DIFFICULTIES, SHOP, clearedDays, purseOf } from '../campaign/economy.js';
+import { CONTRACT_DAYS, DIFFICULTIES, clearedDays, purseOf } from '../campaign/economy.js';
 import type { DayOutcome, GoalObservations } from '../shift/types.js';
 import { outcomeOf } from '../shift/week.js';
 import { readGoals } from '../shift/goals.js';
