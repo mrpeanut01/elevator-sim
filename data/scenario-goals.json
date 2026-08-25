@@ -21,27 +21,6 @@
       },
       "goals": [
         {
-          "kind": "answer-the-demand",
-          "threshold": null,
-          "disposition": "batch",
-          "tuning": {
-            "n": 50,
-            "passes": 38,
-            "fails": 12,
-            "unmeasured": 0,
-            "rateClass": "variable"
-          },
-          "holdout": {
-            "n": 50,
-            "passes": 48,
-            "fails": 2,
-            "unmeasured": 0,
-            "rateClass": "variable"
-          },
-          "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 38 of 50 on the tuning seeds and 48 of 50 on the holdout seeds."
-        },
-        {
           "kind": "beat-the-baseline",
           "threshold": null,
           "disposition": "batch",
@@ -52,6 +31,27 @@
         }
       ],
       "configurationFacts": [
+        {
+          "kind": "deliver-everyone",
+          "threshold": null,
+          "disposition": "configuration-fact",
+          "tuning": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdoutAgrees": true,
+          "reason": "deliver-everyone: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+        },
         {
           "kind": "no-divergence",
           "threshold": null,
@@ -93,51 +93,51 @@
           },
           "holdoutAgrees": true,
           "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
-        }
-      ],
-      "withheld": [
+        },
         {
-          "kind": "deliver-everyone",
+          "kind": "answer-the-demand",
           "threshold": null,
-          "disposition": "not-shippable",
+          "disposition": "configuration-fact",
           "tuning": {
             "n": 50,
-            "passes": 49,
+            "passes": 50,
             "fails": 0,
-            "unmeasured": 1,
-            "rateClass": "unjudgeable"
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
           },
           "holdout": {
             "n": 50,
-            "passes": 48,
+            "passes": 50,
             "fails": 0,
-            "unmeasured": 2,
-            "rateClass": "unjudgeable"
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "Not shippable here. deliver-everyone: 1 of 50 runs never measured the quantity this goal is about, so there is no pass rate. The runs that could be judged are not counted on their own: the ones that fall out are the hard ones, and a rate over the survivors would understate the difficulty while showing an honest-looking denominator."
+          "reason": "answer-the-demand: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "long-waits-under",
           "threshold": 10,
-          "disposition": "not-shippable",
+          "disposition": "configuration-fact",
           "tuning": {
             "n": 50,
-            "passes": 49,
+            "passes": 50,
             "fails": 0,
-            "unmeasured": 1,
-            "rateClass": "unjudgeable"
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
           },
           "holdout": {
             "n": 50,
-            "passes": 48,
+            "passes": 50,
             "fails": 0,
-            "unmeasured": 2,
-            "rateClass": "unjudgeable"
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "Not shippable here. long-waits-under (≤ 10 %): 1 of 50 runs never measured the quantity this goal is about, so there is no pass rate. The runs that could be judged are not counted on their own: the ones that fall out are the hard ones, and a rate over the survivors would understate the difficulty while showing an honest-looking denominator."
-        },
+          "reason": "long-waits-under (≤ 10 %): a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+        }
+      ],
+      "withheld": [
         {
           "kind": "everyone-can-get-there",
           "threshold": null,

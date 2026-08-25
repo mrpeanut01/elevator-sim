@@ -35,7 +35,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -81,7 +81,7 @@ afterAll(async () => {
  * line. `pressMenuRow`'s docstring carries the measurement.
  */
 async function openPausedRun(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const page = await openPage(browser, { viewport: { width: 1280, height: 720 } });
   await page.goto(`${origin}?seed=20260804`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,

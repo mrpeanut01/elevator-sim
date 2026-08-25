@@ -52,7 +52,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -72,7 +72,7 @@ beforeAll(async () => {
   origin = (server.resolvedUrls?.local[0] ?? '').replace(/\/$/, '');
   if (origin === '') throw new Error('the dev server did not report a URL');
   browser = await chromium.launch({ executablePath: CHROMIUM });
-  page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
 }, 120_000);
 
 afterAll(async () => {
@@ -215,10 +215,15 @@ async function playOutAndFile(): Promise<void> {
 }
 
 describe.skipIf(!HAS_BROWSER)('the dispatcher editor reports the run it started', () => {
-  const pageErrors: string[] = [];
-
+  /*
+   * This suite used to keep a page-error collector of its own and close on a *threw nothing on the
+   * way through* case. Both are gone: `openPage` attaches the listener and
+   * `browserTier.test-helper.ts`'s hooks fail on what it collects, over **every** page of every
+   * file in the tier rather than over the three that had thought of it — GitHub issue #268. The
+   * check here is not weaker for being unwritten; it is the same channel, on a wider window, and
+   * `browserTier.test.ts` now forbids a file re-declaring it.
+   */
   beforeAll(async () => {
-    page.on('pageerror', (error: Error) => pageErrors.push(`${error.name}: ${error.message}`));
     await page.goto(origin, { waitUntil: 'load' });
     await page.waitForFunction(
       () => document.querySelector('canvas')?.width !== undefined,
@@ -291,8 +296,4 @@ describe.skipIf(!HAS_BROWSER)('the dispatcher editor reports the run it started'
     expect(strip.text).toContain('50 or more paired runs');
     expect(strip.text).toContain('interval that excludes zero');
   }, 90_000);
-
-  it('threw nothing on the way through', () => {
-    expect(pageErrors).toEqual([]);
-  });
 });

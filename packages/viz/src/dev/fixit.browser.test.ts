@@ -28,6 +28,7 @@ import {
   CHROMIUM,
   HAS_BROWSER,
   enterEngineerStage,
+  openPage,
   pressMenuRow,
   reopenEngineerMenu,
 } from './browserTier.test-helper.js';
@@ -58,7 +59,7 @@ afterAll(async () => {
 
 /** A page with the Fix-a-building overlay open on its first case, reached the player's way. */
 async function fixitPage(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
   await page.goto(origin, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,

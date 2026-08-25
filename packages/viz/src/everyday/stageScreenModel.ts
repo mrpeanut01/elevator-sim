@@ -88,52 +88,146 @@ import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 
 /** One speed setting: what the button says, and what the clock does. */
 export interface StageSpeed {
-  /** § 4.6's label row, verbatim. */
+  /**
+   * What the button says — and it is a **claim about {@link simPerRealS}**, not a decoration.
+   *
+   * `N×` means the day runs at `N` simulated seconds per real second, so the label and the
+   * multiplier are one fact written twice. `stageScreenModel.test.ts` parses the number back out of
+   * this string and requires it to equal the multiplier beside it, which is the only reason the
+   * pair below can be trusted after the next hand edits it.
+   */
   readonly label: string;
   /** § 4.6's `sim s / real` row — simulated seconds per real second. */
   readonly simPerRealS: number;
 }
 
 /**
- * § 4.6's table, **one array indexed twice**.
+ * § 4.6's table, **one array indexed twice** — and every label now equal to the ratio it names.
  *
- * The contract says so outright (*"The label array and the multiplier array must be the same array
- * indexed twice, never two lists (§20.12)"*), and the failure it is guarding against is specific:
- * two parallel arrays let `12×` be drawn over a multiplier of 600, and nothing on screen would say
- * so — the day would simply run at two and a half times what the button claimed. A reader would
- * blame the simulator.
+ * The contract says the first half outright (*"The label array and the multiplier array must be the
+ * same array indexed twice, never two lists (§20.12)"*), and the failure it is guarding against is
+ * specific: two parallel arrays let `12×` be drawn over a multiplier of 600, and nothing on screen
+ * would say so — the day would simply run at two and a half times what the button claimed. A reader
+ * would blame the simulator.
  *
- * Frozen and exported so the screen, its tests and any sweep read the same five rows; the index
- * into it is the whole of the transport's state.
+ * ## The table this replaced was that exact failure, arriving through the contract rather than past it
+ *
+ * GitHub issue **#257**, ruled on by [§ D344](../../../../DECISIONS.md). Until it, this array was
+ * `ENGINE_CONTRACT.md` § 4.6 transcribed faithfully:
+ *
+ * | label shown | `simPerRealS` | what it was |
+ * |---|---|---|
+ * | `½×` | 8 | **8× real time** |
+ * | `1×` | 30 | **30× real time** |
+ * | `4×` | 90 | 90× |
+ * | `12×` | 240 | 240× |
+ * | `30×` | 600 | 600× |
+ *
+ * **There was no 1:1 rung at all**, and a player who slowed the stage all the way down was still
+ * watching an eight-times-compressed building. **Neither reading of those labels rescues them**, and
+ * that is worth stating because the charitable one is the reading a reviewer reaches for first. Read
+ * as *absolute* — sim-seconds per real second, which is what the column beside them holds — all five
+ * are wrong. Read as *relative to the `1×` rung*, they are `8/30 = 0.27` under a label saying `½×`,
+ * `90/30 = 3` under `4×`, `240/30 = 8` under `12×` and `600/30 = 20` under `30×`; only the `1×` row
+ * survives, and it survives trivially, because every relative scale calls its own datum one.
+ *
+ * ## This is a stated deviation from the handoff, and it is the same one § 7.2's ramp already is
+ *
+ * The table above is the vendored contract's own, so replacing it is a disagreement with the
+ * handoff rather than a repair of a transcription slip. The standing rule decides it the way it
+ * decides the wait ramp fifteen lines down: **the handoff wins what the screen looks like and the
+ * simulator wins what a number means.** A multiplier is a number, and a label reading `N×` is a
+ * claim about that number — so the ladder is the simulator's to fix, exactly as `WAIT_BANDS`'
+ * 30/60/120 beat § 7.2's 30/75/150. What the handoff still wins is untouched: a row of speed chips
+ * in mono, in the same place in the header, with the same reset rule.
+ *
+ * ## What moved, stated as a diff rather than as a new table
+ *
+ * **No rung is removed.** All five multipliers above still ship — 8, 30, 90, 240 and 600 — so no
+ * pacing a player had is gone and no measurement taken at one of them is about a speed that no
+ * longer exists. Five are **renamed** to the ratio they always were, and **two are added**:
+ *
+ * - **`1×` at 1** is the rung [§ D344](../../../../DECISIONS.md) needs and the one #257 is filed
+ *   about. Its determination is a single number — *discrete cues need `S ≤ 39` sim-seconds per real
+ *   second*, from a 9.8 s hall-call door cycle against a 250 ms floor on an identifiable cue — and
+ *   the old ladder had two rungs under that bound, neither of which carried its own name.
+ * - **`4×` at 4** because the discrete tier needs somewhere to stand *between* those two. Without
+ *   it, `1 → 8` is an **eight-fold** step on a ladder where no other step exceeds four, and it is
+ *   the step a player takes when they want to watch a car rather than a day.
+ *
+ * So four rungs — 1, 4, 8 and 30 — sit inside § D344's discrete-cue budget and three — 90, 240 and
+ * 600 — sit outside it, which is the speed tiering that ruling describes rather than a coincidence
+ * this table happens to permit. **A decision number is owed** for the deviation and for the default
+ * below; the argument is here.
+ *
+ * Frozen and exported so the screen, its tests and any sweep read the same seven rows; the index
+ * into it is the whole of the transport's state. It is typed as a **non-empty tuple** so that
+ * {@link stageSpeedAt} needs no hand-written fallback row — the one it used to carry was a sixth
+ * speed, `1×` over a multiplier of 30, unreachable by construction and read by no test, which is
+ * this defect a second time in the code that was meant to survive it.
  */
-export const STAGE_SPEEDS: readonly StageSpeed[] = Object.freeze([
-  Object.freeze({ label: '½×', simPerRealS: 8 }),
-  Object.freeze({ label: '1×', simPerRealS: 30 }),
-  Object.freeze({ label: '4×', simPerRealS: 90 }),
-  Object.freeze({ label: '12×', simPerRealS: 240 }),
-  Object.freeze({ label: '30×', simPerRealS: 600 }),
+export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freeze([
+  Object.freeze({ label: '1×', simPerRealS: 1 }),
+  Object.freeze({ label: '4×', simPerRealS: 4 }),
+  Object.freeze({ label: '8×', simPerRealS: 8 }),
+  Object.freeze({ label: '30×', simPerRealS: 30 }),
+  Object.freeze({ label: '90×', simPerRealS: 90 }),
+  Object.freeze({ label: '240×', simPerRealS: 240 }),
+  Object.freeze({ label: '600×', simPerRealS: 600 }),
 ]);
 
 /**
- * Where every run opens — § 4.6 and § 7.3: *"speed is not inherited: it resets to the player's
- * `Default speed` setting at the start of each run"*.
+ * **The speed every run opens at: 30 simulated seconds per real second.** A decision, argued below,
+ * rather than a constant standing in for one.
  *
- * **There is no `Default speed` setting in this build**, so this constant stands in for it and says
- * so rather than pretending to read one: `everyday/settingsView.ts` ships one Motion switch and six
- * refused rows, and a stage that read a preference nothing writes would be the inert-control defect
- * with the polarity reversed. The rule the contract actually cares about is met either way — *a day
- * must never vanish in three seconds because the previous one ended at 30×* — because the reset
- * happens on every new recording regardless of where the value comes from. The lane that builds the
- * setting replaces this constant with a host read and changes nothing else.
+ * § 4.6 and § 7.3 say *"speed is not inherited: it resets to the player's `Default speed` setting at
+ * the start of each run"*. **There is still no `Default speed` setting in this build** —
+ * `everyday/settingsView.ts` ships one Motion switch and six refused rows — and this file will not
+ * pretend to read one, because a stage consulting a preference nothing writes is the inert-control
+ * defect with its polarity reversed. What changed with GitHub issue **#257** is that the value is no
+ * longer a stand-in: it is chosen, for three reasons, and the lane that builds the setting replaces
+ * {@link DEFAULT_STAGE_SIM_PER_REAL_S} with a host read and changes nothing else.
+ *
+ * **1. It cannot be the honest `1×`, and that is the reason the default needed deciding at all.**
+ * At 1:1 the shipped default day — `rise-and-fall`, thirty simulated minutes — is thirty real
+ * minutes, and `office-day` is **ten real hours**. The contract's own rule is that *a day must never
+ * vanish in three seconds because the previous one ended at 30×*; a day that never ends is the same
+ * rule seen from the other side, and a ladder that added a true 1:1 rung and opened on it would have
+ * fixed a lying label by shipping an unwatchable product.
+ *
+ * **2. It is the fastest rung inside [§ D344](../../../../DECISIONS.md)'s `S ≤ 39` budget.** That
+ * ruling ships discrete 1:1 cues below the bound and a continuous bed above it. A default above 39
+ * would mean every player meets the bed first and reaches the discrete tier only by going to look
+ * for it — the top tier of an audio design nobody hears by default. 30 is the largest rung that
+ * clears the bound, so it buys the most day per minute while staying inside it.
+ *
+ * **3. It moves no picture.** 30 is the multiplier this build has always opened at; only its name
+ * changed. Every screenshot, every row of `docs/28-art-direction.md` § 6's table and every browser
+ * case taken at the opening speed is still about the same pacing, so the label repair costs nothing
+ * that would have to be re-measured — which is the whole reason the default was not moved to a rung
+ * that reads more nicely.
+ *
+ * The index is **derived from the declared multiplier rather than written down beside it**, so a
+ * rung inserted below the default cannot silently move it. That is #257's own defect class one level
+ * up: a number and a name kept in two places drift, and the second place is always the one nobody
+ * re-reads.
  */
-export const DEFAULT_STAGE_SPEED_INDEX = 1;
+const DEFAULT_STAGE_SIM_PER_REAL_S = 30;
 
-/** The § 4.6 speed at an index, clamped — a stored index out of range opens at the default. */
+/** Where every run opens — the index of {@link DEFAULT_STAGE_SIM_PER_REAL_S} on the ladder. */
+export const DEFAULT_STAGE_SPEED_INDEX = STAGE_SPEEDS.findIndex(
+  (speed) => speed.simPerRealS === DEFAULT_STAGE_SIM_PER_REAL_S,
+);
+
+/**
+ * The § 4.6 speed at an index, clamped — a stored index out of range opens at the default.
+ *
+ * The second fallback is {@link STAGE_SPEEDS}' first rung and exists only to satisfy the type: the
+ * tuple is non-empty, and `DEFAULT_STAGE_SPEED_INDEX` is asserted to name a real row. It is a rung
+ * of this ladder rather than a hand-written pair, so it cannot be a speed whose label lies.
+ */
 export function stageSpeedAt(index: number): StageSpeed {
-  return STAGE_SPEEDS[index] ?? STAGE_SPEEDS[DEFAULT_STAGE_SPEED_INDEX] ?? {
-    label: '1×',
-    simPerRealS: 30,
-  };
+  return STAGE_SPEEDS[index] ?? STAGE_SPEEDS[DEFAULT_STAGE_SPEED_INDEX] ?? STAGE_SPEEDS[0];
 }
 
 /* -------------------------------------------------------------------------- *

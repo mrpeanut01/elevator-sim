@@ -3,10 +3,16 @@
  *
  * Three claims carry this suite, and each is one the stage would ship broken without it.
  *
- * 1. **§ 4.6's speeds are one array indexed twice.** The contract says so outright and names the
- *    failure: two parallel lists let `12×` be drawn over a multiplier of 600, and nothing on
- *    screen would say so. The case below reads the label and the multiplier off the *same element*
- *    and compares the pair against § 4.6's table, so a re-ordering of either half fails.
+ * 1. **§ 4.6's speed labels mean what they say, and the transport runs at what they say.** This
+ *    used to be the weaker claim — *one array indexed twice*, compared cell by cell against a
+ *    transcription of `ENGINE_CONTRACT.md` § 4.6's table — and the transcription was faithful to a
+ *    table in which **every one of the five labels was false** (GitHub issue **#257**,
+ *    [§ D344](../../../../DECISIONS.md)). A test that copies the contract cannot notice that the
+ *    contract is wrong. So the pair is now checked **against itself**: the number is parsed back
+ *    out of the label and required to equal the multiplier beside it, with no expected table
+ *    anywhere in this file. That subsumes the old case — two parallel lists out of step produce a
+ *    label whose number is not its multiplier — and it is the one property that could not be
+ *    satisfied by transcribing something.
  * 2. **No figure is a whole-run fold.** § D293's rule and § D307's two findings. Checked as a
  *    property rather than by grep: every figure the header publishes is asked at a rising sequence
  *    of playheads and required to behave like a fold *at* that playhead — refusing before anybody
@@ -25,6 +31,9 @@ import { WAIT_BANDS } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { syntheticRecording, servedLeg, waitingLeg } from '../live/synthetic.test-helper.js';
 import { syntheticFloor, syntheticShaft } from '../live/synthetic.test-helper.js';
+import { ManualClock } from '../playback/clock.js';
+import { MAX_SPEED, MIN_SPEED } from '../playback/mapping.js';
+import { Playback } from '../playback/playback.js';
 import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_COLORS } from './tokens.js';
 import { RUN_CONTEXTS } from './types.js';
@@ -62,49 +71,211 @@ import {
 
 describe('§ 4.6 — the speed table', () => {
   /**
-   * ENGINE_CONTRACT § 4.6, transcribed a second time here and compared cell by cell — the same
-   * device `actionBar.test.ts` uses for § 3.3's table. A drift in either direction fails.
+   * **The label is a claim, and this is the parser that holds it to account** — GitHub issue #257's
+   * AC2, *"every speed label equals its actual ratio, asserted by a test over `STAGE_SPEEDS` rather
+   * than by review"*.
+   *
+   * A label is a decimal numeral followed by `×`, and nothing else. That is narrower than the table
+   * this replaced, which shipped `½×` over a multiplier of 8, and the narrowness is the point: a
+   * parser that understood `½` would need a glyph table, and a glyph table is a second place where a
+   * name and a number are kept — which is the defect #257 is about. A half-speed rung is spelled
+   * `0.5×` here, and it parses.
+   *
+   * `null` for anything that does not parse, so an unreadable label **fails** rather than being
+   * quietly skipped. A test that skips what it cannot read is how `½×` would survive this file.
    */
-  const CONTRACT: readonly (readonly [string, number])[] = [
-    ['½×', 8],
-    ['1×', 30],
-    ['4×', 90],
-    ['12×', 240],
-    ['30×', 600],
-  ];
+  const ratioClaimedBy = (label: string): number | null => {
+    const match = /^(\d+(?:\.\d+)?)×$/u.exec(label);
+    if (match === null) return null;
+    const claimed = Number(match[1]);
+    return Number.isFinite(claimed) ? claimed : null;
+  };
 
-  it('is one array indexed twice — the label and the multiplier come off the same element', () => {
-    expect(STAGE_SPEEDS).toHaveLength(CONTRACT.length);
-    for (const [index, [label, simPerRealS]] of CONTRACT.entries()) {
-      const speed = stageSpeedAt(index);
-      /*
-       * Read through the one accessor, so a screen that took its label from one place and its
-       * multiplier from another could not satisfy this. That is the § 20.12 failure in a line: a
-       * button reading `12×` over a clock running at 600.
-       */
-      expect([speed.label, speed.simPerRealS], `speed ${String(index + 1)}`).toEqual([
-        label,
-        simPerRealS,
-      ]);
+  it('states a ratio in every label, in the one form this file can read back', () => {
+    expect(STAGE_SPEEDS.length, 'the ladder is empty — nothing below asserts anything').toBeGreaterThan(
+      1,
+    );
+    for (const speed of STAGE_SPEEDS) {
+      expect(ratioClaimedBy(speed.label), `label ${speed.label} is not a readable ratio`).not.toBeNull();
     }
+  });
+
+  it('runs at exactly the ratio its label claims — derived from the row, never from a table', () => {
+    /*
+     * No expected table anywhere in this case. The old one transcribed `ENGINE_CONTRACT.md` § 4.6
+     * and passed for as long as the contract's own five labels were wrong, which is the failure
+     * mode a transcription has by construction: it can only ever be as true as what it copies.
+     */
+    for (const [index, speed] of STAGE_SPEEDS.entries()) {
+      const row = stageSpeedAt(index);
+      /* Read through the one accessor, so a screen that took its label from one place and its
+         multiplier from another could not satisfy this — the § 20.12 failure in a line. */
+      expect([row.label, row.simPerRealS], `rung ${String(index + 1)}`).toEqual([
+        speed.label,
+        speed.simPerRealS,
+      ]);
+      expect(
+        ratioClaimedBy(row.label),
+        `${row.label} runs at ${String(row.simPerRealS)} sim s per real s`,
+      ).toBe(row.simPerRealS);
+    }
+  });
+
+  it('offers a true 1:1 rung, which is the whole of #257’s first acceptance criterion', () => {
+    const oneToOne = STAGE_SPEEDS.filter((speed) => speed.simPerRealS === 1);
+    expect(oneToOne.map((speed) => speed.label), 'no rung runs the day at real time').toEqual(['1×']);
+  });
+
+  it('keeps a rung the § D344 audio budget can play discrete cues at, besides 1:1', () => {
+    /*
+     * § D344's determination, and the reason this ladder is what stands between the build and 1:1
+     * audio: a 9.8 s hall-call door cycle against a 250 ms floor on an identifiable cue gives
+     * `S ≤ 39` sim-seconds per real second. A ladder with 1:1 and nothing else under the bound
+     * would meet #257's letter and leave the discrete tier with one place to stand.
+     */
+    const discrete = STAGE_SPEEDS.filter((speed) => speed.simPerRealS <= 39);
+    expect(discrete.length, 'nothing between 1:1 and the bed').toBeGreaterThanOrEqual(2);
+  });
+
+  it('removed no rung — every multiplier that shipped before #257 still does', () => {
+    /*
+     * #257's own scope: *"this is about adding the low end and correcting the labels, not removing
+     * speed"*. These five are the multipliers of the table it refutes, so a lane that later drops
+     * one has to say so here rather than in passing. A ten-hour day at 1:1 is ten hours; the fast
+     * rungs are why the continuous bed exists.
+     */
+    const before = [8, 30, 90, 240, 600];
+    const shipped = STAGE_SPEEDS.map((speed) => speed.simPerRealS);
+    expect(shipped).toEqual(expect.arrayContaining(before));
+  });
+
+  it('is strictly ascending, with no two rungs saying the same thing', () => {
+    const multipliers = STAGE_SPEEDS.map((speed) => speed.simPerRealS);
+    expect(multipliers).toEqual([...multipliers].sort((a, b) => a - b));
+    expect(new Set(multipliers).size, 'two rungs run at one speed').toBe(multipliers.length);
+    expect(new Set(STAGE_SPEEDS.map((speed) => speed.label)).size).toBe(STAGE_SPEEDS.length);
   });
 
   it('holds every multiplier inside the transport’s own legal range', () => {
     /* `playback/mapping.ts`'s `[MIN_SPEED, MAX_SPEED]`. A speed button that threw on press would
        be a control that does nothing, loudly. */
     for (const speed of STAGE_SPEEDS) {
-      expect(speed.simPerRealS).toBeGreaterThanOrEqual(0.05);
-      expect(speed.simPerRealS).toBeLessThanOrEqual(1000);
+      expect(speed.simPerRealS).toBeGreaterThanOrEqual(MIN_SPEED);
+      expect(speed.simPerRealS).toBeLessThanOrEqual(MAX_SPEED);
     }
   });
 
-  it('opens at 1× and answers the default for an index it does not have', () => {
-    expect(stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label).toBe('1×');
+  it('opens at a rung that exists, and answers the default for an index it does not have', () => {
+    expect(DEFAULT_STAGE_SPEED_INDEX, 'the declared default names no rung').toBeGreaterThanOrEqual(
+      0,
+    );
+    expect(DEFAULT_STAGE_SPEED_INDEX).toBeLessThan(STAGE_SPEEDS.length);
     /* A stored index from a build with more speeds must open the day, not crash it — and it must
        open it at the *default*, because § 4.6's rule is about a day never vanishing in three
        seconds. */
     expect(stageSpeedAt(99)).toEqual(stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX));
     expect(stageSpeedAt(-1)).toEqual(stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX));
+    expect(stageSpeedAt(1.5)).toEqual(stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX));
+  });
+
+  /**
+   * **#257's AC3 — the default is a decision, and these are the three reasons it gives.**
+   *
+   * Asserted as properties rather than as the number 30, so the case says *why* rather than *what*:
+   * a lane that moves the default has to break one of these three arguments, not edit a literal.
+   */
+  it('opens at the fastest rung inside the § D344 budget, and not at 1:1', () => {
+    const opening = stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX);
+    const discrete = STAGE_SPEEDS.filter((speed) => speed.simPerRealS <= 39);
+    /* Inside the budget, so the discrete-cue tier is what a player meets rather than something
+       they have to go looking for. */
+    expect(opening.simPerRealS).toBeLessThanOrEqual(39);
+    /* The fastest such rung — the most day per minute that still clears the bound. */
+    expect(opening.simPerRealS).toBe(Math.max(...discrete.map((speed) => speed.simPerRealS)));
+    /*
+     * And not the honest 1×. `rise-and-fall` is thirty simulated minutes, so 1:1 opens a
+     * half-hour sitting; `office-day` is ten simulated hours. § 4.6's rule is that a day must
+     * never vanish in three seconds, and a day that never ends is that rule from the other side.
+     */
+    expect(opening.simPerRealS).toBeGreaterThan(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § 4.6 — the transport actually runs at these numbers
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Move the control and require the run to change** — `CLAUDE.md`'s standing requirement, pointed
+ * at a speed rung instead of a slider.
+ *
+ * A ladder whose labels are internally consistent is still worth nothing if the number never
+ * reaches the clock. That is this repository's eleven-times-shipped defect: a value that is
+ * authored, validated, carried and consulted by nothing. So every rung is driven through the object
+ * the mount drives — `Playback`, over a {@link ManualClock} so there is no timer and no flake — and
+ * required to move the playhead by exactly what its label promises.
+ *
+ * The hop this cannot see is named rather than implied: `stageScreen.ts`'s
+ * `playback?.setSpeed(stageSpeedAt(index).simPerRealS)` needs a document, so the *button* to
+ * `setSpeed` link is the browser tier's, not this file's. What is proved here is everything from
+ * `STAGE_SPEEDS` to the playhead.
+ */
+describe('§ 4.6 — every rung reaches the transport', () => {
+  /* Long enough that the fastest rung cannot clamp against `endedAt` inside the interval below. */
+  const longDay = (): VizRecording => syntheticRecording({ startedAt: 0, endedAt: 100_000 });
+  const REAL_MS = 2_000;
+
+  it('advances the playhead by exactly the ratio each label claims', () => {
+    for (const speed of STAGE_SPEEDS) {
+      const clock = new ManualClock(0);
+      const playback = new Playback(longDay(), clock, { speed: speed.simPerRealS });
+      playback.play();
+      clock.advance(REAL_MS);
+      expect(playback.simTimeS, `${speed.label} over ${String(REAL_MS)} ms`).toBeCloseTo(
+        (REAL_MS / 1000) * speed.simPerRealS,
+        9,
+      );
+    }
+  });
+
+  it('runs the day at real time on the 1× rung — one real second, one simulated second', () => {
+    const oneToOne = STAGE_SPEEDS.find((speed) => speed.label === '1×');
+    expect(oneToOne, 'no 1× rung to drive').toBeDefined();
+    const clock = new ManualClock(0);
+    const playback = new Playback(longDay(), clock, { speed: oneToOne?.simPerRealS ?? 0 });
+    playback.play();
+    clock.advance(1_000);
+    expect(playback.simTimeS).toBeCloseTo(1, 9);
+    clock.advance(9_000);
+    expect(playback.simTimeS).toBeCloseTo(10, 9);
+  });
+
+  it('changes the playback rate when the control moves — through setSpeed, which is what the button calls', () => {
+    /*
+     * The button's own path: the transport already exists at the default and `setSpeed` re-anchors
+     * it. Every rung is pressed in turn from the same playhead, and each must produce a *different*
+     * amount of day per second — an inert rung would show up here as two rungs that agree.
+     */
+    const clock = new ManualClock(0);
+    const playback = new Playback(longDay(), clock, {
+      speed: stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).simPerRealS,
+    });
+    playback.play();
+    const advanced: number[] = [];
+    for (const [index, speed] of STAGE_SPEEDS.entries()) {
+      playback.setSpeed(stageSpeedAt(index).simPerRealS);
+      const before = playback.simTimeS;
+      clock.advance(REAL_MS);
+      const moved = playback.simTimeS - before;
+      expect(moved, `${speed.label} moved the day`).toBeCloseTo(
+        (REAL_MS / 1000) * speed.simPerRealS,
+        6,
+      );
+      advanced.push(moved);
+    }
+    expect(new Set(advanced).size, 'two rungs played the day at the same rate').toBe(
+      STAGE_SPEEDS.length,
+    );
   });
 });
 

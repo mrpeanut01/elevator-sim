@@ -35,7 +35,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, MENU_CONTROL_ATTR, enterEngineerStage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, MENU_CONTROL_ATTR, enterEngineerStage, openPage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -46,8 +46,11 @@ beforeAll(async () => {
   server = await createServer({
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
-    // A port of its own, and `strictPort: false` so it moves rather than throws — the three files
-    // in this project run concurrently and would otherwise fight over one port.
+    // A port of its own, and `strictPort: false` so it moves rather than throws — the files in this
+    // project run concurrently and would otherwise fight over one port. It said *three* for as long
+    // as three was true; the tier is **26** files now, and the rule is no longer kept by anybody
+    // counting: `browserTier.test.ts` derives it — every file names a port, none says `port: 0`, and
+    // no two name the same one. That third clause found eleven files across five collisions.
     server: { port: 5191, strictPort: false },
     logLevel: 'error',
   });
@@ -73,7 +76,7 @@ afterAll(async () => {
  * red the day a test — or a remembered preference — opened the menu in the other one.
  */
 async function openFreePlay(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await openPage(browser, { viewport: { width: 1280, height: 900 } });
   await page.goto(`${origin}?seed=20260807`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,

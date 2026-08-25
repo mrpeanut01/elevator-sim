@@ -22,7 +22,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
+import { shiftGoalsOf } from '../dev/leftRail.js';
 import { initialState, profileById, type ViewerState } from '../dev/state.js';
+import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
+import { GOAL_BARS } from '../shift/goals.js';
 import type { ShapedDayReport } from '../shift/report.js';
 
 import { createEverydayHost, EVERYDAY_HOST, type EverydayHostBindings } from './host.js';
@@ -53,6 +56,8 @@ function resourcesOf(): BrowserResources {
 
 const resources = resourcesOf();
 const base = (): ViewerState => initialState(resources, 20260812n);
+/** The loaded `BuildingConfig` `wholeDayFor` reads a traffic profile off. */
+const configOf = (id: string) => resources.entries.find((entry) => entry.config.id === id)?.config;
 
 /**
  * A recording as far as the host ever reads one on these paths: `runState` asks only whether one
@@ -266,7 +271,10 @@ describe('the plain-lever seam — the same vector the Engineer editor holds', (
 });
 
 describe('the run actions', () => {
-  it('startRun and closeDay are the bindings’ own presses, nothing added', () => {
+  it('startRun and closeDay are the bindings’ own presses on a crowd with no authored day', () => {
+    // Garden Apartments is residential and no day-shaped record ships for that crowd, so the day
+    // seam writes nothing here — not an empty patch, which would re-render every surface to change
+    // no field. § D227: a control that writes nothing says so, and this is that said with a run.
     const h = harnessOf(base());
     const host = createEverydayHost(h.bindings);
     host.startRun();
@@ -298,6 +306,75 @@ describe('the run actions', () => {
       withheld: [],
       interventions: [],
     });
+  });
+
+  /**
+   * The day the Everyday player actually runs — `ISSUE_VERIFICATION_FINDINGS.md` § AB.
+   *
+   * The finding was that `office-day` had shipped for waves — ten hours, seventeen phases, three
+   * cited peaks — and no Everyday player could reach it, because every Everyday day fell through
+   * `shiftDemandTemplateId` to a hard-coded thirty-minute `rise-and-fall`. What is asserted here is
+   * the *press*: the run this product's own primary starts is the whole day, on the buildings a day
+   * was authored for and on no others.
+   */
+  it('starts the whole authored day where the building has one, and says so as a window', () => {
+    const office: ViewerState = { ...base(), buildingId: 'midtown-office' };
+    const h = harnessOf(office);
+    createEverydayHost(h.bindings).startRun();
+
+    // Patched **before** the press, because `runShift` reads the state synchronously to build the
+    // config: a patch landing after it would run yesterday's length under today's caption.
+    expect(h.calls).toEqual(['applyPatch', 'startRun']);
+
+    const day = wholeDayFor(resources.trafficProfiles, configOf(office.buildingId));
+    if (day === undefined) throw new Error('midtown-office has no whole day');
+    // Derived from the record, not transcribed: the length is the period `data/` declares.
+    expect(h.patches[0]).toEqual(wholeDayRun(day));
+    expect(h.patches[0]?.shiftLengthS).toBe(day.periodS);
+    // A window and not a `null`, which is the only spelling `core` accepts for a phase list — and
+    // the reason is asserted in `shift/dayLength.test.ts`, where it throws.
+    expect(h.patches[0]?.windowStartS).toBe(0);
+  });
+
+  it('opens tomorrow onto a day of the same kind, in one merge', () => {
+    // Two patches would let a render see a week advanced onto a horizon it is not running yet.
+    const closed: ViewerState = {
+      ...base(),
+      buildingId: 'midtown-office',
+      recording: A_RECORDING,
+      report: A_REPORT,
+    };
+    const h = harnessOf(closed);
+    createEverydayHost(h.bindings).openTomorrow();
+    expect(h.calls).toEqual(['applyPatch', 'openRunTab', 'startRun']);
+    expect(h.patches).toHaveLength(1);
+    expect(h.patches[0]?.week?.day).toBe(closed.week.day + 1);
+    expect(h.patches[0]?.windowStartS).toBe(0);
+    expect(h.patches[0]?.shiftLengthS).toBeGreaterThan(closed.shiftLengthS);
+  });
+
+  it('grades a whole day against the whole day’s bars, and a slice against the slice’s', () => {
+    /*
+     * The half a lane could most easily ship broken: a longer run judged by the ceiling a
+     * thirty-minute one was authored against. `goalsForDay`'s own docstring measures what that
+     * costs — Secure Tower's day 1 goes from 4 of 10 seeds missing something to 9 of 10, on a run
+     * nobody made worse — so the rail's reading and the run's window are read from one predicate.
+     */
+    const day = wholeDayFor(resources.trafficProfiles, configOf('midtown-office'));
+    if (day === undefined) throw new Error('midtown-office has no whole day');
+
+    const slice: ViewerState = { ...base(), buildingId: 'midtown-office' };
+    const whole: ViewerState = { ...slice, ...wholeDayRun(day) };
+    const worstBarOf = (state: ViewerState): number => {
+      const readings = createEverydayHost(harnessOf(state).bindings).goalsToday();
+      return readings.find((reading) => reading.goal.id === 'worst-wait')?.goal.bar ?? Number.NaN;
+    };
+    expect(worstBarOf(whole)).toBe(worstBarOf(slice) * GOAL_BARS.worstWholeDayFactor);
+
+    // And a crowd with no day is graded exactly as it was, whatever its window happens to say —
+    // the horizon comes from the day the building has, never from the number of seconds.
+    const residential: ViewerState = { ...base(), shiftLengthS: 36000, windowStartS: 0 };
+    expect(worstBarOf(residential)).toBe(worstBarOf(base()));
   });
 
   /**
@@ -343,6 +420,94 @@ describe('the run actions', () => {
     const off = createEverydayHost(h.bindings).subscribe(() => {});
     off();
     expect(h.calls).toEqual(['onChange', 'unsubscribe']);
+  });
+});
+
+describe('one run, one set of bars — both shells', () => {
+  /**
+   * The defect this file's neighbour lane shipped, and the reason it is asserted from **both call
+   * paths** rather than from two literals.
+   *
+   * `goalsForDay` grew a second argument and one of its four callers passed it. So an Everyday
+   * player who pressed *Run* on a whole authored day was graded by the Everyday rail against a
+   * 460 s worst-wait ceiling and by the Engineer rail — the same run, the same state, one door
+   * away — against 230 s. Neither number is wrong on its own; publishing both about one run is the
+   * thing `TEST_MATRIX.md` T1's *figures consistent* clause forbids, and it is the failure this
+   * repository's honesty tier exists to catch.
+   *
+   * Both sides here are the product's own expressions: `goalsToday()` is what the Everyday rail
+   * draws, `shiftGoalsOf` is what the Engineer rail draws **and** what `dev/main.ts#closeShift`
+   * files the sheet with. Nothing is transcribed — the state is built from the record's own period
+   * through `wholeDayRun`, and the assertion is that the two paths agree, not that either equals a
+   * number this file chose.
+   */
+  const barsOf = (goals: readonly { readonly id: string; readonly bar: number }[]) =>
+    Object.fromEntries(goals.map((goal) => [goal.id, goal.bar]));
+
+  const everydayBars = (state: ViewerState) =>
+    barsOf(
+      createEverydayHost(harnessOf(state).bindings)
+        .goalsToday()
+        .map((reading) => reading.goal),
+    );
+  const engineerBars = (state: ViewerState) => barsOf(shiftGoalsOf(state, resources));
+
+  it('grades a whole day the same on the Everyday rail and the Engineer rail', () => {
+    const day = wholeDayFor(resources.trafficProfiles, configOf('midtown-office'));
+    if (day === undefined) throw new Error('midtown-office has no whole day');
+    const whole: ViewerState = {
+      ...base(),
+      buildingId: 'midtown-office',
+      ...wholeDayRun(day),
+    };
+
+    expect(engineerBars(whole)).toEqual(everydayBars(whole));
+
+    /*
+     * And the disagreement is a real one rather than a shape mismatch: on a whole day the ceiling
+     * these two must agree *about* is the slice's, scaled. Asserted from `GOAL_BARS` rather than
+     * from 460, so a lane that moves the factor moves this with it.
+     */
+    const slice: ViewerState = { ...base(), buildingId: 'midtown-office' };
+    expect(everydayBars(whole)['worst-wait']).toBe(
+      (everydayBars(slice)['worst-wait'] ?? Number.NaN) * GOAL_BARS.worstWholeDayFactor,
+    );
+  });
+
+  it('grades a slice the same on both, and every day of a week', () => {
+    // The control. A shell that hard-coded `'whole-day'` would pass the case above and fail here,
+    // which is why the slice is asserted rather than assumed to be the untouched case.
+    const slice: ViewerState = { ...base(), buildingId: 'midtown-office' };
+    expect(engineerBars(slice)).toEqual(everydayBars(slice));
+
+    const day = wholeDayFor(resources.trafficProfiles, configOf('midtown-office'));
+    if (day === undefined) throw new Error('midtown-office has no whole day');
+    for (let dayNumber = 1; dayNumber <= 7; dayNumber += 1) {
+      for (const run of [{}, wholeDayRun(day)]) {
+        const state: ViewerState = {
+          ...slice,
+          ...run,
+          week: { ...slice.week, day: dayNumber },
+        };
+        expect(engineerBars(state), `day ${String(dayNumber)}`).toEqual(everydayBars(state));
+      }
+    }
+  });
+
+  it('grades a crowd with no authored day the same on both, whatever its window says', () => {
+    /*
+     * Garden Apartments is one of the three shipped crowds `dayLength.ts` refuses to hand an office
+     * day to. Its window is set to a day's length anyway, so a shell that keyed the horizon on a
+     * number of seconds instead of on *the building has a day* would disagree here.
+     */
+    const residential: ViewerState = {
+      ...base(),
+      buildingId: 'garden-apartments',
+      shiftLengthS: 36_000,
+      windowStartS: 0,
+    };
+    expect(engineerBars(residential)).toEqual(everydayBars(residential));
+    expect(everydayBars(residential)).toEqual(everydayBars(base()));
   });
 });
 

@@ -40,7 +40,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -72,7 +72,7 @@ const VIEWPORT = { width: 1280, height: 800 };
 
 /** A loaded page on the Engineer stage, boot's own run on it. */
 async function stagePage(): Promise<Page> {
-  const page = await browser.newPage({ viewport: VIEWPORT });
+  const page = await openPage(browser, { viewport: VIEWPORT });
   await page.goto(origin, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,

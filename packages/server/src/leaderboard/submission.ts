@@ -185,8 +185,50 @@ export function digestOf(value: unknown): string {
  * Shape validation, before anything is simulated
  * -------------------------------------------------------------------------- */
 
-/** Run lengths the server will simulate. Bounded because a submission commands server CPU. */
-export const ACCEPTED_DURATIONS_S: readonly number[] = Object.freeze([300, 900, 1800, 3600, 7200]);
+/**
+ * The slice ladder — run lengths a player *picks*, bounded because a submission commands server CPU.
+ *
+ * `viz`'s `menu/types.ts#LONGEST_OFFERED_RUN_S` is the client-side bound on the same set and is
+ * still `7200` ([§ D286](../../../../DECISIONS.md)). Nothing below widens what is **offered**; see
+ * {@link ACCEPTED_DURATIONS_S}.
+ */
+const OFFERED_DURATIONS_S: readonly number[] = Object.freeze([300, 900, 1800, 3600, 7200]);
+
+/**
+ * A whole authored day, in seconds — `office-day`'s own `durationMin × 60`.
+ *
+ * **This is the one number on this side of the wire that `viz` derives rather than picks**, and the
+ * asymmetry is the whole of why the constant needs a paragraph. `shift/dayLength.ts#wholeDayFor`
+ * reads `data/traffic-profiles.json`, finds the phase-list record whose peak declares the building's
+ * own `directionalSplit`, and returns that record's period — so the client can post a length nobody
+ * ever offered it. § D286 closed this same mismatch from the other side by deleting the client's
+ * *offer* of 36 000; [§ D356](../../../../DECISIONS.md) then made the same length reachable again
+ * **without** an offer, and a bound on offers cannot see a derivation.
+ *
+ * So the two sides are pinned by a **test rather than by an import**: `viz` may not depend on
+ * `server` (it is a static browser bundle and this package opens a socket and a database — the rule
+ * `menu/challenge.ts` states for the challenge shapes), so `menu/client.test.ts` runs the client's
+ * real `wholeDayFor` over the real `data/` and asserts every length it can produce is in the list
+ * below, read out of **this file's source text**. A day authored in `data/` with a different period,
+ * or this constant edited, turns that case red. That is the deliverable rather than the number.
+ *
+ * **Widening what is postable is not widening what is offered.** § D286's `LONGEST_OFFERED_RUN_S`
+ * stands untouched at 7 200 and `menu.test.ts` still asserts it; a whole day remains something a
+ * building's own record grants, never a row in a length picker.
+ *
+ * A decision number is owed for this entry.
+ */
+const WHOLE_DAY_S = 36_000;
+
+/**
+ * Run lengths the server will simulate: the slice ladder, plus a whole authored day.
+ *
+ * Sorted, because the list is joined into the refusal a player reads and an unsorted one reads as
+ * an accident. See {@link WHOLE_DAY_S} for how the last entry is kept honest against `viz`.
+ */
+export const ACCEPTED_DURATIONS_S: readonly number[] = Object.freeze(
+  [...OFFERED_DURATIONS_S, WHOLE_DAY_S].sort((left, right) => left - right),
+);
 
 /**
  * The outer bound on a window, in seconds.

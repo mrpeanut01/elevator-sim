@@ -35,6 +35,15 @@
  * one would make the mailbox round trip decorative and hand an account to anybody who could name an
  * address.
  *
+ * ## An account can be deleted, and until this route landed it could not
+ *
+ * {@link deleteAccount} answers `DELETE /api/me`: the caller's own account, named by the session
+ * token and by nothing else the request can carry, and the schema's cascade takes every table that
+ * references it. It is the counterpart of {@link requestLink}, which is what *creates* an
+ * account — asking for a sign-in link writes a `users` row whether or not the mail is ever read, so
+ * every address this server has ever been handed is in that table, and before this route there was
+ * no way out of it. `docs/26-telemetry-and-privacy.md` § 5.3 is where that gap was recorded.
+ *
  * ## Two boards, and they answer different questions
  *
  * `/api/board` is the **configuration** board of § D214 § 4: one configuration — dispatcher
@@ -83,6 +92,7 @@ import { configHashOf, submissionIssues, type ResolvedDataFacts, type Submission
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
 import {
   BOARD_METRICS,
+  NoSuchUserError,
   normaliseEmail,
   type BoardMetric,
   type ChallengeEntryRow,
@@ -161,29 +171,55 @@ const MAX_DISPLAY_NAME = 32;
  *
  * `submissionIssues` already keeps an *unauthenticated* shape error from commanding a simulation.
  * This is the authenticated counterpart, and it is needed for the same reason at a larger size: a
- * verification is a **whole 7 200-second run** at the longest accepted length, so one signed-in
- * account submitting in a loop is a CPU denial of service wearing a valid session.
+ * verification is a whole re-simulation, so one signed-in account submitting in a loop is a CPU
+ * denial of service wearing a valid session.
  *
  * Five seconds, which is far below any honest play rate — a player has to watch a run before they
- * can post it — and far above the cost of one replay. Since § D218 a submission can be worth more
- * than one replay, so this is the **unit** rather than the whole interval; {@link cooldownForSeeds}
- * is what a route actually charges.
+ * can post it — and far above the cost of one replay of {@link REFERENCE_REPLAY_S}. A submission can
+ * be worth more than one such replay — more seeds since § D218, and more *seconds* since a whole
+ * authored day became postable — so this is the **unit** rather than the whole interval;
+ * {@link cooldownForReplay} is what a route actually charges.
  */
 const MIN_SUBMIT_INTERVAL_MS = 5_000;
 
 /**
- * The cooldown a submission costs, in milliseconds — **one replay's worth per seed**.
+ * The run length {@link MIN_SUBMIT_INTERVAL_MS} was sized against, in simulated seconds.
+ *
+ * This used to be spelled *"the longest accepted length"* in the sentence above, and that phrasing
+ * is exactly what went stale: `ACCEPTED_DURATIONS_S` now also carries a whole authored day at
+ * 36 000 s, five times this. The number keeps its value and loses its claim to be the maximum —
+ * it is the **reference replay** the five seconds was measured against, and nothing more.
+ */
+const REFERENCE_REPLAY_S = 7_200;
+
+/**
+ * The cooldown a submission costs, in milliseconds — **one replay's worth per seed, per reference
+ * replay's worth of simulated time**.
  *
  * A single-run submission is one simulation and a challenge submission is one *per seed*, so a flat
  * interval sized for the first would let the second command five times the CPU at the same rate.
  * Derived from the seed count rather than written down twice, so `MAX_CHALLENGE_SEEDS` cannot be
  * raised without the cooldown rising with it.
  *
- * Twenty-five seconds for a five-seed challenge. Still far below any honest play rate — a player
- * has to watch five runs before they can post them — and still far above the cost of the replays.
+ * **The length is charged for the same reason and it did not used to be**, because until a whole
+ * authored day became postable every accepted length sat at or below {@link REFERENCE_REPLAY_S} and
+ * the factor was always one. A 36 000-second day is five reference replays of CPU — `§ D356` measured
+ * one at **9 200 ms** on `vertical-city` — so leaving the charge at five seconds would have let a
+ * single account command more simulation per second than the box can run, which is the denial of
+ * service this constant exists to prevent. Widening what is postable without widening what it costs
+ * would have been the widening paying for itself out of the server's budget.
+ *
+ * Derived rather than written down twice, exactly as the seed count is: `ACCEPTED_DURATIONS_S`
+ * cannot be raised without the cooldown rising with it.
+ *
+ * Twenty-five seconds for a five-seed challenge, and twenty-five for a whole day. Still far below
+ * any honest play rate — a player has to watch the runs before they can post them — and still far
+ * above the cost of the replays. Floored at one so every length at or under the reference charges
+ * exactly what it charged before: nothing already shipping moves.
  */
-function cooldownForSeeds(seedCount: number): number {
-  return MIN_SUBMIT_INTERVAL_MS * Math.max(1, seedCount);
+function cooldownForReplay(seedCount: number, durationS: number): number {
+  const replays = Math.max(1, seedCount) * Math.max(1, durationS / REFERENCE_REPLAY_S);
+  return MIN_SUBMIT_INTERVAL_MS * replays;
 }
 
 /**
@@ -281,6 +317,8 @@ export function createApi(deps: ApiDeps): Api {
         return logout(deps, request);
       case 'GET /api/me':
         return me(deps, request);
+      case 'DELETE /api/me':
+        return deleteAccount(deps, request, nextSubmitMs);
       case 'POST /api/me/display-name':
         return setDisplayName(deps, request);
       case 'POST /api/scores':
@@ -543,6 +581,82 @@ async function me(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
     : { status: 200, body: { user: publicUser(user) } };
 }
 
+/**
+ * Erase the caller's own account, and everything attached to it.
+ *
+ * ## The authorization rule is that there is nothing to get wrong
+ *
+ * The account this deletes is the one the **session token** names, and the route reads no other
+ * identity: no path segment, no query parameter, no body field. There is therefore no request a
+ * caller can compose that names somebody else's account — which is a stronger property than
+ * comparing a supplied id against the session's, because a comparison can be forgotten on a later
+ * branch and an argument that does not exist cannot be. `api.test.ts` sends one anyway — in a body,
+ * in a query string, and in the path — and requires the named account to survive all three, and the
+ * *caller's* account to be gone, so that a route which quietly did nothing could not pass either.
+ *
+ * ## Erasure spans two stores, and this route is one of them
+ *
+ * `docs/26-telemetry-and-privacy.md` § 3.3: telemetry rows never carry `users.id` and telemetry
+ * requests never carry a session token, so a player deleting their data sends **two independent
+ * requests** — this one, authenticated to the account, and one naming the `playerId` — because the
+ * client holds both keys at that moment and the server never has to hold the join. So this route
+ * deletes the account and every table that cascades off it — four today, and read out of
+ * `pg_constraint` by `store.test.ts` rather than counted anywhere — and **claims nothing about the
+ * other store**. There is no telemetry in this tree yet (§ 0, fact 1), so the second request has no
+ * endpoint to reach today; when it does, it is a second route rather than a second branch of this
+ * one, or the join this design exists to avoid would be back.
+ *
+ * ## What is deliberately not cleared, which is the half worth arguing
+ *
+ * The account's entry in `nextSubmitMs` goes, because it is an identifier of a deleted account
+ * sitting in this process's memory until a restart and there is no reason to keep it — a fresh id
+ * is a fresh budget anyway, since ids are UUIDs and never reused.
+ *
+ * The **sign-in link limiters do not**, and must not. {@link LINKS_PER_EMAIL} is keyed by the
+ * address, not the account, and its whole job is to bound how often an address can be mailed —
+ * clearing it on deletion would make *delete the account* the way to reset the budget that decides
+ * whether this endpoint is an email-bombing gadget, and a session costs exactly one mail. It
+ * expires on its own fifteen-minute window, which is a bound rather than a retention decision.
+ *
+ * {@link LINKS_PER_CALLER} is untouched for a plainer reason still: its key is an **IP address**,
+ * which was never the account's to erase and belongs to whoever is calling rather than to whoever
+ * signed in. Nothing about deleting an account should move a budget keyed on something an account
+ * does not own.
+ *
+ * ## 200, and the token is dead before the caller reads the answer
+ *
+ * The session that authorised this is a row in `sessions`, one of the four the cascade takes, so it
+ * stops working in the same statement. A second call with the same token gets the 401 an unknown
+ * token has always got, so trying it twice does not distinguish a deleted account from one that
+ * never existed.
+ *
+ * A decision number is owed; the argument is here and in `Store.deleteUser`.
+ */
+async function deleteAccount(
+  deps: ApiDeps,
+  request: ApiRequest,
+  nextSubmitMs: Map<string, number>,
+): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
+  if (user === undefined) {
+    return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to delete your account.' } };
+  }
+  await deps.store.deleteUser(user.id);
+  nextSubmitMs.delete(user.id);
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      // What was actually removed, named rather than summarised as "your data" — a player deciding
+      // whether to press this is entitled to know that their board entries go with the address.
+      detail:
+        'That account is gone: the address, the display name, every board and challenge entry ' +
+        'posted from it, every session and every outstanding sign-in link. The token that made ' +
+        'this request no longer works.',
+    },
+  };
+}
+
 /* --------------------------------------------------------------- leaderboard */
 
 async function submit(
@@ -567,7 +681,10 @@ async function submit(
   // After the cheap gate and before the expensive one. Checked here rather than at the top so a
   // player whose submission is malformed is told that, rather than being told to wait and then
   // told it was malformed anyway.
-  const limited = chargeCooldown(deps, user.id, nextSubmitMs, 1);
+  // The run's own length, not a constant: a whole authored day is five reference replays of CPU and
+  // is charged as such. Read off the submission, which `submissionIssues` has already bounded to
+  // `ACCEPTED_DURATIONS_S` two lines up — so this cannot be an arbitrary number a caller chose.
+  const limited = chargeCooldown(deps, user.id, nextSubmitMs, 1, submission.run.durationS);
   if (limited !== undefined) return limited;
 
   const facts = deps.factsFor(submission.run);
@@ -587,13 +704,19 @@ async function submit(
   }
 
   const configHash = configHashOf(submission.run, facts);
-  const entry = await deps.store.recordEntry({
-    configHash,
-    userId: user.id,
-    run: submission.run,
-    // The **server's** figures. The claim is compared and then discarded; it is never what ranks.
-    measured: verification.measured,
-  });
+  let entry: EntryRow;
+  try {
+    entry = await deps.store.recordEntry({
+      configHash,
+      userId: user.id,
+      run: submission.run,
+      // The **server's** figures. The claim is compared and then discarded; it is never what ranks.
+      measured: verification.measured,
+    });
+  } catch (error) {
+    if (error instanceof NoSuchUserError) return accountVanished();
+    throw error;
+  }
   return { status: 201, body: { configHash, entry: publicEntry(entry) } };
 }
 
@@ -725,7 +848,9 @@ async function submitChallenge(
     };
   }
 
-  const limited = chargeCooldown(deps, user.id, nextSubmitMs, target.seeds.length);
+  // The challenge's own length, from the issued definition rather than from the request — a
+  // challenge fixes its run and `schedule.ts` has already checked it against `ACCEPTED_DURATIONS_S`.
+  const limited = chargeCooldown(deps, user.id, nextSubmitMs, target.seeds.length, target.config.durationS);
   if (limited !== undefined) return limited;
 
   const facts = deps.challengeFactsFor(target.config);
@@ -739,14 +864,20 @@ async function submitChallenge(
   }
 
   const dataHash = challengeDataHashOf(target, facts);
-  const entry = await deps.store.recordChallengeEntry({
-    challengeId: target.id,
-    dataHash,
-    userId: user.id,
-    dispatcherProfileId: submission.dispatcherProfileId,
-    // The **server's** aggregate over the **server's** runs. The claim is compared and discarded.
-    score: verification.score,
-  });
+  let entry: ChallengeEntryRow;
+  try {
+    entry = await deps.store.recordChallengeEntry({
+      challengeId: target.id,
+      dataHash,
+      userId: user.id,
+      dispatcherProfileId: submission.dispatcherProfileId,
+      // The **server's** aggregate over the **server's** runs. The claim is compared and discarded.
+      score: verification.score,
+    });
+  } catch (error) {
+    if (error instanceof NoSuchUserError) return accountVanished();
+    throw error;
+  }
   return { status: 201, body: { challengeId: target.id, dataHash, entry: publicChallengeEntry(entry) } };
 }
 
@@ -815,6 +946,35 @@ async function challengeBoard(deps: ApiDeps, request: ApiRequest): Promise<ApiRe
  * Shared
  * -------------------------------------------------------------------------- */
 
+/**
+ * The account was there when the request authenticated and is not there now.
+ *
+ * **Reachable only since `DELETE /api/me` landed, and only by the account's own owner.** A
+ * verification is a whole simulation, so the gap between {@link authenticate} and the write is
+ * seconds rather than microseconds; a player who deletes their account while a submission is
+ * verifying lands here. Nothing about it is cross-account — a session cannot delete anybody else —
+ * so this is a robustness answer rather than a security one.
+ *
+ * **401 rather than 409 or 500.** A `500` is what this used to be, and it was a lie: nothing failed
+ * on the server, the caller stopped existing. A `409` would invite a retry into a state that cannot
+ * come back. `401` is exactly what the *next* request would get, since the session went with the
+ * account, and `not-signed-in` is the code every client already handles by dropping its session —
+ * which is the correct thing for it to do here.
+ *
+ * The detail says the run was not posted, because the alternative reading — that it was posted and
+ * then erased — is the one a player would otherwise assume, and it is wrong: the insert never
+ * landed.
+ */
+function accountVanished(): ApiResponse {
+  return {
+    status: 401,
+    body: {
+      error: 'not-signed-in',
+      detail: 'That account was deleted while this run was being verified, so nothing was posted.',
+    },
+  };
+}
+
 async function authenticate(deps: ApiDeps, request: ApiRequest): Promise<UserRow | undefined> {
   return request.token === undefined ? undefined : deps.store.userForSession(request.token);
 }
@@ -831,6 +991,8 @@ function chargeCooldown(
   userId: string,
   nextSubmitMs: Map<string, number>,
   seedCount: number,
+  /** The length of one replay, in simulated seconds — see {@link cooldownForReplay}. */
+  durationS: number,
 ): ApiResponse | undefined {
   const nowMs = deps.now();
   if (nowMs < (nextSubmitMs.get(userId) ?? Number.NEGATIVE_INFINITY)) {
@@ -842,7 +1004,7 @@ function chargeCooldown(
       },
     };
   }
-  nextSubmitMs.set(userId, nowMs + cooldownForSeeds(seedCount));
+  nextSubmitMs.set(userId, nowMs + cooldownForReplay(seedCount, durationS));
   return undefined;
 }
 

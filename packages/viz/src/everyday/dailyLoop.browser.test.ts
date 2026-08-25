@@ -35,6 +35,7 @@ import {
   HAS_BROWSER,
   enterEverydayStage,
   openEverydayDoor,
+  openPage,
 } from '../dev/browserTier.test-helper.js';
 
 let server: ViteDevServer;
@@ -63,7 +64,7 @@ afterAll(async () => {
 
 /** A cold load, waited out to the point where the Engineer menu has been dismissed. */
 async function coldLoad(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,

@@ -31,6 +31,7 @@ import { bootstrap, UnsafeConfigurationError, type Server } from '../bootstrap.j
 import { configFor, metricsOf } from '../leaderboard/verify.js';
 import { OutboxMailer } from '../mail/mailer.js';
 import { PgliteSql } from '../store/pglite.test-helper.js';
+import { RacingSql } from '../store/racingSql.test-helper.js';
 import type { ApiRequest, ApiResponse } from './api.js';
 import type { Submission, SubmittedRun } from '../leaderboard/submission.js';
 
@@ -40,15 +41,23 @@ const SECRET = 'a'.repeat(48);
 let server: Server;
 let outbox: OutboxMailer;
 let scratch: string;
+/**
+ * The database under {@link server}, kept so one test can forge a state the API cannot reach.
+ *
+ * Used in exactly one place — the cooldown-clearing test below says why it needs raw SQL and why
+ * the state it builds cannot occur in production. Everything else drives the API.
+ */
+let storeSql: PgliteSql;
 /** Injected, so nothing here depends on what time the suite runs at. */
 let clock = 1_770_000_000_000;
 
 beforeAll(async () => {
   scratch = await mkdtemp(join(tmpdir(), 'elevator-server-'));
   outbox = new OutboxMailer(join(scratch, 'outbox.jsonl'));
+  storeSql = new PgliteSql();
   server = await bootstrap({
     dataDir: DATA_DIR,
-    sql: new PgliteSql(),
+    sql: storeSql,
     env: { ELEVATOR_SIM_SECRET: SECRET },
     publicOrigin: 'https://elevator.example',
     now: () => clock,
@@ -509,6 +518,116 @@ function honest(run: SubmittedRun = RUN): Submission {
   return { run, claimed: metricsOf(runSimulation(config).summary) };
 }
 
+/**
+ * A whole authored day, as `viz` derives it — GitHub issue #267.
+ *
+ * `chancery-house` rather than `midtown-office`, and the choice is measured rather than arbitrary:
+ * of the four office towers whose profile admits `office-day`, Midtown's whole day is **not
+ * quotable** (`awtIsValid: false`, AWT 291.28 at this seed), so it is refused 422 `awt-not-quotable`
+ * on its own merits and could never demonstrate the duration gate. Chancery replays in 407 ms with a
+ * quotable 10.48 s mean, which is the fastest honest fixture available.
+ *
+ * `windowStartS: 0` is not decoration. `core` refuses a `templateOverrides.durationS` refit on a
+ * phase-list record by name (§ D285/§ D356), so a whole day travels as a window over the record's own
+ * period or it throws.
+ */
+const WHOLE_DAY: SubmittedRun = Object.freeze({
+  buildingId: 'chancery-house',
+  dispatcherProfileId: 'eta',
+  demandTemplateId: 'office-day',
+  arrivalRatePctPop5min: null,
+  durationS: 36_000,
+  windowStartS: 0,
+  seed: '20260804',
+});
+
+describe('posting a whole authored day', () => {
+  /*
+   * **The end-to-end case for GitHub issue #267, and it is deliberately not a test of a constant.**
+   *
+   * § D286 closed this same mismatch on the client and it reappeared, because the fix lived on one
+   * side only: § D356 gave the Everyday day a length **derived from the record** rather than picked
+   * from a list, and `LONGEST_OFFERED_RUN_S` correctly kept bounding what is *offered* while saying
+   * nothing about what is *reachable*. A test asserting `ACCEPTED_DURATIONS_S` contains 36 000 would
+   * repeat that mistake in the other direction — it would pass on a server that accepts a length no
+   * client can produce, and fail to notice a client that starts producing one the server refuses.
+   *
+   * So this drives the real route: a run built the way `configFor` builds one, simulated by the
+   * shipped kernel, posted over the real API, and required to be **created**. Its partner is
+   * `menu/client.test.ts`'s *"accepts every whole-day length the client can actually derive"*, which
+   * runs the client's own `wholeDayFor` over the real `data/` and checks its answers against this
+   * server's source text. Between them the two packages cannot drift apart silently again.
+   */
+  it('accepts it, replays it, and ranks it', async () => {
+    const account = await signIn();
+    const truth = honest(WHOLE_DAY);
+    const posted = await call('POST', '/api/scores', { token: account.token, body: truth });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+  }, 120_000);
+
+  it('puts it on its own board, never against a slice of the same day', async () => {
+    /*
+     * The property that makes widening safe rather than a ranking bug, driven through the API so it
+     * is the *server's* digest being compared rather than a recomputation.
+     *
+     * `verify.test.ts` proves `configHashOf` separates the two lengths; this proves the route uses
+     * that digest to file the entry. A ten-hour run and a two-hour window over the same day, same
+     * building, same dispatcher and same seed are different measurements, and a board that mixed
+     * them would rank a rush hour against a whole working day and call one dispatcher better.
+     */
+    const account = await signIn();
+    const day = await call('POST', '/api/scores', { token: account.token, body: honest(WHOLE_DAY) });
+    expect(day.status, JSON.stringify(day.body)).toBe(201);
+
+    // Past the whole day's own cooldown, which is five reference replays rather than one.
+    clock += 60_000;
+    const slice = { ...WHOLE_DAY, durationS: 7_200 };
+    const posted = await call('POST', '/api/scores', { token: account.token, body: honest(slice) });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+
+    expect(bodyOf(day)['configHash']).not.toBe(bodyOf(posted)['configHash']);
+  }, 180_000);
+
+  it('charges what it costs — five reference replays, not one', async () => {
+    /*
+     * Widening what is postable without widening what it costs would have been the widening paying
+     * for itself out of the server's CPU budget. `MIN_SUBMIT_INTERVAL_MS`'s five seconds was sized
+     * against a 7 200-second replay — the docstring said so in as many words, and that sentence was
+     * made false by the line above that admits 36 000. A whole day is five such replays, so it
+     * charges five times the interval.
+     *
+     * Driven against the clock rather than by calling `cooldownForReplay`, because the constant is
+     * not the claim: the claim is that a second submission inside the charged window is refused.
+     */
+    const account = await signIn();
+    const at = clock;
+    const first = await call('POST', '/api/scores', { token: account.token, body: honest(WHOLE_DAY) });
+    expect(first.status, JSON.stringify(first.body)).toBe(201);
+
+    // Ten seconds clears a slice's five-second charge and must not clear a whole day's twenty-five.
+    clock = at + 10_000;
+    const tooSoon = await call('POST', '/api/scores', { token: account.token, body: honest(WHOLE_DAY) });
+    expect(tooSoon.status).toBe(429);
+    expect(bodyOf(tooSoon)['error']).toBe('too-many-submissions');
+
+    clock = at + 26_000;
+    const allowed = await call('POST', '/api/scores', { token: account.token, body: honest(WHOLE_DAY) });
+    expect(allowed.status, JSON.stringify(allowed.body)).toBe(201);
+  }, 180_000);
+
+  it('leaves a slice charging exactly what it charged before', async () => {
+    // The other half, and the reason the factor is floored at one: every length at or under the
+    // reference replay is unchanged, so nothing already shipping moved. `RUN` is 900 s.
+    const account = await signIn();
+    const truth = honest();
+    const at = clock;
+    expect((await call('POST', '/api/scores', { token: account.token, body: truth })).status).toBe(201);
+    clock = at + 6_000;
+    const second = await call('POST', '/api/scores', { token: account.token, body: truth });
+    expect(second.status, JSON.stringify(second.body)).toBe(201);
+  }, 120_000);
+});
+
 describe('posting a score', () => {
   it('is allowed by the session alone, because the session is proof of the address', async () => {
     // § D241 deleted `postingGate` with the password, and this is why that is not a weakening. The
@@ -657,6 +776,227 @@ describe('a board', () => {
     const response = await call('GET', '/api/whatever');
     expect(response.status).toBe(404);
     expect(bodyOf(response)['error']).toBe('no-such-route');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Erasing an account
+ * -------------------------------------------------------------------------- */
+
+describe('deleting an account', () => {
+  it('refuses a caller who is not signed in, and touches nothing while refusing', async () => {
+    const bystander = await signIn();
+    // No token at all, a token that was never issued, and a real token with one character added —
+    // the third because a prefix comparison would accept it and a lookup will not.
+    const refusals = [
+      await call('DELETE', '/api/me'),
+      await call('DELETE', '/api/me', { token: 'not-a-session-token' }),
+      await call('DELETE', '/api/me', { token: `${bystander.token}x` }),
+    ];
+    for (const response of refusals) {
+      expect(response.status, JSON.stringify(response.body)).toBe(401);
+      expect(bodyOf(response)['error']).toBe('not-signed-in');
+    }
+    expect((await call('GET', '/api/me', { token: bystander.token })).status).toBe(200);
+  });
+
+  it('cannot be pointed at somebody else, however the request tries to name them', async () => {
+    const victim = await signIn();
+    /*
+     * Every way a caller could name an account other than the one their session names. The route
+     * reads none of them — the id comes off the session and from nowhere else — so this is not
+     * three checks being exercised, it is three arguments that do not exist. A route that compared
+     * a supplied id against the session's would pass this too, and would be one forgotten branch
+     * away from not passing it; a route with nothing to compare cannot acquire that branch.
+     *
+     * A fresh attacker each time, because a successful deletion spends the caller's own account.
+     */
+    const attempts: readonly { body?: unknown; query?: Record<string, string> }[] = [
+      { body: { userId: victim.id } },
+      { body: { id: victim.id, email: victim.email } },
+      { query: { userId: victim.id } },
+    ];
+    for (const attempt of attempts) {
+      const attacker = await signIn();
+      const response = await call('DELETE', '/api/me', { token: attacker.token, ...attempt });
+      // 200 rather than 400: the request is well-formed and the field is simply never read.
+      expect(response.status, JSON.stringify(attempt)).toBe(200);
+      // The victim is untouched...
+      expect((await call('GET', '/api/me', { token: victim.token })).status, JSON.stringify(attempt)).toBe(200);
+      // ...and the caller's *own* account is gone, which is what stops a route that quietly did
+      // nothing at all from passing the line above.
+      expect((await call('GET', '/api/me', { token: attacker.token })).status, JSON.stringify(attempt)).toBe(401);
+    }
+
+    // And an id in the path is not a route. `DELETE /api/me/<id>` is spelled out because it is the
+    // shape somebody would reach for when adding an admin deletion later, and it must not already
+    // half-exist.
+    const byPath = await call('DELETE', `/api/me/${victim.id}`, { token: (await signIn()).token });
+    expect(byPath.status).toBe(404);
+    expect((await call('GET', '/api/me', { token: victim.token })).status).toBe(200);
+  });
+
+  it('erases the account, its board entry and its session, observed through the API alone', async () => {
+    const account = await signIn();
+    const named = bodyOf(await call('GET', '/api/me', { token: account.token }))['user'] as Record<string, unknown>;
+    const displayName = String(named['displayName']);
+
+    // Its own board — a rate no other test posts at — so the assertions below are about this
+    // account's row rather than about where it happened to rank among everybody else's.
+    const posted = await call('POST', '/api/scores', {
+      token: account.token,
+      body: honest({ ...RUN, arrivalRatePctPop5min: 7 }),
+    });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+    const configHash = String(bodyOf(posted)['configHash']);
+    const before = await call('GET', '/api/board', { query: { configHash, metric: 'awtS' } });
+    expect(JSON.stringify(bodyOf(before)['entries'])).toContain(displayName);
+
+    const deleted = await call('DELETE', '/api/me', { token: account.token });
+    expect(deleted.status, JSON.stringify(deleted.body)).toBe(200);
+
+    // The session is a row in one of the tables the cascade takes, so the token that authorised the
+    // deletion is refused by the very next request.
+    expect((await call('GET', '/api/me', { token: account.token })).status).toBe(401);
+    // The board entry went with it. `store.test.ts` proves this against every child table the
+    // schema declares; this is the same fact observed where a player would notice it.
+    const after = await call('GET', '/api/board', { query: { configHash, metric: 'awtS' } });
+    expect(JSON.stringify(bodyOf(after)['entries'])).not.toContain(displayName);
+
+    // And the row is gone rather than flagged: asking for a link at the same address again creates
+    // a **new** account, which `createUser` could not do while the old one still held the address.
+    await call('POST', '/api/auth/request-link', { body: { email: account.email } });
+    const mail = await lastLink();
+    expect(mail.to).toBe(account.email);
+    const again = await call('POST', '/api/auth/redeem', { body: { token: mail.token } });
+    expect(again.status, JSON.stringify(again.body)).toBe(200);
+    expect((bodyOf(again)['user'] as Record<string, unknown>)['id']).not.toBe(account.id);
+  }, 60_000);
+
+  it('answers 401 rather than 500 when it happens under a submission in flight', async () => {
+    /*
+     * The race `DELETE /api/me` made reachable, driven end to end. `store.test.ts` proves the store
+     * raises `NoSuchUserError`; this proves the route turns it into an answer rather than into an
+     * unhandled rejection through the `Api` interface `bootstrap` exports.
+     *
+     * Its own server, because `RacingSql` has to be underneath the store from the moment it opens
+     * and the shared one is already running. Its own outbox for the same reason.
+     */
+    let raced: Server | undefined;
+    let accountId = '';
+    const sql = new RacingSql(
+      new PgliteSql(),
+      (text) => text.startsWith('INSERT INTO entries'),
+      // Exactly the gap: the submission has authenticated, verified a whole simulation, and is
+      // about to write. A player pressing delete during a verification lands precisely here.
+      async () => {
+        await raced?.store.deleteUser(accountId);
+      },
+    );
+    const outbox = new OutboxMailer(join(scratch, 'raced-outbox.jsonl'));
+    const app = await bootstrap({
+      dataDir: DATA_DIR,
+      sql,
+      env: { ELEVATOR_SIM_SECRET: SECRET },
+      publicOrigin: 'https://elevator.example',
+      now: () => clock,
+      mailer: outbox,
+    });
+    raced = app;
+
+    const ask = async (method: string, path: string, options: { body?: unknown; token?: string } = {}) =>
+      app.api({
+        method,
+        path,
+        query: new Map(),
+        body: options.body,
+        token: options.token,
+        clientIp: '198.51.100.251',
+      });
+
+    await ask('POST', '/api/auth/request-link', { body: { email: 'raced@example.test' } });
+    const message = (await outbox.delivered()).at(-1);
+    const link = /https:\/\/\S+/u.exec(message?.body ?? '')?.[0] ?? '';
+    const token = new URLSearchParams(new URL(link).hash.slice(1)).get('sign-in') ?? '';
+    const session = bodyOf(await ask('POST', '/api/auth/redeem', { body: { token } }));
+    accountId = String((session['user'] as Record<string, unknown>)['id']);
+
+    const response = await ask('POST', '/api/scores', {
+      token: String(session['token']),
+      body: honest(),
+    });
+    // Not a 500, and not a rejection. The caller stopped existing; nothing failed on the server.
+    expect(response.status, JSON.stringify(response.body)).toBe(401);
+    expect(bodyOf(response)['error']).toBe('not-signed-in');
+    // And the detail says the run was not posted, because the other reading — posted, then erased —
+    // is the one a player would assume and it is wrong.
+    expect(String(bodyOf(response)['detail'])).toMatch(/nothing was posted/u);
+    // PostgreSQL's own sentence must not reach a caller: it names the constraint and the table.
+    expect(JSON.stringify(response.body)).not.toMatch(/foreign key|constraint|fkey/u);
+    await app.close();
+  }, 60_000);
+
+  it('does not leave the deleted account holding a submission cooldown', async () => {
+    /*
+     * `deleteAccount` clears the account's entry in `nextSubmitMs`, which is an identifier of a
+     * deleted account sitting in this process's memory until a restart. Replacing that line with a
+     * no-op left all 265 tests green, so it was argued for at length in a docstring and pinned by
+     * nothing.
+     *
+     * **The state this builds cannot occur in production, and that is stated rather than hidden.**
+     * Account ids are `randomUUID()` and are never reused, so nothing a player can do reaches a
+     * second account with a first account's id — which is exactly why the leak is invisible from
+     * outside and why observing it needs raw SQL. What the test pins is the property the line
+     * exists for: *a deleted id carries no cooldown forward*. Forging id reuse is the only seam
+     * through which that is observable at all, and the alternative — exposing the closure's map so
+     * a test could read it — would be production surface added for a test's benefit.
+     *
+     * The clock is frozen throughout, in the shape the cooldown test above uses: `call` advances it
+     * ten seconds and `MIN_SUBMIT_INTERVAL_MS` is five, so without freezing the interval would have
+     * lapsed on its own and the test would pass whatever the line did.
+     */
+    const account = await signIn();
+    const at = clock;
+
+    const posted = await call('POST', '/api/scores', { token: account.token, body: honest() });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+    clock = at;
+
+    expect((await call('DELETE', '/api/me', { token: account.token })).status).toBe(200);
+    clock = at;
+
+    // The forged half: the same id, a fresh row. Straight to the database, because `createUser`
+    // mints its own id and no route can be asked for a particular one.
+    await storeSql.query(
+      'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) ' +
+        'VALUES ($1, $2, $3, $4, $5)',
+      [account.id, 'reborn@example.test', 'Reborn', true, at],
+    );
+    await server.store.createSession('reborn-session-token', account.id);
+    clock = at;
+
+    const again = await call('POST', '/api/scores', {
+      token: 'reborn-session-token',
+      body: honest(),
+    });
+    // 429 here would mean the deleted account's cooldown outlived it. Inside the interval, on a
+    // frozen clock, so nothing but the clearing line can produce a 201.
+    expect(again.status, JSON.stringify(again.body)).toBe(201);
+  }, 120_000);
+
+  it('says what it removed, and does not claim anything about the other store', async () => {
+    const account = await signIn();
+    const detail = String(bodyOf(await call('DELETE', '/api/me', { token: account.token }))['detail']);
+    // The player is told what goes, because a board entry disappearing is not obviously part of
+    // "delete my account" until somebody says so.
+    for (const named of [/address/iu, /board/iu, /session/iu, /sign-in link/iu]) {
+      expect(detail, String(named)).toMatch(named);
+    }
+    // `docs/26` § 3.3: telemetry is a second store reached by a second request holding a different
+    // key, and the server never holds the join. A response that spoke for it would be claiming a
+    // relationship this design exists not to have — and there is no telemetry in this tree to
+    // speak for anyway.
+    expect(detail).not.toMatch(/telemetry|analytics|everything we hold|all your data/iu);
   });
 });
 

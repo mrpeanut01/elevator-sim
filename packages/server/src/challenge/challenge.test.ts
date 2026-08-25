@@ -268,12 +268,63 @@ describe('the board a challenge entry lands on', () => {
     expect(challengeDataHashOf(issuedChallengeFor(0), { ...FACTS, trafficModel: 'v2' })).not.toBe(base);
   });
 
-  it('does not depend on which dispatcher a player chose — that is the free axis', () => {
-    // The defect § D218 exists to fix, checked directly: on a config board the dispatcher is in the
-    // key, so choosing a different one moves a player to a different board instead of up this one.
-    expect(challengeDataHashOf(issuedChallengeFor(0), FACTS)).toBe(
-      challengeDataHashOf(issuedChallengeFor(0), FACTS),
-    );
+  /*
+   * The defect § D218 exists to fix: on a config board the dispatcher is in the key, so choosing a
+   * different one moves a player to a *different* board instead of up this one.
+   *
+   * **This case used to assert a value equals itself.** It read
+   * `expect(challengeDataHashOf(issuedChallengeFor(0), FACTS)).toBe(challengeDataHashOf(issuedChallengeFor(0), FACTS))`
+   * — and `challengeDataHashOf` takes no dispatcher argument, so the two calls were identical by
+   * construction and the assertion could not fail for any implementation of anything. It would have
+   * passed against a deleted function body. A guard that reads as protection and provides none is
+   * the family `RISKS.md` R26 and R40 exist for, and it is worse than no guard, because the next
+   * reader stops looking.
+   *
+   * The claim is now made the only way it can be made honestly: **the dispatcher is not among the
+   * inputs**, and the inputs are enumerated by perturbation rather than by transcription. Each of
+   * the eleven fields the hash names is moved on its own and required to move the hash — which is
+   * what makes the *absence* of a dispatcher field mean something. Without that half, "no dispatcher
+   * in the key" is satisfied by a hash that reads nothing at all.
+   *
+   * The structural half of the same claim — that an issued challenge exposes no dispatcher axis to
+   * begin with — is pinned separately by *issues a challenge as data*, and deliberately: one asserts
+   * the shape a challenge has, this one asserts what the hash does with it.
+   */
+  it('reads every field it names, so the dispatcher being absent from the key means something', () => {
+    const base = challengeDataHashOf(issuedChallengeFor(0), FACTS);
+
+    // Every fact, one at a time. `Object.keys` rather than a list here, so a twelfth fact added to
+    // ChallengeDataFacts and forgotten in the hash fails this case instead of passing it.
+    const factKeys = Object.keys(FACTS) as (keyof typeof FACTS)[];
+    expect(factKeys.length).toBeGreaterThan(0);
+    for (const key of factKeys) {
+      expect(
+        challengeDataHashOf(issuedChallengeFor(0), { ...FACTS, [key]: `${FACTS[key]}-moved` }),
+        `${key} is a declared fact of the board and the hash does not read it, so two boards set ` +
+          'against different reference data would share a key',
+      ).not.toBe(base);
+    }
+
+    // And every axis of the challenge's own config, by the same argument.
+    const issued = issuedChallengeFor(0);
+    const configKeys = Object.keys(issued.config) as (keyof typeof issued.config)[];
+    expect(configKeys.length).toBeGreaterThan(0);
+    for (const key of configKeys) {
+      const moved = typeof issued.config[key] === 'number' ? 999 : 'moved';
+      expect(
+        challengeDataHashOf({ ...issued, config: { ...issued.config, [key]: moved } }, FACTS),
+        `config.${key} distinguishes one board from another and the hash does not read it`,
+      ).not.toBe(base);
+    }
+
+    // The claim itself. Neither input type carries a dispatcher choice, so the hash has no way to
+    // see one — and the two loops above establish that this is a genuine absence rather than a
+    // hash that happens to ignore most of what it is given.
+    expect(
+      [...factKeys, ...configKeys].filter((key) => /dispatcher/iu.test(key)),
+      'a dispatcher axis reached the board key, which is exactly the § D218 defect: a player who ' +
+        'changes dispatcher would move to a different board instead of climbing this one',
+    ).toEqual(['dispatcherLibraryDigest']);
   });
 });
 

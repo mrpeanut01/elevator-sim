@@ -406,10 +406,59 @@ export interface SceneInput {
    * Distinct from {@link SceneInput.unservedFloorIds}, which is geometry: a floor no shaft
    * reaches. This is an *outcome* — a call the run left unanswered — and until now its only
    * surface anywhere in the viewer was the caption `drawSelection` draws for a landing the reader
-   * had picked out of the landing `<select>`. That selector is `wide-only` (dropped below 1280 px)
-   * and the Phase 9 design sends it to Advanced mode, while the same design lists a locked-out
-   * call among the facts Basic mode may never hide. A fact with one optional surface is a fact
-   * that is usually not shown, so it is drawn on the landing itself and named in the banner.
+   * had picked out of the landing `<select>`.
+   *
+   * ## The viewport clause this paragraph used to carry — withdrawn, issue #256
+   *
+   * It said that selector is `wide-only` (dropped below 1280 px). **That was true when it was
+   * written and stopped being true two days later**, which makes it the failure `CLAUDE.md` files
+   * under *a stated mechanism goes stale* rather than a sentence that was ever wrong. The page
+   * really did carry `@media (max-width: 1279px) { .wide-only { display: none; } }`, and the bank
+   * filter, this `<select>` and **Export PNG** really did all three carry that class. The wave 10
+   * rebuild to the design handoff deleted the rule and the class together and moved the three
+   * controls into `.provenance`, where **no width rule of any kind reaches them**. Nothing failed
+   * when the CSS went, so the prose kept the mechanism for a month after the mechanism.
+   *
+   * **No replacement width is named here, because there is none to name** — and inventing one
+   * would be this defect again in new wording. The page declares five width breakpoints — 720,
+   * 767, 899, 1179 and 1339 px, plus `dev/surfaces.ts#DRAWER_BREAKPOINT_PX` at 1340 — and not one
+   * of them reaches this control: it carries no `data-hide-narrow`, which is the 1179 rule's only
+   * subject, and it sits in `<main class="stagecol">` rather than the right rail, so the 1339
+   * drawer rule misses it too. At every width this page supports, the landing `<select>` is on
+   * the screen.
+   *
+   * ## What actually governs it
+   *
+   * Two things, neither of them a width:
+   *
+   * 1. **Which tab is open.** The control lives in `#panel-run`, the Simulation tabpanel, and
+   *    every other tab hides that panel outright.
+   * 2. **Whether the reader has already picked the right landing.** The `<select>` defaults to
+   *    `none`, and `drawSelection` captions *the one landing selected*. An unanswered call on
+   *    floor 7 goes unwritten unless the reader chooses floor 7 — which they would have to
+   *    suspect in order to do.
+   *
+   * A third is a height rather than a width, and is the only survivor of the original clause's
+   * spirit: `#panel-run` is `overflow-y: auto` exactly so that, when the column cannot hold stage
+   * plus chrome, *the provenance rows go below the fold instead of the building*. `index.html`
+   * says so where that rule is written. Below the fold is not the same as dropped, and the
+   * distinction is the reason this is a third item rather than a rescue of the first.
+   *
+   * ## The conclusion stands — on the second support, not the withdrawn one
+   *
+   * Which is said outright, because the point of withdrawing a premise is to find out whether
+   * anything was resting on it. Two of the three original supports are untouched:
+   * `docs/10-experience-layer-contract.md` does send the landing selector to **Advanced**, and the
+   * same contract does list a locked-out call among the facts Basic may never hide. What is gone
+   * is the viewport support — and it was never the load-bearing one. Selection-gating is strictly
+   * stronger than the rule it replaces: `wide-only` hid the *control* on narrow screens only,
+   * whereas a default of `none` hides the *fact* on every screen until the reader guesses the
+   * floor. So the original conclusion is unchanged and better founded than when it was written —
+   * a fact with one optional surface is a fact that is usually not shown, so it is drawn on the
+   * landing itself and named in the banner.
+   *
+   * A decision number is owed. `viewportClaims.test.ts` pins the breakpoint set, so that the next
+   * rule deleted takes a test with it instead of leaving a sentence behind.
    *
    * Derived by the caller from `landingAssignmentsAt`, for the reason {@link SceneInput.queues}
    * gives: `drawScene` stays a pure function of its inputs, and the renderer never reaches for a

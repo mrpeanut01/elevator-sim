@@ -40,10 +40,6 @@
       "replications": 50,
       "goals": [
         {
-          "kind": "answer-the-demand",
-          "threshold": null
-        },
-        {
           "kind": "beat-the-baseline",
           "threshold": null
         }

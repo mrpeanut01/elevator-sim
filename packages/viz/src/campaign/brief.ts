@@ -91,15 +91,32 @@ export function briefingFor(input: BriefingInput): StageBriefing {
       `(seed ${stage.holdoutSeeds.seed}) is disjoint from it and is what a gain has to survive.`,
     facts: published.configurationFacts.map((record) => record.reason),
     withheld: published.withheld.map((record) => record.reason),
+    /*
+     * **Both counts, because there are two bars** — GitHub issue #255's other half.
+     *
+     * This line used to name the tuning count and call it *"the bar"*, which was true of what
+     * `judge.ts` did and is no longer: a stage is judged on its tuning batch **and** on a holdout
+     * batch it was not tuned against, each against that seed set's own published count. Naming one
+     * of the two here would be a brief that describes half the judging — and the seed note two
+     * fields up has promised since it was written that the holdout *"is what a gain has to
+     * survive"*, a sentence nothing enforced until this landed.
+     */
     goals: stage.goals.map((spec) => {
       const record = published.goals.find((entry) => entry.kind === spec.kind);
       const counts = record?.tuning;
+      const holdoutCounts = record?.holdout;
       if (counts === undefined || counts === null) {
         return `${goalLabel(spec)} — judged on the difference between the two settings, by a paired interval that has to exclude zero.`;
       }
+      const holdoutClause =
+        holdoutCounts === undefined || holdoutCounts === null
+          ? ''
+          : ` It passed ${String(holdoutCounts.passes)} of ${String(holdoutCounts.n)} on the ` +
+            `holdout seeds, and that count is the second bar — the one your setting has not seen.`;
       return (
         `${goalLabel(spec)} — judged over ${String(stage.replications)} runs. The shipped setting ` +
-        `passed ${String(counts.passes)} of ${String(counts.n)} on these seeds, and that count is the bar.`
+        `passed ${String(counts.passes)} of ${String(counts.n)} on these seeds, and that count is the bar.` +
+        holdoutClause
       );
     }),
     /*

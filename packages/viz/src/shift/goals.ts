@@ -64,12 +64,72 @@ import {
   type GoalObservations,
   type GoalReading,
   type GoalState,
+  type RunHorizon,
   type ShiftGoal,
 } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * The bars, and how they harden
  * -------------------------------------------------------------------------- */
+
+/**
+ * What the worst-wait ceiling is multiplied by when the day being graded is a **whole authored
+ * day** rather than a thirty-minute slice of one — `shift/dayLength.ts`, and the one bar the day's
+ * length moves.
+ *
+ * ## Why exactly one of the four bars carries this, and it is not the one you would guess
+ *
+ * Two of the four read a **share** (`carryPct`, `minutePct`) and two read a **maximum**
+ * (`peakQueue`, `worstWaitS`). The obvious expectation is that both maxima grow with the horizon —
+ * a maximum over twenty times the wall clock is a maximum over twenty times the opportunities — and
+ * **for the queue that expectation is measured and refuted.** Ten seeds per cell, day 1, the
+ * shipped defaults, thirty-minute `rise-and-fall` against the whole ten-hour `office-day`, median
+ * `peakQueue`:
+ *
+ * | building | slice | whole day |
+ * |---|---|---|
+ * | Midtown Office | 216 | 229 |
+ * | Secure Tower | 32 | 31 |
+ * | Chancery House | 25 | **16** |
+ * | Garden Apartments | 4 | 7 |
+ *
+ * No direction, let alone a factor — a deep queue is made by a peak, and a day contains the same
+ * peaks a slice does. **So the queue bar does not move**, and a lane that had scaled both because
+ * both are maxima would have loosened a real test on no evidence.
+ *
+ * The worst wait does move, and consistently: 1 522 → 2 804, 150 → 310, 79 → 161, 29 → 60 on the
+ * same four cells — ratios of **1.84, 2.07, 2.04 and 2.07**. The mechanism is not extra sampling
+ * either: a slice **truncates its own tail** and a day does not. A thirty-minute run ends while the
+ * morning backlog is still draining, so the longest wait it can record is bounded by the run; the
+ * day's morning backlog drains into a continuing 0.25 inter-peak flow and records what it actually
+ * cost. The same dispatcher on the same building looks worse purely because you watched longer,
+ * which is `CLAUDE.md`'s own warned failure mode — *a mean can move because the window moved* —
+ * arriving at a maximum instead of a mean.
+ *
+ * **`2` rather than a fitted figure**, and the spread is why: four buildings give 1.84–2.07 and a
+ * third decimal would claim a precision four buildings do not support. The run is
+ * `shiftRunConfigOf` at seeds `20 260 824 + 7 919 n`, `n = 0…9`, day 1, `collective`, folded
+ * through `observationsAt(recording, recording.endedAt)`.
+ *
+ * **It is a step and not a curve, deliberately.** Two horizons were measured because the product
+ * offers two kinds of run — a period, and a whole authored day — and a curve through two points is
+ * a curve nobody measured. It is keyed on *is this a whole day* rather than on a number of seconds
+ * for the same reason: a 7 200 s `constant-iso` is a longer *slice*, it truncates its tail exactly
+ * as a shorter one does, and giving it a day's allowance would be interpolating a mechanism that is
+ * not about length.
+ *
+ * **What it is for is invariance, not generosity.** § D345 forbids a difficulty setting from moving
+ * the bar a run is judged against, and `docs/33` § 1.4's third reason says freezing a bar across a
+ * change is *"a silent difficulty change in both directions"*. Leaving the ceiling at 230 s while
+ * the horizon grew twentyfold is exactly that, in the harder direction, chosen by nobody: measured
+ * with the ceiling fixed, Secure Tower's day 1 goes from **4 of 10 seeds missing something to 9 of
+ * 10**, entirely on this bar — outside `docs/33` DC-4's one-third-to-two-thirds band, which 4 of 10
+ * sits inside. At `2` the bar misses on the whole day exactly what it missed on the slice, on all
+ * four cells, which is the property `goals.test.ts` pins.
+ *
+ * A decision number is owed.
+ */
+const WORST_WAIT_WHOLE_DAY_FACTOR = 2;
 
 /**
  * The design's own hardening arithmetic (`design.html` :1428–1439), plus the worst-wait ceiling
@@ -101,6 +161,7 @@ export const GOAL_BARS = Object.freeze({
   worstMinS: 150,
   worstBaseS: 240,
   worstPerDayS: 10,
+  worstWholeDayFactor: WORST_WAIT_WHOLE_DAY_FACTOR,
 });
 
 /**
@@ -130,19 +191,65 @@ export const GOAL_BARS = Object.freeze({
  *
  * A decision number is owed for the retirement; this docstring is the argument.
  *
- * Pure in `day`, so the same day of the same week always asks the same thing.
+ * ## The second argument, and why it is not a difficulty setting
+ *
+ * `over` says **what kind of run today is** — a period, or a whole authored day
+ * (`shift/dayLength.ts`). It exists because § AB gave the Everyday daily loop the ten-hour
+ * `office-day` in place of a thirty-minute `rise-and-fall`, and *a goal measured over thirty
+ * minutes is not a goal over ten hours.* Exactly one bar moves and
+ * {@link WORST_WAIT_WHOLE_DAY_FACTOR} carries the measurement, the mechanism and the refutation of
+ * the other three.
+ *
+ * It is **not** the thing § D345 forbids. Every player on a whole day meets the same bar and every
+ * player on a slice meets the same bar; what differs is the run, not the person. `docs/33` § 4.4's
+ * W4 says the distinction outright — *"changing what day 5 asks of everybody is a design change to
+ * the curve; changing what day 5 asks of an Easy player specifically is the thing § D345 forbids"*.
+ * This is the first kind, and holding the ceiling still across a twentyfold change of horizon would
+ * have been the second kind arriving by accident.
+ *
+ * **`'period'` is the default and that is a decision rather than a convenience.** Three of the
+ * eight shipped buildings have no authored day and never will until one is written for their crowd,
+ * so a slice is the majority case, and every published figure in this repository was graded as one.
+ *
+ * **The named gap the default was covering is closed, and what it cost is worth recording.** This
+ * paragraph used to end by saying `dev/leftRail.ts` and `dev/main.ts` were *"not yet horizon-aware,
+ * and that is a named gap rather than a silent one"*. A named gap is still a gap: while it stood,
+ * an Everyday player running the whole authored day was told by the Everyday rail that today asked
+ * for a worst wait inside **460 s** and by the Engineer rail — the same run, one door away — that
+ * it asked for **230 s**, which is the disagreement `TEST_MATRIX.md` T1 forbids outright. Both
+ * shells now derive the argument from `shift/dayLength.ts#runHorizonOf`, which is one expression in
+ * a directory both of them import, and `everyday/host.test.ts` drives the two call paths against
+ * each other rather than against two literals.
+ *
+ * **The default stays, and stays optional, and `honesty/surfaces.ts` is right to call this bare.**
+ * Its corpus sweeps periods and nothing else: both spaces bound a case at `maxDurationS` — 900 s
+ * always-on, 1 800 s deep — and `honesty/surfaces.ts#planFor` writes `windowStartS: null`, so no
+ * case in either tier is a whole authored day. Passing `'whole-day'` there would have the honesty
+ * tier publish a 460 s ceiling over a 900 s run, which is the tier manufacturing the disagreement it
+ * exists to find. What the default may never again mean is *a product surface has not been told*.
+ *
+ * Pure in its arguments, so the same day of the same week over the same kind of run always asks the
+ * same thing.
  */
-export function goalsForDay(day: number): readonly ShiftGoal[] {
+export function goalsForDay(
+  day: number,
+  over: RunHorizon = 'period',
+): readonly ShiftGoal[] {
   const minuteBar = Math.min(
     GOAL_BARS.minuteMax,
     GOAL_BARS.minuteBase + day * GOAL_BARS.minutePerDay,
   );
   const carryBar = Math.min(GOAL_BARS.carryMax, GOAL_BARS.carryBase + day * GOAL_BARS.carryPerDay);
   const queueBar = Math.max(GOAL_BARS.queueMin, GOAL_BARS.queueBase - day * GOAL_BARS.queuePerDay);
-  const worstBar = Math.max(
-    GOAL_BARS.worstMinS,
-    GOAL_BARS.worstBaseS - day * GOAL_BARS.worstPerDayS,
-  );
+  /*
+   * The ladder first, the horizon second — so the day still hardens by 10 s and still floors, and
+   * the allowance scales the bar the ladder arrived at rather than replacing it. The other order
+   * would floor a whole day at 150 s and hand back the difficulty change this argument exists to
+   * prevent.
+   */
+  const worstBar =
+    Math.max(GOAL_BARS.worstMinS, GOAL_BARS.worstBaseS - day * GOAL_BARS.worstPerDayS) *
+    (over === 'whole-day' ? GOAL_BARS.worstWholeDayFactor : 1);
 
   const carry: ShiftGoal = {
     id: 'carry',

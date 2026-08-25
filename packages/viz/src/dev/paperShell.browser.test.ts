@@ -46,7 +46,7 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -57,7 +57,7 @@ beforeAll(async () => {
   server = await createServer({
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
-    server: { port: 5198, strictPort: false },
+    server: { port: 5207, strictPort: false },
     logLevel: 'error',
   });
   await server.listen();
@@ -81,7 +81,7 @@ afterAll(async () => {
  * colour.
  */
 async function midtownSeed42(width = 1280, height = 800): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width, height } });
+  const page = await openPage(browser, { viewport: { width, height } });
   await page.goto(`${origin}?building=midtown-office&seed=42`, { waitUntil: 'load' });
   await enterEngineerStage(page);
   return page;

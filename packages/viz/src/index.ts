@@ -116,8 +116,8 @@
  * | {@link editableIdsOf} | `src/dev/campaignPanel.ts`, `src/campaign/brief.ts` and `parse.ts`'s lever check. One answer to *"may I move this?"* |
  * | {@link briefingFor} | `src/dev/campaignPanel.ts`'s left column, redrawn on every stage change |
  * | {@link admitProfile}, {@link movedDimensions} | `src/dev/campaignPanel.ts` — a profile outside the stage's editable set is refused with the dimension named, before the batch |
- * | {@link judgeStage} | `src/dev/campaignPanel.ts`, on the batch the Campaign tab just ran |
- * | {@link batchRequestForStage}, {@link demonstrationConfigFor}, {@link stageReplicationSeed} | `src/dev/campaignPanel.ts`, and `campaign.test.ts` calls the same two rather than assembling a second request — the shape § D159 calls *a fixture routing the test to the wrong code path*, one level up |
+ * | {@link judgeStage} | `src/campaign/stageSequence.ts#runStageToVerdict`, and `dev/campaignPanel.ts` through it — **twice per stage**, once per seed set, because a stage clears on the tuning batch *and* on seeds it was not tuned against |
+ * | {@link batchRequestForStage}, {@link demonstrationConfigFor}, {@link stageReplicationSeed} | `src/campaign/stageSequence.ts#runStageToVerdict`, which builds **both** batches so the two can differ only in their seed set; `dev/campaignPanel.ts` and `campaign.test.ts` reach them through it rather than assembling a second request — the shape § D159 calls *a fixture routing the test to the wrong code path*, one level up |
  * | {@link failStateCounts}, {@link evidenceFrom}, {@link failStateReports} | `src/dev/campaignPanel.ts` — § 5.3's four states, counted over the batch and diagnosed on one replayed replication |
  * | {@link PROBABILITY_WORDS}, {@link probabilityWordIn} | `src/campaign/parse.ts`, which refuses an authored brief that trips it — R10 at load time rather than in review |
  * | {@link disclosureItems} | `drawSummaryNow` in `src/dev/main.ts`, on every adopted recording and on every mode change; and `failStateDisclosure` in `src/dev/campaignPanel.ts` — `docs/10` § 4, **W6** |
