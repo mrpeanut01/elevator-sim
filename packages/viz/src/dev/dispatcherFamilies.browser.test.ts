@@ -37,7 +37,7 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, reopenEngineerMenu } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -57,7 +57,7 @@ beforeAll(async () => {
   origin = (server.resolvedUrls?.local[0] ?? '').replace(/\/$/, '');
   if (origin === '') throw new Error('the dev server did not report a URL');
   browser = await chromium.launch({ executablePath: CHROMIUM });
-  page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
 }, 120_000);
 
 afterAll(async () => {

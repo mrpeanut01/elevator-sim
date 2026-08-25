@@ -47,7 +47,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * registered project is wholly gated by asking which project's every file imports that module, and
  * turns an unexpectedly gated tier in CI into a red run.
  */
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, reopenEngineerMenu } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -143,7 +143,7 @@ interface Loaded {
 }
 
 async function load(): Promise<Loaded> {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
   const errors: string[] = [];
   const consoleErrors: string[] = [];
   page.on('pageerror', (error: Error) => errors.push(`${error.name}: ${error.message}`));

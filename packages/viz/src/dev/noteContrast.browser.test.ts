@@ -64,7 +64,7 @@ import { chromium, type Browser } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage } from './browserTier.test-helper.js';
 
 /*
  * **The gate comes from the shared module, and this file is the reason that module now exists in
@@ -178,7 +178,7 @@ beforeAll(async () => {
  * write and the real cascade in one path.
  */
 async function measureAt(scheme: 'dark' | 'light'): Promise<readonly Measured[]> {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme: scheme });
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 }, colorScheme: scheme });
   await page.goto(origin, { waitUntil: 'load' });
   // The scope notes are written during *mount*, not during a render, so the first paint is enough.
   // The wait is for `boot()` to have run the mounts at all, with the canvas standing in for that.

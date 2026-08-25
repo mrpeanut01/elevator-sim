@@ -52,7 +52,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -72,7 +72,7 @@ beforeAll(async () => {
   origin = (server.resolvedUrls?.local[0] ?? '').replace(/\/$/, '');
   if (origin === '') throw new Error('the dev server did not report a URL');
   browser = await chromium.launch({ executablePath: CHROMIUM });
-  page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
 }, 120_000);
 
 afterAll(async () => {

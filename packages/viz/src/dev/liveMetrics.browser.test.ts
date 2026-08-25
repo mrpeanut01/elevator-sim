@@ -40,7 +40,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CASUAL_WORDS, ENGINEER_WORDS } from '../render/overlay.js';
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -87,7 +87,7 @@ const BUILDING_IDS = [
 
 /** One building on the Engineer stage, at a seed, reached the way a player reaches it. */
 async function stageFor(building: string, width = 1280, height = 800): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width, height } });
+  const page = await openPage(browser, { viewport: { width, height } });
   await page.goto(`${origin}?building=${building}&seed=42`, { waitUntil: 'load' });
   await enterEngineerStage(page);
   // The card is hidden until there is a run, which is `docs/21` L-5's *hidden: nothing to say*.

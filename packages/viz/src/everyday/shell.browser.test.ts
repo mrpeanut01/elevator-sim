@@ -34,6 +34,7 @@ import {
   HAS_BROWSER,
   enterEngineerStage,
   enterEverydayStage,
+  openPage,
   pressMenuRow,
   returnToEverydayMode,
 } from '../dev/browserTier.test-helper.js';
@@ -140,7 +141,7 @@ async function runStateOf(page: Page): Promise<{
  * here rather than failing somewhere misleading.
  */
 async function coldLoad(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const page = await openPage(browser, { viewport: { width: 1280, height: 720 } });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
