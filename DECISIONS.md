@@ -24915,3 +24915,255 @@ carries *all N goals*, which is goals-against-goals and would re-create [§ D186
 from `context.batch`. Owed, and named rather than counted as coverage.
 
 ---
+
+## Nine product-owner rulings, taken together on 2026-08-25 — the block §§ D366 to D374
+
+**Date: 2026-08-25 · Owner: product owner · Raised by:**
+[`docs/34-usability-audit-of-the-rules.md`](docs/34-usability-audit-of-the-rules.md) and the charter
+conformance pass against [`docs/22-charter.md`](docs/22-charter.md) § 2 and § 4.
+
+**Why they are one block.** Nine questions were put to the product owner in one brief and answered in
+one sitting. Splitting them across nine separately-dated entries would suggest nine deliberations;
+recording them together, each with its own heading and its own number, keeps both facts — that each
+is a decision in its own right, and that they were taken as a set.
+
+**The numbers are reserved as a block, and that reservation is GitHub issue #173 happening live.**
+`main` ended at § D360. Before writing, `integration/m2-wave-c` was probed and already holds
+**D361–D365** on its branch — unmerged, invisible from `main`, and unreserved. So this block starts at
+**D366**. #173 says *"thirty-two sites say a decision number is owed … and no way for a lane to
+reserve one"*; the count is now 38 and this is the collision that number predicts. Nothing in this
+block fixes that — it is recorded here because the next lane will hit it too.
+
+---
+
+## D366 — charter non-goal 10 stands as written, and the rail keeps the warning
+
+**Rules on:** GitHub issue #274.
+
+**Decision.** *"No entry-screen override that survives a reload, whatever storage it wears"* is
+**unchanged**, and **`everyday/types.ts#ENGINEER_SWAP_NOTE` stays on the § 3.2 rail row** where it is
+drawn today. The alternative put to the owner — a `?engineer` query parameter on the grounds that a
+URL is *requested* rather than *remembered* — is **declined**. So is the audit's sub-proposal to move
+the twenty words off the rail into Settings' build-information panel.
+
+**What this settles.** The non-goal reaches a query parameter. A viewport-conditional or
+URL-conditional entry screen is the override [§ D335](#d335) and [§ D338](#d338) forbid, whatever
+carries it, and the fact that the product already accepts `?building=&seed=` does not extend to the
+entry screen. `docs/31-support-matrix.md` § 2's note that *"somebody has to rule on it"* is ruled.
+
+**What it costs, and the cost is accepted rather than denied.** The warning is 115 characters and
+twenty words on a 212 px rail — measured, and the longest piece of player copy on the narrowest
+surface in the product. It is an instance of GitHub issue #211 and it is **not** available to #211 as
+a cut: the sentence exists because the rule is surprising, and shortening it would leave a player to
+discover the reload behaviour by reloading. A lane trimming § 3.2's rail copy must leave this row
+alone or come back here.
+
+**No code change.** The note is already drawn on that row; this decision is why it stays.
+
+---
+
+## D367 — an independent energy bar is permitted, and it is not an aggregation
+
+**Rules on:** GitHub issue #275.
+
+**Decision.** [§ D106](#d106)'s *"never aggregated into a grade"* forbids **weighting energy into a
+combined score** and does **not** forbid a goal that passes or fails on energy alone. One such bar is
+permitted, and it is specified against **`EnergyStatistics.workPerServedLegKJ`**.
+
+**Why the distinction holds.** § D106's measured reason is that `nearest-car`, the weakest shipped
+dispatcher, sits on the Pareto front at six of eight matrix cells purely by being worst on wait — so a
+grade folding energy in would rank it first. A second, unweighted bar cannot produce that ordering: it
+adds no term to any other goal and produces no combined number. And it is immune to the failure §
+D106 names, because **people served are in the denominator** — the very field § D106 introduced so
+that *"a configuration that spends less by serving fewer people has not saved anything"* is visible.
+A dispatcher improving the bar by carrying fewer people moves the denominator against itself and
+fails `carry` besides.
+
+**What is still forbidden, and this is the half a lane will get wrong.** No weight. No combined
+score. No ordering of two arms on energy — `campaign/judge.ts`'s existing refusal to do so is
+unchanged. The Pareto reporting rule is untouched: *do not scalarize too early* is about **comparing
+dispatchers**, and a player-facing bar is not a comparison. Raw `energyKJ` remains ungraded; only the
+per-served-leg figure may carry a bar.
+
+**What this authorises.** One goal added to `shift/goals.ts`, its threshold **derived from measured
+runs rather than chosen**, in the shape `docs/33-difficulty-curve.md` uses for every other bar. It
+changes what clears and therefore interacts with #234; that re-measurement is part of the work rather
+than a follow-up.
+
+`CLAUDE.md`'s *"Energy is an axis, never a score"* paragraph moves in the same commit as the goal,
+because that paragraph is the sentence lanes actually read.
+
+---
+
+## D368 — #229 is retitled to the two rows that remain, and its premise is recorded as refuted
+
+**Rules on:** GitHub issue #229.
+
+**Decision.** #229 is **retitled** rather than closed, to *build Default speed, and define Clear saved
+progress*. Its original premise — *"six of the rows in Settings are refusals"* — is **refuted on the
+tree** and recorded as such rather than quietly dropped.
+
+**What was measured.** Since GitHub issue #207 the six are not rows: they are entries in
+`everyday/settingsView.ts#SETTINGS_ABSENCES`, drawn in a build-information panel that is closed by
+default and reached from Settings rather than drawn in it. Three of #229's five acceptance criteria
+were already met, including the one naming the remedy.
+
+**What remains, and it is two rows.** *Default speed*, whose own register entry says the preference
+*"is buildable now and is not built"*; and *Clear saved progress*, which needs a defined behaviour
+first, because `dev/main.ts` saves the running session on every state change and a cleared slot is
+rewritten moments later.
+
+**§ 20.12 is unchanged.** *A toggle that toggles nothing is a lie in a settings panel* stands. What
+this decision rejects is the reading that **not drawing the row** ends the matter — see [§ D370](#d370).
+
+---
+
+## D369 — the charter's instrument table derives, or it is not an instrument
+
+**Rules on:** GitHub issue #278.
+
+**Decision.** [`docs/22-charter.md`](docs/22-charter.md) § 4's second table — *"which of these can be
+evaluated today"* — is **mechanised**: every cell that names a command has that command asserted
+against the tree, in `packages/experiments/src/validation/documentation.test.ts`, which already
+asserts prose against the tree in several shapes. The three refuted cells are corrected in the same
+commit.
+
+**What was measured.** The table is stamped *"Verified on this tree, 2026-08-24"*. Re-measured a day
+later on `main`, three of ten rows no longer reproduced: **S10** claimed all 21 journey rows read
+`planned` when the tree held 3 `passing` / 14 `owned` / 4 `planned`; **S8**'s criterion had become met
+with `OUTSTANDING` empty and both tiers green, which the table had no column to say; **S6/S7** said
+the playtest programme did not exist when `docs/30-playtest-programme.md` had been on `main` since M1
+exited.
+
+**The argument, and it is § 4's own.** Every cell is a mechanical measurement stated in prose and four
+quote their command verbatim. Nothing re-ran them. The issue reporting this went stale in its own S10
+figure within two hours of being filed, which is the strongest available evidence that a human
+re-reading is not a mechanism.
+
+**What this does not permit.** Deleting a cell to make the assertion easy, or asserting a weaker
+claim than the cell makes. A cell that cannot be mechanised keeps its prose **and its own date** —
+the table stops carrying one date for ten measurements.
+
+---
+
+## D370 — a register of honest absences is a queue, and the mapping lives beside it
+
+**Rules on:** GitHub issue #279.
+
+**Decision.** The six absence registers drawn by `everyday/buildNotes.ts#buildNotesViewOf` are a
+**backlog with a player-facing face**, not a display. Every entry maps to an open issue, the mapping is
+asserted **in both directions**, and the mapping lives **beside** the registers rather than in their
+copy.
+
+**Why it may not live in the copy.** Those strings are player-facing, and
+`CHARTER_PROGRAMME.md` § M2's third exit criterion — instrumented by
+`honesty/properties.ts#internal-notation` — bars a code identifier from a player surface. An issue
+number appended to an entry is that, and it would take a gate that currently reads zero off zero. The
+map is therefore a separate table, on `screens.test.ts`'s own pattern for `UNBUILT_REASONS`.
+
+**Both directions, and the second is the one that bites later.** An entry with no open issue fails on
+the commit that adds it. An issue closed while its entry still stands fails too — [§ D227](#d227)'s
+direction that catches a lane after it lands, and the reason `AGENT_STATUS.md` already says a register
+keeping a closed absence is decoration.
+
+**What was measured.** 26 entries across six registers, **0** naming an issue. The two neighbouring
+registers that are empty — `screens.ts#UNBUILT_REASONS` and `honesty.test.ts#OUTSTANDING` — are empty
+because each has a mechanism that made somebody empty it.
+
+**Triage is part of the work, and deletion is an expected outcome.** Each of the 26 resolves to an
+existing issue, a new one, or **deletion because it is no longer true**.
+
+---
+
+## D371 — a goal drawn during a run is a reading, and carries no verdict
+
+**Rules on:** GitHub issue #277.
+
+**Decision.** When the Everyday stage draws the day's goals at the playhead, it draws **the reading
+only** — the figure, moving as the run goes — and **no met/not-met verdict** until the playhead
+reaches `endedAt`. [`docs/10-experience-layer-contract.md`](docs/10-experience-layer-contract.md) R6's
+provisional-verdict-with-retraction is **not** built now.
+
+**Why.** R6 permits a labelled provisional verdict that is withdrawn in place if the finished run is
+suppressed. It is the more ambitious answer and it can lie in the interval before it retracts. A
+reading cannot: it claims nothing, so nothing needs withdrawing, and § D293's temporal honesty and the
+corpus's `whole-run-figure-early` property are satisfied by construction rather than by care.
+
+**This does not retire R6.** Building the reading first forecloses nothing; R6 stays available to
+whoever wants the verdict later, and this decision is the reason it is unbuilt rather than an argument
+that it should be.
+
+**What this authorises.** The stage reads `host.goalsToday()` at the playhead through the same fold
+`dev/leftRail.ts#goalRowsOf` uses — never a second implementation — and a browser case drives a real
+day and asserts a drawn reading **moves** as the playhead advances.
+
+---
+
+## D372 — stage 1 gets a tutorial building authored to be failable, and `garden-apartments` is left alone
+
+**Rules on:** GitHub issue #270.
+
+**Decision.** Route **1** of the three #270 names: **a different tutorial building**, authored to be
+failable on its own terms. `garden-apartments` is not re-fabricked. Route 2 (a new goal kind) and
+route 3 (accept the breach and say so on screen) are both declined as the answer, though route 3's
+sentence may stand as an interim while route 1 is built.
+
+**What this rejects, and it was measured rather than argued.** The fabric route works — one car puts
+`collective` inside DC-4's band on both seed sets — and then two of stage 1's three editable dials go
+inert, **78 tests break across 32 files** including 352 published matrix figures, and bunching becomes
+structurally unmeetable on a one-car bank. A stage with a failable goal and dead controls is worse for
+a player than a stage with no goal.
+
+**Why not route 2.** Four of five existing goal kinds are constant across every legal cell, which is a
+real finding and says the kinds are the limit. But a new goal kind changes what the campaign can
+measure at all, and its scope is the least bounded of the three.
+
+**What `garden-apartments` is protected as.** Two of the eight matrix cells, three golden digests, a
+fixit case, and a building *designed* to be easy. It keeps all four.
+
+**`campaign/difficultyCurve.test.ts`'s register entry for stage 1 stays until the new building
+lands**, and goes red for whoever lands it — which is the register working, not a defect.
+
+---
+
+## D373 — *Fix a building* is a main-menu mode, and is not the default entry
+
+**Rules on:** GitHub issue #217, AC1 and AC2, held for the product owner by [§ D350](#d350).
+
+**Decision.** *Fix a building*'s position is **the main menu**, as a peer of the other three modes. It
+does **not** become the default entry point, and #217's AC2 — *"if it becomes the default entry, the
+front door is restructured accordingly"* — is therefore **not triggered**. No front-door restructure
+follows.
+
+**What this preserves.** [§ D299](#d299)'s positioning answer and [§ D335](#d335)'s four-tile front
+door, both of which a promotion to default entry would have reopened.
+
+**What it does not settle, stated so nobody reads it as settled.** #217's own framing is *"it is
+fourth in a list of four"*. This decision rules on **which surface** the mode belongs to, not on the
+**order of the tiles within it**. Tile order stays as shipped; a lane may not reorder `MODE_PICKS` on
+the strength of this entry.
+
+**AC3 and AC4 landed in wave B.** With AC1 answered and AC2 not triggered, #217 closes.
+
+---
+
+## D374 — M2's tester half is recruited for, not re-scoped
+
+**Rules on:** [§ D349](#d349)'s tester half of the M2 exit.
+
+**Decision.** The six gates that need first-time testers are **met by recruiting testers and running
+[`docs/30-playtest-programme.md`](docs/30-playtest-programme.md)'s tier ladder as written**. The gates
+are not re-scoped, and no gate is reassigned to a lane.
+
+**The six.** The three marked **[tester]** in `CHARTER_PROGRAMME.md` § M2, plus #208's AC4, #210's AC5
+and #218's recorded sessions.
+
+**What is true of this container and stays true.** No lane can produce a first-time tester, and the
+preview build is unreachable from the agent container — `CONNECT` returns **403**, re-verified
+2026-08-25. Neither is a reason to move a gate; both are reasons the code half reports
+*code-complete, playtest pending* and ticks nothing here.
+
+**The consequence, accepted.** M2 stays formally open until a human runs the ladder, however far ahead
+the code half runs.
+
+---
