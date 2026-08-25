@@ -12,9 +12,11 @@
  * for every project), so a decision made inside a DOM write is a decision no test can reach.
  *
  * Hence the exported pure functions below — {@link statRowsOf}, {@link moodViewOf},
- * {@link goalRowsOf}, {@link runFiguresOf}, {@link historyBarsOf}, {@link decisionRowViewOf},
- * {@link mathsDisclosureOf} — and hence the fact that {@link mountLeftRail} contains no `if` that
- * is about *what to say*, only about *where to put it*.
+ * {@link shiftGoalsOf}, {@link goalRowsOf}, {@link runFiguresOf}, {@link historyBarsOf},
+ * {@link decisionRowViewOf}, {@link mathsDisclosureOf} — and hence the fact that
+ * {@link mountLeftRail} contains no `if` that is about *what to say*, only about *where to put it*.
+ * {@link shiftGoalsOf} is the one of them `dev/main.ts` also calls, and its docstring says why that
+ * direction is the only one available.
  *
  * ## The rule that outranks the design
  *
