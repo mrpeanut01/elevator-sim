@@ -383,22 +383,48 @@ async function requestLink(
   const perEmail = limiters.perEmail.charge(normaliseEmail(email), nowMs);
   if (perEmail !== undefined) return tooManyLinks(perEmail);
 
-  const user = (await deps.store.userByEmail(email)) ?? (await createPlayer(deps, email));
-  if (user === undefined) {
-    // Every generated name collided, which is a fifty-bit coincidence and therefore a bug. It is
-    // reported as a server failure rather than as anything about the address.
+  /*
+   * Two attempts, because the account can stop existing between the read and the write (#266).
+   *
+   * `DELETE /api/me` can land after `userByEmail` returns a row and before `createLoginToken`
+   * writes against it, and the token then breaks `login_tokens_user_id_fkey`. `Store` maps that to
+   * `NoSuchUserError`; what this route does with it is **start the account again**, because per
+   * § D241 asking for a link on an address with no account is exactly what creates one. So the
+   * second pass finds nothing, makes a fresh account and mails a link to it — which is the answer
+   * a request arriving one millisecond later would have got anyway.
+   *
+   * The link is signed **inside** the loop. Signing it once above and retrying only the write
+   * would mail a token bearing the dead account's id, which is a link that redeems to nothing.
+   *
+   * Two rather than a loop with a cap: the second attempt races nothing, because the account it
+   * creates is one whose id no client has yet seen.
+   */
+  let user: UserRow | undefined;
+  let link: ReturnType<typeof signLoginToken> | undefined;
+  for (let attempt = 0; attempt < 2 && link === undefined; attempt += 1) {
+    user = (await deps.store.userByEmail(email)) ?? (await createPlayer(deps, email));
+    if (user === undefined) {
+      // Every generated name collided, which is a fifty-bit coincidence and therefore a bug. It is
+      // reported as a server failure rather than as anything about the address.
+      return { status: 500, body: { error: 'internal-error', detail: 'That could not be set up. Try again.' } };
+    }
+    const candidate = signLoginToken({ userId: user.id, email: user.email, secret: deps.secret, nowMs });
+    try {
+      // Recorded **before** it is mailed. The other order has a window in which a link is in
+      // somebody's inbox and is not redeemable, which is indistinguishable from a broken server.
+      await deps.store.createLoginToken({
+        jti: candidate.jti,
+        userId: user.id,
+        expiresAtMs: candidate.expiresAtMs,
+      });
+      link = candidate;
+    } catch (error) {
+      if (!(error instanceof NoSuchUserError) || attempt > 0) throw error;
+    }
+  }
+  if (user === undefined || link === undefined) {
     return { status: 500, body: { error: 'internal-error', detail: 'That could not be set up. Try again.' } };
   }
-
-  const link = signLoginToken({
-    userId: user.id,
-    email: user.email,
-    secret: deps.secret,
-    nowMs,
-  });
-  // Recorded **before** it is mailed. The other order has a window in which a link is in somebody's
-  // inbox and is not redeemable, which is indistinguishable from a broken server.
-  await deps.store.createLoginToken({ jti: link.jti, userId: user.id, expiresAtMs: link.expiresAtMs });
   // Awaited, and a failure fails the request. Since § D241 the mail is not a courtesy at the start
   // of an account's life, it is the only door: a send that was dropped silently would be a player
   // staring at "check your email" forever.
@@ -454,7 +480,18 @@ async function redeemLink(deps: ApiDeps, request: ApiRequest): Promise<ApiRespon
   // Spent here, and only here. Anything after this point that fails leaves the link used, which is
   // the safe direction: a player asks for another one, and a stolen link is not waiting to be
   // replayed against whatever the failure was.
-  if (!(await deps.store.consumeLoginToken(claims.jti))) return badLink('spent');
+  if (!(await deps.store.consumeLoginToken(claims.jti))) {
+    /*
+     * `false` has two causes and they are different sentences (#266). The row is gone because the
+     * link was spent, or because `login_tokens` cascaded away with the account — and *"that link
+     * has already been used"* is a true-sounding sentence about something that did not happen. It
+     * also sends the player to ask for another link, which will work, so they learn nothing.
+     *
+     * Asked rather than guessed, and asked of the account rather than of the token: which of the
+     * two happened is a fact about whether the owner is still there.
+     */
+    return badLink((await deps.store.userById(claims.userId)) === undefined ? 'invalid' : 'spent');
+  }
 
   const user = await deps.store.userById(claims.userId);
   // The email is inside the signature and is checked against the account rather than trusted from
@@ -465,7 +502,17 @@ async function redeemLink(deps: ApiDeps, request: ApiRequest): Promise<ApiRespon
     return badLink('invalid');
   }
 
-  const session = await deps.store.createSession(newSessionToken(), user.id);
+  // The last gap, and the most expensive one: the link is already spent, so an unexplained failure
+  // here costs the player the link as well as the session. A deletion landing between the read
+  // above and this write is answered with the refusal the read itself would have produced a
+  // millisecond earlier — the link no longer names an account, so it is not a valid link (#266).
+  let session;
+  try {
+    session = await deps.store.createSession(newSessionToken(), user.id);
+  } catch (error) {
+    if (error instanceof NoSuchUserError) return badLink('invalid');
+    throw error;
+  }
   return { status: 200, body: { token: session.token, user: publicUser(user) } };
 }
 
@@ -532,7 +579,18 @@ async function createPlayer(deps: ApiDeps, email: string): Promise<UserRow | und
     });
     if (created.ok) return created.user;
     // Lost a race to another request for the same address: that account is the right answer.
-    if (created.reason === 'email-taken') return deps.store.userByEmail(email);
+    //
+    // **This branch was unreachable under a race until #266** — the losing insert threw
+    // PostgreSQL's own `23505` past it, so only the sequential path, which is the path that is not
+    // a race, could ever produce `email-taken`.
+    //
+    // `continue` rather than `return` when the winner's account is *itself* already gone, which
+    // needs a deletion between the two statements: returning `undefined` there answers `500` for a
+    // condition that another attempt resolves, and the loop is already bounded at five.
+    if (created.reason === 'email-taken') {
+      const winner = await deps.store.userByEmail(email);
+      if (winner !== undefined) return winner;
+    }
   }
   return undefined;
 }

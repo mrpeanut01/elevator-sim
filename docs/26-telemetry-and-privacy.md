@@ -455,11 +455,33 @@ verifying put the insert on the wrong side of the foreign key — surfacing as P
 message rather than as an answer. Both paths now raise the store's `NoSuchUserError` and the
 submission routes answer `401`, so the outcome is the same whether the account vanished a second
 before the write or a millisecond into it. **Nothing was deleted twice and no entry outlived its
-account**; what was wrong was the reporting. The transaction question is filed as issue **#266** and
-is deliberately not answered here.
+account**; what was wrong was the reporting.
 
-**A decision number is owed** for the route and for the store method; the argument is in
-`packages/server/src/http/api.ts`'s `deleteAccount` and `store.ts`'s `Store.deleteUser`.
+**Those were two of five, and the question this paragraph used to leave open is now answered**
+([§ D361](../DECISIONS.md#d361), issue **#266**). The read-then-write pairs are **derived** from
+`store.ts` and its own schema rather than listed — five of them — and the set that carries a stated
+remedy is wider still, because `createSession` and `createLoginToken` read nothing inside the store
+and are check-then-acts anyway, with the read one frame up in the route. **`Store` gains no
+transactions**, and not because they are expensive: `PgSql.query` takes a pooled connection per
+call, so a `BEGIN` and its `COMMIT` would land on different connections; and even a real transaction
+would not close these, because under `READ COMMITTED` the deletion still commits and the insert
+still fails the key. What would close it is a row lock, and a row lock buys the player a *worse*
+answer — the submission wins and the cascade erases it a moment later.
+
+**What that changes for somebody caught mid-erasure**: asking for a sign-in link while the account
+is being deleted used to answer `500`, on the one route whose whole design is a response that says
+nothing about the address; it now answers the uniform `202` with a link to a freshly created
+account, which is what § 3.3's *asking for a link is what creates the account* already implies.
+Redeeming a link whose account has just gone was reported as *"that link has already been used"* — a
+true-sounding sentence about something that did not happen — and now says the link is not valid,
+which is what it is.
+
+**No claim in this document about *what* is erased changed.** Nothing is deleted twice, no entry
+outlives its account, and the cascade set is still read out of `pg_constraint`. What changed is what
+a raced request is **told**.
+
+The decision numbers for the route and the store method are [§ D358](../DECISIONS.md#d358) and, for
+the general question it left open, [§ D361](../DECISIONS.md#d361).
 
 **No retention horizon came with it, and that is deliberate rather than forgotten.** An account
 nobody deletes is kept; the route is a player's request, not a sweep. A horizon over `users` would
