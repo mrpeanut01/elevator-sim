@@ -486,7 +486,8 @@ transport.**
   measured answer moves the whole issue.** `data/traffic-profiles.json` ships seven demand templates.
   **`office-day` is the only one with a phase schedule** — 600 simulated minutes from 08:00, and its
   first phase is *08:00–08:30 at intensity `0.05`*, one twentieth of nominal, before the up-peak ramp
-  begins. At the default speed (`1×` = 30 simulated seconds per real second) that is **60 real
+  begins. At the default speed (`30×` — 30 simulated seconds per real second; the chip was called
+  `1×` before #257 renamed it and the multiplier did not move) that is **60 real
   seconds** of a near-empty building at the head of a **20-minute** day. The shipped default,
   `rise-and-fall`, is a 30-minute run from 08:30 whose intensity ramps from its first second — **60
   real seconds end to end, with no quiet head at all.**
@@ -508,7 +509,15 @@ takes about 26 minutes; at `30×` about eighty seconds"*, which implies a **13-h
 template this build ships is `office-day`'s **10 hours** — 20 minutes and 60 seconds respectively.
 The guide's numbers are the prototype's, and the prototype's numbers are not canonical
 ([`12-design-handoff.md`](12-design-handoff.md) § 4.1 made the same correction about the day's clock);
-its *interaction* — five relative speeds, a reset per run — is, and is built.
+its *interaction* — a row of speed chips, a reset per run — is, and is built.
+
+**The second half of that sentence has since been narrowed, and § 6 carries the reason.** It used to
+read *"five relative speeds"*, and both halves went with #257: there are **seven** rungs, and they
+are not relative — a chip reading `N×` now means `N` simulated seconds per real second, absolutely.
+The guide's own five were relative to nothing that held: read against its `1×`, its `½×` chip ran at
+0.27 and its `4×` at 3. So the *interaction* the prototype specifies is still built and still
+canonical; the **arithmetic on the chip faces** is the simulator's, on the standing rule that the
+handoff wins what the screen looks like and the simulator wins what a number means.
 
 ### 5.4 Making pressure legible before the report names it
 
@@ -630,27 +639,48 @@ defect `live/bands.ts` exists to prevent ([§ D251](../DECISIONS.md)).
 
 ## 6. Motion, easing, and what time compression rules out
 
-**There is no speed on this transport at which a lift behaves at the rate a lift behaves.**
-`stageScreenModel.ts#STAGE_SPEEDS` ships five settings in *simulated seconds per real second*, and
-the slowest is already **8×** compressed:
+**This section used to open by saying there is no speed on this transport at which a lift behaves at
+the rate a lift behaves. There is one now**, and it is the bottom rung — GitHub issue **#257**,
+ruled on by [§ D344](../DECISIONS.md). `stageScreenModel.ts#STAGE_SPEEDS` ships seven settings in
+*simulated seconds per real second*, every label equal to the ratio it names:
 
 | chip | `simPerRealS` | sim-seconds per frame at 60 Hz | a 9.8 s hall-call door cycle |
 |---|---|---|---|
-| `½×` | 8 | 0.13 | 1.23 s of wall time · ~74 frames |
-| `1×` *(default)* | 30 | 0.50 | **0.33 s** · ~20 frames |
-| `4×` | 90 | 1.5 | 0.11 s · ~7 frames |
-| `12×` | 240 | 4.0 | 41 ms · ~2 frames |
-| `30×` | 600 | 10.0 | **16 ms · under one frame** |
+| `1×` | 1 | 0.017 | 9.8 s of wall time · ~588 frames |
+| `4×` | 4 | 0.067 | 2.45 s · ~147 frames |
+| `8×` | 8 | 0.13 | 1.23 s · ~74 frames |
+| `30×` *(default)* | 30 | 0.50 | **0.33 s** · ~20 frames |
+| `90×` | 90 | 1.5 | 0.11 s · ~7 frames |
+| `240×` | 240 | 4.0 | 41 ms · ~2 frames |
+| `600×` | 600 | 10.0 | **16 ms · under one frame** |
+
+**Every multiplier this table has ever carried is still in it.** The five rows of the old table were
+`½× 8`, `1× 30`, `4× 90`, `12× 240` and `30× 600` — all five labels false, none of them a ratio of
+anything — so the **last five rows above are those same speeds under their true names**, and the
+first two, `1×` and `4×`, are new. Not one pixel of the shipped pacing moved; what moved is which
+rung a sentence has to cite, which is why two of the four rules below carry a re-check note.
 
 The door figures are [`../data/elevator-specs.json`](../data/elevator-specs.json)'s, not invented — a
 centre-opening hall-call stop is `openS 1.8 + dwellHallCallS.typical 5 + closeS 3.0`, and the slowest
 shipped combination is a side-opening door at maximum hall dwell, `2.5 + 7 + 4.0 = 13.5 s`, which
 makes every row of this table *longer* and changes none of its conclusions. The wall-clock column is
 [`29-audio-direction.md`](29-audio-direction.md) § 4.1's arithmetic, which reached the same table for
-the sibling discipline and recommended a cut partly on the strength of it. **The same constraint
-binds pixels, and it binds them harder**, because a picture cannot be turned off in Settings.
+the sibling discipline and recommended a cut partly on the strength of it — a recommendation
+[§ D344](../DECISIONS.md) overrules, keeping the measurement and reading it as a defect report about
+this ladder. **The same constraint binds pixels, and it binds them harder**, because a picture cannot
+be turned off in Settings.
 
-Four rules follow, and each is arithmetic rather than taste.
+**And that last clause is now the whole difference between the two disciplines, so it is worth
+saying plainly.** Audio ships **tiered** on § D344's `S ≤ 39`: discrete 1:1 cues on the four rungs
+below the bound, a continuous bed on the three above it. Motion does not tier, and the four rules
+below stay uniform across all seven rungs — because a CSS transition is written once and cannot ask
+the transport which rung it is on, and a picture whose meaning depended on the speed setting would be
+a second thing for a reader to know before they could read the first. So each rule is held at the
+**worst** rung, which is still `600×`: the ladder gained a bottom, not a lower top.
+
+Four rules follow, and each is arithmetic rather than taste. **All four were derived from the old
+five-rung table and all four have been re-checked against this one (#257 AC4); all four stand, and
+two had to move a citation.**
 
 - **AD-M1 — no easing on any quantity the kernel already computes.** `doorFraction` is exact between
   events; `frame/frameAt.ts` gives an exact car position at any `t`. Motion on this stage is smooth
@@ -659,21 +689,42 @@ Four rules follow, and each is arithmetic rather than taste.
   it would be a *wrong* one: the simulator models jerk and acceleration properly precisely so that
   short hops never reach rated speed, and a UI easing curve would flatten that back out.
 - **AD-M2 — no transition, anywhere, on a value tied to the playhead.** A 200 ms ease is
-  **120 simulated seconds of lag at `30×`** — two simulated minutes — and 48 s at `12×`. The stage
-  files an intervention at *this screen's own playhead*, for the stated reason that *"a change
+  **120 simulated seconds of lag at `600×`** — two simulated minutes — and 48 s at `240×`.
+  *(Re-checked for #257: the arithmetic is unchanged and the citation moved. Those two figures were
+  written as `30×` and `12×`, which were this ladder's top two rungs under their old false names;
+  the rung called `30×` today produces **6 simulated seconds** of lag from the same 200 ms.)* The
+  stage files an intervention at *this screen's own playhead*, for the stated reason that *"a change
   stamped at the Engineer transport's position would be filed at an instant nobody was looking at"*.
   An eased picture reintroduces exactly that defect from the other side: the stamp would name an
   instant the picture had not reached.
-- **AD-M3 — information lives in state, never in events.** At `30×` a whole door cycle can fall
-  between two frames. So a flash, a ripple, a pulse on arrival, an animated "ping" when a car answers
-  a call — every event-shaped cue — is invisible at the speeds a player actually uses to get through
-  a day, and a cue that fires for one event in twelve is decoration that looks like information.
-  **Everything the stage must communicate has to be readable from a single frame**: queue depth, ramp
-  colour, car position, door state, occupancy. This is why § 5.2's shut-door fix is a *shape* rule
-  and not a *transition* rule.
+
+  **Say where this rule is weakest, because #257 built the rung that makes it weak.** At the new
+  `1×`, 200 ms of ease is 0.2 simulated seconds, and a reader meeting AD-M2 there will not find the
+  lag argument forbidding — 0.2 s is a fifth of a second of real door travel. The rule stands anyway,
+  on the two grounds above it: a transition is declared once and cannot know which rung is selected,
+  so it has to be legal at `600×` or nowhere; and the stamp argument was never about speed at all —
+  filing a change at an instant the picture has not reached is wrong at 1:1 exactly as it is at 600×,
+  it is merely cheaper. **What would actually reopen AD-M2 is a per-rung transition policy, and that
+  is the thing to refuse**: it would make the picture's meaning a function of the transport.
+- **AD-M3 — information lives in state, never in events.** At `600×` a whole door cycle can fall
+  between two frames *(re-checked for #257: written as `30×`, same rung, true name — the table's last
+  row is still `16 ms · under one frame`)*. So a flash, a ripple, a pulse on arrival, an animated
+  "ping" when a car answers a call — every event-shaped cue — is invisible at the speeds a player
+  actually uses to get through a day, and a cue that fires for one event in twelve is decoration that
+  looks like information. **Everything the stage must communicate has to be readable from a single
+  frame**: queue depth, ramp colour, car position, door state, occupancy. This is why § 5.2's
+  shut-door fix is a *shape* rule and not a *transition* rule.
+
+  The new bottom rung makes the *gradient* visible rather than the rule wrong: at `1×` a door cycle
+  is 588 frames and an event cue would read perfectly; at `600×` it is under one frame and the same
+  cue reads not at all; the table's frame column is every step in between. That is the "one event in
+  twelve" sentence with numbers attached, and it argues for AD-M3 more strongly than the flat version
+  it replaces. **It is also exactly where motion and sound part company**, and § D344 is the reason:
+  a cue the player can switch off may be tiered by speed, and a picture may not.
 - **AD-M4 — no entrance or exit animation on riders.** Passengers arrive in **batches**, not one at a
-  time. At `30×` a batch appears within one frame, and a per-capsule stagger would be an animation
-  queue that never drains on a busy building. A capsule is present at the playhead or it is not.
+  time. At `600×` a batch appears within one frame *(re-checked for #257: written as `30×`, same
+  rung)*, and a per-capsule stagger would be an animation queue that never drains on a busy building.
+  A capsule is present at the playhead or it is not.
 
 **What this does *not* rule out**, so the rules are not read as "no motion at all": the day itself
 moves, and that is the whole point of the screen. Cars travel, doors open, queues grow and drain,
