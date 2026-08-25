@@ -58,6 +58,7 @@ import {
 } from '../dev/browserTier.test-helper.js';
 import { ACTION_BAR_ROWS } from './actionBar.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
+import { REST_BAR_MIN_PX } from '../render/carRest.js';
 import { EVERYDAY_COLORS } from './tokens.js';
 
 /**
@@ -143,16 +144,23 @@ async function coldLoad(buildingId = 'garden-apartments'): Promise<Page> {
  * - **`tallestRun`**, the longest unbroken vertical run of each colour anywhere on the canvas. That
  *   is the **shape** reading, and it is what tells a shut door from a shut car: the defect painted
  *   amber over the car's whole interior height, and the fix confines it to a band under half of it.
+ * - **`widestRun`**, the same reading turned ninety degrees, added for AD-S17. The rest bar is a
+ *   *horizontal* mark whose whole magnitude channel is its length, so a vertical run says nothing
+ *   about it: a 2.5 px bar and a 2.5 px smudge have the same `tallestRun` and mean different
+ *   things. Both are kept rather than one generalised, because the two claims below need opposite
+ *   axes and a single "longest run in any direction" would satisfy each of them by accident.
  */
 async function canvasInk(
   page: Page,
   colors: readonly string[],
-): Promise<readonly { readonly count: number; readonly tallestRun: number }[]> {
+): Promise<
+  readonly { readonly count: number; readonly tallestRun: number; readonly widestRun: number }[]
+> {
   return page.evaluate((wanted) => {
     const canvas = document.querySelector<HTMLCanvasElement>('.everyday-stage-canvas');
     const ctx = canvas?.getContext('2d') ?? null;
     if (canvas === null || ctx === null || canvas.width === 0) {
-      return wanted.map(() => ({ count: 0, tallestRun: 0 }));
+      return wanted.map(() => ({ count: 0, tallestRun: 0, widestRun: 0 }));
     }
     const { width, height } = canvas;
     const data = ctx.getImageData(0, 0, width, height).data;
@@ -163,8 +171,11 @@ async function canvasInk(
     ]);
     const counts = targets.map(() => 0);
     const tallest = targets.map(() => 0);
+    const widest = targets.map(() => 0);
     const runs = targets.map(() => new Array<number>(width).fill(0));
+    const across = targets.map(() => 0);
     for (let y = 0; y < height; y += 1) {
+      for (const [index] of targets.entries()) across[index] = 0;
       for (let x = 0; x < width; x += 1) {
         const at = (y * width + x) * 4;
         for (const [index, target] of targets.entries()) {
@@ -176,8 +187,12 @@ async function canvasInk(
             const run = (column[x] ?? 0) + 1;
             column[x] = run;
             if (run > (tallest[index] ?? 0)) tallest[index] = run;
+            const row = (across[index] ?? 0) + 1;
+            across[index] = row;
+            if (row > (widest[index] ?? 0)) widest[index] = row;
           } else {
             column[x] = 0;
+            across[index] = 0;
           }
         }
       }
@@ -185,6 +200,7 @@ async function canvasInk(
     return targets.map((_unused, index) => ({
       count: counts[index] ?? 0,
       tallestRun: tallest[index] ?? 0,
+      widestRun: widest[index] ?? 0,
     }));
   }, colors);
 }
@@ -447,6 +463,96 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
       }
     },
   );
+
+  /**
+   * **AD-S17 — a lift that is standing still looks different from one that has just stopped.**
+   *
+   * `docs/34-problem-per-mode.md` § 3.2 states the defect as a claim about pixels: *"an idle car is
+   * a stationary car with `direction === 0` and near-zero load — **pixel-identical** to any empty
+   * car that happens to be stopped"*, and § 9.2 calls it the reason the product's most-used fault
+   * family has no mark on the stage. A claim about pixels is settled on pixels or not at all, so
+   * this case reads the canvas's backing store rather than a model's return value.
+   *
+   * ## The two frames it compares are the same picture
+   *
+   * Not *a resting car beside a moving one* — that comparison confounds the mark with everything
+   * else that differs between two cars. The stage **opens paused at the day's own start hour** with
+   * every lift standing in the lobby and none of them having moved yet, so at that instant the
+   * cars have stood for **zero** seconds and carry no mark. Play the same day forward and the same
+   * three lifts, in the same places, acquire one. The only thing that changed is *how long they
+   * have been standing*, which is precisely the fact the mark exists to carry.
+   *
+   * ## What is asserted, and why it is a width
+   *
+   * `inkSoft` is drawn by nothing else in this cutaway — `carRest.test.ts` asserts that against the
+   * whole of the ink list — so a pixel of it is a rest bar and nothing else. `widestRun` rather
+   * than `count`, because the magnitude channel *is* the bar's length: a count would go up for a
+   * smudge, and AD-A1's second channel is what makes the mark readable in greyscale.
+   *
+   * Watched failing first, with the two draw sites disabled: `expected 0 to be greater than 0`
+   * against *"a lift that has stood for over half a minute carries a mark"*.
+   */
+  it('marks a lift that has been standing still, and marks nothing at the opening frame', async () => {
+    const page = await coldLoad();
+    try {
+      await enterEverydayStage(page);
+
+      /* The opening frame. Every car is standing and none has stood for any time at all. */
+      expect(await page.isVisible('.everyday-stage-start')).toBe(true);
+      const [opening] = await canvasInk(page, [EVERYDAY_COLORS.inkSoft]);
+      expect(
+        opening?.count,
+        'at the day’s first instant no lift has been standing still for any length of time, ' +
+          'so nothing may claim it has',
+      ).toBe(0);
+
+      /* The same day, played forward. `garden-apartments` is idle for most of its hour —
+         `docs/34` § 9.3 measures the landings empty about 91 % of the time — so a lift standing
+         past the 30 s onset is the ordinary state of this building rather than a contrived one. */
+      const opened = await page.textContent('.everyday-stage-clock');
+      await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
+      await page.click('.everyday-stage-play');
+      await page.waitForFunction(
+        (from) => document.querySelector('.everyday-stage-clock')?.textContent !== from,
+        opened,
+        { timeout: 20_000 },
+      );
+
+      /*
+       * Sampled rather than waited on, and the difference is what the failure says. A
+       * `waitForFunction` over the pixels reports a *timeout* when the mark is gone, which names
+       * the harness rather than the product; twenty samples and then an assertion reports
+       * *"a lift that has stood for over half a minute carries a mark: expected 0 to be greater
+       * than 0"*, which names the thing that broke. Watched failing exactly that way with the two
+       * draw sites deleted.
+       *
+       * Twenty is generous rather than tuned: at the top rung a lift crosses the 30 s onset inside
+       * the first frame, so the loop normally leaves on its first reading.
+       */
+      let resting = (await canvasInk(page, [EVERYDAY_COLORS.inkSoft]))[0];
+      for (let sample = 0; sample < 20 && (resting?.count ?? 0) === 0; sample += 1) {
+        await page.waitForTimeout(150);
+        resting = (await canvasInk(page, [EVERYDAY_COLORS.inkSoft]))[0];
+      }
+      await page.click('.everyday-stage-play');
+
+      expect(
+        resting?.count,
+        'a lift that has stood for over half a minute carries a mark',
+      ).toBeGreaterThan(0);
+      /* A **bar**, not a speck: the length is the whole of the magnitude channel, so a mark
+         narrower than the floor `restBarWidthPx` guarantees would be unreadable as a duration. */
+      expect(
+        resting?.widestRun,
+        `the mark is ${String(resting?.widestRun ?? 0)} px wide; the floor is ${String(REST_BAR_MIN_PX)}`,
+      ).toBeGreaterThanOrEqual(REST_BAR_MIN_PX);
+      /* And it is a horizontal mark rather than a blob, which is what puts it in the arrows'
+         family — up, down, and a flat bar for neither. */
+      expect(resting?.widestRun ?? 0).toBeGreaterThan(resting?.tallestRun ?? 0);
+    } finally {
+      await page.close();
+    }
+  });
 
   it('plays, and the clock moves', async () => {
     const page = await coldLoad();

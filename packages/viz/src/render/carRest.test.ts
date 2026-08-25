@@ -52,7 +52,7 @@ beforeAll(async () => {
  * Fixtures — one shaft, one car, and nothing else
  * -------------------------------------------------------------------------- */
 
-const EMPTY_SERIES = { times: [0], values: [0] } as const;
+const EMPTY_SERIES = { times: [0], values: [0], before: 0 } as const;
 
 function shaft(overrides: Partial<VizShaft> = {}): VizShaft {
   return {
@@ -107,8 +107,9 @@ function motion(commandedAt: number, arrivesAt: number): VizShaft['motions'][num
     toHeightM: 3,
     commandedAt,
     startedAt: commandedAt,
+    direction: 'up',
     arrivesAt,
-  } as VizShaft['motions'][number];
+  } as unknown as VizShaft['motions'][number];
 }
 
 /* -------------------------------------------------------------------------- *
@@ -437,7 +438,7 @@ describe('AD-A2 — the rest bar is measured on the ground it is actually drawn 
 describe('carRestsAt — the shape both renderers call', () => {
   it('skips a car with no shaft rather than guessing at one', () => {
     const recording = { startedAt: 0, shafts: [shaft()] } as unknown as VizRecording;
-    const frame = { simTimeS: 600, cars: [frameCar(), frameCar({ carId: 'ghost' })] } as Frame;
+    const frame = { simTimeS: 600, cars: [frameCar(), frameCar({ carId: 'ghost' })] } as unknown as Frame;
     expect(carRestsAt(recording, frame).map((rest) => rest.carId)).toEqual(['main-A']);
   });
 
@@ -454,7 +455,7 @@ describe('carRestsAt — the shape both renderers call', () => {
     const frame = {
       simTimeS: 600,
       cars: [frameCar({ carId: 'B' }), frameCar({ carId: 'A' })],
-    } as Frame;
+    } as unknown as Frame;
     const byId = new Map(carRestsAt(recording, frame).map((rest) => [rest.carId, rest.restedS]));
     expect(byId.get('A')).toBe(600);
     expect(byId.get('B')).toBe(100);
