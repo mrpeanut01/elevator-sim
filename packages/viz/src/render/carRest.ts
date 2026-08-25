@@ -190,15 +190,20 @@ export function carRestsAt(recording: VizRecording, frame: Frame): readonly CarR
  * - **{@link REST_BAR_MIN_SHARE} of the slot** at the onset, so the mark is a *bar* at the instant
  *   it appears rather than a dot that grows into one. A reader who cannot see the shortest state
  *   cannot read the channel.
- * - **{@link REST_BAR_MIN_PX}** absolutely, because `vertical-city` puts 35 cars across a viewport
- *   and `stageCarPaintOf` measures a car at roughly 2.4 px there. A share of 2.4 px is not a mark.
- * - **The slot's own width**, never more, so the bar cannot overhang into the neighbouring shaft.
- *   The `▲`/`▼` it replaces does overhang, and copying that would put two banks' marks on one
- *   column on the building where the columns are narrowest.
+ * - **The slot's own width** at saturation, never more, so the bar cannot overhang into the
+ *   neighbouring shaft. The `▲`/`▼` it replaces *does* overhang, and copying that would put two
+ *   banks' marks on one column on the building where the columns are narrowest.
+ * - **{@link REST_BAR_MIN_PX}** absolutely, and it **outranks the cap above** — which is the one
+ *   place these three rules disagree, so it is stated rather than left to the order of operations.
+ *   `vertical-city` puts 35 cars across a viewport and `stageCarPaintOf`'s docstring measures a car
+ *   at roughly 2.4 px there; a share of 2.4 px is not a mark, and a mark that vanishes at the size
+ *   where the picture is hardest to read is missing exactly when it is needed. The overhang this
+ *   costs is arithmetic rather than a hope: the cutaway's body is `column.width − 3`, so a 3 px bar
+ *   on a 2.4 px body still ends 1.2 px inside its own 5.4 px column and reaches no neighbour.
  */
 export function restBarWidthPx(fill: number, slotWidthPx: number): number {
   const share = REST_BAR_MIN_SHARE + (1 - REST_BAR_MIN_SHARE) * Math.min(1, Math.max(0, fill));
-  return Math.min(slotWidthPx, Math.max(REST_BAR_MIN_PX, slotWidthPx * share));
+  return Math.max(REST_BAR_MIN_PX, slotWidthPx * share);
 }
 
 /** The share of the slot the bar occupies at the onset. */

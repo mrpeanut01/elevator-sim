@@ -26,6 +26,7 @@ import type { FloorQueue, OverlayMetrics } from '../frame/overlay.js';
 import { LOAD_ALARM, LOAD_FULL } from './overlay.js';
 import { formatClock, playheadHasReachedEnd, undeliveredAt } from './canvas.js';
 import { describeQueue } from './riderQueue.js';
+import { carRestsAt, restWords } from './carRest.js';
 import type { BuildingMood } from './mood.js';
 // One home for a run's refusal, in every register — see {@link suppressionSentenceOf}.
 import { CASUAL_REFUSAL_REASON_SO_FAR } from '../mode/disclosure.js';
@@ -335,10 +336,21 @@ export function describeFrame(input: DescribeFrameInput): string {
     );
   }
 
+  /*
+   * AD-S17's text alternative. The drawn half of this signal is a rectangle in the direction
+   * glyph's slot, and a rectangle is nothing at all to a screen reader — the same argument that put
+   * the door phase and the overload in this paragraph, and `docs/28` AD-A1's rule that a state a
+   * player must distinguish never rides on one channel. `directionWords(0)` already said
+   * *standing*; what it could not say is *for how long*, which is the entire content of the mark
+   * and the whole of what campaign stage 1's lesson turns on.
+   */
+  const restByCar = new Map(carRestsAt(recording, frame).map((rest) => [rest.carId, rest]));
   const cars = frame.cars.slice(0, maxCars);
   for (const car of cars) {
+    const rest = restByCar.get(car.carId);
+    const motion = rest === undefined ? directionWords(car.direction) : restWords(rest.restedS);
     parts.push(
-      `Car ${car.label} at floor ${car.floorId}, ${directionWords(car.direction)}, doors ${car.doorPhase}, ` +
+      `Car ${car.label} at floor ${car.floorId}, ${motion}, doors ${car.doorPhase}, ` +
         `${String(car.occupants)} aboard, ${loadWords(car.loadFactor)} at ${car.loadFactor.toFixed(2)} of rated load.`,
     );
   }
