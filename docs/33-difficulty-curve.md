@@ -297,9 +297,20 @@ against a published bar of 45) and is **beaten on three measures** with `beat-th
 resolving against it. `cleared` is `false`. The sensitivity that says what it is still holds:
 `2.2`, `2.25` and `2.3` met the tuning bars and `2.35` did not.
 
-So **stage 2 has no registered witness either**, and § 3.1's DC-3 row reads *ten of ten* rather
+So **stage 2 has no registered witness either**, and § 3.1's DC-3 row read *ten of ten* rather
 than nine. That is a worse-looking campaign and a truer one: the vector that used to stand there was
 a fit to fifty passenger populations, and O7 is the reason it stood there at all.
+
+**It reads *nine* now, and not because anything about stage 2 changed.** § 3.3c measures a vector
+that clears **stage 1** on both batches — park the idle cars in the middle of the building — and it
+had existed the whole time behind a stage that would not accept it. Two things follow that this
+clause did not anticipate. A stage can fail DC-3 because of its **`editable` list** rather than
+because no vector clears it, so *"no witness"* has two causes and only one of them is about the
+building; the register § 2.4 asks for must therefore say **which**, or it will record a scope
+decision as a difficulty finding. And the witness registry itself is still unbuilt: stage 1's
+witness is pinned by `packages/viz/src/campaign/stageOneParking.test.ts` rather than authored in
+`data/`, which is the shape this clause forbids for the same reason it forbids a hand-written list
+anywhere else. That file is a measurement, not the registry, and it says so.
 
 ### 2.5 Why the three rules together are the closed form
 
@@ -346,11 +357,19 @@ Read against §§ 2.2–2.4, the same 130 cells give the three rules directly:
 | **DC-1** — some admitted profile fails a non-comparative goal | 1–7 | **8, 9, 10** |
 | **DC-2** — no admitted profile clears the stage | 1, 2, 4, 6, 8, 9, 10 | **3, 5, 7** |
 | **DC-2b** — at least two admitted profiles differ from the baseline | 1–7 | **8, 9, 10** |
-| **DC-3** — a witness edited vector clears the stage on its judged seeds | **none** | **all ten.** Stage 2's authored vector met every bar on the tuning seeds and is refused on the holdout under the post-#255 judge (§ 2.4), so the one witness that existed is not one |
+| **DC-3** — a witness edited vector clears the stage on its judged seeds | **one — stage 1, and it was measured later: § 3.3c** | **nine.** Stage 2's authored vector met every bar on the tuning seeds and is refused on the holdout under the post-#255 judge (§ 2.4), so the one witness that existed *then* is not one. Stage 1's — park the idle cars in the middle of the building — clears both batches and was locked out by the stage's own `editable` list rather than by the building; § 3.3c is the measurement and the correction |
 
 **DC-1 and DC-2b fail on the same three stages**, which is not a coincidence and is the whole reason
 DC-2b exists: stages 8 and 10 admit only their own baseline and stage 9 admits one other profile, so
 on those three the dropdown can neither break the stage nor clear it.
+
+**The DC-3 row is the one that has since moved, and how it moved is the more useful half.** It read
+*none / all ten* when this sweep was taken, and it was reading the campaign's `editable` lists rather
+than the campaign: stage 1's clearing vector existed the whole time and `admitProfile` refused to run
+it, because the stage did not open the dimension its own building says decides it. The row above is
+corrected rather than rewritten, on this section's own rule that its tables record what a named run
+produced. **The DC-1 and DC-2 rows are unmoved by that work** — § 3.3c measures both and neither
+changed — and stage 1's DC-1 breach, added by § 3.1a, still stands.
 
 Four claims in the tree did not survive that run, and each is written down rather than quietly
 superseded:
@@ -588,7 +607,10 @@ tables are a record of what a named run produced.
    `long-waits-under (≤ 10 %)`: `nearest-car` 48 | 46 against `collective` 50 | 50. The cell's
    *reason* survives untouched, and is the more interesting half: the building is sparse enough that
    parking policy alone decides it, and parking policy shows up in the wait tail rather than in
-   whether the demand was answered.
+   whether the demand was answered. **Both halves of that sentence are now measured rather than
+   inherited from the building's `$comment` — § 3.3c** — and the second half is measured in the
+   sharper form: `long-waits-under` is the *only* one of the five per-run kinds any parking value
+   moves, on any legal demand level, in either direction.
 2. **§ 4.2's F2 is half stale.** *"The **stage** presents a failure a player can produce; the
    **week's day** does not"* was true of the five-minute band and is not true now: § 3.1a records
    stage 1 joining the DC-1 breaches, and § 3.3a measures why. **F2's actual claim still stands** —
@@ -596,6 +618,156 @@ tables are a record of what a named run produced.
    the evidence for it has moved. They are now failing for *different* reasons: the week's day 1
    misses nothing on 0 of 30 seeds because the bars are loose against this building, and the stage
    has no failable goal because the shipped setting never misses one.
+
+### 3.3c The parking axis, measured — it decides the stage and it does not make a goal failable
+
+§ 3.3a swept demand, demand shape, dispatcher and horizon. It did not sweep the axis
+`data/buildings/garden-apartments.json` names in its own first sentence:
+
+> **Simplest case. Parking policy dominates here: traffic is sparse enough that idle car position
+> matters more than assignment cleverness.**
+
+`idle.parkingStrategy` is declared in `packages/core/src/dispatch/parameters.ts` with five values —
+`stay` (the default, and what `collective` runs), `lobby`, `zone-center`, `predicted-demand`,
+`fixed-floor` — and its own schema says *"on sparse-traffic buildings this stage dominates everything
+else."* This section is that sweep. **The building's claim is true and the axis still does not
+produce a failable count goal**, which are two separate findings and are reported separately.
+
+**Instrument.** The same one §§ 3.3a–3.3b used, so the numbers are comparable cell for cell: the
+shipped `scenario/measure.ts#measureScenario` on `garden-apartments` at stage 1's own 900 s horizon,
+both declared seed sets (`tuning-20260730` and `holdout-20260731`, 50 replications each), the
+campaign's full-run window. The parking value rides on the **arm**, which is where `BatchRequest`
+puts a dispatcher and is why the passenger populations are unmoved: `traceKeyOf` does not read the
+dispatcher, so every cell below sees the same fifty traces as § 3.3a's. The one thing added was a
+twelve-line optional `edit` on the measured arm; it is **not landed**, because nothing in the shipped
+tree would call it and a measurement instrument with no caller is this repository's signature defect.
+
+Every cell is *passes of 50 on the tuning set* | *passes of 50 on the holdout set*.
+
+**Result 1 — the four non-wait kinds still never move, on this axis either.** `deliver-everyone`,
+`no-divergence`, `nobody-abandoned` and `answer-the-demand` are **50 | 50** in *every* cell of every
+table below — all five parking values, both reposition dials, and all four legal demand levels. That
+is an independent reproduction of § 3.3a's Result 1 on an axis it did not touch, and it is why
+`long-waits-under (≤ 10 %)` is the only column below.
+
+**Result 2 — at the stage's own demand, one cell is variable on both sets and it is a park at the
+top floor.** Baseline `collective`, `arrivalRatePctPop5min: null`:
+
+| parking | `long-waits-under (≤ 10 %)` |
+|---|---|
+| `stay` (shipped) | 50 \| 50 |
+| `lobby` | 50 \| 50 |
+| `zone-center` | 49 \| 50 |
+| `predicted-demand` | 50 \| 50 |
+| `fixed-floor` at the lobby | 50 \| 50 |
+| `fixed-floor` at floor 2 · 3 · 4 | 50 \| 50 · 50 \| 50 · 50 \| 50 |
+| `fixed-floor` at floor 5 | 48 \| 50 |
+| `fixed-floor` at floor 6 (the top) | **49 \| 49** |
+
+**It is refused, on § 3.3a's own two grounds and a third.** 49 of 50 is 98 %, which is *"a goal the
+shipped setting misses on one run in fifty"* — the shape that section refused for the group-mean
+cells one run short of R12. `nearest-car`, the profile that would have to miss it, scores 48 | 46:
+the whole of the failure a player could produce is **one run in fifty on one set and four on the
+other**, against a bar that itself moved by one. And the third ground is mechanical rather than
+statistical: reaching that bar at all means putting a parking value on the stage's **baseline arm**,
+and no field of `data/campaign.json` carries one. Adding it is not a data change — `stageRun.ts`
+builds the baseline arm from `startingProfileId` alone, and `dev/campaignPanel.ts` computes every
+admission against `profileById(startingProfileId)`, so a stage whose real baseline was an edited
+vector would tell a player *"runs the same system on every declared dimension"* about a move that
+changes the run. The axis is **not exhausted**; what is closed is reaching it from `data/`.
+
+**Result 3 — crossing parking with legal demand does not rescue it.** The residential profile
+declares `{ min: 3, typical: 5, max: 7 }` and DC-R1 forbids exceeding `max`. Every parking value at
+every legal level, baseline `collective`; only the cells variable on **both** sets are listed, and
+the rest are `constant-pass` on at least one:
+
+| rate %pop/5 min | cells variable on both sets |
+|---|---|
+| 3 | none |
+| 5 (`null`) | `fixed-floor` at the top — 49 \| 49 |
+| 6 | `predicted-demand` 48 \| 49 · `fixed-floor` at 4 — 49 \| 49 · at 5 — 49 \| 49 |
+| 7 (`max`) | `predicted-demand` 48 \| 49 · `fixed-floor` at 2 — 49 \| 49 · at 4 — 49 \| 49 · at the top — **46 \| 49** |
+
+The widest margin in the whole legal box is **46 | 49** — 92 % and 98 % — and it needs the demand at
+its declared ceiling *and* a parking value on the baseline arm. Both reposition dials
+(`repositionThresholdS` at 0 and `repositionEnergyWeight` at 0, against their shipped 2 and 0.2) were
+crossed with every cell above and moved no classification.
+
+**Result 4 — and this is the finding worth carrying forward: parking is what clears the stage.**
+Run through the shipped `campaign/stageSequence.ts#runStageToVerdict`, both batches, as a player's
+edited vector against the stage's own `collective` baseline:
+
+| the player's move | tuning batch | holdout | verdict |
+|---|---|---|---|
+| **park in the middle of the building** (`zone-center`) | ahead on **average wait** and **door-to-door time**, interval excludes zero, nothing resolved against | **agrees** | **cleared** |
+| `fixed-floor` at floor 3 · at floor 4 | ahead on **three** measures | agrees | cleared |
+| `predicted-demand` | ahead on average wait and 95th-percentile wait | **does not agree** | not cleared — O7's shortcut, exactly |
+| **park at the ground floor** (`lobby`) | **behind** on average wait and door-to-door | not run | not cleared |
+| `fixed-floor` at the lobby | **behind** on the same two | not run | not cleared |
+| `fixed-floor` at the top | **behind** on three | not run | not cleared |
+| `zone-center` with a 30 s deadband, or an energy price of 2 | nothing separated the two settings | not run | not cleared |
+
+**So stage 1 has a DC-3 witness, and § 3.1's *ten of ten* was measuring the stage's `editable` list
+rather than the stage.** The witness existed the whole time; `campaign/dimensions.ts#admitProfile`
+refused to run it, because the stage opened three weight dials and not the dimension its own building
+says decides it. That is a **scope** decision, which § 3.3's C3 already distinguishes from a
+difficulty one, and it is landed: stage 1's `editable` list now carries `idle.parkingStrategy` and
+the two dimensions moving it brings to life.
+
+**Three dimensions and not one, and `admitProfile` is why.** `idle.repositionThresholdS` and
+`idle.repositionEnergyWeight` both declare `activeWhen: { 'idle.parkingStrategy': [everything but
+`stay`] }`, so moving the strategy makes two dimensions **appear** — and `dimensions.ts` says in as
+many words that *"a dimension that appears or disappears is a move"*. Measured: with the strategy
+alone opened, the witness is still refused with *"also moves 2 dimensions this stage does not open:
+idle.repositionThresholdS (— → 2), idle.repositionEnergyWeight (— → 0.2)"*. Stages 4, 6 and 8 already
+list exactly this trio, so the shape is the campaign's own rather than a new convention.
+
+**Widening changed nothing about the dropdown.** The shipped profiles the stage admits are
+`{nearest-car, eta, collective}` with the idle dimensions open and `{nearest-car, eta, collective}`
+without them — `zoned-uppeak` and `predictive-balanced` are the two profiles that park somewhere, and
+both are refused on weights the stage does not open (`weights.zoneAffinity`;
+`weights.predictedDemand` and eight others). **DC-2 and DC-2b are therefore untouched by this
+section** and neither was re-measured.
+
+**The standing requirement, applied and passed.** *Move the control and require the run to change,
+compared on the legs.* On stage 1's own demonstration replication —
+`stageRun.ts#demonstrationConfigFor`, the run the fail-state report replays — all five parking values
+produce different legs from `stay`, and each gated dial produces different legs against a fixed park.
+The two gated dials pass in the interpretable direction: a 30 s deadband or an energy price of 2
+makes every repositioning trip not worth taking, so the run collapses **byte-identically onto
+`stay`** and is different from the same park at the shipped settings.
+`packages/viz/src/campaign/stageOneParking.test.ts` holds all of it.
+
+**And the copy is honest because the naive answer loses.** The brief hints the fix without naming it,
+which is only defensible if *"park them at the ground floor"* is not automatically right. On this
+building it is measurably wrong — behind on average wait and on door-to-door time — and the middle of
+the building wins. The two losing moves are pinned in the same file, so a change that made the lobby
+win would take the brief's last sentence down with it. The copy names **no count**, deliberately: the
+briefing already derives *"judged over 50 runs"* from `stage.replications`, and an authored sentence
+repeating it would be a second source for one number and stale the day the batch size moved.
+
+### 3.3d A structural note on DC-1 that the parking sweep made unavoidable
+
+Worth writing down because three lanes have now looked for a failable count goal on stage 1 and the
+rule's shape is part of why it is hard.
+
+`campaign/judge.ts` sets a count goal's bar to **the shipped setting's own measured count on these
+seeds** and scores `met = candidate.passes >= target`, refusing to judge at all when the baseline arm
+does not reproduce `target`. Two consequences follow arithmetically:
+
+1. **A stage's starting setting can never fail one of its own count goals.** It scores the bar by
+   construction. So a count goal is never *"here is a problem, fix it"*; it is only ever *"here is a
+   trap, do not fall into it."*
+2. **DC-1 is therefore a rule about punishing a wrong move**, not about presenting a problem. The
+   goal that presents a problem the player fixes is `beat-the-baseline`, which every stage carries
+   and which § D161's *"standing still clears nothing"* makes unmet on the control everywhere.
+
+Neither is an argument for weakening DC-1 — a campaign where no wrong move is ever punished teaches
+less, and the rule catches that. What it does mean is that **DC-1 green and *a new player meets a
+comprehensible problem* are different claims**, and stage 1 is the clearest case: what a first-time
+player can now see, understand and fix is where the cars wait, and that arrives through
+`beat-the-baseline` rather than through anything DC-1 measures. A lane asked to make stage 1 teach
+should read this before optimising for the gate.
 
 ---
 
