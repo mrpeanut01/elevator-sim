@@ -433,3 +433,196 @@ describe('a project that simulates declares a timeout a simulation fits in', () 
     for (const name of SIMULATING) expect(names, `${name} is no longer a registered project`).toContain(name);
   });
 });
+
+/**
+ * Every file in the browser tier starts its own Vite dev server, and each one has to say where.
+ *
+ * ## The trap this guard exists for, stated as it measures rather than as it was reasoned
+ *
+ * `vite.config.ts` pins `{ port: 5174, strictPort: true }`. A test that passes `server: { port: 0 }`
+ * inline does **not** thereby ask for an ephemeral port, and — measured by resolving that exact
+ * config and reading it back — it does not lose to the pinned port either. `server.port` resolves
+ * to `0` and `strictPort` resolves to `true`: **the inline port wins and `strictPort` is
+ * inherited.** Vite then maps `port: 0` onto its own built-in default, `5173`, and `strictPort`
+ * turns a busy `5173` into `Port 5173 is already in use` rather than a step to the next free one.
+ *
+ * So the failure is *refused to serve at all*, not *served somewhere we did not read*. Three files
+ * in this directory carry notes describing it the other way round; those notes are wrong on the
+ * mechanism and right about the fix, and they are corrected where they sit rather than here.
+ *
+ * ## Why a derived guard and not four more docstrings
+ *
+ * The tier has met this four times. Each time one file was repaired and a note was written
+ * explaining it — and each note cited `boot.browser.test.ts`, which was itself never repaired,
+ * because nothing read any of the notes. It survived CI for months: a CI runner has nothing else
+ * on `5173`, so the defect is invisible on exactly the machine the project trusts and fires on
+ * exactly the machine a developer uses.
+ *
+ * A guard that derives the ports from the files is the only version of this that cannot rot. It
+ * asserts three things, and the third is the one a fifth encounter would trip:
+ *
+ * 1. every file in the tier names a port of its own,
+ * 2. none of them says `port: 0`,
+ * 3. no two of them name the **same** port — which is the collision `strictPort: false` merely
+ *    survives rather than prevents, and which would otherwise show up as two servers quietly
+ *    sharing one origin and each seeing the other's page.
+ *
+ * A decision number is owed for making this a derived check rather than a fifth note.
+ */
+describe('every browser-tier file names a port of its own — the trap this tier has met four times', () => {
+  /** `server: { port: <n>, ... }` as the tier actually writes it, across line breaks. */
+  const PORT = /server:\s*\{[^}]*?\bport:\s*(\d+)/su;
+
+  it('gives every file in the tier a port, and never `port: 0`', async () => {
+    const tiers = browserTiers(await registeredProjects());
+    expect(tiers.length, 'no browser tier was found, so this guard is watching nothing').toBeGreaterThan(0);
+
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        const found = PORT.exec(readSource(path));
+        expect(
+          found,
+          `${shortly(path)} starts a Vite server without naming a port. It will land on Vite's ` +
+            'default 5173 and, under the config\'s inherited `strictPort: true`, throw rather than ' +
+            'move the moment anything else holds that port.',
+        ).not.toBeNull();
+        expect(
+          Number((found as RegExpExecArray)[1]),
+          `${shortly(path)} asks for \`port: 0\`. That does not mean *an ephemeral port*: Vite ` +
+            'resolves it to its own default 5173, `strictPort: true` is inherited from ' +
+            'vite.config.ts, and the file then fails with `Port 5173 is already in use` for a ' +
+            'reason that has nothing to do with what it tests.',
+        ).not.toBe(0);
+      }
+    }
+  });
+
+  it('gives no two files the same port', async () => {
+    const tiers = browserTiers(await registeredProjects());
+    const claimed = new Map<number, string>();
+
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        const found = PORT.exec(readSource(path));
+        if (found === null) continue;
+        const port = Number(found[1]);
+        const holder = claimed.get(port);
+        expect(
+          holder,
+          `${shortly(path)} and ${holder} both name port ${port}. \`strictPort: false\` lets the ` +
+            'loser move, so this does not fail loudly — it fails quietly, as two servers on one ' +
+            'origin serving each other\'s pages.',
+        ).toBeUndefined();
+        claimed.set(port, shortly(path));
+      }
+    }
+
+    expect(claimed.size, 'no ports were read, so the two cases above asserted nothing').toBeGreaterThan(0);
+  });
+});
+
+/**
+ * **The page-error gate has one owner, and the choke point is derived** — GitHub issue #268.
+ *
+ * A decision number is owed; the argument is `browserTier.test-helper.ts`'s own section docstring,
+ * which measures what the tier was blind to. The one-line version: a page could raise an unhandled
+ * error on every case and the run stayed green, which is how issue #259 survived four encounters.
+ *
+ * ## Why this belongs here rather than in the helper
+ *
+ * The helper collects; it cannot make itself the *only* collector. That is the same asymmetry the
+ * clauses above exist for — the gate constants were one importable module for eleven waves before
+ * anything checked that every file went through it — so the enforcement lives where the derivation
+ * lives, in a project that always runs, reading the tier's files off disk.
+ *
+ * Three clauses, and the third is the one that stops this becoming *"six copies kept identical by
+ * a sentence"* a second time:
+ *
+ * 1. **Every file that launches a browser opens its pages through `openPage`.** Written this way
+ *    round on purpose: *"at least one file uses the helper"* is non-vacuity, and this is coverage.
+ *    The set is read off the project like everything else here — *26 of 26 launch a Chromium* is
+ *    what it measured when this was written, and is not a number anything below counts from. A
+ *    file that launched one and drove no watched page would be a file whose pages throw into
+ *    nothing.
+ * 2. **No file mints a page itself.** `.newPage(` on any receiver, and `.newContext(` with it —
+ *    a context is the other way to reach a `Page`, and closing one door while leaving the other
+ *    open is the shape of a guard that reads as total and is not.
+ * 3. **No file attaches a `pageerror` listener of its own.** Three files did, and the other
+ *    twenty-three had nothing; the three were folded into the shared collector by this issue. A
+ *    private listener is not merely redundant — it is a second answer to *what counts as a page
+ *    error in this tier*, and the two answers drift in the direction nobody notices, because both
+ *    of them are green almost always.
+ *
+ * Clause 3 reads the **raw** source rather than `code()`, unlike its neighbours: `code()` strips
+ * string literals, so `page.on('pageerror', …)` survives it as `page.on(, …)` with the evidence
+ * removed. The cost is that a docstring writing that call verbatim would trip the clause, which is
+ * a trade worth making in this direction — prose can be rephrased, and a missed second collector
+ * cannot be noticed.
+ */
+describe('the tier collects page errors in one place — GitHub issue #268', () => {
+  /** How a tier file gets a `Page` without the helper. Both receivers, both routes. */
+  const MINTS_A_PAGE = /\.(newPage|newContext)\s*\(/u;
+
+  /** A collector of its own. Raw source — see the docstring above for why not `code()`. */
+  const PRIVATE_COLLECTOR = /\.on\(\s*['"]pageerror['"]/u;
+
+  it('opens every page through the shared collector, in every file that launches a browser', async () => {
+    const tiers = browserTiers(await registeredProjects());
+    expect(tiers.length, 'no browser tier was found, so this guard is watching nothing').toBeGreaterThan(0);
+
+    let watched = 0;
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        const source = code(readSource(path));
+        if (!source.includes('chromium.launch')) continue;
+        expect(
+          source.includes('openPage('),
+          `${shortly(path)} launches a browser and never calls openPage. Its pages raise their ` +
+            'unhandled errors into nothing, which is the state the whole tier was in before ' +
+            'GitHub issue #268 — two full runs carrying #259’s throw reported 0 failed. Replace ' +
+            '`browser.newPage(…)` with `openPage(browser, …)` from browserTier.test-helper.js; ' +
+            'there is nothing else to call, and nothing to remember to assert.',
+        ).toBe(true);
+        watched += 1;
+      }
+    }
+    expect(
+      watched,
+      'no file in the tier launches a browser, so this case asserted nothing about any of them',
+    ).toBeGreaterThan(0);
+  });
+
+  it('lets no file mint a page or a context of its own', async () => {
+    const tiers = browserTiers(await registeredProjects());
+    const minting: string[] = [];
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        if (MINTS_A_PAGE.test(code(readSource(path)))) minting.push(shortly(path));
+      }
+    }
+    expect(
+      minting,
+      'these files reach a page around the tier’s collector. `openPage` in ' +
+        'browserTier.test-helper.js takes exactly what `newPage` takes and attaches the listener ' +
+        'the gate reads; a page minted any other way throws into nothing and the run stays green.',
+    ).toEqual([]);
+  });
+
+  it('lets no file keep a page-error collector of its own', async () => {
+    const tiers = browserTiers(await registeredProjects());
+    const collectors: string[] = [];
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        if (PRIVATE_COLLECTOR.test(readSource(path))) collectors.push(shortly(path));
+      }
+    }
+    expect(
+      collectors,
+      'these files listen on `pageerror` themselves. Three did before GitHub issue #268 — ' +
+        'boot, dispatcherFamilies and dispatcherStrip — and the other twenty-three had no ' +
+        'collector at all, which is the asymmetry that made the tier report green over a throwing ' +
+        'page. The shared gate covers every page of every file; a private one is a second answer ' +
+        'to the same question, and this repository has paid for that shape before.',
+    ).toEqual([]);
+  });
+});

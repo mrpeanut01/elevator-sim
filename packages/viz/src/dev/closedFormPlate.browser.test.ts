@@ -24,7 +24,7 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -51,7 +51,7 @@ afterAll(async () => {
 
 /** Midtown Office at seed 42, with the right rail's Building segment open. */
 async function buildingSegment(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const page = await openPage(browser, { viewport: { width: 1400, height: 900 } });
   await page.goto(`${origin}?building=midtown-office&seed=42`, { waitUntil: 'load' });
   await enterEngineerStage(page);
   await page.locator('#seg-building').first().click();

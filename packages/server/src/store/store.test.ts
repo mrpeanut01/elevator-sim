@@ -22,7 +22,8 @@ import { issuedChallengeFor } from '../challenge/schedule.js';
 import { challengeScoreOf, type SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
 import { PgliteSql } from './pglite.test-helper.js';
-import { SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
+import { RacingSql } from './racingSql.test-helper.js';
+import { NoSuchUserError, SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
 
 const RUN: SubmittedRun = Object.freeze({
   buildingId: 'garden-apartments',
@@ -41,12 +42,21 @@ function metrics(awtS: number): ClaimedMetrics {
 /** A store with a clock the caller drives, and a couple of players in it. */
 async function fixture(): Promise<{
   store: Store;
+  /**
+   * The same database, underneath the store.
+   *
+   * Handed back so the erasure test can read `pg_constraint` — the schema's own account of which
+   * tables reference `users` — rather than being told which four they are. `Store` exposes no
+   * catalog query and should not grow one for a test's benefit.
+   */
+  sql: PgliteSql;
   tick: (ms: number) => void;
   ada: string;
   bo: string;
 }> {
   let clock = 1_770_000_000_000;
-  const store = await Store.open({ sql: new PgliteSql(), now: () => clock });
+  const sql = new PgliteSql();
+  const store = await Store.open({ sql, now: () => clock });
   const make = async (name: string): Promise<string> => {
     const created = await store.createUser({
       email: `${name}@example.test`,
@@ -58,6 +68,7 @@ async function fixture(): Promise<{
   };
   return {
     store,
+    sql,
     tick: (ms) => {
       clock += ms;
     },
@@ -450,5 +461,197 @@ describe('a challenge board', () => {
       issuedChallengeFor(1).id,
       issuedChallengeFor(0).id,
     ]);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Erasure
+ * -------------------------------------------------------------------------- */
+
+/** One table that references `users`, as the database itself describes it. */
+interface UserReference {
+  readonly table: string;
+  readonly column: string;
+  /** `pg_constraint.confdeltype`. `'c'` is `ON DELETE CASCADE`; `'a'` is `NO ACTION`. */
+  readonly onDelete: string;
+}
+
+/**
+ * Every foreign key that points at `users`, read out of PostgreSQL's own catalog.
+ *
+ * **This is the whole point of the erasure tests below and not a convenience.** A hand-written list
+ * of child tables is a list that stops being true the day someone adds a table and does not think
+ * of this file — which is `DECISIONS.md` § D213's lesson and the reason `deadCode.test.ts` derives
+ * its directory list off disk rather than writing one down. The catalog cannot go stale against the
+ * schema, because it *is* the schema: `Store.open` applied it four lines ago.
+ *
+ * Possible only because `PgliteSql` is PostgreSQL rather than a stand-in for one. A test double
+ * would have had to be told the answer, which is the thing being avoided.
+ */
+async function tablesReferencingUsers(sql: PgliteSql): Promise<readonly UserReference[]> {
+  const result = await sql.query(
+    'SELECT child.relname AS table_name, att.attname AS column_name, con.confdeltype AS on_delete ' +
+      'FROM pg_constraint con ' +
+      'JOIN pg_class child ON child.oid = con.conrelid ' +
+      'JOIN pg_class parent ON parent.oid = con.confrelid ' +
+      'CROSS JOIN LATERAL unnest(con.conkey) AS k(attnum) ' +
+      'JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = k.attnum ' +
+      "WHERE con.contype = 'f' AND parent.relname = 'users' " +
+      'ORDER BY child.relname, att.attname',
+  );
+  return result.rows.map((row) => ({
+    table: String(row['table_name']),
+    column: String(row['column_name']),
+    onDelete: String(row['on_delete']),
+  }));
+}
+
+/** How many rows of `table` point at `userId`. */
+async function rowsFor(sql: PgliteSql, reference: UserReference, userId: string): Promise<number> {
+  const result = await sql.query(
+    `SELECT COUNT(*) AS n FROM ${reference.table} WHERE ${reference.column} = $1`,
+    [userId],
+  );
+  return Number(result.rows[0]?.['n'] ?? -1);
+}
+
+/** A player with a row in every table that references `users`. */
+async function populate(store: Store, userId: string, suffix: string): Promise<void> {
+  await store.createSession(`session-${suffix}`, userId);
+  await store.createLoginToken({ jti: `jti-${suffix}`, userId, expiresAtMs: 1_770_000_060_000 });
+  await store.recordEntry({ configHash: 'board-erasure', userId, run: RUN, measured: metrics(10) });
+  await store.recordChallengeEntry({
+    challengeId: issuedChallengeFor(0).id,
+    dataHash: 'data-1',
+    userId,
+    dispatcherProfileId: 'collective',
+    score: challengeScore(20),
+  });
+}
+
+describe('deleting an account', () => {
+  it('declares ON DELETE CASCADE on every table that references users', async () => {
+    const { sql } = await fixture();
+    const children = await tablesReferencingUsers(sql);
+    // A floor rather than a list. It is here so that a catalog query which quietly matched nothing
+    // — a renamed table, a `pg_constraint` shape that moved — cannot pass every assertion below by
+    // having nothing to assert about, which is how `deadCode.test.ts` guards its own scanner.
+    expect(children.length, 'the catalog query found no foreign key to users').toBeGreaterThanOrEqual(4);
+    expect(
+      children.filter((child) => child.onDelete !== 'c').map((child) => `${child.table}.${child.column}`),
+      'these reference users without ON DELETE CASCADE, so deleting an account would either fail ' +
+        'or orphan them — `Store.deleteUser` is one statement and relies on the cascade for the rest',
+    ).toEqual([]);
+  });
+
+  it('takes every child row with it, derived from the schema rather than from a list here', async () => {
+    const { store, sql, ada, bo } = await fixture();
+    await store.issueChallenge(issuedChallengeFor(0));
+    await populate(store, ada, 'ada');
+    await populate(store, bo, 'bo');
+    const children = await tablesReferencingUsers(sql);
+
+    // **Before**, and this half is what stops the assertion after the delete being vacuous: a table
+    // the fixture forgot to populate would report zero afterwards no matter what `deleteUser` did.
+    // It also fails usefully the day a fifth table references `users` — the message names the table
+    // that needs a row here, rather than the test silently covering three of four.
+    for (const child of children) {
+      expect(await rowsFor(sql, child, ada), `${child.table} was never populated for this test`).toBeGreaterThan(0);
+    }
+
+    await store.deleteUser(ada);
+
+    expect(await store.userById(ada)).toBeUndefined();
+    for (const child of children) {
+      expect(await rowsFor(sql, child, ada), `${child.table} still holds a row for the deleted account`).toBe(0);
+    }
+    // And nobody else's. A cascade that took the whole table would satisfy every assertion above.
+    expect((await store.userById(bo))?.displayName).toBe('Bo');
+    for (const child of children) {
+      expect(await rowsFor(sql, child, bo), `${child.table} lost a row belonging to another account`).toBeGreaterThan(0);
+    }
+  });
+
+  it('leaves the challenge itself standing, because it is not the player’s to erase', async () => {
+    const { store, ada } = await fixture();
+    await store.issueChallenge(issuedChallengeFor(0));
+    await populate(store, ada, 'ada');
+    await store.deleteUser(ada);
+    // `challenges` carries no `user_id` and so is not in the derived set above, which is correct
+    // rather than an omission: a challenge is the server's own rotation and other players are
+    // posting to it. An erasure that took it would delete strangers' entries by cascade.
+    expect(await store.challengeById(issuedChallengeFor(0).id)).toBeDefined();
+  });
+
+  it('is silent about an id that is not there, rather than throwing', async () => {
+    const { store } = await fixture();
+    // The route above this has already authenticated, so this can only be a concurrent second
+    // deletion — and the answer to that is the answer to the first one.
+    await expect(store.deleteUser('nobody')).resolves.toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The race that deletion made reachable
+ * -------------------------------------------------------------------------- */
+
+/** A store whose one account is deleted the instant `fires` matches, and that account's id. */
+async function racedFixture(fires: (text: string) => boolean): Promise<{ store: Store; ada: string }> {
+  let store: Store | undefined;
+  let ada = '';
+  const sql = new RacingSql(new PgliteSql(), fires, async () => {
+    await store?.deleteUser(ada);
+  });
+  store = await Store.open({ sql, now: () => 1_770_000_000_000 });
+  const created = await store.createUser({
+    email: 'raced@example.test',
+    displayName: 'Raced',
+    displayNameChosen: true,
+  });
+  if (!created.ok) throw new Error(created.reason);
+  ada = created.user.id;
+  return { store, ada };
+}
+
+describe('an account deleted underneath a submission', () => {
+  it('fails recordEntry as a missing account, not as a raw constraint violation', async () => {
+    const { store, ada } = await racedFixture((text) => text.startsWith('INSERT INTO entries'));
+    // The pre-check passes — the account is there when `recordEntry` looks — and the row is gone by
+    // the time the insert runs. Before this was mapped, what came out was PostgreSQL's own
+    // sentence, naming the constraint and the table, as an unhandled rejection.
+    const failure = store.recordEntry({ configHash: 'raced', userId: ada, run: RUN, measured: metrics(10) });
+    await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
+    await expect(failure).rejects.toThrow('recordEntry: no such user');
+    await expect(failure).rejects.not.toThrow(/foreign key|constraint|entries_user_id_fkey/u);
+  });
+
+  it('fails recordChallengeEntry the same way, because it has the same shape', async () => {
+    const { store, ada } = await racedFixture((text) => text.startsWith('INSERT INTO challenge_entries'));
+    await store.issueChallenge(issuedChallengeFor(0));
+    const failure = store.recordChallengeEntry({
+      challengeId: issuedChallengeFor(0).id,
+      dataHash: 'data-1',
+      userId: ada,
+      dispatcherProfileId: 'collective',
+      score: challengeScore(20),
+    });
+    await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
+    await expect(failure).rejects.toThrow('recordChallengeEntry: no such user');
+  });
+
+  it('does not call a missing challenge a missing account', async () => {
+    const { store, ada } = await fixture();
+    // `challenge_entries` references two tables and only one of them is the account. The mapping
+    // asks the database whether the *owner* went away rather than reading a generated constraint
+    // name, so the other foreign key has to still come out as itself.
+    await expect(
+      store.recordChallengeEntry({
+        challengeId: 'never-issued-0',
+        dataHash: 'data-1',
+        userId: ada,
+        dispatcherProfileId: 'collective',
+        score: challengeScore(25),
+      }),
+    ).rejects.not.toBeInstanceOf(NoSuchUserError);
   });
 });

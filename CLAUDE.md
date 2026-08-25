@@ -84,8 +84,42 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **566 408** | **606** | **48** | **0** | **green**, with **17** findings registered |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **706 094** | **4 710** | **49** | **0** | **green**, with **19** findings registered |
+  | always-on | 49 | **569 184** | **606** | **49** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **710 048** | **4 710** | **50** | **0** | **green**, and the register is empty |
+
+  **Re-measured 2026-08-25 on the integrated tree, both tiers, in one sitting** — after wave B's ten
+  lanes had merged and never once on a branch. Strings moved **+2 776** and **+3 954**; cases and
+  simulations are unmoved.
+
+  **The surfaces column moved by one in both tiers and wave B did not move it**, which is the thing
+  to read twice. The column said **48** and **49**; measured, it is **49** and **50** — and it is
+  **49 on `000852a`, the commit the previous row claims to describe.** The two surface *sets* were
+  probed at the base commit and at the wave's head and diffed: they are **identical**. So nothing in
+  these forty-five commits added a surface; the figure had been stale since M2-GATE and #207 moved
+  six registers into a Settings build-information panel, and nobody re-measured. Published as a
+  correction rather than as a move, because *"cases, simulations and surfaces unmoved"* beside a
+  changed number reads as *this wave added a surface*, and the next reader would go looking for one
+  that does not exist. It is `RISKS.md` R38 on the very row that exists to track that class, and it
+  is the **fifth** time this file has recorded the lesson.
+
+  **The deep tier is still exactly one surface above the always-on tier**, for the reason it has
+  always been — `campaign/judge.ts#judgeStage` is silent in one tier by construction and loud in the
+  other — and that gap surviving the correction is what says the correction is a correction: a real
+  move would have had to disturb it.
+
+  **Both registers are empty and both tiers are green.** `internal-notation`'s nineteen findings were
+  taken to zero by #207 before this wave opened, and wave B added none: the § D343 check was run on
+  the integrated tree and `honesty/properties.ts` is untouched, the scope constants
+  (`STANDARD_SPACE`, `DEEP_SPACE`, `maxDurationS`, `stageProbability`) are unmoved, and `OUTSTANDING`
+  is unmoved. **A lane asked to keep a gate at zero can do it by fixing strings or by moving the
+  gate, and only a diff tells you which** — the whole of `honesty/` in this wave is one 18-line
+  classification entry in `derive.test.ts` ([§ D359](DECISIONS.md)).
+
+  **What the corpus still cannot ask** is whether two surfaces agree about one run. All nine
+  properties are predicates over a single case's rendered strings, so wave B's horizon defect — the
+  Everyday rail grading a run against 460 s while the Engineer rail graded the same run against 230 s
+  — was invisible to it, and a horizon axis would not have helped: each surface was internally honest
+  either way. GitHub issue #269, and § D334's `suppressed-mean` finding was the same shape.
 
   **The verdict column has gone back to meaning what it was written to mean, and the row below
   predicted it.** A ninth property landed on 2026-08-24 — `internal-notation`, the mechanical

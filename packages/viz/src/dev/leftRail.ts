@@ -12,9 +12,11 @@
  * for every project), so a decision made inside a DOM write is a decision no test can reach.
  *
  * Hence the exported pure functions below — {@link statRowsOf}, {@link moodViewOf},
- * {@link goalRowsOf}, {@link runFiguresOf}, {@link historyBarsOf}, {@link decisionRowViewOf},
- * {@link mathsDisclosureOf} — and hence the fact that {@link mountLeftRail} contains no `if` that
- * is about *what to say*, only about *where to put it*.
+ * {@link shiftGoalsOf}, {@link goalRowsOf}, {@link runFiguresOf}, {@link historyBarsOf},
+ * {@link decisionRowViewOf}, {@link mathsDisclosureOf} — and hence the fact that
+ * {@link mountLeftRail} contains no `if` that is about *what to say*, only about *where to put it*.
+ * {@link shiftGoalsOf} is the one of them `dev/main.ts` also calls, and its docstring says why that
+ * direction is the only one available.
  *
  * ## The rule that outranks the design
  *
@@ -78,6 +80,7 @@ import type { ViewMode } from '../mode/types.js';
 import { MOOD_GLYPH, buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { contractById } from '../shift/contracts.js';
 import { scheduledEventFor } from '../shift/calendar.js';
+import { runHorizonOf } from '../shift/dayLength.js';
 import {
   PENDING_DISPLAY,
   bestLineFor,
@@ -91,13 +94,15 @@ import {
   type DayOutcome,
   type GoalObservations,
   type GoalReading,
+  type ShiftGoal,
   type WeekState,
 } from '../shift/types.js';
 
+import type { BrowserResources } from './data.js';
 import {el, fill, keyedFill, setHidden, setStyle, setText } from './dom.js';
 import type { HonestyElements, MoodElements, ShiftElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
-import { disclosureOf } from './state.js';
+import { buildingConfigOf, disclosureOf, type ViewerState } from './state.js';
 
 /**
  * The elements this mount owns — a structural subset of `Elements`, so the shell passes its whole
@@ -630,6 +635,44 @@ function shareColor(pct: number): string {
 /* -------------------------------------------------------------------------- *
  * L5 — TODAY'S SHIFT
  * -------------------------------------------------------------------------- */
+
+/**
+ * What today asks of **this** state, on the Engineer side — the one expression the rail's rows and
+ * the filed sheet's goals are both built from.
+ *
+ * ## Why a function, and why this file
+ *
+ * `shift/goals.ts#goalsForDay` takes the day and *what kind of run today is*, and the second
+ * argument is the one a caller can forget: forgetting it compiles, draws, and grades a ten-hour run
+ * against a thirty-minute ceiling. This shell has **two** callers of it — {@link drawShift} and
+ * `dev/main.ts#closeShift`, the rail the player watches and the sheet it files — and two surfaces
+ * publishing different bars for one run is exactly the disagreement `TEST_MATRIX.md` T1 forbids.
+ * So the shell asks the question once, here, and both read the answer.
+ *
+ * It lives in this file rather than in a neutral one because `dev/main.ts` imports this module and
+ * this module never imports it, so this is the one seam of the two that can hold a shared
+ * derivation without a cycle. The derivation it delegates to is **not** here:
+ * `shift/dayLength.ts#runHorizonOf` is the expression the *other* shell reads too, and the whole
+ * point of it living there is that `everyday/host.ts` and this file cannot answer it differently.
+ * Nothing in this function is a second copy of that lookup, and writing one here would be the
+ * defect it exists to close.
+ *
+ * Pure in its two arguments and exported for the reason every decision in this file is: there is no
+ * jsdom here, so a decision made inside a DOM write is a decision no test can reach.
+ */
+export function shiftGoalsOf(
+  state: ViewerState,
+  resources: BrowserResources,
+): readonly ShiftGoal[] {
+  return goalsForDay(
+    state.week.day,
+    runHorizonOf(
+      resources.trafficProfiles,
+      buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+      state,
+    ),
+  );
+}
 
 export interface GoalRow {
   /** `✓`, `×` or `·` — `GOAL_GLYPHS`. Never the only signal; {@link value} is the other. */
@@ -1232,7 +1275,11 @@ function drawShift(
   setText(ui.event, event.name);
   setText(ui.note, event.note);
 
-  const goals = goalRowsOf(readGoals(goalsForDay(week.day), observations), week.history, week.day);
+  const goals = goalRowsOf(
+    readGoals(shiftGoalsOf(state, view.resources), observations),
+    week.history,
+    week.day,
+  );
   surfaces.goals(
     goals
       .map((goal) => `${goal.label}=${goal.value}=${goal.was}=${String(goal.barPct)}`)

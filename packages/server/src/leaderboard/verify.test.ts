@@ -176,6 +176,38 @@ describe('the cheap gate runs before the expensive one', () => {
     expect(issuesFor(0)).toBe('');
     expect(issuesFor(null)).toBe('');
   });
+
+  /*
+   * GitHub issue #267 — the half of § D286 that lived on the client.
+   *
+   * § D286 closed this same mismatch by deleting the client's *offer* of a ten-hour run; § D356 then
+   * made the same length reachable again without an offer, because the Everyday day is **derived
+   * from the record the building's profile matches** rather than picked from a list. A bound on what
+   * is offered cannot see a derivation, so the two packages drifted apart a second time and a player
+   * who finished a whole day could not post it.
+   *
+   * Asserted as a window, because that is the only shape a whole day can travel in: `core` refuses a
+   * `templateOverrides.durationS` refit on a phase-list record by name (§ D285), so a day named
+   * without a window throws rather than runs.
+   */
+  it('accepts a whole authored day, which is derived rather than offered', () => {
+    const claimed = { awtS: 12, wt95S: 30, ttdMeanS: 40, pctOverLongWait: 2, awtIsValid: true };
+    const wholeDay = { ...RUN, durationS: 36_000, windowStartS: 0 };
+    expect(submissionIssues({ run: wholeDay, claimed })).toEqual([]);
+  });
+
+  it('still refuses a length nobody can reach, so the gate is a gate', () => {
+    // The mutation guard on the case above. Widening `ACCEPTED_DURATIONS_S` to *anything* would make
+    // that test pass for the wrong reason, and a bound that admits every number is not a bound —
+    // `MIN_SUBMIT_INTERVAL_MS` is sized against the longest run this list allows.
+    const claimed = { awtS: 12, wt95S: 30, ttdMeanS: 40, pctOverLongWait: 2, awtIsValid: true };
+    for (const durationS of [7, 36_001, 35_999, 86_400]) {
+      expect(
+        submissionIssues({ run: { ...RUN, durationS, windowStartS: 0 }, claimed }).join(' '),
+        String(durationS),
+      ).toMatch(/durationS must be one of/u);
+    }
+  });
 });
 
 /* -------------------------------------------------------------------------- *
@@ -318,6 +350,25 @@ describe('a board is keyed by what it measures', () => {
     const morning = configHashOf({ ...RUN, windowStartS: 30 * 60 }, facts);
     const lunch = configHashOf({ ...RUN, windowStartS: 255 * 60 }, facts);
     expect(new Set([base, morning, lunch]).size).toBe(3);
+  });
+
+  /*
+   * GitHub issue #267's safety property, and the reason widening `ACCEPTED_DURATIONS_S` is not a
+   * ranking bug: **a ten-hour run never competes against a thirty-minute one.**
+   *
+   * Verified by construction rather than assumed — `configHashOf` puts `durationS` in the canonical
+   * string it digests, so every accepted length is its own board. The case above already proves the
+   * general rule at 1 800 s; this one names the whole day, because that is the length the issue is
+   * about and a general rule nobody instantiated is how a specific regression hides.
+   *
+   * The cost of the property is the empty board it creates, which is `RISKS.md` R32 and GitHub
+   * issue #222 rather than something this test can fix.
+   */
+  it('gives a whole authored day its own board, so it never ranks against a slice', () => {
+    const wholeDay = configHashOf({ ...RUN, durationS: 36_000, windowStartS: 0 }, facts);
+    const twoHours = configHashOf({ ...RUN, durationS: 7_200, windowStartS: 0 }, facts);
+    const halfHour = configHashOf({ ...RUN, durationS: 1_800, windowStartS: 0 }, facts);
+    expect(new Set([wholeDay, twoHours, halfHour]).size).toBe(3);
   });
 
   it('treats a window starting at zero as a selection, not as its absence', () => {

@@ -415,6 +415,35 @@ export interface LeaderboardClient {
  * silently work in development and silently fail in a build served from a CDN, which is the class
  * of bug that only reproduces where it cannot be debugged.
  */
+/**
+ * The sentence a 4xx gets on screen — the server's `detail`, else its `issues`, else the fallback.
+ *
+ * **The middle arm is the one that had been missing**, and it was measured rather than reasoned
+ * about (GitHub issue #267). `http/api.ts` answers a shape error with
+ * `{ error: 'invalid-submission', issues: [...] }` and **no `detail`**, so a player who posted a run
+ * the server would not take read *"The server refused that request."* while the response in hand
+ * said `durationS must be one of 300, 900, 1800, 3600, 7200`. Not a silent failure — which is what
+ * the issue feared — but a refusal a player cannot act on, which is the same defect one notch
+ * quieter.
+ *
+ * This is **not** {@link CLIENT_FAILURES.refused}'s rule being broken. That fallback says nothing
+ * about *why* because inventing a reason here would be a second place deciding what a rejection
+ * means; `issues` is not an invention, it is the server's own wording in the same body as `detail`,
+ * written for the same reader. Preferring `detail` keeps the ordering honest where a route sends
+ * both.
+ *
+ * A decision number is owed for this entry.
+ */
+function refusalDetail(body: Record<string, unknown>): string {
+  if (typeof body['detail'] === 'string') return body['detail'];
+  const issues = Array.isArray(body['issues']) ? (body['issues'] as unknown[]) : [];
+  const sentences = issues.filter((issue): issue is string => typeof issue === 'string' && issue.length > 0);
+  // Joined rather than reduced to the first: a shape gate reports **all** of them on purpose, so a
+  // caller fixing one at a time learns how many there are — and a screen showing one of four would
+  // undo that at the last step.
+  return sentences.length === 0 ? CLIENT_FAILURES.refused : `The server refused that request: ${sentences.join('; ')}.`;
+}
+
 export function createClient(origin: string, transport: Transport): LeaderboardClient {
   const base = origin.replace(/\/$/u, '');
 
@@ -432,7 +461,7 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
         code: typeof body['error'] === 'string' ? body['error'] : `http-${String(response.status)}`,
         // The server's own wording where there is one. It is written for a player and rewriting it
         // here would be a second place that decides what a rejection means.
-        detail: typeof body['detail'] === 'string' ? body['detail'] : CLIENT_FAILURES.refused,
+        detail: refusalDetail(body),
         issues: Array.isArray(body['issues']) ? (body['issues'] as string[]) : [],
         // Whole and unread. The three fields above are what a panel usually needs; the body is what
         // the one refusal that carries a window needs, and dropping it here would mean adding a

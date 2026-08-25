@@ -25,6 +25,21 @@
  * which is CLAUDE.md's own budget and the size a campaign batch will be. `candidates.ts` carries
  * the second reason the two sets are the *same* size, which is that unequal ones manufacture
  * disagreements out of the denominator. Both counts are published beside the rate.
+ *
+ * ## And the window is the campaign's, because a bar is only a bar on the run that produced it
+ *
+ * GitHub issue **#255**. `campaign/stageRun.ts#batchRequestForStage` reads the reporting window from
+ * `shift/reportWindow.ts#shiftReportWindowFor`, and this file reads it from the same function for a
+ * reason that is not symmetry: the bar a count goal is judged against is *the shipped setting's own
+ * measured count on these seeds*, and `campaign/judge.ts` refuses to judge at all when the baseline
+ * arm does not reproduce it. A table measured over the demand template's band and a stage judged
+ * over `full-run` would be two different quantities under one label, and every count goal on the
+ * building the fix moves would arrive at a player as *"not judged"*.
+ *
+ * So the window is not a property of this measurement. It is a property of the **scenario**, taken
+ * from the one place that decides it, and the guard in `goalRates.test.ts` re-derives this table by
+ * calling {@link measureScenario} — so the day the two functions disagree, the file on disk stops
+ * reproducing rather than quietly meaning something else.
  */
 
 import type {
@@ -34,6 +49,7 @@ import type {
 } from './published.js';
 import { runBatch } from '../batch/runBatch.js';
 import type { BatchReplication, BatchRequest, BatchResources } from '../batch/types.js';
+import { shiftReportWindowFor } from '../shift/reportWindow.js';
 import {
   GOAL_BLOCKER,
   GOAL_JUDGEMENT,
@@ -188,6 +204,7 @@ function runSeedSet(
   resources: BatchResources,
   options: MeasureOptions,
 ): readonly BatchReplication[] {
+  const reportWindow = shiftReportWindowFor(scenario.buildingId);
   const request: BatchRequest = {
     buildingId: scenario.buildingId,
     seed: seeds.seed,
@@ -195,6 +212,8 @@ function runSeedSet(
     replications: seeds.replications,
     arms: [{ armId: 'scenario', dispatcherProfileId: scenario.dispatcherProfileId }],
     arrivalRatePctPop5min: scenario.arrivalRatePctPop5min,
+    /* Omitted rather than `undefined` — see `campaign/stageRun.ts` on why those differ. */
+    ...(reportWindow === undefined ? {} : { reportWindow }),
   };
   const result = runBatch(request, resources);
   options.onSeedSet?.(seeds.name, seeds.replications);

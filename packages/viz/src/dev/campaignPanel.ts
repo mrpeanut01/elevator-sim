@@ -40,8 +40,13 @@ import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { restrictedFloorIds } from '../access/zoning.js';
-import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
-import type { BatchRequest, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
+import { populationLineOf, type BatchReport } from '../batch/report.js';
+import type {
+  BatchRequest,
+  BatchResult,
+  BatchWorkerMessage,
+  BatchWorkerRequest,
+} from '../batch/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { briefingFor, type StageBriefing } from '../campaign/brief.js';
 import { admitProfile, movedDimensions } from '../campaign/dimensions.js';
@@ -51,12 +56,14 @@ import {
   failStateReports,
   type FailStateReport,
 } from '../campaign/failStates.js';
-import { judgeStage, type StageReport } from '../campaign/judge.js';
+import type { StageReport } from '../campaign/judge.js';
 import { editableIdsOf } from '../campaign/parse.js';
+import { runStageToVerdict, type StageSequenceOutcome } from '../campaign/stageSequence.js';
 import {
-  batchRequestForStage,
   demonstrationConfigFor,
   stageReplicationSeed,
+  stageSeedSetOf,
+  type StageSeedSet,
 } from '../campaign/stageRun.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { applyControlEdit, controlsFor } from '../controls/controls.js';
@@ -110,6 +117,17 @@ export interface CampaignPanelHandle {
 }
 
 /**
+ * The two ways a batch ends without a result, as values rather than as messages.
+ *
+ * Neither is ever shown. `CANCELLED` is the player stopping the run, and the cancel handler has
+ * already written a better sentence than a generic one; `RUN_FAILED` is the worker refusing, and
+ * `runOneBatch` has already put the worker's own reason on the error line. They exist so that a
+ * sequence waiting on a batch can be ended at all — see `abortRun`.
+ */
+const CANCELLED = Symbol('cancelled');
+const RUN_FAILED = Symbol('run-failed');
+
+/**
  * Read one input back as the value its control declares — `dev/parameterForm.ts`'s rule, applied
  * to the second mount of the same controls.
  *
@@ -137,6 +155,16 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   const { resources, loaded, elements: ui } = options;
   const doc = ui.output.ownerDocument;
   let worker: Worker | undefined;
+  /**
+   * Which run is the one on screen.
+   *
+   * Bumped by {@link abortRun}, read once each sequence finishes. A stage spans two batches, so a
+   * player who cancels between them and starts again has two sequences alive at once; without
+   * this the first one to finish draws, and it is not necessarily the one they are watching.
+   */
+  let runToken = 0;
+  /** How {@link abortRun} settles the batch a terminated worker will never answer. */
+  let abandonRun: ((reason: unknown) => void) | undefined;
   /**
    * The replication this report diagnoses, kept so the mode layer can draw the run-level
    * non-negotiables — the seed, the warnings, the undelivered count — from the same run the floor
@@ -418,6 +446,22 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     worker = undefined;
   }
 
+  /**
+   * End whatever run is in flight, without saying anything about it.
+   *
+   * A terminated worker sends no message, so the promise `runOneBatch` handed out has to be
+   * settled from here or the sequence waiting on it is stranded — which, once a stage takes two
+   * batches, means a cancelled first batch would silently prevent every later run from drawing.
+   * The caller that cancels writes its own sentence; this only stops the machinery.
+   */
+  function abortRun(): void {
+    runToken += 1;
+    const abandon = abandonRun;
+    abandonRun = undefined;
+    stopWorker();
+    abandon?.(CANCELLED);
+  }
+
   /* ------------------------------------------------------------------ *
    * The briefing
    * ------------------------------------------------------------------ */
@@ -574,16 +618,25 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    * Running
    * ------------------------------------------------------------------ */
 
-  function requestFor(stage: CampaignStage): BatchRequest | undefined {
+  /**
+   * Everything that can refuse this stage before a batch starts.
+   *
+   * It used to return the request as well, which was fine while a stage was one batch. It is not
+   * fine now: the requests are built by `campaign/stageSequence.ts` so that the tuning batch and
+   * the holdout batch cannot differ in anything but their seed set, and a pre-flight that also
+   * built one of them would be the second construction of a request that `campaign/stageRun.ts`
+   * exists to prevent.
+   */
+  function admitted(stage: CampaignStage): boolean {
     const baseline = profileById(stage.dispatcher.startingProfileId);
     if (baseline === undefined) {
       fail('this build’s data/ does not carry one of the two dispatcher profiles this stage needs.');
-      return undefined;
+      return false;
     }
     const outcome = candidateProfileFor(stage);
     if (!outcome.ok) {
       fail(outcome.reason);
-      return undefined;
+      return false;
     }
     /*
      * The admission is asked of the **resolved** dispatcher, edited or not. That is the point of
@@ -599,63 +652,190 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     );
     if (!admission.admissible) {
       fail(admission.sentence);
-      return undefined;
+      return false;
     }
-    /* One statement of what a stage run is, shared with the suite — see `campaign/stageRun.ts`. */
-    return batchRequestForStage(stage, ui.profile.value, editFor(stage));
+    return true;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The status line — and it now has two batches to account for
+   * ------------------------------------------------------------------ */
+
+  /**
+   * What the player is told while a batch runs, and which of the two it is.
+   *
+   * **A stage takes up to two batches, so the status line has to say so before the first one
+   * starts.** A surface that looked identical and took twice as long would be a worse product than
+   * the regression this replaced: the player's own model of *Run this stage* is one wait, and a
+   * second wait they were not told about reads as a hang. So the tuning line names the second
+   * batch as a *condition* — it follows only if every goal is met — rather than promising a run
+   * that usually will not happen.
+   *
+   * The seed sets are named, not described. `judge.ts`'s own sentences print
+   * `holdout-20260731 (seed 20260731)`, and a status line that invented a friendlier phrase for the
+   * same set would leave a player matching two names for one thing.
+   */
+  function openingLine(stage: CampaignStage, seedSet: StageSeedSet, total: number): string {
+    const seeds = stageSeedSetOf(stage, seedSet);
+    if (seedSet === 'tuning') {
+      return (
+        `running ${String(total)} replications on ${seeds.name} — both settings, the same ` +
+        `passengers… If every goal is met here, a second batch of ${String(total)} follows on ` +
+        `${stageSeedSetOf(stage, 'holdout').name}, because a stage is cleared on seeds it was not ` +
+        'tuned against.'
+      );
+    }
+    return (
+      `every goal met on the runs you made — now running ${String(total)} replications on ` +
+      `${seeds.name}, seeds this setting was not tuned against. This second batch decides whether ` +
+      'the stage is cleared; it adds no figure to the rows you are about to read.'
+    );
+  }
+
+  function progressLine(
+    stage: CampaignStage,
+    seedSet: StageSeedSet,
+    completed: number,
+    total: number,
+  ): string {
+    const done = `${String(completed)} of ${String(total)} replications on ${stageSeedSetOf(stage, seedSet).name}`;
+    return seedSet === 'tuning'
+      ? `${done} — the page is still yours while this runs.`
+      : `${done} — the second batch, on seeds you could not have tuned against.`;
+  }
+
+  /**
+   * The timing line, and — when the second batch did not happen — the reason it did not.
+   *
+   * A player who watched one batch on a surface that told them to expect two is owed the sentence
+   * saying which of the two things happened. `verdict.holdout === null` is exactly *the holdout
+   * batch was not run*, and it is never *the holdout batch held*.
+   */
+  function closingLine(stage: CampaignStage, outcome: StageSequenceOutcome, elapsedMs: number): string {
+    const per = `${String(outcome.report.replications)} replications per setting`;
+    const took = `${(elapsedMs / 1000).toFixed(1)} s`;
+    const tuning = stageSeedSetOf(stage, 'tuning').name;
+    if (outcome.verdict.holdout === null) {
+      return (
+        `${per} on ${tuning} in ${took}. The holdout batch was not run: a goal missed on the runs ` +
+        'you made cannot be recovered on seeds you did not tune against.'
+      );
+    }
+    return `${per} on ${tuning}, and again on ${stageSeedSetOf(stage, 'holdout').name} — ${took} for both batches.`;
+  }
+
+  /**
+   * One batch, on one worker, as a promise — so the sequence above it can be written as a
+   * sequence rather than as a tree of nested message handlers.
+   *
+   * Cancellation is the reason the rejection is stored rather than thrown: a terminated worker
+   * sends no message, so a promise wired only to the worker's events would never settle and the
+   * run after it would never start. {@link abortRun} settles it, and the one rejection value it
+   * uses is recognised by the caller so that *cancelled* never reaches the error line.
+   */
+  function runOneBatch(
+    stage: CampaignStage,
+    request: BatchRequest,
+    seedSet: StageSeedSet,
+  ): Promise<BatchResult> {
+    return new Promise<BatchResult>((resolve, reject) => {
+      const total = request.arms.length * request.replications;
+      ui.progress.max = total;
+      ui.progress.value = 0;
+      ui.progress.hidden = false;
+      ui.status.textContent = openingLine(stage, seedSet, total);
+
+      const next = new Worker(new URL('./batchWorker.ts', import.meta.url), { type: 'module' });
+      worker = next;
+      abandonRun = reject;
+      const settle = (): void => {
+        abandonRun = undefined;
+        stopWorker();
+      };
+      next.addEventListener('message', (event: MessageEvent) => {
+        const message = event.data as BatchWorkerMessage;
+        if (message.kind === 'progress') {
+          ui.progress.value = message.progress.completed;
+          ui.status.textContent = progressLine(
+            stage,
+            seedSet,
+            message.progress.completed,
+            message.progress.total,
+          );
+          return;
+        }
+        settle();
+        if (message.kind === 'failed') {
+          fail(`the stage could not be run: ${message.message}`);
+          reject(RUN_FAILED);
+          return;
+        }
+        resolve(message.result);
+      });
+      next.addEventListener('error', (event: ErrorEvent) => {
+        settle();
+        fail(`the batch worker failed to start: ${event.message}`);
+        reject(RUN_FAILED);
+      });
+      next.postMessage({ kind: 'run', request } satisfies BatchWorkerRequest);
+    });
   }
 
   function start(): void {
     const stage = currentStage();
     if (stage === undefined) return;
-    const request = requestFor(stage);
-    if (request === undefined) return;
+    if (!admitted(stage)) return;
+    const published = loaded.published.scenarios.find((entry) => entry.id === stage.id);
+    if (published === undefined) {
+      fail(`stage "${stage.id}" has no published goal table entry, so nothing can be judged.`);
+      return;
+    }
     ui.error.textContent = '';
-    stopWorker();
+    abortRun();
     ui.output.replaceChildren();
-
-    const total = request.arms.length * request.replications;
-    ui.progress.max = total;
-    ui.progress.value = 0;
-    ui.progress.hidden = false;
-    ui.status.textContent = `running ${String(total)} replications — both settings, the same passengers…`;
     setRunning(true);
+    /*
+     * A stage run now spans two batches, so *"is this result still the one on screen?"* is a real
+     * question rather than a theoretical one — a player who cancels and starts again while the
+     * first sequence is between batches would otherwise be drawn the older verdict.
+     */
+    const token = ++runToken;
+    let elapsedMs = 0;
 
-    const next = new Worker(new URL('./batchWorker.ts', import.meta.url), { type: 'module' });
-    worker = next;
-    next.addEventListener('message', (event: MessageEvent) => {
-      const message = event.data as BatchWorkerMessage;
-      if (message.kind === 'progress') {
-        ui.progress.value = message.progress.completed;
-        ui.status.textContent = `${String(message.progress.completed)} of ${String(message.progress.total)} replications — the page is still yours while this runs.`;
-        return;
-      }
-      setRunning(false);
-      ui.progress.hidden = true;
-      if (message.kind === 'failed') {
-        fail(`the stage could not be run: ${message.message}`);
-        stopWorker();
-        return;
-      }
-      const report = batchReport(message.result);
-      const published = loaded.published.scenarios.find((entry) => entry.id === stage.id);
-      if (published === undefined) {
-        fail(`stage "${stage.id}" has no published goal table entry, so nothing can be judged.`);
-        stopWorker();
-        return;
-      }
-      const verdict = judgeStage({ stage, published, result: message.result, report });
-      ui.status.textContent = `${String(report.replications)} replications per setting in ${(message.result.elapsedMs / 1000).toFixed(1)} s.`;
-      draw(stage, verdict, report, failStates(stage, message.result.arms[1]?.replications ?? []));
-      stopWorker();
-    });
-    next.addEventListener('error', (event: ErrorEvent) => {
-      setRunning(false);
-      ui.progress.hidden = true;
-      fail(`the batch worker failed to start: ${event.message}`);
-      stopWorker();
-    });
-    next.postMessage({ kind: 'run', request } satisfies BatchWorkerRequest);
+    void runStageToVerdict({
+      stage,
+      published,
+      candidateProfileId: ui.profile.value,
+      edit: editFor(stage),
+      run: async (request, seedSet) => {
+        const result = await runOneBatch(stage, request, seedSet);
+        elapsedMs += result.elapsedMs;
+        return result;
+      },
+    }).then(
+      (outcome) => {
+        if (token !== runToken) return;
+        setRunning(false);
+        ui.progress.hidden = true;
+        ui.status.textContent = closingLine(stage, outcome, elapsedMs);
+        draw(
+          stage,
+          outcome.verdict,
+          outcome.report,
+          failStates(stage, outcome.result.arms[1]?.replications ?? []),
+        );
+      },
+      () => {
+        /*
+         * Both rejection values are already on screen — `runOneBatch` writes the failure to the
+         * error line and the cancel handler writes its own status — so there is nothing to say
+         * here that would not overwrite a more specific sentence with a vaguer one.
+         */
+        if (token !== runToken) return;
+        setRunning(false);
+        ui.progress.hidden = true;
+      },
+    );
   }
 
   /**
@@ -797,6 +977,76 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     );
   }
 
+  /**
+   * The goals, twice, with the batch each answer came from on the row that carries it.
+   *
+   * **The two batches are not interchangeable and this is where a surface could imply they are.**
+   * `judgeStage`'s `goals` are the **tuning** batch — the runs the player made — and they are what
+   * every goal row's sentence has always been, deliberately: feedback a player cannot see is not
+   * feedback, and a stage refused on a count they can go and look at is a stage they can play
+   * again. `holdout.goals` are the same goals over a sample they could not have tuned against, and
+   * they decide `cleared` and nothing else. Printing the two lists one after another with the same
+   * labels would be the confusion the whole split exists to prevent, so each list gets a caption
+   * naming its seed set and every holdout row carries the set on its own label — a reader who
+   * scrolled past the caption still knows which runs they are reading about.
+   *
+   * The holdout half is drawn whether it held or not. Drawing it only when it refused would report
+   * the unflattering half of a measurement and hide the other, which is the shape this repository
+   * refuses everywhere else; and a player who cleared a stage is owed the evidence that they
+   * cleared it on runs they had never seen.
+   */
+  function seedSetBlocks(stage: CampaignStage, verdict: StageReport): readonly HTMLElement[] {
+    const tuning = stageSeedSetOf(stage, 'tuning');
+    const holdoutSeeds = stageSeedSetOf(stage, 'holdout');
+    const nodes: HTMLElement[] = [
+      row(
+        'the runs you made',
+        `${String(verdict.goals.length)} goals, judged on ${tuning.name} (seed ${tuning.seed}) — ` +
+          'the seeds this setting was tuned against, and the batch every row below is about.',
+        'These are the counts to play against: a goal missed here is one you can go and look at. ' +
+          'Meeting all of them is half of clearing the stage.',
+        'figure-observation',
+      ),
+      ...verdict.goals.map((goal) => row(goal.label, goal.sentence, goal.note, goalClass(goal.met))),
+    ];
+
+    const holdout = verdict.holdout;
+    if (holdout === null) {
+      nodes.push(
+        row(
+          'the holdout seeds — not run',
+          `${holdoutSeeds.name} (seed ${holdoutSeeds.seed}) was not run, because a goal missed on ` +
+            'the runs above cannot be recovered on seeds this setting was not tuned against. A ' +
+            'stage is cleared on both batches or on neither, and nothing here was measured about ' +
+            'this one.',
+          undefined,
+          'figure-absent',
+        ),
+      );
+      return nodes;
+    }
+
+    nodes.push(
+      row(
+        holdout.held ? 'the runs you could not tune against' : 'the runs you could not tune against — refused',
+        holdout.sentence,
+        `A second batch of the same two settings over ${holdout.seedSetName}, run after the batch ` +
+          'above met every goal. It decides whether the stage is cleared and it changes no figure ' +
+          'above it: every row up to here is the batch you ran.',
+        holdout.held ? 'figure-observation' : 'figure-warning',
+      ),
+      ...holdout.goals.map((goal) =>
+        row(
+          `${goal.label} · on ${holdout.seedSetName}`,
+          goal.sentence,
+          goal.note,
+          goalClass(goal.met),
+        ),
+      ),
+    );
+    return nodes;
+  }
+
   function draw(
     stage: CampaignStage,
     verdict: StageReport,
@@ -808,9 +1058,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (report.budgetNote !== null) {
       ui.output.append(row('replication budget', report.budgetNote, undefined, 'figure-warning'));
     }
-    for (const goal of verdict.goals) {
-      ui.output.append(row(goal.label, goal.sentence, goal.note, goalClass(goal.met)));
-    }
+    ui.output.append(...seedSetBlocks(stage, verdict));
 
     ui.output.append(
       row(
@@ -976,7 +1224,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   });
   ui.run.addEventListener('click', start);
   ui.cancel.addEventListener('click', () => {
-    stopWorker();
+    abortRun();
     setRunning(false);
     ui.progress.hidden = true;
     ui.status.textContent = 'cancelled — a stopped batch has no result, so nothing is reported.';

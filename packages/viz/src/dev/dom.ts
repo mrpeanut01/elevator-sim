@@ -28,7 +28,7 @@
  *   own comment says why: there is no list of metric names anywhere in this product's UI and a
  *   helper that started one would be the first.
  *
- * ## Why it is not tested directly
+ * ## Why most of it is not tested directly, and which part stopped qualifying
  *
  * It is DOM glue, and this repository has no jsdom (`vitest.config.ts` sets `environment: 'node'`
  * for every project). The pattern that makes UI decisions testable here is the one
@@ -37,6 +37,15 @@
  * string somewhere and returns the node — so that there is nothing in it a test would want to
  * assert. Anything in a mount that *chooses* what to say belongs in a pure module, and every one of
  * this refactor's mounts has one.
+ *
+ * **{@link reconcile} is the exception, and it became one rather than starting as one.** GitHub
+ * issue #259 gave it an ordering rule — one write to a host at a time, nested requests coalesced —
+ * and an ordering rule is a decision, which is the test this paragraph says a helper should not
+ * need. `dom.test.ts` asserts it against a host that models the one browser behaviour the rule
+ * exists for: **removing a focused child runs its blur handler synchronously**. That is a fake, and
+ * a small one, so `menu.browser.test.ts` drives the same path against a real Chromium — the node
+ * tier proves the ordering and the browser tier proves the page no longer throws. Neither is
+ * sufficient alone, which is why both are there.
  */
 
 /** Every element this module makes, keyed so `el('button')` returns a `HTMLButtonElement`. */
@@ -106,11 +115,135 @@ export function fill(host: Element, ...children: readonly (Node | null | undefin
  * Node identity is the caller's problem: reconciling against freshly built children removes and
  * inserts exactly as `fill` would. See `dev/menuPanel.ts#retainer` for the half that keeps the
  * nodes.
+ *
+ * ## Removing a child runs other people's code — GitHub issue #259
+ *
+ * **A decision number is owed for the paragraphs below; this docstring is the argument.**
+ *
+ * `removeChild` is not a write to a data structure. Removing the node that holds focus makes the
+ * browser blur it **synchronously, from inside the call**, and a blur fires `focusout`, `blur` and —
+ * on a text field whose value has moved since it was focused — `change`. Every one of those is a
+ * listener this viewer wrote, and one of them redraws.
+ *
+ * Measured on the shipped page rather than reasoned about, by driving *Enter in the Free play seed
+ * field* (`menu.browser.test.ts § a field commit does not swallow the press beside it`):
+ *
+ * ```
+ * reconcile(.menu-list, 8 children)          ← depth 1, removal loop starts
+ *   HTMLInputElement blur → change → commit  ← fired by removeChild, synchronously
+ *     dispatchMenu → closeMenu → drawMenu → renderMenu
+ *       reconcile(.menu-list, …)             ← depth 2, the same host, 3 children left
+ *       reconcile(.menu-overlay, …)          ← depth 2
+ *   …outer removal loop resumes              ← its snapshot now names nodes it no longer holds
+ *   NotFoundError: The node to be removed is no longer a child of this node
+ * ```
+ *
+ * So the hazard is **re-entrancy**, and it is not the hazard the `Array.from` below guards. That
+ * one is the *live-list* hazard — `childNodes` shortening under a `for…of` that is iterating it —
+ * and the snapshot covers it exactly. What a snapshot cannot survive is this function calling
+ * itself on the same host and emptying it in between: the copy is what keeps the outer loop walking
+ * confidently through a tree that has been replaced underneath it.
+ *
+ * **The throw was the second-worst part.** It unwound `renderMenu` at its first `reconcile`, so the
+ * outer draw's insert pass never ran and neither did the twenty lines after it — `asModal`,
+ * `coverShell`, `restoreFocus`. The screen looked right anyway, because the *nested* draw had
+ * already drawn the same screen, which is the sort of luck that holds until it does not.
+ *
+ * ## What is done about it, and what was rejected
+ *
+ * A host is reconciled by **one call at a time**. A nested call on a host already being written
+ * does not interleave: it leaves the children it wanted and returns, and the call that holds the
+ * host adopts them and writes again. Last request wins, one writer, and the insert pass always
+ * runs.
+ *
+ * That ordering is the point, and it is why the cheaper fix is wrong. **Testing parentage before
+ * removing** — `existing.parentNode === host` — stops the throw in one line and leaves the outer
+ * loop running against a tree the nested draw already rebuilt; its insert pass then re-imposes the
+ * children the outer draw computed *before* the menu closed, so the stale frame overwrites the
+ * current one and `renderMenu` goes on to hand `asModal` and `restoreFocus` a stale `controls`
+ * array. `dom.test.ts § the outer call does not overwrite the nested draw` is that comparison
+ * driven both ways: the guard leaves the nested children in place, the parentage check leaves the
+ * outer's. It trades a loud, accidentally-right outcome for a quiet, wrong one, which is the trade
+ * this repository keeps paying for.
+ *
+ * **Deferring the redraw** out of the blur — a microtask or a timer between the commit and the draw
+ * — was rejected on what it costs the tier rather than on principle (`viz/dev` is not `core/`, so
+ * the no-timers invariant does not reach it). Every assertion in `*.browser.test.ts` that reads the
+ * DOM after an action would become a race against a queue, and the honest fix for that is waits,
+ * which is how a tier starts being flaky. It also moves *product* behaviour: a commit that lands
+ * before the next event would land after it. And it does not fix this function — it moves one
+ * caller out of the way of a hazard the helper still has.
+ *
+ * **Latching the re-entrancy in `renderMenu`** would fix the menu and leave the other ten call
+ * sites holding the same loaded gun. The snapshot-then-remove shape is this function's, so the
+ * guard is too.
+ *
+ * ## The limits, named rather than implied
+ *
+ * The guard makes the snapshot trustworthy against a nested `reconcile` **and nothing else**. A
+ * listener that reached the same host through `fill` — `replaceChildren` detaches every child —
+ * would put the outer loop back where it started. No caller mixes the two on one host today, and a
+ * caller that did would have a second problem: `fill` destroys the pointer memory `reconcile`
+ * exists to keep.
+ *
+ * {@link COALESCED_PASSES} bounds the re-writing, because this is a renderer and an unbounded loop
+ * here is a hung tab rather than a stale frame. The bound is unreachable by the mechanism above —
+ * focus is lost once, so the second pass has nothing left to blur — and a caller that reaches it is
+ * refocusing into the host it redraws on every write, which is a livelock in the caller that this
+ * function cannot resolve. It stops, and the last state it wrote stands.
  */
 export function reconcile(host: Element, ...children: readonly (Node | null | undefined)[]): void {
   const wanted = children.filter((child): child is Node => child != null);
-  // Dropped first, so the second pass indexes into a list that holds nothing but survivors — and
-  // `Array.from` because `childNodes` is live and is about to be mutated under the loop.
+  const holder = RECONCILING.get(host);
+  if (holder !== undefined) {
+    holder.superseded = wanted;
+    return;
+  }
+  const frame: ReconcileFrame = { superseded: undefined };
+  RECONCILING.set(host, frame);
+  try {
+    let target: readonly Node[] = wanted;
+    for (let pass = 1; ; pass += 1) {
+      writeChildren(host, target);
+      const superseded = frame.superseded;
+      if (superseded === undefined) return;
+      frame.superseded = undefined;
+      if (pass >= COALESCED_PASSES) return;
+      target = superseded;
+    }
+  } finally {
+    RECONCILING.delete(host);
+  }
+}
+
+/** What a nested {@link reconcile} on a host leaves behind for the call that holds it. */
+interface ReconcileFrame {
+  superseded: readonly Node[] | undefined;
+}
+
+/**
+ * The hosts with a {@link reconcile} in flight.
+ *
+ * Keyed on the node and weak, on {@link HANDLERS}' rule: a host that goes away takes its entry with
+ * it. The entry only ever exists for the duration of one synchronous call, so this is empty between
+ * draws — it is a re-entrancy latch rather than a cache, and reading it as one would suggest a
+ * cross-draw invariant that is not here.
+ */
+const RECONCILING = new WeakMap<Element, ReconcileFrame>();
+
+/** How many times one {@link reconcile} will re-write a host a nested call moved under it. */
+const COALESCED_PASSES = 8;
+
+/**
+ * One pass: drop what is not wanted, then put what is wanted where it belongs.
+ *
+ * Dropped first, so the second pass indexes into a list that holds nothing but survivors — and
+ * `Array.from` because `childNodes` is **live** and is about to be mutated by the loop reading it.
+ * That is the whole of what the copy is for. It does not — and cannot — cover a removal that
+ * re-enters {@link reconcile} and empties the host; see that function's docstring for the hazard
+ * this snapshot was mistaken for a guard against.
+ */
+function writeChildren(host: Element, wanted: readonly Node[]): void {
   for (const existing of Array.from(host.childNodes)) {
     if (!wanted.includes(existing)) host.removeChild(existing);
   }

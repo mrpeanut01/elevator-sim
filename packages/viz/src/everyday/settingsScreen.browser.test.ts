@@ -20,7 +20,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
-import { CHROMIUM, HAS_BROWSER } from '../dev/browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, openPage } from '../dev/browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -53,7 +53,7 @@ afterAll(async () => {
  * each starts with empty storage.
  */
 async function coldLoad(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const page = await openPage(browser, { viewport: { width: 1280, height: 720 } });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,

@@ -158,6 +158,55 @@ export function normaliseEmail(email: string): string {
 }
 
 /* -------------------------------------------------------------------------- *
+ * The one failure a caller has to be able to tell apart
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The account a write was for is not there — either it never was, or it stopped being there while
+ * the write was in flight.
+ *
+ * **A class rather than a message, because since `deleteUser` landed the two cases are the same
+ * outcome reached two ways and a caller must not have to tell them apart by string.** Before an
+ * account could be deleted, a `users` row could not disappear under a submission: {@link
+ * Store.recordEntry}'s `userById` check ran, and nothing in the product could falsify it before the
+ * `INSERT`. That check **is** a check-then-act, and `DELETE /api/me` is what made the second half
+ * reachable — a player deleting their account while a submission is being verified (a whole
+ * simulation, so the window is seconds rather than microseconds) races the insert, and the insert
+ * loses to the foreign key.
+ *
+ * What arrived at the caller then was PostgreSQL's own message, naming the constraint and the
+ * table, as an unhandled rejection through the `Api` interface and a bare `500` over a socket. The
+ * pre-check's civil `no such user` was bypassed by exactly the race the pre-check cannot close.
+ *
+ * So both paths raise this, `http/api.ts` answers `401` to it, and the message is unchanged from
+ * the one the pre-check always threw.
+ *
+ * **This is not a transaction and does not pretend to be one.** `Store` has no transaction seam at
+ * all — `sql.ts` carries `query`, `exec` and `close` — and giving it one is a larger design question
+ * than the route that made this reachable. What is closed here is the *reporting*: the outcome is
+ * the same whether the account vanished a second before the write or a millisecond into it. A
+ * decision number is owed with the route's.
+ */
+export class NoSuchUserError extends Error {
+  constructor(where: string) {
+    super(`${where}: no such user`);
+    this.name = 'NoSuchUserError';
+  }
+}
+
+/**
+ * Whether a driver error is PostgreSQL's foreign-key violation.
+ *
+ * **`23503` rather than the message**, because the SQLSTATE is defined by the dialect and the
+ * sentence is not: `pg` and PGlite both surface it as `error.code`, and matching on the prose would
+ * be matching on something a server version is free to reword. Module-private — nothing outside
+ * this file has a driver error in its hand, and it must stay that way.
+ */
+function isForeignKeyViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23503';
+}
+
+/* -------------------------------------------------------------------------- *
  * The store
  * -------------------------------------------------------------------------- */
 
@@ -278,6 +327,38 @@ export class Store {
     return user === undefined ? { ok: false, reason: 'no-such-user' } : { ok: true, user };
   }
 
+  /**
+   * Erase an account, and with it everything in this database that points at one.
+   *
+   * **One statement, and the cascade is the rest of it.** Every table that references `users` —
+   * `sessions`, `login_tokens`, `entries` and `challenge_entries` — declares
+   * `user_id … REFERENCES users (id) ON DELETE CASCADE`, so the child rows go inside the same
+   * statement as the parent rather than in four more that could fail halfway and leave an account
+   * half-erased. Four hand-written deletes here would also be a second place that has to be widened
+   * the day a fifth table references `users`, and the day it is not widened is the day erasure
+   * quietly stops being erasure. So the derivation is left to the database, and `store.test.ts`
+   * reads the foreign keys **out of `pg_constraint`** rather than writing the four names down again.
+   *
+   * **It takes an id and never an address.** `http/api.ts`'s `deleteAccount` reads that id off the
+   * session and the route accepts no other identity, so there is no argument here a request could
+   * supply — the one place this could have become a way to erase somebody else.
+   *
+   * **The caller's own session is one of the rows this removes**, so the token that authorised the
+   * deletion stops authorising anything in the same statement. That is the point rather than a side
+   * effect: an account that is gone must not have a working key.
+   *
+   * Returns nothing, unlike {@link consumeLoginToken}, whose `rowCount` **is** its answer. Here the
+   * caller has already authenticated the account into existence, so a `false` could only mean a
+   * concurrent second deletion — and the right response to that is the same as to the first. A
+   * boolean nobody branches on is an invitation to branch on it.
+   *
+   * A decision number is owed for this and for the route above it; the argument is here and in
+   * `http/api.ts`.
+   */
+  async deleteUser(id: string): Promise<void> {
+    await this.#sql.query('DELETE FROM users WHERE id = $1', [id]);
+  }
+
   /* -------------------------------------------------------- sign-in links */
 
   /**
@@ -365,7 +446,7 @@ export class Store {
     readonly measured: ClaimedMetrics;
   }): Promise<EntryRow> {
     const user = await this.userById(input.userId);
-    if (user === undefined) throw new Error('recordEntry: no such user');
+    if (user === undefined) throw new NoSuchUserError('recordEntry');
     const found = await this.#sql.query(
       'SELECT id FROM entries WHERE config_hash = $1 AND user_id = $2 AND seed = $3',
       [input.configHash, input.userId, input.run.seed],
@@ -381,25 +462,31 @@ export class Store {
       measured: input.measured,
       submittedAtMs: this.#now(),
     };
-    await this.#sql.query(
-      'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, ' +
-        'pct_over_long_wait, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ' +
-        'ON CONFLICT (id) DO UPDATE SET run_json = excluded.run_json, awt_s = excluded.awt_s, ' +
-        'wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
-        'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms',
-      [
-        row.id,
-        row.configHash,
-        row.userId,
-        row.run.seed,
-        JSON.stringify(row.run),
-        row.measured.awtS,
-        row.measured.wt95S,
-        row.measured.ttdMeanS,
-        row.measured.pctOverLongWait,
-        row.submittedAtMs,
-      ],
-    );
+    // Guarded, because the `userById` above is a check-then-act and `deleteUser` is what made its
+    // second half reachable. See {@link NoSuchUserError}.
+    try {
+      await this.#sql.query(
+        'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, ' +
+          'pct_over_long_wait, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ' +
+          'ON CONFLICT (id) DO UPDATE SET run_json = excluded.run_json, awt_s = excluded.awt_s, ' +
+          'wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
+          'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms',
+        [
+          row.id,
+          row.configHash,
+          row.userId,
+          row.run.seed,
+          JSON.stringify(row.run),
+          row.measured.awtS,
+          row.measured.wt95S,
+          row.measured.ttdMeanS,
+          row.measured.pctOverLongWait,
+          row.submittedAtMs,
+        ],
+      );
+    } catch (error) {
+      throw await this.#asOwnerError(error, input.userId, 'recordEntry');
+    }
     return row;
   }
 
@@ -509,7 +596,7 @@ export class Store {
     readonly score: ChallengeScore;
   }): Promise<ChallengeEntryRow> {
     const user = await this.userById(input.userId);
-    if (user === undefined) throw new Error('recordChallengeEntry: no such user');
+    if (user === undefined) throw new NoSuchUserError('recordChallengeEntry');
     const found = await this.#sql.query(
       'SELECT id FROM challenge_entries WHERE challenge_id = $1 AND data_hash = $2 AND user_id = $3',
       [input.challengeId, input.dataHash, input.userId],
@@ -526,31 +613,40 @@ export class Store {
       score: input.score,
       submittedAtMs: this.#now(),
     };
-    await this.#sql.query(
-      'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, ' +
-        'runs, legs, mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, ' +
-        'per_seed_json, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ' +
-        'ON CONFLICT (id) DO UPDATE SET dispatcher_profile_id = excluded.dispatcher_profile_id, ' +
-        'runs = excluded.runs, legs = excluded.legs, mean_awt_s = excluded.mean_awt_s, ' +
-        'mean_wt95_s = excluded.mean_wt95_s, mean_ttd_mean_s = excluded.mean_ttd_mean_s, ' +
-        'mean_pct_over_long_wait = excluded.mean_pct_over_long_wait, ' +
-        'per_seed_json = excluded.per_seed_json, submitted_at_ms = excluded.submitted_at_ms',
-      [
-        row.id,
-        row.challengeId,
-        row.dataHash,
-        row.userId,
-        row.dispatcherProfileId,
-        row.score.runs,
-        row.score.legs,
-        row.score.meanAwtS,
-        row.score.meanWt95S,
-        row.score.meanTtdMeanS,
-        row.score.meanPctOverLongWait,
-        JSON.stringify(row.score.perSeed),
-        row.submittedAtMs,
-      ],
-    );
+    // Guarded for {@link recordEntry}'s reason. The `challenge_id` foreign key can also fire here
+    // and is deliberately **not** mapped: `issueChallenge` never deletes, so a challenge cannot
+    // vanish under a submission, and inventing a branch for an unreachable case is the defect this
+    // repository has a standing rule about. `#asOwnerError` distinguishes them by asking whether
+    // the account is what went missing, rather than by reading a generated constraint name.
+    try {
+      await this.#sql.query(
+        'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, ' +
+          'runs, legs, mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, ' +
+          'per_seed_json, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ' +
+          'ON CONFLICT (id) DO UPDATE SET dispatcher_profile_id = excluded.dispatcher_profile_id, ' +
+          'runs = excluded.runs, legs = excluded.legs, mean_awt_s = excluded.mean_awt_s, ' +
+          'mean_wt95_s = excluded.mean_wt95_s, mean_ttd_mean_s = excluded.mean_ttd_mean_s, ' +
+          'mean_pct_over_long_wait = excluded.mean_pct_over_long_wait, ' +
+          'per_seed_json = excluded.per_seed_json, submitted_at_ms = excluded.submitted_at_ms',
+        [
+          row.id,
+          row.challengeId,
+          row.dataHash,
+          row.userId,
+          row.dispatcherProfileId,
+          row.score.runs,
+          row.score.legs,
+          row.score.meanAwtS,
+          row.score.meanWt95S,
+          row.score.meanTtdMeanS,
+          row.score.meanPctOverLongWait,
+          JSON.stringify(row.score.perSeed),
+          row.submittedAtMs,
+        ],
+      );
+    } catch (error) {
+      throw await this.#asOwnerError(error, input.userId, 'recordChallengeEntry');
+    }
     return row;
   }
 
@@ -598,6 +694,26 @@ export class Store {
   }
 
   /* --------------------------------------------------------------- shared */
+
+  /**
+   * The error a failed insert should actually raise: {@link NoSuchUserError} when the account is
+   * what went missing, and otherwise the driver's own error, untouched.
+   *
+   * **It asks the database rather than reading the constraint's name.** A foreign-key violation on
+   * `challenge_entries` can come from either of its two references, and telling them apart by
+   * matching `challenge_entries_user_id_fkey` would be depending on a name PostgreSQL generates and
+   * nothing here declares. Re-reading the account answers the question that is actually being
+   * asked — *did the owner go away?* — and costs one query on a path that has already failed.
+   *
+   * A re-check is itself racy in principle, and is not in practice: ids are UUIDs and are never
+   * reused, so an account cannot come back between the insert failing and this asking.
+   */
+  async #asOwnerError(error: unknown, userId: string, where: string): Promise<unknown> {
+    if (isForeignKeyViolation(error) && (await this.userById(userId)) === undefined) {
+      return new NoSuchUserError(where);
+    }
+    return error;
+  }
 
   async #userRow(sql: string, parameter: string): Promise<UserRow | undefined> {
     const result = await this.#sql.query(sql, [parameter]);

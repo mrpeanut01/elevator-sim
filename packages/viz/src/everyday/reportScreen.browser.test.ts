@@ -32,7 +32,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
-import { CHROMIUM, HAS_BROWSER, enterEverydayStage } from '../dev/browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEverydayStage, openPage } from '../dev/browserTier.test-helper.js';
 import { CASUAL_REACH_NOTE, CASUAL_SMALL_PRINT_LEAD } from '../mode/casualDay.js';
 
 let server: ViteDevServer;
@@ -61,7 +61,7 @@ afterAll(async () => {
 
 /** A cold load, waited out to the point where the Engineer menu has been dismissed. */
 async function coldLoad(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,

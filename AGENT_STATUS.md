@@ -15,11 +15,129 @@
 the same day. #206 was fast-tracked ahead of milestone order on the charter's own § 7 grounds — a
 defect fix needs no specification — and landed before M2 opened.
 
-### Active — M2
+### Active — M2 · wave B, opened 2026-08-24 on a new host
+
+**PR #253 is merged.** M0, M1 and the eight landed M2 lanes are on `main` at `000852a`, and the
+production deploy went green on that commit. The full loop was then **driven on the deployed build**
+— main menu → front door → brief → stage → report → week — so #206 is verified in production and not
+only in CI. The integration branch for this wave is `integration/m2-wave-b`, cut from `000852a`.
+
+**The host changed, and it changes what this programme can measure.** The previous session ran in a
+4-core container on **Node 22** against a package declaring ≥ 26, with `playwright-core`'s pinned
+Chromium absent and the Azure preview answering `403` to `CONNECT`. This host runs **Node 26.5**,
+drives the browser tier locally, and reaches the deployed site. Two consequences: the local suite is
+**1 089 s** rather than 3 771 s, and the `[tester]` gates are *still* out of reach — a machine that
+can drive a browser is not a first-time tester, and § D349's split stands untouched.
 
 | Lane | Task | Issue | Status |
 |---|---|---|---|
-| *(none)* | — | — | next: #217's cleanup, then the longer day, then #208 |
+| FIX-217 | The stale count beside a dead branch | #217 AC3/AC4 | **merged** into `integration/m2-wave-b` |
+| FIX-256 | The 1280 px rule that never existed | #256 | **merged** into `integration/m2-wave-b` |
+| TIER-PORT | The browser tier's fourth `port: 0` | *(no issue — found here)* | **merged** into `integration/m2-wave-b` |
+| FIX-257 | The speed ladder, and a true 1:1 | #257 | in flight |
+| FIX-CAMPAIGN-INTEGRITY | The campaign `reportWindow` **and** O7's hold-out seeds | #255 + O7 | in flight — **high risk, moves published pins** |
+| FIX-254 | The account-deletion route | #254 | in flight |
+| M2-MEASURE | The browser matrix, and the truth of all 22 `TEST_MATRIX.md` rows | M2 exit criteria | **merged** |
+| FIX-HORIZON | One expression answers which horizon a run is | — | **merged** ([§ D359](DECISIONS.md)) |
+| FIX-O8 | The Campaign tab runs the hold-out batch | O8 | **merged** ([§ D360](DECISIONS.md)) |
+| FIX-268 | The tier fails on an unhandled page error | #259 AC4, #268 | **merged** |
+| FIX-267 | A whole day is postable, and the cooldown repriced with it | #267 | **merged** |
+| FIX-STAGE1 | The measurement that stage 1 cannot carry a goal, and the gate | #270 | **merged** — the gate only |
+| FIX-STAGE1B | The fabric route | #270 | **refused and preserved unmerged** on `fix/stage-1-fabric` |
+
+**One lane was deliberately not merged, and it is the most useful refusal of the wave.** FIX-STAGE1B
+did everything asked — one car, `eta` as baseline, DC-1 and DC-2 both holding — and then measured
+what it cost. **Two of stage 1's three editable dials go inert** (one car is one candidate for the
+argmin, so `weights.waitTime` and `weights.distanceTravelled` stop moving the legs), **78 tests fail
+across 32 files** including 352 published matrix figures and three golden digests, and the
+correctness oracle's premise fails with bunching structurally unmeetable on a one-car bank.
+
+A stage whose goal is failable and whose controls are inert is worse for a player than a stage with
+no goal, so the change was refused on a **player-facing** ground rather than a cost one. Branch,
+measurement and the three honest routes are preserved in [#270](https://github.com/mrpeanut01/elevator-sim/issues/270).
+
+**The tier-port lane was not scheduled; it fell out of measuring the baseline, and it is the most
+useful thing this wave has found so far.** `boot.browser.test.ts` is the file the other three notes
+about this trap cite by name, and it is the one nobody repaired. Measured before and after, on this
+host, same command:
+
+| | test files | tests | skipped | wall clock |
+|---|---|---|---|---|
+| before | 25 passed, **1 failed** | 148 | **6** | 90.9 s |
+| after | **26 passed** | **154** | **0** | **70.4 s** |
+
+**The six skips were `boot.browser.test.ts`'s own cases**, and they had never run on this tier — the
+file died in `beforeAll` and reported its contents as skipped rather than failed, which is why a red
+tier read as a mostly-green one. The run is also twenty seconds faster, because eleven files across
+five collisions had been standing each other up and retrying. Both halves of the new guard were
+mutation-tested rather than assumed.
+
+**The wave-B integration point, measured on `integration/m2-wave-b` after five merges.** Both tiers,
+one host, one sitting:
+
+| tier | files | tests | wall clock |
+|---|---|---|---|
+| non-browser (`core`·`experiments`·`server`·`cli`·`viz`) | **418 passed** | **8 623 passed, 11 skipped** | 901 s |
+| `viz-browser`, **default parallelism** | **26 passed** | **154 passed, 0 skipped** | 62–65 s, twice |
+
+**That 154 became 151 later in the wave and the row is left as measured**, because it dates a run.
+#268's gate folded three hand-rolled page-error collectors into one shared check, so three duplicate
+cases went away while the check itself moved from 3 files to 26 — **fewer tests covering more.** The
+figure to carry forward is **151**, and the reason it moved is the reason a bare count is a poor
+summary of a tier.
+
+The browser figure is the one that matters and it is deliberately taken at **default parallelism**
+rather than serially. M2-MEASURE measured that same tier at **19 failed files / 75 failed tests** on
+`000852a`, against **1 failed / 0 failed tests** serially — so a serial green here would have proved
+nothing. Two consecutive runs on **10 cores at load 17.75–21.64**, roughly twice oversubscribed and
+at least as contended as the run that failed, returned zero. That is [#263](https://github.com/mrpeanut01/elevator-sim/issues/263)'s first
+acceptance criterion, and the issue is deliberately **left open**: absence of a load-dependent
+failure is not proof of its removal, CI has not spoken, and the tier still does not fail on an
+unhandled page error — both runs emitted `dev/dom.ts:115`'s `removeChild` throw and stayed green.
+
+The eleven skips are unmoved and are the same eleven the programme baseline recorded: deep-tier
+opt-ins behind `describe.skipIf` in `packages/experiments`, which GitHub issue #163 reports have
+never run in CI. **The browser tier's six skips are gone**, and that is a different number entirely —
+they were a file that never ran, not an opt-in.
+
+**The corpus, measured once after integration — and the surfaces column was a correction, not a
+move.** Both tiers on the integrated tree, 2026-08-25, one sitting:
+
+| tier | cases | strings | simulations | surfaces | failing cases |
+|---|---|---|---|---|---|
+| always-on | 49 | **569 184** | 606 | **49** | **0** |
+| deep | 60 | **710 048** | 4 710 | **50** | **0** |
+
+Strings **+2 776** and **+3 954**; cases and simulations unmoved. The surfaces column read 48 and 49
+and is now 49 and 50 — **and it is 49 on `000852a`, the commit the old row described.** The two
+surface *sets* were probed at base and at head and diffed: **identical**. Wave B added no surface;
+the figure had been stale since M2-GATE and #207. Published as a correction, because a changed number
+beside *"surfaces unmoved"* reads as *this wave added one* and sends the next reader hunting.
+
+**The § D343 check was run and is clean.** `honesty/properties.ts` untouched, `STANDARD_SPACE` /
+`DEEP_SPACE` / `maxDurationS` / `stageProbability` / `OUTSTANDING` unmoved. The whole of `honesty/`
+in forty-five commits is one 18-line classification entry. A gate held at zero by moving the gate
+looks identical in the summary line; only the diff separates them.
+
+**Three product-owner calls were taken on 2026-08-24 and they set this wave's shape.** Merge and
+deploy #253 immediately, rather than stacking further on the branch. The longer day is **Everyday
+only** — campaign stage runs keep their length, so `data/scenario-goals.json` moves for the window
+and the seed split and for nothing else. And **O7 is fixed now rather than deferred to M4**, which is
+why it is inside the campaign lane rather than behind it: the two regenerate one table and the
+repository's own advice on #255 is to *sequence the two rather than regenerate twice*.
+
+**The parallelism rule held, and it is the same rule.** Seven lanes ran at once only because their
+file sets are disjoint: `everyday/modes.ts`, `everyday/stageScreenModel.ts`, `render/canvas.ts`,
+`campaign/`, `packages/server/`, and a measurement lane forbidden to touch source at all. The longer
+day and #208 are **not** in this wave, because both write `everyday/` behind FIX-257 and `shift/`
+behind the campaign lane. They are wave C, and the order is still forced.
+
+**Two lanes independently reported their worktree was provisioned at the old `main` (`c8fd6fa`)
+rather than the base named in the brief**, and both corrected it by branching explicitly from the
+named commit before working. The handoff records this trap and says *"one agent caught this; do not
+rely on that."* Two did. **Do not rely on that either** — every brief in this wave named its base
+commit and told the lane to confirm it with `git log --oneline -1` and stop if it disagreed, and that
+instruction is why both corrections happened before any code was written rather than after.
 
 **They ran in parallel because they shared no file.** FIX-212 owns `everyday/` and `honesty/`;
 SPEC-200 wrote [`docs/33-difficulty-curve.md`](docs/33-difficulty-curve.md) and one README row and

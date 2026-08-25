@@ -26,7 +26,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
-import { CHROMIUM, HAS_BROWSER } from '../dev/browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, openPage } from '../dev/browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -38,7 +38,7 @@ beforeAll(async () => {
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
     // A port of its own, `strictPort: false` — files in one project run concurrently.
-    server: { port: 5201, strictPort: false },
+    server: { port: 5208, strictPort: false },
     logLevel: 'error',
   });
   await server.listen();
@@ -54,7 +54,7 @@ afterAll(async () => {
 
 /** A cold load, settled — the Engineer menu dismissed, so `dev/main.ts`'s boot has published a host. */
 async function coldLoad(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,

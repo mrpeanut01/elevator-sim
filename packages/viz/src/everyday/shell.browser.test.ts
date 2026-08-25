@@ -34,6 +34,7 @@ import {
   HAS_BROWSER,
   enterEngineerStage,
   enterEverydayStage,
+  openPage,
   pressMenuRow,
   returnToEverydayMode,
 } from '../dev/browserTier.test-helper.js';
@@ -48,7 +49,7 @@ beforeAll(async () => {
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
     // A port of its own, `strictPort: false` — files in one project run concurrently.
-    server: { port: 5196, strictPort: false },
+    server: { port: 5202, strictPort: false },
     logLevel: 'error',
   });
   await server.listen();
@@ -140,7 +141,7 @@ async function runStateOf(page: Page): Promise<{
  * here rather than failing somewhere misleading.
  */
 async function coldLoad(): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const page = await openPage(browser, { viewport: { width: 1280, height: 720 } });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,

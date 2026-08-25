@@ -121,7 +121,11 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
     'content-type': 'application/json; charset=utf-8',
     'access-control-allow-origin': options.allowOrigin,
     'access-control-allow-headers': 'content-type, authorization',
-    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    // `DELETE` is here because `DELETE /api/me` exists. A method the API answers and the preflight
+    // does not name is a route that works from `curl` and from nothing a browser can do — which is
+    // this repository's most-repeated defect wearing a CORS header, and would be invisible to
+    // `api.test.ts` because that file calls `handle()` with no browser in front of it.
+    'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
     // The API answers with JSON that is never a document; sniffing it as one is the XSS this
     // header exists to close.
     'x-content-type-options': 'nosniff',

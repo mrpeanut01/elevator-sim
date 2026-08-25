@@ -40,11 +40,20 @@ function unlessBuilt(refusal: string, ...screens: readonly EverydayScreen[]): st
  *   currently *about*, and the one the shell's stage hands off to.
  * - **Campaign** — `packages/viz/src/campaign/` (judging, fail states, brief, stage runs) and
  *   `commissioning/` (budget, choices, refusals) both exist and are exercised by the Engineer
- *   shell's campaign panel. § 8's three Everyday screens are what the tile waits on.
+ *   shell's campaign panel. All three of § 8's Everyday screens are registered, so the tile opens;
+ *   it waited on them for two waves and no longer waits on anything.
  * - **Fix a building** — `packages/viz/src/fixit/` ships all **eighteen** § 10.5 cases, each one
  *   validated against a real paired run and its quoted figures pinned by `fixit/cases.test.ts`
- *   (`docs/18` still names fifteen as outstanding content work, and that sentence is stale). § 10's
- *   Everyday screen is what the tile waits on.
+ *   (`docs/18` still names three as shipped and fifteen as outstanding content work, and that
+ *   sentence is stale). § 10's Everyday screen is registered too, so this tile opens as well.
+ *
+ *   **Eighteen is the only count in this file, and it is not on its honour.** `modes.test.ts`
+ *   reads `data/fixit-cases.json` and fails if the number authored there stops matching the number
+ *   written here, in the word this line spells it in. That check exists because the count *did* go
+ *   stale, silently, in the row below: it went on saying *three* — `docs/18`'s figure — for every
+ *   wave after the fifteen others were authored, while this line went on saying *eighteen* at the
+ *   other end of the file, and nothing in the repository read either sentence. A number in prose
+ *   that no test derives is a number waiting to be wrong.
  * - **Endless rush** — § 9.1's setup screen is built and the tile opens onto it; what is still
  *   missing is behind it rather than in front, and the refusal moved with it. There is no climbing
  *   arrival stream, no held-time clock and no § 9.3 result, so the screen's § 3.3 primary is drawn
@@ -126,14 +135,36 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     blurb: 'A building with something wrong. Diagnose it, change it, re-run it.',
     shape: '~5 min a case · retry as often as you like',
     /*
-     * Three authored cases exist and are validated by real paired runs (`fixit/`, `docs/18`), and
-     * § 10's Everyday screen is not built. Same shape as the campaign row: the thing works, the
-     * screen that would let a player reach it from here does not.
+     * `everyday/fixitScreen.ts` is registered, so `unlessBuilt` resolves to `undefined` here and
+     * **the sentence below is a dead branch** — nothing draws it, on any build where the screen is
+     * in the registry. What was stale was this comment, which went on reading *"three authored
+     * cases exist … and § 10's Everyday screen is not built"* after both of its halves had stopped
+     * being true. The *three* is a fossil of `docs/18`'s *"Three cases ship in
+     * `data/fixit-cases.json`"*, which the table's own docstring above already flags as stale; the
+     * count is **eighteen**, and it is stated once up there and derived from `data/` by
+     * `modes.test.ts` rather than typed a third time here.
+     *
+     * **Say precisely what the defect was, because the issue that reported it did not.** #217's
+     * AC3 says the refusal *"still reads"* the stale sentence, which implies a player meets it.
+     * A player never did. This is § D227's class in a code path — a stale sentence beside dead
+     * code — and it is the milder half of that class rather than the dangerous one: a refusal a
+     * player can read tells them not to touch a thing that works, while this one only misled a
+     * reader of the file about whether the screen existed. Milder is not harmless, and the
+     * Today's-tower row at the top of this table named this exact shape before it happened here.
+     *
+     * **The call stays; only the sentence is corrected.** Hard-coding `unavailable: undefined`
+     * would buy nothing and would take the derivation with it — the one thing that fails on the
+     * commit `fixit` leaves the registry. That is the Endless rush row's reasoning one tile up,
+     * and `screens.ts#UNBUILT_REASONS`' reasoning for keeping an empty table.
+     *
+     * **And the sentence now carries no count**, like its three siblings. A number inside a
+     * refusal is a second copy of a figure that has already gone stale once in this row, and it
+     * would sit in the one place no test reads — the branch that does not evaluate. The subject
+     * is the screen rather than the cases behind it, which is this table's own wording rule.
+     * A decision number is owed for both halves of that: the countless refusal, and the count
+     * being bound to `data/fixit-cases.json` instead of to a reader's diligence.
      */
-    unavailable: unlessBuilt(
-      'the three cases run, but their Everyday screen is not built yet',
-      'fixit',
-    ),
+    unavailable: unlessBuilt('the cases run, but their Everyday screen is not built yet', 'fixit'),
   }),
 ]);
 

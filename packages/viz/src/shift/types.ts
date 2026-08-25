@@ -397,6 +397,21 @@ export interface Observations extends GoalObservations {
 export type GoalComparison = 'at-least' | 'at-most';
 
 /**
+ * What kind of run a day's goals are being asked of — `goals.ts#goalsForDay`'s second argument.
+ *
+ * Two members and no third, because the product runs two kinds of thing and no others: a
+ * **period** — a template's own declared stretch, thirty minutes of `rise-and-fall` or two hours of
+ * `constant-iso`, run whole or windowed to a part — and a **whole day**, an authored phase list run
+ * from its first minute to its last (`shift/dayLength.ts`).
+ *
+ * It is deliberately *not* a number of seconds. The one bar this distinction moves is moved by a
+ * mechanism that is about the run's **tail** rather than its length — a period ends while its
+ * backlog is still draining and a day does not — so a longer period is still a period, and
+ * `goals.ts#WORST_WAIT_WHOLE_DAY_FACTOR` carries the measurement that says so.
+ */
+export type RunHorizon = 'period' | 'whole-day';
+
+/**
  * One bar the day asks you to clear.
  *
  * {@link reads} is a **key of {@link GoalObservations}** rather than a closure, deliberately: a
