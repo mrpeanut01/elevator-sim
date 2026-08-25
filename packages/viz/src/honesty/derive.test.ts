@@ -305,9 +305,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'The Everyday shell\'s boot seam: two CSS selectors and the functions that press what they ' +
         'find. No player reads any of it. The two `ENGINEER_*` selectors are ' +
         '`document.querySelector` arguments — derived only because the two-adjacent-words scanner ' +
-        'reads `[data-menu-control="main.resume"]` as prose — and `dismissEngineerMenu`, ' +
-        '`closeEngineerMenuWhenReady` and `bootEveryday` return a boolean, `void` and the mounted ' +
-        'shell. **`ENGINEER_ROOT_SELECTOR` and the two `console.error` diagnostics left this entry ' +
+        'reads `[data-menu-control="main.resume"]` as prose — and `closeEngineerMenuWhenReady` and ' +
+        '`bootEveryday` return `void` and the mounted shell. ' +
+        '**`dismissEngineerMenu` is deliberately no longer in this list, and it did not go the way ' +
+        '`loadSession` went.** Its strings did not reach a player; it stopped being an export. ' +
+        '§ D335\'s stage hand-off was its one cross-module caller, § D338 retired the hand-off, and ' +
+        'the `export` stood for a wave with nothing importing it (GitHub issue #273) — so it is now ' +
+        'module-scope, the derivation only sees exports, and an id kept here would be this list\'s ' +
+        'second guard failing rather than a claim about anything. The function is unchanged and ' +
+        'still called by `closeEngineerMenuWhenReady`, whose own derived strings are what carry it. ' +
+        '**`ENGINEER_ROOT_SELECTOR` and the two `console.error` diagnostics left this entry ' +
         'with the hand-off**: § 7\'s stage is a screen, so the shell insets nothing and boot has no ' +
         'Engineer root to query and no hand-off at which to report a menu it could not close. The ' +
         'day a string here is drawn on a screen it stops being excludable, exactly as ' +
@@ -317,7 +324,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/boot.ts#ENGINEER_RESUME_SELECTOR',
         'everyday/boot.ts#bootEveryday',
         'everyday/boot.ts#closeEngineerMenuWhenReady',
-        'everyday/boot.ts#dismissEngineerMenu',
       ],
     },
     {

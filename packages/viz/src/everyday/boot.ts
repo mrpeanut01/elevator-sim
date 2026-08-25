@@ -70,9 +70,28 @@ export const ENGINEER_RESUME_SELECTOR = '[data-menu-control="main.resume"]';
  * Press it if it is there. `true` when the menu is gone — pressed now or already closed.
  *
  * The `hidden` check is what makes this idempotent, and idempotence is what lets the observer below
- * call it on every mutation until the row arrives, without a later call re-opening anything. It had
- * a **second** caller at the stage hand-off; § D338 retired that, and this module is now its only
- * one.
+ * call it on every mutation until the row arrives, without a later call re-opening anything.
+ *
+ * ## Module scope, and why that is the whole of the fix for GitHub issue #273
+ *
+ * It was `export`ed because the § D335 stage hand-off called it — the belt to
+ * {@link closeEngineerMenuWhenReady}'s brace. § D338 retired the hand-off, the caller went with it,
+ * and the `export` stood for a wave with nothing importing it. **It is not a dead seam and must not
+ * be counted as one:** the function is called, on the shipped path, by the observer below. What had
+ * no caller was the keyword.
+ *
+ * The other outcome was checked first and ruled out — the defect might have been a *missing* call
+ * rather than a surplus export, if crossing § D338's door were supposed to close this menu behind
+ * the player. It is not, and cannot be: outward, `shell.ts#setCoveredInert` inerts `div.shell`, so
+ * `#open-menu` cannot be pressed while Everyday Mode has the page and nothing else dispatches
+ * `reopen`; back, `menuPanel.ts#coverShell` inerts that same subtree while the menu is drawn, so
+ * `#back-to-everyday` — which lives inside `div.shell` — cannot be pressed while the menu is up. A
+ * player therefore cannot reach either side of the door with this menu open, and a second call site
+ * would be a call that can never do anything.
+ *
+ * `deadCode.test.ts` holds both halves, because neither is safe as a sentence: its limit 6 says why
+ * the package's dead-code audit could not see this (a self-use satisfies its caller question), and
+ * its check goes red if the export comes back **or** if the two presses below go away.
  *
  * ## The lift, and why it is not a hack
  *
@@ -88,7 +107,7 @@ export const ENGINEER_RESUME_SELECTOR = '[data-menu-control="main.resume"]';
  * a microtask, so the shell's re-assert sees the value it already wanted and no window exists in
  * which the covered menu is reachable by a player.
  */
-export function dismissEngineerMenu(doc: Document): boolean {
+function dismissEngineerMenu(doc: Document): boolean {
   const overlay = doc.querySelector<HTMLElement>(ENGINEER_MENU_SELECTOR);
   if (overlay === null) return false;
   if (overlay.hidden) return true;
