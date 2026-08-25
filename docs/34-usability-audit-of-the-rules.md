@@ -124,7 +124,8 @@ buildable is a queue item wearing a refusal.
 build the seam, or do not draw the row — and only the second is free. So *not drawing* is a stable
 equilibrium: it satisfies the rule permanently, at no cost, and nothing ever comes back to it. **A
 register of honest absences is a queue only if something reads it as one.** Six registers and
-twenty-six entries are drawn from `everyday/buildNotes.ts`; the number of them with an open issue is
+twenty-**seven** entries are drawn from `everyday/buildNotes.ts`; the number of them with an open
+issue is
 not tracked anywhere.
 
 **Recommendation.** Report the staleness on #229 (done), and treat the absence registers as a
@@ -265,3 +266,23 @@ accessible name, no reason, or an `aria-describedby` pointing at nothing.
 - [`docs/22-charter.md`](22-charter.md) § 5 non-goals
 - [`docs/31-support-matrix.md`](31-support-matrix.md) § 2, the viewport table
 - GitHub issues #211, #229, #239, #262, #269
+
+
+---
+
+## Correction — the register count in F3 was 26 and is 27
+
+**Published here as 26, and measured again as 27.** F3's count came from a `sed` block extraction
+over the six register declarations, which missed `stageScreenModel.ts#STAGE_ABSENCES`'s ghost entry —
+*"no rival lane — a ghost is a second run of the same crowd…"*. `everyday/buildNotes.test.ts` counts
+the arrays at **runtime** and disagreed on its first run, which is how the error surfaced.
+
+**The figure was corrected rather than the instrument bent to match it**, and the correction is
+recorded here rather than silently applied, because an audit whose own arithmetic goes unchecked has
+no standing to report anybody else's. It changes nothing about F3's finding: 27 entries, 0 linked to
+an issue, and the mechanism § D370 orders is the same mechanism.
+
+It is also the third time in this session that a count published from a text extraction was wrong
+where a count derived from the thing itself was right — the other two being S10's `passing` tally in
+GitHub issue #278 and this audit's own first reading of it. That is the argument for § D369 and
+§ D370 in one sentence, made against this document.
