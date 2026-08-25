@@ -39,7 +39,7 @@ import { replicationSeed } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { CANDIDATE_GOALS, CANDIDATE_SCENARIOS } from './candidates.js';
-import { GOAL_KINDS, GOAL_READS, isPerReplicationGoal } from './goals.js';
+import { DISPOSITION_OF, GOAL_KINDS, GOAL_READS, isPerReplicationGoal } from './goals.js';
 import { measureScenario, publishedScenarioFor } from './measure.js';
 import {
   MIN_SEEDS_PER_GOAL,
@@ -222,6 +222,93 @@ describe('the table printed in docs/10 § M30 is the table in data/scenario-goal
      * times five columns, and no cell in this table is unmeasured.
      */
     expect(compared).toBe(table.scenarios.length * M30_COLUMNS.length);
+  });
+});
+
+/**
+ * **§ M30's three bucket totals, derived rather than transcribed.**
+ *
+ * The sentence above the table counts the cells in each of R12's three buckets, and it had gone
+ * stale exactly as `RISKS.md` **R38** predicts: it published `17 batch goals, 29 configuration
+ * facts, 4 unjudgeable` over a table holding **16, 32, 2**. The clause above this one re-derives the
+ * table *cell by cell* and every cell reproduced — a cell that changes bucket moves two of these
+ * three numbers, and no cell-level check can see a summary of itself.
+ *
+ * Its **name** was stale too, and that is the half worth reading twice: the third bucket was called
+ * *unjudgeable*, and no cell in the shipped table has an unjudgeable rate class. The two cells in it
+ * are there because their two seed sets disagree about the **kind** of answer — a different route to
+ * the same bucket, and the only one that currently fires. A corrected digit under a wrong label
+ * would have left the reader hunting for four runs that served nobody.
+ *
+ * The parse is deliberately strict: it matches the whole sentence rather than scraping digits, so a
+ * rewording that drops a bucket fails here instead of silently matching nothing, and the
+ * `not.toBeNull()` clause is that non-vacuity guard.
+ */
+describe('the bucket totals printed in docs/10 § M30 are counted from the shipped table', () => {
+  /** The per-run kinds § M30's table has a column for; the sentence scopes itself to exactly these. */
+  const perRunKinds = new Set<string>(M30_COLUMNS);
+
+  function bucketTotals(): {
+    readonly goals: number;
+    readonly facts: number;
+    readonly withheld: number;
+    readonly cells: number;
+  } {
+    let goals = 0;
+    let facts = 0;
+    let withheld = 0;
+    for (const scenario of table.scenarios) {
+      for (const [name, bucket] of records(scenario)) {
+        for (const record of bucket) {
+          if (!perRunKinds.has(record.kind)) continue;
+          if (name === 'goals') goals += 1;
+          else if (name === 'configurationFacts') facts += 1;
+          else withheld += 1;
+        }
+      }
+    }
+    return { goals, facts, withheld, cells: goals + facts + withheld };
+  }
+
+  it('counts every per-run cell exactly once, into exactly one bucket', () => {
+    /*
+     * The denominator is derived too. `50` in the prose is ten stages times five per-run columns,
+     * so a stage added without a re-count is this same drift one clause up. Without this, the
+     * three totals could agree with the prose while silently covering fewer cells than the table
+     * has.
+     */
+    expect(bucketTotals().cells).toBe(table.scenarios.length * M30_COLUMNS.length);
+  });
+
+  it('reproduces the three totals and the denominator the prose publishes', async () => {
+    const markdown = await readFile(DOCS_10_PATH, 'utf8');
+    const match =
+      /Of the (\d+) \(goal × stage\) cells with a per-run predicate: \*\*(\d+) batch goals?, (\d+) configuration facts?, (\d+) withheld\*\*/u.exec(
+        markdown,
+      );
+    expect(
+      match,
+      'docs/10 § M30 no longer prints the bucket-totals sentence this guard parses',
+    ).not.toBeNull();
+    if (match === null) return;
+    const totals = bucketTotals();
+    expect([match[1], match[2], match[3], match[4]].join(' / '), 'docs/10 § M30 bucket totals').toBe(
+      [totals.cells, totals.goals, totals.facts, totals.withheld].map(String).join(' / '),
+    );
+  });
+
+  it('holds the prose’s “0 single-run goals” to the thing that makes it zero', () => {
+    /*
+     * This total stays a literal, and the reason it may is that it cannot drift by measurement:
+     * `GoalDisposition` has no `single-run` member, so the category is empty **by construction**.
+     * What is pinned is therefore the construction rather than the digit — a fourth disposition
+     * appearing in the mapping fails this, and whoever adds it is sent to the sentence.
+     */
+    expect([...new Set(Object.values(DISPOSITION_OF))].sort()).toEqual([
+      'batch',
+      'configuration-fact',
+      'not-shippable',
+    ]);
   });
 });
 
