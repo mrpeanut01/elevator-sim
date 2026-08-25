@@ -109,10 +109,12 @@ async function openDispatcherEditor(): Promise<void> {
 }
 
 describe.skipIf(!HAS_BROWSER)('the dispatcher editor authors the families', () => {
-  const pageErrors: string[] = [];
-
+  /*
+   * The collector and the *threw nothing on the way through* case that used to close this suite are
+   * gone into `browserTier.test-helper.ts`, which now watches every page of every file in the tier
+   * rather than the three that had thought of it — GitHub issue #268.
+   */
   beforeAll(async () => {
-    page.on('pageerror', (error: Error) => pageErrors.push(`${error.name}: ${error.message}`));
     await page.goto(origin, { waitUntil: 'load' });
     await page.waitForFunction(
       () => document.querySelector('canvas')?.width !== undefined,
@@ -218,8 +220,4 @@ describe.skipIf(!HAS_BROWSER)('the dispatcher editor authors the families', () =
         'draft rather than on the profile',
     ).toBe(true);
   }, 120_000);
-
-  it('threw nothing on the way through', () => {
-    expect(pageErrors).toEqual([]);
-  });
 });
