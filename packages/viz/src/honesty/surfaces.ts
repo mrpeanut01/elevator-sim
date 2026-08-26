@@ -494,6 +494,7 @@ import { loadSession } from '../persist/session.js';
 import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
 import {
   FREE_PLAY_CONTRACT_ID,
+  WEEK_CONTRACT_SENTINELS,
   closeDay,
   nextDay,
   openEndless,
@@ -3136,19 +3137,40 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * `openWeek('no-such-contract')` is the reader's own building, and it is spelled as an id no
      * contract answers to rather than as a flag, because that is exactly how the shell reaches it.
      */
+    /*
+     * **Derived from `week.ts`, not written out here** — GitHub issue #145.
+     *
+     * This list was four hand-written fixtures, and it covered all four of `coachWeekLines`'
+     * branches **by coincidence**: there happened to be four branches and somebody happened to have
+     * added a case for each. A fifth sentinel could have shipped with a branch nothing drove, which
+     * is the condition #145 describes and is not the same thing as a gap in coverage today.
+     *
+     * `WEEK_CONTRACT_SENTINELS` is the registry, and `week.test.ts` requires it to match the
+     * `export const …_CONTRACT_ID` declarations in that file **in both directions** — so a sentinel
+     * cannot be declared without joining the sweep, and cannot leave the sweep without being
+     * deleted. Between them, "add a state without sweeping it" stops being discouraged and starts
+     * being impossible, which is the exact wording of the ask.
+     *
+     * Three cases are not derived and each is a different kind of thing:
+     * - **`scenario`** is the branch that *resolves*, so it needs a real contract id rather than a
+     *   sentinel — it is what `contractById` answering looks like.
+     * - **`unresolved`** is an id no contract and no sentinel answers to. It reaches the same branch
+     *   as `sandbox`, and it is seeded anyway because it is how a **stale restored state** arrives —
+     *   `week.ts` chose `undefined` over a throw for exactly that case, and a branch reached by two
+     *   different causes is worth driving from both.
+     * - The counts are uniform across sentinels rather than per-case. Only the endless branch reads
+     *   `cleanRun` and only the scenario branch reads `day`, so one pair of numbers exercises every
+     *   count this function can print without a table of magic values to keep in step.
+     */
+    const sentinelWeeks = Object.entries(WEEK_CONTRACT_SENTINELS).map(
+      ([caseName, contractId]) =>
+        [caseName, { ...openWeek(contractId), day: 12, cleanRun: 5 }] as const,
+    );
     for (const [name, week] of [
-      ['scenario', { ...openWeek('c2'), day: 4, cleanRun: 1 }],
-      ['endless', { ...openEndless(), day: 12, cleanRun: 5 }],
-      ['sandbox', openWeek('no-such-contract')],
-      /*
-       * The fourth branch, added with GitHub issue #125 and added for this loop's founding reason.
-       * A free-play week used to carry the *building's* contract id, so it reached the **scenario**
-       * branch and a run that banks nothing was labelled *Scenario · day 1 · 0 clean shifts banked*.
-       * It now carries `FREE_PLAY_CONTRACT_ID` and has a branch of its own — and a branch nothing
-       * drives is a claim nobody checks, which is what this loop exists to say.
-       */
-      ['free play', openWeek(FREE_PLAY_CONTRACT_ID)],
-    ] as const) {
+      ['scenario', { ...openWeek('c2'), day: 4, cleanRun: 1 }] as const,
+      ...sentinelWeeks,
+      ['unresolved', { ...openWeek('no-such-contract'), day: 12, cleanRun: 5 }] as const,
+    ]) {
       const lines = coachWeekLines(week, 1800);
       seeds.push({ field: `coachWeekLines(${name}).label`, text: lines.label, role: 'label' });
       /*
