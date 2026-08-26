@@ -379,3 +379,22 @@ later. A blocker filed behind the thing it blocks.
 § Z records the watched 6/6 run behind it. Not ticked in this wave either — the matrix's figure was
 measured at `000852a` and forty-five commits have landed since, so it is being **re-run** rather than
 inherited. A gate ticked from a stale row is the thing the gate exists to prevent.
+
+
+## Wave D, second half — four issues worked, two closed, two refused
+
+| # | outcome | ground |
+|---|---|---|
+| **147** | **closed** | The card reads `core`'s `HARD_CONSTRAINT_WORDS`, keyed by id so a constraint without words is a compile error there rather than a silent default here. Fallback lives with the surface by that record's own instruction and is **driven** — `hardConstraints` is `readonly string[]`, so `data/` can carry an id the union has never seen |
+| **145** | **closed** | `WEEK_CONTRACT_SENTINELS` is mapped by the corpus; `week.test.ts` reads `week.ts` from disk and requires both directions, with a fourth case guarding the regex so two empty sets cannot agree. The **real `SANDBOX_CONTRACT_ID` had never been swept** — the fixture used `'no-such-contract'` |
+| **281** | **open — 2 of 5** | AC1 and AC2 met; **AC3 not met and the file says so.** Deleting the reset leaves it 3 of 3 green, because `reconcile`'s clamp covers it locally. The deployed build is unreachable (`curl` → `000`) |
+| **173** | **open — premise partly refuted** | `CHARTER_PROGRAMME.md:50` **is** a reservation point and was correct (D374 → D375). It was unguarded, not absent. Now derived, with D63's duplicate registered and the owed count ratcheted at 64 |
+
+**The rule this half kept proving.** Four figures were corrected by measurement before they shipped:
+a screen overflow read as `0` that is `8 772`; a margin written as `73` that is `221`; a duplicate
+count of `2` that is `1`; and a ratchet that read `69` because it counted its own prose. Three of
+the four would have read as tidier findings than the truth.
+
+**What the wave did not do.** It did not close #281 on two of five criteria, did not renumber D63 to
+make a duplicate go away, did not rewrite a dated findings figure to make two registers agree, and
+did not report a suite run taken over a tree that changed underneath it.

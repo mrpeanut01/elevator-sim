@@ -104,6 +104,56 @@ a refresh of a figure taken on another tree, is the per-branch-figure defect
 **Every lane is investigation-only and forbidden to write.** That is why five run at once: they share
 every file and conflict on none. The rule that serializes *code* lanes is untouched.
 
+### Wave D, second half — four issues advanced with code
+
+Reconciliation closed twelve. These four were then **worked** rather than triaged, and two of them
+are refusals that are worth more than the code.
+
+| issue | outcome | the thing to read |
+|---|---|---|
+| **#147** | **closed** | The rail card says what a hard constraint *does*, in `core`'s words. The dense blurb keeps the id **deliberately** — engineer audience, greppable against `data/` — with the consequence recorded: it would trip `internal-notation` on a player surface |
+| **#145** | **closed** | Coverage of `coachWeekLines`' four branches was complete **by coincidence**. `WEEK_CONTRACT_SENTINELS` is now mapped by the corpus and `week.test.ts` reads `week.ts` **from disk** to require both directions |
+| **#281** | **open, 2 of 5** | The tier gained a case that drives the built bundle — and **it does not bite** |
+| **#173** | **open, premise partly refuted** | The reservation mechanism **exists** (`CHARTER_PROGRAMME.md:50`) and was unguarded. It is now derived |
+
+**#281 is the refusal to read first.** Its third criterion asks for a case that fails when either
+half of `shell.ts#go`'s reset is removed. Mutation-tested: deleting the `.everyday-screen` reset
+leaves the new file **3 of 3 green** — the same weakness that got two earlier cases deleted.
+Measured at `375×667` on the locally-served bundle: the document does not scroll at all,
+`.everyday-screen` overflows by **335 px**, and the offset after tapping a tile with the reset
+removed is **0**. `reconcile`'s incidental clamp covers it here. **The defect was measured on the
+*deployed* build, and that build answers `curl` with status `000` from this container** — which is
+issue #123's gap, arriving as a blocker on the issue about a different gap. So the case is a
+regression guard on the right *kind* of artifact and is labelled as exactly that, in its own
+docstring, before a reader reaches the assertions.
+
+**Four measurements were corrected mid-flight, and each would have shipped a wrong claim.**
+
+1. A probe read the fixit screen's overflow as **0** — it is **8 772**. The probe measured before
+   layout settled, and the 0 would have supported a tidier and wrong conclusion.
+2. A margin in `rightRail.ts`'s docstring was written as **73** from memory; measured, it is **221**.
+3. A heading pattern of `^## D(\d+)` reports **two** duplicate decision numbers where the tree has
+   **one** — `## D125 preface —` is a preface *to* D125, not a second D125.
+4. **The #173 ratchet counted itself.** The test states the phrase it counts in its pattern, its
+   prose and its failure message, so the first run read **69** against a tree of **64**, and all
+   five extras were its own words. Excluded by path rather than by a cleverer pattern, because one
+   contrived to miss its own text would miss a real site written the same way.
+
+**One guard was widened rather than worked around.** `browserTier.test.ts` derives every tier file's
+port from source text; a preview server needs one for the same reason, so `startBuiltSite` takes
+Vite's own `preview` options as an object and the guard reads `preview: { port }` beside
+`server: { port }`. Every property it asserts is unchanged, and pointing the new file at 5201 turns
+the collision case red naming both files.
+
+**One suite run was killed rather than reported.** The first local baseline began before the first
+commit and was reading a tree that changed underneath it. It was killed and re-run clean:
+**430 files, 8 838 passed, 11 skipped, exit 0** in 3 325 s — which corroborates CI's two green
+platform legs rather than substituting for them.
+
+**Cost of the new tier file, on a quiet machine:** cold `dist-web/` build **4 152 ms**, whole file
+**6.34 s**. It never reaches the always-on path — `viz-browser` is opted into by name and gated on
+`HAS_BROWSER`.
+
 **Two findings before any lane reported, and one of them was already fixed.** The M2 exit criterion
 *"T1 reads `passing` in `TEST_MATRIX.md`"* is **unticked in
 [`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md) § M2 while `TEST_MATRIX.md` reads `passing`**, and
