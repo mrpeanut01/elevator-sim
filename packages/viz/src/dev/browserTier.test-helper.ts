@@ -77,8 +77,12 @@ import type { EverydayScreen } from '../everyday/types.js';
  * once and the tier's files serve it, so both halves have to be reachable from both places.
  */
 export {
+  BROWSER_ROOTS,
   CHROMIUM,
   CHROMIUM_ENV,
+  CHROMIUM_SOURCE,
+  DISCOVERED,
+  discoverChromium,
   HAS_BROWSER,
   SKIP_REASON,
   startShippedSite,
