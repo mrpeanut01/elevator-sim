@@ -1175,3 +1175,163 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
     );
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The decision-number bookkeeping — GitHub issue #173
+ * -------------------------------------------------------------------------- */
+
+/**
+ * `DECISIONS.md`'s own numbering, derived from its headings rather than transcribed.
+ *
+ * ## Why this exists
+ *
+ * GitHub issue #173 reports that sites saying *"a decision number is owed"* accumulate with nothing
+ * to reserve one. Its own count has now gone stale **twice** — **32** in the title, **38** in its
+ * comment, **64** measured on this tree — which is [`RISKS.md`](../../../../RISKS.md) R38 landing
+ * on the issue whose subject is bookkeeping. The next measurement should not be a manual grep, so
+ * it is these cases.
+ *
+ * ## What counts as a decision heading, and the false positive that shaped the pattern
+ *
+ * `^## D<n> —`, with the em-dash. A looser `^## D<n>` matches **`## D125 preface — …`** as well,
+ * which is a preface *to* D125 rather than a second D125 — and a naive duplicate check therefore
+ * reports two duplicates where the tree has one. That was measured here before it was written, and
+ * the pattern is narrow because of it.
+ *
+ * ## The one live register, and the one that is history
+ *
+ * **`CHARTER_PROGRAMME.md`'s *Next free decision number* row is the live reservation point** and is
+ * asserted below to be correct by derivation. `ISSUE_VERIFICATION_FINDINGS.md` also states a next
+ * free number — **D342**, against a live D375 — and that is **not** asserted and must not be:
+ * it sits inside a dated findings section, so it is a measurement that was true when taken.
+ * Rewriting it would be R37, the failure this project records for replacing a register's history.
+ */
+const DECISION_HEADING = /^## D(\d+) —/gmu;
+
+/**
+ * Every `.ts` and `.md` file the repository owns, derived from disk.
+ *
+ * Excludes what is not this repository's prose to count: dependencies, build output, and `.git`.
+ * `dist-web/` is excluded by name as well as by `dist` — it is Vite's output directory and carries
+ * a copy of the bundled sources, which would double every count taken through here.
+ */
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'dist-web', '.git', 'coverage']);
+
+const filesUnder = (dir: string): readonly string[] => {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('.') && entry.name !== '.github') continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+      out.push(...filesUnder(full));
+    } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.md')) {
+      out.push(full);
+    }
+  }
+  return out;
+};
+
+/** Every number that heads a decision, in file order, including any repeat. */
+const decisionNumbers = (): readonly number[] =>
+  [...read('DECISIONS.md').matchAll(DECISION_HEADING)].map((match) => Number(match[1]));
+
+/**
+ * The one duplicate this tree ships, registered so a **second** one fails.
+ *
+ * `D63` heads two unrelated decisions — a handback note and a `VIZ_SCHEMA_VERSION` bump — so a
+ * `§ D63` citation is ambiguous. It is **not renumbered**, because `RISKS.md` R1's own rule for
+ * this file is that ids are names and renumbering breaks every reference; and it is not silently
+ * tolerated either, because `citations.test.ts` asserts a `§ Dnnn` **resolves** and never that it
+ * is unique. Registered rather than fixed, on `honesty.test.ts`'s `OUTSTANDING` precedent.
+ */
+const KNOWN_DUPLICATE_DECISIONS: readonly number[] = Object.freeze([63]);
+
+/**
+ * Sites saying a decision number is owed, at the last measurement.
+ *
+ * A **ratchet**, not a pin: the count may fall freely and may not rise. An exact pin would go red
+ * on every commit that settles one, which trains people to edit the number rather than read it.
+ * Measured 2026-08-26 on `main` at `2c7b308` with the issue's own command — and it had grown from
+ * **38** on `000852a`, ~68 % in one wave, which is the finding rather than the housekeeping.
+ */
+const DECISION_DEBT_CEILING = 64;
+
+describe('the decision-number bookkeeping (GitHub issue #173)', () => {
+  it('keeps the charter’s next-free number correct by derivation, not by transcription', () => {
+    const numbers = decisionNumbers();
+    // Non-vacuity first: a pattern that stops matching would make every case below pass on an
+    // empty set, which is the trap `deadCode.test.ts` and `week.test.ts` both guard against.
+    expect(numbers.length, 'no decision headings were found, so these cases assert nothing').
+      toBeGreaterThan(300);
+
+    const highest = Math.max(...numbers);
+    const charter = read('CHARTER_PROGRAMME.md');
+    const declared = /\|\s*Next free decision number\s*\|\s*\*\*D(\d+)\*\*/u.exec(charter);
+    expect(
+      declared,
+      'CHARTER_PROGRAMME.md no longer states a next free decision number. That row is the one ' +
+        'place a lane can reserve one; without it GitHub issue #173 has no answer at all.',
+    ).not.toBeNull();
+
+    expect(
+      Number((declared as RegExpExecArray)[1]),
+      `DECISIONS.md's highest decision is D${String(highest)}, so the next free number is ` +
+        `D${String(highest + 1)}. The charter says otherwise, and a lane that trusts it will ` +
+        'reuse a number that is taken.',
+    ).toBe(highest + 1);
+  });
+
+  it('lets no second decision number head two decisions', () => {
+    const numbers = decisionNumbers();
+    const seen = new Set<number>();
+    const duplicated = new Set<number>();
+    for (const n of numbers) {
+      if (seen.has(n)) duplicated.add(n);
+      seen.add(n);
+    }
+    const unregistered = [...duplicated].filter((n) => !KNOWN_DUPLICATE_DECISIONS.includes(n));
+    expect(
+      unregistered,
+      'a decision number heads two decisions, so a `§ Dnnn` citation to it is ambiguous. ' +
+        '`citations.test.ts` asserts such a citation resolves and never that it resolves to one ' +
+        'thing. Do not renumber — ids are names here. Register it beside D63 with the reason, or ' +
+        'retitle the newer heading.',
+    ).toEqual([]);
+
+    // The other direction: a registered duplicate that stopped reproducing must leave the register,
+    // or the register becomes decoration — the same rule `honesty.test.ts` applies to OUTSTANDING.
+    for (const known of KNOWN_DUPLICATE_DECISIONS) {
+      expect(
+        duplicated.has(known),
+        `D${String(known)} is registered as a duplicate and no longer is one. Delete it from ` +
+          'KNOWN_DUPLICATE_DECISIONS on the commit that fixed it.',
+      ).toBe(true);
+    }
+  });
+
+  it('does not let the "a decision number is owed" backlog grow', () => {
+    /*
+     * **The matcher's own file is excluded, and it has to be.** This case states the phrase it
+     * counts — in its pattern, in its prose and in its failure message — so counting itself put the
+     * first run at **69** against a tree with **64**. A grep-shaped gate that reads its own source
+     * measures the gate rather than the thing, and the five it added were entirely its own words.
+     *
+     * Excluded by path rather than by making the pattern cleverer: a pattern contrived to miss its
+     * own text would also miss a real site written the same way.
+     */
+    const owed = filesUnder(ROOT)
+      .filter((path) => !path.endsWith(join('validation', 'documentation.test.ts')))
+      .map((path) => (readFileSync(path, 'utf8').match(/decision number is owed/gu) ?? []).length)
+      .reduce((total, n) => total + n, 0);
+
+    expect(owed, 'nothing matched, so this ratchet is watching nothing').toBeGreaterThan(0);
+    expect(
+      owed,
+      `${String(owed)} sites say a decision number is owed, against a ceiling of ` +
+        `${String(DECISION_DEBT_CEILING)}. This is a ratchet: settle one and lower the ceiling on ` +
+        'the same commit. It rose 38 → 64 during a single wave whose merge said every known issue ' +
+        'had burned down, which is why it is a gate rather than a note (GitHub issue #173).',
+    ).toBeLessThanOrEqual(DECISION_DEBT_CEILING);
+  });
+});
