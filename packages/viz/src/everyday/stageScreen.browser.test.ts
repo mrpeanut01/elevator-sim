@@ -587,7 +587,41 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
       { timeout: 20_000 },
     );
     await page.click('.everyday-stage-play');
-    const before = await page.textContent('.everyday-stage-clock');
+
+    /*
+     * **Read the clock only once it has stopped moving, and the difference is a CI failure.**
+     *
+     * Pausing is a request, not an instant: the click lands, and whatever frame was already in
+     * flight still draws. At `TOP_SPEED_INDEX` — 600× — the clock advances a **simulated minute
+     * every ~100 ms of real time**, so a single late frame between the click and this read captures
+     * a `before` the transport has already left behind. The assertion at the end then compares the
+     * post-intervention clock against a value that was never stable, and fails by exactly one
+     * minute.
+     *
+     * That is what `suite (linux)` reported on this branch: *expected '08:32' to be '08:31'*. It
+     * passes on an idle machine and fails on a loaded runner, which is why it survived until a
+     * wave added a `vite build` to this tier (`everyday/builtBundle.browser.test.ts`) and put two
+     * more cores of contention beside it.
+     *
+     * 300 ms is chosen against the speed rather than picked: at 600× it is three simulated minutes,
+     * so a transport that is still running cannot produce two equal reads across it. The assertion
+     * below is unchanged and is **stronger** for this — it now compares against a clock that was
+     * genuinely at rest.
+     */
+    const before = await page
+      .waitForFunction(
+        () => {
+          const read = (): string =>
+            document.querySelector('.everyday-stage-clock')?.textContent ?? '';
+          const first = read();
+          return new Promise<string | false>((resolve) => {
+            setTimeout(() => resolve(read() === first && first !== '' ? first : false), 300);
+          });
+        },
+        undefined,
+        { timeout: 30_000 },
+      )
+      .then(async (handle) => (await handle.jsonValue()) as string);
 
     await page.click('.everyday-stage-intervene[data-intervention-kind="park-cars-lobby"]');
     /*
