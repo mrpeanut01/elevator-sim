@@ -47,7 +47,59 @@ directions — which is the thing to establish before scheduling anything.
 | R2 | Are the six M1 specification issues closable? | #194, #195, #197, #198, #201, #202 | dispatched |
 | R3 | Duplicate adjudication across the two cohorts | #156–#182 ↔ #219–#252 | dispatched |
 | R4 | Did wave B/C's work land for the issues it named? | #170, #173, #229, #234, #254, #255, #257, #258, #275, #279 | dispatched |
-| R5 | Is the pre-charter backlog still true after thirteen waves? | #93, #123, #130, #145, #146, #147, #149 | dispatched |
+| R5 | Is the pre-charter backlog still true after thirteen waves? | #93, #123, #130, #145, #146, #147, #149 | **reported** |
+
+**All five reported. Of seventeen issues verified against their own acceptance criteria, five were
+closable and twelve were not** — and the twelve fail in one shape. **The criteria that got met were
+the ones about writing prose; the criteria that went unchecked were the ones about anything else.**
+#201's telemetry document is excellent and contains **no occurrence of the word *dashboard***.
+#197's flow maps are complete and `TEST_MATRIX.md` was never rewritten against them — which *both*
+files state in terms. #202's posture lists what the consent question owes and drafts no copy, which
+is *described, not designed*, the exact half its own criterion excludes. Every one of the twelve had
+a lane recorded as **landed** in this file.
+
+**Twelve issues closed, one filed, seventeen dispositioned; 94 open → 83.**
+
+| closed | ground |
+|---|---|
+| #194, #198, #215 | completed, every criterion re-verified against the code |
+| #254, #255, #257, #279 | completed; #279 needed one docstring the lane that built its mechanism never wrote |
+| #156, #160, #164, #168, #180 | duplicate — **each after its unique scope was transferred to the canonical**, which was the whole of the work |
+
+**No duplicate was closed on a title.** Five pairs met the bar and **eleven did not**, the sharpest
+being **#170 ↔ #229**, which is now the *opposite* of a duplicate: § D368 retitled #229 after its
+premise was refuted, and `buildNotes.test.ts#ABSENCE_TRIAGE` partitions the six Settings rows across
+**four** owners, so the two share no row at all. Closing either against the other would have
+silently dropped the Units conversion that `ENGINE_CONTRACT.md` § 13 requires to *convert, not
+relabel*.
+
+**The cross-cohort mapping [`MULTI_AGENT_PLAN.md:122`](MULTI_AGENT_PLAN.md) promised did not
+exist**, and now does — it is in [`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md), which that file
+names as its home and which covered only #186–#193 and #206–#218.
+
+**A new risk class, and it is not R1.** [`RISKS.md`](RISKS.md) **R42** — *a ruling with no consumer*.
+R1 is a behaviour with no caller; this fails one level earlier and **no dead-code audit can see it,
+because a decision has no exports to scan**. Three realised instances: § D330 answered #123 and #130
+on 2026-08-09 and neither is built, and § D367 ruled on the energy bar while § D106 — the entry a
+reader lands on — carried no pointer to it, which is why four lanes read the rule and got the wrong
+answer. The compounding half is what earned it a row: `docs/16:357` said *"Issue #123 holds the
+decision that has not been made"* and the issue's own comment said *"No decision is recorded"*, so a
+reader who checked was told **twice** that an answer which existed did not.
+
+**Three lanes refuted something I told them, which is the process working rather than a lane going
+off-brief.** R5 was told `internal-notation` might now bar #146's string; it ran the property's own
+five regexes and **refuted it twice over** — the string matches none of them, and the Engineer editor
+is outside `PLAYER_FACING_SURFACES` anyway. R1 was told the browser tier runs on this host; it hit
+playwright's *default* resolution path (revision **1234**) rather than the repo's
+`PROVISIONED_FALLBACK` (**1194**), so the tier's own launch works and a default-path launch does not.
+And R4 found that **#255's headline evidence was wrong about the population** — `20260730` is a
+master seed, not a run the campaign ever makes.
+
+**One measurement was refused rather than taken, and the refusal is the right one.** R5 declined to
+re-measure #149's *"8 tests over 5 s, slowest 39.2 s"* because this host was running the full suite
+concurrently at load 5.7–6.9 on 4 cores. A duration distribution taken under that load, published as
+a refresh of a figure taken on another tree, is the per-branch-figure defect
+[`CLAUDE.md`](CLAUDE.md) records five times.
 
 **Every lane is investigation-only and forbidden to write.** That is why five run at once: they share
 every file and conflict on none. The rule that serializes *code* lanes is untouched.
