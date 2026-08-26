@@ -70,8 +70,18 @@ export const CHROMIUM_ENV = 'ELEVATOR_SIM_CHROMIUM';
  * Where the tier looks when nothing says otherwise.
  *
  * A path from the environment that originally provisioned this tier, kept because it costs nothing
- * and documents what *provisioned* meant there. It is not a default anybody should rely on: on every
- * machine this repository has been measured on since, it does not exist, and the tier skips.
+ * and documents what *provisioned* meant there. It is not a default anybody should rely on — but
+ * **it is not dead either, and this sentence used to say it was.**
+ *
+ * It read *"on every machine this repository has been measured on since, it does not exist, and the
+ * tier skips"* until 2026-08-26, when a host arrived where it **does** exist: the tier ran from this
+ * constant with {@link CHROMIUM_ENV} unset, `dailyLoop.browser.test.ts` 6 passed in 18.81 s.
+ * `ISSUE_WORKER_LEDGER.md` W18-5 carried the same claim and is corrected with it. Both were true
+ * where they were written, which is the point — a sentence about *the environment* goes stale the
+ * same way a sentence about the product does (`RISKS.md` R38), and nothing re-derives this one.
+ *
+ * So read it as: **a fallback that works on some hosts and not others**, which is exactly why
+ * {@link HAS_BROWSER} tests the file rather than trusting the constant.
  */
 const PROVISIONED_FALLBACK =
   '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';

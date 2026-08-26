@@ -266,8 +266,29 @@ measured the preview answering `403` to `CONNECT`.
       owner**: it was gated at no milestone at all until then (see the note below). Measured by
       `docs/30-playtest-programme.md`'s tier ladder, where **only a tier-0 answer counts** — one the
       tester reached with no word from the moderator naming the figure or the refusal.
-- [ ] T1 (menu → door → brief → stage → report → week) reads `passing` in
+- [x] **MET — T1 (menu → door → brief → stage → report → week) reads `passing` in**
       [`TEST_MATRIX.md`](TEST_MATRIX.md) — it is the test that would have caught #206.
+      **Ticked 2026-08-26, and it was met before it was ticked.** `TEST_MATRIX.md` has read
+      `passing` since the M2-MEASURE lane, with
+      [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § Z as the run behind it —
+      *"Verified 2026-08-24 by running the browser tier, not by reading the matrix"*, 6 of 6 — and
+      **this box stayed unticked for two days over evidence that already existed.** That is the
+      shape this gate exists to catch, landing on the gate itself.
+
+      **Not ticked from that row either.** § Z's figure was taken at `000852a` and forty-five
+      commits have landed since, so the case was **re-run on the integrated tree**:
+      `npx vitest run --project viz-browser --no-file-parallelism`
+      `packages/viz/src/everyday/dailyLoop.browser.test.ts` → **6 passed, 18.81 s**, on
+      `claude/github-issue-worker-9ol0cy` at `b20cace`. A box ticked from a stale row is what the
+      box is for.
+
+      **Two bounds a reader should carry.** The tier launched from
+      `browserTier.test-helper.ts#PROVISIONED_FALLBACK` with `ELEVATOR_SIM_CHROMIUM` **unset** —
+      which contradicts that helper's own docstring (*"on every machine this repository has been
+      measured on since, it does not exist, and the tier skips"*) and
+      [`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md) W18-5. Both were true when written; this
+      host has one. And T1 is **passing across two cases, not one continuous drive** — § Z says so,
+      and the seam is between the filing case and the week case.
 
 **Review.** Vertical slice review, with recorded sessions.
 
