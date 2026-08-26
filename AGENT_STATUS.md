@@ -15,6 +15,52 @@
 the same day. #206 was fast-tracked ahead of milestone order on the charter's own § 7 grounds — a
 defect fix needs no specification — and landed before M2 opened.
 
+### Active — M2 · wave D, opened 2026-08-26 on a third host
+
+**The host changed again, and it changes what this wave can measure.** This container arrived with
+**no `node_modules` at all** — `npm run typecheck` failed on *"Cannot find module 'vitest'"* and
+*"Cannot find type definition file for 'node'"*, which reads exactly like a broken tree and is not
+one. `npm install` fixed it in 8 s and `tsc -b` is clean. **Record this before anything else:** a
+lane that reads a fresh clone's red typecheck as a repository defect will file a phantom issue. It is
+Node **22.22.2** against a package declaring `>= 26`, so `npm install` warns `EBADENGINE` and
+proceeds.
+
+**The browser tier runs here, and it runs from the fallback rather than the variable.**
+`browserTier.test-helper.ts#PROVISIONED_FALLBACK` —
+`/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell` — **exists on this
+machine**, so `HAS_BROWSER` is true with `ELEVATOR_SIM_CHROMIUM` unset. That contradicts
+[`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md) W18-5, which says the path *"exists on no machine
+this repo has been measured on"*, and the helper's own docstring, which says *"on every machine this
+repository has been measured on since, it does not exist, and the tier skips."* Both were true when
+written and are false here. It is [`RISKS.md`](RISKS.md) R38 landing on a sentence about the
+environment rather than about the product — and the correction is *this host has one*, not *the
+sentence was wrong*.
+
+**This wave opened on reconciliation rather than on new work, because the backlog said to.** 94
+issues are open. No pull request is open. `main` is at `2c7b308` and this branch is identical to it.
+The wave-C merge says *"every known issue burned down"*, and the open list disagrees with it in both
+directions — which is the thing to establish before scheduling anything.
+
+| Lane | Task | Issues | Status |
+|---|---|---|---|
+| R1 | Are the four landed M2 fixes closable against their own criteria? | #211, #213, #214, #215 | dispatched |
+| R2 | Are the six M1 specification issues closable? | #194, #195, #197, #198, #201, #202 | dispatched |
+| R3 | Duplicate adjudication across the two cohorts | #156–#182 ↔ #219–#252 | dispatched |
+| R4 | Did wave B/C's work land for the issues it named? | #170, #173, #229, #234, #254, #255, #257, #258, #275, #279 | dispatched |
+| R5 | Is the pre-charter backlog still true after thirteen waves? | #93, #123, #130, #145, #146, #147, #149 | dispatched |
+
+**Every lane is investigation-only and forbidden to write.** That is why five run at once: they share
+every file and conflict on none. The rule that serializes *code* lanes is untouched.
+
+**Two findings before any lane reported, and one of them was already fixed.** The M2 exit criterion
+*"T1 reads `passing` in `TEST_MATRIX.md`"* is **unticked in
+[`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md) § M2 while `TEST_MATRIX.md` reads `passing`**, and
+[`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § Z is the run behind it — a gate
+box left unticked over evidence that already exists. And § Z's parting finding, the stale
+`{@link closeDay}` refusal at `dailyLoop.browser.test.ts:166`, was **deliberately left for the #207
+lane and has since been fixed** — the comment now records its own staleness. Checked before
+scheduling, which is the only reason it was not done twice.
+
 ### Active — M2 · wave B, opened 2026-08-24 on a new host
 
 **PR #253 is merged.** M0, M1 and the eight landed M2 lanes are on `main` at `000852a`, and the
