@@ -28,7 +28,12 @@ import {
   type LoadedConfig,
   type TrafficProfiles,
 } from '@elevator-sim/core';
-import { CLOSED_FORM_ASSUMPTIONS, DECLARED_TERM_IDS, analyzeUpPeak } from '@elevator-sim/core/browser';
+import {
+  CLOSED_FORM_ASSUMPTIONS,
+  DECLARED_TERM_IDS,
+  HARD_CONSTRAINT_WORDS,
+  analyzeUpPeak,
+} from '@elevator-sim/core/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
@@ -1192,8 +1197,13 @@ describe('what a dispatcher does differently is derived, never authored per id',
      */
     const profiles = config.dispatcherProfiles.profiles;
     const say = (id: string): string => dispatcherBehaviourOf(profile(id), profiles);
-    expect(say('collective')).toContain('`noDirectionReversal`');
-    expect(say('eta')).not.toContain('noDirectionReversal');
+    // Derived from `core`, never from a literal here: if the declared words change, this follows
+    // them, and if the card stops reading them it goes red (issue #147).
+    expect(say('collective')).toContain(HARD_CONSTRAINT_WORDS.noDirectionReversal.name);
+    expect(say('collective')).toContain(HARD_CONSTRAINT_WORDS.noDirectionReversal.effect);
+    // The raw id is what the card used to print, and printing it is the defect #147 named.
+    expect(say('collective')).not.toContain('noDirectionReversal');
+    expect(say('eta')).not.toContain(HARD_CONSTRAINT_WORDS.noDirectionReversal.name);
     expect(say('auction')).toContain('over 1 bidding round');
     expect(say('auction-multi-round')).toContain('over 3 bidding rounds');
     expect(say('destination-panel')).toContain('Riders say which floor they want at the landing');
@@ -1237,6 +1247,31 @@ describe('what a dispatcher does differently is derived, never authored per id',
     expect(code).toContain('`${state.mode}|${profiles');
   });
 
+  it('survives a constraint this build has no words for, and keeps its id (issue #147)', () => {
+    /*
+     * `core`'s `HARD_CONSTRAINT_WORDS` docstring puts this fallback **with the surface**, because
+     * reaching it is a content bug a surface must survive rather than a state `core` may ship. The
+     * cast in `constraintWordsOf` is what makes the arm reachable at all: `hardConstraints` is
+     * `readonly string[]` on the profile, so `data/` can carry an id the union has never heard of.
+     *
+     * The id must survive into the sentence on **this arm only** — a reader who meets a filter the
+     * build cannot name is owed the one string that lets somebody find it, and a card that swallowed
+     * it would leave them with nothing to report.
+     */
+    const profiles = config.dispatcherProfiles.profiles;
+    const invented: DispatcherProfile = {
+      ...profile('eta'),
+      hardConstraints: ['noSuchRuleExists'],
+    };
+    const card = dispatcherBehaviourOf(invented, profiles);
+    expect(card).toContain('noSuchRuleExists');
+    expect(card).toContain('an unnamed filter');
+    // It still says what a hard constraint *is*, which is true of every id including this one.
+    expect(card).toContain('no weight can buy past it');
+    // And a named constraint does not fall down this arm.
+    expect(dispatcherBehaviourOf(profile('collective'), profiles)).not.toContain('unnamed filter');
+  });
+
   it('is as long as the dispatcher is complicated, and the docstring’s figures are pinned', () => {
     /*
      * `dispatcherBehaviourOf`'s docstring quotes three lengths to justify refusing a trim, and a
@@ -1249,7 +1284,7 @@ describe('what a dispatcher does differently is derived, never authored per id',
     const profiles = config.dispatcherProfiles.profiles;
     const lengthOf = (id: string): number => dispatcherBehaviourOf(profile(id), profiles).length;
     expect(lengthOf('eta')).toBe(72);
-    expect(lengthOf('collective')).toBe(203);
+    expect(lengthOf('collective')).toBe(353);
     expect(lengthOf('predictive-balanced')).toBe(668);
     // The longest shipped card is the one that weights the most terms — the claim, not a coincidence.
     const byLength = [...profiles].sort(
