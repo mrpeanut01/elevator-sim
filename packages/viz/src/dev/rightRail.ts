@@ -83,9 +83,11 @@ import {
   COST_TERMS_BY_ID,
   DECLARED_TERM_IDS,
   DispatchError,
+  HARD_CONSTRAINT_WORDS,
   resolveDispatchConfig,
   type DispatcherProfile,
   type ElevatorSpecs,
+  type HardConstraintId,
   type ResolvedBuilding,
   type ResolvedDispatchConfig,
 } from '@elevator-sim/core/browser';
@@ -324,8 +326,15 @@ export function dispatcherCardOf(
  *
  * ## It is long on the cards that are complicated, and that is the choice rather than an oversight
  *
- * Measured over the shipped thirteen: 72 characters for `eta`, 203 for `collective`, and **668 for
- * `predictive-balanced`**, which weights ten of the thirteen terms. The obvious trim — name the
+ * Measured over the shipped thirteen: 72 characters for `eta`, **353** for `collective`, and **668
+ * for `predictive-balanced`**, which weights ten of the thirteen terms. `collective` was 203 until
+ * the constraint gained its words ([#147](https://github.com/mrpeanut01/elevator-sim/issues/147));
+ * saying what a rule *does* costs 150 characters on the two cards that carry one, and the trim
+ * refused below is refused for them too. **The gap at the top narrowed and the claim below still
+ * holds**: `collective-enroute` goes 447 → 597, so the longest card is still the one weighting the
+ * most terms — but by **71** characters where it led by **221**. `rightRail.test.ts` asserts that
+ * ordering rather than trusting it, which is why the margin is worth stating: a third constraint on
+ * that profile would overturn the claim, and the test is what would say so. The obvious trim — name the
  * leaders on the face and put the rest behind the disclosure — was **refused**, on § D301 § 1:
  * subtraction is the default move for a casual mode and it is the one this product does not make.
  * The card is long because that dispatcher is complicated, and a card that hid nine tenths of what
@@ -341,24 +350,37 @@ export function dispatcherCardOf(
  * property {@link dispatcherBlurbOf} was rewritten to have: a reader's own profile weighting all
  * thirteen terms is the worst case and it is a known one.
  *
- * ## What this card still does not say, and why that is now a gap rather than a refusal
+ * ## What this card says about a hard constraint, and where the words come from
  *
- * This card names `noDirectionReversal` verbatim, under a sentence saying what a hard constraint
- * **is** — a filter no weight can buy past — which is true of every id including one this build has
- * never heard of. That used to be a *refusal*: the only prose `core` carried per constraint was
- * `dispatch/parameters.ts`'s 350-character optimizer-schema description, written under CLAUDE.md
- * invariant 8 for a search rather than for a person, and translating it in a renderer would be the
- * taxonomy {@link dispatcherFamilyOf} refuses two functions up for exactly this reason.
+ * This card used to name `noDirectionReversal` **verbatim**, under a sentence saying what a hard
+ * constraint *is* — a filter no weight can buy past — which is true of every id including one this
+ * build has never heard of. It never said what the rule **does**, which is
+ * [#147](https://github.com/mrpeanut01/elevator-sim/issues/147).
  *
- * **The refusal's ground is gone.** `core` now declares player-facing words beside the constraint —
- * `dispatch/types.ts#HARD_CONSTRAINT_WORDS`, surfaced on the schema row as
- * `DISPATCH_PARAMETERS['constraints.noDirectionReversal'].player` — which is the fix
- * [#147](https://github.com/mrpeanut01/elevator-sim/issues/147) asked for, in the place it named.
- * `everyday/workshopModel.ts#constraintCardsOf` reads them, with the honest fallback for a
- * constraint this build cannot name. This rail card does not read them **yet**, so #147 stays open
- * on the surface it names, and this paragraph is a gap with an owner rather than a sentence telling
- * the next reader not to try. Per § D227, a refusal is pinned by a run and never by another
- * sentence; when the ground under one moves, the sentence moves with it.
+ * That was a *refusal* before it was a gap: the only prose `core` carried per constraint was
+ * `dispatch/parameters.ts`'s optimizer-schema description, written under CLAUDE.md invariant 8 for
+ * a search rather than for a person, and translating it in a renderer would be the taxonomy
+ * {@link dispatcherFamilyOf} refuses two functions up for exactly this reason.
+ *
+ * **The refusal's ground went, and now the card follows it.** `core` declares player-facing words
+ * beside the constraint — `dispatch/types.ts#HARD_CONSTRAINT_WORDS`, surfaced on the schema row as
+ * `DISPATCH_PARAMETERS['constraints.noDirectionReversal'].player` — and
+ * {@link mechanismSentencesOf} reads them. **Reading them is not the thing that docstring forbids**:
+ * the rule is that a renderer may not *invent* a description, and these are declared beside the
+ * model, keyed by id so that adding a constraint without words is a compile error rather than a
+ * runtime default. A lookup table in this file would have been `if (id === …)` wearing prose.
+ *
+ * The **fallback** for an id this record cannot name lives here rather than in `core`, because
+ * `HARD_CONSTRAINT_WORDS`' own docstring puts it with the surface: reaching it is a content bug the
+ * surface must survive, not a state `core` may ship. This card's fallback keeps the raw id — a
+ * reader who meets an unnamed filter is owed the one string that lets somebody find it.
+ *
+ * **The dense one-line blurb still prints the id**, deliberately: {@link mechanismClausesOf} feeds
+ * an engineer's summary line where the id is the greppable token that matches
+ * `data/dispatcher-profiles.json`. That is a different audience from this card's prose, and #147
+ * asked about the card. One consequence to carry: the id would trip `internal-notation`'s code-voice
+ * clause on a player surface, and the blurb is exempt only because `dev/` is outside
+ * `PLAYER_FACING_DIRECTORIES` — so the blurb must not move into `everyday/` unnamed.
  */
 export function dispatcherBehaviourOf(
   profile: DispatcherProfile,
@@ -514,15 +536,49 @@ function termList(ids: readonly string[]): string {
  * off one branch — see {@link poolingReadingOf} — so the plate row and this sentence cannot come to
  * disagree about which case a profile is in.
  */
+/**
+ * One hard constraint in words a reader can act on, or the honest fallback.
+ *
+ * The words are `core`'s — `dispatch/types.ts#HARD_CONSTRAINT_WORDS`, declared beside the model and
+ * keyed by {@link HardConstraintId}, so a constraint added without them is a compile error there
+ * rather than a silent default here. This is **not** the lookup table {@link mechanismClausesOf}'s
+ * docstring forbids: that rule bars a renderer from *inventing* a description, and nothing is
+ * invented here.
+ *
+ * **The fallback is this surface's, by `core`'s own instruction** — reaching it is a content bug a
+ * surface must survive, not a state `core` may ship. It keeps the raw id, because a reader who meets
+ * a filter this build cannot name is owed the one string that will let somebody find it. The cast
+ * is load-bearing: `hardConstraints` is `readonly string[]` on the profile, so a `data/` file can
+ * carry an id the union has never heard of, which is exactly the case this arm exists for.
+ */
+function constraintWordsOf(id: string): { readonly name: string; readonly effect: string } {
+  const words = HARD_CONSTRAINT_WORDS[id as HardConstraintId] as
+    | (typeof HARD_CONSTRAINT_WORDS)[HardConstraintId]
+    | undefined;
+  if (words === undefined) {
+    return {
+      name: `an unnamed filter (\`${id}\`)`,
+      effect: `this build carries no words for \`${id}\`; it still rejects cars before any weight is read`,
+    };
+  }
+  return words;
+}
+
 function mechanismSentencesOf(profile: DispatcherProfile): readonly string[] {
   const sentences: string[] = [];
   const constraints = [...(profile.hardConstraints ?? [])].sort((a, b) => a.localeCompare(b));
   if (constraints.length > 0) {
+    const words = constraints.map((id) => constraintWordsOf(id));
     sentences.push(
       `Before any of that it throws out every car the hard rule${constraints.length === 1 ? '' : 's'} ` +
-        `${constraints.map((id) => `\`${id}\``).join(' and ')} rule${constraints.length === 1 ? 's' : ''} ` +
+        `${words.map((w) => `\u201c${w.name}\u201d`).join(' and ')} rule${constraints.length === 1 ? 's' : ''} ` +
         'out — a filter, so no weight can buy past it.',
     );
+    // What the rule *does*, which is the half the card never carried (#147). One sentence each, so
+    // a second constraint reads as a second rule rather than as a longer first one.
+    for (const w of words) {
+      sentences.push(`${w.name.charAt(0).toUpperCase()}${w.name.slice(1)}: ${w.effect}.`);
+    }
   }
   const auction = profile.auction;
   if (auction !== undefined) {

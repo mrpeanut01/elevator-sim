@@ -149,6 +149,34 @@ export const SANDBOX_CONTRACT_ID = 'sandbox';
 export const FREE_PLAY_CONTRACT_ID = 'free-play';
 
 /**
+ * Every contract-id **sentinel** this module ships, as data rather than as three imports.
+ *
+ * ## Why it exists
+ *
+ * A sentinel is an id `contractById` deliberately does not resolve, and each one buys a branch in
+ * `weekLabel.ts#coachWeekLines`. Those branches were swept by a **hand-written** list of four
+ * fixtures in `honesty/surfaces.ts`, so a fourth sentinel could ship with a branch nothing drove —
+ * which is a claim nobody checks, and is the whole of GitHub issue #145. Coverage of the three that
+ * exist was complete **by coincidence**, not by construction, and a coincidence is not a mechanism.
+ *
+ * The corpus now maps this record, so a sentinel added here enters the sweep on the commit that adds
+ * it. `week.test.ts` closes the other direction: it reads this file from disk and requires this
+ * record and the `export const …_CONTRACT_ID` declarations to be the same set, so a sentinel that is
+ * declared and *not* registered fails rather than quietly skipping the sweep.
+ *
+ * **The keys are the corpus's case names**, which is why they are words rather than the constants'
+ * own spelling: they land in a `field` a reader greps for when a violation names one.
+ *
+ * `FIRST_CONTRACT_ID` is **not** here and must not be: it resolves, so it is a scenario rather than
+ * a sentinel, and the corpus seeds it separately as the branch that *does* resolve.
+ */
+export const WEEK_CONTRACT_SENTINELS: Readonly<Record<string, string>> = Object.freeze({
+  endless: ENDLESS_CONTRACT_ID,
+  sandbox: SANDBOX_CONTRACT_ID,
+  'free play': FREE_PLAY_CONTRACT_ID,
+});
+
+/**
  * A week with no assignment — the *endless mode* `c5` and `c8` name in their rewards.
  *
  * ## What it is, and what it deliberately is not

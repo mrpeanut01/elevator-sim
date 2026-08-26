@@ -470,8 +470,21 @@ describe('a project that simulates declares a timeout a simulation fits in', () 
  * A decision number is owed for making this a derived check rather than a fifth note.
  */
 describe('every browser-tier file names a port of its own — the trap this tier has met four times', () => {
-  /** `server: { port: <n>, ... }` as the tier actually writes it, across line breaks. */
-  const PORT = /server:\s*\{[^}]*?\bport:\s*(\d+)/su;
+  /**
+   * `server: { port: <n>, ... }` as the tier actually writes it, across line breaks — **and
+   * `preview: { … }` beside it**, which is the tier's second server kind.
+   *
+   * The `preview` arm landed with GitHub issue #281's `builtBundle.browser.test.ts`, the one file
+   * that serves the **built** `dist-web/` rather than source modules. It needs a port for exactly
+   * the same reason and collides in exactly the same way, so it is read by the same guard rather
+   * than excused from it. `startBuiltSite` takes Vite's own `preview` options as an object for this
+   * reason: a port passed as a bare number would be invisible here, and a guard that cannot see a
+   * file's port is a guard that file is exempt from.
+   *
+   * **This widens what the guard reads and weakens none of what it asserts** — every file still
+   * names a literal port, still may not say `0`, and still may not share one.
+   */
+  const PORT = /(?:server|preview):\s*\{[^}]*?\bport:\s*(\d+)/su;
 
   it('gives every file in the tier a port, and never `port: 0`', async () => {
     const tiers = browserTiers(await registeredProjects());

@@ -354,7 +354,21 @@ App** (2026-08-08): `/no/such/page` answers 404 and `__buildings.json` is served
 **A preview environment cannot reach the API**, and that is a consequence of § 3 rather than a
 defect in it: the allowlist holds exactly one origin and a preview gets a per-pull-request hostname.
 Previews are therefore good for layout and useless for accounts, the leaderboard, challenges and
-sign-in. Issue **#123** holds the decision that has not been made.
+sign-in.
+
+**The decision has been made, and this sentence said otherwise for seventeen days.**
+[§ D330](../DECISIONS.md) took it on 2026-08-09: the allowlist becomes a **membership** relation
+bounded to this Static Web App's own preview pattern, under four conditions. It is **not
+implemented** — `packages/server/src/main.ts:125-144` still throws unless
+`ELEVATOR_SIM_ALLOW_ORIGIN` equals `ELEVATOR_SIM_ORIGIN` exactly — so issue **#123** stays open for
+the implementation rather than for the decision. That distinction is the whole of
+[`RISKS.md`](../RISKS.md) R42: a ruling with no consumer, beside prose still telling the reader the
+question is open.
+
+One thing has moved under it and narrows the blast radius rather than the argument: since
+[§ D335](../DECISIONS.md) the page opens on Everyday Mode, which reads no API at all — the only
+reader of the API meta tag in `packages/viz` is `dev/main.ts:1119` — so a preview reviewer now
+reaches the blocked surfaces only by crossing the door to Engineer.
 
 ---
 

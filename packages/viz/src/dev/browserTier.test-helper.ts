@@ -53,6 +53,7 @@
  */
 
 import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import type { Browser, BrowserContextOptions, Page } from 'playwright-core';
 import { afterAll, afterEach, expect } from 'vitest';
@@ -70,8 +71,18 @@ export const CHROMIUM_ENV = 'ELEVATOR_SIM_CHROMIUM';
  * Where the tier looks when nothing says otherwise.
  *
  * A path from the environment that originally provisioned this tier, kept because it costs nothing
- * and documents what *provisioned* meant there. It is not a default anybody should rely on: on every
- * machine this repository has been measured on since, it does not exist, and the tier skips.
+ * and documents what *provisioned* meant there. It is not a default anybody should rely on — but
+ * **it is not dead either, and this sentence used to say it was.**
+ *
+ * It read *"on every machine this repository has been measured on since, it does not exist, and the
+ * tier skips"* until 2026-08-26, when a host arrived where it **does** exist: the tier ran from this
+ * constant with {@link CHROMIUM_ENV} unset, `dailyLoop.browser.test.ts` 6 passed in 18.81 s.
+ * `ISSUE_WORKER_LEDGER.md` W18-5 carried the same claim and is corrected with it. Both were true
+ * where they were written, which is the point — a sentence about *the environment* goes stale the
+ * same way a sentence about the product does (`RISKS.md` R38), and nothing re-derives this one.
+ *
+ * So read it as: **a fallback that works on some hosts and not others**, which is exactly why
+ * {@link HAS_BROWSER} tests the file rather than trusting the constant.
  */
 const PROVISIONED_FALLBACK =
   '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
@@ -532,4 +543,109 @@ export async function enterEverydayStage(page: Page): Promise<void> {
     undefined,
     { timeout: 120_000 },
   );
+}
+
+/* -------------------------------------------------------------------------- *
+ * The built bundle — GitHub issue #281
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What this tier may **not** conclude from a `vite dev` server, and why it is a list.
+ *
+ * Every other file in this tier drives `createServer` — Vite's dev server, serving modules from
+ * source. **The artifact players load is `dist-web/`**, produced by `npm run build:web` and served
+ * as static files. They are not the same thing, and a defect has already lived in the difference:
+ * the Everyday shell did not reset scroll on navigation, and at `375×667` the built bundle keeps
+ * the offset while the dev server clamps it to `0`. Two cases were written to pin the fix and
+ * **both had to be deleted for asserting nothing** — removing either half of `shell.ts#go`'s reset
+ * left the whole tier green.
+ *
+ * The cause is `dev/dom.ts#reconcile`: it drops every child before inserting, so `scrollHeight`
+ * collapses while the container is empty and the browser clamps `scrollTop` on the way through.
+ * That clamp depends on the incoming screen being **shorter than the offset**, and the two
+ * artifacts lay out differently enough for it to flip.
+ *
+ * So a claim in any of these four families is a claim about the *dev server* unless it is driven
+ * through {@link startBuiltSite}:
+ *
+ * 1. **Layout** — where a thing sits, and what is above the fold.
+ * 2. **Overflow** — which element scrolls, and by how much.
+ * 3. **Geometry** — measured boxes, and anything derived from `getBoundingClientRect`.
+ * 4. **Scroll state carried across a navigation**, which is the family the known defect is in.
+ *
+ * This is exported rather than written in prose because `builtBundle.browser.test.ts` names it in
+ * the sentence a reader meets, and a list nothing imports is a list nobody re-reads.
+ * `RISKS.md` **R26** is the class: a suite built entirely from fixtures cannot tell *the mechanism
+ * is correct* from *the mechanism is reached* — and this is R26 one level up, a whole **build**
+ * standing in for the shipped one.
+ */
+export const BUILT_ARTIFACT_CLAIMS: readonly string[] = Object.freeze([
+  'layout — where a thing sits, and what is above the fold',
+  'overflow — which element scrolls, and by how much',
+  'geometry — measured boxes, and anything derived from getBoundingClientRect',
+  'scroll state carried across a navigation',
+]);
+
+/** A served built bundle, and the way to stop serving it. */
+export interface BuiltSite {
+  readonly origin: string;
+  close(): Promise<void>;
+}
+
+/**
+ * Build `dist-web/` and serve it, the way the deploy serves it.
+ *
+ * ## The cost, and why it is per file rather than per case
+ *
+ * A build is seconds, not milliseconds, so **a build per case is not viable** and this is called
+ * once from a file's `beforeAll`. The build is Vite's own `build()` against the same
+ * `vite.config.ts` the deploy uses, so `outDir`, `copyPublicDir: false` and the manifest plugin
+ * that emits `data/` file by file all apply — which is what makes the served tree the shipped one
+ * rather than an approximation of it.
+ *
+ * `preview()` rather than a hand-rolled static server for the same reason: it is the server Vite
+ * ships for exactly this, so its SPA fallback and MIME handling are the deploy's rather than this
+ * file's guesses.
+ *
+ * ## Two things this deliberately does not do
+ *
+ * It does **not** memoize across files. Vitest isolates each file's module registry, so a
+ * module-scope cache would not be shared anyway, and a cache keyed on disk would make one file's
+ * pass depend on another file having run — which is the kind of order dependence this tier already
+ * refuses elsewhere.
+ *
+ * And it takes **Vite's own `preview` options** rather than a bare number, because
+ * `browserTier.test.ts` derives every tier file's port **from its source text** and requires them
+ * to be distinct. A port chosen here, or passed as a bare argument, would be invisible to that
+ * guard — so the calling file writes `preview: { port: NNNN }` and the guard reads it there, the
+ * same way it reads `server: { port: NNNN }` from every dev-server file in this tier.
+ */
+export async function startBuiltSite(options: {
+  readonly preview: { readonly port: number; readonly strictPort?: boolean };
+}): Promise<BuiltSite> {
+  const { build, preview } = await import('vite');
+  const configFile = fileURLToPath(new URL('../../vite.config.ts', import.meta.url));
+  const root = fileURLToPath(new URL('../..', import.meta.url));
+
+  await build({ configFile, root, logLevel: 'error' });
+
+  const server = await preview({
+    configFile,
+    root,
+    // `strictPort: false` by default for the reason every dev-server file in this tier carries it:
+    // files in one project run concurrently, and a busy port should move rather than fail the case.
+    preview: { strictPort: false, ...options.preview },
+  });
+
+  const origin = (server.resolvedUrls?.local[0] ?? '').replace(/\/$/u, '');
+  if (origin === '') throw new Error('the preview server did not report a URL');
+
+  return {
+    origin,
+    close: async (): Promise<void> => {
+      await new Promise<void>((resolve, reject) => {
+        server.httpServer.close((error) => (error === undefined ? resolve() : reject(error)));
+      });
+    },
+  };
 }

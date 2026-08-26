@@ -223,7 +223,7 @@ of these would have caused wasted or harmful work**, and three would have shippe
 | **W18-2** | `keyedPlate` hashed key+value only, so **a mode toggle never redrew** a plate whose Casual lead lives in `help` — true of `buildingPlateOf` since issue #71, meaning Casual's building-plate text has been shipping unreachable | Fixed in the #100 lane. **Worth confirming in a browser** |
 | **W18-3** | `boot.browser.test.ts`'s comment claimed the Resume row is found *"by the attribute the panel writes"*. It never was — and it must keep matching text, because `menuPanel.ts` deliberately drops the attribute from a refused row and the refused state is what that reading is about | Comment fixed in place; the code was right. CLAUDE.md's *stated mechanism goes stale* in a test file |
 | **W18-4** | ~80 more legs tests across 23 files run real simulations at vitest's default 5 s | #144 fixed the three known sites. The general static check is **not honestly buildable** — a name-level call graph gave **1 881** false positives, and even a correct one asks the wrong question, since most simulations run at module scope. The total alternative is `testTimeout` on the `viz` project, a repo-wide config decision |
-| **W18-5** | `PROVISIONED_FALLBACK` points at a path that exists on no machine this repo has been measured on | Kept, with its status stated as documentation rather than a usable default |
+| **W18-5** | `PROVISIONED_FALLBACK` points at a path that exists on no machine this repo has been measured on | Kept, with its status stated as documentation rather than a usable default. **Corrected 2026-08-26 — the claim is false on this host.** The path exists, and the tier ran from it with `ELEVATOR_SIM_CHROMIUM` unset (`dailyLoop.browser.test.ts`, 6 passed, 18.81 s). `browserTier.test-helper.ts`'s own docstring carried the same claim and is corrected with it. Both were true where written; a sentence about the *environment* goes stale exactly as a sentence about the product does |
 | **W18-6** | Two `.primary` buttons in one `.editor-actions` row, so the run verb must be located by exclusion | Left alone — giving it an id is a product change, and this was a test-repair lane |
 
 ---
@@ -286,3 +286,115 @@ Legend — **Verified**: `code` traced to file:line · `run` reproduced by a rec
 | Campaign path sets no `reportWindow` | `campaign/stageRun.ts:62-75, 110-125` | #209's live residual. **Closing it invalidates `data/scenario-goals.json`** and needs regeneration |
 | `## D63` is a duplicate heading | `DECISIONS.md:1888, 1904` | `citations.test.ts` asserts a `§ Dnnn` resolves, **not that it is unique** |
 | S5's figure has gone stale twice | `docs/10:1680-1694` | *"four of seven"* against ten shipped stages, and two named clearers have flipped. **No test derives the count across all ten** — which is why it went stale without failing anything |
+
+---
+
+# Wave D — reconciliation, 2026-08-26
+
+**Snapshot:** branch `claude/github-issue-worker-9ol0cy` at `2c7b308` (identical to `main`) ·
+**94 open issues, 0 open pull requests** · `npm install` was required before anything (this container
+arrived with no `node_modules`) · `npm run typecheck` **exit 0**.
+
+**Why this wave opened on reconciliation.** The wave-C merge says *"every known issue burned down"*
+and the open list disagreed with it **in both directions**. Establishing which of the two was wrong
+was cheaper than scheduling work against either, so nothing was scheduled until it was. Five
+investigation-only lanes ran at once — they write nothing, so they conflict on nothing.
+
+**The wave's error rate held, and it held in the direction this repository keeps recording.** Of the
+ten issues verified against their own acceptance criteria, **three were closable and seven were
+not**, every one of the seven because a criterion that was *not about writing prose* went unchecked
+while a status board recorded the lane as landed. That is [`RISKS.md`](RISKS.md) R38 landing on
+`AGENT_STATUS.md` rather than on a docstring.
+
+## Closed with evidence — eight
+
+| # | title (short) | ground | evidence |
+|---|---|---|---|
+| **198** | Define the vertical slice | **completed** | All four criteria met in `docs/25-vertical-slice.md` — § 1.1/1.2/§ 4 name the seven screens, § 2.1's C1–C12 and § 2.2's G1–G8 are the reviewer's checklist, § 3's X1–X8 carry the playtest thresholds. The *agreed* half is `CHARTER_PROGRAMME.md` § M1's 2026-08-24 gate. Its own mechanical debt discharged: `README.md:276` exists and `documentation.test.ts` is **25/25** |
+| **194** | [EPIC] Produce the GDD | **completed** | All five criteria met in `docs/32-game-design.md`. The mode count was checked against the code, not the document — 16 registry rows at `everyday/screens.ts:122-137` plus `menu` = **17**, which is what § 1.3 claims. `get_sub_issues` returns `[]`, so closing orphans nothing |
+| **215** | "ATTEMPT 4" after one run | **completed** | `shift/week.ts:395` is the sole increment and was always honest; the dishonest thing was the run beneath it. `everyday/stageScreen.ts:941` now gates on `stageEntryStartsARun` (`:1025`). `stageScreen.test.ts` **pins the call site by source in both directions** — 10 passed |
+| **156** | Endless rush has no engine | **duplicate → #220** | Scope transferred first: the arrival formula, § 20.5's hold line, the never-fall-through constraint, § 9.2's stage shape |
+| **160** | A campaign day is never filed | **duplicate → #223** | Scope transferred first: the state-model decision, the seam map, § 16 rule 14's warning |
+| **164** | Progress dies with the tab | **duplicate → #224** | Scope transferred first: the `persist/validate.ts` migration blocker, the magnitude argument, the pre-written fix site |
+| **168** | § 6.2/§ 7.4's ghost | **duplicate → #226** | Scope transferred first: the five-arm inventory, **the finding that `best` is unblocked**, `ghostPlanOf`'s one-field-swap rule, three refusal registers not one |
+| **180** | The workshop cannot save | **duplicate → #228** | Scope transferred first: § 11.1's **four** save behaviours, the existing verb set, `sendGateOf`'s total gate |
+
+**No duplicate was closed before its unique scope was on the canonical.** That transfer is the whole
+of what closing a duplicate costs here, and five of the five carried implementable detail the
+milestone-level canonical compresses away.
+
+## Verified NOT closable — seven, with the unmet criterion named
+
+| # | met / total | what is actually missing |
+|---|---|---|
+| **211** | 2 of 5 | The budget covers **one slot**, and `reportView.ts:223` says so itself. The report figure cards the issue names by example are still a flat **62-word** block (`mode/casualDay.ts:209`, drawn by `screenDom.ts:137` with no disclosure in `figureCell`) |
+| **213** | 2 of 5 | AC4's absence entry is **still shipped** at `everyday/buildNotes.ts:128`, corrected rather than removed and still triaged to **#177**. AC1 is unmet by an argued decision (`dev/reportPanel.ts:231`) that is not written into the issue |
+| **214** | 2 of 3 | The contradiction is fixed and reaches the product. **The corpus still cannot see it**: `honesty/surfaces.ts:7391` drives `railModel` with **no options**, so only the absence form renders, and `AGREED_FIGURES` declares one pair that is not this one |
+| **195** | 3 of 5 | **No reference board and no visual thesis** (both zero on grep; § 1.1 declines them), and **no minimum stage size**. AC3's stated blocker — *needs a browser* — no longer holds on this host |
+| **197** | 2 of 4 | `TEST_MATRIX.md` is **not** rewritten against the map, and both files say so in terms. § 5.2's D1–D10 are recorded, not removed; **D1 still reproduces** in `boardScreen.ts` |
+| **201** | 3 of 5 | **Zero occurrences of "dashboard"** — no dashboard, owner or cadence, and the omission is not in the document's own open-items register either. § 8 forbids a read route, so the deployment section currently rules out what AC5 needs |
+| **202** | 3 of 6 | The consent surface is **described, not designed** — which is the exact half AC5 excludes. The on-device store the criterion names appears only as somewhere the consent slot may *not* go |
+
+## The cross-cohort mapping, which was owed and did not exist
+
+[`MULTI_AGENT_PLAN.md:122`](MULTI_AGENT_PLAN.md) rules that *"the 34 pre-existing open issues …
+are not superseded by the charter tree. Several are children of it; the mapping is produced by
+verification and recorded in `ISSUE_WORKER_LEDGER.md`, not asserted here."* **That mapping did not
+exist** — this file covered only #186–#193 and #206–#218. This section is it.
+
+**Five pairs meet the duplicate bar** (closed above). **Eleven look like duplicates by title and are
+not**, and the sharpest is worth stating on its own:
+
+- **#170 ↔ #229 is now the *opposite* of a duplicate.** § D368 retitled #229 after its own premise
+  was refuted, and `buildNotes.test.ts#ABSENCE_TRIAGE` partitions the six `SETTINGS_ABSENCES` rows
+  across **four** owners: `Sound` → **#258**, `Units` → **#170**, `Default speed` → **#229**,
+  `Clear saved progress` → **#229**, `Post runs to the board` → **#161**, `Sign out` → **#221**.
+  The two share **no row**. Closing either against the other would silently drop the Units
+  conversion, which `ENGINE_CONTRACT.md` § 13 requires to *convert, not relabel* — a correctness
+  bite, since this repository keeps imperial values only in reference data with the unit in the
+  identifier. `docs/29` § 8 already ruled *"Do not close #170 outright. Half of it is live work."*
+- **#161 ↔ #221** — two owners for one component in `ABSENCE_TRIAGE`, which is the register's own
+  statement that they are not one issue. #161 holds a **contract breach needing a server-side
+  decision**: § 12.1 says one board a day, `server/challenge/schedule.ts` ships **seven**.
+- **#169 ↔ #234** — shared component, **zero shared acceptance criteria**. #169 is unbuilt features;
+  #234 is balance of built content.
+- Also related-not-duplicate: #162↔#227, #172↔#230↔#166, #179↔#248, #158↔#232, #165↔#238,
+  #174↔#235, #177↔#233, #178 § 3↔#225, #182↔#161.
+
+## Two structural findings that outrank the individual verdicts
+
+**No formal epic/sub-issue link exists anywhere in the charter cohort.** `get_sub_issues` returns
+empty for all four epics (#219, #231, #241, #247) and every issue in both cohorts reports
+`has_parent: false`. The hierarchy is prose plus milestone membership only. **Mechanising it is a
+better disposition than closing the cohort-G issues**, and it is what `MULTI_AGENT_PLAN.md` had in
+mind by *"several are children of it"*.
+
+**#179 is a hard blocker for M3's #221 and its restatement #248 is filed in M6**, three milestones
+later. A blocker filed behind the thing it blocks.
+
+## The M2 gate box that is met and unticked
+
+`CHARTER_PROGRAMME.md` § M2 leaves *"T1 reads `passing` in `TEST_MATRIX.md`"* **unticked**, while
+`TEST_MATRIX.md` reads `passing` and [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md)
+§ Z records the watched 6/6 run behind it. Not ticked in this wave either — the matrix's figure was
+measured at `000852a` and forty-five commits have landed since, so it is being **re-run** rather than
+inherited. A gate ticked from a stale row is the thing the gate exists to prevent.
+
+
+## Wave D, second half — four issues worked, two closed, two refused
+
+| # | outcome | ground |
+|---|---|---|
+| **147** | **closed** | The card reads `core`'s `HARD_CONSTRAINT_WORDS`, keyed by id so a constraint without words is a compile error there rather than a silent default here. Fallback lives with the surface by that record's own instruction and is **driven** — `hardConstraints` is `readonly string[]`, so `data/` can carry an id the union has never seen |
+| **145** | **closed** | `WEEK_CONTRACT_SENTINELS` is mapped by the corpus; `week.test.ts` reads `week.ts` from disk and requires both directions, with a fourth case guarding the regex so two empty sets cannot agree. The **real `SANDBOX_CONTRACT_ID` had never been swept** — the fixture used `'no-such-contract'` |
+| **281** | **open — 2 of 5** | AC1 and AC2 met; **AC3 not met and the file says so.** Deleting the reset leaves it 3 of 3 green, because `reconcile`'s clamp covers it locally. The deployed build is unreachable (`curl` → `000`) |
+| **173** | **open — premise partly refuted** | `CHARTER_PROGRAMME.md:50` **is** a reservation point and was correct (D374 → D375). It was unguarded, not absent. Now derived, with D63's duplicate registered and the owed count ratcheted at 64 |
+
+**The rule this half kept proving.** Four figures were corrected by measurement before they shipped:
+a screen overflow read as `0` that is `8 772`; a margin written as `73` that is `221`; a duplicate
+count of `2` that is `1`; and a ratchet that read `69` because it counted its own prose. Three of
+the four would have read as tidier findings than the truth.
+
+**What the wave did not do.** It did not close #281 on two of five criteria, did not renumber D63 to
+make a duplicate go away, did not rewrite a dated findings figure to make two registers agree, and
+did not report a suite run taken over a tree that changed underneath it.

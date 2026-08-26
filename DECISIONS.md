@@ -4404,6 +4404,35 @@ The prohibition on an energy *score* in `docs/10` predates the metric and was or
 *"the quantity does not exist"*. That justification is now false and the prohibition is **stronger**,
 not weaker: it survives on the measurement rather than on the absence of one.
 
+### What rule 2 does **not** forbid — an independent bar is permitted (added 2026-08-26)
+
+**Four lanes have read the four rules above as *energy may not be scored at all*, and that reading is
+wrong.** [§ D367](#d367) rules on it: a **single, independent, unweighted** energy goal — one the
+player passes or fails on its own, never combined with another and never used to order two arms — is
+**permitted, and is not an aggregation under rule 2**.
+
+The reason it survives rule 2 is the reason rule 3 exists. Rule 2 bars *folding* energy into a
+figure that also carries wait, because the dispatcher that drives least carries fewest people and a
+combined number hides that. An independent bar folds nothing. And when it is specified against
+**`workPerServedLegKJ`**, the people served are in the denominator — so the configuration that saves
+energy by serving fewer people **fails the bar rather than winning it**, which is the counterweight
+rule 3 was written to supply. That is why the same sentence forbids a *weighted* energy term and
+permits this.
+
+What stays forbidden is unchanged and is the whole of rules 1, 2 and 4: no weighting, no combined
+score, no letter or star, and **no ordering two arms on energy**.
+
+**This clause is here rather than only in § D367 on purpose.** GitHub issue #275 asked for it in
+these words, because a reader who lands on this entry looking for the rule must find the exception
+in the same place as the rule — four of them landed here and left with the wrong answer. § D367
+carries the ruling and its conditions; this paragraph exists so that nobody has to already know it
+is there.
+
+**Still owed, and deliberately not done here:** the goal itself, its threshold derived from measured
+runs, and `CLAUDE.md`'s *"Energy is an axis, never a score"* paragraph, which § D367 defers to the
+same commit as the goal. Until the goal ships, `CLAUDE.md`'s paragraph is correct as written — there
+is no energy score, because there is no energy goal.
+
 ---
 
 ## D107 — `REPLICATION_METRICS` is **23**, and four places in this file still say nineteen

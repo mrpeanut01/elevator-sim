@@ -11,6 +11,9 @@
  * like bugs and neither is.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { CONTRACTS } from './contracts.js';
@@ -21,6 +24,7 @@ import {
   HISTORY_DAYS,
   PARKED_WEEKS_MAX,
   SANDBOX_CONTRACT_ID,
+  WEEK_CONTRACT_SENTINELS,
   closeDay,
   nextDay,
   openWeek,
@@ -593,5 +597,60 @@ describe('re-closing the same day replays it rather than adding to it', () => {
     // Parking mid-run before the day ever filed: the re-simulated day is the day's first close.
     const week = closeDay(openWeek('c1'), cleanDay(1), true);
     expect(week.attempt).toBe(1);
+  });
+});
+
+describe('the sentinel registry is the sweep, in both directions (issue #145)', () => {
+  /*
+   * `honesty/surfaces.ts` maps `WEEK_CONTRACT_SENTINELS` to build its `coachWeekLines` cases, so
+   * anything in that record is swept. This closes the other direction, which is the half that makes
+   * the ask's wording true: a sentinel **declared and not registered** would ship a `weekLabel.ts`
+   * branch nothing drives, and before this the corpus covered all four branches by coincidence.
+   *
+   * Read from **disk** rather than from the module's exports, on `deadCode.test.ts`'s own ground:
+   * a set derived from the source text sees a declaration the moment it is written, where a set
+   * derived from imports can only see what somebody remembered to import.
+   */
+  const source = readFileSync(fileURLToPath(new URL('./week.ts', import.meta.url)), 'utf8');
+  const declared: readonly { readonly name: string; readonly value: string }[] = [
+    ...source.matchAll(/^export const (\w+_CONTRACT_ID) = '([^']+)';/gmu),
+  ].map((match) => ({ name: match[1] ?? '', value: match[2] ?? '' }));
+
+  it('finds the declarations it is about, so the match cannot pass by matching nothing', () => {
+    // The guard `deadCode.test.ts` learned the hard way: a regex that stops matching turns a
+    // both-directions assertion into two empty sets agreeing with each other.
+    expect(declared.length).toBeGreaterThanOrEqual(3);
+    expect(declared.map((entry) => entry.name)).toContain('ENDLESS_CONTRACT_ID');
+  });
+
+  it('registers every declared sentinel, so one cannot ship a branch the corpus never drives', () => {
+    const registered = new Set(Object.values(WEEK_CONTRACT_SENTINELS));
+    const missing = declared
+      .filter((entry) => !registered.has(entry.value))
+      .map((entry) => entry.name);
+    expect(
+      missing,
+      'declared in week.ts and absent from WEEK_CONTRACT_SENTINELS — add it there, or the honesty ' +
+        'corpus will not sweep the weekLabel.ts branch it buys (GitHub issue #145)',
+    ).toEqual([]);
+  });
+
+  it('registers nothing that is not declared, so a deleted sentinel cannot linger', () => {
+    const declaredValues = new Set(declared.map((entry) => entry.value));
+    const stale = Object.entries(WEEK_CONTRACT_SENTINELS).filter(
+      ([, value]) => !declaredValues.has(value),
+    );
+    expect(stale, 'registered in WEEK_CONTRACT_SENTINELS and declared nowhere in week.ts').toEqual(
+      [],
+    );
+  });
+
+  it('registers no id a contract answers to — a sentinel that resolves is a scenario', () => {
+    for (const [name, id] of Object.entries(WEEK_CONTRACT_SENTINELS)) {
+      expect(
+        CONTRACTS.some((contract) => contract.id === id),
+        `${name} (${id}) resolves to a shipped contract, so it reaches coachWeekLines' first branch`,
+      ).toBe(false);
+    }
   });
 });

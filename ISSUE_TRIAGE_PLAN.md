@@ -341,3 +341,101 @@ the loop with no new features."* V-112 is verifying whether that is actually sma
   criterion. Where a fix touches a published number, it is re-pinned to the run that produced it.
 - Every new control added carries the standing-requirement test: move it, re-run the seed, assert
   the legs differ.
+
+---
+
+# Wave D snapshot — 2026-08-26
+
+**This section is appended, not a replacement.** Everything above describes the 2026-08-07 backlog of
+29 issues (#90–#119) and is left standing: [`RISKS.md`](RISKS.md) **R37** exists because four
+project-level registers were replaced by wave-scoped boards in one commit and nobody noticed. The
+§ 2 rule above — *where a wave-C issue covers the same ground as a wave-A or wave-B issue, the
+wave-C issue is canonical* — is still sound and is applied again below, on a different pair of
+cohorts.
+
+**Open issues: 83** (was 94 at the wave's open) · **Open pull requests: 1** (this wave's) ·
+`main` at `2c7b308` · `tsc -b` **exit 0**.
+
+## 1. The one thing to read first
+
+**The backlog's headline defect is no longer what an issue says; it is what a status board says about
+an issue.** Of ten issues verified against their own acceptance criteria, **three were closable and
+seven were not** — and every one of the seven had a lane recorded as *landed* in
+[`AGENT_STATUS.md`](AGENT_STATUS.md).
+
+The pattern is uniform enough to be a rule: **the criteria that got met were the ones about writing
+prose, and the criteria that went unchecked were the ones about anything else.** #201's document is
+excellent and contains no occurrence of the word *dashboard*. #197's flow maps are complete and
+`TEST_MATRIX.md` was never rewritten against them, which both files state in terms. #202's posture
+lists what the consent question owes and drafts no copy — *described, not designed*, which is the
+exact half its own criterion excludes.
+
+**So the first question for any issue in this backlog is not *is it done?* but *which of its criteria
+was nobody going to check?***
+
+## 2. The cohorts, and which is canonical
+
+| cohort | issues | filed | character |
+|---|---|---|---|
+| **legacy** | #93, #123, #130, #145, #146, #147, #149 | 2026-08-07/09 | pre-charter; instrumented, and now up to thirteen waves stale |
+| **gap** | #157–#182 | 2026-08-13 | implementable specifications with file:line and formulae |
+| **charter** | #195–#252 | 2026-08-24 | milestone-shaped (M0–M6), acceptance-criteria-led, epic-grouped |
+
+**The rule that applied to waves A/B/C does not transfer here, and assuming it would have been the
+mistake.** The charter cohort is *later* but is **not** automatically canonical: it is
+milestone-shaped, and the gap cohort carries the implementable detail. Five pairs were true
+duplicates and the charter issue was canonical in all five — but only because a machine-checked
+register (`buildNotes.test.ts#ABSENCE_TRIAGE`, § D370) independently named it as the owner, not
+because of recency. In every one of the five the gap issue carried scope the charter issue
+compressed away, and **the transfer was the whole of the work**.
+
+**Eleven pairs look like duplicates by title and are not.** The sharpest — **#170 ↔ #229** — is now
+the *opposite* of a duplicate: § D368 retitled #229 after its premise was refuted, and the register
+partitions the six Settings rows across **four** owners, so the two share no row.
+
+## 3. The current clusters
+
+**Closed this wave (12):** #194, #198, #215 · #254, #255, #257, #279 · and five duplicates —
+#156→#220, #160→#223, #164→#224, #168→#226, #180→#228.
+
+**Filed this wave (1):** #286, the three stale five-rung-ladder sites #257's fix left behind, one of
+them a player-facing string.
+
+**Blocked on a tester, not on a lane.** #208 AC4, #210 AC5, #211's fifth criterion, #218's recorded
+sessions, and two M2 exit gates. [§ D349](DECISIONS.md) splits M2's exit for this reason and **no
+agent lane can close any of them** — #211 in particular is uncloseable by any lane as currently
+written, and splitting its tester gate out would let the other four land.
+
+**Blocked on a decision that exists and was never built** — the new class, [`RISKS.md`](RISKS.md)
+**R42**: #123 and #130 (both § D330), and #275's AC2 (§ D367). For #123 and #130 this is the whole
+of the remaining work; the decision half of each acceptance is already met.
+
+**Blocked on a server:** #161, #179, #221, #222, #248, and the `world` and *Race this run* arms of
+#226. **#179 is a hard blocker for M3's #221 and its restatement #248 sits in M6** — a blocker filed
+three milestones behind the thing it blocks, which is the first scheduling hazard to fix.
+
+**Ready to schedule, no blocker:** #281 (the browser tier drives `vite dev`, not `dist-web/`), #145
+(one derivation), #147 (one function reading an export that already exists), #286, #173's deriving
+test.
+
+## 4. What the next batch should be, and why it is safe
+
+1. **#281.** Best value in the backlog. It is P1, fully specified, and its premise was verified by a
+   defect that reproduces on one artifact and not the other. It also makes every other browser-tier
+   claim in this repository mean more.
+2. **#147 and #145 together.** Both are single-derivation fixes in different files, so they
+   parallelize; both close a *stale-refusal* or *unswept-state* class this repository tracks.
+3. **#173's deriving test, before anything else that writes a `DECISIONS.md` entry.** The count went
+   32 → 38 → **64** and grew ~68 % during a wave whose merge says every known issue burned down. A
+   bookkeeping backlog with no instrument is the one thing guaranteed to be worse next wave.
+
+**Not in this batch, and the order is forced:** anything writing `everyday/` beyond one lane at a
+time, and anything touching `honesty/surfaces.ts`, which is still the tightest serialization hazard
+in the tree — an adapter *is* a surface, so there is no interface to lock first.
+
+## 5. Exit criteria for this batch
+
+Every issue reaches one of: closed with evidence, closed as duplicate **with its unique scope
+transferred first**, or open with the unmet criterion named. **A criterion is never narrowed to make
+an issue closable** — where one is unmeetable as written (#213's AC1, #206's AC4), that is recorded
+on the issue as a criterion needing amendment, and the issue stays open until a human amends it.

@@ -41,7 +41,36 @@
  * code identifier. `honesty/properties.ts` measures it mechanically on every case of every run, so
  * this is a rule with an instrument rather than a convention. It applies here **especially**: this
  * panel is the one surface where all six registers are read at once, so a single lapse is on
- * screen beside twenty-six sentences that got it right.
+ * screen beside every other sentence that got it right. (That count was written as a literal here
+ * and is now derived, because it was measured wrong once — the census said twenty-six and there
+ * are twenty-seven, § D370 — and a file whose subject is registers going stale is the last place
+ * to write a number nothing re-derives.)
+ *
+ * ## The register is a queue, not a display
+ *
+ * [§ D370](../../../../DECISIONS.md) rules that every entry in all six registers **names the one
+ * open issue that owns it**. The rule exists because § 20.12 — *a toggle that toggles nothing is a
+ * lie in a settings panel* — offers two ways out, *build the seam* or *do not draw the row*, and
+ * only the second is free: it satisfies the rule permanently, at no cost, and nothing ever returns
+ * to it. Twenty-seven entries stood at zero issues between them when that was measured, beside two
+ * neighbouring registers that are empty precisely because something made someone empty them.
+ *
+ * **The mapping lives beside the register rather than inside it, and it has to.** An issue number
+ * appended to the copy is a code identifier on a player surface, which is the criterion above, and
+ * it would take the M2 gate's own register off zero. So the table is
+ * `buildNotes.test.ts#ABSENCE_TRIAGE` and the player copy does not change by a character.
+ *
+ * **What fails, in each direction.** A new absence added here with no triage row fails on the
+ * commit that adds it — so an entry cannot enter as a permanent refusal. And a triage row whose
+ * entry has gone fails too, which is § D227's direction that bites *after* a lane lands: a register
+ * that keeps an absence somebody filled is decoration, and the row that pointed at it is a claim
+ * about this file that stopped being true. Two further assertions hold the counts equal both ways
+ * and scan every entry for a `#nnn`, so the mapping cannot migrate into the copy.
+ *
+ * **The count is drawn.** {@link buildNotesSummaryOf} derives it from the arrays rather than
+ * stating it, so the number a reader meets on the panel's own summary falls when an entry is built
+ * or deleted. That is the point of counting them at all — a figure nobody can move is a decoration
+ * too.
  */
 
 import { CAMPAIGN_ABSENCES } from '../campaign/career.js';

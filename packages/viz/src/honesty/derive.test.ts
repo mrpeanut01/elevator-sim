@@ -536,6 +536,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * ones, for the reason that sweep already states about the branches nothing could print.
          */
         'shift/week.ts#FREE_PLAY_CONTRACT_ID',
+        /*
+         * The registry those three ids are collected into — GitHub issue #145. It is derived for
+         * exactly the reason `FREE_PLAY_CONTRACT_ID` above it is: it holds `free-play`, whose
+         * hyphen reads as a word break, and now also **keys** that read as words (`endless`,
+         * `sandbox`, `free play`).
+         *
+         * Neither half is prose. The **values** are the same three contract ids already excused
+         * above, and the **keys** are case names for `honesty/surfaces.ts`' own sweep — they land
+         * in a seed's `field`, which is the string a reader greps when a violation names one, and
+         * they reach no screen. The words a player actually reads about a week carrying any of
+         * these are `coachWeekLines`' four branches, and this record is the thing that now makes
+         * every one of them driven: the corpus maps it, so a fourth sentinel is swept on the commit
+         * that declares it, and `week.test.ts` fails if one is declared without being registered.
+         *
+         * So this entry excuses the register that closed the gap, which is worth stating plainly
+         * rather than leaving to look like the gap moving one file over.
+         */
+        'shift/week.ts#WEEK_CONTRACT_SENTINELS',
       ],
     },
     {

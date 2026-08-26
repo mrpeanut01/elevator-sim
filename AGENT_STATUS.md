@@ -15,6 +15,154 @@
 the same day. #206 was fast-tracked ahead of milestone order on the charter's own § 7 grounds — a
 defect fix needs no specification — and landed before M2 opened.
 
+### Active — M2 · wave D, opened 2026-08-26 on a third host
+
+**The host changed again, and it changes what this wave can measure.** This container arrived with
+**no `node_modules` at all** — `npm run typecheck` failed on *"Cannot find module 'vitest'"* and
+*"Cannot find type definition file for 'node'"*, which reads exactly like a broken tree and is not
+one. `npm install` fixed it in 8 s and `tsc -b` is clean. **Record this before anything else:** a
+lane that reads a fresh clone's red typecheck as a repository defect will file a phantom issue. It is
+Node **22.22.2** against a package declaring `>= 26`, so `npm install` warns `EBADENGINE` and
+proceeds.
+
+**The browser tier runs here, and it runs from the fallback rather than the variable.**
+`browserTier.test-helper.ts#PROVISIONED_FALLBACK` —
+`/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell` — **exists on this
+machine**, so `HAS_BROWSER` is true with `ELEVATOR_SIM_CHROMIUM` unset. That contradicts
+[`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md) W18-5, which says the path *"exists on no machine
+this repo has been measured on"*, and the helper's own docstring, which says *"on every machine this
+repository has been measured on since, it does not exist, and the tier skips."* Both were true when
+written and are false here. It is [`RISKS.md`](RISKS.md) R38 landing on a sentence about the
+environment rather than about the product — and the correction is *this host has one*, not *the
+sentence was wrong*.
+
+**This wave opened on reconciliation rather than on new work, because the backlog said to.** 94
+issues are open. No pull request is open. `main` is at `2c7b308` and this branch is identical to it.
+The wave-C merge says *"every known issue burned down"*, and the open list disagrees with it in both
+directions — which is the thing to establish before scheduling anything.
+
+| Lane | Task | Issues | Status |
+|---|---|---|---|
+| R1 | Are the four landed M2 fixes closable against their own criteria? | #211, #213, #214, #215 | dispatched |
+| R2 | Are the six M1 specification issues closable? | #194, #195, #197, #198, #201, #202 | dispatched |
+| R3 | Duplicate adjudication across the two cohorts | #156–#182 ↔ #219–#252 | dispatched |
+| R4 | Did wave B/C's work land for the issues it named? | #170, #173, #229, #234, #254, #255, #257, #258, #275, #279 | dispatched |
+| R5 | Is the pre-charter backlog still true after thirteen waves? | #93, #123, #130, #145, #146, #147, #149 | **reported** |
+
+**All five reported. Of seventeen issues verified against their own acceptance criteria, five were
+closable and twelve were not** — and the twelve fail in one shape. **The criteria that got met were
+the ones about writing prose; the criteria that went unchecked were the ones about anything else.**
+#201's telemetry document is excellent and contains **no occurrence of the word *dashboard***.
+#197's flow maps are complete and `TEST_MATRIX.md` was never rewritten against them — which *both*
+files state in terms. #202's posture lists what the consent question owes and drafts no copy, which
+is *described, not designed*, the exact half its own criterion excludes. Every one of the twelve had
+a lane recorded as **landed** in this file.
+
+**Twelve issues closed, one filed, seventeen dispositioned; 94 open → 83.**
+
+| closed | ground |
+|---|---|
+| #194, #198, #215 | completed, every criterion re-verified against the code |
+| #254, #255, #257, #279 | completed; #279 needed one docstring the lane that built its mechanism never wrote |
+| #156, #160, #164, #168, #180 | duplicate — **each after its unique scope was transferred to the canonical**, which was the whole of the work |
+
+**No duplicate was closed on a title.** Five pairs met the bar and **eleven did not**, the sharpest
+being **#170 ↔ #229**, which is now the *opposite* of a duplicate: § D368 retitled #229 after its
+premise was refuted, and `buildNotes.test.ts#ABSENCE_TRIAGE` partitions the six Settings rows across
+**four** owners, so the two share no row at all. Closing either against the other would have
+silently dropped the Units conversion that `ENGINE_CONTRACT.md` § 13 requires to *convert, not
+relabel*.
+
+**The cross-cohort mapping [`MULTI_AGENT_PLAN.md:122`](MULTI_AGENT_PLAN.md) promised did not
+exist**, and now does — it is in [`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md), which that file
+names as its home and which covered only #186–#193 and #206–#218.
+
+**A new risk class, and it is not R1.** [`RISKS.md`](RISKS.md) **R42** — *a ruling with no consumer*.
+R1 is a behaviour with no caller; this fails one level earlier and **no dead-code audit can see it,
+because a decision has no exports to scan**. Three realised instances: § D330 answered #123 and #130
+on 2026-08-09 and neither is built, and § D367 ruled on the energy bar while § D106 — the entry a
+reader lands on — carried no pointer to it, which is why four lanes read the rule and got the wrong
+answer. The compounding half is what earned it a row: `docs/16:357` said *"Issue #123 holds the
+decision that has not been made"* and the issue's own comment said *"No decision is recorded"*, so a
+reader who checked was told **twice** that an answer which existed did not.
+
+**Three lanes refuted something I told them, which is the process working rather than a lane going
+off-brief.** R5 was told `internal-notation` might now bar #146's string; it ran the property's own
+five regexes and **refuted it twice over** — the string matches none of them, and the Engineer editor
+is outside `PLAYER_FACING_SURFACES` anyway. R1 was told the browser tier runs on this host; it hit
+playwright's *default* resolution path (revision **1234**) rather than the repo's
+`PROVISIONED_FALLBACK` (**1194**), so the tier's own launch works and a default-path launch does not.
+And R4 found that **#255's headline evidence was wrong about the population** — `20260730` is a
+master seed, not a run the campaign ever makes.
+
+**One measurement was refused rather than taken, and the refusal is the right one.** R5 declined to
+re-measure #149's *"8 tests over 5 s, slowest 39.2 s"* because this host was running the full suite
+concurrently at load 5.7–6.9 on 4 cores. A duration distribution taken under that load, published as
+a refresh of a figure taken on another tree, is the per-branch-figure defect
+[`CLAUDE.md`](CLAUDE.md) records five times.
+
+**Every lane is investigation-only and forbidden to write.** That is why five run at once: they share
+every file and conflict on none. The rule that serializes *code* lanes is untouched.
+
+### Wave D, second half — four issues advanced with code
+
+Reconciliation closed twelve. These four were then **worked** rather than triaged, and two of them
+are refusals that are worth more than the code.
+
+| issue | outcome | the thing to read |
+|---|---|---|
+| **#147** | **closed** | The rail card says what a hard constraint *does*, in `core`'s words. The dense blurb keeps the id **deliberately** — engineer audience, greppable against `data/` — with the consequence recorded: it would trip `internal-notation` on a player surface |
+| **#145** | **closed** | Coverage of `coachWeekLines`' four branches was complete **by coincidence**. `WEEK_CONTRACT_SENTINELS` is now mapped by the corpus and `week.test.ts` reads `week.ts` **from disk** to require both directions |
+| **#281** | **open, 2 of 5** | The tier gained a case that drives the built bundle — and **it does not bite** |
+| **#173** | **open, premise partly refuted** | The reservation mechanism **exists** (`CHARTER_PROGRAMME.md:50`) and was unguarded. It is now derived |
+
+**#281 is the refusal to read first.** Its third criterion asks for a case that fails when either
+half of `shell.ts#go`'s reset is removed. Mutation-tested: deleting the `.everyday-screen` reset
+leaves the new file **3 of 3 green** — the same weakness that got two earlier cases deleted.
+Measured at `375×667` on the locally-served bundle: the document does not scroll at all,
+`.everyday-screen` overflows by **335 px**, and the offset after tapping a tile with the reset
+removed is **0**. `reconcile`'s incidental clamp covers it here. **The defect was measured on the
+*deployed* build, and that build answers `curl` with status `000` from this container** — which is
+issue #123's gap, arriving as a blocker on the issue about a different gap. So the case is a
+regression guard on the right *kind* of artifact and is labelled as exactly that, in its own
+docstring, before a reader reaches the assertions.
+
+**Four measurements were corrected mid-flight, and each would have shipped a wrong claim.**
+
+1. A probe read the fixit screen's overflow as **0** — it is **8 772**. The probe measured before
+   layout settled, and the 0 would have supported a tidier and wrong conclusion.
+2. A margin in `rightRail.ts`'s docstring was written as **73** from memory; measured, it is **221**.
+3. A heading pattern of `^## D(\d+)` reports **two** duplicate decision numbers where the tree has
+   **one** — `## D125 preface —` is a preface *to* D125, not a second D125.
+4. **The #173 ratchet counted itself.** The test states the phrase it counts in its pattern, its
+   prose and its failure message, so the first run read **69** against a tree of **64**, and all
+   five extras were its own words. Excluded by path rather than by a cleverer pattern, because one
+   contrived to miss its own text would miss a real site written the same way.
+
+**One guard was widened rather than worked around.** `browserTier.test.ts` derives every tier file's
+port from source text; a preview server needs one for the same reason, so `startBuiltSite` takes
+Vite's own `preview` options as an object and the guard reads `preview: { port }` beside
+`server: { port }`. Every property it asserts is unchanged, and pointing the new file at 5201 turns
+the collision case red naming both files.
+
+**One suite run was killed rather than reported.** The first local baseline began before the first
+commit and was reading a tree that changed underneath it. It was killed and re-run clean:
+**430 files, 8 838 passed, 11 skipped, exit 0** in 3 325 s — which corroborates CI's two green
+platform legs rather than substituting for them.
+
+**Cost of the new tier file, on a quiet machine:** cold `dist-web/` build **4 152 ms**, whole file
+**6.34 s**. It never reaches the always-on path — `viz-browser` is opted into by name and gated on
+`HAS_BROWSER`.
+
+**Two findings before any lane reported, and one of them was already fixed.** The M2 exit criterion
+*"T1 reads `passing` in `TEST_MATRIX.md`"* is **unticked in
+[`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md) § M2 while `TEST_MATRIX.md` reads `passing`**, and
+[`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § Z is the run behind it — a gate
+box left unticked over evidence that already exists. And § Z's parting finding, the stale
+`{@link closeDay}` refusal at `dailyLoop.browser.test.ts:166`, was **deliberately left for the #207
+lane and has since been fixed** — the comment now records its own staleness. Checked before
+scheduling, which is the only reason it was not done twice.
+
 ### Active — M2 · wave B, opened 2026-08-24 on a new host
 
 **PR #253 is merged.** M0, M1 and the eight landed M2 lanes are on `main` at `000852a`, and the
