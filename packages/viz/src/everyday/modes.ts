@@ -37,7 +37,19 @@ function unlessBuilt(refusal: string, ...screens: readonly EverydayScreen[]): st
  *
  * - **Today's tower** — the day the Engineer shell already runs: a seeded shift on one building
  *   with the four-goal day (Everyday slice 5) and the report. This is the mode Casual play is
- *   currently *about*, and the one the shell's stage hands off to.
+ *   currently *about*, and its tile opens § 6.1's front door — `screen: 'door'` below.
+ *
+ *   **Nothing hands off to it any more, and the retired sentence is named rather than deleted**
+ *   (GitHub issue #261). This row read *"the one the shell's stage hands off to"*, and it was true
+ *   of § D335: `stage` was then a **route** that shrank the shell to the rail, uncovered `div.shell`
+ *   and inset the whole Engineer application, so the day a player arrived in was this mode running
+ *   on the Engineer surface. § D338 retired that hand-off entirely. `everyday/stageScreen.ts` is
+ *   § 7's own stage,
+ *   a registered screen inside this loop like the other four; `screens.ts`'s `EverydayRoute` lost
+ *   its `'handoff'` arm outright, so no key can return one. What crosses to the Engineer surface is
+ *   § 3.2's footer row — `shell.ts#enterEngineer` — which is neither this tile nor this mode's
+ *   stage. `modes.test.ts` pins each of those three separately, because the sentence they replace
+ *   went stale in a docstring where two neighbouring rows had already gone stale the same way.
  * - **Campaign** — `packages/viz/src/campaign/` (judging, fail states, brief, stage runs) and
  *   `commissioning/` (budget, choices, refusals) both exist and are exercised by the Engineer
  *   shell's campaign panel. All three of § 8's Everyday screens are registered, so the tile opens;

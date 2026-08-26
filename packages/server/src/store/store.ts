@@ -56,7 +56,7 @@ import { randomUUID } from 'node:crypto';
 import type { IssuedChallenge } from '../challenge/schedule.js';
 import type { ChallengeScore, SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
-import type { Sql } from './sql.js';
+import type { Sql, SqlResult } from './sql.js';
 
 /* -------------------------------------------------------------------------- *
  * Rows
@@ -206,6 +206,21 @@ function isForeignKeyViolation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23503';
 }
 
+/**
+ * Whether a driver error is PostgreSQL's uniqueness violation.
+ *
+ * `23505`, for {@link isForeignKeyViolation}'s reason and with the same rule about what may be read
+ * from it: **the SQLSTATE, never the constraint name.** `users` carries two unique keys and only one
+ * of them is the address; `entries` carries a primary key and a natural key. Which one fired is
+ * answered by asking the database what is now taken, not by matching `users_email_key` — a name
+ * PostgreSQL generates and nothing here declares.
+ *
+ * Module-private, like its neighbour: nothing outside this file has a driver error in its hand.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505';
+}
+
 /* -------------------------------------------------------------------------- *
  * The store
  * -------------------------------------------------------------------------- */
@@ -253,6 +268,19 @@ export class Store {
    *
    * Returns a discriminated result rather than throwing, because "this address already has an
    * account" is an ordinary outcome of a registration form and not an exceptional one.
+   *
+   * **And it returns it whether the loser lost by a second or by a microsecond** (#266). The two
+   * reads above the insert are a check-then-act against `users_email_key` and the
+   * `LOWER(display_name)` index: two requests for the same unknown address both pass them and both
+   * insert, and the loser used to throw PostgreSQL's own sentence — straight past `createPlayer`'s
+   * branch for exactly that case, whose comment reads *"Lost a race to another request for the same
+   * address: that account is the right answer"*. That branch was reachable only by the sequential
+   * path, which is the one that is not a race.
+   *
+   * **Which key fired is settled by asking the database**, per {@link isUniqueViolation}. An
+   * unexplained `23505` — neither address nor name taken — is re-thrown rather than labelled, on
+   * {@link Store.#asOwnerError}'s principle: a mapping that answers a question it did not verify is
+   * a worse failure than an unmapped one.
    */
   async createUser(input: {
     readonly email: string;
@@ -273,11 +301,18 @@ export class Store {
       displayNameChosen: input.displayNameChosen,
       createdAtMs: this.#now(),
     };
-    await this.#sql.query(
-      'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) ' +
-        'VALUES ($1, $2, $3, $4, $5)',
-      [user.id, user.email, user.displayName, user.displayNameChosen, user.createdAtMs],
-    );
+    try {
+      await this.#sql.query(
+        'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) ' +
+          'VALUES ($1, $2, $3, $4, $5)',
+        [user.id, user.email, user.displayName, user.displayNameChosen, user.createdAtMs],
+      );
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      if ((await this.userByEmail(email)) !== undefined) return { ok: false, reason: 'email-taken' };
+      if ((await this.#userByName(input.displayName)) !== undefined) return { ok: false, reason: 'name-taken' };
+      throw error;
+    }
     return { ok: true, user };
   }
 
@@ -311,6 +346,15 @@ export class Store {
    * Checked with {@link #userByName} before the write **and** guarded by the unique index behind it.
    * The check gives the caller a civil refusal; the index is what makes the guarantee true under two
    * players renaming to the same thing at once, which the check alone cannot promise.
+   *
+   * **That last sentence used to be half true, and #266 is the other half.** The index made the
+   * *data* true and handed the *caller* a raw `23505`, which `http/api.ts` could only answer with a
+   * `500` — for a condition whose word is already in this method's return type. The constraint path
+   * now returns what the pre-check returns. It is the more dangerous shape of the stale claim
+   * `DECISIONS.md` § D227 records: a sentence that describes a guarantee the code keeps by crashing.
+   *
+   * A deletion racing the rename needs nothing added: `rowCount === 0` and the re-read's `undefined`
+   * both already answer `no-such-user`, which is the write arbitrating rather than a second check.
    */
   async setDisplayName(
     id: string,
@@ -318,10 +362,21 @@ export class Store {
   ): Promise<{ readonly ok: true; readonly user: UserRow } | { readonly ok: false; readonly reason: 'name-taken' | 'no-such-user' }> {
     const clash = await this.#userByName(displayName);
     if (clash !== undefined && clash.id !== id) return { ok: false, reason: 'name-taken' };
-    const result = await this.#sql.query(
-      'UPDATE users SET display_name = $2, display_name_chosen = TRUE WHERE id = $1',
-      [id, displayName],
-    );
+    let result;
+    try {
+      result = await this.#sql.query(
+        'UPDATE users SET display_name = $2, display_name_chosen = TRUE WHERE id = $1',
+        [id, displayName],
+      );
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      // Asked rather than assumed, for `createUser`'s reason. An `UPDATE` that sets only the name
+      // can collide with one of `users`' three unique keys, but *that* is a fact about this
+      // statement rather than about the error, and the error is not going to say which.
+      const taken = await this.#userByName(displayName);
+      if (taken !== undefined && taken.id !== id) return { ok: false, reason: 'name-taken' };
+      throw error;
+    }
     if (result.rowCount === 0) return { ok: false, reason: 'no-such-user' };
     const user = await this.userById(id);
     return user === undefined ? { ok: false, reason: 'no-such-user' } : { ok: true, user };
@@ -366,13 +421,23 @@ export class Store {
    *
    * Takes the token's `jti` and never the token. The distinction is the whole point: a database that
    * held the mailed string would be a database whose backup is a pile of working account keys.
+   *
+   * **It reads nothing, and it is still a check-then-act** (#266). The read is one frame up:
+   * `requestLink` finds or creates the account and then calls this, and a deletion in that gap
+   * breaks `login_tokens_user_id_fkey`. That is why the enumeration this issue asked for is over
+   * every member that *writes* rather than over the read-then-write pairs a scan of this file can
+   * see — a pair whose halves are in two files is invisible to the narrower question.
    */
   async createLoginToken(input: LoginTokenRow): Promise<void> {
-    await this.#sql.query('INSERT INTO login_tokens (jti, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
-      input.jti,
-      input.userId,
-      input.expiresAtMs,
-    ]);
+    try {
+      await this.#sql.query('INSERT INTO login_tokens (jti, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
+        input.jti,
+        input.userId,
+        input.expiresAtMs,
+      ]);
+    } catch (error) {
+      throw await this.#asOwnerError(error, input.userId, 'createLoginToken');
+    }
   }
 
   /**
@@ -399,13 +464,26 @@ export class Store {
 
   /* ------------------------------------------------------------- sessions */
 
+  /**
+   * Open a session for an account that exists.
+   *
+   * {@link createLoginToken}'s shape, one route along and with more at stake (#266): `redeemLink`
+   * reads the account, checks the address inside the signature against it, and then writes here —
+   * and by that point the link has **already been spent**, so a deletion landing in the gap used to
+   * cost the player an unexplained `500` and the link both. Mapped, so the route answers what it
+   * already answers when the read itself comes back empty.
+   */
   async createSession(token: string, userId: string): Promise<SessionRow> {
     const row: SessionRow = { token, userId, expiresAtMs: this.#now() + SESSION_TTL_MS };
-    await this.#sql.query('INSERT INTO sessions (token, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
-      row.token,
-      row.userId,
-      row.expiresAtMs,
-    ]);
+    try {
+      await this.#sql.query('INSERT INTO sessions (token, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
+        row.token,
+        row.userId,
+        row.expiresAtMs,
+      ]);
+    } catch (error) {
+      throw await this.#asOwnerError(error, userId, 'createSession');
+    }
     return row;
   }
 
@@ -438,6 +516,23 @@ export class Store {
    * One row per (board, player, seed): re-submitting the same seed **replaces** rather than
    * appends, because a deterministic replay of the same seed is the same run and a board that
    * listed it twice would be counting a refresh as an achievement.
+   *
+   * **The database keeps that promise now, and until #266 a `SELECT` did.** The upsert conflicted on
+   * `id` — the *primary* key — while the guarantee is over `UNIQUE (config_hash, user_id, seed)`, so
+   * the replacement only happened when the pre-read found the row. Two submissions of one seed in
+   * flight together both read nothing, both mint a fresh `randomUUID`, and the second violates the
+   * natural key: a double-tapped submit answered `500` and posted nothing for the losing half.
+   *
+   * Conflicting on the natural key makes exactly one caller win and the other update. The row's id
+   * comes back from `RETURNING`, because the winner's id is the row's id and inventing one here
+   * would be reporting an id that is not in the table. The pre-read is **gone rather than guarded**:
+   * with the write arbitrating there is nothing left for it to decide, and
+   * {@link Store.consumeLoginToken} already argues that shape — *"not a `SELECT` then a `DELETE`:
+   * two statements are a check-then-act"*.
+   *
+   * The `userById` above stays, and stays a check-then-act. It is not there to decide whether to
+   * insert; it is there for `displayName`, which this table does not store. Its race is the foreign
+   * key, and that is mapped rather than closed — see {@link NoSuchUserError}.
    */
   async recordEntry(input: {
     readonly configHash: string;
@@ -447,14 +542,8 @@ export class Store {
   }): Promise<EntryRow> {
     const user = await this.userById(input.userId);
     if (user === undefined) throw new NoSuchUserError('recordEntry');
-    const found = await this.#sql.query(
-      'SELECT id FROM entries WHERE config_hash = $1 AND user_id = $2 AND seed = $3',
-      [input.configHash, input.userId, input.run.seed],
-    );
-    const existing = found.rows[0];
 
-    const row: EntryRow = {
-      id: existing === undefined ? randomUUID() : String(existing['id']),
+    const draft = {
       configHash: input.configHash,
       userId: input.userId,
       displayName: user.displayName,
@@ -464,30 +553,32 @@ export class Store {
     };
     // Guarded, because the `userById` above is a check-then-act and `deleteUser` is what made its
     // second half reachable. See {@link NoSuchUserError}.
+    let written;
     try {
-      await this.#sql.query(
+      written = await this.#sql.query(
         'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, ' +
           'pct_over_long_wait, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ' +
-          'ON CONFLICT (id) DO UPDATE SET run_json = excluded.run_json, awt_s = excluded.awt_s, ' +
-          'wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
-          'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms',
+          'ON CONFLICT (config_hash, user_id, seed) DO UPDATE SET run_json = excluded.run_json, ' +
+          'awt_s = excluded.awt_s, wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
+          'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms ' +
+          'RETURNING id',
         [
-          row.id,
-          row.configHash,
-          row.userId,
-          row.run.seed,
-          JSON.stringify(row.run),
-          row.measured.awtS,
-          row.measured.wt95S,
-          row.measured.ttdMeanS,
-          row.measured.pctOverLongWait,
-          row.submittedAtMs,
+          randomUUID(),
+          draft.configHash,
+          draft.userId,
+          draft.run.seed,
+          JSON.stringify(draft.run),
+          draft.measured.awtS,
+          draft.measured.wt95S,
+          draft.measured.ttdMeanS,
+          draft.measured.pctOverLongWait,
+          draft.submittedAtMs,
         ],
       );
     } catch (error) {
       throw await this.#asOwnerError(error, input.userId, 'recordEntry');
     }
-    return row;
+    return { id: idOf(written, 'recordEntry'), ...draft };
   }
 
   /**
@@ -587,6 +678,12 @@ export class Store {
    * metric a reader sorted by, so four readers would be looking at four different boards. Latest
    * wins instead — a challenge entry is the run a player currently stands behind, and switching
    * dispatcher is the move the whole surface exists to make possible.
+   *
+   * **Conflicting on `UNIQUE (challenge_id, data_hash, user_id)` rather than on `id`**, for
+   * {@link Store.recordEntry}'s reason and stated here rather than by reference because it is a
+   * different table with a different natural key: the upsert used to name the primary key, so
+   * *latest wins* held only when the pre-read found the row and two submissions in flight together
+   * failed the second. The row's id comes back from `RETURNING`.
    */
   async recordChallengeEntry(input: {
     readonly challengeId: string;
@@ -597,14 +694,8 @@ export class Store {
   }): Promise<ChallengeEntryRow> {
     const user = await this.userById(input.userId);
     if (user === undefined) throw new NoSuchUserError('recordChallengeEntry');
-    const found = await this.#sql.query(
-      'SELECT id FROM challenge_entries WHERE challenge_id = $1 AND data_hash = $2 AND user_id = $3',
-      [input.challengeId, input.dataHash, input.userId],
-    );
-    const existing = found.rows[0];
 
-    const row: ChallengeEntryRow = {
-      id: existing === undefined ? randomUUID() : String(existing['id']),
+    const draft = {
       challengeId: input.challengeId,
       dataHash: input.dataHash,
       userId: input.userId,
@@ -618,36 +709,39 @@ export class Store {
     // vanish under a submission, and inventing a branch for an unreachable case is the defect this
     // repository has a standing rule about. `#asOwnerError` distinguishes them by asking whether
     // the account is what went missing, rather than by reading a generated constraint name.
+    let written;
     try {
-      await this.#sql.query(
+      written = await this.#sql.query(
         'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, ' +
           'runs, legs, mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, ' +
           'per_seed_json, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ' +
-          'ON CONFLICT (id) DO UPDATE SET dispatcher_profile_id = excluded.dispatcher_profile_id, ' +
+          'ON CONFLICT (challenge_id, data_hash, user_id) DO UPDATE SET ' +
+          'dispatcher_profile_id = excluded.dispatcher_profile_id, ' +
           'runs = excluded.runs, legs = excluded.legs, mean_awt_s = excluded.mean_awt_s, ' +
           'mean_wt95_s = excluded.mean_wt95_s, mean_ttd_mean_s = excluded.mean_ttd_mean_s, ' +
           'mean_pct_over_long_wait = excluded.mean_pct_over_long_wait, ' +
-          'per_seed_json = excluded.per_seed_json, submitted_at_ms = excluded.submitted_at_ms',
+          'per_seed_json = excluded.per_seed_json, submitted_at_ms = excluded.submitted_at_ms ' +
+          'RETURNING id',
         [
-          row.id,
-          row.challengeId,
-          row.dataHash,
-          row.userId,
-          row.dispatcherProfileId,
-          row.score.runs,
-          row.score.legs,
-          row.score.meanAwtS,
-          row.score.meanWt95S,
-          row.score.meanTtdMeanS,
-          row.score.meanPctOverLongWait,
-          JSON.stringify(row.score.perSeed),
-          row.submittedAtMs,
+          randomUUID(),
+          draft.challengeId,
+          draft.dataHash,
+          draft.userId,
+          draft.dispatcherProfileId,
+          draft.score.runs,
+          draft.score.legs,
+          draft.score.meanAwtS,
+          draft.score.meanWt95S,
+          draft.score.meanTtdMeanS,
+          draft.score.meanPctOverLongWait,
+          JSON.stringify(draft.score.perSeed),
+          draft.submittedAtMs,
         ],
       );
     } catch (error) {
       throw await this.#asOwnerError(error, input.userId, 'recordChallengeEntry');
     }
-    return row;
+    return { id: idOf(written, 'recordChallengeEntry'), ...draft };
   }
 
   /**
@@ -753,6 +847,22 @@ const CHALLENGE_COLUMN_OF: Readonly<Record<BoardMetric, string>> = Object.freeze
   ttdMeanS: 'mean_ttd_mean_s',
   pctOverLongWait: 'mean_pct_over_long_wait',
 });
+
+/**
+ * The `id` an upsert's `RETURNING` clause reported, or a loud failure.
+ *
+ * `INSERT … ON CONFLICT … DO UPDATE … RETURNING id` returns exactly one row on both branches, so
+ * the absent case is unreachable — and `String(undefined)` is the string `'undefined'`, which is a
+ * row identity a caller would carry away and a board would rank. An unreachable case that degrades
+ * into plausible nonsense is worth one line to make it stop.
+ */
+function idOf(result: SqlResult, where: string): string {
+  const id = result.rows[0]?.['id'];
+  if (typeof id !== 'string') {
+    throw new Error(`${where}: the upsert returned no id. RETURNING is the row's identity here.`);
+  }
+  return id;
+}
 
 function challengeEntryOf(row: Record<string, unknown>): ChallengeEntryRow {
   return Object.freeze({

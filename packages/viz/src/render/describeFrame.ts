@@ -26,6 +26,7 @@ import type { FloorQueue, OverlayMetrics } from '../frame/overlay.js';
 import { LOAD_ALARM, LOAD_FULL } from './overlay.js';
 import { formatClock, playheadHasReachedEnd, undeliveredAt } from './canvas.js';
 import { describeQueue } from './riderQueue.js';
+import { carRestsAt } from './carRest.js';
 import type { BuildingMood } from './mood.js';
 // One home for a run's refusal, in every register — see {@link suppressionSentenceOf}.
 import { CASUAL_REFUSAL_REASON_SO_FAR } from '../mode/disclosure.js';
@@ -42,7 +43,32 @@ export interface DescribeFrameInput {
    *
    * Said in words for the reason the door phase and the overload are: the glyph is the sighted
    * half of a signal, and a fact this repository calls never-hideable cannot live only in a
-   * `<select>` that is dropped below 1280 px.
+   * `<select>` a reader has to guess a floor to reach.
+   *
+   * ## The viewport clause this paragraph used to carry — withdrawn, issue #260
+   *
+   * It said that `<select>` is *dropped below 1280 px*. **There is no such rule and there has not
+   * been one since `22a1021`**, which deleted `@media (max-width: 1279px) { .wide-only { display:
+   * none; } }` and the `.wide-only` class together. The sentence was true when it was written and
+   * outlived its mechanism by a month, which is what `CLAUDE.md` files under *a stated mechanism
+   * goes stale*. Issue #256 withdrew the same clause from `render/canvas.ts` and **registered this
+   * file and its test as still asserting it**, in `render/viewportClaims.test.ts#KNOWN_STALE`, with
+   * a check that goes red in both directions. The register entry is deleted on the commit that
+   * deletes this sentence, because a finding that has been repaired must stop being registered.
+   *
+   * **No replacement width is named here, because there is none to name.** Naming one would be the
+   * same defect in new wording. What actually governs the control is set out in full in
+   * `render/canvas.ts`'s own `unansweredCallFloorIds`, and none of it is a width: the `<select>`
+   * lives in `#panel-run`, so every other tab hides it outright, and it defaults to `none`, so the
+   * caption it captions is unwritten until the reader picks the floor. `viewportClaims.test.ts`
+   * pins the five widths the page does declare — 720, 767, 899, 1179, 1339 — and asserts that none
+   * of them reaches this element.
+   *
+   * **The conclusion is unchanged and better founded than when it was written**, which is the point
+   * of withdrawing a premise: the surviving support is *stronger* than the one that went. A width
+   * rule hid the **control** on narrow screens; a default of `none` hides the **fact** on every
+   * screen until the reader guesses which floor to ask about — which they would have to suspect in
+   * order to do. So the fact is said here, in words, for every reader.
    */
   readonly unansweredCallFloorIds?: readonly string[] | undefined;
   /**
@@ -94,6 +120,34 @@ function loadWords(loadFactor: number): string {
 
 function directionWords(direction: number): string {
   return direction === 1 ? 'moving up' : direction === -1 ? 'moving down' : 'standing';
+}
+
+/**
+ * *standing still for 4 min 10 s* — AD-S17's text alternative, and `UX.md` KB-13.
+ *
+ * The sighted half of that signal is a rectangle in the direction glyph's slot, and a rectangle is
+ * nothing at all to a screen reader. `docs/28` AD-A1 forbids a state a player must distinguish from
+ * riding on one channel; for a non-sighted reader the drawn channel is not one of them, so the
+ * duration is spelled. {@link directionWords} already said *standing*; what it could not say is
+ * *for how long*, which is the whole of what the mark carries.
+ *
+ * **Private, and beside its two siblings for their reason.** `honesty/derive.test.ts` derives the
+ * player-facing text producers from the tree and any *exported* one that is in no adapter is red.
+ * `loadWords` and `directionWords` are not exported; neither is this. The surface `SURFACE_ADAPTERS`
+ * drives is {@link describeFrame} itself, and these three are how it speaks.
+ *
+ * Minutes and seconds rather than bare seconds: the figures this reaches run from 30 s to a whole
+ * quiet hour, and *"standing still for 2 940 seconds"* is a number a listener has to convert. The
+ * unit is named either way — `docs/28` AD-A5.
+ */
+function restWords(restedS: number): string {
+  const whole = Math.floor(restedS);
+  if (whole < 60) return `standing still for ${String(whole)} s`;
+  const minutes = Math.floor(whole / 60);
+  const seconds = whole % 60;
+  return seconds === 0
+    ? `standing still for ${String(minutes)} min`
+    : `standing still for ${String(minutes)} min ${String(seconds)} s`;
 }
 
 /**
@@ -310,10 +364,21 @@ export function describeFrame(input: DescribeFrameInput): string {
     );
   }
 
+  /*
+   * AD-S17's text alternative. The drawn half of this signal is a rectangle in the direction
+   * glyph's slot, and a rectangle is nothing at all to a screen reader — the same argument that put
+   * the door phase and the overload in this paragraph, and `docs/28` AD-A1's rule that a state a
+   * player must distinguish never rides on one channel. `directionWords(0)` already said
+   * *standing*; what it could not say is *for how long*, which is the entire content of the mark
+   * and the whole of what campaign stage 1's lesson turns on.
+   */
+  const restByCar = new Map(carRestsAt(recording, frame).map((rest) => [rest.carId, rest]));
   const cars = frame.cars.slice(0, maxCars);
   for (const car of cars) {
+    const rest = restByCar.get(car.carId);
+    const motion = rest === undefined ? directionWords(car.direction) : restWords(rest.restedS);
     parts.push(
-      `Car ${car.label} at floor ${car.floorId}, ${directionWords(car.direction)}, doors ${car.doorPhase}, ` +
+      `Car ${car.label} at floor ${car.floorId}, ${motion}, doors ${car.doorPhase}, ` +
         `${String(car.occupants)} aboard, ${loadWords(car.loadFactor)} at ${car.loadFactor.toFixed(2)} of rated load.`,
     );
   }

@@ -66,7 +66,7 @@ import type {
   TrafficProfile,
 } from '@elevator-sim/core/browser';
 
-import { carsToDerate, type Incident } from './incidents.js';
+import { carsToDerate, type BankedBuilding, type CarRef, type Incident } from './incidents.js';
 import type { EventEffect, ShiftEvent, ShiftEventId } from './types.js';
 
 /**
@@ -366,74 +366,149 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
     }
   }
 
-  const outOfServiceCarIds =
-    effect.carsOutOfService > 0
-      ? carsToHold(input.building, effect.carsOutOfService, withheld, input.event.name)
-      : [];
-
   /*
-   * The derate picks its cars by the **same** total order the whole-shift hold uses, and it picks
-   * them from the same building. An event declaring both would therefore take the same car out
-   * twice — no shipped event does, and the refusal below says so rather than letting the two
-   * quietly overlap and produce a car that is held and also scheduled to return.
+   * **Which cars go out is {@link eventCarChoice}'s, and the sentences about it are this
+   * function's.** The refusals below are the ones that used to be pushed inline; the wording did not
+   * move, only the branch that decides which one applies — see that function for why a second caller
+   * needs the decision without the prose.
    */
-  const incidents: Incident[] = [];
-  if (effect.derate !== null) {
-    if (outOfServiceCarIds.length > 0) {
-      withheld.push(
-        `${input.event.name}: this event both holds a car for the whole shift and schedules one to ` +
-          'return, and the two would pick the same car. The window was not applied.',
-      );
-    } else {
-      const choice = carsToDerate(input.building, effect.derate.cars);
-      if (choice.shortfall > 0) {
-        withheld.push(
-          `${input.event.name}: asked to stand ${String(effect.derate.cars)} car(s) down for part of ` +
-            `the shift and could stand ${String(effect.derate.cars - choice.shortfall)}. Every bank ` +
-            'keeps at least one car in service — a bank with none is a set of floors nobody can reach.',
-        );
-      }
-      for (const car of choice.held) {
-        incidents.push({
-          kind: 'maintenance',
-          car,
-          fromFraction: effect.derate.fromFraction,
-          toFraction: effect.derate.toFraction,
-        });
-      }
-    }
+  const { derate } = effect;
+  const cars = eventCarChoice(effect, input.building);
+
+  if (cars.holdShortfall > 0) {
+    withheld.push(
+      `${input.event.name}: asked for ${String(effect.carsOutOfService)} car(s) out of service and ` +
+        `could hold ${String(effect.carsOutOfService - cars.holdShortfall)}. Every bank keeps at ` +
+        'least one car in service — a bank with none is a set of floors nobody can reach, which is a ' +
+        'different scenario rather than a busier one.',
+    );
+  }
+  if (cars.derateRefusedForHold) {
+    withheld.push(
+      `${input.event.name}: this event both holds a car for the whole shift and schedules one to ` +
+        'return, and the two would pick the same car. The window was not applied.',
+    );
+  }
+  if (derate !== null && cars.derateShortfall > 0) {
+    withheld.push(
+      `${input.event.name}: asked to stand ${String(derate.cars)} car(s) down for part of ` +
+        `the shift and could stand ${String(derate.cars - cars.derateShortfall)}. Every bank ` +
+        'keeps at least one car in service — a bank with none is a set of floors nobody can reach.',
+    );
   }
 
-  return { demand, outOfServiceCarIds, incidents, withheld };
+  const incidents: readonly Incident[] =
+    derate === null
+      ? []
+      : cars.derateCars.map((car) => ({
+          kind: 'maintenance' as const,
+          car,
+          fromFraction: derate.fromFraction,
+          toFraction: derate.toFraction,
+        }));
+
+  return { demand, outOfServiceCarIds: cars.holdCars.map(carRuntimeId), incidents, withheld };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Which cars the event takes — one implementation, two callers
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The cars today's event takes out of passenger service, and in which of the two ways.
+ *
+ * **Extracted from {@link shiftRunPatch}'s own body — the choices did not move, only the sentences
+ * that describe them did** — because a second caller needs the same answer and cannot afford the
+ * rest of the patch. `scope/runIdentity.ts` decides *does today reserve a goods car?* against a
+ * commissioned building and has no traffic profile, no demand base and no resolved fabric; before
+ * this it had no way to ask which cars were already taken, and answered as though none were.
+ *
+ * That is the same shape as GitHub issue #272 itself, which is why this is a shared function rather
+ * than a second copy of the branch: the defect was two sites answering *which cars are taken?* and
+ * only one of them being right. A third site would have been the next one.
+ *
+ * The refusals stay in {@link shiftRunPatch}, because they are prose addressed to a player and this
+ * has no event name to put in them. What lives here is only the decision each refusal is about.
+ *
+ * **The order itself is still `incidents.ts#carsToDerate`'s and is stated there** — this absorbed
+ * the docstring of the `carsToHold` wrapper it replaces, and the two reasons are unchanged:
+ * deterministic, because a random draw outside the injected `StreamSet` breaks common random numbers
+ * (invariant 2) and would make two shifts of the same day incomparable; and never the last car in a
+ * bank, because a bank with none is a set of floors nobody can reach, which is a different scenario
+ * rather than a busier one. A whole-shift hold is a runtime id because `recordRun` matches on
+ * `${bankId}-${carId}`, and a window stays a {@link CarRef} because a `serviceEvents` entry names a
+ * bank and a car separately.
+ */
+export interface EventCarChoice {
+  /**
+   * Cars held for the **whole shift**, which `shiftRunPatch` maps to the runtime ids
+   * `RecordRunOptions.outOfServiceCarIds` matches on.
+   *
+   * {@link CarRef} rather than those ids, and that is not a style choice: `${bankId}-${carId}` is
+   * the one expression in `shift/` that `honesty/derive.test.ts`'s two-adjacent-words scanner reads
+   * as prose, so a **new export** containing it becomes an unclassified text producer and turns that
+   * suite red. The two declarations that may hold it — `calendar.ts`'s private `carRuntimeId` and
+   * `shiftRunPatch` — are already classified, and both reach it the way they always did. Keeping the
+   * refs here is what lets this function be shared without moving a classification.
+   */
+  readonly holdCars: readonly CarRef[];
+  /** How many of `carsOutOfService` could not be held, because a bank keeps a car. */
+  readonly holdShortfall: number;
+  /** Cars away for **part** of the run, for `incidents.ts#withIncidents`. */
+  readonly derateCars: readonly CarRef[];
+  /** How many of `derate.cars` could not be stood down. */
+  readonly derateShortfall: number;
+  /**
+   * The event declared **both** a whole-shift hold and a window, so the window was dropped.
+   *
+   * The two pick from the same building by the same total order and would take the same car out
+   * twice, producing a car that is held and also scheduled to return. No shipped event does this;
+   * the flag exists so the refusal is a decision rather than an inline `if`.
+   */
+  readonly derateRefusedForHold: boolean;
+}
+
+export function eventCarChoice(effect: EventEffect, building: BankedBuilding): EventCarChoice {
+  const none: EventCarChoice = {
+    holdCars: Object.freeze([]),
+    holdShortfall: 0,
+    derateCars: Object.freeze([]),
+    derateShortfall: 0,
+    derateRefusedForHold: false,
+  };
+  if (effect.changesNothing) return none;
+
+  const holds =
+    effect.carsOutOfService > 0
+      ? carsToDerate(building, effect.carsOutOfService)
+      : { held: [] as readonly CarRef[], shortfall: 0 };
+  const held = { ...none, holdCars: holds.held, holdShortfall: holds.shortfall };
+
+  if (effect.derate === null) return held;
+  if (holds.held.length > 0) return { ...held, derateRefusedForHold: true };
+
+  const choice = carsToDerate(building, effect.derate.cars);
+  return { ...held, derateCars: choice.held, derateShortfall: choice.shortfall };
 }
 
 /**
- * Pick which cars stand idle — **the rule now lives in `incidents.ts`, and this maps it**.
+ * The id `Simulation` gives a car at run time, and the one `RecordRunOptions.outOfServiceCarIds` is
+ * matched on.
  *
- * The order and its two reasons are unchanged and are stated there: deterministic because a random
- * draw outside the injected `StreamSet` breaks common random numbers (invariant 2) and would make
- * two shifts of the same day incomparable; and never the last car in a bank, because a bank with
- * none is a set of floors nobody can reach, which is a different scenario rather than a busier one.
+ * **Private, and there is a second copy in `calendar.ts` that must stay private too** — GitHub issue
+ * #272 first tried to consolidate the two into one exported helper on `incidents.ts`, and that is
+ * the change to *not* make. `honesty/derive.test.ts` derives its surface set from the source tree,
+ * and `${bankId}-${carId}`'s hyphen reads to the two-adjacent-words scanner as a phrase, so the
+ * declaration holding this expression is a **text producer**. Exporting it created an unclassified
+ * one and, worse, emptied the chain `NOT_PLAYER_FACING` cites by name for
+ * `shift/calendar.ts#calendarAsks` — turning a live exclusion into a ghost and that suite red in
+ * three places.
  *
- * What changed is that `incidents.ts` needs the *same* choice expressed as `(bankId, carId)` for a
- * `serviceEvents` entry, while `recordRun` matches on the runtime id `${bankId}-${carId}` that
- * `Simulation` constructs. Two implementations of "which car goes out today" would let the
- * whole-shift hold and the time-boxed derate disagree about it, on the same day, in the same run.
+ * Two private copies of a five-character expression, each inside a declaration that is already
+ * classified, is the cheaper arrangement. What must not be duplicated is *which cars are taken* —
+ * {@link eventCarChoice} owns that, and it returns {@link CarRef}s precisely so it can be shared
+ * without carrying this string.
  */
-function carsToHold(
-  building: ResolvedBuilding,
-  wanted: number,
-  withheld: string[],
-  eventName: string,
-): readonly string[] {
-  const choice = carsToDerate(building, wanted);
-  if (choice.shortfall > 0) {
-    withheld.push(
-      `${eventName}: asked for ${String(wanted)} car(s) out of service and could hold ` +
-        `${String(wanted - choice.shortfall)}. Every bank keeps at least one car in service — a bank ` +
-        'with none is a set of floors nobody can reach, which is a different scenario rather than a ' +
-        'busier one.',
-    );
-  }
-  return choice.held.map((car) => `${car.bankId}-${car.carId}`);
+function carRuntimeId(car: CarRef): string {
+  return `${car.bankId}-${car.carId}`;
 }

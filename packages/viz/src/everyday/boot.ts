@@ -46,8 +46,13 @@ import { mountEverydayShell, type EverydayShell } from './shell.js';
 /**
  * The Engineer menu, and its *Resume* row — how this shell gets that menu out of the way.
  *
- * `dev/main.ts` opens its own eight-screen menu at boot, over the very surface the stage hands off
- * to. Something has to close it, and there are two ways: reach into that module for `closeMenu`, or
+ * `dev/main.ts` opens its own eight-screen menu at boot, over the Engineer surface — the surface the
+ * heading above says is **swapped** to rather than handed off to, and which this line went on
+ * calling *"the very surface the stage hands off to"* for one wave after § D338 retired that
+ * hand-off (GitHub issue #261). It is the same retired hand-off `everyday/modes.ts` described from
+ * the other end, naming the *mode* where this named the *surface*; both were stale, and neither was
+ * narrowly true of some residual hand-off, because there is no route left that could produce one.
+ * Something has to close it, and there are two ways: reach into that module for `closeMenu`, or
  * press the control a player would press. This presses the control — it is the one seam that stays
  * true if the menu is rewritten, and `dev/menuExit.browser.test.ts` already drives the same row.
  *
@@ -64,8 +69,29 @@ export const ENGINEER_RESUME_SELECTOR = '[data-menu-control="main.resume"]';
 /**
  * Press it if it is there. `true` when the menu is gone — pressed now or already closed.
  *
- * The `hidden` check is what makes this idempotent, and idempotence is what lets it be called from
- * both a boot watcher and the stage hand-off without the second call re-opening anything.
+ * The `hidden` check is what makes this idempotent, and idempotence is what lets the observer below
+ * call it on every mutation until the row arrives, without a later call re-opening anything.
+ *
+ * ## Module scope, and why that is the whole of the fix for GitHub issue #273
+ *
+ * It was `export`ed because the § D335 stage hand-off called it — the belt to
+ * {@link closeEngineerMenuWhenReady}'s brace. § D338 retired the hand-off, the caller went with it,
+ * and the `export` stood for a wave with nothing importing it. **It is not a dead seam and must not
+ * be counted as one:** the function is called, on the shipped path, by the observer below. What had
+ * no caller was the keyword.
+ *
+ * The other outcome was checked first and ruled out — the defect might have been a *missing* call
+ * rather than a surplus export, if crossing § D338's door were supposed to close this menu behind
+ * the player. It is not, and cannot be: outward, `shell.ts#setCoveredInert` inerts `div.shell`, so
+ * `#open-menu` cannot be pressed while Everyday Mode has the page and nothing else dispatches
+ * `reopen`; back, `menuPanel.ts#coverShell` inerts that same subtree while the menu is drawn, so
+ * `#back-to-everyday` — which lives inside `div.shell` — cannot be pressed while the menu is up. A
+ * player therefore cannot reach either side of the door with this menu open, and a second call site
+ * would be a call that can never do anything.
+ *
+ * `deadCode.test.ts` holds both halves, because neither is safe as a sentence: its limit 6 says why
+ * the package's dead-code audit could not see this (a self-use satisfies its caller question), and
+ * its check goes red if the export comes back **or** if the two presses below go away.
  *
  * ## The lift, and why it is not a hack
  *
@@ -81,7 +107,7 @@ export const ENGINEER_RESUME_SELECTOR = '[data-menu-control="main.resume"]';
  * a microtask, so the shell's re-assert sees the value it already wanted and no window exists in
  * which the covered menu is reachable by a player.
  */
-export function dismissEngineerMenu(doc: Document): boolean {
+function dismissEngineerMenu(doc: Document): boolean {
   const overlay = doc.querySelector<HTMLElement>(ENGINEER_MENU_SELECTOR);
   if (overlay === null) return false;
   if (overlay.hidden) return true;
@@ -109,9 +135,10 @@ export function dismissEngineerMenu(doc: Document): boolean {
  * Engineer menu sitting on top of it. That race is not hypothetical — it fired here, on a reload
  * that beat the boot.
  *
- * Waiting for the row and pressing it once removes the race instead of narrowing it: by the time any
- * hand-off can happen the menu is already closed, and {@link dismissEngineerMenu} at the hand-off is
- * then a cheap no-op that stays as the belt to this brace.
+ * Waiting for the row and pressing it once removes the race instead of narrowing it. That made this
+ * the brace and {@link dismissEngineerMenu} at the hand-off the belt — a cheap no-op by the time it
+ * ran. § D338 retired the hand-off and the belt with it, so this is now the **whole** fastening,
+ * which is what the module heading says and what this paragraph went on contradicting.
  *
  * ## Why it watches the overlay rather than the document
  *

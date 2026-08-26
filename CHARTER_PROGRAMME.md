@@ -47,7 +47,7 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
-| Next free decision number | **D361** — D346 write-disclosure, D347 the gate's own hole, D348 #200 into M2, D349 M2's two halves, D350 #217 split, and wave B's four: D351 the count bound to `data/`, D352 the withdrawn 1280 px rule, D353 the tier's `port: 0` mechanism, D354 the honest speed ladder |
+| Next free decision number | **D375** — D346 write-disclosure, D347 the gate's own hole, D348 #200 into M2, D349 M2's two halves, D350 #217 split, wave B's ten: D351 the count bound to `data/`, D352 the withdrawn 1280 px rule, D353 the tier's `port: 0` mechanism, D354 the honest speed ladder, D355 the campaign's hold-out seeds, D356 the whole Everyday day, D357 reconcile's re-entrancy, D358 the deletion route, D359 one horizon, D360 the Campaign tab's two batches — and wave C's five: D361 no transactions in `Store`, D362 the tenth honesty property, D363 the rest bar, D364 the cars an incident schedules, D365 four stale claims — and **D366–D374, a block of nine product-owner rulings taken in one sitting**, which landed on `main` from another session while wave C was open and took the number this file published as next-free |
 
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`

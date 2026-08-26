@@ -20,7 +20,7 @@
 
 import { fileURLToPath } from 'node:url';
 
-import { chromium, type Browser, type Page } from 'playwright-core';
+import { chromium, type Browser, type Page, type ViewportSize } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -50,8 +50,29 @@ afterAll(async () => {
   await server?.close();
 });
 
-async function coldLoad(): Promise<Page> {
-  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+/** What every case here drove before a viewport was ever an argument. */
+const DESKTOP: ViewportSize = { width: 1440, height: 900 };
+
+/**
+ * **The shortest viewport `docs/31-support-matrix.md` supports**, which is not 720.
+ *
+ * The matrix commits to *width* — 360 px and above lays out, below 360 px is tier 4 — and names no
+ * height floor at all. The shortest height it records anywhere is the **667** of its tier-2 row
+ * *narrow layouts at 375×667, 414×896, 767×700*, driven by hand on 2026-07-30. So 667 is the bound
+ * a refusal has to survive, and a screen that only fits at 720 is already outside it.
+ */
+const SHORTEST_SUPPORTED: ViewportSize = { width: 375, height: 667 };
+
+/**
+ * The shortest supported height at a **tier-1** width, which is the one continuously-asserted
+ * geometry the matrix has. 375 px wide is a layout nothing gates (issue #240); 1280 px wide is
+ * `fold1280.browser.test.ts`'s own viewport with the height taken down to the floor, so a failure
+ * here is about the fold rather than about the narrow stylesheet.
+ */
+const SHORT_DESKTOP: ViewportSize = { width: 1280, height: 667 };
+
+async function coldLoad(viewport: ViewportSize = DESKTOP): Promise<Page> {
+  const page = await openPage(browser, { viewport });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
@@ -66,11 +87,90 @@ async function railRow(page: Page, label: string): Promise<void> {
   await page.click(`nav.everyday-rail button:has-text("${label}")`);
 }
 
+/** Open § 9.1 from the menu tile — the door a player uses, not a URL. */
+async function openRush(page: Page): Promise<void> {
+  await page.click('.everyday-mode[data-screen="rush"]');
+  await page.waitForSelector('.everyday-rush');
+}
+
+/**
+ * Where the sentence a player is given for the dead primary actually **is**, in viewport pixels.
+ *
+ * Found by its words rather than by a class, and that is the point of the helper: the case below
+ * is about what a player can read without scrolling, so it must keep asking the question when the
+ * sentence moves from one element to another. A version of this keyed on `.everyday-rush-refusal`
+ * would have gone green by being deleted.
+ *
+ * The deepest match wins — ancestors match the same text and would report a box the size of the
+ * column.
+ */
+async function reasonBox(
+  page: Page,
+  reason: string,
+): Promise<{
+  readonly where: string;
+  readonly top: number;
+  readonly bottom: number;
+  readonly viewportHeight: number;
+  readonly scrolled: number;
+  readonly drawnTimes: number;
+} | null> {
+  return page.evaluate((text) => {
+    const nodes = [...document.querySelectorAll<HTMLElement>('body *')].filter(
+      (node) => (node.textContent ?? '').trim() === text,
+    );
+    const node = nodes.at(-1);
+    if (node === undefined) return null;
+    const box = node.getBoundingClientRect();
+    return {
+      where: node.className === '' ? node.tagName : node.className,
+      top: box.top,
+      bottom: box.bottom,
+      viewportHeight: window.innerHeight,
+      scrolled:
+        window.scrollY + (document.querySelector<HTMLElement>('.everyday-screen')?.scrollTop ?? 0),
+      drawnTimes: nodes.length,
+    };
+  }, reason);
+}
+
+/**
+ * What a screen reader is told about a control — Chromium's own answer, not a re-implementation
+ * of the accessible-name computation in the test.
+ *
+ * Playwright removed `page.accessibility` at 1.62, so this asks the protocol directly. Both halves
+ * come back: `name` is the computed accessible name and `description` is what `aria-describedby`
+ * or `title` contributes, so a case over this cannot pass by putting the reason somewhere the AX
+ * tree does not reach.
+ */
+async function announced(page: Page, selector: string): Promise<string> {
+  const cdp = await page.context().newCDPSession(page);
+  const { root } = (await cdp.send('DOM.getDocument', { depth: -1 })) as {
+    root: { nodeId: number };
+  };
+  const { nodeId } = (await cdp.send('DOM.querySelector', {
+    nodeId: root.nodeId,
+    selector,
+  })) as { nodeId: number };
+  const { nodes } = (await cdp.send('Accessibility.getPartialAXTree', {
+    nodeId,
+    fetchRelatives: false,
+  })) as {
+    nodes: readonly {
+      readonly name?: { readonly value?: string };
+      readonly description?: { readonly value?: string };
+    }[];
+  };
+  return nodes
+    .flatMap((node) => [node.name?.value ?? '', node.description?.value ?? ''])
+    .join(' ')
+    .trim();
+}
+
 describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
   it('opens from the menu tile and draws § 9.1’s bands off the ramp', async () => {
     const page = await coldLoad();
-    await page.click('.everyday-mode[data-screen="rush"]');
-    await page.waitForSelector('.everyday-rush');
+    await openRush(page);
 
     expect(await page.textContent('.everyday-rush h1')).toBe('How long can it hold?');
     // Five bands, each with the rate the contract's expression gives it — a figure, not a word.
@@ -110,13 +210,24 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
 
     // § 3.3's cells: the rush's own left button, its primary, its note — and no timeline.
     expect(await page.textContent('.everyday-bar-leave')).toBe('⤺ Leave the rush');
-    expect(await page.textContent('.everyday-bar-primary')).toBe('Start the rush');
     expect(await page.$eval('.everyday-bar-primary', (b) => (b as HTMLButtonElement).disabled)).toBe(
       true,
     );
     expect(await page.$('.everyday-bar-timeline')).toBeNull();
-    // The screen's own paragraph still says it — that half was never the defect.
-    expect(await page.textContent('.everyday-rush-refusal')).toMatch(/not built/);
+    /*
+     * **The screen's own paragraph is gone, and this assertion went with it.**
+     *
+     * It read `expect(await page.textContent('.everyday-rush-refusal')).toMatch(/not built/)` under
+     * the comment *"that half was never the defect"* — true when written, and untrue by the time
+     * the two independent fixes for #262 were merged. The other one moved the sentence into the bar
+     * and deleted the paragraph, on `rushScreen.ts`'s *"one constant, one place on screen"* rule: a
+     * copy at the foot of the paper column is a sentence the player has already read above the
+     * fold, in a place they may never scroll to.
+     *
+     * Keeping both would put the reason on screen **twice**, which the fold case below asserts
+     * against by name (`drawnTimes`). Green on either branch alone; red together — the merge is
+     * what found it.
+     */
 
     /* The control carries the reason: as a tooltip, and by `aria-describedby` — which must resolve
        to a node that is actually in the document, since a description pointing at nothing reads as
@@ -146,6 +257,88 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
 
     /* And the sentence that read as confirmation is gone from beside the dead button. */
     expect(await page.textContent('.everyday-bar-note')).not.toContain('Nothing to set up');
+
+    // The reason is in the bar, beside the button it is about.
+    expect(await page.textContent('.everyday-bar-note')).toMatch(/not built/);
+    /*
+     * And § 3.3's own note is **not** what is drawn there. *Nothing to set up. It ends when it
+     * ends.* is true of a rush and, next to a button that cannot be pressed, reads as confirmation
+     * — which is the half of #262 that has nothing to do with geometry.
+     */
+    expect(await page.textContent('.everyday-bar-note')).not.toContain('Nothing to set up');
+    await page.close();
+  });
+
+  /**
+   * **The fold case, and the one that reproduces #262 rather than describing it.**
+   *
+   * Driven at {@link SHORT_DESKTOP} and {@link SHORTEST_SUPPORTED}, at `scrollY: 0`, with nothing
+   * scrolled. Measured on the deployed build before the fix, at `scrollY: 0`: the reason's box top
+   * was **905.8** in a 720 px viewport and **3443.2** in a 667 px one. A refusal a player cannot
+   * read is not a refusal.
+   *
+   * It asks where **the words** are, not where an element is — see {@link reasonBox}. An assertion
+   * that `.everyday-rush-refusal` exists is exactly the check that was already green while this
+   * defect shipped.
+   */
+  it('puts the reason inside the viewport at the shortest height the matrix supports', async () => {
+    const reason =
+      'the climbing stream is not built — this screen is the setup, and there is nothing behind ' +
+      'it to start yet';
+
+    for (const viewport of [SHORT_DESKTOP, SHORTEST_SUPPORTED]) {
+      const page = await coldLoad(viewport);
+      await openRush(page);
+
+      const box = await reasonBox(page, reason);
+      const at = `${String(viewport.width)}×${String(viewport.height)}`;
+      expect(box, `${at}: the reason is drawn nowhere`).not.toBeNull();
+      /*
+       * Not a guard on the harness — a claim about the product, and the one that found the defect.
+       *
+       * `openRush` clicks the tile. At `375×667` the rush tile is below the fold, so the click
+       * scrolls it into view, and the page arrives on the new screen carrying that offset unless
+       * something resets it. `shell.ts#go` now does, for every navigation. This case failed on CI
+       * and passed here before that fix, because the two Chromiums lay the four-tile menu out a few
+       * pixels apart and only one left the tile above the fold — so the assertion is kept at the
+       * shortest supported viewport precisely because that is where it bites.
+       */
+      expect(box?.scrolled, `${at}: the page kept a scroll offset across navigation`).toBe(0);
+      expect(box?.viewportHeight).toBe(viewport.height);
+      /*
+       * *"One constant, one place on screen"* — `rushScreen.ts`'s rule where its own refusal
+       * paragraph used to be, which until now was prose and nothing else. A second copy drawn to
+       * give the paper column an ending is a sentence a player has already read in the bar.
+       */
+      expect(box?.drawnTimes, `${at}: the reason is drawn more than once`).toBe(1);
+      expect(box?.top, `${at}: the reason starts above the viewport`).toBeGreaterThanOrEqual(0);
+      expect(
+        box?.bottom,
+        `${at}: the reason ends ${String(Math.round((box?.bottom ?? 0) - viewport.height))} px ` +
+          `below the fold, in ${box?.where ?? '(nowhere)'}`,
+      ).toBeLessThanOrEqual(viewport.height);
+      await page.close();
+    }
+  });
+
+  /**
+   * **The keyboard half, which is worse than the geometry half** — #262, and #239's sweep.
+   *
+   * A `disabled` button is not in the tab order, so a keyboard user never lands on it. Measured
+   * before the fix, Chromium's own AX node for this control was `button "Start the rush"` with
+   * `disabled=true` and **no description at all**: nothing to announce even to a reader who
+   * reaches it in browse mode.
+   *
+   * The assertion is over the name *and* the description together — {@link announced} — because
+   * what matters is whether the reason reaches assistive technology, not which of the two channels
+   * carries it. See `rushScreenModel.ts#rushBarModel` for why it is the name here and what it
+   * would take to make it the description.
+   */
+  it('says on the control itself that it cannot be pressed', async () => {
+    const page = await coldLoad();
+    await openRush(page);
+
+    expect(await announced(page, '.everyday-bar-primary')).toMatch(/not built/);
     await page.close();
   });
 });

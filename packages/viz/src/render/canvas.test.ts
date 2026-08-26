@@ -34,6 +34,7 @@ import { themeFor } from './theme.js';
 import type { FloorQueue, QueuedRider, WaitBand } from '../frame/overlay.js';
 import { MOOD_GLYPH, type BuildingMood } from './mood.js';
 import { BAND_GLYPH } from './riderQueue.js';
+import { CAR_REST_FULL_S, CAR_REST_ONSET_S, REST_BAR_THICKNESS_PX } from './carRest.js';
 import { windowClause } from './runSummary.js';
 import { NO_AVERAGE_LEAD, suppressionBannerFor } from '../mode/disclosure.js';
 import { AWT_INVALID_GROUNDS } from '@elevator-sim/core/browser';
@@ -1693,5 +1694,127 @@ describe('the header subtitle', () => {
     expect(
       texts.some((text) => text.startsWith(`${RECORDING.dispatcherProfileId} · seed 7`)),
     ).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * AD-S17 — the rest bar, on the Engineer stage
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A car that is standing still must not be drawn like a car that has just stopped.**
+ *
+ * `docs/35-problem-per-mode.md` § 3.2 is the finding this closes: *"an idle car is a stationary car
+ * with `direction === 0` and near-zero load — **pixel-identical** to any empty car that happens to
+ * be stopped."* That is a claim about what got painted, so it is checked on the transcript rather
+ * than on a variable: every assertion below is about a `fillRect` the renderer either emitted or
+ * did not.
+ *
+ * The slot is the `▲`/`▼`'s own — `column.x + w + 6`, on the car's centre line — so the three
+ * states of *what is this car doing* are one channel. That is asserted directly, because a mark in
+ * a second place would be a second thing to learn before the first could be read.
+ */
+describe('AD-S17 — the rest bar', () => {
+  /** The `fillRect`s this renderer draws in the direction slot's ink, at the bar's thickness. */
+  function restBarsIn(ctx: RecordingContext, ink = DEFAULT_THEME.textDim): readonly Call[] {
+    return ctx.calls.filter(
+      (call) =>
+        call.op === 'fillRect' &&
+        call.args[4] === ink &&
+        Number(call.args[3]) === REST_BAR_THICKNESS_PX,
+    );
+  }
+
+  /** A standing car. `RECORDING`'s shaft has no motions, so it has stood since `startedAt` (0). */
+  const standing = (simTimeS: number): Frame =>
+    frame({ simTimeS, cars: [car({ direction: 0, doorPhase: 'closed', doorFraction: 0 })] });
+
+  it('draws nothing at all before the onset — a car that has just stopped is still unmarked', () => {
+    expect(restBarsIn(draw(standing(CAR_REST_ONSET_S - 1)))).toHaveLength(0);
+    expect(restBarsIn(draw(standing(CAR_REST_ONSET_S)))).toHaveLength(1);
+  });
+
+  it('draws nothing over a car that is travelling, and nothing over one working its doors', () => {
+    expect(restBarsIn(draw(frame({ simTimeS: 110, cars: [car({ direction: 1 })] })))).toHaveLength(0);
+    expect(
+      restBarsIn(
+        draw(
+          frame({
+            simTimeS: 110,
+            cars: [car({ direction: 0, doorPhase: 'open', doorFraction: 1 })],
+          }),
+        ),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('puts the bar in the arrow’s own slot, on the car’s centre line', () => {
+    /*
+     * The two states share one position, which is the whole of why the third is legible without a
+     * legend: a reader who has watched arrows come and go over a working lift meets the bar in the
+     * place the arrows were. Both positions are recovered from the transcript rather than asserted
+     * about the source, so moving either one apart from the other fails here.
+     */
+    const arrow = draw(frame({ simTimeS: 110, cars: [car({ direction: 1 })] })).calls.find(
+      (call) => call.op === 'fillText' && call.args[0] === '▲',
+    );
+    const bar = restBarsIn(draw(standing(110)))[0];
+    expect(arrow).toBeDefined();
+    expect(bar).toBeDefined();
+    // The glyph is drawn `textAlign: center` at its slot's x; the bar is centred on the same x.
+    expect(Number(bar?.args[0] ?? 0) + Number(bar?.args[2] ?? 0) / 2).toBeCloseTo(
+      Number(arrow?.args[1] ?? -1),
+      6,
+    );
+    expect(Number(bar?.args[1] ?? 0) + REST_BAR_THICKNESS_PX / 2).toBeCloseTo(
+      Number(arrow?.args[2] ?? -1),
+      6,
+    );
+  });
+
+  it('grows with how long the car has stood, and stops growing at the saturation point', () => {
+    const widthAt = (simTimeS: number): number =>
+      Number(restBarsIn(draw(standing(simTimeS)))[0]?.args[2] ?? 0);
+    const onset = widthAt(CAR_REST_ONSET_S);
+    const middle = widthAt((CAR_REST_ONSET_S + CAR_REST_FULL_S) / 2);
+    const full = widthAt(CAR_REST_FULL_S);
+    expect(middle).toBeGreaterThan(onset);
+    expect(full).toBeGreaterThan(middle);
+    // Saturated: a length channel is comparable only if it has an end.
+    expect(widthAt(CAR_REST_FULL_S * 2)).toBe(full);
+  });
+
+  it('never marks a car held out of service, which the other renderer cannot draw at all', () => {
+    /*
+     * The two stages had to be made to agree here. `drawCutaway` skips an out-of-service column
+     * outright — it draws no car in it — so an unguarded mark would exist on one stage and not the
+     * other for the same run. It would also be true and useless: a withdrawn car is standing still
+     * by construction, and the `OOS` pill and the dimmed shaft already say why.
+     */
+    const withdrawn: VizRecording = { ...RECORDING, outOfServiceCarIds: ['main-A'] };
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: withdrawn,
+      frame: standing(CAR_REST_FULL_S),
+      layout,
+      theme: DEFAULT_THEME,
+    });
+    expect(restBarsIn(ctx)).toHaveLength(0);
+    // And the same frame on the same building *is* marked once the car is back in service, so this
+    // is a guard rather than a mark that never draws.
+    expect(restBarsIn(draw(standing(CAR_REST_FULL_S)))).toHaveLength(1);
+  });
+
+  it('is a second channel and not a colour — the mark survives a theme with one ink', () => {
+    /*
+     * `riderQueue.test.ts`'s colour-removal idiom, applied one mark over. Under a theme whose
+     * direction ink and dim ink are the same string the bar is still there and still the right
+     * length, because what carries the state is *shape and size*: a rectangle where a triangle
+     * would be, as long as the car has stood. `docs/28` AD-A1.
+     */
+    const flat: Theme = { ...DEFAULT_THEME, textDim: '#000000', waitingUp: '#000000' };
+    const ctx = new RecordingContext();
+    drawScene(ctx, { recording: RECORDING, frame: standing(CAR_REST_FULL_S), layout, theme: flat });
+    expect(restBarsIn(ctx, '#000000')).toHaveLength(1);
   });
 });

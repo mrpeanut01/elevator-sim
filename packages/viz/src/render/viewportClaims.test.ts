@@ -77,14 +77,23 @@ const DECLARED_BREAKPOINTS_PX: readonly number[] = Object.freeze([720, 767, 899,
 /**
  * Sites that still assert the withdrawn 1280 px rule, with no refutation beside them.
  *
- * Both are `render/describeFrame.ts`'s — the interface docstring and the test comment that quotes
- * it. They are **recorded rather than repaired** because issue #256's lane may not edit them, and a
- * finding that is registered with a check on it is a different thing from one that is unnoticed.
+ * **Empty, and issue #260 is why.** It held two entries — `render/describeFrame.ts`'s interface
+ * docstring and the test comment that quotes it — recorded rather than repaired because issue
+ * #256's lane could not edit them. Both were repaired on the commit that empties this list, each
+ * gaining the withdrawal and the account of what does govern that `<select>` (which tab is open,
+ * and a default of `none`), and neither gaining a replacement width. The ghost check below is what
+ * forced the deletion: it goes red on an entry that has stopped reproducing, so a register cannot
+ * quietly become decoration.
+ *
+ * **The list stays, empty, rather than being deleted with its last entry.** An empty register is a
+ * state that has to keep being checked — the discipline `everyday/screens.ts#UNBUILT_REASONS`
+ * already keeps one screen down — and with nothing in it the first case below now guards the whole
+ * of `packages/viz/src` with no exemptions at all, which is the strongest form this check has.
  *
  * Asserted in **both** directions below, which is what stops this list becoming decoration: an
  * entry that has stopped reproducing must be deleted on the commit that fixed it.
  */
-const KNOWN_STALE: readonly string[] = Object.freeze(['describeFrame.ts', 'describeFrame.test.ts']);
+const KNOWN_STALE: readonly string[] = Object.freeze([]);
 
 /** The claim that was withdrawn, in the form the stale sites spell it. */
 const WITHDRAWN_CLAIM = 'below 1280 px';

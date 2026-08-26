@@ -294,7 +294,31 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         name: 'A fourth car',
         units: 34,
         nights: 8,
-        effect: 'The tower stops being one car short. Eight nights with two cars out.',
+        /*
+         * **This read *"… Eight nights with two cars out."* until GitHub issue #272, and the second
+         * sentence is withdrawn rather than reworded.**
+         *
+         * No campaign day takes a car out of passenger service:
+         * `RecordRunOptions.outOfServiceCarIds` has no writer under `campaign/`, none in any
+         * `everyday/campaign*` module, and none in `everyday/host.ts#runCampaignDay`, which writes
+         * a tower's `buildingId` and `dispatcherId`, presses run, and reads no booking. It is the
+         * same claim `everyday/campaignModel.ts`'s calendar tip made and issue #264 withdrew, one
+         * directory over — the *assertion* half of § D227's class, which is the worse one: a player
+         * who reasons correctly from it blames a missing car for a day their dispatcher lost.
+         *
+         * *A car may be out* would be the same claim with more words. What is left is the part that
+         * is not about the works at all, and the nights are published where they are mechanical
+         * rather than prose: {@link ShopTier.nights} reaches the shop row as `34u · 8n`
+         * (`everyday/campaignModel.ts#shopTierRow`), gates {@link fittedLevel} through
+         * {@link bookingIsLive}, and is what `daysOfBenefit` refuses a late purchase on.
+         *
+         * `economy.test.ts` sweeps every tier's prose for the claim, so the next tier copied out of
+         * the design handoff by hand lands there rather than in a register. The handoff's own line
+         * (`docs/design/elevator-sim-casual.dc.html`) still carries it, which is correct: the
+         * handoff wins every disagreement about what the screen looks like, and the simulator wins
+         * every disagreement about what a number means.
+         */
+        effect: 'The tower stops being one car short.',
       }),
       Object.freeze({
         level: 2,

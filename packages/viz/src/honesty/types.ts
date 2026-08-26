@@ -86,6 +86,23 @@ import type { WaitBandBasis } from '../live/types.js';
  * An uncovered property that happens to pass is the shape this repository's standing requirement is
  * written about, which is why the axis was added after the defect was fixed rather than instead of
  * fixing it.
+ *
+ * ## Why the tenth is a different shape from the other nine, and had to be
+ *
+ * Nine of these are predicates over **one case's rendered strings**: they ask *is this surface
+ * telling the truth about this run?* [`DECISIONS.md` § D359](../../../../DECISIONS.md) shipped a
+ * defect that answers **yes** on both screens and leaves the product incoherent — `goalsForDay`
+ * grew a horizon parameter, one of four callers passed it, and after a whole authored day the
+ * Everyday rail graded the run against a 460 s worst-wait ceiling while the Engineer rail graded
+ * the same run against 230 s. Each rail was internally honest. Nothing asked whether they agreed.
+ *
+ * § D359 also ruled out the cheap fix: a `horizon` axis on the sweep would drive each adapter over
+ * both kinds of run and produce two internally-honest corpora, comparing neither. So
+ * `surfaces-disagree` renders **one state through a declared pair** of shipped expressions and
+ * compares one named figure. The pairs are declared with a reason in `agreement.ts#AGREED_FIGURES`,
+ * and the figures that legitimately differ are declared too, in `#NOT_AGREED` — a pair inferred
+ * from a name collision is not a contract, and a property weakened until it stopped firing on the
+ * batch's two seed sets would be worse than no property at all.
  */
 export const HONESTY_PROPERTIES = [
   /** R3 — no mean, percentile or time-to-destination is shown on a run whose summary refuses it. */
@@ -106,6 +123,8 @@ export const HONESTY_PROPERTIES = [
   'withheld-figure-published',
   /** The charter's M2 gate — no section number, source filename or code identifier where a player reads. */
   'internal-notation',
+  /** `TEST_MATRIX.md` T1 / § D359 — two surfaces, one state, and one figure that means one thing. */
+  'surfaces-disagree',
 ] as const;
 
 export type HonestyProperty = (typeof HONESTY_PROPERTIES)[number];
@@ -249,6 +268,31 @@ export interface WithheldFigure {
   readonly ifPublished: readonly string[];
 }
 
+/**
+ * That this string is **one side of a declared pair** — `agreement.ts#AgreedFigure`'s unit.
+ *
+ * ## Why the reading is marked rather than matched by its words
+ *
+ * *"Are these two strings about the same figure?"* is not answerable from the strings, and a
+ * harness that guessed it from a name collision would be inventing the contract it then enforced —
+ * the one failure `agreement.ts#NOT_AGREED` exists to refuse. So the pairing is **declared**, and
+ * the declaration travels on the reading, exactly as {@link WithheldFigure} and {@link TextPlayhead}
+ * carry the two other facts a property may not infer.
+ *
+ * Marking the reading rather than comparing at render time is also what keeps this property
+ * falsifiable in the way the other nine are: the comparison happens in `properties.ts` over the
+ * same `RenderedText[]` every other check sees, so a `faults.ts` fault that corrupts one side fires
+ * it — *a property that has never failed is a property that cannot fail*.
+ */
+export interface AgreementReading {
+  /** The declared pair — `agreement.ts#AgreedFigure.id`. */
+  readonly pair: string;
+  /** The state both sides were driven over — `agreement.ts#AgreementView.id`. */
+  readonly view: string;
+  /** Which side of the pair this reading is. */
+  readonly side: 'left' | 'right';
+}
+
 /** One string a player would actually see, with the structural facts the surface knows about it. */
 export interface RenderedText {
   /** `<module>#<export>`, matching the ids `derive.ts` produces from the source tree. */
@@ -320,6 +364,13 @@ export interface RenderedText {
    * fact from a cell that is withheld and honest about it. See {@link WithheldFigure}.
    */
   readonly withheld?: WithheldFigure | undefined;
+  /**
+   * That this string is one side of a declared cross-surface pair. See {@link AgreementReading}.
+   *
+   * `undefined` for every string a single surface said about itself, which is all but a handful:
+   * this is the only field on this interface that is about **two** surfaces at once.
+   */
+  readonly agreement?: AgreementReading | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

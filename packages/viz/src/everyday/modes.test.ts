@@ -21,8 +21,8 @@ import { DATA_DIR } from '../fixtures.test-helper.js';
 import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { rushBarModel, RUSH_PRIMARY_REFUSAL } from './rushScreenModel.js';
-import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
-import { EVERYDAY_SCREENS, MODE_PICKS } from './types.js';
+import { isScreenBuilt, routeFor, UNBUILT_REASONS } from './screens.js';
+import { ENGINEER_SWAP_NOTE, EVERYDAY_SCREENS, MODE_PICKS } from './types.js';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 
@@ -296,5 +296,133 @@ describe('modes.ts’ prose is checked against the tree, not against a reader’
     expect(EVERYDAY_MODES.filter((mode) => mode.unavailable !== undefined)).toEqual([]);
     expect(Object.keys(UNBUILT_REASONS)).toEqual([]);
     expect(isScreenBuilt('fixit')).toBe(true);
+  });
+});
+
+/**
+ * **The Today's-tower row's third clause, pinned by the three things that make it true.**
+ *
+ * GitHub issue **#261**. That row said the mode was *"the one the shell's stage hands off to"* —
+ * true of § D335, where `stage` was a **route** that uncovered the Engineer surface, and false from
+ * § D338 onward. It is the *third* clause of this one docstring to go stale the same way: the
+ * Campaign and Fix-a-building rows both claimed their Everyday screens were what their tile *waited
+ * on*, and both tiles opened. Those two were corrected in § D351; this one had a second site
+ * (`everyday/boot.ts`) and was filed rather than guessed at.
+ *
+ * A fourth correction is the thing to prevent, so the replacement is not pinned by a fourth
+ * sentence. Each of its three claims is asserted against the code that makes it true, and the
+ * retired wording is barred from both files by name:
+ *
+ * 1. **The tile opens the front door.** `EVERYDAY_MODES[0].screen === 'door'`.
+ * 2. **The stage is a screen, not a hand-off.** `routeFor('stage')` is `'screen'`, and over § 4's
+ *    whole inventory only the arms `EverydayRoute` still has are produced — the `'handoff'` arm was
+ *    removed outright, so a reintroduced one fails here whichever key returns it.
+ * 3. **The door is § 3.2's footer row.** The shell exposes `enterEngineer`, `types.ts` carries the
+ *    row's own note, and no tile routes to `stage`.
+ *
+ * The last clause is a text check because text is the layer that drifted: the code was already
+ * right on the commit the sentence became wrong, which is exactly why nothing caught it.
+ */
+describe('the Today’s-tower row describes § D338’s door, not § D335’s hand-off', () => {
+  const MODES_TEXT = readFileSync(`${SRC}everyday/modes.ts`, 'utf8');
+  const BOOT_TEXT = readFileSync(`${SRC}everyday/boot.ts`, 'utf8');
+
+  it('opens the tile on § 6.1’s front door and routes the stage as a screen', () => {
+    expect(EVERYDAY_MODES[0]?.title).toBe("Today's tower");
+    expect(EVERYDAY_MODES[0]?.screen).toBe('door');
+    expect(routeFor('stage')).toBe('screen');
+  });
+
+  it('leaves no route arm a hand-off could come back through', () => {
+    /*
+     * Derived over the whole inventory rather than spot-checked on `stage`. The length assertion is
+     * the non-vacuity guard: an empty inventory would satisfy the membership check silently, which
+     * is the shape this suite's own § M30-style notes keep warning about.
+     */
+    expect(EVERYDAY_SCREENS.length).toBeGreaterThan(1);
+    expect([...new Set(EVERYDAY_SCREENS.map(routeFor))].sort()).toEqual(['menu', 'screen']);
+  });
+
+  it('puts the door on § 3.2’s footer row, which is neither the tile nor the stage', () => {
+    /*
+     * The half of the claim that says what *does* cross over. `enterEngineer` is read off the
+     * shell's own type surface, so this fails if the row is removed rather than only if a sentence
+     * is reworded.
+     */
+    expect(readFileSync(`${SRC}everyday/shell.ts`, 'utf8')).toContain('enterEngineer(): void;');
+    expect(ENGINEER_SWAP_NOTE.length).toBeGreaterThan(0);
+    expect(EVERYDAY_MODES.map((mode) => mode.screen)).not.toContain('stage');
+  });
+
+  /**
+   * A retirement marker: the words that turn *"the stage hands off to X"* from a claim into a
+   * history. Deliberately narrow, and **narrowed by a false negative rather than by taste** — the
+   * first draft accepted a bare `no longer`, and the original sentence passed it, because the
+   * Campaign row two lines below says the tile *"no longer waits on anything"* about something else
+   * entirely. A marker general enough to describe any correction will sooner or later sit near the
+   * claim it was supposed to retire. Every word here names *this* retirement.
+   */
+  const RETIREMENT = /§ D338|§ D335|retired|used to read|was true of|any more|went on calling/u;
+
+  /**
+   * Every `hands off` in `text`, with the 300 characters either side of it.
+   *
+   * 300 rather than `documentation.test.ts`'s 400 for the same reason the marker list is narrow: a
+   * docstring in this directory fits about four lines of prose in 300 characters, and the retirement
+   * has to be in the same breath as the claim to be read as qualifying it.
+   */
+  function claimWindows(text: string): readonly string[] {
+    return [...text.matchAll(/hands off/gu)].map((match) =>
+      text.slice(Math.max(0, (match.index ?? 0) - 300), (match.index ?? 0) + 300),
+    );
+  }
+
+  it('lets no “hands off” stand in either file without its retirement beside it', () => {
+    /*
+     * **Shaped after `experiments/validation/documentation.test.ts`**, which holds the withdrawn
+     * access-control mechanism to a refutation within 400 characters, and for the same reason: a
+     * flat ban on the phrase would forbid *quoting* the retired sentence, and this repository's
+     * habit — the one that makes a correction legible a year later — is to quote what was wrong
+     * rather than delete it. So the phrase is allowed; an *unaccompanied* phrase is not.
+     *
+     * Both files are covered because both carried it, from opposite ends: `modes.ts` named the
+     * **mode** the stage handed off to and `boot.ts` named the **surface**. Neither was narrowly
+     * true of some residual hand-off — `EverydayRoute` has no arm that could produce one, which is
+     * the case two rows up.
+     */
+    for (const [name, text] of [
+      ['modes.ts', MODES_TEXT],
+      ['boot.ts', BOOT_TEXT],
+    ] as const) {
+      for (const [index, window] of claimWindows(text).entries()) {
+        expect(window, `${name}: "hands off" #${String(index + 1)} stands as a live claim`).toMatch(
+          RETIREMENT,
+        );
+      }
+      /*
+       * Non-vacuous in the direction that matters, and it runs **after** the loop so that a file
+       * carrying the original sentence fails on the claim rather than on this: a file that stopped
+       * explaining the retired hand-off entirely would otherwise satisfy an emptied loop silently.
+       */
+      expect(text, `${name} no longer explains the retired hand-off`).toMatch(/hand-off/u);
+    }
+  });
+
+  it('negative control: an unaccompanied “hands off” is what this catches', () => {
+    /*
+     * Applied to text rather than to a file, because the guard above must be shown to fail on the
+     * sentence that was actually there — not merely to pass on the one that replaced it.
+     */
+    const asItWas =
+      " * This is the mode Casual play is currently *about*, and the one the shell's stage hands " +
+      'off to.';
+    expect(claimWindows(asItWas)).toHaveLength(1);
+    expect(claimWindows(asItWas)[0]).not.toMatch(RETIREMENT);
+    expect(claimWindows(`${asItWas} § D338 retired it.`)[0]).toMatch(RETIREMENT);
+    /*
+     * And the false negative that narrowed the marker list, kept as a case so it cannot come back:
+     * the Campaign row's own unrelated *"no longer waits on anything"* is not a retirement of this.
+     */
+    expect(claimWindows(`${asItWas} It no longer waits on anything.`)[0]).not.toMatch(RETIREMENT);
   });
 });

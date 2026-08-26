@@ -65,12 +65,12 @@ defect as a figure re-measured per branch:
 
 ### 1.2 The rules this document adds, in one table
 
-Twenty-six, all in three families, all stated as properties rather than preferences so that a lane
+Twenty-seven, all in three families, all stated as properties rather than preferences so that a lane
 can turn each into a test. Anything in this document not carrying one of these labels is context.
 
 | family | rules | section |
 |---|---|---|
-| **AD-S** — the stage | S1–S3 the shut door · S4–S6 the opening · S7–S10 legible pressure · S11–S14 the caps · S15–S16 the wait ramp | § 5 |
+| **AD-S** — the stage | S1–S3 the shut door · S4–S6 the opening · S7–S10 legible pressure · S11–S14 the caps · S15–S16 the wait ramp · S17 the rest bar | § 5 |
 | **AD-M** — motion | M1 no easing · M2 no transitions on the playhead · M3 state not events · M4 no rider entrances | § 6 |
 | **AD-A** — accessibility | A1 never colour-only · A2 measure against the real ground · A3 a live region is not a paint target · A4 refusals are drawn · A5 mono figures with units and `n` · A6 motion is bounded | § 7 |
 
@@ -634,6 +634,92 @@ defect `live/bands.ts` exists to prevent ([§ D251](../DECISIONS.md)).
   naming the four colours **in plain words**. A colour scale whose legend is behind an interaction is
   a colour scale that half the readers never decode, and § 7 makes this a hard requirement rather than
   a preference.
+
+### 5.7 The rest bar — the third state of the slot that had two
+
+> **LANDED.** `render/carRest.ts` is the derivation; `render/canvas.ts#drawCars` and
+> `everyday/stageScreenModel.ts#stageCarRestBarOf` are the two paints.
+> [`35-problem-per-mode.md`](35-problem-per-mode.md) § 3.2 and § 9 are the specification.
+
+**The gap this closes was the highest-value entry in `docs/35`'s absent column**, and it was absent
+in the literal sense: `grep` for `park` or `idle` across `render/` and both stage screens returned
+nothing. An idle car was *"pixel-identical to any empty car that happens to be stopped"*, and
+`PARK_CARS_LOBBY_LABEL` was a button with no visual consequence of its own. Campaign stage 1 teaches
+parking, and three of eighteen fix cases are parking faults — so **the product's most-used fault
+family had no mark on the stage** and the player was asked to reason about something the screen never
+showed. That is one concrete instance of `charter P3` failing, which
+[`22-charter.md`](22-charter.md) already records.
+
+**It is drawn in the direction glyph's own slot**, which `docs/35` § 3.1 records as carrying `▲`/`▼`
+and *"nothing at all when `direction === 0`"*. That hole is the whole design: a reader who has
+watched arrows come and go over a working lift meets the bar where the arrows were, so the three
+states are **one channel** — up, down, and a flat bar for neither. A mark anywhere else on the car
+would be a second thing to learn before the first could be read. The slot's room differs by renderer
+and the rule does not: the Engineer stage draws it beside the car in the `▲`'s own footprint, the
+Casual cutaway above the car across its body.
+
+- **AD-S17 — a car that has stood still carries a mark, and its *length* is how long.** The onset
+  and the saturation point are `WAIT_BANDS`' own — 30 s and 120 s — so a lift crosses into *standing
+  still* at the instant the first person waiting crosses out of *breezy*, and its mark is full at the
+  rung where that person would be eyeing the stairs. That is AD-S15 for a duration: one banding, both
+  halves of the tableau, no second ramp authored anywhere. Length rather than colour is AD-A1 and
+  AD-S7's own trick, so the state survives greyscale and a 4.5 px screen.
+
+**Four constraints it is held to, each of which ruled something out.**
+
+1. **It says *standing still*, never *parked*.** *Parked* is a claim about the dispatcher's
+   intent — `idle.parkingStrategy` — and a renderer asserting it would be a stated mechanism nothing
+   measured, which `CLAUDE.md` has a rule about. *No move in flight, doors shut, past thirty
+   seconds* is an observable a player can check by looking. `docs/35` § 9.4's `PM-PARK` prices the
+   *intent* version as a `core` change and flags it unverified; this needs neither.
+2. **It is R6-clean by construction, not by a gate.** `t − restingSince` is the same shape as
+   `t − arrivedAt`, which every rider capsule on both stages is already tinted by: a state at the
+   playhead, from the past only, identical when the player scrubs back to it. Nothing reads a motion
+   the playhead has not reached, which is § 4.4's *foreshadowing* refused as a property of the file
+   rather than as an intention.
+3. **It survives the ladder at both ends**, which is § 6 and is why it is a **state** and not a cue.
+   At `1×` the bar lengthens continuously and exactly, computed from the playhead like `doorFraction`
+   — no transition, so AD-M2 is untouched, and the growth is legible: the ninety seconds between
+   onset and saturation are ninety real ones. At `600×` a whole door cycle falls between two frames,
+   so an event-shaped *"the car has parked"* flash would be invisible (AD-M3) while a length that is
+   simply true at every frame is not.
+
+   **Say what the top rung costs, rather than only what it does not.** Ten sim-seconds pass per
+   frame there, so a lift that rests for a minute carries a mark for about two frames and one that
+   rests for five minutes carries a steady one for thirty. On a busy building marks will appear and
+   vanish quickly — **and exactly as fast as the `▲`/`▼` in the same slot already do**, which have
+   flickered at that rate since the stage was drawn. The mark adds no new instability to the picture;
+   it inherits the one the channel has. On the buildings where the parking lesson is the point the
+   lifts are idle for most of the hour, so the bars there are steady at every rung.
+4. **Its contrast is measured on the ground it is drawn on** — AD-A2, and § D336's shape. The Casual
+   bar is `inkSoft` on the well's `paper` at **8.36:1**. The Engineer bar is `textDim` over the shaft
+   recess composited on a slab or not, over the mass, over both stops of all four sky ramps: **6.39:1
+   dark, 4.40:1 light** at the worst of the sixteen. All clear AD-A2's 3:1 non-text floor; the Casual
+   one clears the text floor as well. Pinned in `render/carRest.test.ts`, not eyeballed.
+
+**Two colours it deliberately is not.** Not `ink`, because the car body is `ink` and a mark in the
+body's own colour reads as part of the car rather than as a statement about it. Not `terracotta` or
+`sun`, because those are the alarm and the door: a stage that painted *standing still* in an alarm
+colour would be asserting that standing still is **wrong**, which is the player's conclusion to reach
+and the renderer's job to make reachable. **Nor is it a dimming**, which is what a car held out of
+service already is — see § 3's inventory. A second meaning on one channel is how a picture stops
+having any.
+
+**And a withdrawn car carries no mark**, on the same rule read the other way. A car held out of
+service is standing still by construction, so marking it would be true and useless, and it would put
+a second meaning on the one channel whose value is that it has one. The Casual cutaway could not have
+drawn it anyway — it skips an out-of-service column outright — so this is also the two renderers
+being made to agree rather than a preference.
+
+**What the mark does not carry, said here rather than discovered later.** It says *this lift is
+waiting, and has been for a while*. It does **not** say *in the wrong place* — that is a two-place
+reading, and it needs the crowd drawn at the same moment. On `garden-apartments` the crowd is usually
+absent: `docs/35` § 9.3 measures the landings empty about **91 %** of the hour and **no sixty-second
+wait at all on sixteen of twenty seeds**. So this mark supplies the half of § 9.4's tableau that was
+missing and cannot supply the other half, and the parking lesson still lands on the buildings § 9.4
+names — `vertical-city`, `three-cars-one-cars-work` — rather than on the tutorial one. A rail or
+report sentence naming both places at once is the remaining piece and belongs to whichever lane owns
+those surfaces.
 
 ---
 

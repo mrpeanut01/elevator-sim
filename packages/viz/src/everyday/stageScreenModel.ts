@@ -77,6 +77,9 @@ import { WAIT_BANDS } from '../live/bands.js';
 import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
 import { clockAt, phaseAt, timelineOf } from '../live/timeline.js';
 import type { LiveObservations, WaitBandId } from '../live/types.js';
+// AD-S17's length rule, shared with the Engineer stage. The *derivation* — what counts as standing
+// still, and why the word is not *parked* — is that module's docstring and is deliberately one home.
+import { REST_BAR_THICKNESS_PX, restBarWidthPx } from '../render/carRest.js';
 import { actionBarFor } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
 import { EVERYDAY_COLORS as C } from './tokens.js';
@@ -1223,4 +1226,61 @@ function markGrid(
     });
   }
   return marks;
+}
+
+/* -------------------------------------------------------------------------- *
+ * `docs/28` § 5.7 — the rest bar: what a car that is doing nothing looks like
+ * -------------------------------------------------------------------------- */
+
+/** What {@link stageCarRestBarOf} needs. Two numbers; no canvas, no recording, no clock. */
+export interface StageCarRestBarInput {
+  /** The ink body's width — the bar's slot, and the widest it may ever be. */
+  readonly bodyWidth: number;
+  /** `CarRest.fill`: `0` at 30 s of standing still, `1` at two minutes and after. */
+  readonly fill: number;
+}
+
+/**
+ * How far above the car's roof the bar's underside sits.
+ *
+ * The direction glyph's own baseline, which the mount draws at `y − 10`. The `riders/capacity`
+ * readout sits between the two at `y − 1.5`, so the bar clears it: a mark that overlapped a live
+ * figure would make the figure the thing that got harder to read, which is the trade AD-S3 refuses
+ * one layer down.
+ */
+const REST_BAR_SLOT_ABOVE_PX = 10;
+
+/**
+ * **AD-S17 — the rest bar, on this stage** (`docs/28-art-direction.md` § 5.7).
+ *
+ * The cutaway draws `▲` or `▼` over a travelling car and, until now, **nothing at all** over one
+ * that is standing — which `docs/35-problem-per-mode.md` § 3.2 lists as the highest-value absent
+ * symptom in the product, because campaign stage 1 teaches parking and a parked car had no mark.
+ * This is the third state of that one slot: up, down, and neither.
+ *
+ * ## Why the geometry is here and not in the mount
+ *
+ * The same reason {@link stageCarPaintOf} is — GitHub issue **#212**. The door-fill inversion was
+ * arithmetic nothing could check without a canvas, and it shipped for a wave. A bar whose *length*
+ * carries the whole magnitude channel is exactly that shape of claim: a mount that computed it
+ * would be one sign error away from a mark that is longest when the car has just stopped, and no
+ * node test could see it. The length rule itself is `render/carRest.ts#restBarWidthPx`, shared with
+ * the Engineer stage so the two renderers cannot disagree about what the mark means.
+ *
+ * ## Where it sits
+ *
+ * In the direction glyph's own slot — centred on the car, on the glyph's baseline — returned in
+ * the **body's** coordinates like every other rectangle this module plans, so `(0, 0)` is the car's
+ * top-left and a negative `y` is above its roof. That is deliberate rather than sloppy: the mark
+ * belongs to the car, and a caller that had to add the offset itself could put it over a different
+ * one.
+ */
+export function stageCarRestBarOf(input: StageCarRestBarInput): StageCarRect {
+  const width = restBarWidthPx(input.fill, input.bodyWidth);
+  return {
+    x: (input.bodyWidth - width) / 2,
+    y: -REST_BAR_SLOT_ABOVE_PX - REST_BAR_THICKNESS_PX,
+    width,
+    height: REST_BAR_THICKNESS_PX,
+  };
 }

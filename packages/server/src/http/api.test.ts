@@ -22,7 +22,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 
 import { runSimulation } from '@elevator-sim/core';
 
@@ -1086,4 +1086,205 @@ describe('GET /api/wake', () => {
       expect((await call('GET', '/api/wake', { ip: caller })).status).toBe(200);
     }
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The other races a delete route made reachable (#266)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A whole server with one statement chosen to have something else happen inside it.
+ *
+ * The submission race above builds this inline; four more routes need it, and a concurrency harness
+ * written five times is a harness that drifts. Its own server and its own outbox, because
+ * `RacingSql` has to be underneath the store from the moment it opens and the shared one is already
+ * running. **Armed by hand**, because the setup's own writes would otherwise spend the one shot on
+ * building the fixture.
+ */
+async function racedServer(options: {
+  readonly fires: (text: string) => boolean;
+  readonly race: (app: Server) => Promise<void>;
+}): Promise<{
+  readonly app: Server;
+  readonly ask: (method: string, path: string, options?: { body?: unknown; token?: string }) => Promise<ApiResponse>;
+  readonly linkFor: (email: string) => Promise<string>;
+  readonly signInAs: (email: string) => Promise<{ token: string; id: string }>;
+  /** The token in the last message this server's own outbox holds, whoever asked for it. */
+  readonly lastToken: () => Promise<string>;
+  readonly arm: () => void;
+}> {
+  let armed = false;
+  let app: Server | undefined;
+  const sql = new RacingSql(
+    new PgliteSql(),
+    (text) => armed && options.fires(text),
+    async () => {
+      if (app !== undefined) await options.race(app);
+    },
+  );
+  const box = new OutboxMailer(join(scratch, `raced-${String((racedServers += 1))}.jsonl`));
+  app = await bootstrap({
+    dataDir: DATA_DIR,
+    sql,
+    env: { ELEVATOR_SIM_SECRET: SECRET },
+    publicOrigin: 'https://elevator.example',
+    now: () => clock,
+    mailer: box,
+  });
+  // Each of these is a whole in-process PostgreSQL. Registered here rather than left to a trailing
+  // `close()` in the test body, because a failing assertion skips the trailing call and the
+  // instance outlives the run — which is the shape of the flake the #254 lane saw once and could
+  // not reproduce.
+  onTestFinished(async () => (app as Server).close());
+  const ask = async (
+    method: string,
+    path: string,
+    request: { body?: unknown; token?: string } = {},
+  ): Promise<ApiResponse> =>
+    (app as Server).api({
+      method,
+      path,
+      query: new Map(),
+      body: request.body,
+      token: request.token,
+      clientIp: '198.51.100.252',
+    });
+  const lastToken = async (): Promise<string> => {
+    const message = (await box.delivered()).at(-1);
+    const href = /https:\/\/\S+/u.exec(message?.body ?? '')?.[0] ?? '';
+    return new URLSearchParams(new URL(href).hash.slice(1)).get('sign-in') ?? '';
+  };
+  const linkFor = async (email: string): Promise<string> => {
+    const asked = await ask('POST', '/api/auth/request-link', { body: { email } });
+    expect(asked.status, JSON.stringify(asked.body)).toBe(202);
+    return lastToken();
+  };
+  return {
+    app,
+    ask,
+    linkFor,
+    lastToken,
+    signInAs: async (email) => {
+      const redeemed = await ask('POST', '/api/auth/redeem', { body: { token: await linkFor(email) } });
+      expect(redeemed.status, JSON.stringify(redeemed.body)).toBe(200);
+      const body = bodyOf(redeemed);
+      return { token: String(body['token']), id: String((body['user'] as Record<string, unknown>)['id']) };
+    },
+    arm: () => {
+      armed = true;
+    },
+  };
+}
+
+let racedServers = 0;
+
+describe('an account deleted underneath a request that is not a submission', () => {
+  it('still mails a working link when the account goes away mid-request', async () => {
+    /*
+     * `requestLink` reads or creates the account and then writes the login token, and § D241 makes
+     * that the *only* door into the product. A deletion in that gap answered `500` — on the one
+     * route in this API whose whole design is a response that says nothing about the address.
+     *
+     * The honest answer is the uniform 202 and a link that works, because per § D241 asking for a
+     * link on an address with no account is what *creates* one. So the route starts the account
+     * again rather than apologising, and the assertion is that the mailed link redeems — a 202 on
+     * its own would be the same lie in a nicer status code.
+     */
+    let id = '';
+    const raced = await racedServer({
+      fires: (text) => text.startsWith('INSERT INTO login_tokens'),
+      race: async (app) => app.store.deleteUser(id),
+    });
+    id = (await raced.signInAs('vanishing@example.test')).id;
+    raced.arm();
+
+    const response = await raced.ask('POST', '/api/auth/request-link', {
+      body: { email: 'vanishing@example.test' },
+    });
+    expect(response.status, JSON.stringify(response.body)).toBe(202);
+    expect(JSON.stringify(response.body)).not.toMatch(/foreign key|constraint|fkey/u);
+
+    const redeemed = await raced.ask('POST', '/api/auth/redeem', {
+      body: { token: await raced.lastToken() },
+    });
+    expect(redeemed.status, JSON.stringify(redeemed.body)).toBe(200);
+    // A new account, because the old one is gone: the link the player was promised is a link to
+    // something that exists.
+    expect(String((bodyOf(redeemed)['user'] as Record<string, unknown>)['id'])).not.toBe(id);
+  }, 60_000);
+
+  it('calls a link whose account is gone invalid, rather than already used', async () => {
+    /*
+     * `consumeLoginToken`'s `rowCount` is its answer, and the cascade changes what `false` *means*:
+     * the row can be gone because the link was spent or because `login_tokens` went with the
+     * account. Calling the second "already used" is a true-sounding sentence about something that
+     * did not happen — and it sends the player to ask for another link, which will work, which is
+     * how they learn nothing about what occurred.
+     */
+    let id = '';
+    const raced = await racedServer({
+      fires: (text) => text.startsWith('DELETE FROM login_tokens WHERE jti'),
+      race: async (app) => app.store.deleteUser(id),
+    });
+    id = (await raced.signInAs('cascaded@example.test')).id;
+    const second = await raced.linkFor('cascaded@example.test');
+    raced.arm();
+
+    const response = await raced.ask('POST', '/api/auth/redeem', { body: { token: second } });
+    expect(response.status).toBe(400);
+    expect(bodyOf(response)['error']).toBe('link-invalid');
+  }, 60_000);
+
+  it('answers a link whose account vanishes at the session write as an invalid link', async () => {
+    /*
+     * The worst moment in the flow: the link is already spent by the time `createSession` runs, so
+     * an unexplained `500` costs the player the link as well as the session.
+     */
+    let id = '';
+    const raced = await racedServer({
+      fires: (text) => text.startsWith('INSERT INTO sessions'),
+      race: async (app) => app.store.deleteUser(id),
+    });
+    id = (await raced.signInAs('vanish-at-session@example.test')).id;
+    const second = await raced.linkFor('vanish-at-session@example.test');
+    raced.arm();
+
+    const response = await raced.ask('POST', '/api/auth/redeem', { body: { token: second } });
+    expect(response.status, JSON.stringify(response.body)).toBe(400);
+    expect(bodyOf(response)['error']).toBe('link-invalid');
+    expect(JSON.stringify(response.body)).not.toMatch(/foreign key|constraint|fkey/u);
+  }, 60_000);
+});
+
+describe('two players reaching for the same name at the same moment', () => {
+  it('answers the loser 409 name-taken rather than 500', async () => {
+    /*
+     * Both pre-checks pass and the unique index refuses the second write. `name-taken` is already
+     * in `setDisplayName`'s return type and already has a 409 on this route; what was missing was
+     * the constraint path reaching it.
+     *
+     * Driven through `RacingSql` rather than through two overlapping requests, for the reason
+     * `racingSql.test-helper.ts` gives: putting the competing rename exactly in the gap is
+     * deterministic, and a sleep-and-hope version of this would be the flakiest test in the suite.
+     */
+    let other = '';
+    const wanted = 'Contested';
+    const raced = await racedServer({
+      fires: (text) => text.startsWith('UPDATE users'),
+      race: async (app) => {
+        await app.store.setDisplayName(other, wanted);
+      },
+    });
+    const ada = await raced.signInAs('ada-renames@example.test');
+    other = (await raced.signInAs('bo-renames@example.test')).id;
+    raced.arm();
+
+    const response = await raced.ask('POST', '/api/me/display-name', {
+      token: ada.token,
+      body: { displayName: wanted },
+    });
+    expect(response.status, JSON.stringify(response.body)).toBe(409);
+    expect(bodyOf(response)['error']).toBe('name-taken');
+    expect(JSON.stringify(response.body)).not.toMatch(/duplicate key|constraint|users_display_name/u);
+  }, 60_000);
 });

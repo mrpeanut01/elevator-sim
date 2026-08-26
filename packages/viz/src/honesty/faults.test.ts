@@ -88,6 +88,14 @@ const FIXTURE_FOR: Readonly<Record<HonestyProperty, 'quotable' | 'suppressed'>> 
    * speaking, so `replaceFirst` has a `label` string to land on.
    */
   'internal-notation': 'quotable',
+  /*
+   * T1 / § D359 needs neither fixture, and for a reason none of the eight above have: its readings
+   * are taken from a **state** rather than from a run at all — the ask a rail publishes, not the
+   * reading it takes — so both faults land on every case whatever the summary decided about the
+   * means. `quotable` for the same reason the four above take it, and so that a red here is never
+   * confused with a fixture that stopped suppressing.
+   */
+  'surfaces-disagree': 'quotable',
 });
 
 describe('every property fires when the thing it protects is broken', () => {

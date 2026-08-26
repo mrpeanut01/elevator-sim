@@ -64,11 +64,28 @@
  *    audit's two files (tests). It is named in `AUDITED_MODULES` anyway, so a runtime file
  *    landing at the package root enters the audit on the day it lands. `replay/` holds only
  *    `replay.test.ts` and is named for the same reason.
+ * 6. **A surplus export.** `auditModules` returns early on `selfUses > 1`, so an export used by a
+ *    sibling declaration *in its own file* is reported called — and it is, which is why this is a
+ *    limit rather than a bug. What the audit therefore cannot ask is the **other** question: does
+ *    anything import it? A declaration whose only user is its own module is live code carrying a
+ *    dead `export`, and every assertion below is silent about it. GitHub issue **#273** is the
+ *    instance that found this: § D338 deleted the stage hand-off, which was
+ *    `everyday/boot.ts#dismissEngineerMenu`'s second and only cross-module caller, and the export
+ *    stayed standing for a wave with nothing here to notice. Both halves are pinned below — the
+ *    blindness by a positive control, the disposition by a check that goes red if the export
+ *    returns or the call goes.
+ *
+ *    **It is not one instance**, and the count is stated so the pin is not mistaken for the fix:
+ *    measured over `everyday/` on 2026-08-25, **fourteen** value exports had no importer anywhere
+ *    in the tree, five of them in `boot.ts` — which is an entry-point module (`boundaries.test.ts`
+ *    names it as one) and therefore has no importer *by construction*. Whether an entry point
+ *    should export its own boot function at all is a live question and a separate one; #273 asks
+ *    only about the export whose caller was **removed**, and that is what moved here.
  */
 
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -425,6 +442,97 @@ describe('every export of packages/viz has a caller or a stated reason', () => {
     expect(withoutConsumer.uncalled.map((symbol) => symbol.key)).toContain(
       'synthetic-control/SHADE',
     );
+  });
+
+  it('positive control: a surplus export reads live, and that is limit 6 rather than a bug', () => {
+    // Limit 6, demonstrated on the scanner itself rather than asserted about it in the header.
+    // Two synthetic one-file modules through the same auditModules entry point, differing only in
+    // whether a sibling declaration in the *same file* uses the export. Nothing imports it in
+    // either. The scanner reports the first live and the second dead — so "has a caller" and "has
+    // an importer" are different questions, and every assertion above asks only the first.
+    const usedFile = join(PACKAGES_DIR, 'viz/src/synthetic-surplus/used.ts');
+    const loneFile = join(PACKAGES_DIR, 'viz/src/synthetic-surplus/lone.ts');
+    const texts: Record<string, string> = {
+      [usedFile]:
+        'export function press(): number {\n  return 1;\n}\n' +
+        'export function fasten(): number {\n  return press();\n}\n',
+      [loneFile]: 'export function shove(): number {\n  return 1;\n}\n',
+    };
+    const fake = (files: readonly string[]): Corpus => ({
+      files,
+      text: (path) => texts[path] ?? '',
+      bindings: (path) => boundNames(texts[path] ?? ''),
+      namespaces: (path) => namespaceImports(path, texts[path] ?? ''),
+    });
+
+    const audit = auditModules(['viz/src/synthetic-surplus'], fake([usedFile, loneFile]));
+    expect(audit.symbols.map((symbol) => symbol.key)).toContain('synthetic-surplus/press');
+    expect(
+      audit.uncalled.map((symbol) => symbol.key),
+      'a self-used export reads called — this is the blindness limit 6 names, and the check ' +
+        'below is what stands in for it on the one instance we know of',
+    ).not.toContain('synthetic-surplus/press');
+    expect(
+      audit.uncalled.map((symbol) => symbol.key),
+      'the same export with no self-use IS found, which is what makes the line above a hole ' +
+        'rather than the scanner simply not looking',
+    ).toContain('synthetic-surplus/shove');
+  });
+
+  /*
+   * Limit 6's one known instance, and the disposition that closed it — GitHub issue #273.
+   *
+   * `dismissEngineerMenu` was exported because the § D335 stage hand-off called it: it was the
+   * belt to `closeEngineerMenuWhenReady`'s brace. § D338 retired the hand-off and the caller went
+   * with it, leaving an export nothing imports. It is **not** a dead seam and is not counted as
+   * one — the function is called, on the shipped path, by `closeEngineerMenuWhenReady`; what had
+   * no caller was the `export`.
+   *
+   * The missing call was ruled out before the export was dropped, and that is the half worth
+   * recording: crossing § D338's door in either direction cannot leave the Engineer menu open
+   * behind the player. Outward, `shell.ts#setCoveredInert` inerts `div.shell`, so `#open-menu`
+   * cannot be pressed while Everyday Mode has the page and `reopen` is dispatched from nowhere
+   * else. Back, `menuPanel.ts#coverShell` inerts the same subtree while the menu is drawn, so
+   * `#back-to-everyday` — which sits inside `div.shell` — cannot be pressed while the menu is up.
+   * So the boot-time press is the whole of it, and a second call site would be a call that can
+   * never do anything.
+   */
+  it('everyday/boot.ts keeps dismissEngineerMenu at module scope, and keeps calling it', () => {
+    const bootPath = scope.files.find((path) =>
+      path.replace(/\\/g, '/').endsWith('/viz/src/everyday/boot.ts'),
+    );
+    expect(bootPath, 'everyday/boot.ts is not in the scanned corpus').toBeDefined();
+    const boot = scope.text(bootPath ?? '');
+
+    expect(
+      /^export\s+(?:async\s+)?function\s+dismissEngineerMenu\b/m.test(boot),
+      'the export is back. Either something outside boot.ts now imports it — in which case name ' +
+        'that caller here and in the module docstring — or it is residue for the second time',
+    ).toBe(false);
+    expect(
+      /^function\s+dismissEngineerMenu\b/m.test(boot),
+      'the declaration is gone; if it was inlined into closeEngineerMenuWhenReady, this check and ' +
+        'limit 6’s instance both need rewriting rather than deleting',
+    ).toBe(true);
+
+    // The half a missing export cannot protect: the *call*. An export returning is loud; the two
+    // presses quietly disappearing is a menu left open behind an opaque cover, where it paints
+    // identically and nobody can see it.
+    expect(
+      (code(boot).match(/\bdismissEngineerMenu\b/g) ?? []).length,
+      'expected the declaration plus two presses — closeEngineerMenuWhenReady calls it once ' +
+        'eagerly and once per mutation. Counted over comment- and string-stripped source, so a ' +
+        '{@link} in a docstring is not a press',
+    ).toBe(3);
+
+    // And the question limit 6 says the audit cannot ask, asked here over every file in the
+    // corpus — tests included, because a test importer would be a caller too.
+    expect(
+      scope.files
+        .filter((path) => path !== bootPath && scope.bindings(path).has('dismissEngineerMenu'))
+        .map((path) => relative(PACKAGES_DIR, path)),
+    ).toEqual([]);
+    expect(symbols.map((symbol) => symbol.key)).not.toContain('everyday/dismissEngineerMenu');
   });
 
   it('positive control: unreadable input throws — it never skips (R24)', () => {

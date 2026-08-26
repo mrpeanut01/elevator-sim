@@ -499,3 +499,57 @@ describe('§ 8.6’s rolling calendar', () => {
     expect(dayIndexOf(tower({ day: 20 }))).toBe(19);
   });
 });
+
+describe('no shop tier promises a car the works never take', () => {
+  /**
+   * **The standing form of a register entry, on the commit that closed it — GitHub issue #272.**
+   *
+   * `shafts` level 1 read *"The tower stops being one car short. Eight nights with two cars out."*
+   * The second sentence was false in exactly the way `everyday/campaignModel.ts`'s calendar tip was
+   * before issue #264 withdrew it: **no campaign day takes a car out of passenger service.**
+   * `RecordRunOptions.outOfServiceCarIds` has no writer under `campaign/`, none in any
+   * `everyday/campaign*` module, and none in `everyday/host.ts#runCampaignDay` — which writes a
+   * tower's `buildingId` and `dispatcherId` and presses run, and reads no booking at all.
+   * `campaignModel.test.ts` sweeps for that writer and is the check that decides whether the
+   * sentence may ever come back.
+   *
+   * It was **registered rather than fixed** by the lane that found it, because it sat one directory
+   * outside that lane's scope, with a ghost check in `campaignModel.test.ts` holding it in both
+   * directions. It is withdrawn now — *a car may be out* on a day where none ever is would be the
+   * same claim with more words — the ghost check is deleted on this commit, and this is what stands
+   * in its place: not a register of one closed finding, but a sweep of every tier's prose.
+   *
+   * The register entry could only ever fail for the one string it named. This fails for the next
+   * one, on a table a design handoff is copied into by hand.
+   *
+   * **The pattern is narrower than `campaignModel.test.ts`'s `CAR_IS_AWAY` on purpose.** That one
+   * reads *"one car short"* as a claim too, and this table's surviving sentence says exactly that —
+   * a different claim about a different moment (what the building is like once the kit is in, which
+   * is GitHub issue #181's subject and registered there, not this one's). A check that cannot tell
+   * *the works take a car away* from *the tower gains a car* cannot be closed by fixing either.
+   */
+  const WORKS_TAKE_A_CAR = /(?<!\bno )\b(?:cars?|lifts?)\s+(?:out|down|away)\b|(?<!\bno )\bout of service\b/i;
+
+  it('is a pattern that would have caught the sentence it replaced', () => {
+    // Without this the sweep below could pass by matching nothing at all — § D163's *description
+    // rather than a gate*. Both arms: the withdrawn claim, and the sentence left standing beside it
+    // which this must **not** read as the same claim.
+    expect('Eight nights with two cars out.').toMatch(WORKS_TAKE_A_CAR);
+    expect('two cars out of service for four nights').toMatch(WORKS_TAKE_A_CAR);
+    expect('The tower stops being one car short.').not.toMatch(WORKS_TAKE_A_CAR);
+  });
+
+  it('says nothing about a car being out, on any tier of any category', () => {
+    const tiers = SHOP.flatMap((category) =>
+      category.tiers.map((tier) => ({ where: `${category.id} L${String(tier.level)}`, tier })),
+    );
+    expect(tiers.length, 'the shop table was not read').toBeGreaterThan(10);
+    for (const { where, tier } of tiers) {
+      expect(
+        tier.effect,
+        `${where} · "${tier.effect}" claims the works take a car out of service, and no campaign day does — see campaignModel.test.ts's writer sweep, which is what would let this sentence come back`,
+      ).not.toMatch(WORKS_TAKE_A_CAR);
+      expect(tier.name, `${where} · tier name`).not.toMatch(WORKS_TAKE_A_CAR);
+    }
+  });
+});

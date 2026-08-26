@@ -1389,19 +1389,35 @@ export function shiftRunConfigOf(
    * incidents**.
    *
    * After the patch because its `split` input must be the mix the run actually has: a fire drill
-   * inside a vacation week is still a drill, pulled flatter. And because `spokenForCarIds` is what
-   * stops a reserved goods car being the same car the move-in derate already took — which the
-   * incident's own return event would otherwise hand back to passengers mid-shift.
+   * inside a vacation week is still a drill, pulled flatter. The cars are a separate matter and no
+   * longer depend on this ordering: `calendarPatch` is handed the day's `event` and asks
+   * `events.ts#eventCarChoice` itself, which is what stops a reserved goods car being the same car
+   * the move-in derate already took — the car the incident's own return event would otherwise hand
+   * back to passengers mid-shift.
    *
    * Before the incidents because the schedule has to be written onto the building the calendar
    * returns, so one parse-and-resolve covers both edits rather than two.
+   *
+   * **The event and the player's holds, rather than a list of car ids — GitHub issue #272.** This
+   * line used to pass `spokenForCarIds: patch.outOfServiceCarIds`: the event's whole-shift holds
+   * alone, which is `[]` on every day this build can produce, so the paragraph above described a
+   * mechanism the product did not reach. On `midtown-office` / `moving-week` / day 1 the reservation
+   * and `move-in`'s derate both picked `main-D`, the schedule returned it at 1 200 s of an 1 800 s
+   * shift, and 114 people rode the car the caption reserved for the movers.
+   * `calendar.test.ts`'s harness built the right list all along and was never compared against this
+   * one on a day with a period.
+   *
+   * No caller builds that list now. `calendarPatch` derives it from the event through
+   * `events.ts#eventCarChoice` — the same function `shiftRunPatch` decided this run's own holds and
+   * incidents with, three statements above — so the run and the caption cannot pick different cars.
    */
   const calendar = calendarPatch({
     day: calendarDay,
     building: grown,
     split: patch.demand.directionalSplit ?? baseOf(resources, authored, demand).split,
     ...askInput,
-    spokenForCarIds: patch.outOfServiceCarIds,
+    event,
+    playerHeldCarIds: state.outOfServiceCarIds,
   });
 
   const outOfServiceCarIds = [

@@ -504,6 +504,7 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 
 import type { WaitBandBasis } from '../live/types.js';
 
+import { renderAgreements } from './agreement.js';
 import { withheldStates, type WithheldState } from './generate.js';
 import type {
   HonestyCase,
@@ -4633,7 +4634,7 @@ const RIGHT_RAIL: SurfaceAdapter = {
  * reconstructing it here is the alternative to widening their signatures for a test's convenience.
  * Every field is the shipped one: the same `data/` documents, the same resolved buildings.
  */
-function browserResourcesOf(context: HonestyContext): BrowserResources {
+export function browserResourcesOf(context: HonestyContext): BrowserResources {
   return {
     elevatorSpecs: context.elevatorSpecs as ElevatorSpecs,
     trafficProfiles: context.trafficProfiles,
@@ -6012,6 +6013,18 @@ const CALENDAR_AND_FABRIC: SurfaceAdapter = {
       const placed = periodOnDays(period, 1, 7);
       for (const day of [1, 6]) {
         const today = calendarDayFor(placed, day, (day - 1) % 7);
+        /*
+         * The event the day is actually under — GitHub issue #135's fix, swept on every shipped
+         * period rather than only on the ordinary week the shift bundle drives.
+         *
+         * **Hoisted above the patch, and one call rather than two — GitHub issue #272.** It is read
+         * twice below: `calendarPatch` steps over the cars today has already taken, and the two
+         * seeds under it are the override's own name and note. Asking `scheduledEventFor` twice
+         * would be a second expression answering *which event is today*, which is the whole of
+         * issue #135 one directory over — and the calendar's own docstring refuses a second answer
+         * in those words.
+         */
+        const booked = scheduledEventFor(placed, day, (day - 1) % 7);
         const patch = calendarPatch({
           day: today,
           building,
@@ -6019,6 +6032,22 @@ const CALENDAR_AND_FABRIC: SurfaceAdapter = {
           demandTemplateId: 'rise-and-fall',
           demandTemplates: context.trafficProfiles.demandTemplates,
           runLengthS: 1800,
+          /*
+           * **The corpus asks the question the product asks — GitHub issue #272.**
+           *
+           * Without this, the reservation reserved a car the day's event had already taken, and
+           * this surface was the last caller of `calendarPatch` that could. `calendar.ts` named it
+           * as the one omission and named the cell: on `garden-apartments`, whose only bank has two
+           * cars, `move-in`'s derate takes the single car `carsToDerate` may stand down, so the
+           * period reserves **none** and files a refusal — while the caption this seeded read
+           * *"1 car reserved"*. `RISKS.md` R26 exactly: every property stayed green over a string
+           * the product cannot produce, because a property judges the string and not the call.
+           *
+           * `dev/state.ts#shiftRunConfigOf` and `scope/runIdentity.ts` pass the same thing
+           * ([§ D364](../../../../DECISIONS.md)), and `surfaces.test.ts` requires this adapter's
+           * captions and refusals to be the ones those callers would publish.
+           */
+          event: booked,
         });
         /*
          * `observation`, not `label`: the line carries a **population count** taken off the edited
@@ -6032,16 +6061,12 @@ const CALENDAR_AND_FABRIC: SurfaceAdapter = {
           role: 'observation',
         });
         /*
-         * The event the day is actually under — GitHub issue #135's fix, swept on every shipped
-         * period rather than only on the ordinary week the shift bundle drives.
-         *
-         * These are `SHIFT_EVENTS`' own name and note, which `SHIFT_REPORT` already seeds for the
-         * schedule's answer; what is new here is the **override's** answer, and it is a different
-         * pair on five of `moving-week`'s seven days. `label` and `prose` match the roles those two
-         * strings carry everywhere else, so a period cannot smuggle a figure onto a surface by
-         * booking an event with one in its note.
+         * `SHIFT_EVENTS`' own name and note, which `SHIFT_REPORT` already seeds for the schedule's
+         * answer; what is new here is the **override's** answer, and it is a different pair on five
+         * of `moving-week`'s seven days. `label` and `prose` match the roles those two strings carry
+         * everywhere else, so a period cannot smuggle a figure onto a surface by booking an event
+         * with one in its note.
          */
-        const booked = scheduledEventFor(placed, day, (day - 1) % 7);
         seeds.push({ field: `period.${id}.day${String(day)}.event.name`, text: booked.name, role: 'label' });
         seeds.push({ field: `period.${id}.day${String(day)}.event.note`, text: booked.note, role: 'prose' });
         for (const [index, withheld] of patch.withheld.entries()) {
@@ -10081,10 +10106,20 @@ export function coveredDeclarations(): ReadonlySet<string> {
   return covered;
 }
 
-/** Render every surface, in order. Never throws for a surface that has nothing to say. */
+/**
+ * Render every surface, in order. Never throws for a surface that has nothing to say.
+ *
+ * **Plus the cross-surface readings, which are not an adapter and must not be one.** Every entry
+ * in {@link SURFACE_ADAPTERS} answers *what does this one surface say?*, and `honesty.test.ts`
+ * asserts each of them produced strings under **its own id**. A declared pair produces readings
+ * under **two** ids — the two shipped expressions being compared — so it would break that
+ * assertion, and the assertion is right: an adapter is a surface, and a pair is a claim about two.
+ * See `agreement.ts` for the register and § D359 for the defect that needed a new shape.
+ */
 export function renderAll(context: HonestyContext): readonly RenderedText[] {
   const texts: RenderedText[] = [];
   for (const adapter of SURFACE_ADAPTERS) texts.push(...adapter.render(context));
+  texts.push(...renderAgreements(context, browserResourcesOf(context)));
   return texts;
 }
 

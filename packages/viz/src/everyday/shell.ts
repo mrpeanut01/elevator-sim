@@ -545,9 +545,71 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     }
   });
 
+  /**
+   * Every navigation in this shell lands here, and every one of them starts the new screen at its
+   * top.
+   *
+   * ## Why this is a product fix and not a test convenience
+   *
+   * It did not, and the omission is invisible on a desktop. `§ 4`'s menu is four tiles in a column;
+   * at `375×667` — the shortest viewport `docs/31-support-matrix.md` § 1 tier 2 actually drives —
+   * the third and fourth tiles are **below the fold**. A player scrolls to reach *Endless rush*,
+   * taps it, and the document keeps the scroll offset it had: they arrive on the rush screen
+   * already 76 px down it, with its heading off the top of their phone.
+   *
+   * Nothing reset it because nothing needed to while the tier only measured tall viewports. The
+   * browser tier's `puts the reason inside the viewport` case found it by asserting `scrollY === 0`
+   * before measuring — a guard written to make *its own* measurement honest, which then failed on
+   * CI and passed here, because the two Chromiums lay the menu out a few pixels differently and
+   * only one of them left the tile above the fold.
+   *
+   * **The tempting fix was to scroll the test back to the top**, which would have measured a page
+   * no player ever sees and buried a real defect under a green tier. `RISKS.md` R26's shape: the
+   * harness and the product disagreeing, and the harness being right.
+   *
+   * ## Both scrollers, and the correction that got here
+   *
+   * Which element holds the offset depends on the viewport: at `375×667` the **document does not
+   * scroll at all** — `documentElement.scrollHeight - innerHeight` is `0` on the deployed build and
+   * on a local dev server — and the overflow lives on `.everyday-screen`, scrollable by 366 px on
+   * the menu. On CI's Chromium the document *does* overflow, which is why the browser tier saw
+   * `window.scrollY === 76` there and `0` locally. **Neither element alone is the answer**, which is
+   * why the tier's own helper has always summed the two.
+   *
+   * **The screen-element line was written, then deleted on a wrong inference, then restored by
+   * measurement — and the middle step is the one worth recording.** The argument for deleting it was
+   * that `dev/dom.ts#reconcile` drops every child before inserting, collapsing `scrollHeight` while
+   * the container is empty, so the browser clamps `scrollTop` to `0` on the way through; a local
+   * mutation appeared to confirm it, because removing the line changed no case. **Driving the
+   * deployed preview at `375×667` refuted it**: scroll the menu to 300, tap the fourth tile, and the
+   * new screen opens at offset **300** with its heading **272 px above the top of the viewport**.
+   * The clamp is real and it is not reliable — it depends on the incoming screen being shorter than
+   * the offset, which `fixit` is not.
+   *
+   * ## Nothing in this repository's suite can pin it, and that is its own finding
+   *
+   * Two cases were written to bite locally and both were deleted for asserting nothing: removing
+   * either line leaves the whole browser tier green here, on `rush` and on `fixit` alike. The reason
+   * is that the tier drives a **`vite dev` server** while the defect reproduces on the **built
+   * bundle** the preview serves — a different artifact, laid out differently enough that the
+   * reconciler's clamp saves the dev server and does not save production.
+   *
+   * So this line is pinned by a **driven deployment**, not by a case, and the evidence is quoted
+   * above rather than left as a claim. That gap — the tier asserting things about an artifact
+   * nobody ships — is filed separately; it is `RISKS.md` R26 one level up from the code, and it is
+   * larger than this fix.
+   *
+   * `behavior` is left at its default: a smooth scroll here would animate on a playhead-tied redraw,
+   * which `docs/28` § 6's AD-M2 refuses, and it would race the tier's next measurement.
+   *
+   * A decision number is owed.
+   */
   function go(screen: EverydayScreen): void {
     state = { ...state, screen };
     draw();
+    doc.defaultView?.scrollTo(0, 0);
+    const screenEl = root.querySelector<HTMLElement>('.everyday-screen');
+    if (screenEl !== null) screenEl.scrollTop = 0;
   }
 
   /**

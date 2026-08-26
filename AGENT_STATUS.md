@@ -467,6 +467,20 @@ Named on screen in the products' own registers rather than only here:
   `screens.test.ts` asserts it over the whole registry, so a screen registered tomorrow fails on the
   commit that registers it. The bench's bar gained a reason it never had: its `mountedBench` handle
   carried a `ready` bit, and now carries `benchFieldRefusal`/`benchTestsRefusal`'s own sentence.
+  generated; the setup screen's primary is inert, with the reason in the § 3.3 bar beside it and on
+  the control's accessible name, and § 9.3's result screen is deliberately unbuilt rather than
+  printing invented figures. **This row said *"with the reason on the control"* from `0dd8cae`
+  (2026-08-13) until now, and the reason was on the screen, sometimes** — GitHub issue #262 measured
+  it at `scrollY: 0` on the
+  deployed build: 905.8 px down a 720 px viewport, 3 443.2 px down the 667 px one
+  `docs/31-support-matrix.md` supports, and the button carried no `title`, `aria-label` or
+  `aria-describedby` at all. It is the class [`RISKS.md`](RISKS.md) R38 tracks — prose nothing
+  re-derives, drifting away from the thing it describes — landing on the register a reader consults
+  to find out whether a screen is honest, which is what made the defect invisible. Two browser
+  cases now re-derive it: one drives the fold at the matrix's shortest supported height, one reads
+  Chromium's own AX node. The `aria-describedby`
+  channel is still empty and is `shell.ts`'s to provide (issue #239), so the sentence says *name*
+  rather than *description*, which is what a screen module can reach.
 - **The daily board needs a server.** The ladder beside it is live because a rating is measured on
   this device; the board's tab carries § 12.2's labelled unavailable state.
 - **No campaign day is filed yet** from § 8's screens — running one is wired end to end, but marking

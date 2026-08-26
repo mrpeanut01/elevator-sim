@@ -16,7 +16,7 @@
  * which is a way of testing the double.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { issuedChallengeFor } from '../challenge/schedule.js';
 import { challengeScoreOf, type SeedResult } from '../challenge/submission.js';
@@ -24,6 +24,29 @@ import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js'
 import { PgliteSql } from './pglite.test-helper.js';
 import { RacingSql } from './racingSql.test-helper.js';
 import { NoSuchUserError, SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
+
+/**
+ * **Every test in this file boots a whole PostgreSQL, and vitest's default gives it five seconds.**
+ *
+ * The `server` project passes no `testTimeout`, so `vitest.config.ts`'s 5 000 ms default applies —
+ * the same ceiling issue #144 measured as a false red for `viz` and replaced there with 300 000 ms.
+ * Nothing about that argument is specific to simulating: `PgliteSql` compiles and starts
+ * PostgreSQL-in-WebAssembly per fixture, which fits inside five seconds on an idle machine and does
+ * not fit under load.
+ *
+ * **This is the flake the #254 lane saw once and could not reproduce in six runs.** Reproduced here
+ * by running three `vitest run --project server` processes at once: 11, 12 and 6 failures across
+ * three runs of the same green tree, every one of them `Test timed out in 5000ms`, every one of
+ * them in this file. It is not a race, not an ordering problem and not the un-closed instances the
+ * report suspected — those are closed one commit earlier and the timeouts survived it.
+ *
+ * Set for the file rather than annotated per test, because the annotation is a list and the list is
+ * the defect — `vitest.config.ts`'s own note on issue #144 makes that argument at length. **The
+ * right home is the `server` project entry in that file**, next to `viz`'s, and that is out of this
+ * lane's allowed paths; it is owed, and § D361 names it. `core` is in the same position and its
+ * config comment already says so.
+ */
+vi.setConfig({ testTimeout: 300_000, hookTimeout: 300_000 });
 
 const RUN: SubmittedRun = Object.freeze({
   buildingId: 'garden-apartments',
@@ -57,6 +80,12 @@ async function fixture(): Promise<{
   let clock = 1_770_000_000_000;
   const sql = new PgliteSql();
   const store = await Store.open({ sql, now: () => clock });
+  // Every fixture is a whole PostgreSQL, and this file builds one per test. Closed when the test
+  // finishes rather than at the end of the `it`, so a failing assertion does not leak the instance:
+  // the #254 lane saw three session tests fail once under heavy parallel load with un-closed
+  // instances outstanding and could not reproduce it in six runs, which is what an accumulating
+  // resource looks like from the outside.
+  onTestFinished(async () => store.close());
   const make = async (name: string): Promise<string> => {
     const created = await store.createUser({
       email: `${name}@example.test`,
@@ -603,6 +632,7 @@ async function racedFixture(fires: (text: string) => boolean): Promise<{ store: 
     await store?.deleteUser(ada);
   });
   store = await Store.open({ sql, now: () => 1_770_000_000_000 });
+  onTestFinished(async () => store?.close());
   const created = await store.createUser({
     email: 'raced@example.test',
     displayName: 'Raced',
@@ -653,5 +683,177 @@ describe('an account deleted underneath a submission', () => {
         score: challengeScore(25),
       }),
     ).rejects.not.toBeInstanceOf(NoSuchUserError);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The other four races, found by deriving the enumeration rather than reading
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A store whose one account exists, and a competing statement that runs inside a chosen gap.
+ *
+ * {@link racedFixture}'s sibling. That one races a *deletion*, which is the case #254 made
+ * reachable; this one races **another caller doing the same thing**, which was always reachable and
+ * which `concurrency.test.ts` derives three more instances of. The competing statement runs on the
+ * database underneath `RacingSql`, so it does not come back through the one-shot gate.
+ *
+ * Armed by hand, because the fixture's own `createUser` would otherwise spend the shot on itself.
+ */
+async function contendedFixture(options: {
+  readonly fires: (text: string) => boolean;
+  readonly contend: (sql: PgliteSql) => Promise<void>;
+}): Promise<{ store: Store; sql: PgliteSql; ada: string; arm: () => void }> {
+  let armed = false;
+  const inner = new PgliteSql();
+  const sql = new RacingSql(
+    inner,
+    (text) => armed && options.fires(text),
+    async () => options.contend(inner),
+  );
+  const store = await Store.open({ sql, now: () => 1_770_000_000_000 });
+  onTestFinished(async () => store.close());
+  const created = await store.createUser({
+    email: 'raced@example.test',
+    displayName: 'Raced',
+    displayNameChosen: true,
+  });
+  if (!created.ok) throw new Error(created.reason);
+  return {
+    store,
+    sql: inner,
+    ada: created.user.id,
+    arm: () => {
+      armed = true;
+    },
+  };
+}
+
+/** One `users` row, written straight past the store. */
+const INSERT_USER =
+  'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) VALUES ($1, $2, $3, $4, $5)';
+
+describe('two callers doing the same thing at the same moment', () => {
+  it('reports a lost race for an address as a taken address, not as a constraint violation', async () => {
+    // Both requests read the address, both find nothing, both insert. `createPlayer`'s own comment
+    // — "Lost a race to another request for the same address: that account is the right answer" —
+    // described a branch that only the *sequential* path could reach until this was mapped.
+    const { store, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('INSERT INTO users'),
+      contend: async (inner) => {
+        await inner.query(INSERT_USER, ['winner', 'contested@example.test', 'Winner', true, 1_770_000_000_000]);
+      },
+    });
+    arm();
+    expect(
+      await store.createUser({ email: 'contested@example.test', displayName: 'Loser', displayNameChosen: true }),
+    ).toMatchObject({ ok: false, reason: 'email-taken' });
+  });
+
+  it('tells a lost name apart from a lost address, by asking which one is now taken', async () => {
+    // `users` has two unique keys and only one of them is the address, so the mapping cannot read a
+    // constraint name — it asks the database the question actually being asked. § D358's rule, on
+    // the site where the discriminator matters most.
+    const { store, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('INSERT INTO users'),
+      contend: async (inner) => {
+        await inner.query(INSERT_USER, ['winner', 'other@example.test', 'Contested', true, 1_770_000_000_000]);
+      },
+    });
+    arm();
+    expect(
+      await store.createUser({ email: 'fresh@example.test', displayName: 'Contested', displayNameChosen: true }),
+    ).toMatchObject({ ok: false, reason: 'name-taken' });
+  });
+
+  it('reports a rename that lost to another rename as a taken name', async () => {
+    // `setDisplayName`'s docstring already claimed the unique index "is what makes the guarantee
+    // true under two players renaming to the same thing at once, which the check alone cannot
+    // promise". It made the data true and handed the caller a raw `23505`.
+    const { store, ada, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('UPDATE users'),
+      contend: async (inner) => {
+        await inner.query(INSERT_USER, ['winner', 'grace@example.test', 'Grace', true, 1_770_000_000_000]);
+      },
+    });
+    arm();
+    expect(await store.setDisplayName(ada, 'Grace')).toMatchObject({ ok: false, reason: 'name-taken' });
+  });
+
+  it('makes two submissions of one seed one row, rather than failing the second', async () => {
+    // Nothing to do with deletion. The upsert conflicted on `id` — the primary key — while the
+    // guarantee it exists to keep is over `UNIQUE (config_hash, user_id, seed)`. Two concurrent
+    // submissions of the same seed both read nothing, both mint a fresh id, and the second loses.
+    const { store, sql, ada, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('INSERT INTO entries'),
+      contend: async (inner) => {
+        await inner.query(
+          'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, ' +
+            'pct_over_long_wait, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+          ['first-in', 'contested', ada, RUN.seed, JSON.stringify(RUN), 11, 22, 33, 0, 1_770_000_000_000],
+        );
+      },
+    });
+    arm();
+    const row = await store.recordEntry({ configHash: 'contested', userId: ada, run: RUN, measured: metrics(10) });
+    // The winner's row is the row, updated — not a second one and not a rejection. Its id comes
+    // back from the statement, so the caller is told which row it actually wrote.
+    expect(row.id).toBe('first-in');
+    expect(row.measured.awtS).toBe(10);
+    const count = await sql.query('SELECT COUNT(*) AS n FROM entries WHERE config_hash = $1', ['contested']);
+    expect(Number(count.rows[0]?.['n'])).toBe(1);
+  });
+
+  it('does the same for a challenge entry, because it has the same shape', async () => {
+    const { store, sql, ada, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('INSERT INTO challenge_entries'),
+      contend: async (inner) => {
+        await inner.query(
+          'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, ' +
+            'runs, legs, mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, ' +
+            'per_seed_json, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)',
+          ['first-in', issuedChallengeFor(0).id, 'data-1', ada, 'eta', 5, 100, 30, 60, 90, 0, '[]', 1_770_000_000_000],
+        );
+      },
+    });
+    await store.issueChallenge(issuedChallengeFor(0));
+    arm();
+    const row = await store.recordChallengeEntry({
+      challengeId: issuedChallengeFor(0).id,
+      dataHash: 'data-1',
+      userId: ada,
+      dispatcherProfileId: 'collective',
+      score: challengeScore(20),
+    });
+    expect(row.id).toBe('first-in');
+    // Latest wins, which is what the docstring says a challenge entry is: the run a player
+    // currently stands behind, and switching dispatcher is the move the surface exists for.
+    expect(row.dispatcherProfileId).toBe('collective');
+    const count = await sql.query('SELECT COUNT(*) AS n FROM challenge_entries WHERE challenge_id = $1', [
+      issuedChallengeFor(0).id,
+    ]);
+    expect(Number(count.rows[0]?.['n'])).toBe(1);
+  });
+});
+
+describe('an account deleted underneath a write that never read it', () => {
+  it('fails createLoginToken as a missing account, not as a raw constraint violation', async () => {
+    // The pair a read-then-write scan inside `store/` cannot see: the read is one frame up, in
+    // `requestLink`, and this method is a bare `INSERT` into a table with a key to `users`.
+    const { store, ada } = await racedFixture((text) => text.startsWith('INSERT INTO login_tokens'));
+    const failure = store.createLoginToken({ jti: 'jti-raced', userId: ada, expiresAtMs: 1_770_000_060_000 });
+    await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
+    await expect(failure).rejects.toThrow('createLoginToken: no such user');
+    await expect(failure).rejects.not.toThrow(/foreign key|constraint|fkey/u);
+  });
+
+  it('fails createSession the same way, at the worst possible moment', async () => {
+    // `redeemLink` has already spent the link by the time it gets here, so an unexplained failure
+    // costs the player the link as well as the session.
+    const { store, ada } = await racedFixture((text) => text.startsWith('INSERT INTO sessions'));
+    const failure = store.createSession('session-raced', ada);
+    await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
+    await expect(failure).rejects.toThrow('createSession: no such user');
+    await expect(failure).rejects.not.toThrow(/foreign key|constraint|fkey/u);
   });
 });
