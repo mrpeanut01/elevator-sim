@@ -1,7 +1,7 @@
 /**
  * **§ 2's three commitment clauses, measured at the widths the matrix commits to** — GitHub issue
- * #292, and the gate `M2_MEASUREMENT.md` § 4's table calls *"#240's viewport gates, which do not
- * exist"*.
+ * #292, and the gate `M2_MEASUREMENT.md` § 4's table called *"#240's viewport gates, which do not
+ * exist"* until this file existed.
  *
  * `docs/31-support-matrix.md` § 2 puts three things in scope for launch at **360 px of CSS width and
  * above, in a tier-1 browser**: the product *"lays out without horizontal overflow, keeps the stage
@@ -116,6 +116,11 @@
  * uncommitted script cannot keep proving anything, and § 4.1 quotes #203 § 4's rule that *"every
  * tier-1 row must be a row a red run defends"*. § 2 puts 360 px in scope for launch. A width in
  * scope with no run behind it is the state this file ends.
+ *
+ * The **second** half of that issue — the tier file count both documents published and both got
+ * wrong — is `viewportGateClaims.test.ts`, beside this one and deliberately **not** a
+ * `*.browser.test.ts` file: it reads a count off disk, and a count that skipped whenever Chromium
+ * was missing would be a guard reporting as *ran*.
  *
  * § D220 § 4 holds: **no metric is asserted.** Everything here is a box, a pixel or a control's
  * name; what any figure inside the product *means* is the honesty corpus's business, not this
