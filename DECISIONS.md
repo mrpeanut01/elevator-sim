@@ -25770,3 +25770,102 @@ the moment any scored day closes and credits nothing to the sandbox. The fix is 
 day, and it moves two files that share a string-identity test, so they move together or not at all.
 
 ---
+
+## D383 — the Engineer end-of-day close is armed only while the Engineer surface has the page, and it is an edge
+
+**Rules on:** GitHub issue #287 (P0). Settles the arguments in `everyday/swap.ts#EverydaySwapPort.hasThePage`,
+`dev/main.ts#endedUnderTheCover` and `dev/main.ts#engineerHasThePage`.
+
+**Decision.** The Engineer surface's *"the day closes when the day ends"* rule fires **only while the
+Engineer surface holds the page**, and it fires on the **edge** — the frame a run ends — never on the
+level. `everyday/host.ts` gains no transport method.
+
+**What was wrong.** From a cold load, entering the Everyday stage and touching nothing filed, scored and
+banked the day. The Everyday stage and the Engineer surface run **two independent `Playback`s** over one
+recording, and only the Engineer one could file: at the instant the day was banked **the stage clock
+still read `08:30`** — the player's own transport had never moved. `rAF` is per-document, so `inert` and
+`visibility:hidden` do not stop the tick, and entering the Everyday stage *satisfies*
+[§ D232](#d232)'s `playerHasChosen` latch, because the stage's own run goes through the very seam that
+latch watches. #39's defect returning through [§ D338](#d338)'s door.
+
+**Why an edge and not a gate — the load-bearing design point.** `playback.state === 'ended'` is a
+**level**: true on every frame after the run ends. Gating that level on *who holds the page now* would
+have **moved** the file rather than removed it — the first frame after § 3.2's swap would have banked
+the Everyday player's day **on the way through the door**. `endedUnderTheCover` records which run ran
+out where nobody could see it, so a run that ended under the cover stays filed-never rather than
+filed-later.
+
+**Why `host.ts` is untouched.** That file argues at length that a transport method on the host *"would
+be a second clock"*. The argument stands and was not overturned; the fix disarms the Engineer rule
+rather than linking the two transports.
+
+**The issue understates the defect, and the correction is the reason this is worth a decision.** #287
+says it *"does not reproduce more than once per sitting"*, because filing switches the tab to `report`.
+**Refuted empirically.** `everyday/reportScreen.ts:400` → `host.openTomorrow()` calls `openRunTab()`
+**and** `startRun()`, and `adopt` clears `filedRunId` — **both halves of the disarm are undone.** Driven
+on the page: one *Start the day*, one *Open the doors on Tuesday*, then sitting on the brief touching
+nothing, `Your week` read `0 cleared · 0 missed · 2 too quiet to grade, over 2 days closed`. **The loop
+banks a whole week a tester never watched**, which is a different severity from a single day.
+
+**Its arithmetic is refuted in its operands.** There is no 3 528 s day anywhere in the tree:
+`garden-apartments` has **no authored day**, so the run is contract `c1`'s 3 600 s hour, and the measured
+interval is **60 011 ms**. The reported *"at 1× it filed at sim-clock 08:59"* is internally inconsistent
+— 58.8 s at the stage's default 30 sim-seconds-per-real-second is 1 764 s past 08:30, which is that
+reading at the **default** rate rather than at 1×. The *form* of the issue's explanation is right and
+every operand in it is wrong, which is why the fix was built from a trace rather than from the sum.
+
+**A second site of the same class, not in the issue.** `Ctrl`/`Cmd`+`Enter` was bound to `closeShift` on
+a **`window`** listener. `inert` removes an element from hit-testing and the tab order, **not** from the
+bubble path of a key pressed on `body`, so the shortcut filed the Everyday player's day from § 7's
+stage. Both now ask `engineerHasThePage`, which is the one expression the boundary is written in.
+
+**Named and not fixed.** The rest of `main.ts`'s `window` keydown handler is still live under the cover —
+Space, `,`/`.`, `[`/`]` and the seek keys drive the invisible Engineer transport from Everyday screens.
+After this none of them scores a day, but they are Engineer controls answering on an Everyday screen.
+Written down at the site; worth its own issue. And `MountContext.openTab` still files when
+`tab === 'report' && playheadHasRunOut()` — unreachable from Everyday today, because the host binds only
+`openTab('run')`, and **any future Everyday screen binding `openTab('report')` reintroduces this exact
+defect.**
+
+---
+
+## D384 — a stage row that explains why the picture stopped does not tell the player what to press
+
+**Rules on:** GitHub issue #287's fourth acceptance criterion. Settles `everyday/stageScreenModel.ts#STAGE_DAY_OVER`.
+
+**Decision.** When the day has run out under a stage the player is still watching, the § 3.3 row **says
+that the day is over and stops there**. It does not instruct.
+
+**What it replaces.** At the two fastest speed chips the Everyday stage's own playback ends while the
+Engineer one is still running, and the screen was **bit-for-bit identical for ~46 seconds** — 0 px
+changed, the only delta a transport label. Several readers believed the product had crashed. With
+§ D383 the Engineer transport no longer files, so the window is no longer a prelude to a surprise bank;
+it is simply a stopped picture, and it needs a cue rather than a fix.
+
+**Why describe rather than instruct.** The row is drawn in **three** run contexts and an instruction
+true in one is false in the others — the drafted wording was a lie on two of them. The three sentences
+already in that model keep the same discipline, which is why they survive every context unchanged. A
+row that describes cannot go stale against a context it was not written for, which is the § D227 failure
+in its cheapest form.
+
+---
+
+## D385 — the stage's fourth row state enters the corpus as a seed, not as a fourth flag
+
+**Rules on:** the honesty corpus's coverage of the stage bar. Settles the seed comment in `honesty/surfaces.ts`.
+
+**Decision.** § D384's row state is swept as an **additional seed**, and deliberately **not** as a fourth
+row of `interventionStates`.
+
+**Why.** That array's flags are spread into `stageInterventionsOf`, which has no `dayEnded` and would
+take one as an excess property. A fourth row would therefore mean **restructuring a shared literal in
+the one file where restructuring is the hazard** — `honesty/surfaces.ts` is the tightest serialization
+point in the tree, because every lane that adds a player surface writes it and an adapter *is* the
+surface. Two purely additive changes, nineteen lines, no restructuring.
+
+**What is not claimed.** The corpus is **not re-measured** here and no string, surface or case count is
+published. [§ D343](#d343) takes that measurement once, after the wave integrates. The expected rise is
+roughly one string per case per tier, and **an expected rise is a warning, not a measurement** — the
+distinction this repository has recorded five times.
+
+---

@@ -86,7 +86,7 @@ export interface EverydaySwapPort {
    * listener, and a window listener is not covered by `inert` — that shortcut filed the Everyday
    * player's day too. `dev/main.ts#engineerHasThePage` is the one expression both ask through.
    *
-   * A decision number is owed for the boundary this draws: **the Engineer end-of-day close is
+   * Recorded as § D383, for the boundary this draws: **the Engineer end-of-day close is
    * armed only while the Engineer surface has the page.** The Everyday product keeps its own
    * contract, the Engineer product keeps its own behaviour, and neither reaches across the cover.
    */

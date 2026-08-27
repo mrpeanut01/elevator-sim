@@ -731,7 +731,7 @@ export interface StageBarInput {
  * it explains why the picture stopped — and says nothing about what to press. The three sentences
  * above it keep the same discipline, which is why they survive every context unchanged.
  *
- * A decision number is owed; the argument is this docstring's.
+ * Recorded as § D384, whose argument this docstring is.
  */
 export const STAGE_DAY_OVER = 'the day has run out — the stage will not move again on its own';
 

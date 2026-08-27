@@ -744,7 +744,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * and if the transport is still sitting past the end under the cover the very next frame writes it
    * again — so the worst a round trip can do is re-answer a question correctly.
    *
-   * A decision number is owed; the argument is `everyday/swap.ts#EverydaySwapPort.hasThePage`'s.
+   * Recorded as § D383; the argument is `everyday/swap.ts#EverydaySwapPort.hasThePage`'s.
    */
   let endedUnderTheCover: string | undefined;
   /**
