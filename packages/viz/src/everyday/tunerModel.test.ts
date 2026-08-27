@@ -36,9 +36,12 @@ import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import { buildingConfigOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { baseState, legsOf, RESOURCES } from '../scope/probes.test-helper.js';
+import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
-import { SANDBOX_CONTRACT_ID } from '../shift/week.js';
+import type { WeekState } from '../shift/types.js';
+import { closeDay, outcomeOf, SANDBOX_CONTRACT_ID } from '../shift/week.js';
 import { actionBarFor } from './actionBar.js';
+import { railModel } from './rail.js';
 import { classOfSpec, loadStepsFor, speedStepsFor } from './designerModel.js';
 import {
   buildingWithTune,
@@ -388,4 +391,112 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       base,
     );
   }, 60_000);
+
+  /**
+   * **A fresh profile through the tuner, and the rail's two figures against the contract the week is
+   * on** — GitHub issue #290's second acceptance criterion.
+   *
+   * The rail is where the promise is broken or kept: the tuner says four times that the run will not
+   * be scored, and `everyday/rail.ts#careerLineOf` is the sentence a player reads afterwards. So the
+   * case ends there rather than on `WeekState`, which is what makes it a case about the product.
+   */
+  describe('the rail after a day closed from the tuner', () => {
+    const observations = (minutePct: number, kind: 'met' | 'missed') => ({
+      arrived: 400,
+      carryPct: kind === 'met' ? 100 : 10,
+      minutePct,
+      peakQueue: kind === 'met' ? 0 : 99,
+      abandoned: kind === 'met' ? 0 : 9,
+      worstWaitS: kind === 'met' ? 40 : 940,
+      worstWaitIsCensored: false,
+    });
+
+    /** The week a *Close the day* produces, from the week the press left standing. */
+    const closed = (week: WeekState, minutePct: number, kind: 'met' | 'missed'): WeekState =>
+      closeDay(
+        week,
+        outcomeOf({
+          record: null,
+          recordRefusal: null,
+          day: week.day,
+          dayIdx: week.dayIdx,
+          eventId: 'ordinary',
+          arrived: 400,
+          carried: 380,
+          minutePct,
+          readings: readGoals(goalsForDay(week.day), observations(minutePct, kind)),
+        }),
+      );
+
+    /** § 3.2's career line — the rail's two figures, as the identity card draws them. */
+    const careerLine = (week: WeekState): string =>
+      railModel({ screen: 'menu', ctx: 'daily' }, { week, dayClosed: true }).footer.identity.streak;
+
+    it('shows nothing saved before a day is closed, on a cold profile', () => {
+      const state = baseState();
+      expect(state.week.history).toHaveLength(0);
+      expect(careerLine(state.week)).toMatch(/no days saved yet/);
+    });
+
+    it('scores an untouched run, because an untouched run is the standing day', () => {
+      /*
+       * The other half of issue #289, read on the rail. With nothing moved the week never leaves its
+       * assignment, so the day *is* scored and the figures moving is correct — the screen said
+       * *Scored day — three things are fixed* and the state now agrees with it.
+       */
+      const state = baseState();
+      const at = standingAt(state);
+      const after = pressed(state, tunePresses(at.building, at.pattern, at.tune, at.tune));
+      expect(after.week.contractId).not.toBe(SANDBOX_CONTRACT_ID);
+      expect(careerLine(closed(after.week, 26, 'missed'))).toBe('0 days running · best 26%');
+      expect(careerLine(closed(after.week, 97, 'met'))).toBe('1 day running · best 97%');
+    });
+
+    it('banks neither figure from a tuned run, which is what the screen promised', () => {
+      /*
+       * The defect. On the tree at `55f2bca` this line read `0 days running · best 26%` — the
+       * reported symptom exactly — on a screen carrying *Sandbox — nothing counts*, *This run will
+       * be stamped "sandbox"*, *a sandbox day can never be mistaken for a scored one* and § 3.3's
+       * *Sandbox — this run will not be scored.* The clean arm read `1 day running · best 97%`,
+       * which is the half the issue did not report and the reason `closeDay`'s guard covers the
+       * streak as well as the mark.
+       *
+       * **`best —` rather than `best 0%` is what this line should read, and it does not.** The week
+       * carries a real `0`, and `careerLineOf` gates its em dash on `history` — which the sandbox
+       * day still joins, because the run did happen. On a cold profile whose only closed day is a
+       * sandbox one the rail therefore publishes a best of `0%` for a player who has no scored day
+       * at all. That is the pre-existing *"the zero cannot carry the absence"* weakness both
+       * `rail.ts` and `weekView.ts#streakLineOf` document, reached one step earlier; it is strictly
+       * narrower than the defect above — it clears the moment any scored day closes, and it credits
+       * nothing to the sandbox — and it is pinned here rather than left as prose so that the lane
+       * that gates those two surfaces on a *posted* day changes this string deliberately.
+       */
+      const state = baseState();
+      const at = standingAt(state);
+      const moved = { ...at.tune, cars: at.tune.cars + 2 };
+      const after = pressed(state, tunePresses(at.building, at.pattern, at.tune, moved));
+      expect(after.week.contractId).toBe(SANDBOX_CONTRACT_ID);
+      expect(careerLine(closed(after.week, 26, 'missed'))).toBe('0 days running · best 0%');
+      expect(careerLine(closed(after.week, 97, 'met'))).toBe('0 days running · best 0%');
+    });
+
+    it('leaves a best a player already earned exactly where it was', () => {
+      /*
+       * The high-water rule, preserved rather than deleted. The sandbox week is the player's own
+       * week relabelled — `withBuilding` reaches it through `switchWeek(…, 'resume')`, whose sandbox
+       * arm is `withContract` — so the figure it carries in is a real best, and a guard that zeroed
+       * it would be the loss `closeDay`'s docstring was written to prevent, arriving from the other
+       * side.
+       */
+      const state = baseState();
+      const at = standingAt(state);
+      const scored = { ...state, week: closed(state.week, 74, 'met') };
+      const moved = { ...at.tune, cars: at.tune.cars + 2 };
+      const after = pressed(scored, tunePresses(at.building, at.pattern, at.tune, moved));
+      expect(after.week.contractId).toBe(SANDBOX_CONTRACT_ID);
+      expect(after.week.bestMinutePct).toBe(74);
+      expect(closed(after.week, 99, 'met').bestMinutePct).toBe(74);
+      expect(closed(after.week, 3, 'missed').bestMinutePct).toBe(74);
+    });
+  });
 });

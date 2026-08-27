@@ -389,6 +389,47 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
   const cleanRun = outcome.allMet ? base.cleanRun + 1 : base.cleanRun;
   const contract = contractById(week.contractId);
 
+  /*
+   * ## A sandbox day leaves the scoreboard exactly where it found it — GitHub issue #290
+   *
+   * The three figures below — {@link WeekState.streak}, {@link WeekState.cleanRun} and
+   * {@link WeekState.bestMinutePct} — are the week's *scoreboard*, and they moved on a week that
+   * belongs to no assignment. A player on a cold profile went brief → tuner → *Run it and watch* →
+   * *Close the day* and the rail changed from `no days saved yet` to `0 days running · best 26%`,
+   * on a screen that had told them four times over that the run would not be scored:
+   * *Sandbox — nothing counts*, *This run will be stamped "sandbox"*, *a sandbox day can never be
+   * mistaken for a scored one*, and § 3.3's own *Sandbox — this run will not be scored.*
+   *
+   * **The reported symptom understated it, and the correction is worth stating.** The issue reads
+   * the day counter staying at `0` as a guard working. There was no guard: the counter stayed at
+   * `0` because that particular day was *missed*, and `wasGraded` reset the streak. Measured on a
+   * **clean** sandbox day the same rail publishes `1 day running · best 97%` — so the streak moved
+   * too, and a fix that guarded `bestMinutePct` alone would have left the product saying two
+   * different things about one promise.
+   *
+   * ## Why the sandbox and not the other two sentinels
+   *
+   * {@link ENDLESS_CONTRACT_ID} is *chosen*: a player pressed **Keep going** and asked for a week
+   * that never ends, and those are days they meant to play. {@link FREE_PLAY_CONTRACT_ID} likewise
+   * has its own entry door. The sandbox is *arrived at* — the tower is drawn, so there is no
+   * assignment for it because nobody wrote one — and it is the only one of the three with a screen
+   * promising in as many words that nothing counts. {@link SANDBOX_CONTRACT_ID}'s own docstring
+   * makes exactly this distinction, and this guard is that distinction reaching the arithmetic.
+   *
+   * ## What still moves, and why that is not an oversight
+   *
+   * {@link WeekState.history}, {@link WeekState.closedDay}, {@link WeekState.attempt} and the day
+   * loop are untouched: the day *happened*, § 14's week screen draws it, `dev/main.ts` reads
+   * `history.at(-1)` for the sheet it just filed, and `watch/library.ts` counts it among the days
+   * this device filed. *Nothing counts* is a claim about the score, not a claim that the run never
+   * occurred — and a day deleted from history would take the report's own *yesterday* with it.
+   *
+   * `completed` needs no guard here and never did: `contractById` answers `undefined` for every
+   * sentinel, so `clears` is already `false` on this week. The three below had no such accident
+   * protecting them.
+   */
+  const posted = week.contractId !== SANDBOX_CONTRACT_ID;
+
   const clears =
     contract !== undefined &&
     cleanRun >= contract.needClean &&
@@ -401,15 +442,21 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
     contractId: week.contractId,
     day: week.day,
     dayIdx: week.dayIdx,
-    streak,
+    streak: posted ? streak : week.streak,
     /*
      * `bestMinutePct` is a **high-water mark and stays one**, measured against the week rather than
      * the attempt. It is an observation about what this building has been seen to do, not a reward
      * for the current attempt, and rolling it back would mean a player's best day disappeared
      * because they re-ran a later one.
+     *
+     * **That argument is about retries of scored days, and it does not reach `posted`.** A high
+     * water mark is a record of the best thing that happened; a sandbox day is a run this file
+     * stamps as belonging to no assignment, so it is not one of the things that can have happened
+     * to the score. The two rules compose rather than compete — inside a posted week the mark still
+     * never goes down, and the sandbox simply never offers it a candidate.
      */
-    bestMinutePct: Math.max(week.bestMinutePct, outcome.minutePct),
-    cleanRun,
+    bestMinutePct: posted ? Math.max(week.bestMinutePct, outcome.minutePct) : week.bestMinutePct,
+    cleanRun: posted ? cleanRun : week.cleanRun,
     completed: clears && contract !== undefined ? [...base.completed, contract.id] : base.completed,
     // A retry replaces the day it re-ran rather than appending a second entry for it — otherwise the
     // seven-day sparkline would show Monday twice and the week would look a day longer than it is.

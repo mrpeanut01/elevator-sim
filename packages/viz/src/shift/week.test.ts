@@ -31,6 +31,7 @@ import {
   outcomeOf,
   switchWeek,
   takeContract,
+  withContract,
 } from './week.js';
 import type { DayOutcome, GoalReading, WeekState } from './types.js';
 
@@ -652,5 +653,91 @@ describe('the sentinel registry is the sweep, in both directions (issue #145)', 
         `${name} (${id}) resolves to a shipped contract, so it reaches coachWeekLines' first branch`,
       ).toBe(false);
     }
+  });
+});
+
+/**
+ * **A sandbox day leaves the scoreboard where it found it** — GitHub issue #290.
+ *
+ * `closeDay`'s guard carries the argument. These cases pin the shape of it, and in particular pin
+ * the two halves that are easy to get backwards: the mark must not *rise* on a sandbox day, and it
+ * must not *fall* either — the sandbox week is the player's own week wearing a different label, so
+ * the figure it carries in is their real best and rolling it back would be the loss the high-water
+ * rule was written to prevent, arriving from the other side.
+ */
+describe('a sandbox day leaves the scoreboard where it found it — GitHub issue #290', () => {
+  /** A week with a real scoreboard on it: one clean day banked at 74 %, now on day 2. */
+  const scored = (): WeekState => nextDay(closeDay(openWeek('c1'), day(openWeek('c1'), 'met', 74)));
+
+  /**
+   * That same week relabelled — which is what a drawn tower actually produces.
+   *
+   * `withBuilding` reaches the sandbox through `switchWeek(week, parked, SANDBOX_CONTRACT_ID,
+   * 'resume')`, and with nothing parked under that id its answer is `withContract(week, …)`: the
+   * player has not left their week, they have changed what it is *of*. So the contract is the only
+   * variable between the arms below, which is what makes the comparison a measurement of the guard
+   * rather than of two different weeks.
+   */
+  const relabelled = (contractId: string): WeekState => withContract(scored(), contractId);
+
+  it('raises the best on every week except the sandbox', () => {
+    for (const [name, id] of Object.entries(WEEK_CONTRACT_SENTINELS)) {
+      const week = relabelled(id);
+      expect(week.bestMinutePct, name).toBe(74);
+      const after = closeDay(week, day(week, 'met', 97));
+      expect(after.bestMinutePct, name).toBe(id === SANDBOX_CONTRACT_ID ? 74 : 97);
+    }
+    // The scored arm, so *does not move* is read beside a *does*: the guard is the sentinel, not
+    // the arithmetic having quietly stopped working.
+    const week = scored();
+    expect(closeDay(week, day(week, 'met', 97)).bestMinutePct).toBe(97);
+  });
+
+  it('does not move the streak or the banked count either', () => {
+    /*
+     * The issue reported only `bestMinutePct`, and read the day counter staying at `0` as a guard
+     * working. It was not: that day was *missed*, so `wasGraded` reset the streak. On a **clean**
+     * sandbox day the counter moved too — measured, the rail published `1 day running · best 97%` —
+     * which is why the guard covers all three and not the one field that was noticed.
+     */
+    const week = relabelled(SANDBOX_CONTRACT_ID);
+    const after = closeDay(week, day(week, 'met', 97));
+    expect(after.streak).toBe(week.streak);
+    expect(after.cleanRun).toBe(week.cleanRun);
+    expect(week.streak).toBeGreaterThan(0);
+
+    // And a missed sandbox day does not take the streak away, which is the same rule's other side.
+    const missed = closeDay(week, day(week, 'missed', 12));
+    expect(missed.streak).toBe(week.streak);
+    expect(missed.cleanRun).toBe(week.cleanRun);
+  });
+
+  it('never lowers the mark either, on a sandbox week or a scored one', () => {
+    const sandbox = relabelled(SANDBOX_CONTRACT_ID);
+    expect(closeDay(sandbox, day(sandbox, 'missed', 3)).bestMinutePct).toBe(74);
+    const week = scored();
+    expect(closeDay(week, day(week, 'missed', 3)).bestMinutePct).toBe(74);
+  });
+
+  it('keeps the day itself — the run happened, and the week screen draws it', () => {
+    /*
+     * *Nothing counts* is a claim about the score, never a claim that the run did not occur.
+     * `dev/main.ts` reads `history.at(-1)` for the sheet it has just filed and `watch/library.ts`
+     * counts these among the days this device filed, so a day dropped here would take the report's
+     * own *yesterday* with it.
+     */
+    const week = relabelled(SANDBOX_CONTRACT_ID);
+    const after = closeDay(week, day(week, 'met', 97));
+    expect(after.history).toHaveLength(week.history.length + 1);
+    expect(after.history.at(-1)?.minutePct).toBe(97);
+    expect(after.closedDay).toBe(week.day);
+    expect(after.attempt).toBe(1);
+  });
+
+  it('clears nothing, which it did not before either — the guard adds no accident', () => {
+    const week = relabelled(SANDBOX_CONTRACT_ID);
+    const after = closeDay(week, day(week, 'met', 100));
+    expect(after.cleared).toBeNull();
+    expect(after.completed).toEqual(week.completed);
   });
 });
