@@ -49,6 +49,13 @@
  * change through the host's `applyBuildingSpec`, which selects the drawn tower through
  * `withBuilding` and puts the week on `shift/week.ts#SANDBOX_CONTRACT_ID`. That is the mechanism,
  * and {@link tuneSandboxStrip}'s sentence beside it is a description of it.
+ *
+ * **And the converse now holds too, which it did not until GitHub issue #289.** The press was
+ * unconditional, so *entering the sandbox and changing nothing* was also a sandbox run — the screen
+ * said *Scored day — three things are fixed* over a day the state had already moved onto the sandbox
+ * contract and re-measured on the wrong window. {@link tunePresses} is the guard, and it reads
+ * {@link movedKeys} — the same predicate the strip, the stamp and § 3.3's note read — so the
+ * sentence and the mechanism cannot disagree.
  */
 
 import { personsOf, type BuildingSpec } from '../authoring/buildingSpec.js';
@@ -135,6 +142,79 @@ export function patternWithTune(spec: PatternSpec, tune: TuneState): PatternSpec
 export function movedKeys(from: TuneState, to: TuneState): readonly TuneKey[] {
   const keys: TuneKey[] = ['floors', 'cars', 'speed', 'cap', 'dwell', 'rate', 'lobbyShare'];
   return keys.filter((key) => from[key] !== to[key]);
+}
+
+/**
+ * What *Run it and watch* writes before it runs — GitHub issue **#289**.
+ *
+ * ## The defect: entering the sandbox and changing nothing re-measured the building
+ *
+ * The primary pressed `applyBuildingSpec(buildingWithTune(standing, tune))` **unconditionally**, on
+ * every press, whether or not a control had been touched. `applyBuildingSpec` allocates a *fresh
+ * id* and selects the result through `withBuilding`, so an untouched press turned
+ * `garden-apartments` into `bld-1` — a document byte-identical to the one it was copied from,
+ * wearing a name the matrix has never measured.
+ *
+ * `shift/reportWindow.ts#shiftReportWindowFor` is keyed on that name. Garden Apartments is the one
+ * shipped building whose every matrix cell declares `full-run`, and the reason is measured rather
+ * than stylistic: at its rates the peak five minutes holds **0 to 25** arrivals of a day averaging
+ * 38.6, so the narrow band is empty on 14 seeds in 500 and the sheet then withholds *both* headline
+ * figures under *"the reporting window held no arrivals"*. Copied to `bld-1` the rule returns
+ * `undefined` — *leave the template's band alone* — and `docs/20` defect 5 came back on the one
+ * screen that had never been on `reportWindow.ts`'s list of callers. Measured: the same day, run
+ * from the tuner, reported `peak-5min` where the scored route reported `full-run`.
+ *
+ * ## Why the guard is *anything moved* rather than *the building moved*
+ *
+ * The narrower guard is the tempting one and it is wrong. Standing the week on
+ * `shift/week.ts#SANDBOX_CONTRACT_ID` is something only `applyBuildingSpec` does — it is
+ * `withBuilding`'s doing, and there is no other door to it. So a press that skipped the building
+ * because only *How busy* had moved would run a **re-timed crowd against a scored assignment**:
+ * {@link tuneSandboxStrip} would say *Sandbox — nothing counts* while `closeDay` banked the day
+ * against Scenario 1. That is the forgery `dev/buildingEditor.ts#stateRunningSaved` exists to
+ * prevent, arriving from the opposite direction, and it would have been a *new* defect shipped to
+ * close this one.
+ *
+ * So one predicate decides everything: {@link movedKeys}. It already drives the strip, the stamp
+ * and § 3.3's two-state note, and now it drives the presses too — which is what makes the screen and
+ * the state agree **by construction** rather than by two authors remembering the same rule.
+ *
+ * ## Both documents or neither, and an untouched tuner runs the standing day
+ *
+ * {@link tunerBarModel}'s docstring already stated this as the contract — *"an untouched tuner runs
+ * the standing day, which is what Scored day — three things are fixed means"* — and the code
+ * contradicted it. It does not any more: with nothing moved, nothing is written, the run is the one
+ * the daily loop would have made, and the id `shiftReportWindowFor` is asked about is the authored
+ * one.
+ *
+ * A **genuinely tuned** building keeps the old behaviour exactly, including the fall-through to the
+ * template's band, and that is correct rather than tolerated: a drawn tower has no matrix cell, and
+ * inventing a window for a building nobody censused is what `reportWindow.ts`'s last paragraph
+ * refuses.
+ *
+ * @param building what is standing, as {@link tuneStateFrom} read it
+ * @param pattern the demand that is standing, likewise
+ * @param standing the tune read off those two on mount — the *before* side of {@link movedKeys}
+ * @param tune what the seven controls hold now
+ */
+export function tunePresses(
+  building: BuildingSpec,
+  pattern: PatternSpec,
+  standing: TuneState,
+  tune: TuneState,
+): TunePresses {
+  if (movedKeys(standing, tune).length === 0) return { building: undefined, pattern: undefined };
+  return { building: buildingWithTune(building, tune), pattern: patternWithTune(pattern, tune) };
+}
+
+/**
+ * The documents {@link tunePresses} hands the primary. `undefined` is *press nothing*, which is a
+ * different instruction from *press this unchanged copy* — the copy takes a new id and a new
+ * contract, which is the whole of issue #289.
+ */
+export interface TunePresses {
+  readonly building: BuildingSpec | undefined;
+  readonly pattern: PatternSpec | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

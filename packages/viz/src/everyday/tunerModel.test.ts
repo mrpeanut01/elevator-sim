@@ -17,11 +17,27 @@ import { join } from 'node:path';
 import { parseElevatorSpecs, type ElevatorSpecs } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
-import { BLANK_SPEC, buildingFromSpec, personsOf } from '../authoring/buildingSpec.js';
+import {
+  BLANK_SPEC,
+  buildingFromSpec,
+  personsOf,
+  specFromBuilding,
+  type BuildingSpec,
+} from '../authoring/buildingSpec.js';
 import { DWELL_CHOICES, DWELL_SETTINGS } from '../authoring/dispatcherSpec.js';
 import { classesFromSpecs } from '../authoring/machineSpec.js';
-import { DEFAULT_PATTERN, demandFromSpec } from '../authoring/patternSpec.js';
+import {
+  DEFAULT_PATTERN,
+  demandFromSpec,
+  specFromTrafficProfile,
+  type PatternSpec,
+} from '../authoring/patternSpec.js';
+import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
+import { buildingConfigOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
+import { baseState, legsOf, RESOURCES } from '../scope/probes.test-helper.js';
+import { shiftReportWindowFor } from '../shift/reportWindow.js';
+import { SANDBOX_CONTRACT_ID } from '../shift/week.js';
 import { actionBarFor } from './actionBar.js';
 import { classOfSpec, loadStepsFor, speedStepsFor } from './designerModel.js';
 import {
@@ -32,6 +48,7 @@ import {
   tuneCapacityReadout,
   tuneDwellChips,
   tuneMachineSteps,
+  tunePresses,
   tuneReadout,
   tuneSandboxStrip,
   tuneSpeedReadout,
@@ -39,6 +56,7 @@ import {
   tunerBarModel,
   tunerNoteFor,
   TUNE_CARDS,
+  type TunePresses,
   type TuneState,
 } from './tunerModel.js';
 
@@ -238,4 +256,136 @@ describe('a sandbox run is never posted, and the screen says so', () => {
     expect(named.name).toContain('70');
     expect(named.name).not.toBe(DEFAULT_PATTERN.name);
   });
+});
+
+/**
+ * **An untouched tuner runs the standing day** — GitHub issue #289.
+ *
+ * `tunerModel.ts#tunePresses` carries the argument; this block is the run behind it. Every case
+ * drives the **shipped press path** rather than a restatement of it, because the defect lived
+ * entirely in what that path does to the building's *id*: the document was byte-identical either
+ * way, and a test that compared documents would have passed on the broken tree.
+ */
+describe('an untouched tuner runs the standing day — GitHub issue #289', () => {
+  /**
+   * The press, exactly as `everyday/host.ts#applyBuildingSpec` makes it.
+   *
+   * `savedBuildingFrom` then `stateRunningSaved` **are** that method's body — the two calls it
+   * composes, in its order. A helper that instead wrote `{ ...state, buildingId }` would skip
+   * `withBuilding`, which is where the week takes the sandbox contract, and would therefore be
+   * measuring a press the product does not make.
+   */
+  function pressed(state: ViewerState, presses: TunePresses): ViewerState {
+    if (presses.building === undefined) return state;
+    const saved = savedBuildingFrom(presses.building, state, RESOURCES);
+    return stateRunningSaved(state, RESOURCES, saved);
+  }
+
+  /**
+   * What the tuner mounts with — the two documents and the seven read off them.
+   *
+   * These two calls are `host.buildingSpec()` and `host.patternSpec()`'s own bodies for a state
+   * whose pattern is `'building'`, which is what a state off {@link baseState} has. The host is not
+   * constructed here because its bindings need a mutable shell; what is being measured is the
+   * decision, and the decision reads specs.
+   */
+  function standingAt(state: ViewerState): {
+    readonly building: BuildingSpec;
+    readonly pattern: PatternSpec;
+    readonly tune: TuneState;
+  } {
+    const config = buildingConfigOf(RESOURCES, state.savedBuildings, state.buildingId);
+    expect(config, 'the standing building is one this build knows').toBeDefined();
+    const building = specFromBuilding(config!, state.buildingId);
+    const pattern = specFromTrafficProfile(RESOURCES.trafficProfiles, config?.trafficProfile);
+    return { building, pattern, tune: tuneStateFrom(building, pattern, state.levers.dwell) };
+  }
+
+  it('presses nothing at all, so the run is the one the daily loop would have made', () => {
+    const state = { ...baseState(), shiftLengthS: 3600 };
+    const at = standingAt(state);
+    const presses = tunePresses(at.building, at.pattern, at.tune, at.tune);
+
+    /*
+     * Both `undefined`, and that is a different instruction from *press this unchanged copy*.
+     * `applyBuildingSpec` allocates a fresh id on every call, so pressing a byte-identical document
+     * still renames the building — which is the whole defect, and why the assertion is on the
+     * absence rather than on the document's contents.
+     */
+    expect(presses.building).toBeUndefined();
+    expect(presses.pattern).toBeUndefined();
+
+    const after = pressed(state, presses);
+    expect(after.buildingId).toBe(state.buildingId);
+    expect(after.week.contractId).toBe(state.week.contractId);
+    expect(after.week.contractId).not.toBe(SANDBOX_CONTRACT_ID);
+    // The legs, never a window statistic — `docs/05`'s standing requirement in its contrapositive.
+    expect(legsOf(after)).toBe(legsOf(state));
+  }, 60_000);
+
+  it('leaves the window on the building’s own answer rather than the template’s band', () => {
+    /*
+     * The defect, measured on both sides. Garden Apartments is the building the matrix moves —
+     * every one of its cells declares `full-run`, for the reason `benchmark/arms.ts` § 2 measured —
+     * and the press renamed it to `bld-1`, which the matrix has never measured, so
+     * `shiftReportWindowFor` returned `undefined` and the sheet went back to the five-minute band
+     * `docs/20` defect 5 moved it off.
+     */
+    const state = { ...baseState(), shiftLengthS: 3600 };
+    expect(shiftReportWindowFor(state.buildingId)).toBe('full-run');
+    const at = standingAt(state);
+
+    const untouched = pressed(state, tunePresses(at.building, at.pattern, at.tune, at.tune));
+    expect(shiftRunConfigOf(RESOURCES, untouched).config.reportWindow).toBe('full-run');
+
+    /*
+     * And the other side, so this is a guard rather than an assertion that the guard is never
+     * reached: a genuinely tuned tower **does** fall through to the template's band, which
+     * `reportWindow.ts`'s last paragraph argues is correct — a building nobody censused gets no
+     * invented window.
+     */
+    const moved = { ...at.tune, cars: at.tune.cars + 2 };
+    const tuned = pressed(state, tunePresses(at.building, at.pattern, at.tune, moved));
+    expect(tuned.buildingId).not.toBe(state.buildingId);
+    expect(tuned.week.contractId).toBe(SANDBOX_CONTRACT_ID);
+    expect(shiftRunConfigOf(RESOURCES, tuned).config.reportWindow).toBeUndefined();
+  });
+
+  it('takes the sandbox contract whenever any of the seven moved, not only the building four', () => {
+    /*
+     * The narrow guard — *press the building only when a building key moved* — is the tempting one,
+     * and it would have shipped a new defect to close this one. `applyBuildingSpec` is the only
+     * door to `SANDBOX_CONTRACT_ID`, so a press that skipped it because only *How busy* had moved
+     * would run a re-timed crowd **against a scored assignment**, with the strip saying
+     * *Sandbox — nothing counts* over a day `closeDay` banks against Scenario 1.
+     *
+     * So the crowd and dwell keys are asserted here beside the building four: the predicate is
+     * `movedKeys`, which is the same one the strip, the stamp and § 3.3's note already read.
+     */
+    const state = { ...baseState(), shiftLengthS: 3600 };
+    const at = standingAt(state);
+    const patches: readonly Partial<TuneState>[] = [
+      { rate: at.tune.rate + 3 },
+      { lobbyShare: at.tune.lobbyShare - 10 },
+      { dwell: 'snappy' },
+    ];
+    for (const patch of patches) {
+      const presses = tunePresses(at.building, at.pattern, at.tune, { ...at.tune, ...patch });
+      expect(presses.building, JSON.stringify(patch)).toBeDefined();
+      expect(presses.pattern, JSON.stringify(patch)).toBeDefined();
+      expect(pressed(state, presses).week.contractId, JSON.stringify(patch)).toBe(
+        SANDBOX_CONTRACT_ID,
+      );
+    }
+  });
+
+  it('moves the run when a control moves — the standing requirement, on the legs', () => {
+    const state = { ...baseState(), shiftLengthS: 900 };
+    const at = standingAt(state);
+    const base = legsOf(pressed(state, tunePresses(at.building, at.pattern, at.tune, at.tune)));
+    const moved = { ...at.tune, cars: at.tune.cars + 2 };
+    expect(legsOf(pressed(state, tunePresses(at.building, at.pattern, at.tune, moved)))).not.toBe(
+      base,
+    );
+  }, 60_000);
 });

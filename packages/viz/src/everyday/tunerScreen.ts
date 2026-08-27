@@ -34,7 +34,6 @@ import { classOfSpec, designerClasses } from './designerModel.js';
 import {
   buildingWithTune,
   movedKeys,
-  patternWithTune,
   snapToStep,
   tuneCapacityReadout,
   tuneDwellChips,
@@ -43,6 +42,7 @@ import {
   tuneSandboxStrip,
   tuneSpeedReadout,
   tuneStateFrom,
+  tunePresses,
   tunerBarModel,
   TUNE_CARDS,
   TUNER_COPY as COPY,
@@ -340,16 +340,24 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   host.append(root);
 
   return {
-    /* § 3.3's primary — *Run it and watch*: both documents, then the run, then the stage. */
+    /* § 3.3's primary — *Run it and watch*: what moved, then the run, then the stage. */
     primary: () => {
       /*
-       * Both documents, then the run, then the stage. The building goes first because
-       * `applyBuildingSpec` is the press that moves the week onto the sandbox contract, and a
-       * pattern saved against a scored week and then sandboxed would be a saved pattern whose name
-       * describes a run the week never had.
+       * **What moved**, then the run, then the stage — and *nothing* is what an untouched tuner
+       * writes, which is GitHub issue #289. `tunerModel.ts#tunePresses` owns that decision and
+       * argues it at length; the short form is that this line pressed `applyBuildingSpec`
+       * unconditionally, so entering the sandbox and changing nothing re-saved the standing
+       * building under a fresh id, and `shift/reportWindow.ts` — which is keyed on the id —
+       * stopped recognising Garden Apartments and handed the sheet back the five-minute band it
+       * was moved off for `docs/20` defect 5.
+       *
+       * The building still goes first when there is one, because `applyBuildingSpec` is the press
+       * that moves the week onto the sandbox contract, and a pattern saved against a scored week
+       * and then sandboxed would be a saved pattern whose name describes a run the week never had.
        */
-      dataHost.applyBuildingSpec(buildingWithTune(standingBuilding, tune));
-      dataHost.applyPatternSpec(patternWithTune(pattern, tune));
+      const presses = tunePresses(standingBuilding, pattern, standing, tune);
+      if (presses.building !== undefined) dataHost.applyBuildingSpec(presses.building);
+      if (presses.pattern !== undefined) dataHost.applyPatternSpec(presses.pattern);
       dataHost.startRun();
       context.go('stage');
     },
