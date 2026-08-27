@@ -97,9 +97,9 @@ const WINDOW_CALLERS: Readonly<Record<string, string>> = Object.freeze({
  * ## Why this second registry exists, and why the issue's criterion was raised to reach it
  *
  * Issue #289 asked that *`shiftReportWindowFor`'s caller set be derived rather than hand-listed, so
- * a fifth producer cannot arrive unregistered*. Derived, that set is the three files above — and
- * **it would not have caught the defect the issue reports**, because `everyday/tunerScreen.ts` was
- * never a caller. It was a *bypasser*: it replaced the id the window is keyed on, with a copy of the
+ * a fifth producer cannot arrive unregistered*. Derived, that set is the three callers above plus
+ * the file that declares them — and **it would not have caught the defect the issue reports**,
+ * because `everyday/tunerScreen.ts` was never a caller. It was a *bypasser*: it replaced the id the window is keyed on, with a copy of the
  * same building under a fresh name, and every caller above then did its job perfectly on the wrong
  * question.
  *
