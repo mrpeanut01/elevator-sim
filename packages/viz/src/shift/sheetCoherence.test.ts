@@ -113,9 +113,33 @@ function recordingOf(id: string): VizRecording {
   return recording;
 }
 
+/**
+ * The closing fold, once per building.
+ *
+ * Memoised rather than recomputed per assertion, and it is a cost decision rather than a
+ * correctness one: `observationsAt` is pure and uncached by design (the playhead scrubs backwards),
+ * so calling it fifteen times over a 7 308-leg day is fifteen full walks for one answer.
+ */
+const folds = new Map<string, Observations>();
+const closingQueues = new Map<string, ReturnType<typeof queueAt>>();
+
 function observationsOf(id: string): Observations {
+  const found = folds.get(id);
+  if (found !== undefined) return found;
   const recording = recordingOf(id);
-  return shiftObservationsOf(observationsAt(recording, recording.endedAt));
+  const fold = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+  folds.set(id, fold);
+  return fold;
+}
+
+/** The closing queue, once per building, for {@link observationsOf}'s reason. */
+function closingQueuesOf(id: string): ReturnType<typeof queueAt> {
+  const found = closingQueues.get(id);
+  if (found !== undefined) return found;
+  const recording = recordingOf(id);
+  const queues = queueAt(recording, recording.endedAt);
+  closingQueues.set(id, queues);
+  return queues;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -235,9 +259,7 @@ describe.each(BUILDING_IDS)('%s — no two figures on the sheet contradict each 
      */
     const recording = recordingOf(id);
     const observations = observationsOf(id);
-    const mood = buildingMood(
-      moodObservationsOf(recording, queueAt(recording, recording.endedAt), recording.endedAt),
-    );
+    const mood = buildingMood(moodObservationsOf(recording, closingQueuesOf(id), recording.endedAt));
     const driver = mood.drivers.find((entry) => entry.id === 'abandoned');
     if (driver === undefined) throw new Error('no unluckiest-rider driver');
     if (driver.text.includes('Nobody in the')) {
