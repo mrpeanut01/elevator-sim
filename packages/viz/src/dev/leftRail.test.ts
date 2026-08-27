@@ -113,6 +113,7 @@ function bandsOf(counts: readonly number[], basis: WaitBandBasis = 'now'): WaitB
     worst: WAIT_BANDS[worstIndex] as (typeof WAIT_BANDS)[number],
     worstIndex,
     longestCurrentWaitS: total === 0 ? undefined : 130,
+    longestWaitIsCensored: false,
   };
 }
 

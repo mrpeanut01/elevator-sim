@@ -268,13 +268,20 @@ export function waitBandsAt(
   const tally = WAIT_BANDS.map(() => 0);
   let total = 0;
   let longestCurrentWaitS: number | undefined;
+  let longestWaitIsCensored = false;
 
-  for (const waitedS of basis === 'now' ? standingWaitsAt(recording, t) : realisedWaitsBy(recording, t)) {
+  for (const { waitedS, resolved } of basis === 'now'
+    ? standingWaitsAt(recording, t)
+    : realisedWaitsBy(recording, t)) {
     const index = bandIndexOf(waitedS);
     tally[index] = (tally[index] ?? 0) + 1;
     total += 1;
+    // Strict `>`, so the flag belongs to the **first** leg to reach the maximum in record order —
+    // the same tie rule `observations.ts` keeps, and for the same reason: a tie broken by whichever
+    // leg came last would make the qualification depend on iteration order.
     if (longestCurrentWaitS === undefined || waitedS > longestCurrentWaitS) {
       longestCurrentWaitS = waitedS;
+      longestWaitIsCensored = !resolved;
     }
   }
 
@@ -302,13 +309,22 @@ export function waitBandsAt(
     worst: requireBand(worstIndex),
     worstIndex,
     longestCurrentWaitS,
+    longestWaitIsCensored,
   };
 }
 
-/** The wait age of everybody standing at `t` — `queueAt`'s answer, unaltered. */
-function* standingWaitsAt(recording: VizRecording, t: SimTime): Generator<number> {
+/**
+ * The wait age of everybody standing at `t` — `queueAt`'s answer, unaltered.
+ *
+ * `resolved: true` on every one of them, and it is not a fudge: on this basis the quantity being
+ * banded is *how long these people have been standing*, which `t - arrivedAt` answers **exactly**.
+ * It is a lower bound on the wait they will eventually serve, and this card never claims that —
+ * see {@link WaitBands.longestWaitIsCensored} for the whole of the argument, which is the one place
+ * the two bases genuinely mean different things by the same number.
+ */
+function* standingWaitsAt(recording: VizRecording, t: SimTime): Generator<RealisedWait> {
   for (const queue of queueAt(recording, t)) {
-    for (const rider of queue.riders) yield rider.waitedS;
+    for (const rider of queue.riders) yield { waitedS: rider.waitedS, resolved: true };
   }
 }
 
@@ -316,23 +332,62 @@ function* standingWaitsAt(recording: VizRecording, t: SimTime): Generator<number
  * The **worst wait each rider had realised** by `t`, for everybody whose call was registered by
  * then.
  *
- * A rider who boarded contributes the wait they actually served; a rider still standing
- * contributes the wait they have stood so far, which is a lower bound and is banded as one. Both
- * are non-decreasing in `t`, so this banding never un-happens as the playhead advances — the same
- * property, and for the same reason, that `observations.ts` derives `abandoned` from a crossing
- * time rather than from `t - arrivedAt > horizonS`.
+ * A rider who boarded contributes the wait they actually served; a rider the building turned away
+ * contributes the wait that ended at the refusal; a rider still standing contributes the wait they
+ * have stood so far, which is a lower bound and is yielded as one. All three are non-decreasing in
+ * `t`, so this banding never un-happens as the playhead advances — the same property, and for the
+ * same reason, that `observations.ts` derives `abandoned` from a crossing time rather than from
+ * `t - arrivedAt > horizonS`.
+ *
+ * ## The refusal clause is GitHub issue #288's second site, and it is where `2 915 s` came from
+ *
+ * The ending rule here was `boardedAt` alone, so a rider refused at a credential check — who never
+ * boards — read as **standing for the rest of the run**, and their `t - arrivedAt` walked up with
+ * the playhead until it was the largest number on the card. That is what the mood card's
+ * retrospective sub-line printed: measured on Secure Tower over its own authored day (`office-day`,
+ * seed 20 260 824, shipped defaults) it read *"across the whole shift · 107 riders stood past two
+ * minutes, the longest 34 472 s"* over a run whose service-level row correctly said the longest wait
+ * was **313 s** — 34 472 s being a rider turned away at 1 564 s in a 36 036 s run. On the breadth
+ * fixture the same shape is smaller and just as wrong: Secure Tower's *"4 riders stood past two
+ * minutes, the longest 438 s"* was its four refused riders and nobody else, against a worst realised
+ * wait of 92 s.
+ *
+ * The issue reported that figure under its *censored maximum* mechanism. It is not one: a refusal
+ * **ends** a wait, so the number was not a bound that needed qualifying, it was a wait that never
+ * happened. Fixing the censoring alone would have relabelled it and left it on the card.
+ *
+ * `boardedAt ?? refusedAt` is `core`'s own ending rule minus the field `VizLeg` does not carry
+ * (`metrics/summarize.ts#diagnoseServiceLevel`), and it is the rule `observations.ts` applies in
+ * both of its folds. Three modules, one answer to *when did this wait end*.
  *
  * Deliberately over `recording.legs` and not over the landing fold: the legs are what `queueAt`
  * walks too, so the two bases count one population and a rider cannot be in the whole-run banding
- * and absent from the live one.
+ * and absent from the live one. A refused rider stays **in** this banding, at the 0 s they actually
+ * waited — they registered a call, so {@link WaitBands.total} counts them, and the outcome itself is
+ * `LiveObservations.turnedAway`'s to report.
  */
-function* realisedWaitsBy(recording: VizRecording, t: SimTime): Generator<number> {
+function* realisedWaitsBy(recording: VizRecording, t: SimTime): Generator<RealisedWait> {
   for (const leg of recording.legs) {
     if (leg.arrivedAt > t) break; // sorted by `(arrivedAt, passengerId)` — see `VizLeg`
-    const { boardedAt } = leg;
-    const endedAt = boardedAt !== undefined && boardedAt <= t ? boardedAt : t;
-    yield Math.max(0, endedAt - leg.arrivedAt);
+    const resolvedAt = leg.boardedAt ?? leg.refusedAt;
+    const resolved = resolvedAt !== undefined && resolvedAt <= t;
+    yield {
+      waitedS: Math.max(0, (resolved ? resolvedAt : t) - leg.arrivedAt),
+      resolved,
+    };
   }
+}
+
+/**
+ * One rider's contribution to a banding, and whether their wait had **ended** by `t`.
+ *
+ * The flag rides with the wait rather than being recomputed at the maximum, because the question
+ * *is this figure a bound* is a question about the one leg that produced it and there is no second
+ * pass in which to ask it.
+ */
+interface RealisedWait {
+  readonly waitedS: number;
+  readonly resolved: boolean;
 }
 
 /**
@@ -371,6 +426,23 @@ export function moodOf(bands: WaitBands): Mood {
   const longest = Math.round(Math.max(bands.longestCurrentWaitS ?? 0, 0));
   const fumingCount = bands.counts[WAIT_BANDS.length - 1]?.count ?? 0;
   const live = bands.basis === 'now';
+  /*
+   * *at least*, when the longest wait belongs to somebody whose wait had not ended — GitHub issue
+   * #288's second mechanism, and the word `shift/report.ts#worstWaitFigure` already uses for the
+   * same fact about the same kind of figure.
+   *
+   * The project's rule about a censored maximum was written once and reached one consumer:
+   * `shift/goals.ts` refuses to grade one *in either direction*, because `VizLeg` carries no
+   * `abandonedAt` and a bound that might overstate can prove nothing. This card was printing the
+   * same bound as a fact three rows from a service-level row that qualifies its own. Qualifying is
+   * the weaker of the two answers that rule allows and it is the right one here: refusing would
+   * blank the only figure a retrospective card has, and a card cannot be quiet about the worst
+   * thing that happened.
+   *
+   * Empty on the live basis by construction — see {@link WaitBands.longestWaitIsCensored} for why
+   * a wait age on that basis is exact rather than bounded.
+   */
+  const atLeast = bands.longestWaitIsCensored ? 'at least ' : '';
 
   /*
    * The live sub-lines are the design's. The retrospective ones are written against the same four
@@ -391,10 +463,10 @@ export function moodOf(bands: WaitBands): Mood {
       ]
     : [
         'across the whole shift, nobody stood half a minute',
-        `across the whole shift · longest wait ${String(longest)} s`,
-        `across the whole shift · longest wait ${String(longest)} s`,
+        `across the whole shift · longest wait ${atLeast}${String(longest)} s`,
+        `across the whole shift · longest wait ${atLeast}${String(longest)} s`,
         `across the whole shift · ${String(fumingCount)} riders stood past two minutes, ` +
-          `the longest ${String(longest)} s`,
+          `the longest ${atLeast}${String(longest)} s`,
       ];
   const headlines = live ? MOOD_HEADLINES : RUN_OVER_HEADLINES;
   return {
