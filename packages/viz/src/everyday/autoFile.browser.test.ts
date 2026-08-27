@@ -140,9 +140,26 @@ afterAll(async () => {
   await server?.close();
 });
 
+/**
+ * The two viewports the sweep below uses — the issue measured at three and got one number.
+ *
+ * It could not have got anything else, and saying why is the reason there are two rather than
+ * three: the interval is a `requestAnimationFrame` loop over a playhead, and nothing in it reads a
+ * box. So this axis is a **negative control on the issue's own report** rather than a search — one
+ * wide and one narrow, enough to have caught a layout dependence nobody expects, and not a third
+ * copy of a case whose mechanism has no layout input.
+ */
+const VIEWPORTS = [
+  { width: 1280, height: 800 },
+  { width: 1024, height: 768 },
+] as const;
+
 /** A cold load at a short day, settled: `dev/main.ts` has booted and its own menu is dismissed. */
-async function coldLoad(runS: number = RUN_S): Promise<Page> {
-  const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
+async function coldLoad(
+  runS: number = RUN_S,
+  viewport: { readonly width: number; readonly height: number } = VIEWPORTS[0],
+): Promise<Page> {
+  const page = await openPage(browser, { viewport: { ...viewport } });
   await page.goto(`${origin}?building=garden-apartments&seed=424242&duration=${String(runS)}`, {
     waitUntil: 'load',
   });
@@ -183,23 +200,29 @@ async function waitPastTheCoveredEnd(
 }
 
 describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
-  it('does not file itself on a stage the player has not touched', async () => {
-    const page = await coldLoad();
-    try {
-      await enterEverydayStage(page);
-      /*
-       * Four times over the instant the defect fired at. The issue measured 58.6–59.2 s against a
-       * derived 60.0, so the margin is not tight in either direction — what a longer wait buys is
-       * the reading *nothing files, ever*, rather than *nothing had filed yet*.
-       */
-      await waitPastTheCoveredEnd(page, 4);
-      const bar = await barSays(page);
-      expect(bar.note).not.toBe(FILED_NOTE);
-      expect(bar.inert).toBe(false);
-    } finally {
-      await page.close();
-    }
-  }, 300_000);
+  it.each(VIEWPORTS)(
+    'does not file itself on a stage the player has not touched, at $width×$height',
+    async (viewport) => {
+      const page = await coldLoad(RUN_S, viewport);
+      try {
+        await enterEverydayStage(page);
+        /*
+         * Four times over the instant the defect fired at. The issue measured 58.6–59.2 s against a
+         * derived 60.0 — and 60.0 is what this tree measures, 60 011 ms, which is the one number in
+         * that report that does not reproduce. The margin is not tight in either direction, and
+         * what a longer wait buys is the reading *nothing files, ever* rather than *nothing had
+         * filed yet*.
+         */
+        await waitPastTheCoveredEnd(page, 4);
+        const bar = await barSays(page);
+        expect(bar.note).not.toBe(FILED_NOTE);
+        expect(bar.inert).toBe(false);
+      } finally {
+        await page.close();
+      }
+    },
+    300_000,
+  );
 
   it('does not file itself at the fastest chip, when the player’s own transport has ended', async () => {
     const page = await coldLoad();
