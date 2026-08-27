@@ -81,6 +81,11 @@ export interface EverydaySwapPort {
    * `GAMEPLAY_AND_NAVIGATION.md` § 6.4 and § 16 rule 1 both forbid it in the same words: *`Close
    * the day` is the **only** thing that sets `dayClosed`*.
    *
+   * **Two readers, not one**, and the second is why this is a port read rather than a line inside
+   * `tick`: `dev/main.ts` also binds `Ctrl`/`Cmd`+`Enter` to the same close on a **`window`**
+   * listener, and a window listener is not covered by `inert` — that shortcut filed the Everyday
+   * player's day too. `dev/main.ts#engineerHasThePage` is the one expression both ask through.
+   *
    * A decision number is owed for the boundary this draws: **the Engineer end-of-day close is
    * armed only while the Engineer surface has the page.** The Everyday product keeps its own
    * contract, the Engineer product keeps its own behaviour, and neither reaches across the cover.

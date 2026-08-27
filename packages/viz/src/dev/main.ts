@@ -738,11 +738,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * already state: *has this run been filed?*, *did we run it?* and *did this run end somewhere we
    * were not?* are three questions, and § D311 is what happens when two of them share a flag.
    *
-   * **Deliberately not saved or restored by {@link enterWatch}/`leaveWatch`**, where `filedRunId` is.
-   * That pair exists so a filed day cannot be filed twice through the spectator's back door; this one
-   * needs no such care because it re-derives itself. {@link adopt} clears it, and if the transport is
-   * still sitting past the end under the cover the very next frame writes it again — so the worst a
-   * round trip can do is re-answer a question correctly.
+   * **Deliberately not saved or restored by {@link enterWatch}/{@link stopWatching}**, where
+   * `filedRunId` is. That pair exists so a filed day cannot be filed twice through the spectator's
+   * back door; this one needs no such care because it re-derives itself. {@link adopt} clears it,
+   * and if the transport is still sitting past the end under the cover the very next frame writes it
+   * again — so the worst a round trip can do is re-answer a question correctly.
    *
    * A decision number is owed; the argument is `everyday/swap.ts#EverydaySwapPort.hasThePage`'s.
    */
