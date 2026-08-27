@@ -280,15 +280,35 @@ const MEASURE = (): Reading => {
     if (over > clippedPx) clippedPx = over;
   }
 
-  /* Per axis, so a vertically scrollable box that clips horizontally keeps its vertical gesture. */
+  /*
+   * Per axis, so a vertically scrollable box that clips horizontally keeps its vertical gesture.
+   *
+   * **Pinned to zero rather than to wherever the box happens to sit, and that distinction is the
+   * whole of GitHub issue #292's second CI failure.** A `hidden`/`clip` box cannot be scrolled by
+   * any gesture, so whatever offset it currently holds was put there by script — a focus, an
+   * earlier `scrollIntoView`, the browser's own scroll restoration. Reading reachability from that
+   * offset asks *could a gesture reach this control from wherever this browser left the box*, which
+   * is a question about the browser.
+   *
+   * Zeroing first asks the question the clause means: *from the state the player arrives in, can a
+   * gesture reach it* — and `shell.ts:606-613` resets to the origin on navigation, so zero is that
+   * state rather than an invented one.
+   *
+   * It was found by two CI legs disagreeing with this machine **byte-identically on Linux and
+   * macOS** while every control existed in all three. The same stage drew `everyday-stage-play`,
+   * `everyday-stage-start`, seven speed chips, a primary, a back and a leave in every environment;
+   * only *which of them fell outside the viewport* differed, and the two answers were near
+   * complements — the signature of a container resting at opposite ends, not of a layout that
+   * changed. Chromium 1234 against 1194, and the pinned offset was the only thing reading it.
+   */
   const pinned: [Element, number | null, number | null][] = [];
   for (const node of document.querySelectorAll('*')) {
     const style = getComputedStyle(node);
-    pinned.push([
-      node,
-      /hidden|clip/u.test(style.overflowX) ? node.scrollLeft : null,
-      /hidden|clip/u.test(style.overflowY) ? node.scrollTop : null,
-    ]);
+    const lockX = /hidden|clip/u.test(style.overflowX);
+    const lockY = /hidden|clip/u.test(style.overflowY);
+    if (lockX) node.scrollLeft = 0;
+    if (lockY) node.scrollTop = 0;
+    pinned.push([node, lockX ? 0 : null, lockY ? 0 : null]);
   }
   const undoWhatNoGestureCouldDo = (): void => {
     for (const [node, left, top] of pinned) {
@@ -331,14 +351,14 @@ const MEASURE = (): Reading => {
     /* The bar's note is the one string that names the state; the transport's own control names it
        a second way, so a state with no note is still distinguishable from a state with none drawn. */
     stageState:
-      document.querySelector('.everyday-stage') === null
+      shell.querySelector('.everyday-stage') === null
         ? undefined
-        : `${document.querySelector('.everyday-bar-note')?.textContent?.trim() ?? '(no note)'} :: ${
-            [...document.querySelectorAll('button, [role="button"]')]
-              .map((node) => node.className)
-              .filter((name) => typeof name === 'string' && name.length > 0)
-              .join(',') || '(no controls)'
-          }`.slice(0, 300),
+        : `${shell.querySelector('.everyday-bar-note')?.textContent?.trim() ?? '(no note)'} :: ${
+            controls
+              .map((node) => nameOf(node))
+              .filter((name) => name.startsWith('everyday-'))
+              .join(',') || '(no everyday controls)'
+          }`.slice(0, 1_200),
   };
 };
 
