@@ -78,7 +78,8 @@ the result written down. **A tier-2 row with no date is a tier-3 row that has no
 | Platform | Browser | Last driven | Evidence |
 |---|---|---|---|
 | Desktop Chromium at 1280×800 | Chromium | continuous | `packages/viz/src/dev/fold1280.browser.test.ts` — this is really tier 1, listed here because § 2 needs the viewport |
-| Desktop, narrow layouts at 375×667, 414×896, 767×700 | Chromium | 2026-07-30 (wave 12 drive phase, commit `5d4b782`) | `packages/viz/UX.md` rows `RX-03`, `RX-04b`, `RX-12` |
+| Desktop, narrow layouts at 375×667, 414×896, 767×700 — **the Engineer surface** | Chromium | 2026-07-30 (wave 12 drive phase, commit `5d4b782`) | `packages/viz/UX.md` rows `RX-03`, `RX-04b`, `RX-12`. The shell those three were fixed against is the one `@media (max-width: 767px)` restyles; `packages/viz/index.html` did not load `everyday/boot.ts` until 2026-08-12 ([§ D335](../DECISIONS.md)), so this row says nothing about the shell a player now meets first |
+| Narrow layouts at 360×800 and 375×667 — **the Everyday shell** | Chromium | continuous, since GitHub issue #292 | `packages/viz/src/everyday/viewportGates.browser.test.ts` — really tier 1. It measures all three of § 2's clauses and **currently registers 21 failures across them**, which is the state § 2 commits against and #240 is open to fix |
 
 **And that is the whole of tier 2, which is the finding.** No row in this table names Firefox, Safari,
 or Edge, because no record in this tree says the product has been opened in one. If you have driven
@@ -167,6 +168,20 @@ stated as two clauses that can each fail:
   it is the three things `UX.md`'s `RX-03`, `RX-04b` and `RX-12` already assert in prose, given a
   width and a gate. 360 px is chosen because it is the narrowest width any evidence in this tree
   touches (`layout.test.ts`'s 360 px case), so committing to it costs a test rather than a redesign.
+
+  **The gate exists now, it measures all three clauses, and the product fails all three**
+  (`packages/viz/src/everyday/viewportGates.browser.test.ts`, GitHub issue #292). Measured
+  2026-08-27 on the Everyday shell: at 360×800 the screen region is 148 px against content that lays
+  out at 241, `.everyday-main` clips **93 px** on the main menu and **337 px** on the stage, **five**
+  controls on the menu cannot be brought into the viewport by any gesture — all four mode tiles and
+  § 3.3's primary — and the stage canvas holds **42.5 %** of the height against this clause's 60 %.
+  At 375×667: 78 px, 322 px, five controls, 51.0 %. The **cost of the commitment is now visible**,
+  which is what a gate is for; the layout work is #240's and the findings are registered rather than
+  suppressed, so a new one is red and a fixed one is red as *delete this entry*.
+
+  **Clause 2 also fails at 1280×800**, at **42.5 %**, because `everyday/stageScreen.ts:530` writes
+  the Everyday stage canvas as a literal `height:340px`. This clause is scoped *"360 px and above"*,
+  so a tier-1 desktop viewport is inside it, and that is outside #240's stated subject.
 - **Out of scope for launch, and stated as a refusal rather than a backlog item:** tap-target sizing,
   gesture affordances, a touch-first control layout, hover-dependent affordances having non-hover
   equivalents, and any claim that a phone is a *supported* way to play. **A phone user is not
@@ -216,13 +231,19 @@ to read it as narrower or wider than it is.
 | **1280** | **Nothing.** There is no 1280 px rule in the stylesheet — see the note below this table | — |
 | **1180** | `[data-hide-narrow]` hides the header's spec line and the banner. § D236 took the **phase pill** and the **mode select** back out of that set: hiding the mode select was a functional lockout, because `display: none` removed it from the tab order and no other control anywhere changes Casual/Engineer (issue #72) | `packages/viz/index.html`, `@media (max-width: 1179px)`; `dev/shellChrome.test.ts` asserts which elements carry the attribute and which may not |
 | **899, 767, 720** | Further layout blocks, each asserted only as *the stylesheet contains this rule* | `index.html`; `surfaces.test.ts` finds the 767 px block with `indexOf` and reads the rules inside it |
-| **420** | The single narrowest viewport driven anywhere in the browser tier — one live-metrics card overflow case | `packages/viz/src/dev/liveMetrics.browser.test.ts:191` |
-| **375 / 414** | Driven by hand once, 2026-07-30, and by nothing since | `packages/viz/UX.md` `RX-03` |
-| **360** | The narrowest width any test in the tree names, in a pure layout unit test | `render/layout.test.ts` |
+| **420** | ~~The single narrowest viewport driven anywhere in the browser tier~~ — one live-metrics card overflow case, and no longer the narrowest | `packages/viz/src/dev/liveMetrics.browser.test.ts:191` |
+| **375** | Driven **continuously**, on the Everyday shell, against all three of § 2's clauses. ~~Driven by hand once, 2026-07-30, and by nothing since~~ — that remains true of the **Engineer** shell, which `RX-03` is about | `packages/viz/src/everyday/viewportGates.browser.test.ts`; `packages/viz/UX.md` `RX-03` for the hand-drive |
+| **414** | Driven by hand once, 2026-07-30, and by nothing since | `packages/viz/UX.md` `RX-03` |
+| **360** | ~~The narrowest width any test in the tree names, in a pure layout unit test~~ — **driven** now, at 360×800, on the main menu and the stage, with geometry asserted at both | `packages/viz/src/everyday/viewportGates.browser.test.ts`; `render/layout.test.ts` for the pure unit |
 
-**So the current de-facto support floor is 1280 px for asserted geometry and 420 px for anything
-being driven at all**, and the 360–767 band is CSS that was correct on one afternoon. #240's job is to
-turn the second column of that table into gates. This document's commitment above — 360 px, three
+~~**So the current de-facto support floor is 1280 px for asserted geometry and 420 px for anything
+being driven at all**~~ — **that was true until GitHub issue #292.** The floor for *asserted geometry*
+is **360 px** now, on the Everyday shell, at both of § 2's named widths. What has not changed is the
+thing that sentence was really reporting: the 360–767 band is still CSS that was correct on one
+afternoon, and the gate that now watches it is watching it **fail** — 21 registered findings across
+the three clauses, listed in `viewportGates.browser.test.ts`'s `OUTSTANDING`. A gate at a width is
+not the same as a product that passes at it, and turning the second column of that table into gates
+is done for § 2's three clauses and undone for everything else. #240 is the layout work. This document's commitment above — 360 px, three
 clauses — is what those gates should assert.
 
 **And one row of that table was wrong before it was written, which is worth recording rather than
