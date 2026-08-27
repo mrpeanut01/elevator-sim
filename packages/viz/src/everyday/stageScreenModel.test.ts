@@ -630,6 +630,33 @@ describe('§ 3.3 — the stage row, refined', () => {
   });
 
   /**
+   * And the sentence itself, checked against **every** run context this one screen serves.
+   *
+   * The first draft instructed — *"close it and its report is written"* — and § 3.3 gives the stage
+   * primary a different verb in each context: *Close the day*, *End the rush*, and on `watch`
+   * *Play this crowd yourself*, where § 14.1 forbids closing the day at all. So the assertion is
+   * two-sided: the note is the **same** sentence everywhere (a per-context note would be four
+   * sentences to keep true instead of one), and it contains **none** of the primaries' verbs, which
+   * is what stops it from ever contradicting the button beside it.
+   *
+   * Derived from `RUN_CONTEXTS` rather than from a list here, so a fifth context arrives in this
+   * assertion instead of quietly skipping it.
+   */
+  it('says the same thing in every run context, and instructs in none of them', () => {
+    const ended = { hasRun: true, dayClosed: false, recomputing: false, dayEnded: true } as const;
+    for (const ctx of RUN_CONTEXTS) {
+      const bar = stageBarModelOf({ screen: 'stage', ctx }, ended);
+      expect(bar.note, ctx).toBe(STAGE_DAY_OVER);
+      /*
+       * The button's own words, whatever they are in this context, must not appear in the note.
+       * Compared in lower case on the whole label: `Play this crowd yourself` inside a sentence
+       * would be as wrong as `Close the day` is, and neither is a thing a caveat should be saying.
+       */
+      expect(STAGE_DAY_OVER.toLowerCase(), ctx).not.toContain(bar.primary.label.toLowerCase());
+    }
+  });
+
+  /**
    * The default, which is every caller written before the field existed.
    *
    * `dayEnded` is optional, so `honesty/surfaces.ts` and `everyday/stageScreen.ts`'s three older

@@ -716,9 +716,24 @@ export interface StageBarInput {
  * the player should press, and the row's job is to say so. So the note is replaced and the button
  * is left alone — a state where there is more to do, not less.
  *
+ * ## Why it describes and does not instruct, which is a correction rather than a preference
+ *
+ * The first draft read *"the day has run out — **close it** and its report is written"*, and that
+ * sentence is a lie on two of the four run contexts this one screen serves. § 3.3 gives the stage
+ * primary a different verb in each: *Close the day* on `daily` and `campaign`, *End the rush* on
+ * `rush`, and *Play this crowd yourself* on `watch` — where § 14.1 forbids closing the day at all,
+ * because it is somebody else's. A note telling a spectator to close a day they may not close is
+ * the inert-control defect wearing a caveat's clothes.
+ *
+ * The fix is not a list of the contexts where the instruction holds. It is to notice that the
+ * instruction was never this cell's to give: the **primary sits immediately beside the note and
+ * already says the verb**, correctly, in all four. So the note does the one job the button cannot —
+ * it explains why the picture stopped — and says nothing about what to press. The three sentences
+ * above it keep the same discipline, which is why they survive every context unchanged.
+ *
  * A decision number is owed; the argument is this docstring's.
  */
-export const STAGE_DAY_OVER = 'the day has run out — close it and its report is written';
+export const STAGE_DAY_OVER = 'the day has run out — the stage will not move again on its own';
 
 /**
  * § 3.3's stage row, refined.
