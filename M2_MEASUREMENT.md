@@ -160,12 +160,12 @@ asserted at both (`packages/viz/src/everyday/viewportGates.browser.test.ts`).
 than about this machine.** Measured:
 
 ```
-grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 29
-find packages -name "*.browser.test.ts" | wc -l                            # → 29
+grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 30
+find packages -name "*.browser.test.ts" | wc -l                            # → 30
 grep -rn "firefox\|webkit\|Firefox\|WebKit\|Gecko" packages --include="*.ts"  # → no output
 ```
 
-**29 of 29** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
+**30 of 30** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
 `webkit` and `Gecko` do not occur anywhere in `packages/**/*.ts`. The tier is **single-engine by
 construction**.
 
@@ -382,7 +382,7 @@ stands.** Two independent reasons, and only the second is about hardware:
 
 1. **The product's own tier is single-engine** (§ 3). Even a machine with all three browsers
    installed could not make `npx vitest run --project viz-browser` cover a matrix, because **29 of
-   29** browser-tier files name `chromium`. Until a browser-tier file takes its engine as a parameter, *"the slice runs
+   30** browser-tier files name `chromium`. Until a browser-tier file takes its engine as a parameter, *"the slice runs
    on the target browser matrix"* is a claim no tier command can produce evidence for.
 2. **Tier 1 is two rows and both are Chromium.** #203 § 4's rule is explicit: *"Every tier-1 row must
    be a row a red run defends, and adding a tier-1 row means adding its gate in the same change."*
