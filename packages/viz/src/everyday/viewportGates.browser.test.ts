@@ -72,9 +72,11 @@
  * goes red as *delete this entry*. A register of ghosts is a suppression list; a register nothing
  * re-derives is decoration.
  *
- * The layout work is **#240**, which is open, unstarted, and carries these clauses as its own
- * acceptance criteria. So when #240 lands, this file is **supposed** to go red, once, with a diff
- * naming every entry that stopped reproducing. Deleting those entries is part of landing #240, and
+ * The layout work is **#240** — open, unassigned, no linked pull request, milestone M4. It does not
+ * restate these three clauses; it incorporates them, by *"Build to the support matrix decided in
+ * pre-production"* and by its fourth criterion, *"journey tests run at the minimum viewport as well
+ * as at desktop width"*, which is what this file now does. So when #240 lands, this file is
+ * **supposed** to go red, once, with a diff naming every entry that stopped reproducing. Deleting those entries is part of landing #240, and
  * an empty {@link OUTSTANDING} is what turns this file from a record into a gate. Nothing else about
  * the file changes on that day.
  *
