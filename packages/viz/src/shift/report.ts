@@ -1223,7 +1223,7 @@ function figuresFor(
       id: 'stairs',
       label: 'TOOK THE STAIRS',
       value: String(observations.abandoned),
-      note: stairsNote(observations),
+      note: stairsNote(observations, summary),
       tone: observations.abandoned > 0 ? 'bad' : 'good',
       axisOnly: false,
     },
@@ -1316,28 +1316,52 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
  * A decision number is owed for the cohort captions (this note, the lever clause, the Casual lead
  * in `mode/casualDay.ts`, and the goal label's window); this docstring is the argument.
  */
-function stairsNote(observations: Observations): string {
+function stairsNote(observations: Observations, summary: VizSummary): string {
   const horizon = horizonLabelOf(observations.horizonS);
   const { abandoned, abandonedCarried } = observations;
-  const scope = 'over the whole shift';
-  if (abandoned === 0) {
-    return `no wait crossed the ${horizon} give-up horizon ${scope}${turnedAwayClause(observations)}`;
-  }
+  const clauses = [
+    stairsCohortClause(abandoned, abandonedCarried, horizon),
+    /*
+     * **Which cohort this cell is over, said in the same idiom the cell four along uses** — GitHub
+     * issue #288's fourth criterion, and `worstWaitFigure`'s *"the peak-5min window's worst — the
+     * goal row reads the whole shift"* is the sentence this copies.
+     *
+     * The two figures are folded over different populations and both are right: this one counts
+     * every leg the playhead has reached, and WORST WAIT counts the reporting window's arrivals.
+     * On a shipped run they genuinely differ — `live/observations.test.ts` measures **zero**
+     * spanning windows across all eight buildings — and the sheet printed the two four inches apart
+     * with only one of them saying so. The window id is the run's own rather than the word
+     * *peak-5min*, so a day whose window is the whole of it says so and a reader can see that the
+     * two coincide.
+     */
+    `counted over the whole shift, not the ${summary.reportWindow.id} window`,
+    turnedAwayClause(observations),
+  ];
+  return clauses.filter((clause) => clause !== '').join('; ');
+}
+
+/** The three shapes the CARRIED overlap takes, and the empty case. See {@link stairsNote}. */
+function stairsCohortClause(
+  abandoned: number,
+  abandonedCarried: number,
+  horizon: string,
+): string {
+  if (abandoned === 0) return `no wait crossed the ${horizon} give-up horizon`;
   if (abandonedCarried === abandoned) {
     return (
-      `waited past the ${horizon} horizon ${scope}, before a car came — every one of them is ` +
-      `inside CARRIED too, so these two cells overlap rather than add${turnedAwayClause(observations)}`
+      `waited past the ${horizon} horizon before a car came — every one of them is inside ` +
+      'CARRIED too, so these two cells overlap rather than add'
     );
   }
   if (abandonedCarried === 0) {
     return (
-      `waited past the ${horizon} horizon ${scope} and were never carried — they sit inside ` +
-      `CARRIED’s denominator and not its count${turnedAwayClause(observations)}`
+      `waited past the ${horizon} horizon and were never carried — they sit inside CARRIED’s ` +
+      'denominator and not its count'
     );
   }
   return (
-    `waited past the ${horizon} horizon ${scope} — ${String(abandonedCarried)} of them were ` +
-    `still carried and are inside CARRIED too; the rest were not${turnedAwayClause(observations)}`
+    `waited past the ${horizon} horizon — ${String(abandonedCarried)} of them were still carried ` +
+    'and are inside CARRIED too; the rest were not'
   );
 }
 
@@ -1374,8 +1398,8 @@ function turnedAwayClause(observations: Observations): string {
   const { turnedAway } = observations;
   if (turnedAway === 0) return '';
   return (
-    `; a further ${String(turnedAway)} were turned away at a credential check and waited for ` +
-    'nothing — a different outcome, not a slow one'
+    `a further ${String(turnedAway)} never waited at all — the building turned them away at a ` +
+    'credential check, which is a different outcome and not a slow one'
   );
 }
 
