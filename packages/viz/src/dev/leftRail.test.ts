@@ -83,6 +83,7 @@ function observations(overrides: Partial<LiveObservations> = {}): LiveObservatio
     deepestQueueFloorId: '12',
     abandoned: 0,
     abandonedCarried: 0,
+    turnedAway: 0,
     horizonS: 900,
     worstWaitSoFarS: 42,
     worstWaitIsCensored: false,
@@ -112,6 +113,7 @@ function bandsOf(counts: readonly number[], basis: WaitBandBasis = 'now'): WaitB
     worst: WAIT_BANDS[worstIndex] as (typeof WAIT_BANDS)[number],
     worstIndex,
     longestCurrentWaitS: total === 0 ? undefined : 130,
+    longestWaitIsCensored: false,
   };
 }
 

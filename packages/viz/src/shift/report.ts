@@ -1223,7 +1223,7 @@ function figuresFor(
       id: 'stairs',
       label: 'TOOK THE STAIRS',
       value: String(observations.abandoned),
-      note: stairsNote(observations),
+      note: stairsNote(observations, summary),
       tone: observations.abandoned > 0 ? 'bad' : 'good',
       axisOnly: false,
     },
@@ -1316,9 +1316,36 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
  * A decision number is owed for the cohort captions (this note, the lever clause, the Casual lead
  * in `mode/casualDay.ts`, and the goal label's window); this docstring is the argument.
  */
-function stairsNote(observations: Observations): string {
+function stairsNote(observations: Observations, summary: VizSummary): string {
   const horizon = horizonLabelOf(observations.horizonS);
   const { abandoned, abandonedCarried } = observations;
+  const clauses = [
+    stairsCohortClause(abandoned, abandonedCarried, horizon),
+    /*
+     * **Which cohort this cell is over, in the idiom WORST WAIT already uses** — GitHub issue
+     * #288's fourth criterion, and `worstWaitFigure`'s *"the peak-5min window's worst — the goal
+     * row reads the whole shift"* is the sentence this copies, pointed the other way.
+     *
+     * The two figures are folded over different populations and both are right: this one counts
+     * every leg the playhead has reached, and WORST WAIT counts the reporting window's arrivals.
+     * On a shipped run they genuinely differ — `live/observations.test.ts` measures **zero**
+     * spanning windows across all eight buildings — and the sheet printed the two four inches apart
+     * with only one of them saying so. The window id is the run's own rather than the word
+     * *peak-5min*, so a day whose window is the whole of it says so and a reader can see that the
+     * two coincide.
+     */
+    `counted over the whole shift, not the ${summary.reportWindow.id} window`,
+    turnedAwayClause(observations),
+  ];
+  return clauses.filter((clause) => clause !== '').join('; ');
+}
+
+/** The three shapes the CARRIED overlap takes, and the empty case. See {@link stairsNote}. */
+function stairsCohortClause(
+  abandoned: number,
+  abandonedCarried: number,
+  horizon: string,
+): string {
   if (abandoned === 0) return `no wait crossed the ${horizon} give-up horizon`;
   if (abandonedCarried === abandoned) {
     return (
@@ -1335,6 +1362,45 @@ function stairsNote(observations: Observations): string {
   return (
     `waited past the ${horizon} horizon — ${String(abandonedCarried)} of them were still carried ` +
     'and are inside CARRIED too; the rest were not'
+  );
+}
+
+/**
+ * The fourth outcome, named on the cell that used to swallow it — GitHub issue #288.
+ *
+ * ## Why it is here at all
+ *
+ * `Observations.abandoned` counted riders the building had **turned away at a credential check**,
+ * because `crossesHorizonAt` ended a wait at `boardedAt` and a refused rider never boards. Measured
+ * on Secure Tower over its own authored day, **72 of 72** stairs-takers were those riders, every one
+ * of whom waited zero seconds, under a caption reading *waited past the 15-minute horizon and were
+ * never carried*.
+ *
+ * The count is fixed at the fold. What that fix would have done on its own is take this cell from
+ * `72` to `0` and leave seventy-two people off the sheet entirely — a day that improved its wait
+ * figures by turning people away, reported as a clean day. `CLAUDE.md` refuses exactly that trade
+ * for abandonment and stairs uptake, and § D266 refuses it for this outcome by name: it is
+ * published **beside** the wait figures, on the footing `workPerServedLegKJ` sits beside raw energy.
+ *
+ * ## Why a clause on this note rather than a cell of its own
+ *
+ * A seventh figure would be a **grade-shaped** thing in a grid of grade-shaped things, and the
+ * tone rules on this sheet colour a cell good or bad. A refusal is neither: the building is doing
+ * what its access zoning says, and the reader whose day this is did not choose the zoning. So it
+ * rides on the cell whose cohort it was being confused with, where a reader meeting `TOOK THE
+ * STAIRS 0` beside a hundred-person shortfall in CARRIED has the sentence that explains it.
+ *
+ * Empty when nobody was turned away, which is every run of a building declaring no `accessZones`
+ * and every run of a zoned building whose riders are all correctly badged — so no such sheet grows
+ * a clause about a population it does not have. (The **scope** clause above is on every sheet, and
+ * has to be: which cohort a count is over is not a fact only some runs have.)
+ */
+function turnedAwayClause(observations: Observations): string {
+  const { turnedAway } = observations;
+  if (turnedAway === 0) return '';
+  return (
+    `a further ${String(turnedAway)} never waited at all — the building turned them away at a ` +
+    'credential check, which is a different outcome and not a slow one'
   );
 }
 

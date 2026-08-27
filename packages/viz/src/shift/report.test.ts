@@ -363,6 +363,41 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
     expect(withStairs({ abandoned: 0, abandonedCarried: 0 })).toContain('give-up horizon');
   });
 
+  it('says which cohort it is over, in the idiom WORST WAIT already uses — issue #288', () => {
+    /*
+     * The two figures are folded over different populations and both are right: this cell counts
+     * every leg, WORST WAIT counts the reporting window's arrivals, and no shipped template's
+     * window spans its run. The sheet printed them four inches apart with only one saying so.
+     *
+     * The window id is read off the run rather than typed, so a day whose window is the whole of it
+     * says that instead — which is a state `office-day` produces and this fixture does not.
+     */
+    const report = reportOf(saturated);
+    const windowId = saturated.summary.reportWindow.id;
+    expect(figure(report, 'stairs').note).toContain(
+      `counted over the whole shift, not the ${windowId} window`,
+    );
+    expect(figure(report, 'worst-wait').note).toContain(`${windowId} window`);
+  });
+
+  it('names the riders the door turned away, and stays silent when there are none', () => {
+    /*
+     * The other half of issue #288, and the half that stops the fix from being a suppression.
+     * `abandoned` no longer counts a rider refused at a credential check — on Secure Tower's own
+     * authored day that took the cell from 72 to 0 — so the sheet has to say where those people
+     * went, or a day that improved its wait figures by turning people away reads as a clean day.
+     * `CLAUDE.md` refuses exactly that trade; § D266 publishes the outcome beside the wait figures.
+     */
+    const note = withStairs({ abandoned: 0, abandonedCarried: 0, turnedAway: 72 });
+    expect(note).toContain('a further 72 never waited at all');
+    expect(note).toContain('turned them away at a credential check');
+    expect(note).toContain('not a slow one');
+    // Silent where there is nothing to say, so every unzoned building's sheet is unchanged.
+    expect(withStairs({ abandoned: 0, abandonedCarried: 0, turnedAway: 0 })).not.toContain(
+      'credential',
+    );
+  });
+
   it('no surface on the sheet claims these riders left — the old wording is gone', () => {
     const report = reportOf(saturated);
     const everything = JSON.stringify(report);

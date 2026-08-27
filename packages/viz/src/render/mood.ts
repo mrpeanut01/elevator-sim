@@ -89,6 +89,14 @@ import { BAND_WORDS } from './riderQueue.js';
  *
  * `saturated` **is** here, and it is not an estimate: R4 makes *Overwhelmed* (`summary.saturated`)
  * the first-preference fail state, and R5's own corrected example `Pick` names it.
+ *
+ * `reportWindow` **is** here too, and it grades nothing — GitHub issue #288's fourth criterion. It
+ * is a window descriptor rather than a figure, and it is in the `Pick` for the reason a figure
+ * would not be: `serviceLevel` is folded over that window's arrivals and the counts printed beside
+ * this card are folded over the whole shift, so the driver that reads one of them has to be able to
+ * say which. Measured on the breadth fixture, the gap is not hypothetical — Secure Tower's
+ * `serviceLevel` is over **102** arrivals while the same run holds **211** legs. Naming the window
+ * makes no claim the source does not; it says which cohort the source's claim is about.
  */
 export type MoodSummary = Pick<
   VizSummary,
@@ -101,6 +109,7 @@ export type MoodSummary = Pick<
   | 'longWaitThresholdS'
   | 'waitCount'
   | 'handlingCapacity'
+  | 'reportWindow'
   | 'serviceLevel'
 >;
 
@@ -150,6 +159,7 @@ export function moodObservationsOf(
       longWaitThresholdS: s.longWaitThresholdS,
       waitCount: s.waitCount,
       handlingCapacity: s.handlingCapacity,
+      reportWindow: s.reportWindow,
       serviceLevel: s.serviceLevel,
     },
     queues,
@@ -357,8 +367,18 @@ export function buildingMood(
   drivers.push({
     id: DRIVER_IDS.abandoned,
     label: 'the unluckiest rider',
-    // `summary.serviceLevel` folds every arrival in the run, including the ones the playhead has
-    // not reached: *the longest wait* is the longest wait of the day, not of the day so far.
+    /*
+     * `summary.serviceLevel` is folded before the first paint, including over arrivals the playhead
+     * has not reached, so this reading is settled rather than accruing: *the longest wait* is the
+     * longest wait of the day, not of the day so far. That is what {@link MoodDriver.basis} gates
+     * on and `'whole-run'` is right for it.
+     *
+     * **The word is about the clock and not about the cohort**, and the comment that stood here
+     * said *"folds every arrival in the run"*, which is false: `diagnoseServiceLevel` folds the
+     * arrivals inside `summary.reportWindow`, and on Secure Tower's breadth run that is 102 of 211.
+     * A `basis` of `'whole-run'` beside a figure over a five-minute window is the reader's problem
+     * unless the sentence says so, which is why the text below names the window — issue #288.
+     */
     basis: 'whole-run',
     level: level.verdict === 'starved' || overHorizon > 0 ? 'distressed' : 'calm',
     /*
@@ -374,14 +394,37 @@ export function buildingMood(
      * even where it plainly means *particular*. The rule is right to be blunt here — the sentence
      * sits beside a count of people who gave up.
      */
+    /*
+     * **The window is in the sentence** — GitHub issue #288's fourth criterion.
+     *
+     * `summary.serviceLevel` is folded over the run's **reporting window**; every count printed
+     * beside this card — the rail's stat rows, the Day report's CARRIED and TOOK THE STAIRS — is
+     * folded over the **whole shift**. Both are right and they are over different people, and the
+     * issue's sheet is what that costs: *"Nobody waited past the 900 s abandonment horizon"* three
+     * rows from a stairs cell reading `11`, with nothing on either to say they are two populations.
+     *
+     * It is not a rare configuration. `observations.test.ts` measured **zero** spanning windows
+     * across all eight shipped buildings on the breadth fixture, and on Secure Tower the split is
+     * 102 arrivals against 211 legs. It closes only on a run whose window is the whole day, which
+     * `office-day` produces and the thirty-minute slice does not — so the clause is generated from
+     * `reportWindow.id` rather than written out, exactly as `shift/report.ts#worstWaitFigure`
+     * generates its own. A sheet where the two coincide will say `report-window` on both and a
+     * reader can see that they do.
+     *
+     * The **verdict is untouched**: `level` and both branches are what they were, and the driver's
+     * `overHorizonCount` reading was already correct — it is the sentence's silence about *whose*
+     * horizon crossings it counted that was the defect, not its arithmetic.
+     */
     text: lead(
       'Past a fixed wait, this run stops counting somebody as waiting at all and treats them as ' +
         'having given up.',
       overHorizon > 0
-        ? `${String(overHorizon)} of ${String(level.arrivalCount)} people waited past the ` +
-          `${level.horizonS.toFixed(0)} s point at which this run stops counting a wait at all.`
-        : `Nobody waited past the ${level.horizonS.toFixed(0)} s abandonment horizon; the longest ` +
-          `wait was ${level.longestWaitS === null ? 'not measured — nobody arrived in the reporting window' : `${level.longestWaitS.toFixed(0)} s${level.longestWaitIsCensored ? ' and counting, because that person never boarded' : ''}`}.`,
+        ? `${String(overHorizon)} of ${String(level.arrivalCount)} people in the ` +
+          `${summary.reportWindow.id} window waited past the ${level.horizonS.toFixed(0)} s point ` +
+          'at which this run stops counting a wait at all.'
+        : `Nobody in the ${summary.reportWindow.id} window waited past the ` +
+          `${level.horizonS.toFixed(0)} s abandonment horizon; the longest wait there was ` +
+          `${level.longestWaitS === null ? 'not measured — nobody arrived in the reporting window' : `${level.longestWaitS.toFixed(0)} s${level.longestWaitIsCensored ? ' and counting, because that person never boarded' : ''}`}.`,
     ),
   });
 

@@ -113,6 +113,35 @@ export function waitingLeg(passengerId: string, arrivedAt: number, originFloorId
   };
 }
 
+/**
+ * A leg the building **turned away for want of a credential** — § D265's fourth outcome.
+ *
+ * `refusedAt` defaults to `arrivedAt` because that is what the simulator produces: measured, every
+ * refused leg on every shipped run refuses at the instant it arrives — 4 of 4 on `secure-tower` and
+ * 5 of 5 on `mixed-use-high-rise` over the breadth fixture, 72 of 72 on Secure Tower over its own
+ * authored day. The parameter exists so a suite can build the *unmeasured* case on purpose rather
+ * than by forgetting, since a fold that only ever meets a zero-second refusal cannot show whether
+ * it resolves the wait at the refusal or at the arrival.
+ *
+ * No `carId` and no `bankId`: nothing carried this rider, which is the whole of what a refusal is.
+ */
+export function refusedLeg(
+  passengerId: string,
+  arrivedAt: number,
+  refusedAt: number = arrivedAt,
+  originFloorId = 'L0',
+): VizLeg {
+  return {
+    passengerId,
+    originFloorId,
+    destinationFloorId: 'L2',
+    direction: 'up',
+    arrivedAt,
+    refusedAt,
+    credentialGroup: 'tenant-alpha-staff',
+  };
+}
+
 /** A leg that arrived, boarded and alighted. */
 export function servedLeg(
   passengerId: string,
