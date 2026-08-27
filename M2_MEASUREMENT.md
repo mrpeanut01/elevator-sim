@@ -180,8 +180,8 @@ construction**.
 
 A criterion measured on one engine is not a matrix, so the instrument had to be built outside the
 tier — and it had to be built outside because a measurement lane may not edit the tier. **That second
-clause is a rule about a lane's remit and not a property of an instrument**, and § 3.5 below is where
-it stopped applying.
+clause is a rule about a lane's remit and not a property of an instrument**, and § 3.1 below records
+where it stopped applying.
 
 ### 3.1 The instrument
 
@@ -197,8 +197,8 @@ loads the page at six viewports and reads horizontal overflow, tile count and pa
 node matrixProbe.mjs /path/to/worktree
 ```
 
-**§ 3.5 is where the second half of that sentence stopped applying.** *"A measurement lane changes no
-source and no test"* is a rule about **that lane's remit**, and it is not a property of an
+**The second half of that sentence has stopped applying, and this is where.** *"A measurement lane
+changes no source and no test"* is a rule about **that lane's remit**, and it is not a property of an
 instrument — an uncommitted script cannot keep proving anything, and § 4.1 quotes #203 § 4's own rule
 that *"every tier-1 row must be a row a red run defends."* § 2 puts 360 px in scope for launch, so
 the successor instrument for § 2's three clauses is **in the tier**, at
@@ -208,9 +208,9 @@ half — the multi-engine question — which is a fact about this machine rather
 ### 3.2 The cells
 
 **Boot and layout, six viewports per engine.** `tiles` is the four Everyday mode tiles; `overflow` is
-`max(documentElement.scrollWidth, body.scrollWidth) − documentElement.clientWidth`. ~~which is § 2's
-first clause.~~ **It is not § 2's first clause and it cannot be** — see the correction under the
-table, which is the load-bearing half of this section now.
+`max(documentElement.scrollWidth, body.scrollWidth) − documentElement.clientWidth`, ~~which is § 2's
+first clause~~ — **which it is not, and cannot be over this shell.** See the correction under the
+table; it is the load-bearing half of this section now.
 
 | engine | 1280×800 | 1440×900 | 768×1024 | 414×896 | 375×667 | 360×640 |
 |---|---|---|---|---|---|---|
