@@ -8439,6 +8439,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageScreenModel.ts#STAGE_OUT_OF_SERVICE',
     'everyday/stageScreenModel.ts#STAGE_AWAITING_RUN',
+    'everyday/stageScreenModel.ts#STAGE_DAY_OVER',
     'everyday/stageScreenModel.ts#stageOpeningLineOf',
     'everyday/stageScreenModel.ts#stageNextStretchOf',
   ],
@@ -8621,6 +8622,24 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       seeds.push({ field: `stage.bar(${label}).primary`, text: bar.primary.label, role: 'label' });
     }
     seeds.push({ field: 'stage.recomputing', text: STAGE_RECOMPUTING, role: 'prose' });
+    /*
+     * § 3.3's fourth state — GitHub issue **#287**. Seeded here rather than as a fourth row of
+     * `interventionStates` above, and the placement is forced rather than chosen: that array's
+     * flags are spread into `stageInterventionsOf` as well, which has no `dayEnded` and would take
+     * one as an excess property. A fourth row would mean restructuring a shared literal for one
+     * string, in the one file in this tree where restructuring is the hazard.
+     *
+     * Through `stageBarModelOf` rather than by seeding the constant, so what enters the corpus is
+     * the string the **row renders** in that state. A constant seeded directly would still be swept
+     * on the day the row stopped drawing it.
+     */
+    const dayOver = stageBarModelOf(
+      { screen: 'stage', ctx: 'daily' },
+      { hasRun: true, dayClosed: false, recomputing: false, dayEnded: true },
+    );
+    if (dayOver.note !== undefined) {
+      seeds.push({ field: 'stage.bar(day-over).note', text: dayOver.note, role: 'reason' });
+    }
 
     return singleRun(this.id, seeds);
   },
