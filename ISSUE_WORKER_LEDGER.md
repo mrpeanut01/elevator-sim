@@ -509,8 +509,67 @@ the stronger verdict; the row stays open, narrowed, because the other candidate 
 
 - **The honesty corpus is not re-measured and no counts are published** (§ D343). Both merged lanes
   ran the always-on tier as a pass/fail gate only, and said so.
-- **The full `--project viz` suite has not run to completion.** Three lanes' suites contended for CPU
-  and were starved — one measured 3 minutes of CPU in 24 minutes of wall clock before killing its run.
-  Each lane derived its blast radius mechanically and ran every test importing a changed module, which
-  is real coverage and **is not the same claim**. The full suite runs once on the integrated tree.
-- **No issue is closed.** Closure waits on merge, which is where it has always waited here.
+- **The honesty corpus is not re-measured and no counts are published** — § D343 takes that once,
+  **after this merges to `main`**, and three lanes added player-facing strings, so the Phase 9 figures
+  in `CLAUDE.md` will move. **That measurement is owed to the next session.**
+
+## Wave E closed — the integrated result, measured rather than inherited
+
+**The full suite ran on the integrated tree, twice: locally and on both CI legs.**
+
+| run | result |
+|---|---|
+| local, integrated tree | **463 files · 9 106 passed · 11 skipped · 1 failed** |
+| CI `suite (linux)` at `0c694b1` | **green** |
+| CI `suite (macos)` at `0c694b1` | **green** |
+| `Review`, `Deploy viewer` | green |
+
+**The local failure was the most useful result of the wave**, and it was Lane F's own count gate red
+against Lane F's own figure: the browser-tier file count read **29** on its branch and **30**
+integrated, once Lane A added `autoFile.browser.test.ts`. Three values in one wave — 25 in the support
+matrix and 26 in `M2_MEASUREMENT.md` when the wave opened against a tree of 28, then 29, then 30 —
+**each correct where it was taken.** The gate proved itself on the person who wrote it.
+
+### CI then failed twice more, and the first diagnosis was wrong
+
+`suite (linux)` and `suite (macos)` both went red on the viewport register, **byte-identically**. The
+first hypothesis was a timing race and it was **withdrawn**: identical output from two different
+runners is not what a race produces. Five local conditions were green — default, a 20× CPU throttle,
+forced `prefers-reduced-motion: reduce`, the full Chromium build, and the whole suite at default
+parallelism — and CI's browser could not be installed here (`playwright-core` pins **1234**; this
+container has **1194**, download blocked).
+
+**The root cause was the pinned scroll offset.** Every control existed in all three environments —
+the same stage drew `stage-play`, `stage-start`, seven speed chips, a primary, a back and a leave
+everywhere. Only *which of them fell outside the viewport* differed, and the two answers were **near
+complements**: the signature of a scroll container resting at opposite ends. `MEASURE` pinned each
+`hidden`/`clip` box to its **current** offset, but such a box cannot be moved by any gesture, so that
+offset was put there by script. Reading reachability from it asks a question about the browser.
+Zeroing first asks what the clause means.
+
+**The register is unchanged by that fix**, which is the evidence it is right: a no-op on the leg that
+was green, a definition on the legs that were not. No register entry was added, deleted or reworded
+to reach green — that register is the record of what #240 has to fix.
+
+## Wave E dispositions
+
+| # | disposition | evidence |
+|---|---|---|
+| **287** (P0) | **closed** | Four ACs met. Its *"not more than once per sitting"* **refuted** — the loop banks a week; its arithmetic wrong in every operand |
+| **288** | **closed** | Four ACs met. Its headline `2 915 s` **misattributed** — fixing what it described would have relabelled the number and left it on the card |
+| **289** | **closed** | Three ACs, **AC2 raised** — a caller-set test could not have caught a bypasser |
+| **290** | **closed** | Two ACs. Its *"counter correctly stays at 0"* **refuted** — no guard existed, that day was missed |
+| **291** | **closed** | Three ACs. A **twin defect two sentences away** would have left AC3 unmet |
+| **292** | **closed** | Four ACs. Its location claim **refuted**; instrument red-by-register, calibrated independently |
+| **293** | **closed** | Three ACs. **Four** stale sites, not three; a register row stale about where it is drawn |
+| **294** | **closed** | Three ACs. Premise **refuted as framing**; decision recorded as § D375 |
+| **295** | **open, deliberately** | Its criterion is *"closes when the table is empty"*. Six rows remain (F22, F26, F28, F32, F37, F38) plus the narrowed F39 and the F33 product decision |
+
+**Six of the eight closed issues carried a claim that verification refuted.** That is the wave's
+headline and it is the fourth consecutive wave to report it.
+
+**Filed from findings:** #296 (a **twelfth dead seam**, with a false disclosure on top), #297, #298,
+#299, #300, #301, #303. **Decisions allocated:** D375–D385.
+
+**What no fix in this wave has:** verification against a deployed artifact. The PR's Azure preview is
+unreachable from this container — `CONNECT` returns **403**, as § D374 recorded on 2026-08-25.

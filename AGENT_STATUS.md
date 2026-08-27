@@ -774,10 +774,25 @@ reverting the tab title turns 2 of 4 cases red, while dropping the rush note fro
 the import-graph case **green** and the browser case red. An import survives the deletion of the
 `append`; Lane E said exactly that and built the browser case for it.
 
-**Not run, and not claimed:** the full `--project viz` suite, and the deep honesty tier. Three lanes'
-suites contended for CPU on one container and were **starved rather than hung** — one measured 3
-minutes of CPU across 24 minutes of wall clock. Per § D343 the corpus is measured once, after
-integration; **no counts are published by this wave.**
+**Run, and the result stated:** the full suite on the integrated tree — **463 files, 9 106 passed, 11
+skipped** locally, and **green on both CI legs** at `0c694b1`. The deep honesty tier was **not** run
+and the corpus is **not** re-measured: § D343 takes that once, **after this merges to `main`**, and it
+is owed to the next session because three lanes added player-facing strings.
+
+**Two CI failures were worked to green, and the first diagnosis was withdrawn.** The count gate caught
+its own author's per-branch figure (29 on the branch, 30 integrated). Then the viewport register went
+red on **both** legs byte-identically — which ruled out the timing race that had been proposed, since
+identical output from two runners is not what a race produces. Root cause: `MEASURE` pinned each
+`hidden`/`clip` box to its **current** scroll offset, so reachability was read from wherever the
+browser had left the container rather than from the arrival origin. Every control existed everywhere;
+only which fell outside the viewport differed, and the two answers were **near complements**.
+
+**The register is unchanged by that fix** — a no-op on the green leg, a definition on the red ones —
+and **no register entry was added, deleted or reworded to reach green.**
+
+**Could not be reproduced here, and that is recorded rather than glossed:** CI installs the Chromium
+`playwright-core` pins (**1234**); this container has **1194** and the download is blocked. Five local
+conditions were green before the fix.
 
 **Unreachable from this container, re-confirmed today:** the PR's Azure preview. `CONNECT` returns
 **403**, exactly as § D374 recorded on 2026-08-25. So no landed fix in this wave has been verified
