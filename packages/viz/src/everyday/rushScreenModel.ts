@@ -183,7 +183,9 @@ export const RUSH_HOLD_LINE = Object.freeze({
 /**
  * Every authored sentence this screen puts in front of a player, from
  * `docs/design/elevator-sim-casual.dc.html`'s `isRush` block. The handoff wins every disagreement
- * about what the screen says.
+ * about what the screen says. `rushScreen.ts` draws this table — named rather than left to *this
+ * screen*, because deixis is what went stale on {@link RUSH_BESTS} and a module name is a thing a
+ * test can check.
  *
  * Two lines are **not** the prototype's and say so. `holdLine` is the prototype's own wording
  * already corrected to § 20.5 (its screen copy states the two-minute rule that its code did not
@@ -290,12 +292,29 @@ export function rushGeneratedRangeLine(): string {
  * its *subject* is wrong. `rushScreenModel.test.ts` now asserts this entry against the screen
  * `screens.ts` actually routes `stage` to, so the next retirement of a stage fails a test instead of
  * quietly re-writing history on a player-facing surface.
+ *
+ * ## The standings entry pointed *down* at rows that are on another screen — GitHub issue #293
+ *
+ * It read *"the five entries **below**"*, which was true while this register was drawn on the rush
+ * screen above them and stopped being true the day #207 moved it. `buildNotesViewOf` filters and
+ * re-orders nothing, so what a player actually met in Settings was a row promising five entries
+ * underneath it and the *drawing board* section underneath it instead — a deictic pointing at
+ * nothing.
+ *
+ * It is the same expiry as § 9.2's entry above, and it is worth recording separately because this
+ * one is a register row's own words going stale about **where the row is drawn** rather than about
+ * what it describes. A register entry may not assume its position on a page: this one has already
+ * outlived one renderer. So it names the screen the rows are on, which stays true from anywhere the
+ * register is drawn — including from the rush screen, if a later lane ever draws it there again.
+ *
+ * The rows' own disclosure is {@link RUSH_BESTS_FIXTURE_NOTE}, drawn beside them, which is the
+ * marker § 20.11 requires of a fixture. This entry is the queue item; that one is the licence.
  */
 export const RUSH_ABSENCES: readonly string[] = Object.freeze([
   'the climbing stream — no demand pattern this build ships ramps upward without a ceiling, so the ninety minutes a rush asks for cannot be generated yet',
   'a rush stage of its own — a run plays on the ordinary stage screen, whose clock reads the time of day and whose pill reads the part of the day the crowd is in; a rush wants time held and a wave number, and nothing in this build works either of them out',
   'a result screen of its own — a rush that has not run has no furthest wave, and a screen that answered anyway would be inventing one',
-  'the standings — the five entries below are the handoff’s own fixtures, not runs this build measured',
+  'the standings — the five entries on the rush setup screen are the handoff’s own fixtures, not runs this build measured',
 ]);
 
 /**
@@ -482,11 +501,31 @@ export interface RushBestView {
  * § 9.1's five standings — *five entries including two reference runs, labelled as reference runs*.
  *
  * The values are the handoff's own fixtures (`RUSH_BESTS` in the prototype) and this build has
- * measured none of them, which {@link RUSH_ABSENCES} says on the same screen. They are drawn rather
- * than withheld because the guide's five rows are what the screen *is* — a list with two labelled
- * reference runs — and a column of five dashes would say nothing about the shape it is teaching.
- * The one thing not carried over is the prototype's `you: true` row: this build has no *you* here,
- * so the row that claimed one is the player's own and reads `—`.
+ * measured none of them, which {@link RUSH_BESTS_FIXTURE_NOTE} says beside them: `rushScreen.ts`
+ * draws the marker and then these rows, in that order, and draws both or neither.
+ * They are drawn rather than withheld because the guide's five rows are what the screen *is* — a
+ * list with two labelled reference runs — and a column of five dashes would say nothing about the
+ * shape it is teaching. The one thing not carried over is the prototype's `you: true` row: this
+ * build has no *you* here, so the row that claimed one is the player's own and reads `—`.
+ *
+ * ## The sentence above used to name {@link RUSH_ABSENCES}, and it had been wrong since #207
+ *
+ * It read *"which {@link RUSH_ABSENCES} says **on the same screen**"* — and the register left this
+ * screen on the merge that closed GitHub issue #207 — which the comment standing where
+ * `absencesEyebrow` used to sit, inside {@link RUSH_SCREEN_COPY}, already recorded correctly.
+ * `rushScreen.ts` does not import `RUSH_ABSENCES` and has not since that merge; the register is
+ * drawn on the Settings build-information panel, two clicks away.
+ *
+ * That is § D227's stale refusal in its **worst** form, and the shape is worth naming rather than
+ * merely fixing. An ordinary stale refusal tells a reader not to touch a control that works. This
+ * one was the **licence**: it is the sentence that answered *why may unmeasured names and figures
+ * be drawn at all*, and it answered by pointing at a disclosure that was no longer there. A
+ * justification whose premise has silently expired keeps reading as a justification. GitHub issue
+ * #293; a decision number is owed.
+ *
+ * `rushScreenModel.test.ts` now ties the claim to the renderer rather than to these words: the note
+ * and the rows it is about must be drawn by the same module, derived from source. A register that
+ * moves again takes the sentence that describes it with it.
  */
 export const RUSH_BESTS: readonly RushBestView[] = Object.freeze([
   {
@@ -507,6 +546,58 @@ export const RUSH_BESTS: readonly RushBestView[] = Object.freeze([
   },
   { name: 'Steady hand', who: 'reference run', wave: 'wave 11', held: '33 min', reference: true },
 ]);
+
+/**
+ * What the standings are, drawn **beside the rows it is about** — GAMEPLAY § 20.11's own remedy.
+ *
+ * `rushScreen.ts` draws it, immediately above the five rows of {@link RUSH_BESTS}, and nowhere
+ * else. The module is named here in the lead rather than left as *this screen*, because deixis is
+ * what went stale on {@link RUSH_BESTS} and a module name is a thing `rushScreenModel.test.ts` can
+ * hold against the import graph.
+ *
+ * ## Why this exists at all
+ *
+ * § 20.11 lists `RUSH_BESTS` by name among the authored fixtures, and gives each of them exactly
+ * two ways to ship: *"Each needs a real source … or an explicit `FIXTURE` marker so nobody ships
+ * them as truth."* The real source is the rush engine, which is not built. So the marker is the
+ * only branch available, and a marker two clicks away in Settings is not a marker — it is a
+ * different screen's sentence about this one.
+ *
+ * This screen is the **only** place the build prints another player's name against a figure. Every
+ * other surface that could refuses in so many words: `world.ts#WORLD_FIGURES_REASON` on the front
+ * door and Your week, `gauntlet/ladder.ts#LADDER_WORLD_ABSENCE` on the ladder,
+ * `settingsView.ts`'s honest sentence where the prototype had a signed-in `Nadia R.`, and
+ * `campaign/career.ts`'s first day rather than a fixture of somebody else's month. Being the one
+ * exception is what makes the disclosure load-bearing rather than decorative.
+ *
+ * ## Why it is its own constant rather than the register
+ *
+ * {@link RUSH_PRIMARY_REFUSAL} is the same shape one screen up, and GitHub issue #207 drew the
+ * line this follows: **a refusal that belongs to a thing a player is looking at is drawn on that
+ * thing; a register of what the build does not do is drawn once, somewhere a reader goes looking.**
+ * Putting `RUSH_ABSENCES` back on this screen would re-litigate #207 and duplicate the panel; the
+ * three entries about the missing engine do not belong beside a list of names. What belongs beside
+ * the names is the one sentence that is about the names.
+ *
+ * ## Why it says *not people*, and not merely *not measured*
+ *
+ * `watch/reference.ts` states the rule the rest of the tree keeps: *"The labels are deliberately
+ * not names. A reference run is called the house baseline, not Sam — a name is what makes a reader
+ * assume a person, and § 20.11's whole subject is readers assuming that."* Two of these five rows
+ * carry handles (`delft_vt`, `r_okonkwo`) that read exactly like accounts, so a note saying only
+ * *these figures are unmeasured* would leave the people standing. The wording follows
+ * `world.ts#WORLD_FIGURES_REASON`'s opening deliberately, so the two refusals a player meets about
+ * other people's runs are recognisably the same refusal.
+ *
+ * **What this does not decide is what the rows should become.** GitHub issue #222 owns that — it
+ * would seed the boards with the shipped dispatchers' own verifiable runs, labelled as baselines —
+ * and #220 owns the engine. Removing the rows outright would pre-empt both. This makes the screen
+ * honest today and stays one deletion away from either answer.
+ */
+export const RUSH_BESTS_FIXTURE_NOTE =
+  'Nobody else’s rush can be reached from this build — there is no server to post one to, and no ' +
+  'rush has run here yet. These five rows are the handoff’s own fixtures, the two names among ' +
+  'them included: not runs this build measured, and not people who play it.';
 
 /**
  * § 9.1's *driving* block, as a **statement rather than a control**.

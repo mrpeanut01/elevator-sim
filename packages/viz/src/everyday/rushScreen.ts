@@ -5,7 +5,7 @@
  * § 20.5 hold line, the register of absences and the § 3.3 refinement live and are argued. This
  * file draws that model with `tokens.ts`'s § 19 values, in the prototype's two-column geometry: the
  * paper column carries the title, the three facts and the five bands; the ink column carries the
- * hold rule, the standings and who would drive.
+ * hold rule, the standings under the marker that says what they are, and who would drive.
  *
  * It wires **no control**. § 3.3 gives the screen one primary (`Start the rush`) and the shell owns
  * it; the model marks it inert because the climbing stream is not built, and the prototype's
@@ -29,6 +29,7 @@ import {
   rushHoldLineFigure,
   rushOpeningLine,
   RUSH_BESTS,
+  RUSH_BESTS_FIXTURE_NOTE,
   RUSH_SCREEN_COPY as COPY,
 } from './rushScreenModel.js';
 import {
@@ -159,6 +160,23 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   bestsBlock.style.cssText = 'margin-top:22px';
   const bestsEyebrow = el(doc, 'div', undefined, COPY.bestsEyebrow);
   bestsEyebrow.style.cssText = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};margin-bottom:11px`;
+  /*
+   * **The fixture marker, above the rows rather than under them** — GAMEPLAY § 20.11, GitHub issue
+   * #293. The five standings are authored fixtures carrying two handles that read as accounts, and
+   * § 20.11 gives a fixture two ways to ship: a real source, or a marker so nobody takes it for
+   * truth. The engine that would be the real source is #220's, so the marker is what there is.
+   *
+   * It goes *before* the list for the reason `dev/menuPanel.ts#exampleBoard` puts its own
+   * disclaimer before its two example rows: a reader who has already read five names and two held
+   * times has formed the belief the note exists to prevent. The note is not part of the list, so it
+   * sits outside `bestsList` and no row's geometry moves.
+   *
+   * It is drawn here and nowhere else, and `rushScreenModel.test.ts` requires that this module and
+   * the module drawing `RUSH_BESTS` stay the same module. That is the § D227 relation rather than a
+   * pinned string: the licence and the thing it licenses cannot be separated without a red test.
+   */
+  const bestsNote = el(doc, 'p', 'everyday-rush-bests-note', RUSH_BESTS_FIXTURE_NOTE);
+  bestsNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0 0 11px;text-wrap:pretty`;
   const bestsList = el(doc, 'div', 'everyday-rush-bests');
   bestsList.style.cssText = 'display:grid;gap:7px';
   for (const best of RUSH_BESTS) {
@@ -181,7 +199,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     row.append(left, right);
     bestsList.append(row);
   }
-  bestsBlock.append(bestsEyebrow, bestsList);
+  bestsBlock.append(bestsEyebrow, bestsNote, bestsList);
   ink.append(bestsBlock);
 
   const drivingBlock = el(doc, 'div');
