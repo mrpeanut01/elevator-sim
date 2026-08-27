@@ -6,7 +6,11 @@
  *
  * **A decision number is owed for this module.** It is not allocated here: two lanes have already
  * collided over one, so the argument lives in this docstring and the number is assigned at
- * integration.
+ * integration. That declaration is the module's, not this docstring's alone: GitHub issue #291's
+ * two window arguments — on {@link CASUAL_LEAD_BY_CELL}'s `average-wait` entry and on
+ * {@link CASUAL_SMALL_PRINT_LEAD} — are covered by it and do not repeat it, because one declaration
+ * per module is the unit this one chose and `validation/documentation.test.ts`'s owed-decision
+ * ratchet counts sites rather than modules.
  *
  * ## What was measured, before anything was built
  *
@@ -192,10 +196,44 @@ const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
   minute:
     'A head count of people, not an estimate — so it stays on this sheet even on days the ' +
     'average below it is refused.',
+  /*
+   * Window-independent, where the old sentence was not — GitHub issue
+   * [#291](https://github.com/mrpeanut01/elevator-sim/issues/291), and it is the entry directly
+   * below the rule that forbids it. It read *"Averaged over the busiest five minutes of the day
+   * rather than over all of it: this is what a wait came to when the building was under the most
+   * pressure"* — a claim about **which window this sheet was read over**, on a build where that
+   * window is a per-run fact. `shift/reportWindow.ts` gives Garden Apartments `full-run`, so the
+   * first sheet a new player ever sees led its AVERAGE WAIT cell with the peak band and then
+   * printed the cell's own note — *over 55 legs in the full-run window* — one seam later, in the
+   * same paragraph. The rule above is not a new one: the window is a per-run fact exactly as the
+   * day is, so *"it may only say things that are true of every day"* already covered it.
+   *
+   * **The record had already ruled this phrasing wrong.** `docs/20` defect 5 found the same words
+   * on the same building, and the fix moved the window clause into `shift/report.ts#smallPrintFor`,
+   * which reads `summary.reportWindow.id`. That ruling reached `shift/report.ts` and did not reach
+   * this table — `RISKS.md` R42, *a ruling with no consumer*, with this entry as the consumer it
+   * missed. `mode/disclosure.ts#CASUAL_LEAD_BY_FIGURE`'s entry for the same figure never named a
+   * window at all, which is the rest of R42's shape: one rule, two consumers, and only one drifted.
+   *
+   * ## Why the sentence is neutral rather than keyed on the run
+   *
+   * Keying it off `summary.reportWindow.id` was the other option the issue offers, and it is the
+   * weaker one. The window is already on this sheet twice — `shift/report.ts`'s note on this very
+   * cell and `smallPrintFor`'s span — and both derive it from the run. A third copy is a third
+   * thing to keep in step, which is the duplication § D299's lane exists to remove; and
+   * `reportWindow.id` is an open set (`'full-run'`, `'peak-5min'`, `'peak-Ns'`, `'report-window'`),
+   * so a lookup over it needs a fallback, and the honest fallback is this sentence anyway.
+   *
+   * So it takes the {@link CASUAL_LEAD_BY_CELL} `stairs` entry's fix rather than a new mechanism:
+   * a static lead **defers** to the cell's own note instead of guessing what the note will say.
+   * Staying static is also what keeps this table checkable — `casualDay.test.ts`'s window sweep
+   * derives the rule from the object rather than pinning this entry, which is the half of the fix
+   * that survives the next lead somebody adds.
+   */
   'average-wait':
-    'Averaged over the busiest five minutes of the day rather than over all of it: this is what ' +
-    'a wait came to when the building was under the most pressure, which is the stretch worth ' +
-    'judging it on.',
+    'An average wait: everybody’s wait added up and divided, so a few long ones can hide inside ' +
+    'a good-looking number. How many legs went into it, and which stretch of the day it was read ' +
+    'over, are the cell’s own note — and that stretch is not the same on every building.',
   /*
    * Rewritten for `docs/19` defect 3, and the old sentence is quoted because it was false twice
    * over: *"People who stopped waiting and walked. They are counted here and nowhere else."* The
@@ -300,13 +338,42 @@ export const CASUAL_LEVERS_HEADING = 'What would make tomorrow better';
  * whether this run was good, does not name a dispatcher, and does not shorten the claim about what
  * one day can support — that claim is the small print's whole point and softening it here would be
  * this module doing the thing it was built to refuse.
+ *
+ * ## It translates the window; it does not say which window this is — issue #291's second half
+ *
+ * This constant carried the same defect as {@link CASUAL_LEAD_BY_CELL}'s `average-wait` entry, in a
+ * worse position, and the issue reports only the first. It read *“The peak-5min window” is the
+ * busiest five minutes of the day: the averages here are taken over that stretch and **not over the
+ * whole shift**”* — and `dev/reportPanel.ts#reportViewOf` joins it to `shift/report.ts`'s own
+ * paragraph with a single space, so on a `full-run` sheet a Casual reader met, in one run of text:
+ *
+ * > … taken over that stretch and **not over the whole shift**, so a wait quoted on this sheet is a
+ * > wait during the worst of it. … Every cohort figure above is the **full-run** window,
+ * > 08:30–09:30: “Riders waited twenty-five seconds on average” is false without “**over the whole
+ * > shift**”.
+ *
+ * A flat contradiction two sentences apart, on Garden Apartments day 1 — which
+ * `shift/reportWindow.ts` gives `full-run`, and which is the first sheet a new player ever sees.
+ * Fixing the cell lead alone would have left the sheet naming two windows, which is the acceptance
+ * criterion the issue actually wrote (*“names one window and only one”*) rather than the mechanism
+ * it named.
+ *
+ * **Both terms are still translated, which is what #100 asked for**; what is dropped is the claim
+ * about which of them applies here. A reader on a peak-5min sheet still meets the jargon explained,
+ * because the explanation is now vocabulary rather than an assertion about this run — and the run's
+ * own answer is one sentence away, derived by `smallPrintFor` from `summary.reportWindow`, where it
+ * belongs. It stays a **static constant** rather than becoming a function of the summary: it is a
+ * driven surface in `honesty/surfaces.ts`, the run already states its own window twice, and a third
+ * derivation is a third thing to keep in step.
  */
 export const CASUAL_SMALL_PRINT_LEAD =
-  'Two phrases below are worth having before you read them. “The peak-5min window” is the busiest ' +
-  'five minutes of the day: the averages here are taken over that stretch and not over the whole ' +
-  'shift, so a wait quoted on this sheet is a wait during the worst of it. “A confidence interval ' +
-  'that excludes zero” is the bar for saying one setting beat another — one day cannot clear it, ' +
-  'and fifty or more paired runs can, which is what Compare is for.';
+  'Two phrases below are worth having before you read them. One of them names the window every ' +
+  'average on this sheet was read over, and which window that is changes with the building: ' +
+  '“the full-run window” is the whole shift, “the peak-5min window” is the busiest five minutes ' +
+  'of it. Either way, a wait quoted here comes from inside the window named below and from no ' +
+  'other stretch of the day. “A confidence interval that excludes zero” is the bar for saying one ' +
+  'setting beat another — one day cannot clear it, and fifty or more paired runs can, which is ' +
+  'what Compare is for.';
 
 /**
  * What Casual says about **reach** — § D299 § 2, on the sheet rather than in a decision record.
