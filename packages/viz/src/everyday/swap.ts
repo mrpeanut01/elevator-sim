@@ -57,6 +57,40 @@ export interface EverydaySwapPort {
    * queued click can land after a swap has already happened.
    */
   returnToEveryday(): void;
+  /**
+   * Whether Everyday Mode has the page at this instant — `EverydayShell.world() === 'everyday'`,
+   * read live rather than latched.
+   *
+   * ## Why a *read* does not reopen the argument above
+   *
+   * The paragraph over this interface refuses a second **verb**, and it still does: a port that
+   * offered `enterEngineer` as well as `returnToEveryday` would be a second way into a transition
+   * that already has one, and the two halves would get to disagree about what `inert` should say.
+   * This is not that. It moves the page nowhere; it lets the surface behind the cover find out
+   * which world is in front of it, which is a question `dev/main.ts` had no way to ask and was
+   * answering by assumption.
+   *
+   * ## What it is for — GitHub issue **#287**
+   *
+   * `dev/main.ts#tick` closes the day when its own transport reaches the end of the run. That is
+   * the Engineer surface's own behaviour and is right on the Engineer surface. Behind the Everyday
+   * cover it was a second clock scoring somebody else's day: the covered transport autoplays at
+   * ×60 whatever chip the player is holding, so arriving on § 7's stage and touching nothing filed,
+   * scored and banked a day in `(endedAt − startedAt) / 60` real seconds — measured at 60.0 s on
+   * the hour `garden-apartments` opens on, on a day the player had not watched a frame of.
+   * `GAMEPLAY_AND_NAVIGATION.md` § 6.4 and § 16 rule 1 both forbid it in the same words: *`Close
+   * the day` is the **only** thing that sets `dayClosed`*.
+   *
+   * **Two readers, not one**, and the second is why this is a port read rather than a line inside
+   * `tick`: `dev/main.ts` also binds `Ctrl`/`Cmd`+`Enter` to the same close on a **`window`**
+   * listener, and a window listener is not covered by `inert` — that shortcut filed the Everyday
+   * player's day too. `dev/main.ts#engineerHasThePage` is the one expression both ask through.
+   *
+   * A decision number is owed for the boundary this draws: **the Engineer end-of-day close is
+   * armed only while the Engineer surface has the page.** The Everyday product keeps its own
+   * contract, the Engineer product keeps its own behaviour, and neither reaches across the cover.
+   */
+  hasThePage(): boolean;
 }
 
 let provided: EverydaySwapPort | undefined;

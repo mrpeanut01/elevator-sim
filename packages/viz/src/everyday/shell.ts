@@ -1479,8 +1479,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * The return half of § 3.2's door — `everyday/swap.ts` has the argument for why it is a provided
    * port rather than an import. Published after the first `draw()`, so the header control cannot be
    * revealed over a shell that has not covered the page yet.
+   *
+   * `hasThePage` closes over the very `let` {@link EverydayShell.world} publishes rather than over a
+   * copy of it, which is what makes *"which world has the page"* one fact with two readers instead
+   * of two facts that agree by habit. Issue **#287** is what the reader on the other side of the
+   * cover needs it for: `dev/main.ts`'s end-of-day close may not fire over a day the Everyday
+   * product is holding.
    */
-  provideEverydaySwap({ returnToEveryday });
+  provideEverydaySwap({ returnToEveryday, hasThePage: () => world === 'everyday' });
 
   return {
     root,
