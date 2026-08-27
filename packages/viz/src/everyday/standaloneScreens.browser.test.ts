@@ -188,6 +188,66 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
   });
 
   /**
+   * **The standings' fixture marker reaches the page, above the names it is about** — issue #293.
+   *
+   * The five standings print two invented handles against held times (`delft_vt · wave 19 ·
+   * 57 min`), and they are the only place this build prints another player's name against a figure.
+   * GAMEPLAY § 20.11 lets an authored fixture ship on a real source or on *"an explicit `FIXTURE`
+   * marker so nobody ships them as truth"*; the engine that would be the real source is #220's, so
+   * the marker is the whole of the compliance.
+   *
+   * What #293 found is that the sentence licensing those rows — *"which `RUSH_ABSENCES` says on the
+   * same screen"* — had been false since the merge that closed #207 moved the register to Settings.
+   * The unit tier now ties the marker to the rows through the import graph, and that is where the
+   * argument lives. **This case is here because an import is evidence and not proof**: a module can
+   * import a constant and never append it, which is the one failure the unit tier states outright
+   * that it cannot see.
+   *
+   * So the assertion is ordering, not existence. #262 is the precedent that makes the distinction
+   * worth paying for on this very screen: a refusal *existed* in the DOM and was 184 px below the
+   * fold, and the case asserting it existed was green throughout. A marker underneath five names a
+   * reader has already read is that defect again — the belief it exists to prevent has been formed
+   * by the time it is met — so what is checked is that it is painted above the first row.
+   */
+  it('draws the standings under a marker saying they are fixtures, not people (§ 20.11)', async () => {
+    const page = await coldLoad();
+    await openRush(page);
+
+    const note = await page.textContent('.everyday-rush-bests-note');
+    /*
+     * Both halves of the marker, because only one of them was ever in doubt. *Not measured* is the
+     * claim the old docstring made; *not people* is the one § 20.11 is actually about — the handles
+     * read as accounts, and `watch/reference.ts` keeps the rest of the tree to *"a reference run is
+     * called the house baseline, not Sam"*.
+     */
+    expect(note).toContain('not runs this build measured');
+    expect(note).toContain('not people who play it');
+
+    /* And the rows it is about really are the unmeasured ones, so the marker is not decorating an
+       empty list — `RUSH_BESTS`' two handles, on the page, under it. */
+    const rows = await page.$$eval('.everyday-rush-best', (nodes) =>
+      nodes.map((node) => node.textContent ?? ''),
+    );
+    expect(rows).toHaveLength(5);
+    expect(rows.join(' ')).toContain('delft_vt');
+
+    const painted = await page.evaluate(() => {
+      const marker = document.querySelector('.everyday-rush-bests-note');
+      const first = document.querySelector('.everyday-rush-best');
+      if (marker === null || first === null) return null;
+      return { marker: marker.getBoundingClientRect().bottom, row: first.getBoundingClientRect().top };
+    });
+    expect(painted).not.toBeNull();
+    expect(
+      painted === null ? 0 : painted.marker,
+      'the marker is painted below the first standings row. § 20.11 asks for a marker on the ' +
+        'fixture, and a reader who has already read five names and two held times has formed the ' +
+        'belief it exists to prevent — GitHub issue #262 is the same mistake measured in pixels.',
+    ).toBeLessThanOrEqual(painted === null ? 0 : painted.row);
+    await page.close();
+  });
+
+  /**
    * **GitHub issue #262, at the height it was measured at.**
    *
    * This case used to be called *with the refusal on the control* and asserted

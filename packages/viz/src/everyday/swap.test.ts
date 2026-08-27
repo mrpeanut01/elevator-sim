@@ -18,13 +18,16 @@ import {
   type EverydaySwapPort,
 } from './swap.js';
 
-function fakePort(): EverydaySwapPort & { readonly presses: number[] } {
+function fakePort(
+  world: 'everyday' | 'engineer' = 'everyday',
+): EverydaySwapPort & { readonly presses: number[] } {
   const presses: number[] = [];
   return {
     presses,
     returnToEveryday: () => {
       presses.push(presses.length + 1);
     },
+    hasThePage: () => world === 'everyday',
   };
 }
 
@@ -60,6 +63,25 @@ describe('the Everyday swap port', () => {
     stop();
     provideEverydaySwap(fakePort());
     expect(heard).toBe(2);
+  });
+
+  /**
+   * The read half — GitHub issue **#287**, and both branches, because `dev/main.ts` turns this
+   * answer into *may the end of the day file it*.
+   *
+   * The `undefined` arm is the one worth stating: **no shell provided reads as the Engineer surface
+   * having the page**, which is why `dev/main.ts` writes `=== true` rather than `!== false`. A build
+   * that loads `dev/main.ts` alone has no other world for a day to belong to, and a fix that
+   * disarmed the close there would have turned issue #287 into an Engineer surface that can never
+   * file a day at all.
+   */
+  it('says which world has the page, and answers for a page that has no Everyday Mode', () => {
+    provideEverydaySwap(undefined);
+    expect(everydaySwap()?.hasThePage() === true).toBe(false);
+    provideEverydaySwap(fakePort('everyday'));
+    expect(everydaySwap()?.hasThePage()).toBe(true);
+    provideEverydaySwap(fakePort('engineer'));
+    expect(everydaySwap()?.hasThePage()).toBe(false);
   });
 
   it('replaces the port on a re-mount rather than keeping the first', () => {

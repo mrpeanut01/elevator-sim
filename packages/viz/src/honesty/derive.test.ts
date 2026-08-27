@@ -900,6 +900,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'editor/editorEdits.ts#blankBuilding',
         'editor/editorEdits.ts#serializeBuilding',
         /*
+         * GitHub issue #289's guard: *which documents does* Run it and watch *write*. It returns a
+         * `BuildingSpec` and a `PatternSpec` — or neither, which is the whole point of it — and is
+         * derived only through the transitive clause, because it calls `patternWithTune`. That
+         * function's `Tuned — 6%pop/5 min, 40% through the lobby` **is** the prose, it is the one
+         * string in the pair a player ever reads, and `EVERYDAY_STANDALONE_SCREENS` already claims
+         * and renders it. Claiming it here as well would put one sentence under two owners, which
+         * is the thing § D362's declared pair exists to make impossible.
+         */
+        'everyday/tunerModel.ts#tunePresses',
+        /*
          * Returns a boolean, or a record whose prose came from somewhere already driven.
          * `canSubmitForm` answers *may this be sent* and is derived only through `formIssues`,
          * which `MENU` drives directly.

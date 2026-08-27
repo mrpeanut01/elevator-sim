@@ -25467,3 +25467,405 @@ preview build is unreachable from the agent container — `CONNECT` returns **40
 the code half runs.
 
 ---
+
+## D375 — the browser tab carries the wordmark and names no world
+
+**Rules on:** GitHub issue #294. Settles the marker owed at `packages/viz/index.html`.
+
+**Decision.** The tab title is **`Elevator Sim`**, fixed, naming neither Everyday nor Engineer, and
+pinned byte for byte to `railModel().brand` by `everyday/pageTitle.test.ts`.
+
+**What was wrong.** The title read `Elevator Sim — shift mode` on a page that opens on Everyday Mode.
+That is not an orphan string and calling it a typo would have hidden the finding: `SHIFT MODE` is the
+Engineer header's own eyebrow (`index.html:1720`, `.brand-mode`), required by
+[`docs/12-design-handoff.md`](docs/12-design-handoff.md) S3 from the canonical handoff. **The title
+was correct until [§ D335](#d335) moved the front door.** [`RISKS.md`](RISKS.md) R42's shape — a
+ruling that did not reach one of its consumers — not a slip.
+
+**Why not name Everyday.** It is the same defect with its polarity reversed the moment [§ D338](#d338)'s
+door is used, and the door is a shipped control rather than an edge case.
+
+**Why not follow the player, which is the answer that looks right.** A title that follows is correct on
+screen and wrong where the browser *keeps* one. It is stamped onto the history entry and onto any
+bookmark taken while it stands, so a bookmark made in Engineer files a URL that always opens Everyday
+under the word *engineer*. That is § 3.5's entry-screen override — which § D338 **refused** — written
+into the browser's own store instead of `localStorage`, where it is harder to see and impossible to
+clear from inside the product. It is also new machinery: **nothing in `packages/` writes
+`document.title` at runtime**, verified repo-wide, so following the player means building a writer for
+a value the product has never written.
+
+**Why the wordmark is not a compromise.** `Elevator Sim` is what **both** shells already call the
+product on their own chrome — `railModel().brand` and `.brand-name` — each carrying its world on a
+separate eyebrow *inside* the world. The tab is the one place the application is visible with no world
+under it, so the one name that belongs there is the one that survives the door.
+
+**The two criteria are in tension, and the stronger one selects this.** #294's AC1 wants the title to
+name the opening world; AC3 fails any mode *"the four-tile menu does not offer"* — and the menu offers
+*Today's tower*, *Campaign*, *Endless rush* and *Fix a building*, so `— everyday mode` is not offered
+either. AC1 is answered by this recorded decision rather than literally.
+
+---
+
+## D376 — a licence is drawn on the thing it licenses, not filed in a register
+
+**Rules on:** GitHub issue #293. Settles the marker owed at `everyday/rushScreenModel.ts`.
+
+**Decision.** The Endless rush standings **keep their five rows** and gain
+`RUSH_BESTS_FIXTURE_NOTE`, drawn by `rushScreen.ts` immediately **above** them.
+`RUSH_ABSENCES` stays in the Settings build-information panel where [§ D307](#d307)'s successor put it.
+
+**What was wrong, and it is worse than an ordinary stale refusal.** The docstring permitting five
+unmeasured named holders to be drawn said the register saying so was *"on the same screen"*. It had not
+been since the merge closing GitHub issue #207 moved the register two clicks into Settings. An ordinary
+stale refusal ([§ D227](#d227)) tells a reader not to touch a control that works. **This one was the
+licence** — the sentence answering *why may unmeasured names and figures be drawn at all* — and it
+answered by pointing at a disclosure that was no longer there. A justification whose premise has
+silently expired keeps reading as a justification.
+
+**Why the marker rather than removing the rows.** GAMEPLAY § 20.11 names `RUSH_BESTS` outright and gives
+a fixture two ways to ship: *a real source, **or** an explicit marker so nobody ships them as truth*.
+The engine that would be the real source is #220's and is unbuilt, so the marker is the branch that is
+available. Removing the rows would also pre-empt **#222**, which owns what these rows eventually
+become, and the guide's five rows are what the screen *is* — a column of five dashes teaches nothing.
+
+**Why above rather than below.** `dev/menuPanel.ts#exampleBoard` puts its disclaimer before its example
+rows for the reason that decides it here: a reader who has already read five names and two held times
+has formed the belief the note exists to prevent.
+
+**Why not put `RUSH_ABSENCES` back.** That re-litigates #207 and duplicates the panel. The split that
+survives is the one [§ D307](#d307) drew: **a refusal about a thing a player is looking at goes on that
+thing; a register goes once, where a reader looks for one.**
+
+**Mechanised, not asserted.** `rushScreenModel.test.ts` requires that the module drawing the marker and
+the module drawing `RUSH_BESTS` stay the same module, in both directions, so a register that moves
+again takes the sentence describing it along. The import-graph case is **evidence and not proof** — it
+survives deleting the `append` — which is why `standaloneScreens.browser.test.ts` compares painted
+rectangles. Both were mutation-validated; the first draft of the claim-to-renderer case was **green
+against the defect it was written for**, because it asked whether the docstring named the module
+*anywhere* and the history section named it only to say what it does *not* import.
+
+---
+
+## D377 — a corpus seeds every cell a row draws, or the figure the issue is about goes unread
+
+**Rules on:** the honesty corpus's coverage of composite rows. Settles the marker owed at
+`honesty/surfaces.ts`. Extends [§ D343](#d343) rather than amending it.
+
+**Decision.** A surface adapter seeds **every cell its row renders**. Where a row draws *n* fields, the
+adapter seeds *n*.
+
+**What was wrong.** The Endless rush standings row draws four cells — `name`, `who`, `wave`, `held` —
+and `EVERYDAY_STANDALONE_SCREENS` seeded three. **`held` was the missing one**, so `'57 min'` against
+the handle `delft_vt` had never been read by the search: precisely the *other player's figure* that
+GitHub issue #293 is about, on the one surface in the build that prints one.
+
+**Why this is a rule and not a repair.** A partly-seeded row is worse than an unseeded one. An unseeded
+surface is visibly absent from the corpus and the surfaces column says so; a partly-seeded row **counts
+as covered**, and every count published about the corpus includes it. The nine single-surface properties
+run over the cells that were seeded and return green over the cell that was not.
+
+**How it was found, which is the argument for the rule.** Not by auditing coverage — by adding an
+unrelated string to the same adapter and reading the neighbouring lines. Nothing in the tree could have
+reported it: a seed count has no denominator to check against, because *how many cells does this row
+draw* is answerable only by reading the renderer.
+
+**What is not decided here.** No mechanical check derives seed sets from renderers; this rules on what
+an adapter owes, not on how to prove it. That derivation is worth building and is not built.
+[§ D343](#d343)'s measurement rule is untouched: the corpus is measured **once, after integration**,
+and this wave publishes no counts.
+
+---
+
+## D378 — a viewport gate measures the clause, not a proxy, and lands red rather than silent
+
+**Rules on:** GitHub issue #292. Settles the argument Lane F deliberately left unmarked, because
+`validation/documentation.test.ts`'s ratchet stood at its ceiling and a lane may not raise one.
+
+**Decision.** `M2_MEASUREMENT.md` § 3.2's *"zero horizontal overflow at every width down to 360 px"* is
+**corrected rather than deleted**: it was true of the **document scroll box** and is not evidence for
+[`docs/31-support-matrix.md`](docs/31-support-matrix.md) § 2's first clause. All three of § 2's clauses
+are now measured by `everyday/viewportGates.browser.test.ts`, which **ships red-by-register** rather
+than green.
+
+**Why the old number could not see the defect.** The Everyday shell root is `position:fixed` with
+`overflow:hidden`, and `.everyday-main` is `overflow:hidden` too, so clipped content never reaches the
+document scroll box. Measured on the menu at 360×800: the old metric reads **0** while
+`.everyday-main`'s own `scrollWidth − clientWidth` reads **93 px**; on the stage, **0** against
+**337 px**. Proven synthetically as well — an over-wide child injected into such a box leaves the
+document metric at **exactly 0**. The metric is null on this shell **by construction**, which is why no
+amount of re-running it would ever have found this.
+
+**Reachability is asked as *what could a gesture do*, and `scrollIntoView` does not answer it.**
+`overflow:hidden` is **script-scrollable and person-unscrollable**: a naive probe reports the bar
+primary reachable because the browser silently scrolls `.everyday-main` by 32 px, a scroll no
+scrollbar, wheel, touch drag or key can perform. The instrument lets the browser try, then **undoes
+every scroll a gesture could not have produced**, per axis, and only those.
+
+**Why it lands red-by-register instead of failing the suite.** The layout work is #240, open and
+unassigned. A case that simply failed would make CI red for everyone until #240 lands, which is a cost
+this lane may not impose. So the 21 findings sit in `OUTSTANDING`, asserted with `toEqual` **in both
+directions**, on `honesty.test.ts`'s precedent: a new failure is unregistered and goes red, and a
+failure that stops reproducing goes red as *delete this entry*. **A register of ghosts is a suppression
+list; a register nothing re-derives is decoration.** When #240 lands the file goes red once, naming
+every entry that stopped reproducing, and emptying it is part of landing #240.
+
+**The calibration is what makes the register believable.** Before the register runs, the same measuring
+function is pointed at a **manufactured** failing state — an injected over-wide child in an injected
+clipping box — and required to report the old metric as 0, the new one as the injected overrun, the
+injected button by name, and its in-viewport twin **not**. That calibration does not depend on the
+product's own defect, so it keeps proving the instrument after #240 has removed the thing it is
+currently catching.
+
+**What the issue got wrong, recorded because the shape matters.** #292 placed the stale browser-tier
+file count at `docs/31-support-matrix.md:158-162`. Those lines are § 2's commitment prose. The matrix's
+count lives at `:53`, `:54` and `:477` and read **25**, while `M2_MEASUREMENT.md` read **26**, against a
+tree of **28** — **two documents disagreeing with each other as well as with the tree**. That page's own
+§ 7 item 7 had already predicted exactly this drift and said *re-derive them, do not copy them
+forward*. It drifted anyway, which is the argument for deriving the count in a test rather than
+writing the warning again.
+
+**Two things found that #292 did not contain.**
+
+1. **Clause 2 fails at 1280×800**, a tier-1 desktop viewport. `everyday/stageScreen.ts:530` writes
+   `height:340px` as a literal, so the Everyday stage canvas is 340 px at every viewport height —
+   **42.5 %** against § 2's 60 % floor. That is inside a clause scoped *"360 px and above"* and
+   **outside #240's subject**, so it is nobody's work until filed.
+2. **The Everyday shell had never been measured against any of the three clauses.** `RX-03` and
+   `RX-04b` were fixed against the **Engineer** surface on 2026-07-30; `index.html` began loading
+   `everyday/boot.ts` on 2026-08-12 ([§ D335](#d335)). The gate and the shell it is quoted about have
+   never been the same shell.
+
+**What is not decided here.** The 360 px layout is #240 and stays #240. **This instrument going red is
+the correct end state of the fix, not a regression**, and both documents now say so where a reader
+meets the number.
+
+---
+
+## D379 — one answer to *when did this wait end*, and the fourth outcome is counted, named, and not gradeable
+
+**Rules on:** GitHub issue #288. Settles the arguments in `live/observations.ts#crossesHorizonAt`,
+`live/bands.ts#realisedWaitsBy`, `live/types.ts#LiveObservations.turnedAway` and
+`shift/types.ts#Observations.turnedAway`, none of which declared themselves owed.
+
+**Decision.** Every module that asks when a wait ended answers `leg.boardedAt ?? leg.refusedAt` —
+`core`'s own rule (`metrics/summarize.ts:727`) minus the field `VizLeg` does not carry. A rider turned
+away at a credential check is folded as a **fourth outcome** in the same pass, published beside the
+others, and **not put on `GoalObservations`**.
+
+**What was wrong.** Only `boardedAt` could stop a leg crossing the give-up horizon, so a rider refused
+at the door — who waited **zero seconds** — was counted in the cohort the sheet labels *TOOK THE
+STAIRS*, *"waited past the 15-minute horizon and were never carried"*. Measured on Secure Tower's
+authored day: `abandoned` = **72**, and **72 of 72** were refused legs, against a service-level row
+correctly reporting `overHorizonCount` = **0**. This folded [§ D265](#d265)/[§ D266](#d266)'s fourth
+outcome back inside a wait statistic built to publish it beside AWT, never within it.
+
+**The issue's own diagnosis of its headline figure was wrong, and this is the load-bearing
+correction.** #288 attributes its `2 915 s` to the censored-maximum mechanism. It is not: it is **this**
+defect at a second site the issue does not name, `live/bands.ts#realisedWaitsBy`, which ended a wait at
+`boardedAt` alone so a refused rider read as standing for the remainder of the run. Secure Tower's
+whole day printed *"the longest **34 472 s**"* for a rider turned away at 1 564 s of a 36 036 s run,
+against a service-level row correctly saying 313 s. **Fixing the censoring alone would have relabelled
+that number and left it on the card.**
+
+**Two further clauses of the issue are refuted.** `render/mood.ts#headlineFor` prints **no figure at
+all**; the retrospective sub-line belongs to `live/bands.ts#moodOf`. And the *standing right now* row
+reads `queueAt`, whose `isWaitingAt` already excludes refused legs, so it is **exact** for the quantity
+it names and is not a censored-maximum consumer.
+
+**Why `turnedAway` is not gradeable.** A goal reading *fewer refusals* is a target a player could hit
+by **locking the building down**, which is the same failure as improving AWT by serving fewer people —
+the reason [§ D106](#d106) keeps energy an axis and never a score. It is counted and named on the
+sheet; it is not something to win.
+
+---
+
+## D380 — a censored maximum may be qualified in `live/`, and may not be called a lower bound
+
+**Rules on:** GitHub issue #288's second mechanism. Settles `live/types.ts#WaitBands.longestWaitIsCensored`.
+
+**Decision.** A censored maximum on a live card is **qualified**, not refused — refusing would blank the
+only figure a retrospective card has — and the qualification **may not use the words *at least***.
+
+**The distinction, which was caught by the lane in its own first fix.** `shift/report.ts#worstWaitFigure`
+says *at least*, and that is **true there**: `core` can see `abandonedAt`, so its censored figure really
+is a lower bound. `VizLeg` carries no `abandonedAt`, so in `live/` an unresolved leg may be a rider who
+**walked out**, for whom `t − arrivedAt` **overstates** by every second since they left. A bound that
+might overstate is not a lower bound, and `shift/goals.ts` refuses rather than qualifies for exactly
+that reason. Copying the wording across the boundary would have been a false claim in the honest
+direction — the hardest kind to notice. A case now asserts *at least* is **absent** from the live
+clause.
+
+**What is deliberately not fixed, and why it is not hidden.** `VizLeg` gains no `abandonedAt`: the issue
+offered the smaller reversible option and verification showed it sufficient for the reported symptom. So
+the band tallies still count a walked-out rider at their accrued wait, and `frame/overlay.ts#isWaitingAt`
+still keeps them in `queueAt`. No shipped building declares `sim.patience`, but `dev/parameterForm.ts`
+lets a player turn it on. **Closing that properly is a contract change and a product-owner call**, not a
+lane's.
+
+---
+
+## D381 — the tuner applies a spec only when something moved, and the caller set is derived twice over
+
+**Rules on:** GitHub issue #289. Settles `everyday/tunerModel.ts#tunePresses`.
+
+**Decision.** *Run it and watch* applies a building spec **only when a control has actually moved**. The
+non-test caller set of `shiftReportWindowFor` is derived from disk, and so is a **second** set covering
+the modules that bypass it.
+
+**What was wrong.** The press called `applyBuildingSpec` unconditionally, which stood the week on
+`SANDBOX_CONTRACT_ID` and handed `withBuilding` a drawn tower. The id the matrix was then asked about
+was no longer the authored one, `shiftReportWindowFor` returned `undefined` — *leave the template's band
+alone* — and the peak-5min band was used under a header still reading `GARDEN APARTMENTS`. Reproduced:
+`reportWindow` `'full-run'` → `undefined`, `contractId` `c1` → `sandbox`, `buildingId`
+`garden-apartments` → `bld-1`.
+
+**Why the criterion had to be raised rather than met as written.** #289's AC2 asks that the **caller
+set** be derived so a fifth producer cannot arrive unregistered. That alone **would not have caught this
+defect**, because the tuner is not a caller — it is a **bypasser**, and a derived list of callers is
+blind to a module that changes the answer without asking the question. A second derived set covers the
+bypassers, and a planted fifth producer reddens both.
+
+**`specIsDirty` is refuted as the predicate to reuse.** It exists at `authoring/dispatcherSpec.ts:437`
+and asks a *dispatcher* question. The right predicate was already in the tuner and unused by the press:
+`movedKeys(standing, tune)`, which the screen computes and renders three ways.
+
+**What stays as it was.** A **genuinely tuned** building has no matrix cell, and falling through to the
+template's band is correct for it. Only *entering the sandbox and changing nothing* is fixed.
+
+---
+
+## D382 — a sandbox day moves nothing the rail publishes, and the machine ladder carries the standing value
+
+**Rules on:** GitHub issue #290, and the third defect found while fixing it. Settles
+`shift/week.ts#closeDay` and `everyday/tunerModel.ts#tuneMachineSteps`.
+
+**Decision.** A day on `SANDBOX_CONTRACT_ID` moves **`bestMinutePct`, `streak` and `cleanRun`** — none of
+them. And the tuner's machine ladder **carries the standing value** when the class admits it, instead of
+snapping to the catalogue.
+
+**Why the guard is wider than #290 asked for.** The issue reads the day counter staying at `0` as a guard
+working. **There is no guard** — that day was *missed*. On a **clean** sandbox day the rail publishes
+`1 day running · best 97%`. Guarding `bestMinutePct` alone would have left the product saying two
+different things about one promise, on a screen that makes it four times.
+
+**The third defect, which is the reason this ruling is not only about a guard.** `redraw` snapped speed
+onto the class ladder, and its comment said that was *"only reachable through a class change, which this
+screen does not offer today"*. **False.** `speedStepsFor` filters the § 10.1 **catalogue** to the class
+band, and shipped buildings need not sit on the catalogue:
+
+| building | authored | snapped to | effect |
+|---|---|---|---|
+| `garden-apartments` | **0.63 m/s** | 0.50 | opens **21 % slower** than the building it names |
+| `crown-hotel` | **3.0 m/s** | 2.5 | opens **17 % slower** |
+
+Both are contract-backed campaign buildings. It is also why a playtest that touched nothing read all
+four *sandbox* strings — they are the `moved.length > 0` arm — and it would have **defeated § D381's
+guard on exactly the building #289 reports.** The snap is kept for genuine class changes and asserted in
+that direction, so deleting it fails.
+
+**Known residual, pinned by a test rather than by prose.** On a cold profile whose only closed day is a
+sandbox one, the rail reads `best 0%` where it should read `best —`: `careerLineOf` and
+`weekView.ts#streakLineOf` gate their em dash on `history`, which a sandbox day still joins. It clears
+the moment any scored day closes and credits nothing to the sandbox. The fix is to gate on a **posted**
+day, and it moves two files that share a string-identity test, so they move together or not at all.
+
+---
+
+## D383 — the Engineer end-of-day close is armed only while the Engineer surface has the page, and it is an edge
+
+**Rules on:** GitHub issue #287 (P0). Settles the arguments in `everyday/swap.ts#EverydaySwapPort.hasThePage`,
+`dev/main.ts#endedUnderTheCover` and `dev/main.ts#engineerHasThePage`.
+
+**Decision.** The Engineer surface's *"the day closes when the day ends"* rule fires **only while the
+Engineer surface holds the page**, and it fires on the **edge** — the frame a run ends — never on the
+level. `everyday/host.ts` gains no transport method.
+
+**What was wrong.** From a cold load, entering the Everyday stage and touching nothing filed, scored and
+banked the day. The Everyday stage and the Engineer surface run **two independent `Playback`s** over one
+recording, and only the Engineer one could file: at the instant the day was banked **the stage clock
+still read `08:30`** — the player's own transport had never moved. `rAF` is per-document, so `inert` and
+`visibility:hidden` do not stop the tick, and entering the Everyday stage *satisfies*
+[§ D232](#d232)'s `playerHasChosen` latch, because the stage's own run goes through the very seam that
+latch watches. #39's defect returning through [§ D338](#d338)'s door.
+
+**Why an edge and not a gate — the load-bearing design point.** `playback.state === 'ended'` is a
+**level**: true on every frame after the run ends. Gating that level on *who holds the page now* would
+have **moved** the file rather than removed it — the first frame after § 3.2's swap would have banked
+the Everyday player's day **on the way through the door**. `endedUnderTheCover` records which run ran
+out where nobody could see it, so a run that ended under the cover stays filed-never rather than
+filed-later.
+
+**Why `host.ts` is untouched.** That file argues at length that a transport method on the host *"would
+be a second clock"*. The argument stands and was not overturned; the fix disarms the Engineer rule
+rather than linking the two transports.
+
+**The issue understates the defect, and the correction is the reason this is worth a decision.** #287
+says it *"does not reproduce more than once per sitting"*, because filing switches the tab to `report`.
+**Refuted empirically.** `everyday/reportScreen.ts:400` → `host.openTomorrow()` calls `openRunTab()`
+**and** `startRun()`, and `adopt` clears `filedRunId` — **both halves of the disarm are undone.** Driven
+on the page: one *Start the day*, one *Open the doors on Tuesday*, then sitting on the brief touching
+nothing, `Your week` read `0 cleared · 0 missed · 2 too quiet to grade, over 2 days closed`. **The loop
+banks a whole week a tester never watched**, which is a different severity from a single day.
+
+**Its arithmetic is refuted in its operands.** There is no 3 528 s day anywhere in the tree:
+`garden-apartments` has **no authored day**, so the run is contract `c1`'s 3 600 s hour, and the measured
+interval is **60 011 ms**. The reported *"at 1× it filed at sim-clock 08:59"* is internally inconsistent
+— 58.8 s at the stage's default 30 sim-seconds-per-real-second is 1 764 s past 08:30, which is that
+reading at the **default** rate rather than at 1×. The *form* of the issue's explanation is right and
+every operand in it is wrong, which is why the fix was built from a trace rather than from the sum.
+
+**A second site of the same class, not in the issue.** `Ctrl`/`Cmd`+`Enter` was bound to `closeShift` on
+a **`window`** listener. `inert` removes an element from hit-testing and the tab order, **not** from the
+bubble path of a key pressed on `body`, so the shortcut filed the Everyday player's day from § 7's
+stage. Both now ask `engineerHasThePage`, which is the one expression the boundary is written in.
+
+**Named and not fixed.** The rest of `main.ts`'s `window` keydown handler is still live under the cover —
+Space, `,`/`.`, `[`/`]` and the seek keys drive the invisible Engineer transport from Everyday screens.
+After this none of them scores a day, but they are Engineer controls answering on an Everyday screen.
+Written down at the site; worth its own issue. And `MountContext.openTab` still files when
+`tab === 'report' && playheadHasRunOut()` — unreachable from Everyday today, because the host binds only
+`openTab('run')`, and **any future Everyday screen binding `openTab('report')` reintroduces this exact
+defect.**
+
+---
+
+## D384 — a stage row that explains why the picture stopped does not tell the player what to press
+
+**Rules on:** GitHub issue #287's fourth acceptance criterion. Settles `everyday/stageScreenModel.ts#STAGE_DAY_OVER`.
+
+**Decision.** When the day has run out under a stage the player is still watching, the § 3.3 row **says
+that the day is over and stops there**. It does not instruct.
+
+**What it replaces.** At the two fastest speed chips the Everyday stage's own playback ends while the
+Engineer one is still running, and the screen was **bit-for-bit identical for ~46 seconds** — 0 px
+changed, the only delta a transport label. Several readers believed the product had crashed. With
+§ D383 the Engineer transport no longer files, so the window is no longer a prelude to a surprise bank;
+it is simply a stopped picture, and it needs a cue rather than a fix.
+
+**Why describe rather than instruct.** The row is drawn in **three** run contexts and an instruction
+true in one is false in the others — the drafted wording was a lie on two of them. The three sentences
+already in that model keep the same discipline, which is why they survive every context unchanged. A
+row that describes cannot go stale against a context it was not written for, which is the § D227 failure
+in its cheapest form.
+
+---
+
+## D385 — the stage's fourth row state enters the corpus as a seed, not as a fourth flag
+
+**Rules on:** the honesty corpus's coverage of the stage bar. Settles the seed comment in `honesty/surfaces.ts`.
+
+**Decision.** § D384's row state is swept as an **additional seed**, and deliberately **not** as a fourth
+row of `interventionStates`.
+
+**Why.** That array's flags are spread into `stageInterventionsOf`, which has no `dayEnded` and would
+take one as an excess property. A fourth row would therefore mean **restructuring a shared literal in
+the one file where restructuring is the hazard** — `honesty/surfaces.ts` is the tightest serialization
+point in the tree, because every lane that adds a player surface writes it and an adapter *is* the
+surface. Two purely additive changes, nineteen lines, no restructuring.
+
+**What is not claimed.** The corpus is **not re-measured** here and no string, surface or case count is
+published. [§ D343](#d343) takes that measurement once, after the wave integrates. The expected rise is
+roughly one string per case per tier, and **an expected rise is a warning, not a measurement** — the
+distinction this repository has recorded five times.
+
+---

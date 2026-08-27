@@ -119,6 +119,7 @@ import { railModel, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
   RUSH_BESTS,
+  RUSH_BESTS_FIXTURE_NOTE,
   RUSH_PRIMARY_REFUSAL,
   RUSH_SCREEN_COPY,
   rushBandViews,
@@ -7555,6 +7556,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#rushBarModel',
     'everyday/rushScreenModel.ts#RUSH_BANDS',
     'everyday/rushScreenModel.ts#RUSH_BESTS',
+    /*
+     * The standings' fixture marker — GitHub issue #293. It belongs on this adapter rather than on
+     * {@link EVERYDAY_BUILD_NOTES} for the same rule that splits `#RUSH_PRIMARY_REFUSAL` from
+     * `#RUSH_ABSENCES` just above: a refusal drawn on the thing it is about is swept with that
+     * thing, and `rushScreen.ts` draws this one directly above the five rows it describes.
+     */
+    'everyday/rushScreenModel.ts#RUSH_BESTS_FIXTURE_NOTE',
     'everyday/rushScreenModel.ts#rushBandViews',
     'everyday/rushScreenModel.ts#rushFactViews',
     'everyday/rushScreenModel.ts#rushDrivingLine',
@@ -7633,10 +7641,23 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       });
       seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
     }
+    /*
+     * The marker before the rows, in the order the screen draws them — GitHub issue #293. It is a
+     * `reason`: it refuses the five rows below it, and R3's exemption is exactly for a refusal that
+     * has to name what it is refusing.
+     */
+    seeds.push({ field: 'rush.bests.fixtureNote', text: RUSH_BESTS_FIXTURE_NOTE, role: 'reason' });
     for (const best of RUSH_BESTS) {
       seeds.push({ field: `rush.best.${best.name}.name`, text: best.name, role: 'label' });
       seeds.push({ field: `rush.best.${best.name}.who`, text: best.who, role: 'label' });
       seeds.push({ field: `rush.best.${best.name}.wave`, text: best.wave, role: 'label' });
+      /*
+       * **`held` had never been in the corpus, and it is the figure the issue is about.** The row
+       * draws four cells and this adapter seeded three: `57 min` against a handle is precisely the
+       * *other player's figure* #293 opens on, and the search had never read one. Found while
+       * adding the marker above; the rule it produced is § D377.
+       */
+      seeds.push({ field: `rush.best.${best.name}.held`, text: best.held, role: 'label' });
     }
 
     /* ------------------------------------------------------- § 13 designer */
@@ -8439,6 +8460,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageScreenModel.ts#STAGE_OUT_OF_SERVICE',
     'everyday/stageScreenModel.ts#STAGE_AWAITING_RUN',
+    'everyday/stageScreenModel.ts#STAGE_DAY_OVER',
     'everyday/stageScreenModel.ts#stageOpeningLineOf',
     'everyday/stageScreenModel.ts#stageNextStretchOf',
   ],
@@ -8621,6 +8643,24 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       seeds.push({ field: `stage.bar(${label}).primary`, text: bar.primary.label, role: 'label' });
     }
     seeds.push({ field: 'stage.recomputing', text: STAGE_RECOMPUTING, role: 'prose' });
+    /*
+     * § 3.3's fourth state — GitHub issue **#287**. Seeded here rather than as a fourth row of
+     * `interventionStates` above, and the placement is forced rather than chosen: that array's
+     * flags are spread into `stageInterventionsOf` as well, which has no `dayEnded` and would take
+     * one as an excess property. A fourth row would mean restructuring a shared literal for one
+     * string, in the one file in this tree where restructuring is the hazard.
+     *
+     * Through `stageBarModelOf` rather than by seeding the constant, so what enters the corpus is
+     * the string the **row renders** in that state. A constant seeded directly would still be swept
+     * on the day the row stopped drawing it.
+     */
+    const dayOver = stageBarModelOf(
+      { screen: 'stage', ctx: 'daily' },
+      { hasRun: true, dayClosed: false, recomputing: false, dayEnded: true },
+    );
+    if (dayOver.note !== undefined) {
+      seeds.push({ field: 'stage.bar(day-over).note', text: dayOver.note, role: 'reason' });
+    }
 
     return singleRun(this.id, seeds);
   },

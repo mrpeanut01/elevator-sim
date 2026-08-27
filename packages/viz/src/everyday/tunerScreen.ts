@@ -34,11 +34,11 @@ import { classOfSpec, designerClasses } from './designerModel.js';
 import {
   buildingWithTune,
   movedKeys,
-  patternWithTune,
   snapToStep,
   tuneCapacityReadout,
   tuneDwellChips,
   tuneMachineSteps,
+  tunePresses,
   tuneReadout,
   tuneSandboxStrip,
   tuneSpeedReadout,
@@ -268,13 +268,23 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
     const drawn = buildingWithTune(standingBuilding, tune);
     const machineClass = classOfSpec(classes, drawn);
-    const steps = tuneMachineSteps(machineClass, tune);
+    const steps = tuneMachineSteps(machineClass, tune, standing);
     /*
      * A design whose class does not carry the set speed or load is snapped back onto the ladder
      * **before** the chips are drawn, not after — a card drawn from one value and lit from another
      * is a control whose selected state is a lie. Only ever downward, `snapToStep`'s own rule, and
-     * only reachable through a class change, which this screen does not offer today: it is here
-     * because `applyBuildingSpec` would otherwise hand `parseBuilding` a car outside its band.
+     * it is here because `applyBuildingSpec` would otherwise hand `parseBuilding` a car outside its
+     * band.
+     *
+     * **This used to say it was only reachable through a class change, and that was false.** The
+     * ladder is the *catalogue* filtered to the class, and two shipped buildings are specified off
+     * the catalogue — Garden Apartments at 0.63 m/s, Crown Hotel at 3.0 — so both were snapped
+     * **on mount, before the player touched anything**: Garden opened 21 % slower than the building
+     * it named, `movedNow` read `['speed']` on an untouched screen, and the strip announced a
+     * sandbox over an edit nobody had made. `tuneMachineSteps` now takes `standing` and offers what
+     * the building actually has whenever its class admits it, so the snap fires on the case it was
+     * written for and on no other. `tunerModel.test.ts` drives every building in `data/buildings/`
+     * through this exact sequence.
      */
     const snappedSpeed = snapToStep(steps.speeds, tune.speed);
     const snappedCap = snapToStep(steps.loads, tune.cap);
@@ -340,16 +350,24 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   host.append(root);
 
   return {
-    /* § 3.3's primary — *Run it and watch*: both documents, then the run, then the stage. */
+    /* § 3.3's primary — *Run it and watch*: what moved, then the run, then the stage. */
     primary: () => {
       /*
-       * Both documents, then the run, then the stage. The building goes first because
-       * `applyBuildingSpec` is the press that moves the week onto the sandbox contract, and a
-       * pattern saved against a scored week and then sandboxed would be a saved pattern whose name
-       * describes a run the week never had.
+       * **What moved**, then the run, then the stage — and *nothing* is what an untouched tuner
+       * writes, which is GitHub issue #289. `tunerModel.ts#tunePresses` owns that decision and
+       * argues it at length; the short form is that this line pressed `applyBuildingSpec`
+       * unconditionally, so entering the sandbox and changing nothing re-saved the standing
+       * building under a fresh id, and `shift/reportWindow.ts` — which is keyed on the id —
+       * stopped recognising Garden Apartments and handed the sheet back the five-minute band it
+       * was moved off for `docs/20` defect 5.
+       *
+       * The building still goes first when there is one, because `applyBuildingSpec` is the press
+       * that moves the week onto the sandbox contract, and a pattern saved against a scored week
+       * and then sandboxed would be a saved pattern whose name describes a run the week never had.
        */
-      dataHost.applyBuildingSpec(buildingWithTune(standingBuilding, tune));
-      dataHost.applyPatternSpec(patternWithTune(pattern, tune));
+      const presses = tunePresses(standingBuilding, pattern, standing, tune);
+      if (presses.building !== undefined) dataHost.applyBuildingSpec(presses.building);
+      if (presses.pattern !== undefined) dataHost.applyPatternSpec(presses.pattern);
       dataHost.startRun();
       context.go('stage');
     },

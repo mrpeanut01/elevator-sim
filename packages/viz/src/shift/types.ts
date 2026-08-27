@@ -326,7 +326,16 @@ export interface GoalObservations {
   readonly minutePct: number;
   /** The deepest a single landing has stacked, in people. */
   readonly peakQueue: number;
-  /** Legs that crossed the 900 s abandonment horizon. The handoff calls them *took the stairs*. */
+  /**
+   * Legs whose wait crossed {@link Observations.horizonS}, the run's own abandonment horizon. The
+   * handoff calls them *took the stairs*.
+   *
+   * **A wait that ended in a refusal is not one of them** — GitHub issue #288. A rider the building
+   * turned away for want of a credential never boards, and while the ending rule read `boardedAt`
+   * alone they were counted here: 72 of 72 on Secure Tower's own authored day, every one of whom
+   * waited zero seconds. They are {@link Observations.turnedAway} now. See
+   * `live/observations.ts#crossesHorizonAt`.
+   */
   readonly abandoned: number;
   /**
    * The longest wait known so far, whole seconds. `0` when nobody has arrived — never displayed
@@ -371,6 +380,25 @@ export interface Observations extends GoalObservations {
    * totalled by a reader; the note that names this overlap can.
    */
   readonly abandonedCarried: number;
+  /**
+   * Legs the building **turned away for want of a credential** — § D265's fourth outcome, which is
+   * neither delivered, nor waiting, nor abandoned.
+   *
+   * On {@link Observations} and not on {@link GoalObservations}, deliberately. It is a fact the
+   * **report** needs and a goal must not read: a day is not better for having turned people away,
+   * and a gradeable *fewer refusals* would be a target a player could hit by locking the building
+   * down. § D266 publishes it **beside** the wait figures on the footing `workPerServedLegKJ` sits
+   * beside raw energy, and beside is not inside.
+   *
+   * It exists because {@link GoalObservations.abandoned} stopped counting these riders (issue
+   * #288). A repair that only removed a figure would have made the sheet quieter rather than
+   * truer, which is the trade `CLAUDE.md` refuses for abandonment and stairs uptake in as many
+   * words. `report.ts`'s TOOK THE STAIRS note is where a reader meets it.
+   *
+   * `0` on every run of a building that declares no `accessZones`, and on every run of a zoned
+   * building whose riders are all correctly badged.
+   */
+  readonly turnedAway: number;
   /**
    * The abandonment horizon the {@link GoalObservations.abandoned} count is drawn at, seconds —
    * `summary.serviceLevel.horizonS`, copied and never assumed, so the TOOK THE STAIRS caption

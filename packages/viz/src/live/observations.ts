@@ -79,6 +79,7 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
   let servedUnderThresholdCount = 0;
   let abandoned = 0;
   let abandonedCarried = 0;
+  let turnedAway = 0;
   let worstWaitSoFarS: number | undefined;
   let worstWaitIsCensored = false;
 
@@ -93,6 +94,14 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
       if (boardedAt - leg.arrivedAt < longWaitThresholdS) servedUnderThresholdCount += 1;
     }
     if (alighted) carried += 1;
+    /*
+     * The fourth outcome, counted where the other three are counted — § D265, § D266, issue #288.
+     *
+     * It is folded here rather than derived by a surface because `abandoned` below now **excludes**
+     * these riders, and a count that stops being reported in one place has to start being reported
+     * in another or the repair is a suppression. See {@link LiveObservations.turnedAway}.
+     */
+    if (leg.refusedAt !== undefined && leg.refusedAt <= t) turnedAway += 1;
     // Strictly past, not at: waiting *exactly* the horizon is inside it, matching `core`'s own
     // `overHorizonCount`, which counts arrivals whose wait is **known to exceed** the horizon.
     if (crossesHorizonAt(leg, horizonS) < t) {
@@ -142,6 +151,7 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
     deepestQueueFloorId: queues.deepestNowFloorId,
     abandoned,
     abandonedCarried,
+    turnedAway,
     horizonS,
     worstWaitSoFarS,
     worstWaitIsCensored,
@@ -152,14 +162,45 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
  * The instant this leg's wait reaches the horizon, or `Infinity` if it never does.
  *
  * A leg that boarded after waiting longer than the horizon reached it at `arrivedAt + horizonS`,
- * and a leg that never boarded reaches it at the same instant — the wait is the same quantity
+ * and a leg whose wait never ended reaches it at the same instant — the wait is the same quantity
  * either way, and `core`'s own `overHorizonCount` counts both. Deriving the crossing time rather
  * than testing `t - arrivedAt > horizonS` is what makes the count **non-decreasing in `t`**: a
  * leg that boards at 950 s having waited 950 s must not stop being abandoned the moment the
  * playhead passes its boarding.
+ *
+ * ## A refusal ends a wait, and leaving it out was GitHub issue #288
+ *
+ * `boardedAt` alone was the ending rule here, and it is the wrong one: a rider the building turns
+ * away for want of a credential **never boards**, so this function handed them
+ * `arrivedAt + horizonS` and {@link LiveObservations.abandoned} — the sheet's *TOOK THE STAIRS*,
+ * captioned *waited past the 15-minute horizon and were never carried* — counted them. Measured on
+ * Secure Tower over its own authored day (`office-day`, seed 20 260 824, shipped defaults): **72 of
+ * 72** stairs-takers were riders refused at a credential check, every one of whom waited **zero
+ * seconds** — `refusedAt` equals `arrivedAt` on every refused leg, 72 of 72, which is the identity
+ * the queue sweep below records at 4 of 4 and 5 of 5 on the breadth fixture. Three rows
+ * away, `render/mood.ts`'s unluckiest-rider driver read `summary.serviceLevel.overHorizonCount` —
+ * which `core` gets right — and printed *"Nobody waited past the 900 s abandonment horizon"* over
+ * the same run. One sheet, two counts of one cohort, `72` and `0`.
+ *
+ * That is § D265/§ D266's **fourth outcome** — neither delivered, nor waiting, nor abandoned —
+ * folded back inside a wait statistic built to publish it *beside* AWT and never within it. The
+ * ending rule is now `core`'s own: `metrics/summarize.ts#diagnoseServiceLevel` ends a wait at
+ * `boardedAt ?? abandonedAt ?? refusedAt ?? censoredAtS`, and this is that rule minus the field
+ * `VizLeg` does not carry. It is also, exactly, the resolution the worst-wait fold a few lines
+ * under this one's call site had been applying all along, so the two folds in one function had
+ * disagreed about when a wait ends since the day `refusedAt` arrived.
+ *
+ * **The count this removes has not gone quiet**, which is the half that matters: those riders are
+ * {@link LiveObservations.turnedAway}, folded in the same pass and published beside `abandoned` on
+ * the footing `workPerServedLegKJ` sits beside raw energy (`CLAUDE.md` § Energy is an axis). A fix
+ * that made the sheet quieter rather than truer would be the same defect wearing a repair.
+ *
+ * Monotonicity survives, and it is worth saying why rather than trusting it: a refusal is a fact
+ * about the leg, not about the playhead, so the crossing time this returns still does not move with
+ * `t`. A refused leg's wait is `0` on every shipped run, so it never crosses any horizon at all.
  */
 function crossesHorizonAt(leg: VizLeg, horizonS: number): number {
-  const endedAt = leg.boardedAt;
+  const endedAt = leg.boardedAt ?? leg.refusedAt;
   if (endedAt !== undefined && endedAt - leg.arrivedAt <= horizonS) return Number.POSITIVE_INFINITY;
   return leg.arrivedAt + horizonS;
 }

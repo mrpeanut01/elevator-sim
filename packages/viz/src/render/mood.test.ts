@@ -205,6 +205,91 @@ describe('every driver reads its own observation', () => {
     }
   });
 
+  it('names the cohort the unluckiest-rider reading is over, on both arms — issue #288', () => {
+    /*
+     * The service-level figures are folded over `summary.reportWindow`; every count printed beside
+     * this card is folded over the whole shift. The issue's sheet is what the silence cost:
+     * *"Nobody waited past the 900 s abandonment horizon"* three rows from a stairs cell reading
+     * `11`, with nothing on either saying they are two populations.
+     *
+     * The window id is **read**, not typed — the assertion below moves the window and requires the
+     * sentence to move with it, which is the difference between a clause generated from the run and
+     * one that happens to match today's template.
+     */
+    const windowed = (id: string): MoodObservations =>
+      observations({ reportWindow: { id, startS: 60, endS: 360 } });
+    for (const id of ['peak-5min', 'report-window', 'lunch-hold']) {
+      const driver = buildingMood(windowed(id)).drivers.find((d) => d.id === 'abandoned');
+      expect(driver?.text, id).toContain(`in the ${id} window`);
+    }
+
+    // And on the loud arm, where the count and the denominator are already in the sentence.
+    const starved = observations({
+      reportWindow: { id: 'peak-5min', startS: 60, endS: 360 },
+      serviceLevel: {
+        verdict: 'starved',
+        longestWaitS: 950,
+        longestWaitIsCensored: true,
+        overHorizonCount: 7,
+        arrivalCount: 46,
+        horizonS: 900,
+      },
+    });
+    const loud = buildingMood(starved).drivers.find((d) => d.id === 'abandoned');
+    expect(loud?.text).toContain('7 of 46 people in the peak-5min window');
+  });
+
+  it('leaves the unluckiest-rider verdict exactly where it was — only the sentence moved', () => {
+    /*
+     * The issue corrects its own first report on this point and the correction is worth a case: the
+     * unluckiest-rider driver is the **accurate** one on that sheet, and naming its cohort may not
+     * turn into re-grading it. Both arms, and the whole gauge with them.
+     */
+    const quiet = observations({ reportWindow: { id: 'peak-5min', startS: 60, endS: 360 } });
+    const loudSummary: Partial<VizSummary> = {
+      reportWindow: { id: 'peak-5min', startS: 60, endS: 360 },
+      serviceLevel: {
+        verdict: 'starved',
+        longestWaitS: 950,
+        longestWaitIsCensored: true,
+        overHorizonCount: 7,
+        arrivalCount: 46,
+        horizonS: 900,
+      },
+    };
+    expect(buildingMood(quiet).drivers.find((d) => d.id === 'abandoned')?.level).toBe('calm');
+    expect(
+      buildingMood(observations(loudSummary)).drivers.find((d) => d.id === 'abandoned')?.level,
+    ).toBe('distressed');
+    // Moving the window moves the sentence and nothing else: no driver's level, and not the gauge.
+    const other = observations({ reportWindow: { id: 'lunch-hold', startS: 60, endS: 360 } });
+    expect(buildingMood(other).level).toBe(buildingMood(quiet).level);
+    expect(buildingMood(other).drivers.map((d) => d.level)).toEqual(
+      buildingMood(quiet).drivers.map((d) => d.level),
+    );
+    /*
+     * The censoring qualification this driver already carried is still there. It is worth an
+     * assertion rather than a nod, because it is the reason this line was the accurate one: the
+     * driver has always said *and counting, because that person never boarded* about a bound, while
+     * the mood card's sub-line printed the same kind of bound as a fact. That gap is now closed on
+     * the other side (`live/bands.ts`), and this side must not lose it in the process.
+     */
+    const censored = observations({
+      reportWindow: { id: 'peak-5min', startS: 60, endS: 360 },
+      serviceLevel: {
+        verdict: 'served',
+        longestWaitS: 210,
+        longestWaitIsCensored: true,
+        overHorizonCount: 0,
+        arrivalCount: 46,
+        horizonS: 900,
+      },
+    });
+    const text = buildingMood(censored).drivers.find((d) => d.id === 'abandoned')?.text ?? '';
+    expect(text).toContain('in the peak-5min window');
+    expect(text).toContain('210 s and counting, because that person never boarded');
+  });
+
   it('the standing driver reads the queues, not the summary', () => {
     const empty = buildingMood(observations({}, []));
     expect(empty.drivers.find((d) => d.id === 'standing')?.level).toBe('calm');

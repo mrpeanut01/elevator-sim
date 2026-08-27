@@ -148,7 +148,9 @@ IE and anything outside the Vite baseline · JavaScript disabled · **CSS width 
 - **Out of scope for launch, as a refusal:** tap-target sizing, gesture affordances, touch-first
   layout, hover equivalents, and any claim that a phone is a *supported* way to play.
 
-De-facto floor today: **1280 px for asserted geometry, 420 px for anything driven at all**.
+De-facto floor today: **1280 px for asserted geometry, ~~420 px~~ 360 px for anything driven at
+all** — 420 was true until issue #292 put 360×800 and 375×667 into the tier, where geometry is now
+asserted at both (`packages/viz/src/everyday/viewportGates.browser.test.ts`).
 
 ---
 
@@ -158,16 +160,28 @@ De-facto floor today: **1280 px for asserted geometry, 420 px for anything drive
 than about this machine.** Measured:
 
 ```
-grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 26
-find packages -name "*.browser.test.ts" | wc -l                            # → 26
+grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 30
+find packages -name "*.browser.test.ts" | wc -l                            # → 30
 grep -rn "firefox\|webkit\|Firefox\|WebKit\|Gecko" packages --include="*.ts"  # → no output
 ```
 
-**26 of 26** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
+**30 of 30** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
 `webkit` and `Gecko` do not occur anywhere in `packages/**/*.ts`. The tier is **single-engine by
-construction**. A criterion measured on one engine is not a matrix, so the instrument had to be
-built outside the tier — and it had to be built outside because a measurement lane may not edit the
-tier.
+construction**.
+
+> **This figure read `26 of 26` until 2026-08-27, and it was wrong by two before anybody re-ran the
+> command.** `docs/31-support-matrix.md` § 1 published **25** for the same set on the same tree, so
+> the two documents did not even agree with each other — and § 7 item 7 of that document had already
+> named this exact number as one that *"will drift silently … Re-derive them, do not copy them
+> forward."* Naming a risk is not a check. It is derived now, from disk, in both of the shapes above
+> and in both documents, by `packages/viz/src/everyday/viewportGates.browser.test.ts`; **that file is
+> itself the twenty-ninth**, which is the whole lesson in one line — a hand-written `28` would have
+> been stale before it was pushed. GitHub issue #292.
+
+A criterion measured on one engine is not a matrix, so the instrument had to be built outside the
+tier — and it had to be built outside because a measurement lane may not edit the tier. **That second
+clause is a rule about a lane's remit and not a property of an instrument**, and § 3.1 below records
+where it stopped applying.
 
 ### 3.1 The instrument
 
@@ -183,11 +197,20 @@ loads the page at six viewports and reads horizontal overflow, tile count and pa
 node matrixProbe.mjs /path/to/worktree
 ```
 
+**The second half of that sentence has stopped applying, and this is where.** *"A measurement lane
+changes no source and no test"* is a rule about **that lane's remit**, and it is not a property of an
+instrument — an uncommitted script cannot keep proving anything, and § 4.1 quotes #203 § 4's own rule
+that *"every tier-1 row must be a row a red run defends."* § 2 puts 360 px in scope for launch, so
+the successor instrument for § 2's three clauses is **in the tier**, at
+`packages/viz/src/everyday/viewportGates.browser.test.ts`. What stays out of band is the **matrix**
+half — the multi-engine question — which is a fact about this machine rather than about the tier.
+
 ### 3.2 The cells
 
 **Boot and layout, six viewports per engine.** `tiles` is the four Everyday mode tiles; `overflow` is
-`max(documentElement.scrollWidth, body.scrollWidth) − documentElement.clientWidth`, which is § 2's
-first clause.
+`max(documentElement.scrollWidth, body.scrollWidth) − documentElement.clientWidth`, ~~which is § 2's
+first clause~~ — **which it is not, and cannot be over this shell.** See the correction under the
+table; it is the load-bearing half of this section now.
 
 | engine | 1280×800 | 1440×900 | 768×1024 | 414×896 | 375×667 | 360×640 |
 |---|---|---|---|---|---|---|
@@ -202,8 +225,55 @@ far as loading the page, so **neither row says anything about whether this produ
 WebKit.** Tier 3 stays exactly as unevidenced as `docs/31-support-matrix.md` § 7 item 1 says it is.
 
 **Zero page errors and zero console errors in every green cell**, and **zero horizontal overflow at
-every width down to 360 px** — which is § 2's first commitment clause, measured for the first time
-at the floor it names.
+every width down to 360 px** — ~~which is § 2's first commitment clause, measured for the first time
+at the floor it names.~~
+
+> ### The `0 px` column is correct, and it is evidence for nothing — GitHub issue #292
+>
+> **The measurement stands. The conclusion drawn from it is withdrawn.** Every `0 px` above is a true
+> statement about the **document scroll box**, and this product's overflow does not go there.
+>
+> `packages/viz/src/everyday/shell.ts:299` makes the Everyday root `position:fixed`, `:304` gives it
+> `overflow:hidden`, and `:330` gives `.everyday-main` `overflow:hidden` as well. Content that
+> overruns a clipping box is **clipped, not scrolled**, so it never reaches `documentElement` and
+> `scrollWidth` there stays exactly equal to `clientWidth` — however far outside the viewport a
+> control is drawn. A `position:fixed; overflow:hidden` shell is invisible to this metric **by
+> construction**: it reads `0` in precisely the case § 2's clause exists to catch. The six cells were
+> not close calls that a better run would have caught; the quantity was null over this shell.
+>
+> **Which shell, and this is the half a reader will otherwise assume wrongly.** The row was taken
+> with the page on **Everyday Mode**, which is what `packages/viz/index.html` has loaded since
+> **2026-08-12** (§ D335). `UX.md`'s `RX-03` and `RX-04b` — the prose § 2 says its clauses restate —
+> were driven, broken, fixed and re-driven on **2026-07-30 in `5d4b782`**, against the **Engineer**
+> surface and its `@media (max-width: 767px)` block. Six weeks separate them. So this row is not a
+> re-confirmation of `RX-03` at a new floor: **the Everyday shell had never been measured against any
+> of § 2's three clauses**, and it still had not been when this row was published.
+>
+> **Corrected by measurement rather than by argument.**
+> `packages/viz/src/everyday/viewportGates.browser.test.ts` reads the per-element quantity —
+> `scrollWidth − clientWidth` on every drawn box whose own `overflow-x` clips — beside the metric
+> above, on the same page at the same instant, and adds the two clauses this section measured
+> nothing of. Chromium headless shell r1194, 2026-08-27:
+>
+> | viewport | screen | the metric above | clipped | controls no gesture reaches | stage canvas |
+> |---|---|---|---|---|---|
+> | 360×800 | main menu | **0 px** | **93 px** | **5** | — |
+> | 360×800 | stage | **0 px** | **337 px** | **12** | 340 px = **42.5 %** |
+> | 375×667 | main menu | **0 px** | **78 px** | **5** | — |
+> | 375×667 | stage | **0 px** | **322 px** | **11** | 340 px = **51.0 %** |
+> | 1280×800 | main menu | 0 px | 0 px | 0 | — |
+> | 1280×800 | stage | 0 px | 0 px | 0 | 340 px = **42.5 %** |
+>
+> The five controls at 360×800 are the whole main menu: all four mode tiles, and § 3.3's primary
+> `Play today's tower`, drawn at `left: 360` and **wholly outside the viewport**. The rail is
+> `RAIL_WIDTH_PX = 212` at every width (`everyday/shell.ts:129`, inline, no breakpoint), which leaves
+> the screen region 148 px at 360 and 163 px at 375 for content that lays out at 241 px. The stage
+> canvas is a literal `height:340px` (`everyday/stageScreen.ts:530`), so **clause 2 fails at 1280×800
+> as well** — a tier-1 desktop viewport, and outside #240's stated subject.
+>
+> **All of that is registered rather than fixed, and the suite is green.** The layout is #240's, open
+> and unstarted; the register is asserted in both directions, so a new failure is red and a fixed one
+> is red as *delete this entry*. This lane fixed the instrument and the claim, not the shell.
 
 **The slice itself, at the tier-1 viewport 1280×800**, driven through the player's own controls:
 
@@ -302,7 +372,7 @@ The two bold rows are the ones this lane's matrix work turns on: **T1's test is 
 | **Android Chrome, real device** | no device | § 4 refuses a device cloud on cost. The affordable proxy is Playwright's `hasTouch`/`isMobile` on the already-installed Chromium — **also unreachable here**, because `isMobile` is the very field the older builds reject, and no shipped tier file sets it |
 | **iOS / iPadOS Safari** | no device, and the WebKit cell above | unchanged: the matrix's own weakest row |
 | **Old Chromium** | — | § 4 refuses this deliberately; the Vite baseline target is the control |
-| **200 % browser zoom** (§ 5's accessibility row) | not attempted — it rides on #240's viewport gates, which do not exist | trivial once a viewport gate exists: 200 % at 1280 is geometrically the 640 px layout |
+| **200 % browser zoom** (§ 5's accessibility row) | not attempted — it rode on #240's viewport gates, ~~which do not exist~~ **which exist now**: `packages/viz/src/everyday/viewportGates.browser.test.ts` drives 360, 375 and 1280 and measures all three of § 2's clauses at each (issue #292) | trivial now: 200 % at 1280 is geometrically the 640 px layout, and the sweep takes a viewport list |
 | **Screen readers** | no assistive stack | unchanged; § 5 already labels this best-effort and untested |
 
 ### 4.1 The honest verdict on M2's box
@@ -311,8 +381,8 @@ The two bold rows are the ones this lane's matrix work turns on: **T1's test is 
 stands.** Two independent reasons, and only the second is about hardware:
 
 1. **The product's own tier is single-engine** (§ 3). Even a machine with all three browsers
-   installed could not make `npx vitest run --project viz-browser` cover a matrix, because 26 of 26
-   files name `chromium`. Until a browser-tier file takes its engine as a parameter, *"the slice runs
+   installed could not make `npx vitest run --project viz-browser` cover a matrix, because **29 of
+   30** browser-tier files name `chromium`. Until a browser-tier file takes its engine as a parameter, *"the slice runs
    on the target browser matrix"* is a claim no tier command can produce evidence for.
 2. **Tier 1 is two rows and both are Chromium.** #203 § 4's rule is explicit: *"Every tier-1 row must
    be a row a red run defends, and adding a tier-1 row means adding its gate in the same change."*
@@ -337,8 +407,8 @@ Not a wish list — each is small, and each converts a *claim* into something a 
    module and `browserTier.test.ts` already enforces that every tier file goes through it — so the
    engine belongs in the same place. That single change is what turns *"the slice runs on the target
    browser matrix"* from an unanswerable sentence into a command, and it is a **precondition for the
-   Firefox row #203 § 4 already recommends**: installing Gecko buys nothing while 26 of 26 files name
-   `chromium`.
+   Firefox row #203 § 4 already recommends**: installing Gecko buys nothing while **29 of 29**
+   browser-tier files name `chromium`.
 3. **One touch cell.** § 2's `best effort` becomes measurable with `hasTouch`/`isMobile` on the
    Chromium already installed, at one phone viewport, through one real journey. §&nbsp;4 of the matrix
    calls this *"Recommended, and cheapest of all"* and it is #240's gate.
@@ -556,7 +626,7 @@ that are not about this repository — a missing browser, a busy port."*
 
 **Three separate things are true here and they should not be merged:**
 
-- **The other 25 files already solved this**, each taking an explicit port with `strictPort: false`
+- **Every other file in the tier already solved this**, each taking an explicit port with `strictPort: false`
   — `liveMetrics` 5205, `closedFormPlate` 5206, and so on, several with a comment calling it *"the
   tier's convention"*. `boot.browser.test.ts` is the **last file on the old convention** and nobody
   noticed, because the tier skips without `ELEVATOR_SIM_CHROMIUM` and 5173 is usually free.

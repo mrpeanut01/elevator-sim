@@ -682,16 +682,72 @@ export interface StageBarInput {
   readonly hasRun: boolean;
   readonly dayClosed: boolean;
   readonly recomputing: boolean;
+  /**
+   * Whether the transport **the player is holding** has reached the end of the day — GitHub issue
+   * **#287**, its fourth acceptance criterion.
+   *
+   * Optional, and the default is the state every existing caller was already in: a day still
+   * running. It is the one fact on this input that is not about the *host* — the other three are
+   * `runState()` reads — and that asymmetry is the point rather than an oversight. The playhead is
+   * § 7's stage's own (`everyday/host.ts` refuses a transport method for the reason its docstring
+   * gives), so nothing the host can be asked knows this; the screen holding the transport is the
+   * only thing that does, and it writes it through `everyday/stageScreen.ts`'s `barFacts`.
+   */
+  readonly dayEnded?: boolean | undefined;
 }
+
+/**
+ * What § 3.3's row says once the day has run out and nobody has filed it — issue **#287**.
+ *
+ * ## Why this sentence exists at all
+ *
+ * The issue's last section: at the top of § 7's speed ladder the stage's own playback finishes in a
+ * few seconds, and from that instant the screen is **bit-for-bit identical** — the only delta on the
+ * whole page being the transport button flipping `⏸ Pause` to `▶ Play`. Readers reported believing
+ * the product had crashed. It looked temporary only because a second, covered transport was
+ * running behind it and eventually filed the day; with that removed the stillness is permanent,
+ * which is worse rather than better, and this is the half of the fix that owes the player a
+ * sentence.
+ *
+ * ## Why it is a note and not a refusal
+ *
+ * The three sentences above it all resolve § 3.3's primary **inert**, because in each of those
+ * states pressing it would do nothing. This one is the opposite state: the primary is exactly what
+ * the player should press, and the row's job is to say so. So the note is replaced and the button
+ * is left alone — a state where there is more to do, not less.
+ *
+ * ## Why it describes and does not instruct, which is a correction rather than a preference
+ *
+ * The first draft read *"the day has run out — **close it** and its report is written"*, and that
+ * sentence is a lie on two of the four run contexts this one screen serves. § 3.3 gives the stage
+ * primary a different verb in each: *Close the day* on `daily` and `campaign`, *End the rush* on
+ * `rush`, and *Play this crowd yourself* on `watch` — where § 14.1 forbids closing the day at all,
+ * because it is somebody else's. A note telling a spectator to close a day they may not close is
+ * the inert-control defect wearing a caveat's clothes.
+ *
+ * The fix is not a list of the contexts where the instruction holds. It is to notice that the
+ * instruction was never this cell's to give: the **primary sits immediately beside the note and
+ * already says the verb**, correctly, in all four. So the note does the one job the button cannot —
+ * it explains why the picture stopped — and says nothing about what to press. The three sentences
+ * above it keep the same discipline, which is why they survive every context unchanged.
+ *
+ * Recorded as § D384, whose argument this docstring is.
+ */
+export const STAGE_DAY_OVER = 'the day has run out — the stage will not move again on its own';
 
 /**
  * § 3.3's stage row, refined.
  *
  * The table's cell is *Close the day* with the note *Stops the clock and writes the report*, and it
- * is right for a running day. Three states the table cannot know: no run yet, a day already filed,
- * and a re-simulation in flight. Each resolves the primary **inert** with the note saying why — the
- * shell draws an inert primary disabled, so the button never looks pressable while doing nothing
- * (`BarPrimary.inert`'s own contract).
+ * is right for a running day. **Four** states the table cannot know: no run yet, a day already
+ * filed, a re-simulation in flight, and a day that has run out and not been filed.
+ *
+ * The first three resolve the primary **inert** with the note saying why — the shell draws an inert
+ * primary disabled, so the button never looks pressable while doing nothing (`BarPrimary.inert`'s
+ * own contract). **The fourth is the one that does not**, and the asymmetry is the whole of it: a
+ * day that has run out is the state in which the primary is most worth pressing, so the row
+ * explains and does not refuse. {@link STAGE_DAY_OVER} carries the argument, including why it
+ * describes rather than instructs.
  */
 export function stageBarModelOf(state: EverydayState, input: StageBarInput): ActionBarModel {
   const table = actionBarFor(state);
@@ -718,7 +774,16 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
       : input.dayClosed
         ? 'the day is filed — its report is written'
         : undefined;
-  if (refusal === undefined) return base;
+  if (refusal === undefined) {
+    /*
+     * The fourth state, and it is the only one that leaves the primary alone — {@link STAGE_DAY_OVER}
+     * carries why. **Below the three refusals rather than beside them**, which is an ordering by
+     * cause and not by taste: a filed day's transport is also sitting at the end of the run, so a
+     * day that has both run out and been filed must say *filed* — the newer fact would otherwise
+     * shout over the older one and tell a player to press a button that is already inert.
+     */
+    return input.dayEnded === true ? { ...base, note: STAGE_DAY_OVER } : base;
+  }
   return {
     ...base,
     primary: { ...base.primary, inert: refusal },

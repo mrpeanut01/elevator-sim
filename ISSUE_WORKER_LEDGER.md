@@ -398,3 +398,178 @@ the four would have read as tidier findings than the truth.
 **What the wave did not do.** It did not close #281 on two of five criteria, did not renumber D63 to
 make a duplicate go away, did not rewrite a dated findings figure to make two registers agree, and
 did not report a suite run taken over a tree that changed underneath it.
+
+## Wave E — the 2026-08-27 playtest cohort, dispatched as six lanes plus a concurrent verifier
+
+**Snapshot:** 2026-08-27, base `55f2bca` = `origin/main` at dispatch · working branch
+`claude/github-issue-worker-tfg581` · PR **#302** · `npm run typecheck` **clean on the merged tree**.
+
+**The batch chose itself.** Nine issues (#287–#295) were filed at 12:00–12:04 on 2026-08-27 from an
+agentic playtest round, none triaged, one **P0**, every one carrying file:line mechanisms and a
+provenance line pinning the build under test to `55f2bca` — *"both hashes reproduce exactly from
+`55f2bca` via `npm run build:web`"*. A cohort with no staleness gap is the cheapest cohort to verify,
+which is why it went first rather than by age.
+
+| # | P | lane | outcome |
+|---|---|---|---|
+| **287** | P0 | A | in flight |
+| **288** | P1 | B | in flight |
+| **289** | P1 | C | in flight |
+| **290** | P2 | C | in flight |
+| **291** | P1 | D | **landed** — and the defect had a second instance the issue did not report |
+| **292** | P1 | F | in flight |
+| **293** | P1 | E | **landed** — four stale sites, not the three the issue named |
+| **294** | P3 | D | **landed** — premise refuted as framing; decision taken, number owed |
+| **295** | P2 | V | **10 of 16 rows verified**; six filed, two refuted, one referred |
+
+### The habit held again, and this time on the issues rather than on the code
+
+Every lane that has reported found something its brief did not describe, and two of the four findings
+would have left an acceptance criterion unmet if the issue had been actioned literally:
+
+- **#291's window claim had a twin two sentences away.** `CASUAL_SMALL_PRINT_LEAD`
+  (`mode/casualDay.ts:341`) carried the identical defect, and `dev/reportPanel.ts:1466` joins the two
+  into **one paragraph**, so Garden day 1 printed a flat contradiction with itself. The issue quotes
+  the second half of that paragraph and did not notice the first. AC3 — *names one window and only
+  one* — is red against a tree with only the reported entry fixed.
+- **#293's stale sites were four.** `docs/27-flow-maps.md:315` quoted the claim too, two rows below a
+  neighbouring claim already marked *"Corrected 2026-08-25 (issue #262)"* — the correction reached
+  its neighbour and not it.
+- **#293 also carried a defect nobody predicted.** `RUSH_ABSENCES[3]` read *"the five entries
+  **below**"* while being drawn in Settings with *The drawing board* underneath it. A register row
+  gone stale about **where it is drawn** — the § D227 class turned on the register itself.
+- **#294's premise is refuted as framing.** `shift mode` is not an orphan string: `SHIFT MODE` is the
+  Engineer header's own eyebrow (`index.html:1720`), required by `docs/12-design-handoff.md` S3 from
+  the canonical handoff. The title was **correct until § D335 moved the front door**. R42's shape, not
+  a typo — and it changes the fix, because there is a live consumer to keep true.
+
+### What the corpus had never read
+
+`honesty/surfaces.ts` seeded three of the four cells the standings row draws. **`held` was the
+missing one** — so `'57 min'` against a handle, which is precisely the *other player's figure* #293
+opens on, had never been read by the search. Found while adding the marker, not by looking for it. It
+carries its own owed-decision marker at the site, in `honesty/surfaces.ts`.
+
+### Two instruments, and only one of them proves what it claims
+
+Both merged lanes' checks were **mutation-validated by the integrator**, not only by the lane that
+wrote them, and the results differ in a way worth recording:
+
+| mutation | import-graph case | browser case |
+|---|---|---|
+| revert the tab title | **red** (2 of 4) | — |
+| drop the rush note from the renderer | **green** | **red** |
+
+The import-graph case is green under a mutation that removes the note from the page, because the
+import survives the deletion of the `append`. **Lane E said so itself** — *"an import is evidence,
+not proof — which is why the browser case compares painted rectangles"* — and that is why the browser
+case exists. A lane that had claimed the weaker instrument was sufficient would have shipped a check
+that cannot fail for the reason it was written.
+
+**Lane E also caught its own first instrument passing against the defect it was written for.** v1
+asked whether the docstring named the renderer *anywhere*; `RUSH_BESTS`' history section mentions
+`rushScreen.ts` only to say what it does *not* import, which satisfied the check. Narrowed to the
+docstring's lead, it fails on the base wording. That is the page-error-probe lesson landing on a
+lane that then applied it to itself.
+
+### The ratchet was at its ceiling, and it was not moved
+
+`validation/documentation.test.ts`'s owed-decision ratchet stands at **64 with zero headroom** and its
+docstring says it *"may not rise"*. Three new markers took it to 67. The lane **did not raise the
+ceiling** and **did not rephrase to dodge the grep** — the gate's own docstring forbids the second —
+and folded both arguments under `casualDay.ts`'s existing module-level declaration instead.
+
+**It then reported a blind spot it could have used silently:** `filesUnder` scans `.ts` and `.md`
+only, so the `index.html` marker is not counted at all. Owed its own issue. A lane that benefits from
+a gate's hole and says nothing is the more expensive outcome, and this one said so in the open.
+
+### Six issues filed from the verifier, and two rows refuted
+
+**#296** (F35), **#297** (F27), **#298** (F24), **#299** (F36), **#300** (F23), **#301** (F40).
+
+**#296 is a twelfth dead seam with a false disclosure on top**, and it is the row #295 nominated to be
+verified first — *"the agents disagree"*. **Both agents were right.** `drivingProfileOf`
+(`dev/state.ts:1153`) reads `state.levers`, `state.selectorSpec` and `state.ruleRows`, and never
+`state.dispatcherSpec`, so `lobby` travels and **all 13 term sliders and all 3 behaviour flags are
+byte-identical on the legs** — while `everyday/actionBar.ts:340` tells the player *"Unsaved changes
+travel with the run."* `scope/surface.ts:262` already declares the field latent in those words.
+
+The single browser case guarding that screen passes because **its own docstring names the false
+premise**: it asserts on the printed cost expression, which *is* composed from the ignored weights.
+An assertion on a window statistic rather than on the legs — the standing requirement failing on the
+one screen written to satisfy it.
+
+**F34 refuted on its load-bearing word.** The fourth campaign goal is not *silently* dropped:
+`campaignModel.ts:267` gives the row `refusal: TRIPS_REFUSAL` and `campaignScreens.ts:298-302` draws
+it. Its duplicate note against #277 is wrong too — different surfaces, different arrays, no overlap.
+**F39 refuted for the report's figure grid** by trace rather than by failure to reproduce, which is
+the stronger verdict; the row stays open, narrowed, because the other candidate was not localised.
+
+### What this wave has not done
+
+- **The honesty corpus is not re-measured and no counts are published** (§ D343). Both merged lanes
+  ran the always-on tier as a pass/fail gate only, and said so.
+- **The honesty corpus is not re-measured and no counts are published** — § D343 takes that once,
+  **after this merges to `main`**, and three lanes added player-facing strings, so the Phase 9 figures
+  in `CLAUDE.md` will move. **That measurement is owed to the next session.**
+
+## Wave E closed — the integrated result, measured rather than inherited
+
+**The full suite ran on the integrated tree, twice: locally and on both CI legs.**
+
+| run | result |
+|---|---|
+| local, integrated tree | **463 files · 9 106 passed · 11 skipped · 1 failed** |
+| CI `suite (linux)` at `0c694b1` | **green** |
+| CI `suite (macos)` at `0c694b1` | **green** |
+| `Review`, `Deploy viewer` | green |
+
+**The local failure was the most useful result of the wave**, and it was Lane F's own count gate red
+against Lane F's own figure: the browser-tier file count read **29** on its branch and **30**
+integrated, once Lane A added `autoFile.browser.test.ts`. Three values in one wave — 25 in the support
+matrix and 26 in `M2_MEASUREMENT.md` when the wave opened against a tree of 28, then 29, then 30 —
+**each correct where it was taken.** The gate proved itself on the person who wrote it.
+
+### CI then failed twice more, and the first diagnosis was wrong
+
+`suite (linux)` and `suite (macos)` both went red on the viewport register, **byte-identically**. The
+first hypothesis was a timing race and it was **withdrawn**: identical output from two different
+runners is not what a race produces. Five local conditions were green — default, a 20× CPU throttle,
+forced `prefers-reduced-motion: reduce`, the full Chromium build, and the whole suite at default
+parallelism — and CI's browser could not be installed here (`playwright-core` pins **1234**; this
+container has **1194**, download blocked).
+
+**The root cause was the pinned scroll offset.** Every control existed in all three environments —
+the same stage drew `stage-play`, `stage-start`, seven speed chips, a primary, a back and a leave
+everywhere. Only *which of them fell outside the viewport* differed, and the two answers were **near
+complements**: the signature of a scroll container resting at opposite ends. `MEASURE` pinned each
+`hidden`/`clip` box to its **current** offset, but such a box cannot be moved by any gesture, so that
+offset was put there by script. Reading reachability from it asks a question about the browser.
+Zeroing first asks what the clause means.
+
+**The register is unchanged by that fix**, which is the evidence it is right: a no-op on the leg that
+was green, a definition on the legs that were not. No register entry was added, deleted or reworded
+to reach green — that register is the record of what #240 has to fix.
+
+## Wave E dispositions
+
+| # | disposition | evidence |
+|---|---|---|
+| **287** (P0) | **closed** | Four ACs met. Its *"not more than once per sitting"* **refuted** — the loop banks a week; its arithmetic wrong in every operand |
+| **288** | **closed** | Four ACs met. Its headline `2 915 s` **misattributed** — fixing what it described would have relabelled the number and left it on the card |
+| **289** | **closed** | Three ACs, **AC2 raised** — a caller-set test could not have caught a bypasser |
+| **290** | **closed** | Two ACs. Its *"counter correctly stays at 0"* **refuted** — no guard existed, that day was missed |
+| **291** | **closed** | Three ACs. A **twin defect two sentences away** would have left AC3 unmet |
+| **292** | **closed** | Four ACs. Its location claim **refuted**; instrument red-by-register, calibrated independently |
+| **293** | **closed** | Three ACs. **Four** stale sites, not three; a register row stale about where it is drawn |
+| **294** | **closed** | Three ACs. Premise **refuted as framing**; decision recorded as § D375 |
+| **295** | **open, deliberately** | Its criterion is *"closes when the table is empty"*. Six rows remain (F22, F26, F28, F32, F37, F38) plus the narrowed F39 and the F33 product decision |
+
+**Six of the eight closed issues carried a claim that verification refuted.** That is the wave's
+headline and it is the fourth consecutive wave to report it.
+
+**Filed from findings:** #296 (a **twelfth dead seam**, with a false disclosure on top), #297, #298,
+#299, #300, #301, #303. **Decisions allocated:** D375–D385.
+
+**What no fix in this wave has:** verification against a deployed artifact. The PR's Azure preview is
+unreachable from this container — `CONNECT` returns **403**, as § D374 recorded on 2026-08-25.

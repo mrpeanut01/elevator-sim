@@ -136,6 +136,37 @@ export interface WaitBands {
    * wait anybody realised, which is the figure that does not go away when the lobby empties.
    */
   readonly longestCurrentWaitS: number | undefined;
+  /**
+   * Whether {@link longestCurrentWaitS} belongs to a leg whose wait had **not ended** by
+   * {@link atS} — so the figure is not a wait anybody realised, and this layer cannot say what it
+   * is instead. See below: it is emphatically **not** a lower bound.
+   *
+   * `shift/goals.ts` will not grade a censored maximum at all, in either direction, and
+   * `LiveObservations.worstWaitIsCensored` carries the same distinction for the fold the goals
+   * read. This is that distinction reaching the mood card, which had been printing the figure as a
+   * fact — GitHub issue #288's second mechanism, and the one that is *not* fixed by getting the
+   * ending rule right, because a rider still standing when the shift ended really has no wait yet.
+   *
+   * **It is not a lower bound and the copy may not call it one.** `VizLeg` carries no
+   * `abandonedAt`, so an unresolved leg is either somebody still standing or somebody who ran out
+   * of patience and left long ago — and for the second, `t - arrivedAt` *overstates*. That is the
+   * whole reason `goals.ts` refuses rather than qualifies. `moodOf` therefore says *that wait had
+   * not ended, and nothing here says when it did* — true under both readings — and leaves *at
+   * least* to `shift/report.ts#worstWaitFigure`, which reads `core`'s flag and may.
+   *
+   * ## It is only ever `true` on the retrospective basis, and that is a claim rather than a gap
+   *
+   * On `'now'` the quantity is *how long the people standing there have been standing*, and
+   * `t - arrivedAt` answers that **exactly** — every rider in the banding is unresolved by
+   * construction, so a flag that read `true` for all of them would qualify a number that needs no
+   * qualification and would say nothing a reader could act on. On `'whole-run'` the quantity is
+   * *the longest wait anybody realised across the shift*, and for a rider whose wait never ended
+   * there is no such number to report. Two bases, two questions — the module docstring's own
+   * framing — and the censoring belongs to the second.
+   *
+   * `false` when the banding is over nobody, matching `longestCurrentWaitS`'s `undefined`.
+   */
+  readonly longestWaitIsCensored: boolean;
 }
 
 /** The mood card's face, headline and sub-line — design `:57–64`, `:2281–2299`. */
@@ -225,6 +256,13 @@ export interface LiveObservations {
    * **Derived, because the recording has no such field.** A leg is counted from the instant
    * `arrivedAt + horizonS`, whether it eventually boarded or not, which is what makes the count
    * non-decreasing in `t` and independent of what happens after the playhead.
+   *
+   * **A wait that ended in a refusal is not in it** — GitHub issue #288. A rider turned away at a
+   * credential check never boards, and until the ending rule named one they were handed
+   * `arrivedAt + horizonS` and counted here: 72 of 72 stairs-takers on Secure Tower's own authored
+   * day were riders who had waited **zero seconds**, under a caption reading *waited past the
+   * 15-minute horizon and were never carried*. They are {@link turnedAway} instead. See
+   * `observations.ts#crossesHorizonAt` for the ending rule and for the run.
    */
   readonly abandoned: number;
   /**
@@ -240,6 +278,30 @@ export interface LiveObservations {
    * folded from the same legs in the same pass so the three counts cannot disagree.
    */
   readonly abandonedCarried: number;
+  /**
+   * Legs the building **turned away for want of a credential** by `t` — § D265's fourth outcome,
+   * counted rather than absorbed.
+   *
+   * Neither delivered, nor waiting, nor abandoned. `core`'s conservation identity is
+   * `generated === delivered + undelivered + abandoned + accessRefused` and this is a leg-level
+   * fold of that last term, taken in the same pass as {@link arrived} and {@link abandoned} so the
+   * four counts on one sheet cannot come from four walks of the legs.
+   *
+   * **It exists because {@link abandoned} stopped counting them** (issue #288), and a repair that
+   * only removed a figure would have made the sheet quieter rather than truer — the exact trade
+   * `CLAUDE.md` refuses for abandonment and stairs uptake, and `DECISIONS.md` § D266 refuses for
+   * this outcome specifically: it is published **beside** the wait figures on the footing
+   * `workPerServedLegKJ` sits beside raw energy. A day that improves its wait by turning people
+   * away at the door has not improved anything.
+   *
+   * **Not derivable from `VizSummary`**, which carries no `accessRefused` — `render/mood.ts`'s
+   * delivered driver says so where it explains why it cannot name the remainder. `VizLeg.refusedAt`
+   * is on the contract already, so this needs no schema change and no new recording version.
+   *
+   * `0` on every run of a building that declares no `accessZones`, and on every run of a zoned
+   * building whose riders are all correctly badged.
+   */
+  readonly turnedAway: number;
   /**
    * The longest wait any leg arrived by `t` had realised **or accrued** by `t`, seconds.
    * `undefined` when nobody has arrived.

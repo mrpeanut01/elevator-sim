@@ -23,7 +23,7 @@ import { recordRun } from '../record/recordRun.js';
 
 import { BAND_COLORS, WAIT_BANDS, bandIndexOf, moodAt, moodOf, waitBandsAt } from './bands.js';
 import { observationsAt } from './observations.js';
-import { syntheticRecording, servedLeg, waitingLeg } from './synthetic.test-helper.js';
+import { refusedLeg, syntheticRecording, servedLeg, waitingLeg } from './synthetic.test-helper.js';
 
 let config: LoadedConfig;
 const recordings = new Map<string, VizRecording>();
@@ -335,6 +335,109 @@ describe.each(BUILDING_IDS)('%s — the whole-run banding, on a real run', (buil
     expect(closing.total).toBeGreaterThanOrEqual(
       waitBandsAt(recording, recording.endedAt).total,
     );
+  }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The retrospective card's two ways of printing a wait nobody waited — issue #288
+ * -------------------------------------------------------------------------- */
+
+describe('a rider the door turned away is not somebody who stood all shift', () => {
+  it('bands them at the wait they served, which is none of it', () => {
+    /*
+     * The defect in its smallest form. A refused leg never boards, so an ending rule reading
+     * `boardedAt` alone walked their wait up with the playhead: at `t = 3000` this rider read as
+     * having stood for **2 900 s** and took the card's fourth band and its longest-wait figure with
+     * them. `refusedAt` equals `arrivedAt` on every refused leg the simulator produces, so the
+     * honest banding is the first one.
+     */
+    const recording = syntheticRecording({
+      legs: [refusedLeg('p1', 100), servedLeg('p2', 0, 20, 90)],
+      endedAt: 3000,
+    });
+    const bands = waitBandsAt(recording, 3000, 'whole-run');
+    expect(bands.total).toBe(2);
+    expect(bands.counts.map((entry) => entry.count)).toEqual([2, 0, 0, 0]);
+    expect(bands.longestCurrentWaitS).toBe(20);
+    expect(bands.longestWaitIsCensored).toBe(false);
+    expect(moodOf(bands).sub).toBe('across the whole shift, nobody stood half a minute');
+  });
+
+  it('still bands a refusal that came late at the wait it really cost', () => {
+    // The negative control: the fix resolves the wait *at the refusal*, it does not skip the leg.
+    const recording = syntheticRecording({ legs: [refusedLeg('p1', 0, 200)], endedAt: 3000 });
+    const bands = waitBandsAt(recording, 3000, 'whole-run');
+    expect(bands.longestCurrentWaitS).toBe(200);
+    expect(bands.counts.map((entry) => entry.count)).toEqual([0, 0, 0, 1]);
+  });
+
+  it('qualifies a longest wait that belongs to somebody who never got a car', () => {
+    /*
+     * Issue #288's second mechanism, which the first does not fix: this rider was never refused and
+     * never boarded, so the record never saw their wait end. The project's rule —
+     * `shift/goals.ts` will not grade a censored maximum in either direction — now reaches the card
+     * that prints one.
+     */
+    const recording = syntheticRecording({ legs: [waitingLeg('p1', 0)], endedAt: 3000 });
+    const bands = waitBandsAt(recording, 3000, 'whole-run');
+    expect(bands.longestWaitIsCensored).toBe(true);
+    expect(moodOf(bands).sub).toContain('the longest 3000 s — that wait had not ended');
+    // And it is a qualification rather than a suppression: the figure is still there.
+    expect(moodOf(bands).sub).toContain('1 riders stood past two minutes');
+  });
+
+  it('does not call the figure a lower bound, because this layer cannot prove it is one', () => {
+    /*
+     * The word `shift/report.ts#worstWaitFigure` uses is *at least*, and it may: `core` can see
+     * `abandonedAt`, so a leg it calls censored really was still waiting. `VizLeg` carries none, so
+     * an unresolved leg here may belong to a rider who ran out of patience and walked out long ago,
+     * for whom `t - arrivedAt` **overstates**. `at least` would be a claim this layer cannot make,
+     * which is exactly why `goals.ts` refuses rather than qualifies — so the clause says what is
+     * true under both readings and nothing more.
+     */
+    const recording = syntheticRecording({ legs: [waitingLeg('p1', 0)], endedAt: 3000 });
+    expect(moodOf(waitBandsAt(recording, 3000, 'whole-run')).sub).not.toContain('at least');
+  });
+
+  it('does not qualify a maximum that a rider actually served', () => {
+    const recording = syntheticRecording({ legs: [servedLeg('p1', 0, 200, 260)], endedAt: 3000 });
+    const bands = waitBandsAt(recording, 3000, 'whole-run');
+    expect(bands.longestWaitIsCensored).toBe(false);
+    expect(moodOf(bands).sub).toContain('the longest 200 s');
+    expect(moodOf(bands).sub).not.toContain('had not ended');
+  });
+
+  it('leaves the live card’s wait age unqualified, because that number is exact', () => {
+    // The two bases mean different things by one figure — `WaitBands.longestWaitIsCensored`. A
+    // rider standing at 130 s has stood 130 s; the card says so and claims nothing about their day.
+    const recording = syntheticRecording({ legs: [waitingLeg('p1', 0)], endedAt: 3000 });
+    const bands = waitBandsAt(recording, 130);
+    expect(bands.longestWaitIsCensored).toBe(false);
+    expect(moodOf(bands).sub).toBe('1 riders past two minutes');
+  });
+});
+
+describe.each(BUILDING_IDS)('%s — the card and the fold agree about the worst wait', (buildingId) => {
+  it('reaches the same maximum, and the same verdict on whether it is a bound', () => {
+    /*
+     * Two modules, two walks of the legs, one answer — the evidence idiom this package uses for
+     * `peakQueue` against the landing fold. `observationsAt` and `waitBandsAt(…, 'whole-run')` apply
+     * the same ending rule to the same population, and they are deliberately **not** refactored into
+     * one call: deriving the card from the fold would make this a tautology, and this is the check
+     * that would have caught issue #288 the day it landed, since the two disagreed by 34 000 s on
+     * Secure Tower's own day while each looked internally consistent.
+     */
+    const recording = recordingOf(buildingId);
+    for (const t of sampleTimes(recording)) {
+      const bands = waitBandsAt(recording, t, 'whole-run');
+      const fold = observationsAt(recording, t);
+      expect(`${String(t)}: ${String(bands.longestCurrentWaitS)}`).toBe(
+        `${String(t)}: ${String(fold.worstWaitSoFarS)}`,
+      );
+      expect(`${String(t)}: ${String(bands.longestWaitIsCensored)}`).toBe(
+        `${String(t)}: ${String(fold.worstWaitIsCensored)}`,
+      );
+    }
   }, 300_000);
 });
 

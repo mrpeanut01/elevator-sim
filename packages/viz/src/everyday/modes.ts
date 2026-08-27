@@ -131,9 +131,29 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
      * § 9.1's setup screen is registered, so this resolves to `undefined` and the tile opens. The
      * sentence is kept current rather than left as it was: it is what a reader would be told if the
      * screen were ever unregistered, and a refusal that describes a build two waves old is § D227's
-     * defect with a longer fuse. What the rush still lacks is named on the screen itself
-     * (`rushScreenModel.ts#RUSH_ABSENCES`) and on its primary, which is where a refusal about a
-     * missing engine belongs once the screen in front of it is real.
+     * defect with a longer fuse.
+     *
+     * **The sentence that stood here was that defect, in the comment arguing against it** — GitHub
+     * issue #293. It read *"what the rush still lacks is named **on the screen itself**
+     * (`rushScreenModel.ts#RUSH_ABSENCES`)"*, and `RUSH_ABSENCES` left that screen on the merge
+     * that closed issue #207. It is written out rather than quietly corrected because a comment
+     * that names the failure mode and then commits it is the most persuasive kind of wrong: a
+     * reader checking this claim has just been told by the same paragraph that such claims go
+     * stale.
+     *
+     * Where the three things actually are, each named with the module that draws it:
+     *
+     * - the **register** of what the rush lacks — `buildNotes.ts`, the Settings build-information
+     *   panel, since #207 put every register in one place a reader goes looking;
+     * - the **primary's** refusal — `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL`, drawn into the
+     *   § 3.3 bar beside the button it is about, which is where a refusal about a missing engine
+     *   belongs once the screen in front of it is real;
+     * - the **standings'** fixture marker — `rushScreenModel.ts#RUSH_BESTS_FIXTURE_NOTE`, drawn by
+     *   `rushScreen.ts` beside the five rows, because § 20.11 requires a fixture's marker to
+     *   travel with the fixture rather than sit two clicks away.
+     *
+     * `modes.test.ts` checks all three against the import graph rather than against a reader's
+     * diligence, so the next register to move fails here instead of leaving a sentence behind.
      */
     unavailable: unlessBuilt(
       'not built yet — the rush setup screen draws, but nothing behind it generates the climb',

@@ -115,13 +115,18 @@ import type { EverydayState } from './types.js';
  * -------------------------------------------------------------------------- */
 
 /**
- * The three facts the shell's bar draw needs and cannot be handed.
+ * The four facts the shell's bar draw needs and cannot be handed.
  *
  * `screens.ts` calls `bar(state)` with the shell's state alone, so a screen whose row depends on
  * its own run state keeps that state here — `fixitScreen.ts`'s idiom, for its stated reason. The
- * mount writes it and asks for a redraw (`refreshBar`) whenever one of the three moves.
+ * mount writes it and asks for a redraw (`refreshBar`) whenever one of the four moves.
+ *
+ * **The fourth is not a host read, and that is what makes it belong here** — GitHub issue **#287**.
+ * The first three are `EverydayHost.runState()` answers, so any screen could ask for them;
+ * `dayEnded` is a fact about the transport *this* screen owns, and `everyday/host.ts` deliberately
+ * exposes none. {@link syncTransport} is its one writer, on the edge rather than on every frame.
  */
-const barFacts = { hasRun: false, dayClosed: false, recomputing: false };
+const barFacts = { hasRun: false, dayClosed: false, recomputing: false, dayEnded: false };
 
 /* -------------------------------------------------------------------------- *
  * Small DOM helpers — the shell's own, kept local rather than exported
@@ -754,6 +759,24 @@ function mountStage(
 
   function syncTransport(): void {
     const playing = playback?.state === 'playing';
+    /*
+     * § 3.3's row hears the day run out — GitHub issue **#287**'s fourth criterion.
+     *
+     * This is the whole of the *"is it still running?"* seam, and it is here because this is the
+     * one function every transport change already passes through: the two chips, the play toggle,
+     * `adopt`, and `tick`'s own `else` branch on the frame the playback stops. Nothing else has to
+     * learn about it.
+     *
+     * **On the edge, guarded, not on every call.** `refreshBar` re-renders § 3.3's row, and
+     * `syncTransport` runs on frames; an unguarded call would rebuild the bar sixty times a second
+     * for a fact that moves twice a day. The guard is also what keeps this out of `tick`'s hot
+     * path — a playing transport re-schedules from inside `tick` and never reaches here at all.
+     */
+    const ended = playback?.state === 'ended';
+    if (ended !== barFacts.dayEnded) {
+      barFacts.dayEnded = ended;
+      context.refreshBar();
+    }
     playButton.textContent = playing ? '⏸ Pause' : '▶ Play';
     playButton.disabled = playback === undefined;
     for (const [index, button] of speedButtons.entries()) {
