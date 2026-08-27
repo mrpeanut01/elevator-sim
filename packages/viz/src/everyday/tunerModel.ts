@@ -375,12 +375,14 @@ export interface TuneMachineSteps {
  * @param standing the seven as {@link tuneStateFrom} read them off the building — the values that
  *   have to be expressible, as opposed to `tune`, which is where the controls are now. Adding
  *   `tune`'s own values instead would make the ladder contain every value it is ever asked about
- *   and the snap could never fire, which is the class-change guard deleted by accident.
+ *   and the snap could never fire, which is the class-change guard deleted by accident. It is
+ *   **required rather than defaulted to `tune`** for exactly that reason: a default is that mistake
+ *   pre-made, waiting for the first caller who does not read this paragraph.
  */
 export function tuneMachineSteps(
   machineClass: MachineClass | undefined,
   tune: TuneState,
-  standing: TuneState = tune,
+  standing: TuneState,
 ): TuneMachineSteps {
   if (machineClass === undefined) return { speeds: [tune.speed], loads: [tune.cap] };
   return {

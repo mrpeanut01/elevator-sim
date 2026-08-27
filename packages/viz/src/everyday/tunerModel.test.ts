@@ -131,12 +131,12 @@ describe('§ 18’s seven, read off what is standing', () => {
 
   it('offers speed and capacity as steps within the class, and snaps a narrowed ladder down', () => {
     const machineClass = classOfSpec(CLASSES, BLANK_SPEC);
-    const steps = tuneMachineSteps(machineClass, STANDING);
+    const steps = tuneMachineSteps(machineClass, STANDING, STANDING);
     expect(steps.speeds).toEqual(speedStepsFor(machineClass!));
     expect(steps.loads).toEqual(loadStepsFor(machineClass!));
     // A class this build does not have leaves a stepper that cannot move rather than one offering
     // a step the loader would refuse.
-    expect(tuneMachineSteps(undefined, STANDING)).toEqual({
+    expect(tuneMachineSteps(undefined, STANDING, STANDING)).toEqual({
       speeds: [STANDING.speed],
       loads: [STANDING.cap],
     });
