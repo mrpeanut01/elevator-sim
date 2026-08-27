@@ -466,6 +466,13 @@ function failuresOf(cell: Cell): readonly string[] {
  * The one entry that is **not** #240's is the last: `everyday/stageScreen.ts:530` writes the stage
  * canvas at a literal `height:340px`, so clause 2 fails at 1280×800 as well, which is a tier-1
  * desktop viewport and outside #240's stated subject.
+ *
+ * **The narrowest margin in this list, named because it is the one that could move under another
+ * Chromium**: `everyday-stage-speed ×7` at 360×800 against `×6` at 375×667. The seventh is the `1×`
+ * chip, which overruns by **9 px** at 360 and fits at 375 — every other finding here overruns by
+ * between 33 and 321 px. A build whose text metrics differ by more than 9 px across a chip row would
+ * flip that one entry to `×6`, and the failure would read as a layout change rather than as a font.
+ * If this file goes red on exactly that line and on nothing else, measure before believing it.
  */
 const OUTSTANDING: readonly string[] = Object.freeze([
   '360×800 · main menu · clause 1 · content clipped horizontally',
