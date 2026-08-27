@@ -35,17 +35,26 @@
  * {@link engineerEndMs} is that arithmetic written once, and every wait below is a multiple of it —
  * a case that waited a flat number of seconds would go quiet the day the opening hour moves.
  *
- * **The last two cases are the negative controls, and the file is worth nothing without them.**
- * Four cases that assert *the day did not file* all pass on a build where nothing can ever file.
- * So the fifth lets a day run out **after** the player has crossed into the Engineer world, and the
- * sixth drives that surface's own Run button; both require the day **to** file, on the same page
- * and through the same instrument. Between them they pin the boundary as an *edge* — the instant
- * the day ran out is the instant that decides which product owns it — rather than as a rule reading
- * *an Everyday day never files by itself*, which is the wrong fix that all four absence cases would
- * have been equally happy with.
+ * **The last three cases are the negative controls, and the file is worth nothing without them.**
+ * Five cases that assert *the day did not file* all pass on a build where nothing can ever file.
+ * So one lets a day run out **after** the player has crossed into the Engineer world, one presses
+ * the keyboard shortcut on the surface that shortcut belongs to, and one drives that surface's own
+ * Run button; all three require the day **to** file, on the same page and through the same
+ * instrument. Between them they pin the boundary as an *edge* — the instant the day ran out is the
+ * instant that decides which product owns it — rather than as a rule reading *an Everyday day never
+ * files by itself*, which is the wrong fix that every absence case would have been equally happy
+ * with.
  *
- * All four absence cases fail on `55f2bca` and both controls pass there, which is the instrument
+ * Every absence case fails on `55f2bca` and every control passes there, which is the instrument
  * moving in both directions before its green was trusted.
+ *
+ * ## The third filing site, which issue #287 does not name
+ *
+ * Two of the cases below are about `dev/main.ts#tick`, which is what the issue reports. A third
+ * turned up while tracing what else was armed behind § D338's cover: `Ctrl`/`Cmd`+`Enter` is bound
+ * to `closeShift` on a **`window`** listener, and neither `inert` nor `visibility:hidden` takes an
+ * element out of the bubble path of a key pressed on `body`. It is the same defect by a different
+ * road and the same sentence forbids it.
  */
 
 import { fileURLToPath } from 'node:url';
@@ -223,6 +232,34 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
     }
   }, 300_000);
 
+  /**
+   * The **third** filing site, and the one that is not a transport at all.
+   *
+   * `dev/main.ts` binds `Ctrl`/`Cmd`+`Enter` to `closeShift` on a **`window`** listener. `inert` is
+   * what covers the Engineer surface, and `inert` does not stop a window-level key handler — so a
+   * shortcut belonging to a surface the Everyday player cannot see filed, scored and banked their
+   * day from § 7's stage. Not what issue #287 reported, found while tracing what else was armed
+   * behind the cover, and the same sentence forbids it: *`Close the day` is the **only** thing that
+   * sets `dayClosed`*.
+   *
+   * Driven as a real keystroke on the page rather than a synthesised event, and both modifiers,
+   * because the product accepts either and a case that pressed one would leave the other armed.
+   */
+  it('is not filed by the Engineer surface’s own keyboard shortcut', async () => {
+    const page = await coldLoad();
+    try {
+      await enterEverydayStage(page);
+      await page.keyboard.press('Control+Enter');
+      await page.keyboard.press('Meta+Enter');
+      await page.waitForTimeout(500);
+      const bar = await barSays(page);
+      expect(bar.note).not.toBe(FILED_NOTE);
+      expect(bar.inert).toBe(false);
+    } finally {
+      await page.close();
+    }
+  }, 300_000);
+
   it('stays unfiled across a round trip through § 3.2’s door', async () => {
     const page = await coldLoad();
     try {
@@ -293,6 +330,29 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
         (note) => document.querySelector('.everyday-bar-note')?.textContent === note,
         FILED_NOTE,
         { timeout: 120_000 },
+      );
+    } finally {
+      await page.close();
+    }
+  }, 300_000);
+
+  /**
+   * The third negative control: the shortcut is not broken, it is **scoped**.
+   *
+   * `LONG_RUN_S` is what makes this an isolation rather than a coincidence. The covered transport
+   * cannot reach the end of a fifteen-minute day in under fifteen real seconds, so a day that is
+   * filed within five of them was filed by the keystroke and by nothing else.
+   */
+  it('still closes the day from the keyboard on the surface the shortcut belongs to', async () => {
+    const page = await coldLoad(LONG_RUN_S);
+    try {
+      await enterEverydayStage(page);
+      await enterEngineerStage(page);
+      await page.keyboard.press('Control+Enter');
+      await page.waitForFunction(
+        (note) => document.querySelector('.everyday-bar-note')?.textContent === note,
+        FILED_NOTE,
+        { timeout: 5_000 },
       );
     } finally {
       await page.close();

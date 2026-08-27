@@ -4169,6 +4169,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawStage();
   }
 
+  /**
+   * Whether **this** surface is the one the player is looking at — GitHub issue **#287**.
+   *
+   * One expression for a question two sites ask, because the two are the same question and a second
+   * spelling of it is how they come to disagree. Both are ways to file a day that are *this*
+   * surface's and not the Everyday product's: {@link tick}'s end-of-day close, and the
+   * `Ctrl`/`Cmd`+`Enter` arm of the `window` key handler. § 6.4 gives the other product exactly one
+   * way to set `dayClosed` — its own *Close the day* — and neither of these is it.
+   *
+   * **`!== true` rather than `=== false`, and that is the load-bearing half.** `everydaySwap()`
+   * answers `undefined` on a build that loaded this module with no Everyday shell over it, and
+   * there the honest reading is that this surface has the page: there is no other world for the day
+   * to belong to. A predicate that read the absent port as *somebody else has it* would have turned
+   * one issue into an Engineer surface that can never file a day at all.
+   */
+  function engineerHasThePage(): boolean {
+    return everydaySwap()?.hasThePage() !== true;
+  }
+
   function tick(now: number): void {
     if (playback !== undefined && state.tab === 'run') {
       renderLive();
@@ -4200,7 +4219,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * is the honest reading: there is no other world for the day to belong to.
        */
       if (playback.state === 'ended' && filedRunId !== state.recording?.runId) {
-        if (everydaySwap()?.hasThePage() === true) endedUnderTheCover = state.recording?.runId;
+        if (!engineerHasThePage()) endedUnderTheCover = state.recording?.runId;
         else if (endedUnderTheCover !== state.recording?.runId) closeShift();
       }
     }
@@ -6308,7 +6327,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
           break;
         }
         case 'Enter':
-          if (event.metaKey || event.ctrlKey) closeShift();
+          /*
+           * **And only while this surface has the page** — GitHub issue **#287**'s class, found
+           * while tracing what else was armed behind § D338's cover, and not what that issue
+           * reported.
+           *
+           * This listener is on `window`. The Everyday shell covers the Engineer surface with
+           * `inert` and `visibility:hidden`, and **neither stops a window-level key handler** —
+           * `inert` takes an element out of hit-testing and the tab order, not out of the bubble
+           * path of a key pressed on `body`. So a shortcut belonging to a surface the Everyday
+           * player cannot see filed, scored and banked their day, from § 7's stage, on two
+           * keystrokes. Measured: `Ctrl`+`Enter` on a stage the player had not closed left the row
+           * reading *the day is filed*.
+           *
+           * The other arms of this handler are deliberately **not** guarded here, and the omission
+           * is a decision rather than an oversight: Space, the seek keys and the speed chips move
+           * the covered transport, which after {@link tick}'s fix files nothing and shows nobody
+           * anything. That is its own defect — an Engineer keyboard live under an Everyday screen —
+           * and it is a different one, with a different fix, and it does not score a day.
+           */
+          if ((event.metaKey || event.ctrlKey) && engineerHasThePage()) closeShift();
           break;
         case 'Escape':
           // SH-12 / KX-11: Escape dismisses the drawer, and only the drawer — in column mode the
