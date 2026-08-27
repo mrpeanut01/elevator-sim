@@ -3,7 +3,49 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Elevator Sim — shift mode</title>
+    <!-- The tab carries the **wordmark**, and no world. GitHub issue #294.
+
+         It read `Elevator Sim — shift mode` until 2026-08-27, and that was not a stray string:
+         `SHIFT MODE` is the Engineer header's own eyebrow one screen down (`.brand-mode`, below),
+         required by `docs/12-design-handoff.md` S3 and drawn from the handoff at `:24–50`. The title
+         was right when this file's only shell was the Engineer one. § D335 moved the front door to
+         Everyday Mode — one line of this file — and the title stayed pointed at the other world, so
+         the first thing a player read named a mode the four-tile menu never mentions.
+
+         ## The decision the issue asks for: the title is FIXED, and it names neither world
+
+         § D338's door is live, so a player crosses between two shells inside one visit. Three
+         options, and the third is the one that survives all of them:
+
+         1. Keep it naming Engineer — wrong on load, which is the defect.
+         2. Name Everyday instead — correct on load and wrong from the moment the player presses
+            *Switch to Engineer*. Strictly the same defect with its polarity reversed.
+         3. Follow the player — correct at every instant on screen, and wrong everywhere the
+            browser keeps a title after the fact. Nothing in `packages/viz/src` writes
+            `document.title` today, so this is new machinery, and what it would write is not
+            confined to the tab: a browser stamps `document.title` onto the history entry and onto
+            any bookmark taken while it stands. A player who crosses the door and bookmarks would
+            file this URL under *engineer* — and the URL always opens Everyday Mode, because § 3.5
+            says the app opens on the main menu and § D338 refuses to remember the world. That is
+            the entry-screen override § D338 rejected, written into the browser's own store instead
+            of into `localStorage`.
+
+         So the tab says `Elevator Sim` and stops. It is not a compromise between the two worlds:
+         it is what **both** shells already call this product on their own chrome —
+         `everyday/rail.ts#railModel`'s `brand` and the `.brand-name` line below — each of which
+         carries its world on a *separate* eyebrow beside it, inside the world, where it is true by
+         construction. The tab strip is the one place the app is visible with no world under it at
+         all, which is why it gets the half that is true there.
+
+         It also cannot go stale. Every alternative names a world, and a name for a world is the
+         thing this repository's register is mostly about (`RISKS.md` R38, R42, § D227); § D335 is
+         proof the door moves. `everyday/pageTitle.test.ts` pins the title to `railModel().brand`
+         byte for byte, so the wordmark and the tab cannot drift, and refuses any mode the main
+         menu does not offer.
+
+         **A decision number is owed for this.** Numbers collide across lanes, so the argument is
+         here and the number is assigned at integration. -->
+    <title>Elevator Sim</title>
     <!-- An inline icon so /favicon.ico stops 404ing on every load — the only console error every
          session carried, training a reader to ignore the console (§ D198). Two shaft rects and a
          car, in guide § 19's tokens: the Casual rail's ink ground (#23201C), its raised-surface
