@@ -7,6 +7,9 @@
  * of thing `CLAUDE.md` opens on.
  */
 
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { actionBarFor } from './actionBar.js';
@@ -343,5 +346,221 @@ describe('what the screen refuses, and where the refusal sits', () => {
      */
     expect(line).toContain('brief');
     expect(line).not.toMatch(/not built/);
+  });
+});
+
+/**
+ * **Where each of these constants is drawn, checked against the import graph rather than believed.**
+ *
+ * This suite is GitHub issue #293's third acceptance criterion — *a case ties the claim to the
+ * renderer, so a register that moves again takes the sentence that describes it with it*. It exists
+ * because of what #293 found, which is worth stating precisely, because the shape recurs and the
+ * two earlier instances recorded in this file were both caught only after they had shipped.
+ *
+ * {@link RUSH_BESTS} prints two invented handles against held times — `delft_vt · wave 19 · 57 min`
+ * and one more — and is the only place this build prints another player's name against a figure.
+ * What licensed that was its own docstring: *"this build has measured none of them, which
+ * {@link RUSH_ABSENCES} says **on the same screen**"*. The register left this screen on the merge
+ * that closed issue #207. `rushScreen.ts` has not imported it since, and `modes.ts` carried the same
+ * claim in the same words.
+ *
+ * So the sentence that went stale was not a description of a control — it was the **licence**. An
+ * ordinary § D227 refusal tells a reader not to touch something that works; this one answered *why
+ * may unmeasured names be drawn at all*, and answered by pointing at a disclosure two clicks away in
+ * Settings. That is the failure this suite is pointed at.
+ *
+ * ## Why it checks module names rather than reading the prose
+ *
+ * The stale claims said *on the same screen* and *on the screen itself*. Deixis is exactly what
+ * cannot be checked: it means whatever page the reader last had in mind, so it stays grammatical
+ * after the thing it points at has moved, and it is silent about which module was supposed to draw
+ * it. A **module name** is checkable, which is why the docstrings above now carry one.
+ *
+ * Scanning the prose for the phrase was tried and rejected: {@link RUSH_ABSENCES}' own docstring
+ * says *"not on this screen"* and {@link RUSH_BESTS_FIXTURE_NOTE}'s says *"putting `RUSH_ABSENCES`
+ * back on this screen would re-litigate #207"*. Both are true, and both match any pattern loose
+ * enough to catch the defect. A test a truthful author trips over is a test that gets deleted.
+ *
+ * ## What this can catch, and what it cannot
+ *
+ * It **can** catch: a constant whose declared renderer stopped importing it (the #207 move, from
+ * either end); a new player-facing constant with no declared renderer at all; a docstring naming a
+ * module that no longer draws the thing it describes; and the standings being drawn on a surface
+ * that does not also draw their fixture marker.
+ *
+ * It **cannot** catch: a module that imports a constant and never renders it — an import is
+ * evidence, not proof, and the browser tier is what proves a string reaches a page; whether the
+ * *rest* of a docstring's sentence is true, only that it names the right module; or a claim written
+ * in a file outside `everyday/`. It also exempts the constants drawn in this module by its own
+ * functions, because a file naming itself is not a claim that can go stale — the cross-module claim
+ * is the one that expires silently, and it is the one #207 broke.
+ */
+describe('every rush constant names the module that draws it — § D227, GitHub issue #293', () => {
+  const HERE = fileURLToPath(new URL('.', import.meta.url));
+  const MODEL = readFileSync(`${HERE}rushScreenModel.ts`, 'utf8');
+
+  /**
+   * Which modules under `everyday/` import a given name from the rush model — parsed, not listed.
+   *
+   * `honesty/` is deliberately out of scope. Its adapter imports half of this file, and it is the
+   * *search* rather than a screen: counting it as a renderer would let a constant that reaches no
+   * player look drawn. That is the distinction `derive.test.ts` draws between a surface and the
+   * thing sweeping it, and it matters here for the same reason.
+   */
+  function importersOf(symbol: string): readonly string[] {
+    return readdirSync(HERE)
+      .filter(
+        (file) =>
+          file.endsWith('.ts') && !file.endsWith('.test.ts') && file !== 'rushScreenModel.ts',
+      )
+      .filter((file) => {
+        const block = /import\s*\{([^}]*)\}\s*from\s*'\.\/rushScreenModel\.js'/u.exec(
+          readFileSync(`${HERE}${file}`, 'utf8'),
+        );
+        /*
+         * The imported name, never the local alias: `RUSH_SCREEN_COPY as COPY` is an import of the
+         * former. Matching the alias would miss every renamed import, which is most of them.
+         */
+        return (block?.[1] ?? '')
+          .split(',')
+          .map((entry) => entry.trim().split(/\s+as\s+/u)[0]?.trim())
+          .includes(symbol);
+      })
+      .sort();
+  }
+
+  /**
+   * The **lead** of the doc comment above `export const NAME` — everything before its first `##`.
+   *
+   * The lead rather than the whole block, and the reason is a defect this case had on its first
+   * draft. It asked whether the docstring contained the module's name anywhere, and
+   * {@link RUSH_BESTS} satisfied that from a section recording the history of #293, which mentions
+   * `rushScreen.ts` only to say what it *does not* import. Restoring the exact stale wording the
+   * issue reported left the case green: the instrument was measuring a word, not a claim.
+   *
+   * A docstring's lead is where it says what the thing is and who draws it; the `##` sections below
+   * are argument and history, and a module named only down there is a mention rather than a claim.
+   * So the convention this enforces is *name the renderer in the summary*, which is both where a
+   * reader looks first and the one position an incidental reference cannot occupy.
+   */
+  function leadOf(symbol: string): string {
+    const at = MODEL.indexOf(`export const ${symbol}`);
+    if (at < 0) return '';
+    const opened = MODEL.lastIndexOf('/**', at);
+    const closed = MODEL.lastIndexOf('*/', at);
+    if (opened < 0 || closed < opened) return '';
+    const block = MODEL.slice(opened, closed);
+    const section = block.indexOf('\n * ## ');
+    return section < 0 ? block : block.slice(0, section);
+  }
+
+  /**
+   * Every exported constant of the rush model, and the module that puts it in front of a player.
+   *
+   * `null` is *not player-facing*: arithmetic that reaches a reader only through a sentence
+   * elsewhere in this file. It is spelled out per constant rather than inferred from the type,
+   * because a number that quietly grows a label is exactly the case worth failing on.
+   *
+   * `'rushScreenModel.ts'` means this file draws it through one of its own functions. Those rows
+   * are exempt from the docstring case below, for the reason the suite docstring gives.
+   */
+  const DRAWN_BY: Readonly<Record<string, string | null>> = Object.freeze({
+    RUSH_STREAM: null,
+    MORNING_RUSH_RATE: null,
+    RUSH_HOLD_LINE: null,
+    LAST_GENERATED_WAVE: null,
+    /* `rushBandViews` shapes these into the screen's five rows; the raw table is never imported. */
+    RUSH_BANDS: 'rushScreenModel.ts',
+    /* `rushBarModel` substitutes it into the § 3.3 bar the shell draws — GitHub issue #262. */
+    RUSH_PRIMARY_REFUSAL: 'rushScreenModel.ts',
+    RUSH_SCREEN_COPY: 'rushScreen.ts',
+    /*
+     * The register moved here on the merge that closed #207. This row is what makes that fact
+     * checkable rather than remembered, and it is the row #293 would have failed on.
+     */
+    RUSH_ABSENCES: 'buildNotes.ts',
+    RUSH_BESTS: 'rushScreen.ts',
+    RUSH_BESTS_FIXTURE_NOTE: 'rushScreen.ts',
+  });
+
+  it('declares a renderer for every exported constant, so a new one cannot arrive unclaimed', () => {
+    /*
+     * Derived from the file, never typed twice. A constant added without a row here fails on the
+     * commit that adds it — the half of § D370's register discipline that applies to a mapping
+     * rather than to a queue.
+     */
+    const exported = [...MODEL.matchAll(/^export const (\w+)/gmu)].map((match) => match[1]);
+    expect(exported.length).toBeGreaterThan(0);
+    expect([...exported].sort()).toEqual(Object.keys(DRAWN_BY).sort());
+  });
+
+  it('keeps no row naming a module that has stopped importing the constant — the #207 move', () => {
+    const wrong: string[] = [];
+    for (const [symbol, drawnBy] of Object.entries(DRAWN_BY)) {
+      const importers = importersOf(symbol);
+      if (drawnBy === null || drawnBy === 'rushScreenModel.ts') {
+        if (importers.length > 0) {
+          wrong.push(
+            `${symbol} is declared undrawn or in-file, but ${importers.join(', ')} imports it`,
+          );
+        }
+      } else if (!importers.includes(drawnBy)) {
+        wrong.push(
+          `${symbol} is declared drawn by ${drawnBy}, which does not import it ` +
+            `(importers: ${importers.join(', ') || 'none'})`,
+        );
+      }
+    }
+    expect(
+      wrong,
+      'a constant and the module said to draw it have parted company. § D227: the sentence that ' +
+        'describes a register must move with the register — GitHub issue #293 is what happens ' +
+        'when it does not, and there the claim was the licence for printing unmeasured names.',
+    ).toEqual([]);
+  });
+
+  it('makes every cross-module claim name its module, so the sentence cannot stay behind', () => {
+    const silent: string[] = [];
+    for (const [symbol, drawnBy] of Object.entries(DRAWN_BY)) {
+      if (drawnBy === null || drawnBy === 'rushScreenModel.ts') continue;
+      if (!leadOf(symbol).includes(drawnBy)) silent.push(`${symbol} → ${drawnBy}`);
+    }
+    /*
+     * This is the case that fails on the base commit of #293. `RUSH_BESTS` is drawn by
+     * `rushScreen.ts` and its docstring named no module at all — it said *on the same screen*, and
+     * pointed at a register that had left. A docstring that names its renderer is one a reader can
+     * check in a second, and one a mechanical check can hold.
+     */
+    expect(
+      silent,
+      'these docstrings describe where a constant is drawn without naming the module that draws ' +
+        'it. Deixis — *this screen*, *the same screen* — survives the thing it points at moving, ' +
+        'which is exactly how GitHub issue #293 shipped.',
+    ).toEqual([]);
+  });
+
+  it('draws the standings’ fixture marker wherever it draws the standings, and nowhere else', () => {
+    /*
+     * **The § 20.11 relation, and the one case here that is not about a docstring.** § 20.11 lists
+     * `RUSH_BESTS` among the authored fixtures and gives each one a real source or *"an explicit
+     * `FIXTURE` marker so nobody ships them as truth"*. The engine that would be the real source is
+     * GitHub issue #220's and is not built, so the marker is the whole of the compliance — and a
+     * marker on a different surface from the fixture is not one.
+     *
+     * Asserted as set equality rather than as *the note is drawn somewhere*, which is the direction
+     * that matters: a second screen that grew a standings list without the marker would satisfy the
+     * weaker form and be precisely the defect back again. Neither side may be empty, or two absent
+     * things would compare equal and the case would pass over a build that draws no standings at
+     * all.
+     */
+    const rows = importersOf('RUSH_BESTS');
+    const marker = importersOf('RUSH_BESTS_FIXTURE_NOTE');
+    expect(rows.length).toBeGreaterThan(0);
+    expect(
+      marker,
+      'the five standings carry two invented handles against held times, and § 20.11 lets a ' +
+        'fixture ship only with a real source or a marker beside it. These two must be drawn by ' +
+        'the same modules — moving one without the other is GitHub issue #293 exactly.',
+    ).toEqual(rows);
   });
 });

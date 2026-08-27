@@ -183,7 +183,9 @@ export const RUSH_HOLD_LINE = Object.freeze({
 /**
  * Every authored sentence this screen puts in front of a player, from
  * `docs/design/elevator-sim-casual.dc.html`'s `isRush` block. The handoff wins every disagreement
- * about what the screen says.
+ * about what the screen says. `rushScreen.ts` draws this table — named rather than left to *this
+ * screen*, because deixis is what went stale on {@link RUSH_BESTS} and a module name is a thing a
+ * test can check.
  *
  * Two lines are **not** the prototype's and say so. `holdLine` is the prototype's own wording
  * already corrected to § 20.5 (its screen copy states the two-minute rule that its code did not
@@ -499,7 +501,8 @@ export interface RushBestView {
  * § 9.1's five standings — *five entries including two reference runs, labelled as reference runs*.
  *
  * The values are the handoff's own fixtures (`RUSH_BESTS` in the prototype) and this build has
- * measured none of them, which {@link RUSH_BESTS_FIXTURE_NOTE} says beside them on this screen.
+ * measured none of them, which {@link RUSH_BESTS_FIXTURE_NOTE} says beside them: `rushScreen.ts`
+ * draws the marker and then these rows, in that order, and draws both or neither.
  * They are drawn rather than withheld because the guide's five rows are what the screen *is* — a
  * list with two labelled reference runs — and a column of five dashes would say nothing about the
  * shape it is teaching. The one thing not carried over is the prototype's `you: true` row: this
@@ -546,6 +549,11 @@ export const RUSH_BESTS: readonly RushBestView[] = Object.freeze([
 
 /**
  * What the standings are, drawn **beside the rows it is about** — GAMEPLAY § 20.11's own remedy.
+ *
+ * `rushScreen.ts` draws it, immediately above the five rows of {@link RUSH_BESTS}, and nowhere
+ * else. The module is named here in the lead rather than left as *this screen*, because deixis is
+ * what went stale on {@link RUSH_BESTS} and a module name is a thing `rushScreenModel.test.ts` can
+ * hold against the import graph.
  *
  * ## Why this exists at all
  *
