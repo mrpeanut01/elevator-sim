@@ -626,7 +626,7 @@ that are not about this repository — a missing browser, a busy port."*
 
 **Three separate things are true here and they should not be merged:**
 
-- **The other 25 files already solved this**, each taking an explicit port with `strictPort: false`
+- **Every other file in the tier already solved this**, each taking an explicit port with `strictPort: false`
   — `liveMetrics` 5205, `closedFormPlate` 5206, and so on, several with a comment calling it *"the
   tier's convention"*. `boot.browser.test.ts` is the **last file on the old convention** and nobody
   noticed, because the tier skips without `ELEVATOR_SIM_CHROMIUM` and 5173 is usually free.

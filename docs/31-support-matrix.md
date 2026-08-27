@@ -368,12 +368,14 @@ leg**, of which the browser tier is **~157 s** (`ci.yml`).
 ### The arithmetic, and the one number that matters
 
 The browser tier is **~157 s out of ~2 000–3 400 s**. That is roughly **5–8 %** of a leg. So the
-cost of a second browser engine is *not* a second CI leg — it is a second pass over 25 files, on the
-same leg, at roughly the tier's own cost.
+cost of a second browser engine is *not* a second CI leg — it is a second pass over the tier, on the
+same leg, at roughly the tier's own cost. **The ~157 s was measured over the 25 `*.browser.test.ts`
+files the tier held then; it holds 29 now** and the timing has not been re-measured, so read the
+percentage as the shape of the answer rather than as a current figure.
 
 | What to add | What it buys | What it costs | Verdict |
 |---|---|---|---|
-| **Firefox** on the existing Linux leg | Tier 3's largest claim becomes a fact. Gecko is where the canvas and `@container` assertions are most likely to differ | ~157 s per leg if all 25 files run, plus one more Playwright browser download (size unmeasured — `playwright-core install firefox` reports it), and a real risk of an initial burst of engine-specific failures that are the product's, not the tier's | **Recommended, and the highest-value single addition.** Run it on the **Linux leg only** — the engine is the variable, not the host OS |
+| **Firefox** on the existing Linux leg | Tier 3's largest claim becomes a fact. Gecko is where the canvas and `@container` assertions are most likely to differ | ~157 s per leg when the tier held 25 files and it holds 29 now, so somewhat more, plus one more Playwright browser download (size unmeasured — `playwright-core install firefox` reports it), and a real risk of an initial burst of engine-specific failures that are the product's, not the tier's | **Recommended, and the highest-value single addition.** Run it on the **Linux leg only** — the engine is the variable, not the host OS |
 | **WebKit** on the existing macOS leg | Safari — and, more to the point, **every browser on iOS**, all of which are WebKit whatever their name | ~157 s on the leg that already takes 56 min; a Playwright WebKit download | **Recommended second.** On macOS, because Playwright's Linux WebKit is a build that is not Safari, and testing a not-Safari to claim Safari support is the shape of defect this repository records |
 | **A Windows leg** (`windows-latest`) | The largest desktop user base by share, on an engine tier 1 already covers | A **whole third leg** — ~33–56 min of runner time per PR, plus the pin-portability question `ci.yml`'s header opens: a third platform is *a third pin environment whose pin set nobody has measured*, and § D201 found 26 pins **exactly inverted** between two platforms | **Refused for now, and the reason is not the minutes.** It would fork the pinned-digest question three ways. If Windows support ever needs to be a tier-1 claim, it should be a **browser-tier-only** leg that runs no statistical pins |
 | **A touch/mobile emulation pass** | § 2's `best effort` becomes measurable | Small: Playwright's `hasTouch`/`isMobile` on the **already-installed** Chromium. A handful of files at a phone viewport | **Recommended, and cheapest of all.** It is #240's gate |
