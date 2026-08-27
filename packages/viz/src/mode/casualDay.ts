@@ -359,7 +359,15 @@ export const CASUAL_LEVERS_HEADING = 'What would make tomorrow better';
  * it named.
  *
  * **Both terms are still translated, which is what #100 asked for**; what is dropped is the claim
- * about which of them applies here. A reader on a peak-5min sheet still meets the jargon explained,
+ * about which of them applies here. The opener still promises *two* phrases and now quotes three
+ * strings, so it says outright that the first comes in two forms — a sentence that miscounted its
+ * own page would be this issue's defect in miniature, on the fix for it. That opener is load-bearing
+ * beyond this constant: `everyday/reportView.ts` forbids re-ordering the layered block **because**
+ * it says *below*, so the words *below* and *two* both have to stay true.
+ *
+ * It costs **ten words** on the longest player-facing block in the product (84 → 94, measured), which
+ * is GitHub issue #211's subject, so the count is stated rather than left to be discovered. They land
+ * in `honestyPartsOf`'s folded `front` part rather than in the paragraph that opens without a press. A reader on a peak-5min sheet still meets the jargon explained,
  * because the explanation is now vocabulary rather than an assertion about this run — and the run's
  * own answer is one sentence away, derived by `smallPrintFor` from `summary.reportWindow`, where it
  * belongs. It stays a **static constant** rather than becoming a function of the summary: it is a
@@ -367,13 +375,12 @@ export const CASUAL_LEVERS_HEADING = 'What would make tomorrow better';
  * derivation is a third thing to keep in step.
  */
 export const CASUAL_SMALL_PRINT_LEAD =
-  'Two phrases below are worth having before you read them. One of them names the window every ' +
-  'average on this sheet was read over, and which window that is changes with the building: ' +
-  '“the full-run window” is the whole shift, “the peak-5min window” is the busiest five minutes ' +
-  'of it. Either way, a wait quoted here comes from inside the window named below and from no ' +
-  'other stretch of the day. “A confidence interval that excludes zero” is the bar for saying one ' +
-  'setting beat another — one day cannot clear it, and fifty or more paired runs can, which is ' +
-  'what Compare is for.';
+  'Two phrases below are worth having before you read them. One names the window every average ' +
+  'here was read over, and it comes in two forms: “the full-run window” is the whole shift, ' +
+  '“the peak-5min window” is the busiest five minutes of it. Either way, a wait quoted on this ' +
+  'sheet is a wait from inside the window named below. “A confidence interval that excludes ' +
+  'zero” is the bar for saying one setting beat another — one day cannot clear it, and fifty or ' +
+  'more paired runs can, which is what Compare is for.';
 
 /**
  * What Casual says about **reach** — § D299 § 2, on the sheet rather than in a decision record.
