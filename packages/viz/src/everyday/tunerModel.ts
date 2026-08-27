@@ -56,6 +56,12 @@
  * contract and re-measured on the wrong window. {@link tunePresses} is the guard, and it reads
  * {@link movedKeys} — the same predicate the strip, the stamp and § 3.3's note read — so the
  * sentence and the mechanism cannot disagree.
+ *
+ * **That guard needed a second fix to be worth anything, and it is the more interesting one.**
+ * `movedKeys` was already non-empty on two shipped buildings *before the player touched anything*,
+ * because the machine card's ladder could not express what they are specified at and
+ * `tunerScreen.ts` snapped the document onto it on mount. See {@link tuneMachineSteps}: a predicate
+ * that believes a control moved is a guard that presses as though one had.
  */
 
 import { personsOf, type BuildingSpec } from '../authoring/buildingSpec.js';
@@ -336,17 +342,72 @@ export interface TuneMachineSteps {
 
 /**
  * The ladders, from the design's own class — `designerModel.ts`'s, so the two screens offer one
- * answer about what a machine comes in.
+ * answer about what a machine comes in — **plus whatever the standing building actually has.**
  *
  * A class this build does not have leaves both ladders holding only what is currently set, which is
  * a stepper that cannot move rather than one that offers a step the loader would refuse.
+ *
+ * ## Why the standing value joins the ladder, which is a defect fix rather than a nicety
+ *
+ * `speedStepsFor` filters § 10.1's **catalogue** to the class's band, and a shipped building is
+ * under no obligation to have been specified at a catalogue speed. Two of the eight are not:
+ * `garden-apartments` runs at **0.63 m/s** where its hydraulic class offers `0.50` and `0.75`, and
+ * `crown-hotel` at **3.0** where gearless offers `2.5, 3.5, 4, 5, 7`. Both values are inside their
+ * class's band — `parseBuilding` loads them, which is how they ship — they are simply not chips.
+ *
+ * Without them the ladder cannot express what is standing, and `tunerScreen.ts`'s `redraw` then
+ * snapped the *document* down to the nearest chip **on mount, before the player touched anything**:
+ * Garden Apartments opened 21 % slower than the building it claimed to be, `movedKeys` reported
+ * `['speed']` on an untouched screen, and the strip said *Sandbox — nothing counts* over an edit
+ * nobody had made. It also defeated issue #289's guard on the one building that issue is about,
+ * because a tuner that believes a control moved presses as though one had.
+ *
+ * The comment that governed that snap said it was *"only reachable through a class change, which
+ * this screen does not offer today"*. That was a stated mechanism that had gone stale — it is
+ * reachable on two shipped buildings with no class change at all, which is measured in
+ * `tunerModel.test.ts` over every building in `data/buildings/` rather than asserted here.
+ *
+ * **The snap is kept, and it still guards what it was written to guard.** A class change narrows
+ * the band, the standing value then falls outside it, this function does not offer it, and
+ * {@link snapToStep} moves the design onto a step the loader will accept. What changes is only that
+ * a value the loader *already accepts* is no longer treated as one it would refuse.
+ *
+ * @param standing the seven as {@link tuneStateFrom} read them off the building — the values that
+ *   have to be expressible, as opposed to `tune`, which is where the controls are now. Adding
+ *   `tune`'s own values instead would make the ladder contain every value it is ever asked about
+ *   and the snap could never fire, which is the class-change guard deleted by accident.
  */
 export function tuneMachineSteps(
   machineClass: MachineClass | undefined,
   tune: TuneState,
+  standing: TuneState = tune,
 ): TuneMachineSteps {
   if (machineClass === undefined) return { speeds: [tune.speed], loads: [tune.cap] };
-  return { speeds: speedStepsFor(machineClass), loads: loadStepsFor(machineClass) };
+  return {
+    speeds: withStanding(
+      speedStepsFor(machineClass),
+      standing.speed,
+      machineClass.speedMinMps,
+      machineClass.speedMaxMps,
+    ),
+    loads: withStanding(
+      loadStepsFor(machineClass),
+      standing.cap,
+      machineClass.loadMinLb,
+      machineClass.loadMaxLb,
+    ),
+  };
+}
+
+/** A ladder with `value` in it, if the class admits it and it is not a step already. Sorted. */
+function withStanding(
+  steps: readonly number[],
+  value: number,
+  min: number,
+  max: number,
+): readonly number[] {
+  if (value < min || value > max || steps.includes(value)) return steps;
+  return [...steps, value].sort((a, b) => a - b);
 }
 
 /** Snap a value onto a ladder — used when a class change narrows one under a set value. */

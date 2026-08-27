@@ -268,13 +268,23 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
     const drawn = buildingWithTune(standingBuilding, tune);
     const machineClass = classOfSpec(classes, drawn);
-    const steps = tuneMachineSteps(machineClass, tune);
+    const steps = tuneMachineSteps(machineClass, tune, standing);
     /*
      * A design whose class does not carry the set speed or load is snapped back onto the ladder
      * **before** the chips are drawn, not after — a card drawn from one value and lit from another
      * is a control whose selected state is a lie. Only ever downward, `snapToStep`'s own rule, and
-     * only reachable through a class change, which this screen does not offer today: it is here
-     * because `applyBuildingSpec` would otherwise hand `parseBuilding` a car outside its band.
+     * it is here because `applyBuildingSpec` would otherwise hand `parseBuilding` a car outside its
+     * band.
+     *
+     * **This used to say it was only reachable through a class change, and that was false.** The
+     * ladder is the *catalogue* filtered to the class, and two shipped buildings are specified off
+     * the catalogue — Garden Apartments at 0.63 m/s, Crown Hotel at 3.0 — so both were snapped
+     * **on mount, before the player touched anything**: Garden opened 21 % slower than the building
+     * it named, `movedNow` read `['speed']` on an untouched screen, and the strip announced a
+     * sandbox over an edit nobody had made. `tuneMachineSteps` now takes `standing` and offers what
+     * the building actually has whenever its class admits it, so the snap fires on the case it was
+     * written for and on no other. `tunerModel.test.ts` drives every building in `data/buildings/`
+     * through this exact sequence.
      */
     const snappedSpeed = snapToStep(steps.speeds, tune.speed);
     const snappedCap = snapToStep(steps.loads, tune.cap);

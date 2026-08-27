@@ -11,10 +11,10 @@
  * third is § 3.3's two-state note and the sandbox strip.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { parseElevatorSpecs, type ElevatorSpecs } from '@elevator-sim/core/browser';
+import { parseBuilding, parseElevatorSpecs, type ElevatorSpecs } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -269,6 +269,135 @@ describe('a sandbox run is never posted, and the screen says so', () => {
  * entirely in what that path does to the building's *id*: the document was byte-identical either
  * way, and a test that compared documents would have passed on the broken tree.
  */
+/**
+ * **Opening the tuner changes nothing** — the defect found while closing issue #289.
+ *
+ * `tunerScreen.ts`'s `redraw` snaps the design onto its class's ladder before drawing the chips, and
+ * the comment governing that snap said it was *"only reachable through a class change, which this
+ * screen does not offer today"*. It was not. `speedStepsFor` filters § 10.1's **catalogue** to the
+ * class's band, and a shipped building need not have been specified at a catalogue speed: two are
+ * not, so the snap fired **on mount, before any control was touched**.
+ *
+ * Measured on the tree at `55f2bca`, over all eight buildings in `data/buildings/`:
+ *
+ * | building | authored | class ladder | snapped to | `movedKeys` on mount |
+ * |---|---|---|---|---|
+ * | `garden-apartments` | **0.63 m/s** | `0.50, 0.75` | `0.50` | `['speed']` |
+ * | `crown-hotel` | **3.0 m/s** | `2.5, 3.5, 4, 5, 7` | `2.5` | `['speed']` |
+ * | the other six | on the catalogue | — | unmoved | `[]` |
+ *
+ * Three consequences, in the order they matter. Garden Apartments opened **21 % slower** than the
+ * building it named, so *Run it and watch* on an untouched tuner ran a tower nobody had asked for.
+ * The strip then announced *Sandbox — nothing counts* and the stamp *This run will be stamped
+ * "sandbox"* over an edit nobody had made — which is why a playtest that touched nothing could
+ * still read all four of issue #290's sandbox strings. And it defeated issue #289's guard on the
+ * one building that issue is about, because a tuner that believes a control moved presses as though
+ * one had.
+ *
+ * The buildings are read from **disk** rather than listed, on `deadCode.test.ts`'s ground: a
+ * building added tomorrow at a non-catalogue speed is caught the day it lands.
+ */
+describe('opening the tuner changes nothing — the mount, over every shipped building', () => {
+  const BUILDING_FILES = readdirSync(join(DATA_DIR, 'buildings'))
+    .filter((name) => name.endsWith('.json'))
+    .sort((a, b) => a.localeCompare(b));
+
+  /**
+   * `redraw`'s opening sequence, line for line, as it runs on the first frame after mount.
+   *
+   * Reproduced here rather than driven through the DOM because `tunerScreen.ts` needs a document
+   * and this package's pure/DOM split exists so that the decisions do not. The sequence is four
+   * calls and they are the same four, in the same order — a divergence between this and the screen
+   * is the thing the `writes` claims and the browser tier's `.everyday-tuner-step` chips catch.
+   */
+  function afterMount(file: string): {
+    readonly spec: BuildingSpec;
+    readonly standing: TuneState;
+    readonly snapped: TuneState;
+    readonly speeds: readonly number[];
+    readonly loads: readonly number[];
+  } {
+    const config = parseBuilding(
+      JSON.parse(readFileSync(join(DATA_DIR, 'buildings', file), 'utf8')) as unknown,
+    );
+    const spec = specFromBuilding(config, config.id);
+    const standing = tuneStateFrom(spec, DEFAULT_PATTERN, undefined);
+    const machineClass = classOfSpec(CLASSES, buildingWithTune(spec, standing));
+    const steps = tuneMachineSteps(machineClass, standing, standing);
+    return {
+      spec,
+      standing,
+      snapped: {
+        ...standing,
+        speed: snapToStep(steps.speeds, standing.speed),
+        cap: snapToStep(steps.loads, standing.cap),
+      },
+      speeds: steps.speeds,
+      loads: steps.loads,
+    };
+  }
+
+  it('leaves the seven exactly as it read them, on every shipped building', () => {
+    expect(BUILDING_FILES.length).toBeGreaterThan(1);
+    for (const file of BUILDING_FILES) {
+      const at = afterMount(file);
+      expect(movedKeys(at.standing, at.snapped), file).toEqual([]);
+    }
+  });
+
+  it('leaves the building document byte-identical, which is the half that reaches the run', () => {
+    /*
+     * The seven are the screen's vocabulary; this is the document the simulator reads. Asserted
+     * separately because a snap that moved `speed` moved every car's `ratedSpeedMps`, and *the run
+     * is unchanged* is the claim *Scored day — three things are fixed* actually makes.
+     */
+    for (const file of BUILDING_FILES) {
+      const at = afterMount(file);
+      expect(buildingWithTune(at.spec, at.snapped), file).toStrictEqual(at.spec);
+    }
+  });
+
+  it('offers the standing value as a step, so the lit chip is the true one', () => {
+    /*
+     * The mechanism behind the two cases above, asserted directly so a fix that instead deleted the
+     * snap would not pass here: the ladder has to be able to *express* what is standing, or the
+     * card is drawn from one value and lit from another.
+     */
+    for (const file of BUILDING_FILES) {
+      const at = afterMount(file);
+      expect(at.speeds, file).toContain(at.standing.speed);
+      expect(at.loads, file).toContain(at.standing.cap);
+    }
+  });
+
+  it('still snaps a value the class does not admit — the guard it was written for', () => {
+    /*
+     * The other direction, and the reason the snap is kept. A class change narrows the band, the
+     * standing value falls outside it, and `tuneMachineSteps` must **not** offer it — otherwise
+     * `applyBuildingSpec` hands `parseBuilding` a car outside its band, which is what the snap
+     * exists to prevent. Driven on a class whose band excludes a speed the ladder would otherwise
+     * carry over.
+     */
+    const fast = CLASSES.find((entry) => entry.speedMaxMps < 2);
+    expect(fast, 'a class with a low ceiling to snap onto').toBeDefined();
+    const standing: TuneState = { ...STANDING, speed: 9.5, cap: 99_000 };
+    const steps = tuneMachineSteps(fast, standing, standing);
+    expect(steps.speeds).not.toContain(9.5);
+    expect(steps.loads).not.toContain(99_000);
+    expect(snapToStep(steps.speeds, standing.speed)).toBeLessThan(9.5);
+  });
+
+  it('says *Scored day* on the screen it opens, because nothing has moved', () => {
+    for (const file of BUILDING_FILES) {
+      const at = afterMount(file);
+      const moved = movedKeys(at.standing, at.snapped);
+      expect(tuneSandboxStrip(moved).state, file).toMatch(/Scored day/);
+      expect(tunePresses(at.spec, DEFAULT_PATTERN, at.standing, at.snapped).building, file)
+        .toBeUndefined();
+    }
+  });
+});
+
 describe('an untouched tuner runs the standing day — GitHub issue #289', () => {
   /**
    * The press, exactly as `everyday/host.ts#applyBuildingSpec` makes it.
