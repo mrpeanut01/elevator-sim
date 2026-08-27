@@ -119,6 +119,7 @@ import { railModel, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
   RUSH_BESTS,
+  RUSH_BESTS_FIXTURE_NOTE,
   RUSH_PRIMARY_REFUSAL,
   RUSH_SCREEN_COPY,
   rushBandViews,
@@ -7555,6 +7556,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#rushBarModel',
     'everyday/rushScreenModel.ts#RUSH_BANDS',
     'everyday/rushScreenModel.ts#RUSH_BESTS',
+    /*
+     * The standings' fixture marker — GitHub issue #293. It belongs on this adapter rather than on
+     * {@link EVERYDAY_BUILD_NOTES} for the same rule that splits `#RUSH_PRIMARY_REFUSAL` from
+     * `#RUSH_ABSENCES` just above: a refusal drawn on the thing it is about is swept with that
+     * thing, and `rushScreen.ts` draws this one directly above the five rows it describes.
+     */
+    'everyday/rushScreenModel.ts#RUSH_BESTS_FIXTURE_NOTE',
     'everyday/rushScreenModel.ts#rushBandViews',
     'everyday/rushScreenModel.ts#rushFactViews',
     'everyday/rushScreenModel.ts#rushDrivingLine',
@@ -7633,10 +7641,23 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       });
       seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
     }
+    /*
+     * The marker before the rows, in the order the screen draws them — GitHub issue #293. It is a
+     * `reason`: it refuses the five rows below it, and R3's exemption is exactly for a refusal that
+     * has to name what it is refusing.
+     */
+    seeds.push({ field: 'rush.bests.fixtureNote', text: RUSH_BESTS_FIXTURE_NOTE, role: 'reason' });
     for (const best of RUSH_BESTS) {
       seeds.push({ field: `rush.best.${best.name}.name`, text: best.name, role: 'label' });
       seeds.push({ field: `rush.best.${best.name}.who`, text: best.who, role: 'label' });
       seeds.push({ field: `rush.best.${best.name}.wave`, text: best.wave, role: 'label' });
+      /*
+       * **`held` had never been in the corpus, and it is the figure the issue is about.** The row
+       * draws four cells and this adapter seeded three: `57 min` against a handle is precisely the
+       * *other player's figure* #293 opens on, and the search had never read one. Found while
+       * adding the marker above; a decision number is owed with that one.
+       */
+      seeds.push({ field: `rush.best.${best.name}.held`, text: best.held, role: 'label' });
     }
 
     /* ------------------------------------------------------- § 13 designer */
