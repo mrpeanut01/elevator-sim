@@ -11,7 +11,7 @@
  * § D227). So *Endless rush is not built* is checked against the tree rather than believed.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -284,6 +284,77 @@ describe('modes.ts’ prose is checked against the tree, not against a reader’
         counting,
       );
     }
+  });
+
+  /**
+   * Where the rush comment says its three sentences are drawn, checked against the import graph.
+   *
+   * **This case exists because the comment it checks was wrong, in the paragraph arguing against
+   * being wrong** — GitHub issue #293. The rush tile's comment says *"a refusal that describes a
+   * build two waves old is § D227's defect with a longer fuse"*, and then claimed what the rush
+   * lacks is named *on the screen itself (`rushScreenModel.ts#RUSH_ABSENCES`)*. The register left
+   * that screen on the merge that closed issue #207 and has been drawn on the Settings
+   * build-information panel since.
+   *
+   * That ordering is the whole lesson. A reader who arrives to check the claim has just been told
+   * by the same paragraph that such claims expire — which is the strongest possible reason to
+   * assume this one had been kept current, and the reason it survived two waves.
+   *
+   * ## What it checks, and why it is a table rather than a phrase
+   *
+   * The comment now names a module per sentence, and this pairs each of them with the constant it
+   * is named for and asks the import graph. Not the prose: the comment **quotes** the wording it
+   * replaced, so any pattern loose enough to catch *on the screen itself* would fire on the
+   * correction that records it. `rushScreenModel.test.ts` makes the same argument at more length
+   * over the same import graph, and this is the half that lives where `modes.ts`' own claim does —
+   * a claim is checked next to where it is written, or nobody finds the check.
+   *
+   * The `RUSH_ABSENCES` row is the regression itself: a lane that draws the register back onto the
+   * rush screen makes `rushScreen.ts` import it, and this fails until the sentence above is
+   * revisited. That is § D227 in the direction that bites after a lane lands.
+   */
+  const RUSH_CLAIMS: readonly { readonly symbol: string; readonly drawnBy: string }[] =
+    Object.freeze([
+      { symbol: 'RUSH_ABSENCES', drawnBy: 'buildNotes.ts' },
+      /* In-file: `rushBarModel` substitutes it into the § 3.3 bar the shell draws — issue #262. */
+      { symbol: 'RUSH_PRIMARY_REFUSAL', drawnBy: 'rushScreenModel.ts' },
+      { symbol: 'RUSH_BESTS_FIXTURE_NOTE', drawnBy: 'rushScreen.ts' },
+    ]);
+
+  it('names, for each rush sentence, a module that really draws it — § D227, issue #293', () => {
+    const wrong: string[] = [];
+    for (const { symbol, drawnBy } of RUSH_CLAIMS) {
+      expect(MODES_SOURCE, `the rush comment no longer names ${drawnBy}`).toContain(drawnBy);
+      /*
+       * Derived per claim rather than listed: the modules that import the constant from the rush
+       * model. An in-file renderer imports nothing, so its row asserts the empty set — which is
+       * also what makes a future move *onto* a screen fail here rather than pass silently.
+       */
+      const importers = readdirSync(SRC + 'everyday')
+        .filter(
+          (file) =>
+            file.endsWith('.ts') && !file.endsWith('.test.ts') && file !== 'rushScreenModel.ts',
+        )
+        .filter((file) => {
+          const block = /import\s*\{([^}]*)\}\s*from\s*'\.\/rushScreenModel\.js'/u.exec(
+            readFileSync(`${SRC}everyday/${file}`, 'utf8'),
+          );
+          return (block?.[1] ?? '')
+            .split(',')
+            .map((entry) => entry.trim().split(/\s+as\s+/u)[0]?.trim())
+            .includes(symbol);
+        });
+      const drawn = drawnBy === 'rushScreenModel.ts' ? [] : [drawnBy];
+      if (importers.sort().join() !== drawn.join()) {
+        wrong.push(`${symbol}: named ${drawnBy}, imported by ${importers.join(', ') || 'nothing'}`);
+      }
+    }
+    expect(
+      wrong,
+      'the rush tile’s comment names a module that does not draw the constant it is named for. ' +
+        'GitHub issue #293: the claim that licensed printing unmeasured names outlived the ' +
+        'disclosure it pointed at, in the comment that names that exact failure mode.',
+    ).toEqual([]);
   });
 
   it('confirms the refusals are unreachable, from both ends', () => {
