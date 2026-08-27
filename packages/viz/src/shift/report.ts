@@ -1322,9 +1322,9 @@ function stairsNote(observations: Observations, summary: VizSummary): string {
   const clauses = [
     stairsCohortClause(abandoned, abandonedCarried, horizon),
     /*
-     * **Which cohort this cell is over, said in the same idiom the cell four along uses** — GitHub
-     * issue #288's fourth criterion, and `worstWaitFigure`'s *"the peak-5min window's worst — the
-     * goal row reads the whole shift"* is the sentence this copies.
+     * **Which cohort this cell is over, in the idiom WORST WAIT already uses** — GitHub issue
+     * #288's fourth criterion, and `worstWaitFigure`'s *"the peak-5min window's worst — the goal
+     * row reads the whole shift"* is the sentence this copies, pointed the other way.
      *
      * The two figures are folded over different populations and both are right: this one counts
      * every leg the playhead has reached, and WORST WAIT counts the reporting window's arrivals.
@@ -1391,8 +1391,9 @@ function stairsCohortClause(
  * STAIRS 0` beside a hundred-person shortfall in CARRIED has the sentence that explains it.
  *
  * Empty when nobody was turned away, which is every run of a building declaring no `accessZones`
- * and every run of a zoned building whose riders are all correctly badged — so the shipped sheet is
- * byte-identical on those, and the clause appears exactly where there is something to say.
+ * and every run of a zoned building whose riders are all correctly badged — so no such sheet grows
+ * a clause about a population it does not have. (The **scope** clause above is on every sheet, and
+ * has to be: which cohort a count is over is not a fact only some runs have.)
  */
 function turnedAwayClause(observations: Observations): string {
   const { turnedAway } = observations;
