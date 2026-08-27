@@ -371,19 +371,32 @@ describe('a rider the door turned away is not somebody who stood all shift', () 
     expect(bands.counts.map((entry) => entry.count)).toEqual([0, 0, 0, 1]);
   });
 
-  it('says *at least* when the longest wait belongs to somebody who never got a car', () => {
+  it('qualifies a longest wait that belongs to somebody who never got a car', () => {
     /*
      * Issue #288's second mechanism, which the first does not fix: this rider was never refused and
-     * never boarded, so `t - arrivedAt` really is a lower bound on a wait that never finished. The
-     * project's rule — `shift/goals.ts` will not grade a censored maximum in either direction — now
-     * reaches the card that prints one.
+     * never boarded, so the record never saw their wait end. The project's rule —
+     * `shift/goals.ts` will not grade a censored maximum in either direction — now reaches the card
+     * that prints one.
      */
     const recording = syntheticRecording({ legs: [waitingLeg('p1', 0)], endedAt: 3000 });
     const bands = waitBandsAt(recording, 3000, 'whole-run');
     expect(bands.longestWaitIsCensored).toBe(true);
-    expect(moodOf(bands).sub).toContain('the longest at least 3000 s');
+    expect(moodOf(bands).sub).toContain('the longest 3000 s — unresolved');
     // And it is a qualification rather than a suppression: the figure is still there.
     expect(moodOf(bands).sub).toContain('1 riders stood past two minutes');
+  });
+
+  it('does not call the figure a lower bound, because this layer cannot prove it is one', () => {
+    /*
+     * The word `shift/report.ts#worstWaitFigure` uses is *at least*, and it may: `core` can see
+     * `abandonedAt`, so a leg it calls censored really was still waiting. `VizLeg` carries none, so
+     * an unresolved leg here may belong to a rider who ran out of patience and walked out long ago,
+     * for whom `t - arrivedAt` **overstates**. `at least` would be a claim this layer cannot make,
+     * which is exactly why `goals.ts` refuses rather than qualifies — so the clause says what is
+     * true under both readings and nothing more.
+     */
+    const recording = syntheticRecording({ legs: [waitingLeg('p1', 0)], endedAt: 3000 });
+    expect(moodOf(waitBandsAt(recording, 3000, 'whole-run')).sub).not.toContain('at least');
   });
 
   it('does not qualify a maximum that a rider actually served', () => {
@@ -391,7 +404,7 @@ describe('a rider the door turned away is not somebody who stood all shift', () 
     const bands = waitBandsAt(recording, 3000, 'whole-run');
     expect(bands.longestWaitIsCensored).toBe(false);
     expect(moodOf(bands).sub).toContain('the longest 200 s');
-    expect(moodOf(bands).sub).not.toContain('at least');
+    expect(moodOf(bands).sub).not.toContain('unresolved');
   });
 
   it('leaves the live card’s wait age unqualified, because that number is exact', () => {

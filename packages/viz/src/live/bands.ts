@@ -427,22 +427,39 @@ export function moodOf(bands: WaitBands): Mood {
   const fumingCount = bands.counts[WAIT_BANDS.length - 1]?.count ?? 0;
   const live = bands.basis === 'now';
   /*
-   * *at least*, when the longest wait belongs to somebody whose wait had not ended — GitHub issue
-   * #288's second mechanism, and the word `shift/report.ts#worstWaitFigure` already uses for the
-   * same fact about the same kind of figure.
+   * What the card says when the longest wait belongs to a leg whose wait never ended — GitHub
+   * issue #288's second mechanism.
    *
    * The project's rule about a censored maximum was written once and reached one consumer:
-   * `shift/goals.ts` refuses to grade one *in either direction*, because `VizLeg` carries no
-   * `abandonedAt` and a bound that might overstate can prove nothing. This card was printing the
-   * same bound as a fact three rows from a service-level row that qualifies its own. Qualifying is
-   * the weaker of the two answers that rule allows and it is the right one here: refusing would
-   * blank the only figure a retrospective card has, and a card cannot be quiet about the worst
-   * thing that happened.
+   * `shift/goals.ts` refuses to grade one *in either direction*. This card printed the same kind of
+   * figure as a fact, three rows from a service-level row that qualifies its own. Qualifying is the
+   * weaker of the two answers AC2 allows and it is the right one here — refusing would blank the
+   * only figure a retrospective card has, and a card cannot be quiet about the worst thing that
+   * happened.
+   *
+   * ## Why this is not the word `shift/report.ts#worstWaitFigure` uses
+   *
+   * That cell says **at least**, and it is right to: it reads `core`'s
+   * `serviceLevel.longestWaitIsCensored`, and `core` can see `abandonedAt`, so a leg it calls
+   * censored really was still waiting and the figure really is a lower bound.
+   *
+   * `VizLeg` carries no `abandonedAt`. An unresolved leg here is *either* a rider still standing
+   * *or* a rider who ran out of patience and left long ago — and for the second, `t - arrivedAt`
+   * **overstates** their wait by every second since they walked. So *at least* would be a claim
+   * this layer cannot make, which is precisely why `goals.ts` refuses rather than qualifies
+   * (`live/types.ts#LiveObservations.worstWaitIsCensored` owns that argument). No shipped building
+   * declares `sim.patience`, but `dev/parameterForm.ts` lets a player turn it on, so the wrong word
+   * would be wrong on a run this product can produce.
+   *
+   * What is true under both readings is that the record never saw the wait end, and that is what
+   * the clause says. It claims nothing about where the true number sits.
    *
    * Empty on the live basis by construction — see {@link WaitBands.longestWaitIsCensored} for why
    * a wait age on that basis is exact rather than bounded.
    */
-  const atLeast = bands.longestWaitIsCensored ? 'at least ' : '';
+  const unresolved = bands.longestWaitIsCensored
+    ? ' — unresolved, so this record cannot say when that wait ended'
+    : '';
 
   /*
    * The live sub-lines are the design's. The retrospective ones are written against the same four
@@ -463,10 +480,10 @@ export function moodOf(bands: WaitBands): Mood {
       ]
     : [
         'across the whole shift, nobody stood half a minute',
-        `across the whole shift · longest wait ${atLeast}${String(longest)} s`,
-        `across the whole shift · longest wait ${atLeast}${String(longest)} s`,
+        `across the whole shift · longest wait ${String(longest)} s${unresolved}`,
+        `across the whole shift · longest wait ${String(longest)} s${unresolved}`,
         `across the whole shift · ${String(fumingCount)} riders stood past two minutes, ` +
-          `the longest ${atLeast}${String(longest)} s`,
+          `the longest ${String(longest)} s${unresolved}`,
       ];
   const headlines = live ? MOOD_HEADLINES : RUN_OVER_HEADLINES;
   return {

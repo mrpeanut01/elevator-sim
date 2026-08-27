@@ -262,7 +262,7 @@ describe.each(BUILDING_IDS)('%s — no two figures on the sheet contradict each 
     const windowWorst = recording.summary.serviceLevel.longestWaitS;
     if (windowWorst === null) throw new Error(`${id}: the window held no arrivals`);
     const sub = moodAt(recording, recording.endedAt, 'whole-run').sub;
-    const printed = /longest (?:at least )?(\d+) s/.exec(sub);
+    const printed = /longest (?:wait )?(\d+) s/.exec(sub);
     if (printed === null) {
       // Only the calmest band prints no figure, and it may only do so under half a minute.
       expect(sub).toContain('nobody stood half a minute');

@@ -142,9 +142,16 @@ export interface WaitBands {
    *
    * `shift/goals.ts` will not grade a censored maximum at all, in either direction, and
    * `LiveObservations.worstWaitIsCensored` carries the same distinction for the fold the goals
-   * read. This is that distinction reaching the mood card, which had been printing the bound as a
+   * read. This is that distinction reaching the mood card, which had been printing the figure as a
    * fact — GitHub issue #288's second mechanism, and the one that is *not* fixed by getting the
    * ending rule right, because a rider still standing when the shift ended really has no wait yet.
+   *
+   * **It is not a lower bound and the copy may not call it one.** `VizLeg` carries no
+   * `abandonedAt`, so an unresolved leg is either somebody still standing or somebody who ran out
+   * of patience and left long ago — and for the second, `t - arrivedAt` *overstates*. That is the
+   * whole reason `goals.ts` refuses rather than qualifies. `moodOf` therefore says the record never
+   * saw the wait end, which is true under both readings, and leaves *at least* to
+   * `shift/report.ts#worstWaitFigure`, which reads `core`'s flag and may.
    *
    * ## It is only ever `true` on the retrospective basis, and that is a claim rather than a gap
    *
