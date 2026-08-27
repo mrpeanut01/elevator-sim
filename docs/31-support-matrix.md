@@ -50,8 +50,8 @@ legs, and a run in which it would silently skip is red rather than green
 
 | Platform | Browser | Evidence |
 |---|---|---|
-| Linux, x86-64 (`ubuntu-latest`) | **Chromium** headless shell, from `playwright-core` | 25 `*.browser.test.ts` files, driven through a real Vite dev server against the built `core` |
-| macOS (`macos-latest`, ARM64 today) | **Chromium** headless shell, from `playwright-core` | Same 25 files, same gate |
+| Linux, x86-64 (`ubuntu-latest`) | **Chromium** headless shell, from `playwright-core` | 29 `*.browser.test.ts` files, driven through a real Vite dev server against the built `core` |
+| macOS (`macos-latest`, ARM64 today) | **Chromium** headless shell, from `playwright-core` | The same 29 `*.browser.test.ts` files, same gate |
 
 Three things about this tier that a reader will otherwise assume wrongly:
 
@@ -473,7 +473,14 @@ Recorded because a specification that hides its own open items is the defect it 
    something with another cause. It is one docstring, one `UX.md` row, and a `grep` to settle it —
    and until somebody does, the 1280 px figure in this repository's prose should not be read as a
    support boundary.
-7. **Two counts in this document are read off the tree and will drift silently**: *25*
-   `*.browser.test.ts` files and the *eight* reference-data documents `vite.config.ts` emits. Neither
-   is asserted anywhere against this document, so both are exactly the kind of transcribed figure
-   § 6's standing rule exists for. Re-derive them, do not copy them forward.
+7. **One of the two counts in this document that were read off the tree drifted, exactly as this
+   item said it would.** It read ~~*25*~~ where the tree held **28** when GitHub issue #292 re-ran
+   the command, and `M2_MEASUREMENT.md` § 3 published **26** for the same set at the same moment, so
+   the two documents disagreed with each other as well as with the tree. It is
+   **29** now and it is **derived** — `packages/viz/src/everyday/viewportGates.browser.test.ts` reads
+   the count off disk and requires every published shape of it in both documents to match, which is
+   why the number moved again on the commit that closed it: that file is the twenty-ninth. The
+   *eight* reference-data documents `vite.config.ts` emits is still transcribed and still exactly the
+   kind of figure § 6's standing rule exists for. Re-derive it, do not copy it forward — and note
+   that this item naming the risk did not stop the risk, which is the argument for a check over a
+   sentence.

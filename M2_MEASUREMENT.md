@@ -158,16 +158,28 @@ De-facto floor today: **1280 px for asserted geometry, 420 px for anything drive
 than about this machine.** Measured:
 
 ```
-grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 26
-find packages -name "*.browser.test.ts" | wc -l                            # → 26
+grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 29
+find packages -name "*.browser.test.ts" | wc -l                            # → 29
 grep -rn "firefox\|webkit\|Firefox\|WebKit\|Gecko" packages --include="*.ts"  # → no output
 ```
 
-**26 of 26** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
+**29 of 29** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
 `webkit` and `Gecko` do not occur anywhere in `packages/**/*.ts`. The tier is **single-engine by
-construction**. A criterion measured on one engine is not a matrix, so the instrument had to be
-built outside the tier — and it had to be built outside because a measurement lane may not edit the
-tier.
+construction**.
+
+> **This figure read `26 of 26` until 2026-08-27, and it was wrong by two before anybody re-ran the
+> command.** `docs/31-support-matrix.md` § 1 published **25** for the same set on the same tree, so
+> the two documents did not even agree with each other — and § 7 item 7 of that document had already
+> named this exact number as one that *"will drift silently … Re-derive them, do not copy them
+> forward."* Naming a risk is not a check. It is derived now, from disk, in both of the shapes above
+> and in both documents, by `packages/viz/src/everyday/viewportGates.browser.test.ts`; **that file is
+> itself the twenty-ninth**, which is the whole lesson in one line — a hand-written `28` would have
+> been stale before it was pushed. GitHub issue #292.
+
+A criterion measured on one engine is not a matrix, so the instrument had to be built outside the
+tier — and it had to be built outside because a measurement lane may not edit the tier. **That second
+clause is a rule about a lane's remit and not a property of an instrument**, and § 3.5 below is where
+it stopped applying.
 
 ### 3.1 The instrument
 
@@ -311,8 +323,8 @@ The two bold rows are the ones this lane's matrix work turns on: **T1's test is 
 stands.** Two independent reasons, and only the second is about hardware:
 
 1. **The product's own tier is single-engine** (§ 3). Even a machine with all three browsers
-   installed could not make `npx vitest run --project viz-browser` cover a matrix, because 26 of 26
-   files name `chromium`. Until a browser-tier file takes its engine as a parameter, *"the slice runs
+   installed could not make `npx vitest run --project viz-browser` cover a matrix, because **29 of
+   29** browser-tier files name `chromium`. Until a browser-tier file takes its engine as a parameter, *"the slice runs
    on the target browser matrix"* is a claim no tier command can produce evidence for.
 2. **Tier 1 is two rows and both are Chromium.** #203 § 4's rule is explicit: *"Every tier-1 row must
    be a row a red run defends, and adding a tier-1 row means adding its gate in the same change."*
@@ -337,8 +349,8 @@ Not a wish list — each is small, and each converts a *claim* into something a 
    module and `browserTier.test.ts` already enforces that every tier file goes through it — so the
    engine belongs in the same place. That single change is what turns *"the slice runs on the target
    browser matrix"* from an unanswerable sentence into a command, and it is a **precondition for the
-   Firefox row #203 § 4 already recommends**: installing Gecko buys nothing while 26 of 26 files name
-   `chromium`.
+   Firefox row #203 § 4 already recommends**: installing Gecko buys nothing while **29 of 29**
+   browser-tier files name `chromium`.
 3. **One touch cell.** § 2's `best effort` becomes measurable with `hasTouch`/`isMobile` on the
    Chromium already installed, at one phone viewport, through one real journey. §&nbsp;4 of the matrix
    calls this *"Recommended, and cheapest of all"* and it is #240's gate.
