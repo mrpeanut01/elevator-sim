@@ -25575,3 +25575,68 @@ an adapter owes, not on how to prove it. That derivation is worth building and i
 and this wave publishes no counts.
 
 ---
+
+## D378 — a viewport gate measures the clause, not a proxy, and lands red rather than silent
+
+**Rules on:** GitHub issue #292. Settles the argument Lane F deliberately left unmarked, because
+`validation/documentation.test.ts`'s ratchet stood at its ceiling and a lane may not raise one.
+
+**Decision.** `M2_MEASUREMENT.md` § 3.2's *"zero horizontal overflow at every width down to 360 px"* is
+**corrected rather than deleted**: it was true of the **document scroll box** and is not evidence for
+[`docs/31-support-matrix.md`](docs/31-support-matrix.md) § 2's first clause. All three of § 2's clauses
+are now measured by `everyday/viewportGates.browser.test.ts`, which **ships red-by-register** rather
+than green.
+
+**Why the old number could not see the defect.** The Everyday shell root is `position:fixed` with
+`overflow:hidden`, and `.everyday-main` is `overflow:hidden` too, so clipped content never reaches the
+document scroll box. Measured on the menu at 360×800: the old metric reads **0** while
+`.everyday-main`'s own `scrollWidth − clientWidth` reads **93 px**; on the stage, **0** against
+**337 px**. Proven synthetically as well — an over-wide child injected into such a box leaves the
+document metric at **exactly 0**. The metric is null on this shell **by construction**, which is why no
+amount of re-running it would ever have found this.
+
+**Reachability is asked as *what could a gesture do*, and `scrollIntoView` does not answer it.**
+`overflow:hidden` is **script-scrollable and person-unscrollable**: a naive probe reports the bar
+primary reachable because the browser silently scrolls `.everyday-main` by 32 px, a scroll no
+scrollbar, wheel, touch drag or key can perform. The instrument lets the browser try, then **undoes
+every scroll a gesture could not have produced**, per axis, and only those.
+
+**Why it lands red-by-register instead of failing the suite.** The layout work is #240, open and
+unassigned. A case that simply failed would make CI red for everyone until #240 lands, which is a cost
+this lane may not impose. So the 21 findings sit in `OUTSTANDING`, asserted with `toEqual` **in both
+directions**, on `honesty.test.ts`'s precedent: a new failure is unregistered and goes red, and a
+failure that stops reproducing goes red as *delete this entry*. **A register of ghosts is a suppression
+list; a register nothing re-derives is decoration.** When #240 lands the file goes red once, naming
+every entry that stopped reproducing, and emptying it is part of landing #240.
+
+**The calibration is what makes the register believable.** Before the register runs, the same measuring
+function is pointed at a **manufactured** failing state — an injected over-wide child in an injected
+clipping box — and required to report the old metric as 0, the new one as the injected overrun, the
+injected button by name, and its in-viewport twin **not**. That calibration does not depend on the
+product's own defect, so it keeps proving the instrument after #240 has removed the thing it is
+currently catching.
+
+**What the issue got wrong, recorded because the shape matters.** #292 placed the stale browser-tier
+file count at `docs/31-support-matrix.md:158-162`. Those lines are § 2's commitment prose. The matrix's
+count lives at `:53`, `:54` and `:477` and read **25**, while `M2_MEASUREMENT.md` read **26**, against a
+tree of **28** — **two documents disagreeing with each other as well as with the tree**. That page's own
+§ 7 item 7 had already predicted exactly this drift and said *re-derive them, do not copy them
+forward*. It drifted anyway, which is the argument for deriving the count in a test rather than
+writing the warning again.
+
+**Two things found that #292 did not contain.**
+
+1. **Clause 2 fails at 1280×800**, a tier-1 desktop viewport. `everyday/stageScreen.ts:530` writes
+   `height:340px` as a literal, so the Everyday stage canvas is 340 px at every viewport height —
+   **42.5 %** against § 2's 60 % floor. That is inside a clause scoped *"360 px and above"* and
+   **outside #240's subject**, so it is nobody's work until filed.
+2. **The Everyday shell had never been measured against any of the three clauses.** `RX-03` and
+   `RX-04b` were fixed against the **Engineer** surface on 2026-07-30; `index.html` began loading
+   `everyday/boot.ts` on 2026-08-12 ([§ D335](#d335)). The gate and the shell it is quoted about have
+   never been the same shell.
+
+**What is not decided here.** The 360 px layout is #240 and stays #240. **This instrument going red is
+the correct end state of the fix, not a regression**, and both documents now say so where a reader
+meets the number.
+
+---
