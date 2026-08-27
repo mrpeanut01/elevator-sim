@@ -716,6 +716,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /** The run whose day has already been filed. See {@link tick}. */
   let filedRunId: string | undefined;
   /**
+   * The run whose day ran out **behind the Everyday cover** — GitHub issue **#287**.
+   *
+   * ## What it is, in one sentence
+   *
+   * A day that reached its end while the other product had the page was not this surface's day to
+   * close, and it does not become this surface's day to close later. This records which run that
+   * happened to, so a player who then walks through § 3.2's door does not have the day filed out
+   * from under them by the trip.
+   *
+   * ## Why the guard in {@link tick} is not enough on its own
+   *
+   * That guard is a *level* — `playback.state === 'ended'` is true on every frame from the end of
+   * the run onward — so gating it on *who has the page right now* would have moved the file rather
+   * than removed it: the first frame after `enterEngineer` would find an ended transport, an unfiled
+   * run and the Engineer surface in front, and bank the Everyday player's day on the way in. Turning
+   * the level into an **edge** is what makes the boundary hold: the instant the day ran out is the
+   * instant that decides, and that instant belongs to whichever world was in front of it.
+   *
+   * A third `let` beside {@link filedRunId} and {@link simulatedRecording}, on the rule those two
+   * already state: *has this run been filed?*, *did we run it?* and *did this run end somewhere we
+   * were not?* are three questions, and § D311 is what happens when two of them share a flag.
+   *
+   * **Deliberately not saved or restored by {@link enterWatch}/`leaveWatch`**, where `filedRunId` is.
+   * That pair exists so a filed day cannot be filed twice through the spectator's back door; this one
+   * needs no such care because it re-derives itself. {@link adopt} clears it, and if the transport is
+   * still sitting past the end under the cover the very next frame writes it again — so the worst a
+   * round trip can do is re-answer a question correctly.
+   *
+   * A decision number is owed; the argument is `everyday/swap.ts#EverydaySwapPort.hasThePage`'s.
+   */
+  let endedUnderTheCover: string | undefined;
+  /**
    * Why the run on screen was started — `docs/20` defect 17, and the one fact `closeShift` cannot
    * read off the recording.
    *
@@ -4148,9 +4180,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * The day closes when the day ends — the handoff's own behaviour (`closeDay` fires at
        * `tod >= DAY_END` and opens the sheet). Guarded on `filedRunId` rather than on a boolean, so
        * loading a different recording arms it again and a loop does not file the same day twice.
+       *
+       * **And only while this surface has the page** — GitHub issue **#287**, the defect this
+       * comment used to describe its way past. The sentence above is a statement about the
+       * *Engineer* product, and § D338's door put a second one in front of it: `everyday/boot.ts`
+       * mounts a cover, § 7's stage builds its **own** `Playback` over the same recording, and the
+       * player drives that one. This one keeps running behind the cover at `DEFAULT_BASE_SPEED`
+       * — ×60, autoplayed, reachable by no control the Everyday player has — so it reached the end
+       * of a five-minute-to-an-hour day on a fixed real-time schedule and filed, scored and banked
+       * it. Measured: 60.0 s from arriving on the stage, at the hour `garden-apartments` opens on,
+       * having touched nothing. `GAMEPLAY_AND_NAVIGATION.md` § 6.4 and § 16 rule 1 say the same
+       * thing twice — *`Close the day` is the **only** thing that sets `dayClosed`* — and the
+       * Everyday player's own press for it is `EverydayHost.closeDay`, which reaches `closeShift`
+       * by the front door and is untouched by this.
+       *
+       * {@link endedUnderTheCover} carries the reason this is an **edge** and not simply a gate on
+       * who has the page. `everydaySwap()` answering `undefined` — a build that loaded `dev/main.ts`
+       * with no Everyday shell over it — is the Engineer surface having the page by default, which
+       * is the honest reading: there is no other world for the day to belong to.
        */
       if (playback.state === 'ended' && filedRunId !== state.recording?.runId) {
-        closeShift();
+        if (everydaySwap()?.hasThePage() === true) endedUnderTheCover = state.recording?.runId;
+        else if (endedUnderTheCover !== state.recording?.runId) closeShift();
       }
     }
     requestAnimationFrame(tick);
@@ -5198,6 +5249,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     });
     disableTransport(ui, false);
     filedRunId = undefined;
+    /*
+     * The other half of the filing gate re-armed with it — issue #287. A new recording has not
+     * ended anywhere yet, so the record of *where the last one ended* would be a claim about a run
+     * that is no longer on screen. See {@link endedUnderTheCover} for why clearing it here is safe
+     * even mid-cover: the next frame re-derives it from the transport and the port.
+     */
+    endedUnderTheCover = undefined;
     selectedLandingId = '';
     fillLandingSelect(recording);
     fillBankSelect(recording);
