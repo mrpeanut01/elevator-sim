@@ -18,7 +18,14 @@ import { describe, expect, it } from 'vitest';
 import { specFromBuilding } from '../authoring/buildingSpec.js';
 import { specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
-import { tunePresses, tuneStateFrom } from '../everyday/tunerModel.js';
+import { classOfSpec, designerClasses } from '../everyday/designerModel.js';
+import {
+  buildingWithTune,
+  snapToStep,
+  tuneMachineSteps,
+  tunePresses,
+  tuneStateFrom,
+} from '../everyday/tunerModel.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { buildingConfigOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
@@ -99,9 +106,9 @@ const WINDOW_CALLERS: Readonly<Record<string, string>> = Object.freeze({
  * Issue #289 asked that *`shiftReportWindowFor`'s caller set be derived rather than hand-listed, so
  * a fifth producer cannot arrive unregistered*. Derived, that set is the three callers above plus
  * the file that declares them — and **it would not have caught the defect the issue reports**,
- * because `everyday/tunerScreen.ts` was never a caller. It was a *bypasser*: it replaced the id the window is keyed on, with a copy of the
- * same building under a fresh name, and every caller above then did its job perfectly on the wrong
- * question.
+ * because `everyday/tunerScreen.ts` was never a caller. It was a *bypasser*: it replaced the id the
+ * window is keyed on with a copy of the same building under a fresh name, and every caller above
+ * then did its job perfectly on the wrong question.
  *
  * So the derived set that matters is this one — everything that can move that id. `withBuilding` is
  * the one function that writes it on the shift path (`stateRunningSaved` and the host's
@@ -340,13 +347,32 @@ describe('the run the shift path actually asks for', () => {
         seed,
       };
 
-      /* What the tuner mounts with, and what its primary presses — `tunerModel.ts`'s decision. */
+      /*
+       * What the tuner mounts with, what its first `redraw` leaves it holding, and what its primary
+       * then presses.
+       *
+       * The snap is reproduced rather than skipped, and on this building that is the whole case:
+       * Garden Apartments is specified at **0.63 m/s** and its hydraulic class's catalogue chips are
+       * `0.50` and `0.75`, so `redraw` used to snap the design down on mount and the press then
+       * fired over an edit nobody had made. A version of this case that stopped at `tuneStateFrom`
+       * would have gone green on a tree where the product was still broken.
+       */
       const config = buildingConfigOf(RESOURCES, state.savedBuildings, state.buildingId);
       expect(config, 'the standing building is one this build knows').toBeDefined();
       const building = specFromBuilding(config!, state.buildingId);
       const pattern = specFromTrafficProfile(RESOURCES.trafficProfiles, config?.trafficProfile);
-      const tune = tuneStateFrom(building, pattern, state.levers.dwell);
-      const presses = tunePresses(building, pattern, tune, tune);
+      const standing = tuneStateFrom(building, pattern, state.levers.dwell);
+      const machineClass = classOfSpec(
+        designerClasses(RESOURCES.elevatorSpecs),
+        buildingWithTune(building, standing),
+      );
+      const steps = tuneMachineSteps(machineClass, standing, standing);
+      const tune = {
+        ...standing,
+        speed: snapToStep(steps.speeds, standing.speed),
+        cap: snapToStep(steps.loads, standing.cap),
+      };
+      const presses = tunePresses(building, pattern, standing, tune);
 
       /* The press path, as `everyday/host.ts#applyBuildingSpec` composes it. */
       const ran =

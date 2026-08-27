@@ -42,7 +42,12 @@ import type { WeekState } from '../shift/types.js';
 import { closeDay, outcomeOf, SANDBOX_CONTRACT_ID } from '../shift/week.js';
 import { actionBarFor } from './actionBar.js';
 import { railModel } from './rail.js';
-import { classOfSpec, loadStepsFor, speedStepsFor } from './designerModel.js';
+import {
+  classOfSpec,
+  designerClasses,
+  loadStepsFor,
+  speedStepsFor,
+} from './designerModel.js';
 import {
   buildingWithTune,
   movedKeys,
@@ -414,29 +419,51 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
   }
 
   /**
-   * What the tuner mounts with — the two documents and the seven read off them.
+   * What the tuner **holds after its first frame** — the two documents, and the seven as `redraw`
+   * leaves them.
    *
-   * These two calls are `host.buildingSpec()` and `host.patternSpec()`'s own bodies for a state
+   * The two spec calls are `host.buildingSpec()` and `host.patternSpec()`'s own bodies for a state
    * whose pattern is `'building'`, which is what a state off {@link baseState} has. The host is not
    * constructed here because its bindings need a mutable shell; what is being measured is the
    * decision, and the decision reads specs.
+   *
+   * **`tune` is the post-`redraw` state rather than `tuneStateFrom`'s output, and that distinction
+   * was a defect rather than a nicety.** `redraw` snaps speed and load onto the class ladder before
+   * drawing the chips, and on two shipped buildings that snap used to fire on mount — so a helper
+   * that stopped at `tuneStateFrom` would report an untouched screen that the product never has.
+   * The block above pins the snap itself over every building; this one presses what the screen is
+   * actually holding when the player reaches the button.
    */
   function standingAt(state: ViewerState): {
     readonly building: BuildingSpec;
     readonly pattern: PatternSpec;
+    readonly standing: TuneState;
     readonly tune: TuneState;
   } {
     const config = buildingConfigOf(RESOURCES, state.savedBuildings, state.buildingId);
     expect(config, 'the standing building is one this build knows').toBeDefined();
     const building = specFromBuilding(config!, state.buildingId);
     const pattern = specFromTrafficProfile(RESOURCES.trafficProfiles, config?.trafficProfile);
-    return { building, pattern, tune: tuneStateFrom(building, pattern, state.levers.dwell) };
+    const standing = tuneStateFrom(building, pattern, state.levers.dwell);
+    const classes = designerClasses(RESOURCES.elevatorSpecs);
+    const machineClass = classOfSpec(classes, buildingWithTune(building, standing));
+    const steps = tuneMachineSteps(machineClass, standing, standing);
+    return {
+      building,
+      pattern,
+      standing,
+      tune: {
+        ...standing,
+        speed: snapToStep(steps.speeds, standing.speed),
+        cap: snapToStep(steps.loads, standing.cap),
+      },
+    };
   }
 
   it('presses nothing at all, so the run is the one the daily loop would have made', () => {
     const state = { ...baseState(), shiftLengthS: 3600 };
     const at = standingAt(state);
-    const presses = tunePresses(at.building, at.pattern, at.tune, at.tune);
+    const presses = tunePresses(at.building, at.pattern, at.standing, at.tune);
 
     /*
      * Both `undefined`, and that is a different instruction from *press this unchanged copy*.
@@ -467,7 +494,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
     expect(shiftReportWindowFor(state.buildingId)).toBe('full-run');
     const at = standingAt(state);
 
-    const untouched = pressed(state, tunePresses(at.building, at.pattern, at.tune, at.tune));
+    const untouched = pressed(state, tunePresses(at.building, at.pattern, at.standing, at.tune));
     expect(shiftRunConfigOf(RESOURCES, untouched).config.reportWindow).toBe('full-run');
 
     /*
@@ -477,7 +504,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
      * invented window.
      */
     const moved = { ...at.tune, cars: at.tune.cars + 2 };
-    const tuned = pressed(state, tunePresses(at.building, at.pattern, at.tune, moved));
+    const tuned = pressed(state, tunePresses(at.building, at.pattern, at.standing, moved));
     expect(tuned.buildingId).not.toBe(state.buildingId);
     expect(tuned.week.contractId).toBe(SANDBOX_CONTRACT_ID);
     expect(shiftRunConfigOf(RESOURCES, tuned).config.reportWindow).toBeUndefined();
@@ -502,7 +529,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       { dwell: 'snappy' },
     ];
     for (const patch of patches) {
-      const presses = tunePresses(at.building, at.pattern, at.tune, { ...at.tune, ...patch });
+      const presses = tunePresses(at.building, at.pattern, at.standing, { ...at.tune, ...patch });
       expect(presses.building, JSON.stringify(patch)).toBeDefined();
       expect(presses.pattern, JSON.stringify(patch)).toBeDefined();
       expect(pressed(state, presses).week.contractId, JSON.stringify(patch)).toBe(
@@ -514,9 +541,9 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
   it('moves the run when a control moves — the standing requirement, on the legs', () => {
     const state = { ...baseState(), shiftLengthS: 900 };
     const at = standingAt(state);
-    const base = legsOf(pressed(state, tunePresses(at.building, at.pattern, at.tune, at.tune)));
+    const base = legsOf(pressed(state, tunePresses(at.building, at.pattern, at.standing, at.tune)));
     const moved = { ...at.tune, cars: at.tune.cars + 2 };
-    expect(legsOf(pressed(state, tunePresses(at.building, at.pattern, at.tune, moved)))).not.toBe(
+    expect(legsOf(pressed(state, tunePresses(at.building, at.pattern, at.standing, moved)))).not.toBe(
       base,
     );
   }, 60_000);
@@ -575,7 +602,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
        */
       const state = baseState();
       const at = standingAt(state);
-      const after = pressed(state, tunePresses(at.building, at.pattern, at.tune, at.tune));
+      const after = pressed(state, tunePresses(at.building, at.pattern, at.standing, at.tune));
       expect(after.week.contractId).not.toBe(SANDBOX_CONTRACT_ID);
       expect(careerLine(closed(after.week, 26, 'missed'))).toBe('0 days running · best 26%');
       expect(careerLine(closed(after.week, 97, 'met'))).toBe('1 day running · best 97%');
@@ -603,7 +630,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       const state = baseState();
       const at = standingAt(state);
       const moved = { ...at.tune, cars: at.tune.cars + 2 };
-      const after = pressed(state, tunePresses(at.building, at.pattern, at.tune, moved));
+      const after = pressed(state, tunePresses(at.building, at.pattern, at.standing, moved));
       expect(after.week.contractId).toBe(SANDBOX_CONTRACT_ID);
       expect(careerLine(closed(after.week, 26, 'missed'))).toBe('0 days running · best 0%');
       expect(careerLine(closed(after.week, 97, 'met'))).toBe('0 days running · best 0%');
@@ -621,7 +648,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       const at = standingAt(state);
       const scored = { ...state, week: closed(state.week, 74, 'met') };
       const moved = { ...at.tune, cars: at.tune.cars + 2 };
-      const after = pressed(scored, tunePresses(at.building, at.pattern, at.tune, moved));
+      const after = pressed(scored, tunePresses(at.building, at.pattern, at.standing, moved));
       expect(after.week.contractId).toBe(SANDBOX_CONTRACT_ID);
       expect(after.week.bestMinutePct).toBe(74);
       expect(closed(after.week, 99, 'met').bestMinutePct).toBe(74);
