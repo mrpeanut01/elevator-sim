@@ -670,13 +670,18 @@ describe('a sandbox day leaves the scoreboard where it found it — GitHub issue
   const scored = (): WeekState => nextDay(closeDay(openWeek('c1'), day(openWeek('c1'), 'met', 74)));
 
   /**
-   * That same week relabelled — which is what a drawn tower actually produces.
+   * That same week relabelled, so the **contract id is the only variable** between the arms below.
    *
+   * On the sandbox arm this is the product's own construction rather than a convenience:
    * `withBuilding` reaches the sandbox through `switchWeek(week, parked, SANDBOX_CONTRACT_ID,
-   * 'resume')`, and with nothing parked under that id its answer is `withContract(week, …)`: the
-   * player has not left their week, they have changed what it is *of*. So the contract is the only
-   * variable between the arms below, which is what makes the comparison a measurement of the guard
-   * rather than of two different weeks.
+   * 'resume')`, and with nothing parked under that id its answer is exactly
+   * `withContract(week, …)` — the player has not left their week, they have changed what it is *of*.
+   *
+   * On the endless and free-play arms it is **not** how those weeks arrive (both reach
+   * {@link takeContract}, which opens a fresh one), and it is used anyway on purpose: a fresh week
+   * carries a zero scoreboard, so comparing it against a carried one would measure the two weeks
+   * rather than the guard. What is being asked here is narrow — *does `closeDay` discriminate on
+   * the contract id* — and one variable is what asks it.
    */
   const relabelled = (contractId: string): WeekState => withContract(scored(), contractId);
 
