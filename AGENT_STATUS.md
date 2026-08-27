@@ -706,3 +706,79 @@ surface. `packages/viz/src/everyday/` is the second.
   numbers, none of which was correct after integration.
 - **Verify the issue before scheduling it.** This session refuted #200's central figure (four of ten →
   **three of ten**), #206's AC4 premise, #217's framing, and two claims of my own.
+
+---
+
+## Wave E — the 2026-08-27 playtest cohort (in flight)
+
+**Opened** 2026-08-27 on base `55f2bca` = `origin/main`. **Integration branch:**
+`claude/github-issue-worker-tfg581`, PR **#302**. Seven lanes: six in worktrees, one read-only
+verifier run **concurrently with** the build lanes rather than after them, which is the change
+GitHub issue #295's own retrospective asked for.
+
+| lane | task | issues | branch | status | next action |
+|---|---|---|---|---|---|
+| A | WAVE-E1-A | #287 (P0) | `worktree-agent-acc4acea97ce19e81` | in flight | — |
+| B | WAVE-E1-B | #288 | `worktree-agent-ad4341180185f9af3` | in flight | — |
+| C | WAVE-E1-C | #289, #290 | `worktree-agent-a137e33d73e5b6e16` | in flight | — |
+| D | WAVE-E1-D | #291, #294 | `worktree-agent-acc8987f3045d668d` | **merged** `f08be59` | close on merge to `main` |
+| E | WAVE-E1-E | #293 | `worktree-agent-aa54a147347d57612` | **merged** `98b7176` | close on merge to `main` |
+| F | WAVE-E1-F | #292 | `worktree-agent-ab356710d43b178da` | in flight | — |
+| V | WAVE-E1-V | #295 | none — read-only | **complete** | six filed, #295 stays open |
+
+### The integrator's own finding, which no lane could have had
+
+**The owed-decision ratchet sits *on* its ceiling.** Measured on `55f2bca` rather than inherited:
+**64 against a ceiling of 64, zero headroom.** Every lane brief in this repository says *put the
+argument in a docstring and say a number is owed; the integrator allocates at merge* — correct for a
+lane, and **incomplete for a wave**. Three lanes each wrote one marker, the count went to 67, and the
+branch could not go green until all three were settled.
+
+Settled at integration as **D375** (the tab title names no world), **D376** (a licence is drawn on the
+thing it licenses), **D377** (a corpus seeds every cell a row draws). Added three, settled three:
+**net zero, 64 either side of the wave.** `CHARTER_PROGRAMME.md`'s next-free row moved 375 → 378 on
+the same commit, because the gate derives it from `DECISIONS.md` and a lane trusting a stale row
+reuses a number that is taken.
+
+**The near-miss is recorded at the gate rather than tidied away.** The ceiling was briefly written
+down to 63, on an assumption that the base stood there and this wave had cleared one. It had not. **A
+ceiling of 63 over a tree of 64 is red for a reason that flatters the wave that wrote it**, which is
+the one direction this gate must never be adjusted in — and it would have been indistinguishable, six
+months later, from a genuine fall.
+
+**For the next lane:** with no headroom, allocation is no longer deferrable. A lane that follows the
+standard brief to the letter now hands the integrator a red gate.
+
+### Two lanes reported something the issue did not contain, and one reported it against itself
+
+- **#291's defect had a twin two sentences away** (`CASUAL_SMALL_PRINT_LEAD`), joined into the same
+  paragraph by `reportPanel.ts:1466`. Fixing only the reported entry leaves AC3 red.
+- **#293's stale sites were four, not three**, and `RUSH_ABSENCES[3]` itself read *"the five entries
+  **below**"* while drawn in Settings with *The drawing board* underneath it — a register row gone
+  stale about **where it is drawn**.
+- **Lane E caught its own first instrument passing against the defect it was written for.** v1 asked
+  whether a docstring named the renderer *anywhere*; the history section named it only to say what it
+  does *not* import. Narrowed to the lead, it fails on the base wording.
+- **Lane E then corrected its own test report, unprompted.** Two long runs it had reported as
+  completing had produced no result — the `exit code 0` was the `| tail` pipeline's, not vitest's.
+  It said so rather than letting a false green stand. **That correction is the single most valuable
+  thing in the lane's report**, because every other claim in it is only worth what the reporting
+  discipline is worth.
+
+### What the integrator has and has not run
+
+**Green on the merged tree:** `npm run typecheck`; `validation/documentation.test.ts` 28/28;
+`validation/citations.test.ts` 4/4. Both merged lanes' new instruments **mutation-validated by the
+integrator**, not only by the lane that wrote them — and the results differ in the way that matters:
+reverting the tab title turns 2 of 4 cases red, while dropping the rush note from the renderer leaves
+the import-graph case **green** and the browser case red. An import survives the deletion of the
+`append`; Lane E said exactly that and built the browser case for it.
+
+**Not run, and not claimed:** the full `--project viz` suite, and the deep honesty tier. Three lanes'
+suites contended for CPU on one container and were **starved rather than hung** — one measured 3
+minutes of CPU across 24 minutes of wall clock. Per § D343 the corpus is measured once, after
+integration; **no counts are published by this wave.**
+
+**Unreachable from this container, re-confirmed today:** the PR's Azure preview. `CONNECT` returns
+**403**, exactly as § D374 recorded on 2026-08-25. So no landed fix in this wave has been verified
+against a deployed artifact, and none is described as though it had been.
