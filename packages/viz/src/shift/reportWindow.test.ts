@@ -15,8 +15,12 @@ import { fileURLToPath } from 'node:url';
 import { MATRIX_CELLS } from '@elevator-sim/experiments/browser';
 import { describe, expect, it } from 'vitest';
 
+import { specFromBuilding } from '../authoring/buildingSpec.js';
+import { specFromTrafficProfile } from '../authoring/patternSpec.js';
+import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
+import { tunePresses, tuneStateFrom } from '../everyday/tunerModel.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
-import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import { buildingConfigOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
 import { shiftReportWindowFor } from './reportWindow.js';
 
@@ -310,6 +314,61 @@ describe('the run the shift path actually asks for', () => {
       expect(after.saturated).toBe(false);
       expect(after.serviceLevel.longestWaitS).not.toBeNull();
       expect(after.waitCount).toBeGreaterThan(20);
+    }
+  }, 120_000);
+
+  /**
+   * The same sheet, reached through **the tuner** — GitHub issue #289's third criterion.
+   *
+   * The test above drives `shiftRunConfigOf` from a state the daily loop produced, and on that path
+   * the defect had been closed since `docs/20` defect 5 landed. It came back on a path that test
+   * cannot see: *Take it to the sandbox* → *Run it and watch*, with nothing touched. The press
+   * re-saved the standing building under a fresh id, the matrix stopped recognising it, and the
+   * five-minute band came back — so the first sheet a new player ever sees withheld **both** of its
+   * headline figures on a day whose riders all turned up, with all four goal rows graded ✓.
+   *
+   * Driven on the same pinned seeds, because those are the days where the band holds nobody and
+   * therefore the days where the difference is visible at all. On the other 486 the two windows
+   * agree and this case would pass on the broken tree.
+   */
+  it('keeps both headlines when the tuner runs the standing day, untouched', () => {
+    for (const seed of EMPTY_BAND_SEEDS) {
+      const state: ViewerState = {
+        ...baseState(),
+        buildingId: 'garden-apartments',
+        shiftLengthS: 3600,
+        seed,
+      };
+
+      /* What the tuner mounts with, and what its primary presses — `tunerModel.ts`'s decision. */
+      const config = buildingConfigOf(RESOURCES, state.savedBuildings, state.buildingId);
+      expect(config, 'the standing building is one this build knows').toBeDefined();
+      const building = specFromBuilding(config!, state.buildingId);
+      const pattern = specFromTrafficProfile(RESOURCES.trafficProfiles, config?.trafficProfile);
+      const tune = tuneStateFrom(building, pattern, state.levers.dwell);
+      const presses = tunePresses(building, pattern, tune, tune);
+
+      /* The press path, as `everyday/host.ts#applyBuildingSpec` composes it. */
+      const ran =
+        presses.building === undefined
+          ? state
+          : stateRunningSaved(
+              state,
+              RESOURCES,
+              savedBuildingFrom(presses.building, state, RESOURCES),
+            );
+
+      const plan = shiftRunConfigOf(RESOURCES, ran);
+      const summary = recordRun(plan.config, {
+        recordDecisions: false,
+        outOfServiceCarIds: plan.outOfServiceCarIds,
+      }).recording.summary;
+
+      expect(summary.reportWindow.id, String(seed)).toBe('full-run');
+      // Both headlines, which is the pairing the sheet withheld: the mean and the worst wait.
+      expect(summary.awtIsValid, String(seed)).toBe(true);
+      expect(summary.waitCount, String(seed)).toBeGreaterThan(20);
+      expect(summary.serviceLevel.longestWaitS, String(seed)).not.toBeNull();
     }
   }, 120_000);
 });
