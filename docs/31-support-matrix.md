@@ -173,8 +173,9 @@ stated as two clauses that can each fail:
   (`packages/viz/src/everyday/viewportGates.browser.test.ts`, GitHub issue #292). Measured
   2026-08-27 on the Everyday shell: at 360×800 the screen region is 148 px against content that lays
   out at 241, `.everyday-main` clips **93 px** on the main menu and **337 px** on the stage, **five**
-  controls on the menu cannot be brought into the viewport by any gesture — all four mode tiles and
-  § 3.3's primary — and the stage canvas holds **42.5 %** of the height against this clause's 60 %.
+  controls on the menu cannot be brought into the viewport by any gesture — all four mode tiles, and
+  the pinned action bar's primary, `Play today's tower`, drawn at `left: 360` and so wholly outside
+  the viewport — and the stage canvas holds **42.5 %** of the height against this clause's 60 %.
   At 375×667: 78 px, 322 px, five controls, 51.0 %. The **cost of the commitment is now visible**,
   which is what a gate is for; the layout work is #240's and the findings are registered rather than
   suppressed, so a new one is red and a fixed one is red as *delete this entry*.
