@@ -83,6 +83,7 @@ function observations(overrides: Partial<LiveObservations> = {}): LiveObservatio
     deepestQueueFloorId: '12',
     abandoned: 0,
     abandonedCarried: 0,
+    turnedAway: 0,
     horizonS: 900,
     worstWaitSoFarS: 42,
     worstWaitIsCensored: false,

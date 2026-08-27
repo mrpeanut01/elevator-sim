@@ -25,7 +25,7 @@ import { queueAt } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 
 import { observationsAt } from './observations.js';
-import { servedLeg, syntheticRecording, waitingLeg } from './synthetic.test-helper.js';
+import { refusedLeg, servedLeg, syntheticRecording, waitingLeg } from './synthetic.test-helper.js';
 
 let config: LoadedConfig;
 const recordings = new Map<string, VizRecording>();
@@ -135,6 +135,39 @@ describe.each(BUILDING_IDS)('%s — the counters are counters', (buildingId) => 
     );
   }, 300_000);
 
+  it('counts every wait that crossed the horizon and no rider the door turned away', () => {
+    /*
+     * `abandoned`, re-derived from the legs by `core`'s own ending rule
+     * (`metrics/summarize.ts#diagnoseServiceLevel`: `boardedAt ?? abandonedAt ?? refusedAt ??
+     * censoredAtS`, minus the field `VizLeg` does not carry), and the two must agree — GitHub
+     * issue #288, where they did not. Deriving it here rather than reading the module's own
+     * constant is the point: this is a second expression of the rule, so a fold that quietly went
+     * back to `boardedAt` alone fails even on a building whose refusals all land inside the
+     * horizon.
+     *
+     * **This case alone is not enough and says so**, because the breadth fixture cannot produce
+     * the state the defect needs. A 900 s run against a 900 s horizon has *no* leg that crosses at
+     * all — and mutating the ending rule back to `boardedAt` leaves this green on all eight
+     * buildings. The run that reaches it is Secure Tower's own authored day, in
+     * *the sheet cannot contradict itself* below; the guard in the sibling describe holds the
+     * fixture's own non-vacuity in the two directions it can.
+     */
+    const recording = recordingOf(buildingId);
+    const horizonS = recording.summary.serviceLevel.horizonS;
+    const t = recording.endedAt;
+    const crossed = recording.legs.filter((leg) => {
+      if (leg.arrivedAt > t) return false;
+      const endedAt = leg.boardedAt ?? leg.refusedAt;
+      const waitEndedAt = endedAt ?? Number.POSITIVE_INFINITY;
+      return Math.min(waitEndedAt, t) - leg.arrivedAt > horizonS;
+    });
+    const o = observationsAt(recording, t);
+    expect(`${buildingId}: ${String(o.abandoned)}`).toBe(
+      `${buildingId}: ${String(crossed.length)}`,
+    );
+    expect(o.turnedAway).toBe(recording.legs.filter((leg) => leg.refusedAt !== undefined).length);
+  }, 300_000);
+
   it('agrees with the fold about the deepest queue any floor ever held', () => {
     const recording = recordingOf(buildingId);
     for (const t of sampleTimes(recording)) {
@@ -196,6 +229,39 @@ describe('the fold and the summary really are two cohorts on every shipped run',
     });
     expect(spanning).toEqual([]);
   }, 300_000);
+
+  it('really does put refused legs and over-horizon legs in front of the breadth fold', () => {
+    /*
+     * The non-vacuity guard for *counts every wait that crossed the horizon and no rider the door
+     * turned away*. Both halves of that assertion are about populations the fixture has to contain,
+     * and this is where it is checked rather than hoped for: a `data/` change that badged every
+     * rider correctly, or a demand rate that stopped anybody crossing the horizon, would leave that
+     * case green while measuring nothing.
+     *
+     * Named counts rather than a bare *greater than zero*, because the identity they pin is the one
+     * `observations.ts#sweepQueues` states as measured fact — `refusedAt` equals `arrivedAt` on
+     * **every** refused leg — and a run where that stopped being true is a run whose stairs count
+     * this suite would want to look at again.
+     */
+    const refusedByBuilding = Object.fromEntries(
+      BUILDING_IDS.map((id) => [id, recordingOf(id).legs.filter((l) => l.refusedAt !== undefined)]),
+    );
+    const refusedTotal = Object.values(refusedByBuilding).reduce(
+      (sum, legs) => sum + legs.length,
+      0,
+    );
+    const refusedAtArrival = Object.values(refusedByBuilding).reduce(
+      (sum, legs) => sum + legs.filter((l) => l.refusedAt === l.arrivedAt).length,
+      0,
+    );
+    expect(refusedTotal).toBeGreaterThan(0);
+    expect(refusedAtArrival).toBe(refusedTotal);
+
+    const crossers = BUILDING_IDS.filter(
+      (id) => observationsAt(recordingOf(id), recordingOf(id).endedAt).abandoned > 0,
+    );
+    expect(crossers.length).toBeGreaterThan(0);
+  }, 300_000);
 });
 
 describe('the edges a real run will not show on demand', () => {
@@ -244,6 +310,63 @@ describe('the edges a real run will not show on demand', () => {
     expect(observationsAt(recording, 900).abandoned).toBe(0); // exactly the horizon is inside it
     expect(observationsAt(recording, 901).abandoned).toBe(1);
     expect(observationsAt(recording, 1100).abandoned).toBe(1);
+  });
+
+  /* ------------------------------------------------------------------------ *
+   * The fourth outcome — GitHub issue #288
+   * ------------------------------------------------------------------------ */
+
+  it('does not count a rider turned away at the door as having waited past the horizon', () => {
+    // The defect, in its smallest form: a refused rider never boards, so an ending rule that reads
+    // `boardedAt` alone hands them `arrivedAt + horizonS` and the sheet's TOOK THE STAIRS cell —
+    // captioned *waited past the 15-minute horizon* — counts somebody who waited zero seconds.
+    const recording = syntheticRecording({ legs: [refusedLeg('p1', 0)], endedAt: 3000 });
+    for (const t of [0, 100, 901, 1500, 3000]) {
+      expect(observationsAt(recording, t).abandoned, `t=${String(t)}`).toBe(0);
+    }
+    // Removed from one count and reported in another. A repair that only deleted a figure would
+    // have made this sheet quieter rather than truer — `CLAUDE.md`, and § D266.
+    expect(observationsAt(recording, 3000).turnedAway).toBe(1);
+  });
+
+  it('still counts a refusal that came after the horizon, because that wait really did cross it', () => {
+    /*
+     * The negative control on the case above, and the reason `crossesHorizonAt` resolves the wait
+     * at `refusedAt` rather than testing `refusedAt !== undefined`. No shipped run produces this —
+     * every measured refusal is at `arrivedAt` — so a fold that special-cased *refused* instead of
+     * *the wait ended here* would look identical on every building the project ships and would be
+     * wrong about the one leg that mattered.
+     */
+    const recording = syntheticRecording({ legs: [refusedLeg('p1', 0, 950)], endedAt: 3000 });
+    expect(observationsAt(recording, 899).abandoned).toBe(0);
+    expect(observationsAt(recording, 901).abandoned).toBe(1);
+    // Counted under both heads, and that is correct rather than double counting: this rider's wait
+    // crossed the horizon *and* the building turned them away. The two cells overlap, exactly as
+    // `abandonedCarried` records the overlap between TOOK THE STAIRS and CARRIED.
+    expect(observationsAt(recording, 3000).turnedAway).toBe(1);
+  });
+
+  it('counts a rider turned away only from the instant the building turned them away', () => {
+    const recording = syntheticRecording({ legs: [refusedLeg('p1', 100, 400)], endedAt: 3000 });
+    expect(observationsAt(recording, 399).turnedAway).toBe(0);
+    expect(observationsAt(recording, 400).turnedAway).toBe(1);
+  });
+
+  it('ends a refused rider’s worst wait at the refusal, which is the rule `abandoned` now shares', () => {
+    /*
+     * The two folds in `observationsAt` had disagreed about when a wait ends since `refusedAt`
+     * arrived: the worst-wait fold resolved at `boardedAt ?? refusedAt` and the horizon crossing
+     * resolved at `boardedAt`. Asserted together so they cannot drift apart again — a refused
+     * rider is neither the worst wait in the building nor a stairs-taker.
+     */
+    const recording = syntheticRecording({
+      legs: [refusedLeg('p1', 0), servedLeg('p2', 10, 40, 90)],
+      endedAt: 3000,
+    });
+    const o = observationsAt(recording, 3000);
+    expect(o.worstWaitSoFarS).toBe(30);
+    expect(o.worstWaitIsCensored).toBe(false);
+    expect(o.abandoned).toBe(0);
   });
 
   it('does not report a phantom peak when a landing empties and refills at the same instant', () => {
