@@ -186,20 +186,49 @@ async function coldLoad(
 /**
  * What § 3.3's row says about today, read off the page.
  *
- * Both halves, because either alone is a weaker claim than the issue's: a filed day resolves the
- * primary **inert** (`stageBarModelOf`) *and* puts the reason in the note, and the shell draws an
- * inert primary disabled. A case that only read the note would pass against a build that disabled
- * the button and said nothing, which is the second half of the same defect.
+ * Both halves of the state, because either alone is a weaker claim than the issue's: a filed day
+ * resolves the primary **inert** (`stageBarModelOf`) *and* puts the reason in the note, and the
+ * shell draws an inert primary disabled. A case that only read the note would pass against a build
+ * that disabled the button and said nothing, which is the second half of the same defect.
  *
  * The Everyday root is never removed or hidden with `display` — § D338 covers it with
  * `visibility:hidden` — so this reads correctly from inside the Engineer world too, which is what
  * the round-trip case needs.
+ *
+ * ## `primary`, and why it is here rather than in the one case that reads it
+ *
+ * Every absence case below asserts *the note is **not** the filed sentence* and *the button is
+ * **not** disabled*, and **both of those are true of a page with no action bar on it at all** —
+ * `?? ''` is not the filed sentence and `?? false` is not disabled. So a row that failed to render
+ * would satisfy five cases while measuring nothing, which is this repository's *"a zero from an
+ * instrument nobody validated"* with the instrument reading zero for the wrong reason.
+ *
+ * The viewport sweep is what made that a live risk rather than a theoretical one: the second
+ * viewport is narrow, § 3.3's row is responsive, and nobody had checked that the note survives
+ * there. {@link expectStageRowIsUp} is the guard, and it is asserted in every absence case rather
+ * than in the narrow one — a vacuity hole that is only closed on the viewport that exposed it is
+ * closed by luck.
  */
-async function barSays(page: Page): Promise<{ readonly note: string; readonly inert: boolean }> {
+async function barSays(
+  page: Page,
+): Promise<{ readonly note: string; readonly inert: boolean; readonly primary: string }> {
   return page.evaluate(() => ({
     note: document.querySelector('.everyday-bar-note')?.textContent ?? '',
     inert: document.querySelector<HTMLButtonElement>('.everyday-bar-primary')?.disabled ?? false,
+    primary: document.querySelector('.everyday-bar-primary')?.textContent ?? '',
   }));
+}
+
+/**
+ * The stage's own § 3.3 row is on the page and is the one this case thinks it is reading.
+ *
+ * Positive facts only — a label that is there and a note that is not empty — because that is what
+ * the absence assertions cannot supply for themselves. The label is the daily stage row's own
+ * primary, taken from the table rather than transcribed, so a guide edit moves this with it.
+ */
+function expectStageRowIsUp(bar: { readonly note: string; readonly primary: string }): void {
+  expect(bar.primary).toBe(FILED_BAR.primary.label);
+  expect(bar.note.length).toBeGreaterThan(0);
 }
 
 /** Wait out `multiple` covered-transport runs. The unit is the interval the defect fired at. */
@@ -227,6 +256,7 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
          */
         await waitPastTheCoveredEnd(page, 4);
         const bar = await barSays(page);
+        expectStageRowIsUp(bar);
         expect(bar.note).not.toBe(FILED_NOTE);
         expect(bar.inert).toBe(false);
       } finally {
@@ -249,6 +279,7 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
       await page.click('.everyday-stage-play');
       await waitPastTheCoveredEnd(page, 4);
       const bar = await barSays(page);
+      expectStageRowIsUp(bar);
       expect(bar.note).not.toBe(FILED_NOTE);
       expect(bar.inert).toBe(false);
       // The player's own transport really did finish: § 7.3's button is back to offering Play.
@@ -288,6 +319,7 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
       await page.keyboard.press('Meta+Enter');
       await page.waitForTimeout(500);
       const bar = await barSays(page);
+      expectStageRowIsUp(bar);
       expect(bar.note).not.toBe(FILED_NOTE);
       expect(bar.inert).toBe(false);
     } finally {
@@ -311,6 +343,7 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
       await returnToEverydayMode(page);
       await waitPastTheCoveredEnd(page, 1);
       const bar = await barSays(page);
+      expectStageRowIsUp(bar);
       expect(bar.note).not.toBe(FILED_NOTE);
       expect(bar.inert).toBe(false);
     } finally {
@@ -323,7 +356,9 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
     try {
       await enterEverydayStage(page);
       await waitPastTheCoveredEnd(page, 2);
-      expect((await barSays(page)).note).not.toBe(FILED_NOTE);
+      const before = await barSays(page);
+      expectStageRowIsUp(before);
+      expect(before.note).not.toBe(FILED_NOTE);
       /*
        * § 3.3's primary. It lands the player on the report (`stageFilingLandsOn`, issue #206), so
        * the bar under them is the report's — the fact asserted is the one the host holds: the day
