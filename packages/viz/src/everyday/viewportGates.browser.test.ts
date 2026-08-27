@@ -189,6 +189,15 @@ interface Reading {
   readonly canvasPct: number | undefined;
   /** Drawn controls considered. A cell that considered none has measured nothing. */
   readonly controlsSeen: number;
+  /**
+   * Which of `stageBarModelOf`'s four states the stage bar was in, or `undefined` off the stage.
+   *
+   * Not a clause and not measured against anything — it exists so that a disagreement between two
+   * machines can be read as *they saw different states* rather than *they disagree about the
+   * layout*. Those are different findings with different owners, and telling them apart from a CI
+   * log was what this reading was missing.
+   */
+  readonly stageState: string | undefined;
 }
 
 /**
@@ -319,6 +328,17 @@ const MEASURE = (): Reading => {
     unreachable,
     canvasPct,
     controlsSeen: controls.length,
+    /* The bar's note is the one string that names the state; the transport's own control names it
+       a second way, so a state with no note is still distinguishable from a state with none drawn. */
+    stageState:
+      document.querySelector('.everyday-stage') === null
+        ? undefined
+        : `${document.querySelector('.everyday-bar-note')?.textContent?.trim() ?? '(no note)'} :: ${
+            [...document.querySelectorAll('button, [role="button"]')]
+              .map((node) => node.className)
+              .filter((name) => typeof name === 'string' && name.length > 0)
+              .join(',') || '(no controls)'
+          }`.slice(0, 300),
   };
 };
 
@@ -399,6 +419,46 @@ async function coldLoad(width: number, height: number): Promise<Page> {
 }
 
 /**
+ * A reading taken once the screen has stopped changing, rather than once a timer has expired.
+ *
+ * **The stage is the reason this exists, and CI is where it was found.** A fixed wait after
+ * {@link enterEverydayStage} measures whichever controls happen to be drawn at that instant, and the
+ * stage's bar passes through more than one state on the way in — `stageBarModelOf` has four. On a
+ * ten-core box the 600 ms that used to stand here always landed after the last of them; on GitHub's
+ * two-core runner, with `npm test` at default parallelism and nothing forcing this tier serial, it
+ * landed *before*, and the register disagreed with the product about six entries. The product was
+ * identical in both. Only the moment of reading differed.
+ *
+ * So this polls the same {@link MEASURE} the cells use and returns the first reading that **two
+ * consecutive polls agree on**, which is a fact about the page rather than about the host. It is the
+ * shape wave D landed on `stageScreen.browser.test.ts` for the same reason — *read the clock once it
+ * has stopped, not once the click has landed*.
+ *
+ * The interval is 300 ms because a state the bar passes through survives at least one frame at any
+ * plausible refresh rate, so two equal reads 300 ms apart cannot both fall inside one transition. The
+ * budget is generous rather than tight: this runs three times per suite and a slow read costs seconds,
+ * while a read taken early costs a red gate nobody can reproduce.
+ *
+ * **It throws rather than returning the last reading if the screen never settles.** A screen still
+ * changing after twelve seconds is a finding, and returning its final sample would file that finding
+ * as a layout measurement — the failure this whole file exists to stop.
+ */
+async function settledReading(page: Page): Promise<Reading> {
+  let previous = JSON.stringify(await page.evaluate(MEASURE));
+  for (let poll = 0; poll < 40; poll += 1) {
+    await page.waitForTimeout(300);
+    const reading = (await page.evaluate(MEASURE)) as Reading;
+    const current = JSON.stringify(reading);
+    if (current === previous) return reading;
+    previous = current;
+  }
+  throw new Error(
+    'the screen was still changing after 40 polls — a reading taken here would be a measurement ' +
+      'of a transition rather than of a layout, which is the defect this file exists to catch',
+  );
+}
+
+/**
  * Every cell, measured once.
  *
  * Memoised because the stage leg of each viewport is a real shift on a worker, and four cases
@@ -419,8 +479,7 @@ async function sweep(): Promise<readonly Cell[]> {
            would be measuring a screen nobody can open at this width, which is half of what is
            being measured. */
         await enterEverydayStage(page);
-        await page.waitForTimeout(600);
-        cells.push({ at, screen: 'stage', reading: await page.evaluate(MEASURE) });
+        cells.push({ at, screen: 'stage', reading: await settledReading(page) });
       } finally {
         await page.close();
       }
@@ -571,12 +630,41 @@ describe.skipIf(!HAS_BROWSER)('§ 2 at 360 px and above — the three clauses, m
       ).toBeGreaterThan(0);
     }
 
+    /*
+     * **Why the message carries the stage's own state, and why that is not decoration.**
+     *
+     * This case went red on GitHub's Linux runner while passing on the authoring machine under five
+     * separate conditions — default, a 20x CPU throttle, forced `prefers-reduced-motion: reduce`,
+     * the full Chromium build rather than the headless shell, and the whole suite at default
+     * parallelism. The two runs disagreed about *which controls the stage had drawn*, not about
+     * where any of them sat: `everyday-stage-start` against `everyday-stage-play`, and a primary
+     * and a timeline against a back and a leave.
+     *
+     * That is a difference of **transport state**, and `stageBarModelOf` has four of them. A reading
+     * taken in one state and a register written from another will disagree forever without either
+     * being wrong about the layout — which is a defect in this instrument rather than in the product,
+     * and exactly the kind this file exists to refuse in others.
+     *
+     * So the failure now prints the state each stage cell was in. A message that says *the sets
+     * differ* costs a CI cycle to learn nothing from; one that says *this cell was in the day-over
+     * state and the register was written from the running one* is a root cause. It is attached to
+     * the assertion rather than logged, because a log on a green run is noise and this is only ever
+     * read when the case is already red.
+     */
+    const states = cells
+      .filter((cell) => cell.screen === 'stage')
+      .map((cell) => `${cell.at}: ${cell.reading.stageState ?? '(not recorded)'}`)
+      .join(' · ');
+
     expect(
       cells.flatMap(failuresOf),
       'The register and the product disagree. A line only the product has is a new failure of one ' +
         "of docs/31-support-matrix.md § 2's three clauses, and it is unregistered. A line only the " +
         'register has has stopped reproducing — if that is #240 landing, delete it here in the ' +
-        'same commit, because a register of ghosts is a suppression list.',
+        'same commit, because a register of ghosts is a suppression list.\n\n' +
+        `Stage transport state when each stage cell was read — ${states}\n` +
+        'If these differ from the machine the register was written on, the disagreement is about ' +
+        'when the page was read and not about the layout, and the fix belongs in this file.',
     ).toEqual([...OUTSTANDING]);
   }, 600_000);
 
