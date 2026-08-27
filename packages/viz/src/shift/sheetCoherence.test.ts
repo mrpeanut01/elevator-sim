@@ -213,8 +213,9 @@ describe.each(BUILDING_IDS)('%s — no two figures on the sheet contradict each 
      * `generated === delivered + undelivered + abandoned + accessRefused`. `VizSummary` carries no
      * `accessRefused`, which is what `render/mood.ts`'s delivered driver says it cannot name — so
      * the sheet's own three counts have to close over the legs instead, and this is the check that
-     * they do. Before the fix `abandoned` overlapped `turnedAway` completely and the sheet's cells
-     * could not be totalled at all.
+     * they do. The identity holds either side of issue #288 — it is the *other* three cells that
+     * were wrong — and it is here because the fix moves seventy-two people between two of them,
+     * which is exactly when a total is worth re-deriving.
      */
     const observations = observationsOf(id);
     const recording = recordingOf(id);
