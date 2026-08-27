@@ -45,8 +45,20 @@
  * files by itself*, which is the wrong fix that every absence case would have been equally happy
  * with.
  *
- * Every absence case fails on `55f2bca` and every control passes there, which is the instrument
- * moving in both directions before its green was trusted.
+ * **What was actually watched failing, and where** — stated case by case rather than as a blanket
+ * claim, because *"they all fail on the parent commit"* is the kind of sentence that is written
+ * once and is wrong by the next commit:
+ *
+ * - On `55f2bca`, four cases failed and the Engineer-Run control passed: the untouched stage at
+ *   1280×800, the fastest chip, the round trip, and the *Close the day* case (which asserts the day
+ *   is unfiled before it presses anything).
+ * - The keyboard case was watched failing **after** the transport fix had landed, which is stronger
+ *   than watching it fail on `55f2bca` would have been: with the tick already disarmed, the only
+ *   thing left that could file the day was the keystroke.
+ * - The day-over sentence was watched failing by mutation — the `refreshBar()` in
+ *   `stageScreen.ts#syncTransport` removed — where it reported the row's unchanged note.
+ * - **The second viewport has never been seen red**, and that is the honest status of it: it was
+ *   added after the fix, and it is a control on the issue's report rather than a reproduction.
  *
  * ## The third filing site, which issue #287 does not name
  *
