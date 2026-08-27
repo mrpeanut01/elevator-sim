@@ -739,10 +739,15 @@ export const STAGE_DAY_OVER = 'the day has run out — the stage will not move a
  * § 3.3's stage row, refined.
  *
  * The table's cell is *Close the day* with the note *Stops the clock and writes the report*, and it
- * is right for a running day. Three states the table cannot know: no run yet, a day already filed,
- * and a re-simulation in flight. Each resolves the primary **inert** with the note saying why — the
- * shell draws an inert primary disabled, so the button never looks pressable while doing nothing
- * (`BarPrimary.inert`'s own contract).
+ * is right for a running day. **Four** states the table cannot know: no run yet, a day already
+ * filed, a re-simulation in flight, and a day that has run out and not been filed.
+ *
+ * The first three resolve the primary **inert** with the note saying why — the shell draws an inert
+ * primary disabled, so the button never looks pressable while doing nothing (`BarPrimary.inert`'s
+ * own contract). **The fourth is the one that does not**, and the asymmetry is the whole of it: a
+ * day that has run out is the state in which the primary is most worth pressing, so the row
+ * explains and does not refuse. {@link STAGE_DAY_OVER} carries the argument, including why it
+ * describes rather than instructs.
  */
 export function stageBarModelOf(state: EverydayState, input: StageBarInput): ActionBarModel {
   const table = actionBarFor(state);
