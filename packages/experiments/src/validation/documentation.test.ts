@@ -1254,6 +1254,23 @@ const KNOWN_DUPLICATE_DECISIONS: readonly number[] = Object.freeze([63]);
  * on every commit that settles one, which trains people to edit the number rather than read it.
  * Measured 2026-08-26 on `main` at `2c7b308` with the issue's own command — and it had grown from
  * **38** on `000852a`, ~68 % in one wave, which is the finding rather than the housekeeping.
+ *
+ * **Unmoved by wave E, and the wave is why that is worth a sentence.** Three lanes each wrote a
+ * marker and the integrator settled all three at integration as D375–D377, which is where this
+ * process puts allocation. Added three, settled three: **net zero, and the count is 64 either
+ * side of the wave.**
+ *
+ * The ceiling was briefly written down to 63 on the way there, on an assumption that the base
+ * stood at 63 and the wave had cleared one. Measured on `55f2bca` rather than assumed, the base
+ * is **64** — the ratchet has been sitting *on* its ceiling with zero headroom, not below it. A
+ * ceiling of 63 over a tree of 64 is red for a reason that flatters the wave that wrote it, which
+ * is the one direction this gate must never be adjusted in.
+ *
+ * **The operational consequence, for the next lane:** with no headroom, any lane that writes a
+ * marker turns this gate red unless one is settled in the same wave. That is the ratchet working,
+ * not a defect in it — but it means allocation is no longer deferrable to whenever it is
+ * convenient, and a brief that says *put the argument in a docstring and say a number is owed*
+ * now obliges the integrator to allocate before the branch can go green.
  */
 const DECISION_DEBT_CEILING = 64;
 

@@ -7655,7 +7655,7 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
        * **`held` had never been in the corpus, and it is the figure the issue is about.** The row
        * draws four cells and this adapter seeded three: `57 min` against a handle is precisely the
        * *other player's figure* #293 opens on, and the search had never read one. Found while
-       * adding the marker above; a decision number is owed with that one.
+       * adding the marker above; the rule it produced is § D377.
        */
       seeds.push({ field: `rush.best.${best.name}.held`, text: best.held, role: 'label' });
     }

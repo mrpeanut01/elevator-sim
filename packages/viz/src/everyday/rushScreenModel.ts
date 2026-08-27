@@ -521,7 +521,7 @@ export interface RushBestView {
  * one was the **licence**: it is the sentence that answered *why may unmeasured names and figures
  * be drawn at all*, and it answered by pointing at a disclosure that was no longer there. A
  * justification whose premise has silently expired keeps reading as a justification. GitHub issue
- * #293; a decision number is owed.
+ * #293; recorded as § D375's neighbour, § D376.
  *
  * `rushScreenModel.test.ts` now ties the claim to the renderer rather than to these words: the note
  * and the rows it is about must be drawn by the same module, derived from source. A register that

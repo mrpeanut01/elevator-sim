@@ -25467,3 +25467,111 @@ preview build is unreachable from the agent container — `CONNECT` returns **40
 the code half runs.
 
 ---
+
+## D375 — the browser tab carries the wordmark and names no world
+
+**Rules on:** GitHub issue #294. Settles the marker owed at `packages/viz/index.html`.
+
+**Decision.** The tab title is **`Elevator Sim`**, fixed, naming neither Everyday nor Engineer, and
+pinned byte for byte to `railModel().brand` by `everyday/pageTitle.test.ts`.
+
+**What was wrong.** The title read `Elevator Sim — shift mode` on a page that opens on Everyday Mode.
+That is not an orphan string and calling it a typo would have hidden the finding: `SHIFT MODE` is the
+Engineer header's own eyebrow (`index.html:1720`, `.brand-mode`), required by
+[`docs/12-design-handoff.md`](docs/12-design-handoff.md) S3 from the canonical handoff. **The title
+was correct until [§ D335](#d335) moved the front door.** [`RISKS.md`](RISKS.md) R42's shape — a
+ruling that did not reach one of its consumers — not a slip.
+
+**Why not name Everyday.** It is the same defect with its polarity reversed the moment [§ D338](#d338)'s
+door is used, and the door is a shipped control rather than an edge case.
+
+**Why not follow the player, which is the answer that looks right.** A title that follows is correct on
+screen and wrong where the browser *keeps* one. It is stamped onto the history entry and onto any
+bookmark taken while it stands, so a bookmark made in Engineer files a URL that always opens Everyday
+under the word *engineer*. That is § 3.5's entry-screen override — which § D338 **refused** — written
+into the browser's own store instead of `localStorage`, where it is harder to see and impossible to
+clear from inside the product. It is also new machinery: **nothing in `packages/` writes
+`document.title` at runtime**, verified repo-wide, so following the player means building a writer for
+a value the product has never written.
+
+**Why the wordmark is not a compromise.** `Elevator Sim` is what **both** shells already call the
+product on their own chrome — `railModel().brand` and `.brand-name` — each carrying its world on a
+separate eyebrow *inside* the world. The tab is the one place the application is visible with no world
+under it, so the one name that belongs there is the one that survives the door.
+
+**The two criteria are in tension, and the stronger one selects this.** #294's AC1 wants the title to
+name the opening world; AC3 fails any mode *"the four-tile menu does not offer"* — and the menu offers
+*Today's tower*, *Campaign*, *Endless rush* and *Fix a building*, so `— everyday mode` is not offered
+either. AC1 is answered by this recorded decision rather than literally.
+
+---
+
+## D376 — a licence is drawn on the thing it licenses, not filed in a register
+
+**Rules on:** GitHub issue #293. Settles the marker owed at `everyday/rushScreenModel.ts`.
+
+**Decision.** The Endless rush standings **keep their five rows** and gain
+`RUSH_BESTS_FIXTURE_NOTE`, drawn by `rushScreen.ts` immediately **above** them.
+`RUSH_ABSENCES` stays in the Settings build-information panel where [§ D307](#d307)'s successor put it.
+
+**What was wrong, and it is worse than an ordinary stale refusal.** The docstring permitting five
+unmeasured named holders to be drawn said the register saying so was *"on the same screen"*. It had not
+been since the merge closing GitHub issue #207 moved the register two clicks into Settings. An ordinary
+stale refusal ([§ D227](#d227)) tells a reader not to touch a control that works. **This one was the
+licence** — the sentence answering *why may unmeasured names and figures be drawn at all* — and it
+answered by pointing at a disclosure that was no longer there. A justification whose premise has
+silently expired keeps reading as a justification.
+
+**Why the marker rather than removing the rows.** GAMEPLAY § 20.11 names `RUSH_BESTS` outright and gives
+a fixture two ways to ship: *a real source, **or** an explicit marker so nobody ships them as truth*.
+The engine that would be the real source is #220's and is unbuilt, so the marker is the branch that is
+available. Removing the rows would also pre-empt **#222**, which owns what these rows eventually
+become, and the guide's five rows are what the screen *is* — a column of five dashes teaches nothing.
+
+**Why above rather than below.** `dev/menuPanel.ts#exampleBoard` puts its disclaimer before its example
+rows for the reason that decides it here: a reader who has already read five names and two held times
+has formed the belief the note exists to prevent.
+
+**Why not put `RUSH_ABSENCES` back.** That re-litigates #207 and duplicates the panel. The split that
+survives is the one [§ D307](#d307) drew: **a refusal about a thing a player is looking at goes on that
+thing; a register goes once, where a reader looks for one.**
+
+**Mechanised, not asserted.** `rushScreenModel.test.ts` requires that the module drawing the marker and
+the module drawing `RUSH_BESTS` stay the same module, in both directions, so a register that moves
+again takes the sentence describing it along. The import-graph case is **evidence and not proof** — it
+survives deleting the `append` — which is why `standaloneScreens.browser.test.ts` compares painted
+rectangles. Both were mutation-validated; the first draft of the claim-to-renderer case was **green
+against the defect it was written for**, because it asked whether the docstring named the module
+*anywhere* and the history section named it only to say what it does *not* import.
+
+---
+
+## D377 — a corpus seeds every cell a row draws, or the figure the issue is about goes unread
+
+**Rules on:** the honesty corpus's coverage of composite rows. Settles the marker owed at
+`honesty/surfaces.ts`. Extends [§ D343](#d343) rather than amending it.
+
+**Decision.** A surface adapter seeds **every cell its row renders**. Where a row draws *n* fields, the
+adapter seeds *n*.
+
+**What was wrong.** The Endless rush standings row draws four cells — `name`, `who`, `wave`, `held` —
+and `EVERYDAY_STANDALONE_SCREENS` seeded three. **`held` was the missing one**, so `'57 min'` against
+the handle `delft_vt` had never been read by the search: precisely the *other player's figure* that
+GitHub issue #293 is about, on the one surface in the build that prints one.
+
+**Why this is a rule and not a repair.** A partly-seeded row is worse than an unseeded one. An unseeded
+surface is visibly absent from the corpus and the surfaces column says so; a partly-seeded row **counts
+as covered**, and every count published about the corpus includes it. The nine single-surface properties
+run over the cells that were seeded and return green over the cell that was not.
+
+**How it was found, which is the argument for the rule.** Not by auditing coverage — by adding an
+unrelated string to the same adapter and reading the neighbouring lines. Nothing in the tree could have
+reported it: a seed count has no denominator to check against, because *how many cells does this row
+draw* is answerable only by reading the renderer.
+
+**What is not decided here.** No mechanical check derives seed sets from renderers; this rules on what
+an adapter owes, not on how to prove it. That derivation is worth building and is not built.
+[§ D343](#d343)'s measurement rule is untouched: the corpus is measured **once, after integration**,
+and this wave publishes no counts.
+
+---
