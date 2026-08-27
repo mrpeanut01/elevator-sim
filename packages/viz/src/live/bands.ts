@@ -451,14 +451,16 @@ export function moodOf(bands: WaitBands): Mood {
    * declares `sim.patience`, but `dev/parameterForm.ts` lets a player turn it on, so the wrong word
    * would be wrong on a run this product can produce.
    *
-   * What is true under both readings is that the record never saw the wait end, and that is what
-   * the clause says. It claims nothing about where the true number sits.
+   * What is true under both readings is that the wait had not ended and that nothing on this run
+   * says when it did, and that is what the clause says. It claims nothing about where the true
+   * number sits, and it says it in the words a player has rather than in the vocabulary of a
+   * censoring rule.
    *
    * Empty on the live basis by construction — see {@link WaitBands.longestWaitIsCensored} for why
    * a wait age on that basis is exact rather than bounded.
    */
   const unresolved = bands.longestWaitIsCensored
-    ? ' — unresolved, so this record cannot say when that wait ended'
+    ? ' — that wait had not ended, and nothing here says when it did'
     : '';
 
   /*

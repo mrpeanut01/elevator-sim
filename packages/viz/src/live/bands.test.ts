@@ -381,7 +381,7 @@ describe('a rider the door turned away is not somebody who stood all shift', () 
     const recording = syntheticRecording({ legs: [waitingLeg('p1', 0)], endedAt: 3000 });
     const bands = waitBandsAt(recording, 3000, 'whole-run');
     expect(bands.longestWaitIsCensored).toBe(true);
-    expect(moodOf(bands).sub).toContain('the longest 3000 s — unresolved');
+    expect(moodOf(bands).sub).toContain('the longest 3000 s — that wait had not ended');
     // And it is a qualification rather than a suppression: the figure is still there.
     expect(moodOf(bands).sub).toContain('1 riders stood past two minutes');
   });
@@ -404,7 +404,7 @@ describe('a rider the door turned away is not somebody who stood all shift', () 
     const bands = waitBandsAt(recording, 3000, 'whole-run');
     expect(bands.longestWaitIsCensored).toBe(false);
     expect(moodOf(bands).sub).toContain('the longest 200 s');
-    expect(moodOf(bands).sub).not.toContain('unresolved');
+    expect(moodOf(bands).sub).not.toContain('had not ended');
   });
 
   it('leaves the live card’s wait age unqualified, because that number is exact', () => {
