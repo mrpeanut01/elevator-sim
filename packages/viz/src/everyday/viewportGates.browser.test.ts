@@ -468,7 +468,7 @@ function failuresOf(cell: Cell): readonly string[] {
  * Landing #240 turns entries in this list into red lines saying *this stopped reproducing*.
  * Deleting them then is part of landing it — a finding that has been fixed must stop being
  * registered, or the register becomes decoration. When this list is empty, the four cases below
- * stop being a record and start being the gate § 2 has been owed since 2026-07-30.
+ * stop being a record and start being the gate § 2 has named since it was written on 2026-08-24.
  *
  * The one entry that is **not** #240's is the last: `everyday/stageScreen.ts:530` writes the stage
  * canvas at a literal `height:340px`, so clause 2 fails at 1280×800 as well, which is a tier-1
