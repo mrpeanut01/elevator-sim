@@ -138,7 +138,8 @@ export interface WaitBands {
   readonly longestCurrentWaitS: number | undefined;
   /**
    * Whether {@link longestCurrentWaitS} belongs to a leg whose wait had **not ended** by
-   * {@link atS}, and is therefore a lower bound rather than a wait anybody realised.
+   * {@link atS} — so the figure is not a wait anybody realised, and this layer cannot say what it
+   * is instead. See below: it is emphatically **not** a lower bound.
    *
    * `shift/goals.ts` will not grade a censored maximum at all, in either direction, and
    * `LiveObservations.worstWaitIsCensored` carries the same distinction for the fold the goals
@@ -149,9 +150,9 @@ export interface WaitBands {
    * **It is not a lower bound and the copy may not call it one.** `VizLeg` carries no
    * `abandonedAt`, so an unresolved leg is either somebody still standing or somebody who ran out
    * of patience and left long ago — and for the second, `t - arrivedAt` *overstates*. That is the
-   * whole reason `goals.ts` refuses rather than qualifies. `moodOf` therefore says the record never
-   * saw the wait end, which is true under both readings, and leaves *at least* to
-   * `shift/report.ts#worstWaitFigure`, which reads `core`'s flag and may.
+   * whole reason `goals.ts` refuses rather than qualifies. `moodOf` therefore says *that wait had
+   * not ended, and nothing here says when it did* — true under both readings — and leaves *at
+   * least* to `shift/report.ts#worstWaitFigure`, which reads `core`'s flag and may.
    *
    * ## It is only ever `true` on the retrospective basis, and that is a claim rather than a gap
    *
@@ -159,8 +160,8 @@ export interface WaitBands {
    * `t - arrivedAt` answers that **exactly** — every rider in the banding is unresolved by
    * construction, so a flag that read `true` for all of them would qualify a number that needs no
    * qualification and would say nothing a reader could act on. On `'whole-run'` the quantity is
-   * *the longest wait anybody realised across the shift*, which for a rider still standing is a
-   * bound on a wait that has not finished. Two bases, two questions — the module docstring's own
+   * *the longest wait anybody realised across the shift*, and for a rider whose wait never ended
+   * there is no such number to report. Two bases, two questions — the module docstring's own
    * framing — and the censoring belongs to the second.
    *
    * `false` when the banding is over nobody, matching `longestCurrentWaitS`'s `undefined`.
