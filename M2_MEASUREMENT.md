@@ -148,7 +148,9 @@ IE and anything outside the Vite baseline · JavaScript disabled · **CSS width 
 - **Out of scope for launch, as a refusal:** tap-target sizing, gesture affordances, touch-first
   layout, hover equivalents, and any claim that a phone is a *supported* way to play.
 
-De-facto floor today: **1280 px for asserted geometry, 420 px for anything driven at all**.
+De-facto floor today: **1280 px for asserted geometry, ~~420 px~~ 360 px for anything driven at
+all** — 420 was true until issue #292 put 360×800 and 375×667 into the tier, where geometry is now
+asserted at both (`packages/viz/src/everyday/viewportGates.browser.test.ts`).
 
 ---
 
@@ -195,11 +197,20 @@ loads the page at six viewports and reads horizontal overflow, tile count and pa
 node matrixProbe.mjs /path/to/worktree
 ```
 
+**§ 3.5 is where the second half of that sentence stopped applying.** *"A measurement lane changes no
+source and no test"* is a rule about **that lane's remit**, and it is not a property of an
+instrument — an uncommitted script cannot keep proving anything, and § 4.1 quotes #203 § 4's own rule
+that *"every tier-1 row must be a row a red run defends."* § 2 puts 360 px in scope for launch, so
+the successor instrument for § 2's three clauses is **in the tier**, at
+`packages/viz/src/everyday/viewportGates.browser.test.ts`. What stays out of band is the **matrix**
+half — the multi-engine question — which is a fact about this machine rather than about the tier.
+
 ### 3.2 The cells
 
 **Boot and layout, six viewports per engine.** `tiles` is the four Everyday mode tiles; `overflow` is
-`max(documentElement.scrollWidth, body.scrollWidth) − documentElement.clientWidth`, which is § 2's
-first clause.
+`max(documentElement.scrollWidth, body.scrollWidth) − documentElement.clientWidth`. ~~which is § 2's
+first clause.~~ **It is not § 2's first clause and it cannot be** — see the correction under the
+table, which is the load-bearing half of this section now.
 
 | engine | 1280×800 | 1440×900 | 768×1024 | 414×896 | 375×667 | 360×640 |
 |---|---|---|---|---|---|---|
@@ -214,8 +225,55 @@ far as loading the page, so **neither row says anything about whether this produ
 WebKit.** Tier 3 stays exactly as unevidenced as `docs/31-support-matrix.md` § 7 item 1 says it is.
 
 **Zero page errors and zero console errors in every green cell**, and **zero horizontal overflow at
-every width down to 360 px** — which is § 2's first commitment clause, measured for the first time
-at the floor it names.
+every width down to 360 px** — ~~which is § 2's first commitment clause, measured for the first time
+at the floor it names.~~
+
+> ### The `0 px` column is correct, and it is evidence for nothing — GitHub issue #292
+>
+> **The measurement stands. The conclusion drawn from it is withdrawn.** Every `0 px` above is a true
+> statement about the **document scroll box**, and this product's overflow does not go there.
+>
+> `packages/viz/src/everyday/shell.ts:299` makes the Everyday root `position:fixed`, `:304` gives it
+> `overflow:hidden`, and `:330` gives `.everyday-main` `overflow:hidden` as well. Content that
+> overruns a clipping box is **clipped, not scrolled**, so it never reaches `documentElement` and
+> `scrollWidth` there stays exactly equal to `clientWidth` — however far outside the viewport a
+> control is drawn. A `position:fixed; overflow:hidden` shell is invisible to this metric **by
+> construction**: it reads `0` in precisely the case § 2's clause exists to catch. The six cells were
+> not close calls that a better run would have caught; the quantity was null over this shell.
+>
+> **Which shell, and this is the half a reader will otherwise assume wrongly.** The row was taken
+> with the page on **Everyday Mode**, which is what `packages/viz/index.html` has loaded since
+> **2026-08-12** (§ D335). `UX.md`'s `RX-03` and `RX-04b` — the prose § 2 says its clauses restate —
+> were driven, broken, fixed and re-driven on **2026-07-30 in `5d4b782`**, against the **Engineer**
+> surface and its `@media (max-width: 767px)` block. Six weeks separate them. So this row is not a
+> re-confirmation of `RX-03` at a new floor: **the Everyday shell had never been measured against any
+> of § 2's three clauses**, and it still had not been when this row was published.
+>
+> **Corrected by measurement rather than by argument.**
+> `packages/viz/src/everyday/viewportGates.browser.test.ts` reads the per-element quantity —
+> `scrollWidth − clientWidth` on every drawn box whose own `overflow-x` clips — beside the metric
+> above, on the same page at the same instant, and adds the two clauses this section measured
+> nothing of. Chromium headless shell r1194, 2026-08-27:
+>
+> | viewport | screen | the metric above | clipped | controls no gesture reaches | stage canvas |
+> |---|---|---|---|---|---|
+> | 360×800 | main menu | **0 px** | **93 px** | **5** | — |
+> | 360×800 | stage | **0 px** | **337 px** | **12** | 340 px = **42.5 %** |
+> | 375×667 | main menu | **0 px** | **78 px** | **5** | — |
+> | 375×667 | stage | **0 px** | **322 px** | **11** | 340 px = **51.0 %** |
+> | 1280×800 | main menu | 0 px | 0 px | 0 | — |
+> | 1280×800 | stage | 0 px | 0 px | 0 | 340 px = **42.5 %** |
+>
+> The five controls at 360×800 are the whole main menu: all four mode tiles, and § 3.3's primary
+> `Play today's tower`, drawn at `left: 360` and **wholly outside the viewport**. The rail is
+> `RAIL_WIDTH_PX = 212` at every width (`everyday/shell.ts:129`, inline, no breakpoint), which leaves
+> the screen region 148 px at 360 and 163 px at 375 for content that lays out at 241 px. The stage
+> canvas is a literal `height:340px` (`everyday/stageScreen.ts:530`), so **clause 2 fails at 1280×800
+> as well** — a tier-1 desktop viewport, and outside #240's stated subject.
+>
+> **All of that is registered rather than fixed, and the suite is green.** The layout is #240's, open
+> and unstarted; the register is asserted in both directions, so a new failure is red and a fixed one
+> is red as *delete this entry*. This lane fixed the instrument and the claim, not the shell.
 
 **The slice itself, at the tier-1 viewport 1280×800**, driven through the player's own controls:
 
@@ -314,7 +372,7 @@ The two bold rows are the ones this lane's matrix work turns on: **T1's test is 
 | **Android Chrome, real device** | no device | § 4 refuses a device cloud on cost. The affordable proxy is Playwright's `hasTouch`/`isMobile` on the already-installed Chromium — **also unreachable here**, because `isMobile` is the very field the older builds reject, and no shipped tier file sets it |
 | **iOS / iPadOS Safari** | no device, and the WebKit cell above | unchanged: the matrix's own weakest row |
 | **Old Chromium** | — | § 4 refuses this deliberately; the Vite baseline target is the control |
-| **200 % browser zoom** (§ 5's accessibility row) | not attempted — it rides on #240's viewport gates, which do not exist | trivial once a viewport gate exists: 200 % at 1280 is geometrically the 640 px layout |
+| **200 % browser zoom** (§ 5's accessibility row) | not attempted — it rode on #240's viewport gates, ~~which do not exist~~ **which exist now**: `packages/viz/src/everyday/viewportGates.browser.test.ts` drives 360, 375 and 1280 and measures all three of § 2's clauses at each (issue #292) | trivial now: 200 % at 1280 is geometrically the 640 px layout, and the sweep takes a viewport list |
 | **Screen readers** | no assistive stack | unchanged; § 5 already labels this best-effort and untested |
 
 ### 4.1 The honest verdict on M2's box
