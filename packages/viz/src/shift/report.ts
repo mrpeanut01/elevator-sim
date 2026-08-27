@@ -1319,22 +1319,63 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
 function stairsNote(observations: Observations): string {
   const horizon = horizonLabelOf(observations.horizonS);
   const { abandoned, abandonedCarried } = observations;
-  if (abandoned === 0) return `no wait crossed the ${horizon} give-up horizon`;
+  const scope = 'over the whole shift';
+  if (abandoned === 0) {
+    return `no wait crossed the ${horizon} give-up horizon ${scope}${turnedAwayClause(observations)}`;
+  }
   if (abandonedCarried === abandoned) {
     return (
-      `waited past the ${horizon} horizon before a car came — every one of them is inside ` +
-      'CARRIED too, so these two cells overlap rather than add'
+      `waited past the ${horizon} horizon ${scope}, before a car came — every one of them is ` +
+      `inside CARRIED too, so these two cells overlap rather than add${turnedAwayClause(observations)}`
     );
   }
   if (abandonedCarried === 0) {
     return (
-      `waited past the ${horizon} horizon and were never carried — they sit inside CARRIED’s ` +
-      'denominator and not its count'
+      `waited past the ${horizon} horizon ${scope} and were never carried — they sit inside ` +
+      `CARRIED’s denominator and not its count${turnedAwayClause(observations)}`
     );
   }
   return (
-    `waited past the ${horizon} horizon — ${String(abandonedCarried)} of them were still carried ` +
-    'and are inside CARRIED too; the rest were not'
+    `waited past the ${horizon} horizon ${scope} — ${String(abandonedCarried)} of them were ` +
+    `still carried and are inside CARRIED too; the rest were not${turnedAwayClause(observations)}`
+  );
+}
+
+/**
+ * The fourth outcome, named on the cell that used to swallow it — GitHub issue #288.
+ *
+ * ## Why it is here at all
+ *
+ * `Observations.abandoned` counted riders the building had **turned away at a credential check**,
+ * because `crossesHorizonAt` ended a wait at `boardedAt` and a refused rider never boards. Measured
+ * on Secure Tower over its own authored day, **72 of 72** stairs-takers were those riders, every one
+ * of whom waited zero seconds, under a caption reading *waited past the 15-minute horizon and were
+ * never carried*.
+ *
+ * The count is fixed at the fold. What that fix would have done on its own is take this cell from
+ * `72` to `0` and leave seventy-two people off the sheet entirely — a day that improved its wait
+ * figures by turning people away, reported as a clean day. `CLAUDE.md` refuses exactly that trade
+ * for abandonment and stairs uptake, and § D266 refuses it for this outcome by name: it is
+ * published **beside** the wait figures, on the footing `workPerServedLegKJ` sits beside raw energy.
+ *
+ * ## Why a clause on this note rather than a cell of its own
+ *
+ * A seventh figure would be a **grade-shaped** thing in a grid of grade-shaped things, and the
+ * tone rules on this sheet colour a cell good or bad. A refusal is neither: the building is doing
+ * what its access zoning says, and the reader whose day this is did not choose the zoning. So it
+ * rides on the cell whose cohort it was being confused with, where a reader meeting `TOOK THE
+ * STAIRS 0` beside a hundred-person shortfall in CARRIED has the sentence that explains it.
+ *
+ * Empty when nobody was turned away, which is every run of a building declaring no `accessZones`
+ * and every run of a zoned building whose riders are all correctly badged — so the shipped sheet is
+ * byte-identical on those, and the clause appears exactly where there is something to say.
+ */
+function turnedAwayClause(observations: Observations): string {
+  const { turnedAway } = observations;
+  if (turnedAway === 0) return '';
+  return (
+    `; a further ${String(turnedAway)} were turned away at a credential check and waited for ` +
+    'nothing — a different outcome, not a slow one'
   );
 }
 

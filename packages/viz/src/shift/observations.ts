@@ -71,6 +71,10 @@ export function shiftObservationsOf(live: LiveObservations): Observations {
     peakQueueAtS: live.peakQueue.atS ?? null,
     abandoned: live.abandoned,
     abandonedCarried: live.abandonedCarried,
+    // The fourth outcome, projected like the other three. Not a fifth division here: `live/` folds
+    // it in the same pass as `arrived` and `abandoned`, which is what stops one sheet holding two
+    // answers to *how many did this building turn away* — issue #288, § D265, § D266.
+    turnedAway: live.turnedAway,
     horizonS: live.horizonS,
     // `0` when nobody has arrived, for `minutePct`'s reason one case up: a goal is a comparison
     // and needs a number, and under the wake-up gate the value is never displayed and never
