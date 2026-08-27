@@ -25640,3 +25640,133 @@ the correct end state of the fix, not a regression**, and both documents now say
 meets the number.
 
 ---
+
+## D379 — one answer to *when did this wait end*, and the fourth outcome is counted, named, and not gradeable
+
+**Rules on:** GitHub issue #288. Settles the arguments in `live/observations.ts#crossesHorizonAt`,
+`live/bands.ts#realisedWaitsBy`, `live/types.ts#LiveObservations.turnedAway` and
+`shift/types.ts#Observations.turnedAway`, none of which declared themselves owed.
+
+**Decision.** Every module that asks when a wait ended answers `leg.boardedAt ?? leg.refusedAt` —
+`core`'s own rule (`metrics/summarize.ts:727`) minus the field `VizLeg` does not carry. A rider turned
+away at a credential check is folded as a **fourth outcome** in the same pass, published beside the
+others, and **not put on `GoalObservations`**.
+
+**What was wrong.** Only `boardedAt` could stop a leg crossing the give-up horizon, so a rider refused
+at the door — who waited **zero seconds** — was counted in the cohort the sheet labels *TOOK THE
+STAIRS*, *"waited past the 15-minute horizon and were never carried"*. Measured on Secure Tower's
+authored day: `abandoned` = **72**, and **72 of 72** were refused legs, against a service-level row
+correctly reporting `overHorizonCount` = **0**. This folded [§ D265](#d265)/[§ D266](#d266)'s fourth
+outcome back inside a wait statistic built to publish it beside AWT, never within it.
+
+**The issue's own diagnosis of its headline figure was wrong, and this is the load-bearing
+correction.** #288 attributes its `2 915 s` to the censored-maximum mechanism. It is not: it is **this**
+defect at a second site the issue does not name, `live/bands.ts#realisedWaitsBy`, which ended a wait at
+`boardedAt` alone so a refused rider read as standing for the remainder of the run. Secure Tower's
+whole day printed *"the longest **34 472 s**"* for a rider turned away at 1 564 s of a 36 036 s run,
+against a service-level row correctly saying 313 s. **Fixing the censoring alone would have relabelled
+that number and left it on the card.**
+
+**Two further clauses of the issue are refuted.** `render/mood.ts#headlineFor` prints **no figure at
+all**; the retrospective sub-line belongs to `live/bands.ts#moodOf`. And the *standing right now* row
+reads `queueAt`, whose `isWaitingAt` already excludes refused legs, so it is **exact** for the quantity
+it names and is not a censored-maximum consumer.
+
+**Why `turnedAway` is not gradeable.** A goal reading *fewer refusals* is a target a player could hit
+by **locking the building down**, which is the same failure as improving AWT by serving fewer people —
+the reason [§ D106](#d106) keeps energy an axis and never a score. It is counted and named on the
+sheet; it is not something to win.
+
+---
+
+## D380 — a censored maximum may be qualified in `live/`, and may not be called a lower bound
+
+**Rules on:** GitHub issue #288's second mechanism. Settles `live/types.ts#WaitBands.longestWaitIsCensored`.
+
+**Decision.** A censored maximum on a live card is **qualified**, not refused — refusing would blank the
+only figure a retrospective card has — and the qualification **may not use the words *at least***.
+
+**The distinction, which was caught by the lane in its own first fix.** `shift/report.ts#worstWaitFigure`
+says *at least*, and that is **true there**: `core` can see `abandonedAt`, so its censored figure really
+is a lower bound. `VizLeg` carries no `abandonedAt`, so in `live/` an unresolved leg may be a rider who
+**walked out**, for whom `t − arrivedAt` **overstates** by every second since they left. A bound that
+might overstate is not a lower bound, and `shift/goals.ts` refuses rather than qualifies for exactly
+that reason. Copying the wording across the boundary would have been a false claim in the honest
+direction — the hardest kind to notice. A case now asserts *at least* is **absent** from the live
+clause.
+
+**What is deliberately not fixed, and why it is not hidden.** `VizLeg` gains no `abandonedAt`: the issue
+offered the smaller reversible option and verification showed it sufficient for the reported symptom. So
+the band tallies still count a walked-out rider at their accrued wait, and `frame/overlay.ts#isWaitingAt`
+still keeps them in `queueAt`. No shipped building declares `sim.patience`, but `dev/parameterForm.ts`
+lets a player turn it on. **Closing that properly is a contract change and a product-owner call**, not a
+lane's.
+
+---
+
+## D381 — the tuner applies a spec only when something moved, and the caller set is derived twice over
+
+**Rules on:** GitHub issue #289. Settles `everyday/tunerModel.ts#tunePresses`.
+
+**Decision.** *Run it and watch* applies a building spec **only when a control has actually moved**. The
+non-test caller set of `shiftReportWindowFor` is derived from disk, and so is a **second** set covering
+the modules that bypass it.
+
+**What was wrong.** The press called `applyBuildingSpec` unconditionally, which stood the week on
+`SANDBOX_CONTRACT_ID` and handed `withBuilding` a drawn tower. The id the matrix was then asked about
+was no longer the authored one, `shiftReportWindowFor` returned `undefined` — *leave the template's band
+alone* — and the peak-5min band was used under a header still reading `GARDEN APARTMENTS`. Reproduced:
+`reportWindow` `'full-run'` → `undefined`, `contractId` `c1` → `sandbox`, `buildingId`
+`garden-apartments` → `bld-1`.
+
+**Why the criterion had to be raised rather than met as written.** #289's AC2 asks that the **caller
+set** be derived so a fifth producer cannot arrive unregistered. That alone **would not have caught this
+defect**, because the tuner is not a caller — it is a **bypasser**, and a derived list of callers is
+blind to a module that changes the answer without asking the question. A second derived set covers the
+bypassers, and a planted fifth producer reddens both.
+
+**`specIsDirty` is refuted as the predicate to reuse.** It exists at `authoring/dispatcherSpec.ts:437`
+and asks a *dispatcher* question. The right predicate was already in the tuner and unused by the press:
+`movedKeys(standing, tune)`, which the screen computes and renders three ways.
+
+**What stays as it was.** A **genuinely tuned** building has no matrix cell, and falling through to the
+template's band is correct for it. Only *entering the sandbox and changing nothing* is fixed.
+
+---
+
+## D382 — a sandbox day moves nothing the rail publishes, and the machine ladder carries the standing value
+
+**Rules on:** GitHub issue #290, and the third defect found while fixing it. Settles
+`shift/week.ts#closeDay` and `everyday/tunerModel.ts#tuneMachineSteps`.
+
+**Decision.** A day on `SANDBOX_CONTRACT_ID` moves **`bestMinutePct`, `streak` and `cleanRun`** — none of
+them. And the tuner's machine ladder **carries the standing value** when the class admits it, instead of
+snapping to the catalogue.
+
+**Why the guard is wider than #290 asked for.** The issue reads the day counter staying at `0` as a guard
+working. **There is no guard** — that day was *missed*. On a **clean** sandbox day the rail publishes
+`1 day running · best 97%`. Guarding `bestMinutePct` alone would have left the product saying two
+different things about one promise, on a screen that makes it four times.
+
+**The third defect, which is the reason this ruling is not only about a guard.** `redraw` snapped speed
+onto the class ladder, and its comment said that was *"only reachable through a class change, which this
+screen does not offer today"*. **False.** `speedStepsFor` filters the § 10.1 **catalogue** to the class
+band, and shipped buildings need not sit on the catalogue:
+
+| building | authored | snapped to | effect |
+|---|---|---|---|
+| `garden-apartments` | **0.63 m/s** | 0.50 | opens **21 % slower** than the building it names |
+| `crown-hotel` | **3.0 m/s** | 2.5 | opens **17 % slower** |
+
+Both are contract-backed campaign buildings. It is also why a playtest that touched nothing read all
+four *sandbox* strings — they are the `moved.length > 0` arm — and it would have **defeated § D381's
+guard on exactly the building #289 reports.** The snap is kept for genuine class changes and asserted in
+that direction, so deleting it fails.
+
+**Known residual, pinned by a test rather than by prose.** On a cold profile whose only closed day is a
+sandbox one, the rail reads `best 0%` where it should read `best —`: `careerLineOf` and
+`weekView.ts#streakLineOf` gate their em dash on `history`, which a sandbox day still joins. It clears
+the moment any scored day closes and credits nothing to the sandbox. The fix is to gate on a **posted**
+day, and it moves two files that share a string-identity test, so they move together or not at all.
+
+---
