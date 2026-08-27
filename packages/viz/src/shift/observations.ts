@@ -71,7 +71,7 @@ export function shiftObservationsOf(live: LiveObservations): Observations {
     peakQueueAtS: live.peakQueue.atS ?? null,
     abandoned: live.abandoned,
     abandonedCarried: live.abandonedCarried,
-    // The fourth outcome, projected like the other three. Not a fifth division here: `live/` folds
+    // The fourth outcome, copied like `abandoned` beside it and derived nowhere else: `live/` folds
     // it in the same pass as `arrived` and `abandoned`, which is what stops one sheet holding two
     // answers to *how many did this building turn away* — issue #288, § D265, § D266.
     turnedAway: live.turnedAway,

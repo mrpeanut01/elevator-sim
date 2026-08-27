@@ -176,8 +176,8 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
  * captioned *waited past the 15-minute horizon and were never carried* — counted them. Measured on
  * Secure Tower over its own authored day (`office-day`, seed 20 260 824, shipped defaults): **72 of
  * 72** stairs-takers were riders refused at a credential check, every one of whom waited **zero
- * seconds** — `refusedAt` equals `arrivedAt` on every refused leg, 72 of 72, which is the same
- * identity the queue sweep below measures at 4 of 4 and 5 of 5 on the breadth fixture. Three rows
+ * seconds** — `refusedAt` equals `arrivedAt` on every refused leg, 72 of 72, which is the identity
+ * the queue sweep below records at 4 of 4 and 5 of 5 on the breadth fixture. Three rows
  * away, `render/mood.ts`'s unluckiest-rider driver read `summary.serviceLevel.overHorizonCount` —
  * which `core` gets right — and printed *"Nobody waited past the 900 s abandonment horizon"* over
  * the same run. One sheet, two counts of one cohort, `72` and `0`.
@@ -186,8 +186,8 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
  * folded back inside a wait statistic built to publish it *beside* AWT and never within it. The
  * ending rule is now `core`'s own: `metrics/summarize.ts#diagnoseServiceLevel` ends a wait at
  * `boardedAt ?? abandonedAt ?? refusedAt ?? censoredAtS`, and this is that rule minus the field
- * `VizLeg` does not carry. It is also, exactly, the resolution the worst-wait fold eight lines
- * below the call site had been applying all along, so the two folds in this one function had
+ * `VizLeg` does not carry. It is also, exactly, the resolution the worst-wait fold a few lines
+ * under this one's call site had been applying all along, so the two folds in one function had
  * disagreed about when a wait ends since the day `refusedAt` arrived.
  *
  * **The count this removes has not gone quiet**, which is the half that matters: those riders are
