@@ -24,21 +24,28 @@
  * own control. Nothing here lifts a cover — a tier that did would be testing a surface nobody can
  * open, which is `dev/browserTier.test-helper.ts`'s standing argument.
  *
- * ## `?duration=300`, and why that is not a weakened case
+ * ## `?duration=`, and why a short day is not a weakened case
  *
  * The interval is `(endedAt − startedAt) / 60` and nothing about the defect depends on its size:
- * at the shipped hour it is ~60 s of waiting per case, and at five minutes it is ~5 s. The link
- * carries `duration` already (`dev/main.ts#deepLinkStateOf`), `garden-apartments` declares no whole
+ * at the shipped hour it is ~60 s of waiting per case — measured, on this tree, at 60 011 ms from
+ * arriving on the stage — and at five minutes it is ~5 s. The link carries `duration` already
+ * (`dev/main.ts#deepLinkStateOf`, clamped to `[60, 7200]`), `garden-apartments` declares no whole
  * day (`shift/dayLength.ts#wholeDayFor` answers `undefined` for it), so the Everyday brief's own
  * `startRun` patches no length over it and the run really is the one the address asked for.
- * {@link ENGINEER_END_MS} is that arithmetic written once, and every wait below is a multiple of it
- * — a case that waited a flat number of seconds would go quiet the day the default hour moves.
+ * {@link engineerEndMs} is that arithmetic written once, and every wait below is a multiple of it —
+ * a case that waited a flat number of seconds would go quiet the day the opening hour moves.
  *
- * **The last case is the negative control and the file is worth nothing without it.** Four cases
- * that assert *the day did not file* all pass on a build where nothing can ever file. So the fifth
- * drives the Engineer surface's own end-of-day close, through the player's own Run button, on the
- * same page and through the same instrument, and requires the day **to** file. It is the mutation
- * this suite would otherwise be blind to.
+ * **The last two cases are the negative controls, and the file is worth nothing without them.**
+ * Four cases that assert *the day did not file* all pass on a build where nothing can ever file.
+ * So the fifth lets a day run out **after** the player has crossed into the Engineer world, and the
+ * sixth drives that surface's own Run button; both require the day **to** file, on the same page
+ * and through the same instrument. Between them they pin the boundary as an *edge* — the instant
+ * the day ran out is the instant that decides which product owns it — rather than as a rule reading
+ * *an Everyday day never files by itself*, which is the wrong fix that all four absence cases would
+ * have been equally happy with.
+ *
+ * All four absence cases fail on `55f2bca` and both controls pass there, which is the instrument
+ * moving in both directions before its green was trusted.
  */
 
 import { fileURLToPath } from 'node:url';
@@ -56,7 +63,7 @@ import {
   openPage,
   returnToEverydayMode,
 } from '../dev/browserTier.test-helper.js';
-import { STAGE_SPEEDS, stageBarModelOf } from './stageScreenModel.js';
+import { STAGE_DAY_OVER, STAGE_SPEEDS, stageBarModelOf } from './stageScreenModel.js';
 
 /** The run the address asks for, in simulated seconds. See the module docstring. */
 const RUN_S = 300;
@@ -202,6 +209,15 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
       expect(bar.inert).toBe(false);
       // The player's own transport really did finish: § 7.3's button is back to offering Play.
       expect(await page.textContent('.everyday-stage-play')).toContain('Play');
+      /*
+       * And the fourth criterion. The issue's own last section is what this line answers: from the
+       * instant the stage's playback finishes, the page was bit-for-bit identical with only that
+       * `⏸ Pause` → `▶ Play` flip to show for itself, and readers took it for a crash. Removing the
+       * covered transport makes the stillness *permanent*, so the row is what has to say the day is
+       * over — and the two assertions above it are the other half: the primary that ends the
+       * stillness is still pressable.
+       */
+      expect(bar.note).toBe(STAGE_DAY_OVER);
     } finally {
       await page.close();
     }

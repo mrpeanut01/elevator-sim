@@ -60,6 +60,7 @@ import {
   STAGE_ABSENCES,
   STAGE_ALARM_STANDING,
   STAGE_BAND_INK,
+  STAGE_DAY_OVER,
   STAGE_INTERVENTIONS,
   STAGE_NO_PHASE,
   STAGE_RECOMPUTING,
@@ -583,6 +584,64 @@ describe('§ 3.3 — the stage row, refined', () => {
       expect(bar.note, JSON.stringify(flags)).not.toBe('Stops the clock and writes the report.');
       expect((bar.note ?? '').length).toBeGreaterThan(10);
     }
+  });
+
+  /**
+   * The fourth state — GitHub issue **#287**'s fourth criterion, and the one that goes the other
+   * way from the three above.
+   *
+   * A day that has run out and not been filed is the state in which the primary is *most* worth
+   * pressing, so the row explains and does not refuse. Asserted as a pair, because half of it —
+   * a note that changed — would pass just as well against a build that had also disabled the
+   * button, which is the thing this state must not do.
+   */
+  it('says the day has run out, and leaves the primary pressable', () => {
+    const bar = stageBarModelOf(state, {
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      dayEnded: true,
+    });
+    expect(bar.note).toBe(STAGE_DAY_OVER);
+    expect(bar.primary.inert).toBeUndefined();
+    expect(bar.primary.label).toBe('Close the day');
+  });
+
+  /**
+   * And the ordering, asserted rather than left to the reading order of a ternary.
+   *
+   * A filed day's transport is also sitting at the end of the run, so both facts are true at once
+   * and only one sentence can be on the row. *Filed* wins: the newer fact would otherwise shout
+   * over the older one and point a player at a button that is already inert. The `recomputing` and
+   * *no run yet* arms are checked in the same breath — the first because a re-simulation replaces
+   * the transport, the second because `dayEnded` cannot be true without a run and a caller that
+   * passed both anyway must not get a sentence about closing a day that does not exist.
+   */
+  it('lets each refusal outrank it, so the row never points at an inert button', () => {
+    for (const flags of [
+      { hasRun: true, dayClosed: true, recomputing: false, dayEnded: true },
+      { hasRun: true, dayClosed: false, recomputing: true, dayEnded: true },
+      { hasRun: false, dayClosed: false, recomputing: false, dayEnded: true },
+    ]) {
+      const bar = stageBarModelOf(state, flags);
+      expect(bar.note, JSON.stringify(flags)).not.toBe(STAGE_DAY_OVER);
+      expect(bar.primary.inert, JSON.stringify(flags)).toBe(bar.note);
+    }
+  });
+
+  /**
+   * The default, which is every caller written before the field existed.
+   *
+   * `dayEnded` is optional, so `honesty/surfaces.ts` and `everyday/stageScreen.ts`'s three older
+   * states compile untouched. An optional flag whose absent arm was never asserted is how a
+   * default quietly becomes the wrong one.
+   */
+  it('is the table’s own row again when nobody says whether the day ended', () => {
+    const bar = stageBarModelOf(state, { hasRun: true, dayClosed: false, recomputing: false });
+    expect(bar.note).toBe('Stops the clock and writes the report.');
+    expect(stageBarModelOf(state, { ...{ hasRun: true, dayClosed: false, recomputing: false }, dayEnded: false }).note).toBe(
+      'Stops the clock and writes the report.',
+    );
   });
 });
 

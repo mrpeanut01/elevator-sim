@@ -682,7 +682,43 @@ export interface StageBarInput {
   readonly hasRun: boolean;
   readonly dayClosed: boolean;
   readonly recomputing: boolean;
+  /**
+   * Whether the transport **the player is holding** has reached the end of the day — GitHub issue
+   * **#287**, its fourth acceptance criterion.
+   *
+   * Optional, and the default is the state every existing caller was already in: a day still
+   * running. It is the one fact on this input that is not about the *host* — the other three are
+   * `runState()` reads — and that asymmetry is the point rather than an oversight. The playhead is
+   * § 7's stage's own (`everyday/host.ts` refuses a transport method for the reason its docstring
+   * gives), so nothing the host can be asked knows this; the screen holding the transport is the
+   * only thing that does, and it writes it through `everyday/stageScreen.ts`'s `barFacts`.
+   */
+  readonly dayEnded?: boolean | undefined;
 }
+
+/**
+ * What § 3.3's row says once the day has run out and nobody has filed it — issue **#287**.
+ *
+ * ## Why this sentence exists at all
+ *
+ * The issue's last section: at the top of § 7's speed ladder the stage's own playback finishes in a
+ * few seconds, and from that instant the screen is **bit-for-bit identical** — the only delta on the
+ * whole page being the transport button flipping `⏸ Pause` to `▶ Play`. Readers reported believing
+ * the product had crashed. It looked temporary only because a second, covered transport was
+ * running behind it and eventually filed the day; with that removed the stillness is permanent,
+ * which is worse rather than better, and this is the half of the fix that owes the player a
+ * sentence.
+ *
+ * ## Why it is a note and not a refusal
+ *
+ * The three sentences above it all resolve § 3.3's primary **inert**, because in each of those
+ * states pressing it would do nothing. This one is the opposite state: the primary is exactly what
+ * the player should press, and the row's job is to say so. So the note is replaced and the button
+ * is left alone — a state where there is more to do, not less.
+ *
+ * A decision number is owed; the argument is this docstring's.
+ */
+export const STAGE_DAY_OVER = 'the day has run out — close it and its report is written';
 
 /**
  * § 3.3's stage row, refined.
@@ -718,7 +754,16 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
       : input.dayClosed
         ? 'the day is filed — its report is written'
         : undefined;
-  if (refusal === undefined) return base;
+  if (refusal === undefined) {
+    /*
+     * The fourth state, and it is the only one that leaves the primary alone — {@link STAGE_DAY_OVER}
+     * carries why. **Below the three refusals rather than beside them**, which is an ordering by
+     * cause and not by taste: a filed day's transport is also sitting at the end of the run, so a
+     * day that has both run out and been filed must say *filed* — the newer fact would otherwise
+     * shout over the older one and tell a player to press a button that is already inert.
+     */
+    return input.dayEnded === true ? { ...base, note: STAGE_DAY_OVER } : base;
+  }
   return {
     ...base,
     primary: { ...base.primary, inert: refusal },
