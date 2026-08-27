@@ -8,15 +8,179 @@
  * cell moves it.
  */
 
+import { readFile, readdir } from 'node:fs/promises';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { MATRIX_CELLS } from '@elevator-sim/experiments/browser';
 import { describe, expect, it } from 'vitest';
 
+import { specFromBuilding } from '../authoring/buildingSpec.js';
+import { specFromTrafficProfile } from '../authoring/patternSpec.js';
+import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
+import { classOfSpec, designerClasses } from '../everyday/designerModel.js';
+import {
+  buildingWithTune,
+  snapToStep,
+  tuneMachineSteps,
+  tunePresses,
+  tuneStateFrom,
+} from '../everyday/tunerModel.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
-import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import { buildingConfigOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
 import { shiftReportWindowFor } from './reportWindow.js';
 
 const MATRIX_BUILDINGS = [...new Set(MATRIX_CELLS.map((cell) => cell.building))];
+
+/* -------------------------------------------------------------------------- *
+ * Who can move this window — derived from disk, GitHub issue #289
+ * -------------------------------------------------------------------------- */
+
+const VIZ_SRC = fileURLToPath(new URL('..', import.meta.url));
+
+/** Every runtime `.ts` under `packages/viz/src`, as paths relative to it. Tests excluded. */
+async function runtimeFiles(dir: string = VIZ_SRC): Promise<readonly string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const found: string[] = [];
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...(await runtimeFiles(path)));
+    else if (
+      entry.name.endsWith('.ts') &&
+      !entry.name.endsWith('.test.ts') &&
+      !entry.name.endsWith('.test-helper.ts')
+    )
+      found.push(relative(VIZ_SRC, path).split('\\').join('/'));
+  }
+  return found.sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Comments removed, so a *mention* is never read as a call.
+ *
+ * Load-bearing rather than tidy: `everyday/tunerModel.ts`'s docstring quotes the very press this
+ * scan looks for, and a scanner that counted prose would register the file that explains the defect
+ * as a file that commits it. It is also the reason the registries below can carry long reasons
+ * without seeding themselves.
+ */
+function stripComments(text: string): string {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+}
+
+async function filesCalling(pattern: RegExp): Promise<readonly string[]> {
+  const hits: string[] = [];
+  for (const file of await runtimeFiles()) {
+    const code = stripComments(await readFile(join(VIZ_SRC, file), 'utf8'));
+    if (pattern.test(code)) hits.push(file);
+  }
+  return hits;
+}
+
+/**
+ * Every non-test caller of {@link shiftReportWindowFor}, and **which id each asks it about**.
+ *
+ * The id is the interesting half. The function is total over strings and answers `undefined` for
+ * anything the matrix has not measured, so a caller cannot fail loudly — it can only quietly ask
+ * about the wrong building, which is what `dev/state.ts`'s own comment guards against by asking
+ * about `authored.id` rather than about the resolved day's.
+ */
+const WINDOW_CALLERS: Readonly<Record<string, string>> = Object.freeze({
+  'campaign/stageRun.ts':
+    'the stage’s own `stage.building`, at both the plan and the judged-run call — a stage names a ' +
+    'shipped building by construction, so the id is never a copy.',
+  'dev/state.ts':
+    '`shiftRunConfigOf`, asked of `authored.id` — the id before growth, commissioning and ' +
+    'incidents, which edit a building without renaming it.',
+  'scenario/measure.ts': '`scenario.buildingId`, the id the scenario declares.',
+  'shift/reportWindow.ts':
+    'declares it — in the registry rather than filtered out of the scan, because a declaration ' +
+    'that vanished would take its three callers with it and the set would still match.',
+});
+
+/**
+ * Every non-test file that can move `ViewerState.buildingId`, and what it does about the window.
+ *
+ * ## Why this second registry exists, and why the issue's criterion was raised to reach it
+ *
+ * Issue #289 asked that *`shiftReportWindowFor`'s caller set be derived rather than hand-listed, so
+ * a fifth producer cannot arrive unregistered*. Derived, that set is the three callers above plus
+ * the file that declares them — and **it would not have caught the defect the issue reports**,
+ * because `everyday/tunerScreen.ts` was never a caller. It was a *bypasser*: it replaced the id the
+ * window is keyed on with a copy of the same building under a fresh name, and every caller above
+ * then did its job perfectly on the wrong question.
+ *
+ * So the derived set that matters is this one — everything that can move that id. `withBuilding` is
+ * the one function that writes it on the shift path (`stateRunningSaved` and the host's
+ * `applyBuildingSpec` are its two wrappers), which is what makes the question askable at all.
+ * A sixth screen that presses any of the three lands here and fails until it says which it is.
+ *
+ * The entries answer one question: **does this move the id to a building the matrix has not
+ * measured, and did the player ask for that?** *Yes, and yes* is correct — a drawn tower has no
+ * cell and `reportWindow.ts` refuses to invent one for it. *Yes, and no* is issue #289.
+ */
+const ID_MOVERS: Readonly<Record<string, string>> = Object.freeze({
+  'dev/state.ts': 'declares `withBuilding` — the write itself.',
+  'dev/buildingEditor.ts':
+    '`stateRunningSaved`, and the Engineer editor’s *Save and run* that calls it. The reader ' +
+    'asked for a new building by drawing one, so the matrix not knowing it is the honest state.',
+  'dev/main.ts':
+    'the boot re-selection, the campaign day’s contract building and the coach’s building ' +
+    '`<select>` — all three move to a building the player named, never to a copy of one.',
+  'dev/rightRail.ts': 'the rail’s building picker: the same named-selection case.',
+  'menu/enterFreePlay.ts': 'free play’s own selection — again a building the player named.',
+  'everyday/host.ts':
+    'declares and implements `applyBuildingSpec`, the Everyday port onto `stateRunningSaved`.',
+  'everyday/designerScreen.ts':
+    '*Save as a new building* — the drawing board’s whole purpose, so the fresh id is what the ' +
+    'player asked for.',
+  'everyday/tunerScreen.ts':
+    'issue #289. Guarded on `tunerModel.ts#tunePresses`: an untouched tuner presses nothing, so ' +
+    'the id stays the authored one and the window stays the building’s own answer. A tuned one ' +
+    'presses, and the fall-through is then correct.',
+});
+
+describe('who can move this window — the producer set, derived from disk', () => {
+  it('has exactly the registered callers, and no further one arrives unregistered', async () => {
+    const found = await filesCalling(/\bshiftReportWindowFor\s*\(/);
+    expect(found).toEqual(Object.keys(WINDOW_CALLERS).sort((a, b) => a.localeCompare(b)));
+  });
+
+  it('has exactly the registered id movers, and no further one arrives unregistered', async () => {
+    /*
+     * The three wrappers together rather than `withBuilding` alone: a screen reaches the write
+     * through whichever of them its layer offers, and a set derived from the innermost one would
+     * report `everyday/host.ts` and stay silent about the screens pressing it — which is exactly
+     * the blindness that let the tuner ship.
+     */
+    const found = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec)\s*\(/);
+    expect(found).toEqual(Object.keys(ID_MOVERS).sort((a, b) => a.localeCompare(b)));
+  });
+
+  it('gives every registered file a reason rather than a tick', () => {
+    /*
+     * A registry whose entries may be empty strings is a hand-written list wearing a derivation's
+     * clothes: the next arrival would be waved through with `''` and the set would still match.
+     */
+    for (const [file, why] of [...Object.entries(WINDOW_CALLERS), ...Object.entries(ID_MOVERS)])
+      expect(why.length, file).toBeGreaterThan(30);
+  });
+
+  it('finds the scan works at all — a mention in prose is not a call', async () => {
+    /*
+     * The instrument, checked against a file that is known to say the words and known not to make
+     * the call. `everyday/tunerModel.ts` quotes `applyBuildingSpec(buildingWithTune(…))` in the
+     * docstring that explains issue #289; it must be absent from the movers, and `tunerScreen.ts`
+     * — which makes the call — must be present. A scan that could not tell them apart would report
+     * a green over a set it had not actually derived.
+     */
+    const movers = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec)\s*\(/);
+    const prose = await readFile(join(VIZ_SRC, 'everyday/tunerModel.ts'), 'utf8');
+    expect(prose).toContain('applyBuildingSpec(');
+    expect(movers).not.toContain('everyday/tunerModel.ts');
+    expect(movers).toContain('everyday/tunerScreen.ts');
+  });
+});
 
 /**
  * The buildings the rule moves, derived here rather than exported from the module.
@@ -157,6 +321,80 @@ describe('the run the shift path actually asks for', () => {
       expect(after.saturated).toBe(false);
       expect(after.serviceLevel.longestWaitS).not.toBeNull();
       expect(after.waitCount).toBeGreaterThan(20);
+    }
+  }, 120_000);
+
+  /**
+   * The same sheet, reached through **the tuner** — GitHub issue #289's third criterion.
+   *
+   * The test above drives `shiftRunConfigOf` from a state the daily loop produced, and on that path
+   * the defect had been closed since `docs/20` defect 5 landed. It came back on a path that test
+   * cannot see: *Take it to the sandbox* → *Run it and watch*, with nothing touched. The press
+   * re-saved the standing building under a fresh id, the matrix stopped recognising it, and the
+   * five-minute band came back — so the first sheet a new player ever sees withheld **both** of its
+   * headline figures on a day whose riders all turned up, with all four goal rows graded ✓.
+   *
+   * Driven on the same pinned seeds, because those are the days where the band holds nobody and
+   * therefore the days where the difference is visible at all. On the other 486 the two windows
+   * agree and this case would pass on the broken tree.
+   */
+  it('keeps both headlines when the tuner runs the standing day, untouched', () => {
+    for (const seed of EMPTY_BAND_SEEDS) {
+      const state: ViewerState = {
+        ...baseState(),
+        buildingId: 'garden-apartments',
+        shiftLengthS: 3600,
+        seed,
+      };
+
+      /*
+       * What the tuner mounts with, what its first `redraw` leaves it holding, and what its primary
+       * then presses.
+       *
+       * The snap is reproduced rather than skipped, and on this building that is the whole case:
+       * Garden Apartments is specified at **0.63 m/s** and its hydraulic class's catalogue chips are
+       * `0.50` and `0.75`, so `redraw` used to snap the design down on mount and the press then
+       * fired over an edit nobody had made. A version of this case that stopped at `tuneStateFrom`
+       * would have gone green on a tree where the product was still broken.
+       */
+      const config = buildingConfigOf(RESOURCES, state.savedBuildings, state.buildingId);
+      expect(config, 'the standing building is one this build knows').toBeDefined();
+      const building = specFromBuilding(config!, state.buildingId);
+      const pattern = specFromTrafficProfile(RESOURCES.trafficProfiles, config?.trafficProfile);
+      const standing = tuneStateFrom(building, pattern, state.levers.dwell);
+      const machineClass = classOfSpec(
+        designerClasses(RESOURCES.elevatorSpecs),
+        buildingWithTune(building, standing),
+      );
+      const steps = tuneMachineSteps(machineClass, standing, standing);
+      const tune = {
+        ...standing,
+        speed: snapToStep(steps.speeds, standing.speed),
+        cap: snapToStep(steps.loads, standing.cap),
+      };
+      const presses = tunePresses(building, pattern, standing, tune);
+
+      /* The press path, as `everyday/host.ts#applyBuildingSpec` composes it. */
+      const ran =
+        presses.building === undefined
+          ? state
+          : stateRunningSaved(
+              state,
+              RESOURCES,
+              savedBuildingFrom(presses.building, state, RESOURCES),
+            );
+
+      const plan = shiftRunConfigOf(RESOURCES, ran);
+      const summary = recordRun(plan.config, {
+        recordDecisions: false,
+        outOfServiceCarIds: plan.outOfServiceCarIds,
+      }).recording.summary;
+
+      expect(summary.reportWindow.id, String(seed)).toBe('full-run');
+      // Both headlines, which is the pairing the sheet withheld: the mean and the worst wait.
+      expect(summary.awtIsValid, String(seed)).toBe(true);
+      expect(summary.waitCount, String(seed)).toBeGreaterThan(20);
+      expect(summary.serviceLevel.longestWaitS, String(seed)).not.toBeNull();
     }
   }, 120_000);
 });

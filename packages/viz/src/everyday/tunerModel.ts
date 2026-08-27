@@ -49,6 +49,19 @@
  * change through the host's `applyBuildingSpec`, which selects the drawn tower through
  * `withBuilding` and puts the week on `shift/week.ts#SANDBOX_CONTRACT_ID`. That is the mechanism,
  * and {@link tuneSandboxStrip}'s sentence beside it is a description of it.
+ *
+ * **And the converse now holds too, which it did not until GitHub issue #289.** The press was
+ * unconditional, so *entering the sandbox and changing nothing* was also a sandbox run — the screen
+ * said *Scored day — three things are fixed* over a day the state had already moved onto the sandbox
+ * contract and re-measured on the wrong window. {@link tunePresses} is the guard, and it reads
+ * {@link movedKeys} — the same predicate the strip, the stamp and § 3.3's note read — so the
+ * sentence and the mechanism cannot disagree.
+ *
+ * **That guard needed a second fix to be worth anything, and it is the more interesting one.**
+ * `movedKeys` was already non-empty on two shipped buildings *before the player touched anything*,
+ * because the machine card's ladder could not express what they are specified at and
+ * `tunerScreen.ts` snapped the document onto it on mount. See {@link tuneMachineSteps}: a predicate
+ * that believes a control moved is a guard that presses as though one had.
  */
 
 import { personsOf, type BuildingSpec } from '../authoring/buildingSpec.js';
@@ -135,6 +148,79 @@ export function patternWithTune(spec: PatternSpec, tune: TuneState): PatternSpec
 export function movedKeys(from: TuneState, to: TuneState): readonly TuneKey[] {
   const keys: TuneKey[] = ['floors', 'cars', 'speed', 'cap', 'dwell', 'rate', 'lobbyShare'];
   return keys.filter((key) => from[key] !== to[key]);
+}
+
+/**
+ * What *Run it and watch* writes before it runs — GitHub issue **#289**.
+ *
+ * ## The defect: entering the sandbox and changing nothing re-measured the building
+ *
+ * The primary pressed `applyBuildingSpec(buildingWithTune(standing, tune))` **unconditionally**, on
+ * every press, whether or not a control had been touched. `applyBuildingSpec` allocates a *fresh
+ * id* and selects the result through `withBuilding`, so an untouched press turned
+ * `garden-apartments` into `bld-1` — a document byte-identical to the one it was copied from,
+ * wearing a name the matrix has never measured.
+ *
+ * `shift/reportWindow.ts#shiftReportWindowFor` is keyed on that name. Garden Apartments is the one
+ * shipped building whose every matrix cell declares `full-run`, and the reason is measured rather
+ * than stylistic: at its rates the peak five minutes holds **0 to 25** arrivals of a day averaging
+ * 38.6, so the narrow band is empty on 14 seeds in 500 and the sheet then withholds *both* headline
+ * figures under *"the reporting window held no arrivals"*. Copied to `bld-1` the rule returns
+ * `undefined` — *leave the template's band alone* — and `docs/20` defect 5 came back on the one
+ * screen that had never been on `reportWindow.ts`'s list of callers. Measured: the same day, run
+ * from the tuner, reported `peak-5min` where the scored route reported `full-run`.
+ *
+ * ## Why the guard is *anything moved* rather than *the building moved*
+ *
+ * The narrower guard is the tempting one and it is wrong. Standing the week on
+ * `shift/week.ts#SANDBOX_CONTRACT_ID` is something only `applyBuildingSpec` does — it is
+ * `withBuilding`'s doing, and there is no other door to it. So a press that skipped the building
+ * because only *How busy* had moved would run a **re-timed crowd against a scored assignment**:
+ * {@link tuneSandboxStrip} would say *Sandbox — nothing counts* while `closeDay` banked the day
+ * against Scenario 1. That is the forgery `dev/buildingEditor.ts#stateRunningSaved` exists to
+ * prevent, arriving from the opposite direction, and it would have been a *new* defect shipped to
+ * close this one.
+ *
+ * So one predicate decides everything: {@link movedKeys}. It already drives the strip, the stamp
+ * and § 3.3's two-state note, and now it drives the presses too — which is what makes the screen and
+ * the state agree **by construction** rather than by two authors remembering the same rule.
+ *
+ * ## Both documents or neither, and an untouched tuner runs the standing day
+ *
+ * {@link tunerBarModel}'s docstring already stated this as the contract — *"an untouched tuner runs
+ * the standing day, which is what Scored day — three things are fixed means"* — and the code
+ * contradicted it. It does not any more: with nothing moved, nothing is written, the run is the one
+ * the daily loop would have made, and the id `shiftReportWindowFor` is asked about is the authored
+ * one.
+ *
+ * A **genuinely tuned** building keeps the old behaviour exactly, including the fall-through to the
+ * template's band, and that is correct rather than tolerated: a drawn tower has no matrix cell, and
+ * inventing a window for a building nobody censused is what `reportWindow.ts`'s last paragraph
+ * refuses.
+ *
+ * @param building what is standing, as {@link tuneStateFrom} read it
+ * @param pattern the demand that is standing, likewise
+ * @param standing the tune read off those two on mount — the *before* side of {@link movedKeys}
+ * @param tune what the seven controls hold now
+ */
+export function tunePresses(
+  building: BuildingSpec,
+  pattern: PatternSpec,
+  standing: TuneState,
+  tune: TuneState,
+): TunePresses {
+  if (movedKeys(standing, tune).length === 0) return { building: undefined, pattern: undefined };
+  return { building: buildingWithTune(building, tune), pattern: patternWithTune(pattern, tune) };
+}
+
+/**
+ * The documents {@link tunePresses} hands the primary. `undefined` is *press nothing*, which is a
+ * different instruction from *press this unchanged copy* — the copy takes a new id and a new
+ * contract, which is the whole of issue #289.
+ */
+export interface TunePresses {
+  readonly building: BuildingSpec | undefined;
+  readonly pattern: PatternSpec | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -256,17 +342,74 @@ export interface TuneMachineSteps {
 
 /**
  * The ladders, from the design's own class — `designerModel.ts`'s, so the two screens offer one
- * answer about what a machine comes in.
+ * answer about what a machine comes in — **plus whatever the standing building actually has.**
  *
  * A class this build does not have leaves both ladders holding only what is currently set, which is
  * a stepper that cannot move rather than one that offers a step the loader would refuse.
+ *
+ * ## Why the standing value joins the ladder, which is a defect fix rather than a nicety
+ *
+ * `speedStepsFor` filters § 10.1's **catalogue** to the class's band, and a shipped building is
+ * under no obligation to have been specified at a catalogue speed. Two of the eight are not:
+ * `garden-apartments` runs at **0.63 m/s** where its hydraulic class offers `0.50` and `0.75`, and
+ * `crown-hotel` at **3.0** where gearless offers `2.5, 3.5, 4, 5, 7`. Both values are inside their
+ * class's band — `parseBuilding` loads them, which is how they ship — they are simply not chips.
+ *
+ * Without them the ladder cannot express what is standing, and `tunerScreen.ts`'s `redraw` then
+ * snapped the *document* down to the nearest chip **on mount, before the player touched anything**:
+ * Garden Apartments opened 21 % slower than the building it claimed to be, `movedKeys` reported
+ * `['speed']` on an untouched screen, and the strip said *Sandbox — nothing counts* over an edit
+ * nobody had made. It also defeated issue #289's guard on the one building that issue is about,
+ * because a tuner that believes a control moved presses as though one had.
+ *
+ * The comment that governed that snap said it was *"only reachable through a class change, which
+ * this screen does not offer today"*. That was a stated mechanism that had gone stale — it is
+ * reachable on two shipped buildings with no class change at all, which is measured in
+ * `tunerModel.test.ts` over every building in `data/buildings/` rather than asserted here.
+ *
+ * **The snap is kept, and it still guards what it was written to guard.** A class change narrows
+ * the band, the standing value then falls outside it, this function does not offer it, and
+ * {@link snapToStep} moves the design onto a step the loader will accept. What changes is only that
+ * a value the loader *already accepts* is no longer treated as one it would refuse.
+ *
+ * @param standing the seven as {@link tuneStateFrom} read them off the building — the values that
+ *   have to be expressible, as opposed to `tune`, which is where the controls are now. Adding
+ *   `tune`'s own values instead would make the ladder contain every value it is ever asked about
+ *   and the snap could never fire, which is the class-change guard deleted by accident. It is
+ *   **required rather than defaulted to `tune`** for exactly that reason: a default is that mistake
+ *   pre-made, waiting for the first caller who does not read this paragraph.
  */
 export function tuneMachineSteps(
   machineClass: MachineClass | undefined,
   tune: TuneState,
+  standing: TuneState,
 ): TuneMachineSteps {
   if (machineClass === undefined) return { speeds: [tune.speed], loads: [tune.cap] };
-  return { speeds: speedStepsFor(machineClass), loads: loadStepsFor(machineClass) };
+  return {
+    speeds: withStanding(
+      speedStepsFor(machineClass),
+      standing.speed,
+      machineClass.speedMinMps,
+      machineClass.speedMaxMps,
+    ),
+    loads: withStanding(
+      loadStepsFor(machineClass),
+      standing.cap,
+      machineClass.loadMinLb,
+      machineClass.loadMaxLb,
+    ),
+  };
+}
+
+/** A ladder with `value` in it, if the class admits it and it is not a step already. Sorted. */
+function withStanding(
+  steps: readonly number[],
+  value: number,
+  min: number,
+  max: number,
+): readonly number[] {
+  if (value < min || value > max || steps.includes(value)) return steps;
+  return [...steps, value].sort((a, b) => a - b);
 }
 
 /** Snap a value onto a ladder — used when a class change narrows one under a set value. */
