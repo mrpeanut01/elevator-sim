@@ -95,7 +95,9 @@
  * `dayLength.test.ts` runs two Secure Tower simulations and finishes in **1.7 s**, against a
  * `--project viz` total that did not move (126 s).
  *
- * A decision number is owed for all of the above.
+ * **Recorded here rather than in `DECISIONS.md`, under § D405.** Everything above is a
+ * measurement of this module's own cost, taken here and re-derivable here by re-running the
+ * seed named with it; nothing outside this module has to obey it.
  */
 
 import type {
@@ -286,8 +288,9 @@ export function runsWholeDay(
  * > `shift/dayLength.test.ts` asserts both of its answers against the template the same state
  * > resolves to.
  *
- * `packages/viz/src/honesty/` belongs to another lane this wave, so the entry is owed rather than
- * written. **Three ways to make it green were considered and refused**, and they are worth stating
+ * **Recorded here rather than in `DECISIONS.md`, under § D405** — the classification entry is one
+ * line in a file this module does not own, and the argument for it is a fact about this tag.
+ * **Three ways to make it green were considered and refused**, and they are worth stating
  * so nobody re-derives them: spelling the tag `'wholeDay'`, hiding the declaration behind a bare
  * `export { … }` so the deriver reads it as unexported, and widening `goalsForDay`'s parameter to
  * take a boolean so the tag never leaves the one span that already carries it. The first two make
@@ -295,7 +298,7 @@ export function runsWholeDay(
  * warns about; the third distorts a type to satisfy a scanner. A classification entry is the honest
  * repair, and it belongs to the file that owns the classification.
  *
- * A decision number is owed; this docstring is the argument.
+ * Recorded here rather than in `DECISIONS.md`, under § D405; this docstring is the argument.
  */
 export function runHorizonOf(
   trafficProfiles: TrafficProfiles,

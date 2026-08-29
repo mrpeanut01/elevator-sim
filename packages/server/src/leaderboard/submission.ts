@@ -216,7 +216,9 @@ const OFFERED_DURATIONS_S: readonly number[] = Object.freeze([300, 900, 1800, 36
  * stands untouched at 7 200 and `menu.test.ts` still asserts it; a whole day remains something a
  * building's own record grants, never a row in a length picker.
  *
- * A decision number is owed for this entry.
+ * Recorded here rather than in `DECISIONS.md`, under § D405 — the constant is local to this module and
+ * pinned from outside it by `menu/client.test.ts`, which reads this file's source text and runs
+ * the client's real `wholeDayFor` against it. § D286's `LONGEST_OFFERED_RUN_S` is untouched.
  */
 const WHOLE_DAY_S = 36_000;
 

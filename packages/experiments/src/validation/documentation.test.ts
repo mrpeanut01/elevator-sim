@@ -1330,8 +1330,8 @@ const OPEN_RESERVATION: {
   wave: 'H',
   from: 396,
   // Lanes A–D hold D396–D403; lane E's block was dispatched open-ended ("D404 upward") and it
-  // reports 414 as the highest it used, which is what an open-ended block's ceiling means.
-  to: 414,
+  // reports 417 as the highest it used, which is what an open-ended block's ceiling means.
+  to: 417,
 };
 
 const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
@@ -1380,8 +1380,25 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
  * not a defect in it — but it means allocation is no longer deferrable to whenever it is
  * convenient, and a brief that says *put the argument in a docstring and say a number is owed*
  * now obliges the integrator to allocate before the branch can go green.
+ *
+ * ## 64 → 5, wave H, and the ceiling is the count rather than a round number
+ *
+ * Measured with this case's own expression at each step: **64 → 56 → 32 → 5**, on the commits that
+ * settled the sites. § D404 built the mechanism and § D405 ruled what an entry is *for* — the
+ * working agreement says *the relevant doc*, and for a decision whose whole reach is one module the
+ * relevant doc **is** the module — after which most of the backlog was re-classified rather than
+ * written up, and eight sites turned out to be answered by decisions that already existed.
+ *
+ * **The five that remain are named, because an unexplained remainder is where a backlog restarts.**
+ * They are the sites lane E's territory excluded, not sites it judged: two in `CLAUDE.md`'s Phase 9
+ * row (the honesty string counts moved by #127 and #137, and #137's per-side counts) and three in
+ * `DECISIONS.md` below D404 (#137's counts again inside § D322, issue #140's run-identity refusal
+ * inside § D323, and § D366's preamble, which merely **quotes** the issue title and is not a debt at
+ * all). The last one is worth its own sentence: this ratchet counts a discussion of the marker as a
+ * use of it, which is why the convention for writing about it is to name it rather than utter it —
+ * see § D405. Over-counting is the safe direction for a ratchet; under-counting is not.
  */
-const DECISION_DEBT_CEILING = 32;
+const DECISION_DEBT_CEILING = 5;
 
 describe('the decision-number bookkeeping (GitHub issue #173)', () => {
   it('keeps the charter’s next-free number correct by derivation, not by transcription', () => {
@@ -1528,15 +1545,45 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
      * Excluded by path rather than by making the pattern cleverer: a pattern contrived to miss its
      * own text would also miss a real site written the same way.
      */
-    const owed = filesUnder(ROOT)
-      .filter((path) => !path.endsWith(join('validation', 'documentation.test.ts')))
-      .map((path) => (readFileSync(path, 'utf8').match(/decision number is owed/gu) ?? []).length)
+    const marker = /decision number is owed/gu;
+    const scanned = filesUnder(ROOT).filter(
+      (path) => !path.endsWith(join('validation', 'documentation.test.ts')),
+    );
+    const owed = scanned
+      .map((path) => (readFileSync(path, 'utf8').match(marker) ?? []).length)
       .reduce((total, n) => total + n, 0);
 
-    expect(owed, 'nothing matched, so this ratchet is watching nothing').toBeGreaterThan(0);
+    /*
+     * **The non-vacuity guard is on the instrument, not on the defect, and that is a repair.**
+     *
+     * It used to read `expect(owed).toBeGreaterThan(0)` — *nothing matched, so this ratchet is
+     * watching nothing*. The intent was right and the subject was wrong: that assertion is
+     * satisfied by **any single site anywhere**, so it never proved the scan reached the tree; and
+     * it goes red on the commit that settles the last one, which is the commit this whole gate
+     * exists to reward. A gate that fails when its subject is fixed teaches exactly one lesson —
+     * delete the assertion — and deleting it removes the only protection against a scan that reads
+     * nothing.
+     *
+     * So the two things that can silently break are asserted directly. The walk must find files:
+     * a `SKIP_DIRS` entry that swallowed `packages/`, or a suffix filter that stopped matching,
+     * would otherwise take `owed` to zero and *pass*. And the pattern must still match a real
+     * site's wording, checked against a control string rather than against the tree — a pattern
+     * edited to something narrower is the other way this reaches zero while the sites remain.
+     *
+     * With both in place, **`owed === 0` is a legitimate green** and means what it says.
+     */
+    expect(scanned.length, 'the walk found no files, so this ratchet is scanning nothing')
+      .toBeGreaterThan(500);
+    const control = 'A decision number is owed for the omission pair; the argument lives elsewhere.';
+    expect(
+      control.match(marker)?.length ?? 0,
+      'the marker pattern no longer matches a real site’s wording, so a tree full of them would ' +
+        'read as zero. This control is one of the sentences that was actually in the tree.',
+    ).toBe(1);
+
     expect(
       owed,
-      `${String(owed)} sites say a decision number is owed, against a ceiling of ` +
+      `${String(owed)} sites carry the owed-decision marker, against a ceiling of ` +
         `${String(DECISION_DEBT_CEILING)}. This is a ratchet: settle one and lower the ceiling on ` +
         'the same commit. It rose 38 → 64 during a single wave whose merge said every known issue ' +
         'had burned down, which is why it is a gate rather than a note (GitHub issue #173).',

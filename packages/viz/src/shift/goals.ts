@@ -127,7 +127,9 @@ import {
  * sits inside. At `2` the bar misses on the whole day exactly what it missed on the slice, on all
  * four cells, which is the property `goals.test.ts` pins.
  *
- * A decision number is owed.
+ * **Recorded here rather than in `DECISIONS.md`, under § D405.** The factor is local to this
+ * module and pinned by `goals.test.ts` on all four cells; it *complies* with § D345 rather than
+ * moving it — the bar tracks the horizon, and no difficulty setting touches either.
  */
 const WORST_WAIT_WHOLE_DAY_FACTOR = 2;
 
@@ -189,7 +191,10 @@ export const GOAL_BARS = Object.freeze({
  * (`GOAL_OBSERVATION_IDS` keeps `'abandoned'` so restored histories that carry the retired
  * goal's readings stay restorable — see its docstring.)
  *
- * A decision number is owed for the retirement; this docstring is the argument.
+ * **Recorded here rather than in `DECISIONS.md`, under § D405.** The retirement is local to this
+ * module's goal set: the ceiling subsumes the horizon goal outright, so the alternation would
+ * have alternated a strong test with a test it implies. `GOAL_OBSERVATION_IDS` keeps
+ * `'abandoned'` so restored histories stay restorable, and the reading survives where it belongs.
  *
  * ## The second argument, and why it is not a difficulty setting
  *

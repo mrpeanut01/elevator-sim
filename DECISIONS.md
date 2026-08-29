@@ -27109,3 +27109,106 @@ proposed **D361** — a number wave C had already taken on a branch it could not
 document's content is unchanged by the renumbering, which is the point of ids being names.
 
 ---
+
+## D415 — the rule vocabulary ships eight of GAMEPLAY § 11.5's ten actions, and the two omissions are the model's refusal made once
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the refusal
+`packages/core/src/config/types.ts#RULE_ACTIONS` argues and two surfaces inherit.**
+
+**Decision.** `RULE_ACTIONS` declares **eight** ids. GAMEPLAY § 11.5 lists ten; the two it does not
+declare are **refused by omission**, and the refusal is made once — in the vocabulary, beside the
+model — rather than a second time on every screen that offers a rule.
+
+**Numbered under [§ D405](#d405) criterion 2**: it deviates from a specification the product is
+measured against, and a reader comparing § 11.5 against the shipped editor finds two rows missing
+with nothing at the spec's end to say why.
+
+**The two reasons are different and both load-bearing.**
+
+- ***skip everything above floor v* is not offered** because service range is **building fabric**
+  (`servesFloors`), and § 11.4's own header carries the boundary sentence — *zoning and service
+  ranges belong to the building, not the dispatcher*. A dispatcher-side floor mask would be a second
+  source of truth about which floors a shaft serves, which is CLAUDE.md's *three kinds of zoning are
+  distinct concepts* one layer down.
+- ***treat up-calls as urgent* is not offered** because **no term in the cost library prices
+  direction-conditional urgency**. Every wait and starvation weight prices up and down calls alike,
+  so the honest compile would move both and the label would lie. That is invariant 7's boundary read
+  in the strict direction: a genuinely new *cost term* would justify new code, and until one exists
+  the action cannot be expressed.
+
+**The reworded alternative is a design-owner decision and is not taken here.** *Treat every call as
+urgent* is expressible — it is the starvation weight — and whether to offer it is a question about
+the surface rather than about the model. It is flagged, not answered.
+
+**The omission propagates by derivation rather than by repetition**, which is the half worth
+keeping. `authoring/ruleSpec.ts` and `everyday/workshopModel.ts` both build their offered list
+**from `RULE_ACTIONS`**, so the two actions are unbuildable on either surface without either screen
+carrying a refusal of its own. Two screens each declining a row in their own words would be two
+places to keep in step.
+
+---
+
+## D416 — the Workshop deviates from the handoff twice, and both times because the simulator wins about numbers
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the two deviations
+`packages/viz/src/everyday/workshopModel.ts` argues, and the `playStyles` block under them.**
+
+**Decision.** `everyday/workshopModel.ts` does not transcribe two pieces of the design handoff's
+copy, and **the six play styles are `data/dispatcher-profiles.json`'s `playStyles` block** rather
+than a table in the renderer.
+
+**Numbered under [§ D405](#d405) criterion 2**: [`docs/12-design-handoff.md`](docs/12-design-handoff.md)
+makes the handoff canonical for the interface and exists to record *every deviation with the
+constraint that forced it*. A deviation recorded only in the deviating module is exactly what that
+document is for and does not have.
+
+**Deviation 1 — § 11.3's sign sentence is replaced, not transcribed.** The handoff says *"distance
+and a full car push a score up; a long wait pushes it down"*. That is true of its own toy simulator
+and **false of this one**: `CostTermDefinition.evaluate` must return a non-negative value — *a cost,
+never a bonus* — and the weighted sum is added, so nothing on the printed line can pull a score down.
+`mathsDisclosureOf` says what is true instead, and it is the more useful sentence anyway: every term
+is a kind of badness, and a weight decides which kind outranks which. This is CLAUDE.md's two-halves
+rule applied exactly as written — the handoff wins about what the screen looks like, the simulator
+wins about what a number means.
+
+**Deviation 2 — the style cards' trade sentences are re-authored in `data/`.** Two of
+`ENGINE_CONTRACT` § 6.2's are claims of *quality* — *"the biggest single win on a busy morning"* —
+and § 11.1's own rule for this copy is *"one plain sentence about the trade, not a claim of
+quality"*. The spec's copy fails the spec's own rule; the rule wins.
+
+**And the styles are data because invariant 7 says so.** A play style is a weight vector with a
+name. A renderer holding six names against six profile ids is the forbidden
+`if (strategy === 'nearest-car')` table with a friendlier key.
+
+---
+
+## D417 — *took the stairs* is an overlap, and every surface that names it says so
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the caption rule
+`packages/viz/src/shift/report.ts#stairsNote` argues.**
+
+**Decision.** `Observations.abandoned` counts **waits that crossed the abandonment horizon**,
+whether or not a car eventually came. It is a name for an *attribute*, never a fourth disjoint
+outcome — so **every surface that publishes it publishes the overlap with it**, from
+`Observations.abandonedCarried`, folded in the same pass as both counts so the three cannot disagree,
+and against the run's **own** horizon (`Observations.horizonS`) rather than a hard-coded fifteen
+minutes.
+
+**Numbered under [§ D405](#d405) criterion 1**: it binds four surfaces in three modules that
+`report.ts` does not own — its own note, the lever clause, `mode/casualDay.ts`'s Casual lead, and the
+goal label's window — and a fifth surface added tomorrow has to obey it without reading
+`stairsNote`'s docstring.
+
+**The defect it closes is arithmetic a reader does in their head.** The sheet printed `CARRIED 768
+of 768 who turned up` beside `TOOK THE STAIRS 348` with nothing connecting them: on a saturated
+no-patience run nobody actually leaves, so every one of those legs boards and lands inside CARRIED,
+and a reader totalling the people gets **1 116 out of 768**. Both counts were right. The captions
+treated overlapping cells as adding ones, which is this project's own standing failure — a true
+number in a frame that makes it mean something false.
+
+**It is CLAUDE.md's *beside, never folded in* rule, one register down.** Abandonment is published
+beside AWT and never inside it, on the footing `workPerServedLegKJ` sits beside raw energy; this says
+the same thing about the *caption* rather than about the statistic. The sentence *overlap, not an
+addition* is the whole reason the cell carries a note at all.
+
+---

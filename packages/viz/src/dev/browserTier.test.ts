@@ -485,7 +485,8 @@ describe('a project whose tests do not fit the 5 s default declares a timeout th
  *    survives rather than prevents, and which would otherwise show up as two servers quietly
  *    sharing one origin and each seeing the other's page.
  *
- * A decision number is owed for making this a derived check rather than a fifth note.
+ * Recorded here rather than in `DECISIONS.md`, under § D405. Deriving the ports from the files rather
+ * than writing a fifth note is a fact about this tier and is asserted three ways below.
  */
 describe('every browser-tier file names a port of its own — the trap this tier has met four times', () => {
   /**
@@ -555,8 +556,8 @@ describe('every browser-tier file names a port of its own — the trap this tier
 /**
  * **The page-error gate has one owner, and the choke point is derived** — GitHub issue #268.
  *
- * A decision number is owed; the argument is `browserTier.test-helper.ts`'s own section docstring,
- * which measures what the tier was blind to. The one-line version: a page could raise an unhandled
+ * Recorded here rather than in `DECISIONS.md`, under § D405; the argument is `browserTier.test-helper.ts`'s
+ * own section docstring, which measures what the tier was blind to. The one-line version: a page could raise an unhandled
  * error on every case and the run stayed green, which is how issue #259 survived four encounters.
  *
  * ## Why this belongs here rather than in the helper
