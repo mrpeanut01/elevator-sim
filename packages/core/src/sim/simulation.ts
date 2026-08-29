@@ -3540,11 +3540,53 @@ export class Simulation {
     for (const bankId of dirty) this.#dispatchBank(bankId, at);
   }
 
+  /**
+   * Send a car to `floorId`, unless it could not get there before the deadline.
+   *
+   * ## The gate is on the **arrival**, and it used to be on the command (GitHub issue #305)
+   *
+   * `SIM_DEFAULTS.drainGraceS` states the contract this enforces: the drain tail is a **hard
+   * timeout**, and *"work scheduled past it is not scheduled at all — not a departure, not a
+   * dispatch retry, not a sky-lobby transfer, and not a door transition"*. Every sibling gate in
+   * this file reads that the same way — {@link #scheduleTransfer} and
+   * {@link #scheduleOpeningTransport} price the walk and refuse the whole hop, {@link #armPatience}
+   * prices the wait, {@link #scheduleDoor} prices the transition — because the instant that
+   * matters is the one an **event lands on the queue**, not the one a decision is taken at.
+   *
+   * This gate did not. It compared `at` — the instant the car is *commanded* — against the
+   * deadline, and then scheduled `motion.arrivesAt` unconditionally, so a car commanded at
+   * t = deadline − 1 with a thirty-second flight put a `sim.carArrived` on the queue thirty
+   * seconds past the run's own hard deadline. `runUntilEmpty` drains whatever is on the queue,
+   * so that arrival **fired**: it completed the move, took a travel sample past the run's end,
+   * and stepped the car — which can register a landing, price a bank and assign a car, all after
+   * the run had declared itself over. Measured on shipped buildings rather than inferred: at
+   * `vertical-city`/`collective`, 600 s of demand and a 60 s tail, **fourteen** travel samples
+   * landed past the deadline and the last was **37.9 s** past it.
+   *
+   * It was usually invisible, which is why it survived: `endedAt` is
+   * `max(recorder.lastEventAt, demand horizon)` and `MetricsRecorder.sampleTravel` deliberately
+   * does not advance `lastEventAt`, so a late arrival that only moved a car left `endedAt`
+   * untouched. It shows in `endedAt` only when the late arrival *also* does something the
+   * recorder observes — which is exactly what `fuzz-1000130` caught, a run reporting
+   * `endedAt = 3493.78` against its own deadline of 3493.
+   *
+   * The check is **strictly stronger than the one it replaces**, not a relocation of it:
+   * `arrivesAt = at + motorStartDelayS + profile.duration + levelingSettleS` and every term is
+   * non-negative with `profile.duration > 0`, so `at > deadlineS` implies
+   * `arrivesAt > deadlineS` and every departure the old gate refused this one refuses too.
+   *
+   * The arrival instant comes from {@link Car.plannedDepartureFor}, which is `departFor` without
+   * the writes, so the instant checked here is the instant the kernel is then handed. Deriving it
+   * from `buildProfile` and the spec would be a second authority on when a car arrives, and this
+   * defect is what one of those looks like after it drifts.
+   *
+   * A car that is refused is left standing, and that is the same shape as every sibling: the
+   * transfer that is refused leaves its passenger on the landing, the door transition that is
+   * refused leaves the door where it is. Nothing is half-committed — `plannedDepartureFor` writes
+   * nothing — so `Car.departures` still counts exactly the moves the run commanded, which is what
+   * `benchmark/energyLiveness.test.ts` pairs one-to-one against the travel samples.
+   */
   #depart(car: Car, floorId: string, at: SimTime): void {
-    if (at > this.#deadlineS) {
-      this.#deadlineTruncations += 1;
-      return;
-    }
     if (!car.shaft.floorsById.has(floorId)) return;
     // A double-deck car drives between stop positions, so "go to 27" is "go to 26 and open the
     // upper deck onto 27" — and a car already at 26 has nowhere to go. Normalizing *before* the
@@ -3552,6 +3594,12 @@ export class Simulation {
     // hardware cannot make. Identity for every single-deck car.
     const target = car.stopFloorFor(floorId);
     if (!car.canStart || car.floorId === target) return;
+
+    const planned = car.plannedDepartureFor(target, at);
+    if (planned.arrivesAt > this.#deadlineS) {
+      this.#deadlineTruncations += 1;
+      return;
+    }
 
     const motion = car.departFor(target, at);
     this.#scheduleArrival(car, motion.arrivesAt);
@@ -3567,6 +3615,17 @@ export class Simulation {
    * fire and no-op would have been the cheaper fix and the wrong one: it would leave a
    * phantom event in `eventCount()` and make the event budget depend on how often cars
    * diverted.
+   *
+   * ## Why there is no deadline gate here, stated because there used to be no gate anywhere
+   *
+   * Both callers are already inside the deadline, for two different reasons, and GitHub issue
+   * #305 was one of them not being true. {@link #depart} now prices the arrival before it
+   * commits, so what reaches here is an instant it has already accepted. {@link #considerDiversion}
+   * cannot break that: a diversion keeps `motion.startedAt` and shortens the profile to a floor
+   * strictly short of the one the car was already going to, so `diverted.arrivesAt` is strictly
+   * *earlier* than the arrival this car already had — and that one was gated. A gate here would
+   * therefore be a second authority that never fires, and the way to keep this honest is to keep
+   * the two callers honest rather than to add a third check that hides which of them slipped.
    */
   #scheduleArrival(car: Car, arrivesAt: SimTime): void {
     this.#carArrivals.set(

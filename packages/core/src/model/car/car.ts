@@ -590,16 +590,62 @@ export class Car implements CarLike {
   }
 
   /**
+   * The move {@link departFor} would make, **without making it**.
+   *
+   * Exists for one caller and one question: a run with a hard deadline has to know *when a
+   * departure would land* before it commits to one, because the arrival is an event on the
+   * kernel's queue and an event past the deadline is work the run may not do
+   * (`SIM_DEFAULTS.drainGraceS`: *"work scheduled past it is not scheduled at all — not a
+   * departure …"*). `Simulation.#depart` is that caller.
+   *
+   * **A second copy of the arithmetic would be the bug this method exists to fix.** The
+   * arrival instant is `at + motorStartDelayS + profile.duration + levelingSettleS`, and a
+   * caller that rebuilt it from `buildProfile` and the spec would be a second authority on when
+   * a car arrives — free to drift from the one the kernel actually schedules against. So this
+   * shares {@link departFor}'s whole body through `#planMotion`: same validation, same errors,
+   * same `CarMotion`, and the only difference is that nothing is written.
+   *
+   * Pure. Nothing about the car changes — not `#motion`, not `#direction`, not the departure
+   * count — so a planned move that is then refused leaves no trace, which is what keeps
+   * `departures` equal to the number of moves the run actually commanded (and therefore equal
+   * to the travel samples `benchmark/energyLiveness.test.ts` counts against it).
+   *
+   * @throws ModelError under exactly the conditions {@link departFor} throws under.
+   */
+  plannedDepartureFor(floorId: string, at: SimTime = this.now()): CarMotion {
+    return this.#planMotion(floorId, at);
+  }
+
+  /**
    * Begin a move to `floorId`, building the S-curve profile for it.
    *
    * The returned {@link CarMotion} carries the three times the kernel needs: `commandedAt`,
    * `startedAt` (after the motor start delay) and `arrivesAt` (after levelling). Schedule the
    * arrival event at `arrivesAt` and call {@link completeArrival} when it fires.
    *
+   * A caller that must know `arrivesAt` *before* committing — anything with a deadline — asks
+   * {@link plannedDepartureFor} first; both go through the same `#planMotion`, so the instant it
+   * answers with is the instant this method then commits to.
+   *
    * @throws ModelError if the car is already moving, its doors are not shut, it is
    *   overloaded, the shaft does not serve `floorId`, or the car is already there.
    */
   departFor(floorId: string, at: SimTime = this.now()): CarMotion {
+    const motion = this.#planMotion(floorId, at);
+    this.#motion = motion;
+    this.#direction = motion.direction;
+    this.#departures += 1;
+    return motion;
+  }
+
+  /**
+   * Validate the move and build its profile. The whole of {@link departFor} except the writes.
+   *
+   * Split out so that "when would this car arrive?" and "go there" cannot answer differently:
+   * {@link plannedDepartureFor} is this and nothing else, and `departFor` is this plus three
+   * assignments.
+   */
+  #planMotion(floorId: string, at: SimTime): CarMotion {
     if (this.#motion !== undefined) {
       throw new ModelError(
         `Car "${this.id}" is already travelling to "${this.#motion.toFloorId}" and cannot depart for "${floorId}".`,
@@ -647,9 +693,6 @@ export class Car implements CarLike {
       direction: target.index > this.#floor.index ? 'up' : 'down',
     });
 
-    this.#motion = motion;
-    this.#direction = motion.direction;
-    this.#departures += 1;
     return motion;
   }
 
