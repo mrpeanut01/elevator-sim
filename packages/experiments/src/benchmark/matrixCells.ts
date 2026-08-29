@@ -268,10 +268,10 @@ export const MATRIX_CELLS: readonly MatrixCell[] = Object.freeze([
     armCeilings: Object.freeze({
       'nearest-car': 24,
       'predictive-balanced': 81,
-      'destination-panel': 33,
+      'destination-panel': 171,
     }),
     rationale:
-      'The incoming-only regime DECISIONS.md § D100 established as the one comparable point on this building — its own mixed 40/30/30 scenario admits no paired comparison at all, and that refusal is structural rather than load-driven. Three arms saturate inside the band and two of them below this budget, so nearest-car and destination-panel are UNQUOTABLE here with their ceilings printed. The band floor binds the budget: the spread would buy a 1.0 s half-width at 36, and CLAUDE.md does not permit 36.',
+      'The incoming-only regime DECISIONS.md § D100 established as the one comparable point on this building — its own mixed 40/30/30 scenario admits no paired comparison at all, and that refusal is structural rather than load-driven. Three arms saturate inside the band and one of them below this budget, so nearest-car is UNQUOTABLE here with its ceiling printed. destination-panel read 33 until GitHub issue #306: DECISIONS.md § D333 bounded the landing panel\'s promise, the arm that was the only one able to suffer that defect stopped saturating here, and its ceiling is 171 — measured on the fix and on the commit before it rather than inferred (§ D396). The band floor binds the budget: the spread would buy a 1.0 s half-width at 36, and CLAUDE.md does not permit 36.',
   }),
   Object.freeze({
     id: 'vertical-city-up-peak',

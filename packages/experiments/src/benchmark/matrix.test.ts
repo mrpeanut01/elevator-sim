@@ -165,6 +165,38 @@ describe('every cell is a paired experiment, and says so', () => {
           expect(result.unquotableArms, `${result.cell.id}/${armId}`).not.toContain(armId);
         }
       }
+      /*
+       * And the third direction, which was missing until GitHub issue #306 — the one that goes
+       * stale first.
+       *
+       * The two loops above ask about arms that came back **unquotable**, and about ceilings **at
+       * or above** the budget. Neither asks the remaining question: the census said this arm would
+       * lose its AWT *before* this budget, so it must have. Without it a ceiling that **healed** —
+       * the arm now surviving a budget the census said it could not — passes this whole always-on
+       * tier in silence, and `matrixCensus.test.ts` is opt-in, so nothing at all is left asking.
+       *
+       * That is not hypothetical. `mixed-use-up-peak`'s `destination-panel` declared 33 against a
+       * budget of 50 while measuring **171**, for eighteen days: `103a8fe` re-derived that cell's
+       * front, its verdict census and its 44 interval pins in the same commit as § D333's fix and
+       * left the census record beside them unmoved. Every check in this file stayed green.
+       * See § D396, and § D397 for why this loop is the one that would have caught it.
+       *
+       * Exact rather than advisory, and both halves are properties of the apparatus rather than
+       * observations about a run: replication `i` is the same run at every budget
+       * (`harness.ts#replicationSeed(seed, i)` — the whole basis of CRN here), and **one** invalid
+       * replication invalidates the cell (`replicationRunner.ts#aggregateCell`, which is not a
+       * majority vote). So `ceiling < replications` implies UNQUOTABLE with no tolerance in it.
+       */
+      for (const [armId, ceiling] of Object.entries(result.cell.armCeilings)) {
+        if (ceiling >= result.cell.replications) continue;
+        expect(
+          result.unquotableArms,
+          `${result.cell.id}: the census declares "${armId}" first invalid at replication ` +
+            `${String(ceiling)}, below this cell's budget of ${String(result.cell.replications)}, ` +
+            'so it cannot have a quotable AWT here — either the simulator has moved or the ' +
+            'declared ceiling has, and ELEVATOR_SIM_DEEP=1 matrixCensus.test.ts is what says which',
+        ).toContain(armId);
+      }
     }
   });
 });
