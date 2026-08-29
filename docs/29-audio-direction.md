@@ -3,12 +3,21 @@
 **Issue:** #196 · **Milestone:** M1, pre-production · **Written:** 2026-08-24 on
 `claude/elevator-sim-charter-kickoff-rexfw8` · **Character:** a recommendation, not an adoption.
 
-**Status: RECOMMENDED — CUT. Awaiting the product owner.**
+**Status: RECOMMENDED — CUT. ~~Awaiting the product owner.~~ OVERRULED on 2026-08-24 by
+[§ D344](../DECISIONS.md): audio ships, speed-tiered. § 7's cut is not executed.**
+The recommendation stood for as long as it took the owner to read it, and this line went on saying
+*awaiting* for two waves afterwards — GitHub issue **#286**, `RISKS.md` **R38**. **The evidence below
+stands and only the conclusion is overruled**, which is § D344's own wording: the ruling keeps § 4.1's
+measurement and reads it as a defect report about the speed ladder rather than as a reason to cut.
+[#258](https://github.com/mrpeanut01/elevator-sim/issues/258) is the lane that builds what was
+ruled; **this document takes no position on it and is not amended to describe it**, because two
+accounts of one design drift apart and § D344 plus #258 are the account.
+
 [`MULTI_AGENT_PLAN.md`](../MULTI_AGENT_PLAN.md) § 9 names *"the audio decision (#196)"* in the list
 of escalations the orchestrator does not decide. This document therefore does what a lane may do —
 reach a recommendation with its evidence, and specify the change precisely enough that no further
 judgement is needed to execute it — and stops short of the thing it may not do. **Nothing in § 7
-happens until a human says yes.**
+happens until a human says yes** — and the human said no.
 
 M1 writes no production code. No `.ts` file, no `data/*.json` file and no shipped string is changed
 by this document; § 7 is an instruction for a later lane, not a diff.
@@ -28,13 +37,24 @@ named conditions that reopen it.**
 
 Three facts drive that, and each is checkable in one command:
 
-1. **The stage has no real-time speed.** `everyday/stageScreenModel.ts#STAGE_SPEEDS` ships five
-   values in *simulated seconds per real second*: **8, 30, 90, 240, 600**. The slowest is 8×
-   compressed and the default is 30×. A hall-call door cycle taken from
-   [`data/elevator-specs.json`](../data/elevator-specs.json) — open 1.8 s, dwell 5 s, close 3.0 s —
-   is **9.8 s** of simulated time, which is **0.33 s** of wall time at the default speed and
-   **16 ms** at 30×. Door chimes, motor whine and the texture of a door closing are the material
-   #196 names, and none of them survives that. § 4.1 does the arithmetic.
+1. **~~The stage has no real-time speed.~~ It has one now, and this fact is the one that fell.**
+   When this was written, `everyday/stageScreenModel.ts#STAGE_SPEEDS` shipped ~~five~~ values in
+   *simulated seconds per real second* — ~~*8, 30, 90, 240, 600*~~ — so the slowest rung was
+   ~~*8× compressed*~~ and the chip reading `1×` ran at thirty. [§ D354](../DECISIONS.md) made the
+   ladder **seven rungs — 1, 4, 8, 30, 90, 240 and 600 — every label equal to the ratio it names**,
+   which puts a **true 1:1** at the bottom and leaves the default at 30 under its own name. The
+   current table is `docs/28-art-direction.md` § 6's and is not restated here, because two accounts
+   of one ladder drift apart; that is how this paragraph came to be wrong (GitHub issue **#286**,
+   `RISKS.md` **R38**).
+
+   What survives unchanged is the arithmetic and the conclusion **for the fast rungs**: a hall-call
+   door cycle taken from [`data/elevator-specs.json`](../data/elevator-specs.json) — open 1.8 s,
+   dwell 5 s, close 3.0 s — is **9.8 s** of simulated time, which is still **0.33 s** of wall time at
+   the default and **16 ms** at the top rung, now named `600×` rather than `30×`. Door chimes, motor
+   whine and the texture of a door closing are the material #196 names, and none of them survives
+   *that*. What no longer holds is *"at any speed the transport offers"*: at `1×` the same cycle is
+   **9.8 s** of wall time and a chime fits inside it with room to spare. § 4.1 does the arithmetic
+   and carries the same correction.
 2. **Audio is forbidden from carrying information, by #196's own acceptance criterion** — *"no cue
    conveys information the screen does not also convey"*. That is the right rule and it caps the
    ceiling: whatever audio does here, it cannot be the thing that shows the player the trouble,
@@ -158,16 +178,34 @@ That is a visible subtraction from a specified surface.
 
 ### 4.1 Time compression, and the arithmetic that kills the discrete cues
 
-The transport is `everyday/stageScreen.ts` over `everyday/stageScreenModel.ts`. Five speeds, in
+The transport is `everyday/stageScreen.ts` over `everyday/stageScreenModel.ts`. ~~Five~~ speeds, in
 simulated seconds per real second:
 
 | Chip | `simPerRealS` | Real time for a 9.8 s door cycle | For the slowest shipped door, 13.5 s |
 |---|---|---|---|
-| `½×` | 8 | 1.23 s | 1.69 s |
-| `1×` *(default)* | 30 | **0.33 s** | 0.45 s |
-| `4×` | 90 | 0.11 s | 0.15 s |
-| `12×` | 240 | 41 ms | 56 ms |
-| `30×` | 600 | **16 ms** | 23 ms |
+| ~~`½×`~~ | 8 | 1.23 s | 1.69 s |
+| ~~`1×`~~ *(default)* | 30 | **0.33 s** | 0.45 s |
+| ~~`4×`~~ | 90 | 0.11 s | 0.15 s |
+| ~~`12×`~~ | 240 | 41 ms | 56 ms |
+| ~~`30×`~~ | 600 | **16 ms** | 23 ms |
+
+> **This table is superseded, and it is kept rather than rewritten.** Every `simPerRealS` in it
+> still ships and every arithmetic cell is still right; what changed is that
+> [§ D354](../DECISIONS.md) renamed all five chips to the ratios they always were and **added two
+> rungs below them — `1×` at 1 and `4×` at 4**. So the chip column is the only wrong column, the
+> multipliers are a subset rather than the set, and the *conclusion drawn from it* — that no speed
+> lets a lift behave at the rate a lift behaves — is **false of the two rungs this table has no row
+> for**. § D344's ruling is exactly that reading. The current seven-rung table lives in
+> `docs/28-art-direction.md` § 6 and is not duplicated here; this one is struck through because a
+> superseded measurement that is quietly rewritten stops being evidence of anything, and § D344
+> rests on it. GitHub issue **#286**.
+>
+> Read the rest of § 4 with the two missing rungs in mind: the *"there are three ways out"* list
+> below argues against gating cues by speed on the ground that gating makes audio a slow-tier
+> feature. § D344 adopted that gate anyway, with the crossover **computed** at `S ≤ 39` rather than
+> chosen — which is four of the seven rungs, not two of five — and with the fast tier given a
+> continuous bed instead of silence. That is the argument being answered rather than ignored, and
+> the answer is #258's to build.
 
 The door figures are from [`data/elevator-specs.json`](../data/elevator-specs.json), not invented: a
 centre-opening hall-call stop is `openS 1.8 + dwellHallCallS.typical 5 + closeS 3.0 = 9.8 s`, and the
@@ -175,12 +213,18 @@ slowest shipped combination is a side-opening door at maximum hall dwell,
 `2.5 + 7 + 4.0 = 13.5 s`. Passenger transfer at `1.2 s` per person per direction lengthens both;
 including it makes audio's case *better* and does not change the conclusion.
 
-**The label `1×` does not mean real time.** It means "the normal speed for watching a day", and a
-day is watched in minutes. There is no speed on this transport at which a lift behaves at the rate a
-lift behaves. Read the table again with a real chime in mind — a recorded door chime is roughly
-0.5–1.5 s of audio. At the **default** speed, a one-second chime outlasts the entire door cycle it
-announces by a factor of three. At `30×` it outlasts it by sixty. A cue that is still sounding when
-the car has departed two floors is not a cue; it is a smear.
+~~**The label `1×` does not mean real time.**~~ **It does now, and this paragraph is the sentence
+[§ D354](../DECISIONS.md) was written to answer.** When this was written the chip reading `1×` ran at
+thirty and meant "the normal speed for watching a day", and *"there is no speed on this transport at
+which a lift behaves at the rate a lift behaves"* was true of all five rungs. § D344 read exactly
+that as a label describing a thing it is not, § D354 fixed it, and the bottom rung is now 1:1.
+
+The rest of the paragraph is unchanged and still holds **from the default upward**. Read the table
+again with a real chime in mind — a recorded door chime is roughly 0.5–1.5 s of audio. At the
+**default** speed, a one-second chime outlasts the entire door cycle it announces by a factor of
+three. At the top rung — `600×` now, `30×` in the table above — it outlasts it by sixty. A cue that
+is still sounding when the car has departed two floors is not a cue; it is a smear. At `1×` it is
+not a smear at all, which is the whole of what changed.
 
 **And the smear is polyphonic.** `midtown-office` ships **4 cars** over 21 floors — the small end.
 `vertical-city` ships **35 cars across seven banks**, eight of them `doubleDeck: true`, which means
@@ -534,11 +578,17 @@ A cut that cannot be revisited is a cut made permanent by neglect, which is not 
    this document, and it is a fact about staffing rather than about the product. If it changes, the
    decision should be re-taken and most of §§ 4.1–4.4 still applies — but the balance is different
    when the cues will actually exist.
-2. **The transport gains a speed at which lifts behave like lifts.** § 4.1 is arithmetic over
-   `STAGE_SPEEDS`. A `1×`-means-`1×` mode — a close-up on one car, a real-time replay of a single
-   incident, an inspection view — makes discrete cues coherent again for the first time, and door
-   chimes become the obvious thing to put in it. **This is the likeliest of the three**, because a
-   real-time inspection view is a plausible thing for P3's stage work to want on its own merits.
+2. **~~The transport gains a speed at which lifts behave like lifts.~~ DELIVERED — 2026-08-24,
+   [§ D354](../DECISIONS.md), GitHub issue #257.** This clause was written as a hope and it was the
+   one this document called *"the likeliest of the three"*; it stopped being a hope the same week and
+   went on reading as one for two waves afterwards (GitHub issue **#286**, `RISKS.md` **R38**). What
+   was asked for was *a `1×`-means-`1×` mode … makes discrete cues coherent again for the first
+   time*. `STAGE_SPEEDS` now carries **a true 1:1 rung**, and **four of its seven** sit inside
+   § D344's `S ≤ 39` discrete-cue budget where **two of five** did and neither of those was 1:1. So
+   the condition is met by more than its own wording asked, and the reopening is not hypothetical:
+   § D344 had already overruled the recommendation, and
+   [#258](https://github.com/mrpeanut01/elevator-sim/issues/258) is the open lane that builds the
+   speed-tiered design. Nothing here re-argues it.
 3. **`charter S9` gets an instrument and shows headroom.** § 4.3's argument is partly that the budget
    is unmeasured. Once a CI load budget exists and the measured cold load sits comfortably under
    three seconds on the target matrix, the size objection becomes a number to check rather than a
@@ -556,7 +606,11 @@ stage; then ask again.
 Recorded because a recommendation that hides its own soft spots is not one.
 
 - **It does not decide anything.** [`MULTI_AGENT_PLAN.md`](../MULTI_AGENT_PLAN.md) § 9 escalates
-  #196. Until a human adopts it, the tree is unchanged and the Sound row keeps refusing.
+  #196. ~~Until a human adopts it, the tree is unchanged and the Sound row keeps refusing.~~ **A
+  human ruled on 2026-08-24 and did not adopt it** ([§ D344](../DECISIONS.md)): audio ships,
+  speed-tiered. The tree is still unchanged and the Sound row still refuses — but now because
+  [#258](https://github.com/mrpeanut01/elevator-sim/issues/258) is unbuilt, not because the decision
+  is unmade, and under that ruling the row gains a consumer rather than being deleted.
 - **The stop rate in § 4.1 is an assumption, not a measurement.** One stop per car per 30 simulated
   seconds is stated as an assumption with its reasoning attached, in the shape
   [`CLAUDE.md`](../CLAUDE.md) requires of the `accessZones` share. The *door cycle* figures are read

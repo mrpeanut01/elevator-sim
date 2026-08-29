@@ -11,6 +11,7 @@ import { displayNameIssueOf, MAX_DISPLAY_NAME } from '../menu/account.js';
 import { AVATAR_SWATCHES } from './profile.js';
 import { railFooter } from './rail.js';
 import { SETTINGS_ABSENCES, settingsScreenViewOf } from './settingsView.js';
+import { STAGE_SPEEDS } from './stageScreenModel.js';
 
 const BASE = { profile: undefined, reduceMotion: false } as const;
 
@@ -151,6 +152,44 @@ describe('This device — statements of fact, and the register of refusals besid
     expect(entries.find((entry) => entry.startsWith('Sound'))).toContain(
       'a toggle that toggles nothing is a lie',
     );
+  });
+
+  /**
+   * **The `Default speed` entry counts the ladder; it does not state a number** — GitHub issue
+   * #286, `RISKS.md` R38.
+   *
+   * It said *five* for two waves after [§ D354](../../../../DECISIONS.md) made the ladder seven,
+   * on a string a player reads, and nothing went red — the sentence was in the honesty corpus the
+   * whole time (`surfaces.ts#EVERYDAY_BUILD_NOTES` seeds this array) and **no property compares a
+   * written count against the structure it counts**. So this case is the instrument, and it is
+   * written to survive the next ladder change rather than to pin today's seven: it asserts the
+   * shipped sentence carries `STAGE_SPEEDS.length`, whatever that becomes.
+   *
+   * The second half is what makes it a guard rather than a tautology. A count restated **in words**
+   * beside the derived one would read as authoritative and drift on its own, so a spelled number
+   * anywhere in the entry is a failure — which is exactly the shape the old string had.
+   *
+   * The row itself belongs to GitHub issue **#229**; only its count belongs here.
+   */
+  it('counts the stage’s speeds from `STAGE_SPEEDS` rather than writing the number down', () => {
+    const entry = SETTINGS_ABSENCES.find((one) => one.startsWith('Default speed'));
+    expect(
+      entry,
+      'the `Default speed` entry has gone. #229 owns whether the row is refused at all; if the ' +
+        'refusal was withdrawn, delete this case with it rather than leaving a guard over nothing.',
+    ).toBeDefined();
+    expect(
+      entry,
+      'the count in this sentence is not the ladder’s. Interpolate `STAGE_SPEEDS.length`; a ' +
+        'corrected literal is the same defect with a fresher number.',
+    ).toContain(`its own ${String(STAGE_SPEEDS.length)} speeds`);
+    for (const word of ['two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']) {
+      expect(
+        entry,
+        `“${word}” is a count written in words where one is already derived — two counts in one ` +
+          'sentence is the drift this case exists to stop.',
+      ).not.toContain(word);
+    }
   });
 
   /**

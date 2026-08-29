@@ -161,6 +161,7 @@ import {
   STAGE_NO_GHOST,
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
+  STAGE_SPEEDS,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
 import {
@@ -8474,6 +8475,32 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       seeds.push({ field: `stage.legend.${rung.id}`, text: rung.label, role: 'label' });
       /* Covered, not seeded — a hex is not a sentence. Called so the claim in `covers` is true. */
       void stageInkFor(rung.id === 'breezy' ? 1 : 200);
+    }
+    /*
+     * **§ 4.6's transport chips** — [§ D354](../../../../DECISIONS.md)'s named gap, closed here.
+     *
+     * That decision's own closing paragraph is the argument: *"`STAGE_SPEEDS` is **not in the
+     * honesty corpus** … a chip face nothing sweeps can lie indefinitely"*, and it had lied for nine
+     * waves — five labels, none of them the ratio it named, `1×` running at thirty. The mount draws
+     * `speed.label` straight onto the button (`stageScreen.ts`'s `speedButtons`), so these are this
+     * model's words on a player's screen exactly as the legend's are.
+     *
+     * **Seeded and deliberately not in `covers`, on `#stageCarReadoutOf`'s ground one list up.**
+     * `derive.test.ts` derives a text producer from *prose* — two adjacent alphabetic words — and a
+     * chip face is `1×`. So `STAGE_SPEEDS` is in no derived set, and claiming it above would be a
+     * declaration the derivation cannot find, which that file's first guard refuses. Loosening the
+     * guard to make room would cost more than the entry is worth; naming it here is what the
+     * readout already does.
+     *
+     * **What this buys and what it does not, said plainly.** It puts the faces where the search can
+     * read them, so a chip that acquires a word is swept from that day. It would **not** have caught
+     * § D354's defect: no property compares a label to the multiplier behind it, and none can — the
+     * ten are predicates over rendered strings and the multiplier is not one. `stageScreenModel.ts`'s
+     * own test is still the instrument for that, and `everyday/stageLadderClaims.test.ts` is the one
+     * for the sentences *about* the ladder (GitHub issue #286).
+     */
+    for (const speed of STAGE_SPEEDS) {
+      seeds.push({ field: `stage.speed.${String(speed.simPerRealS)}`, text: speed.label, role: 'label' });
     }
     for (const arm of STAGE_INTERVENTIONS) {
       seeds.push({
