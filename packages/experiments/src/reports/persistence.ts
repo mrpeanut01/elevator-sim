@@ -304,9 +304,9 @@ export function summarizeOptionsOf(
  * measurement" with "the number zero" the moment anything reads it back. Here they become
  * `"NaN"`, `"Infinity"` and `"-Infinity"`: unambiguous, and never mistakable for a value.
  *
- * Used for digests and comparisons only. The stored form is ordinary `JSON.stringify`, because
- * that is what `core` writes and re-ordering its keys would make the stored bytes differ from the
- * bytes `serializeRunRecord` produces.
+ * Used for digests and comparisons only. The stored form is ordinary `JSON.stringify`, and
+ * re-ordering its keys would make the stored bytes differ from the bytes every other writer of a
+ * `RunRecord` produces — `core` has no serializer of its own to disagree with (§ D395).
  */
 export function canonicalJson(value: unknown): string {
   if (value === undefined) return 'null';

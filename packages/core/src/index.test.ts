@@ -171,11 +171,15 @@ describe('Phase 2 is usable through the barrel alone', () => {
     expect(result.summary.waiting.p95S).toBeGreaterThanOrEqual(result.summary.waiting.meanS);
     expect(result.summary.timeToDestination.meanS).toBeGreaterThan(0);
 
-    // Invariant 5: the record carries its seed, it survives a persist/parse round trip, and
-    // it reconstructs the very StreamSet the run drew from.
-    expect(barrel.runSeed(result.record)).toBe(BigInt(result.seed));
-    expect(barrel.parseRunRecord(barrel.serializeRunRecord(result.record)).seed).toBe(result.seed);
-    expect(new barrel.StreamSet(barrel.runSeed(result.record)).arrivals.nextFloat()).toBe(
+    // Invariant 5's first clause, which is the half `core` owns: the record carries its seed, it
+    // survives a persist/parse round trip, and it reconstructs the very StreamSet the run drew
+    // from. The second clause — *replays exactly* — needs the configuration beside the record and
+    // is asserted where that pair exists, in `experiments/reports/replay.test.ts` and
+    // `experiments/validation/storedRunReplay.test.ts`. Writing is `JSON.stringify` and is not a
+    // `core` export: § D395 deleted the wrapper that pretended this line was a replay.
+    expect(BigInt(result.record.seed)).toBe(BigInt(result.seed));
+    expect(barrel.parseRunRecord(JSON.stringify(result.record)).seed).toBe(result.seed);
+    expect(new barrel.StreamSet(BigInt(result.record.seed)).arrivals.nextFloat()).toBe(
       new barrel.StreamSet(20260726).arrivals.nextFloat(),
     );
   }, 60_000);

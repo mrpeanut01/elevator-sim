@@ -626,6 +626,13 @@ export interface Elements {
   /** Tab button and its panel, per surface. Keyed by {@link TabName}. */
   readonly tabs: Readonly<Record<TabName, HTMLButtonElement>>;
   readonly panels: Readonly<Record<TabName, HTMLElement>>;
+  /**
+   * What the strip says about the contextual editors it is still holding back — issue #130,
+   * [§ D330](../../../../DECISIONS.md). Written only by `surfaces.ts#applySurfaceState`, from a
+   * count that function has just derived; it is a note, not a control, and carries no id a deep
+   * link or keyboard ring knows about.
+   */
+  readonly tabGateNote: HTMLElement;
   readonly paramSource: HTMLSelectElement;
   readonly paramForm: HTMLElement;
   readonly paramStatus: HTMLElement;
@@ -973,6 +980,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     campaign: 'panel-campaign',
     parameters: 'panel-parameters',
   }),
+  tabGateNote: 'tab-gate-note',
   paramSource: 'param-source',
   paramForm: 'param-form',
   paramStatus: 'param-status',

@@ -24620,6 +24620,26 @@ the honesty corpus**: `honesty/surfaces.ts` drives fifteen other `stageScreenMod
 one. A chip face nothing sweeps can lie indefinitely. Adding it was outside the lane's scope and is the
 real fix for the class; until then this is a label pinned by one test rather than by the search.
 
+**Closing note (2026-08-29, GitHub issue #286).** The gap above is closed: `EVERYDAY_STAGE` seeds all
+seven chip faces, so the search reads them. **Seeded and deliberately not in that adapter's `covers`**,
+on `#stageCarReadoutOf`'s ground — `derive.test.ts` derives a text producer from *prose*, two adjacent
+alphabetic words, and a chip face is `1×`, so `STAGE_SPEEDS` is in no derived set and a `covers` entry
+would be a declaration the derivation cannot find. The reason is recorded at the seed rather than the
+guard being loosened to admit it.
+
+**Say what it buys, because it is less than this paragraph implies.** It would **not** have caught the
+defect this decision fixed. No honesty property compares a label to the multiplier behind it, and none
+can: the ten are predicates over rendered strings and the multiplier is not one. What being in the
+corpus buys is that a chip which acquires a *word* is swept from that day. The label-equals-ratio rule
+is still `stageScreenModel.test.ts`'s alone — *a label pinned by one test rather than by the search*
+remains true, and the sentence is left standing rather than deleted for that reason.
+
+**The other half of that finding turned out to be the larger one.** Three sentences *about* this
+ladder went stale with it, one of them a string a player reads — and that string was in the corpus the
+whole time, on the build-information panel. Being swept is not being checked. See
+`everyday/stageLadderClaims.test.ts`, which re-derives the documents' claims from `STAGE_SPEEDS`, and
+`settingsView.ts#SETTINGS_ABSENCES`, which interpolates the count rather than stating it.
+
 ---
 
 ---
@@ -26283,5 +26303,444 @@ they are out of this lane's region and want their own issue.
 **What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
 integration. The full ladders above are reported once and are not all re-run per suite: the test
 holds the two rungs the sentence rests on, the Midtown endpoint, and the sentence itself.
+
+---
+
+## D393 — the opt-in tiers get a schedule, and the instrument that keeps them on it is a test rather than the workflow
+
+**Rules on:** GitHub issue #163. Settles `.github/workflows/deep-tiers.yml`,
+`packages/viz/src/deepTiers.test.ts`, and `docs/22-charter.md` § 4's S9 row.
+
+**Decision.** Nine gated test tiers run **weekly** on `main` (Sunday 03:00 UTC) and on
+`workflow_dispatch`, as **nine separate jobs**, on **one platform**, with failures raised into a
+GitHub issue. They are **not** added to `ci.yml`'s per-PR `suite`, and the workflow may not acquire
+a `pull_request:` trigger. What runs per pull request is the *wiring* check, never a tier.
+
+**The state this replaced.** `ci.yml:159` runs a bare `npm test`. No workflow named
+`ELEVATOR_SIM_DEEP`, `ELEVATOR_SIM_FUZZ`, `ELEVATOR_SIM_HONESTY` or `CORPUS_OUT`, and **no workflow
+in this repository had a `schedule:` trigger at all**. So the tiers were text that read as coverage
+nobody had — [§ D220](#d220)'s browser-tier defect one directory over, and `fuzz/deep.test.ts`'s own
+header had been saying *"runs on request and in CI cron"* about a cron that has never existed.
+
+**The count is derived, and both published numbers were wrong.** `vitest list` collects a
+`skipIf`-ed suite's children when the gate is open and omits them when it is shut, so the delta
+between two collections *is* the tier. On `0cd422a`: **eighteen tests, nine gated blocks, nine
+files**. The issue says seventeen; the triage that verified it said ~19 across eight blocks.
+
+**The undercount that mattered is not the number.** The issue names two variables. There is a
+**third** — `ELEVATOR_SIM_FUZZ=deep` — and it guards the 250-case fuzz campaign. A workflow that set
+only the two named variables would have left that tier exactly as unrun as it found it, **while
+reporting green**.
+
+**A test count also understates the tiers**, which is why no number is offered as the measure of
+what this buys. Four of them widen the tests already there rather than adding new ones: the golden
+set goes 4 → 6, the honesty corpus 49 → 60 cases, `perfScaling`'s grids widen *and* its printed fits
+become assertions, and `perfSweep` turns a projection into an executed sweep.
+
+**Corrected: the seed-collision claim.** #163's title says these tiers hold *"the only
+seed-collision check in the repo"*. Measured, that is too strong, and the acceptance clause rests on
+it:
+
+| check | scale | tier |
+|---|---|---|
+| `runner/crn.test.ts` — *"produces distinct seeds across a large batch"* | 500 seeds | **always-on** |
+| `validation/perfSweep.test.ts` — distinct trace digests | 200 | **always-on**, same file |
+| `validation/perfSweep.test.ts` — distinct trace digests | **20 000** | **deep only** |
+
+`perfSweep`'s own docstring is careful where the title is not: *"no other suite runs enough
+replications to see it"* is a claim about **scale**, not about existence. So what had never run is
+the collision search at twenty thousand, and `CLAUDE.md`'s invariants 2 and 5 lean on that scale
+rather than on the kind of check being absent below it.
+
+**Weekly, not nightly.** `collectiveAdoption.test.ts` documents its own run with
+`--testTimeout=14400000` — four hours — and `perfSweep`'s deep arm carries a two-hour ceiling. A
+nightly matrix of that spends many runner-hours a week re-answering a question about a tree that
+moves in waves rather than in commits, and the first thing anybody does with a nightly job costing
+that much is turn it off, which returns the tiers to the state this rules on.
+
+**Nine jobs, not one.** GitHub's job ceiling is six hours and one tier alone declares four, so a
+single sequential job risks being killed at the ceiling and taking every result with it.
+`fail-fast: false` across separate jobs stops the first finding hiding the other eight. And they
+fail for unrelated reasons: `perfScaling.test.ts` records its own wall-clock flake under concurrent
+load — *"a gate nobody can trust is a gate everybody overrides"* — which, isolated, reddens one job
+named for it rather than the correctness oracle beside it.
+
+**One platform, and the exception is named rather than glossed.** `ci.yml` runs two legs to make pin
+portability measurable ([§ D196](#d196), [§ D201](#d201)). Most of what runs here is not that kind
+of assertion, so a second leg would double a multi-hour cost to re-answer the one question this
+workflow does not ask. **`golden-runs` is the exception**: byte-identical replay *is* a pin, and its
+deep tier adds two goldens `ci.yml` never sees, so those two are pinned on Linux only. Stated as a
+limit, not resolved.
+
+**The § D343 measurement lives inside this workflow rather than beside it.**
+`measure.corpus.test.ts` says run it *"once, after integration, never per branch"*, and every word of
+that describes a scheduled run on `main` and describes nothing a pull request can do. Both tiers in
+one job, because [§ D343](#d343)'s rule is that the pair is what makes either figure mean anything
+and two jobs could be scheduled onto two commits. It **publishes nothing**: the figures land as an
+artifact with the commit beside them, for a person to carry into `CLAUDE.md`. A workflow that edited
+that row would be a pin maintaining itself, and `RISKS.md` R38's remedy is a derivation with its
+tree named — which is the half no deriver can do for anybody.
+
+**The instrument is `deepTiers.test.ts`, not the workflow.** What closed [§ D220](#d220)'s browser
+defect was never the CI step; it was `dev/browserTier.test.ts` deriving the tier from disk. This
+does the same for the other nine: ten non-browser test files carry a line-initial gate, each
+declares the variables that open it, and the workflow must name the file, in the right vitest
+project, with every one of those variables set in the step that runs it — asserted in **both**
+directions, with a vacuity guard, because every case iterates the derived set and a detector
+matching nothing would assert that no tier is unwired and be green.
+
+**Detection is over-inclusive on purpose, and the reason is a defect this lane committed.** The
+crude comment/string stripper `browserTier.test.ts` calls *"deliberately over-removing"* was used
+first and **missed `collectiveAdoption.test.ts`** — an apostrophe inside a template literal opened a
+bogus string that swallowed the gate on line 398, giving nine files instead of ten, silently. The
+error is now taken in the other direction: a line-initial match on raw source, where a false
+positive forces a visible table entry and a false negative cannot happen.
+
+**`ELEVATOR_SIM_REGENERATE_GOAL_RATES` is in the table with `scheduled: false`, and it is the
+polarity trap.** It is a regeneration flag, not a tier gate: measured with `vitest list`, setting it
+**removes** a check, because `goalRates.test.ts` then rewrites the pinned counts instead of checking
+them. A scheduled run that set every variable it could find would delete a check and go green, so
+the workflow is asserted **not** to set it.
+
+**`--passWithNoTests=false`, on every command, and it is the most load-bearing flag in the file.**
+Every project in `vitest.config.ts` sets `passWithNoTests: true` — correct for a package whose phase
+has not landed — so a workflow selecting tests *by path* goes green on a typo:
+`npx vitest run --project experiments src/fuzz/doesNotExist.test.ts` exits **0** having executed
+nothing, and is indistinguishable in the Actions tab from a job whose tests passed. With the flag it
+exits **1**, and a real path still exits 0. `vitest.config.ts` is deliberately untouched — the flag
+belongs to the workflow that needs it, and that file has another owner (issue #149).
+
+**Aliveness, in two halves, one of which has no mechanism.** *Mechanised:* the wiring check above,
+so a tenth gated tier cannot arrive unwired without a red pull request. *Not mechanised:* whether
+the cron has **fired**. A test that asked would need the network and a wall clock, and GitHub
+disables scheduled workflows after 60 days of repository inactivity, silently. So that half is a
+command written into the workflow header — `gh run list --workflow=deep-tiers.yml --limit 5` — and
+saying which half is which is the point, because *"satisfied in prose and mechanised by nothing"* is
+the clause this repository already knows to distrust first.
+
+**Validated by mutation, because a zero from an unvalidated instrument is worthless.** Nine
+mutations, each keeping every case in scope — a mutation that removes a row from the iterator
+validates nothing — and each detected by the case that claims to detect it, exit 1 every time: a
+tier misspelled in its run line, a gate variable dropped from its step, the schedule deleted, a
+`pull_request:` trigger added, `--passWithNoTests=false` removed from one command, the issue-raising
+step broken, **a tenth gated tier added to disk and left unwired**, the corpus job made to commit its
+own figures, and `ELEVATOR_SIM_REGENERATE_GOAL_RATES` set on a job.
+
+Separately, **all ten workflow invocations were shown to open their gate** with `vitest list`,
+against a negative control of the same commands with the variables unset, which collect nothing.
+That control is the half that matters: without it, ten rows reading OPEN would be a probe that
+cannot tell open from shut. The `summary` and `report` jobs — the two whose breakage would look
+exactly like a normal run — were executed locally against a `needs` payload mixing failure, success,
+skipped and cancelled: both node scripts exit 0, the table renders all nine rows, and the issue body
+names the two failures and nothing else.
+
+**What turning them on found, reported rather than fixed.** `fuzz-deep` came back **RED** on the
+first run: 1 counterexample in 250 cases, `fuzz-1000130`, `[termination] run ended at
+t=3493.7775825325903, past its hard deadline of t=3493`. Not a rounding artefact — `checkTermination`
+already tolerates `EPSILON = 1e-9` against an overshoot of **0.7776 s**. The file's status table had
+published *green, 0 failures* since T22 and nothing could have re-taken it, which is `CLAUDE.md`'s
+*"a published number goes stale the same way"* on a table whose whole job was to say whether this
+tier passes. Recorded in an `OPEN` register with a ghost check, on [§ D307](#d307)'s precedent, and
+tracked as GitHub issue #305. Nothing in `fuzz/` moved: `checkTermination` is unchanged line for
+line, `EPSILON` is still `1e-9`, `PROPERTY_BOUNDS` is unmoved, the generator was not narrowed.
+
+**`honesty-deep` was red until it was measured a second time, and that is the most useful thing this
+lane learned about measuring tiers at all.** Contended — sharing the container with two other deep
+tiers — it took **43.9 min and timed out**: `Test timed out in 1800000ms`, 25 of 26 passing and the
+deep case killed, **no honesty property refuted, the corpus simply never finished**. Alone it
+**passes**: 26 of 26, exit 0, 32.6 min for the file with the deep case inside its own ceiling.
+
+**Alone is this job's condition** — one tier per job, one runner each, nothing competing — so the
+first number alone would have shipped a job believed red by construction on the strength of how it
+happened to be measured. That is this repository's own *"a pin is a claim about a machine"* wearing
+a clock instead of a float, and it is the reason the other four figures in the workflow's timing
+table are labelled as taken under contention and therefore as ceilings on the cost rather than the
+cost.
+
+The headroom is thin and the second measurement does not make it thick: the ceiling is the tier's
+own — `1_800_000` as the third argument to the `it`, which wins over the config default and over any
+`--testTimeout` a workflow could pass, so `timeout-minutes` governs the runner and not this — and
+`measure.corpus.test.ts` puts the tier at ~23 min against it, on a container larger than a hosted
+runner. **The ceiling is deliberately not raised from the workflow.** A tier's declared bound is the
+tier's to declare, and widening somebody else's to make one's own workflow green is the move this
+repository refuses outright.
+
+**`matrix-census` is the third red, and it is the sharpest answer to *what was this tier for?***
+Run once, 17.0 min, exit 1: **three declared figures do not reproduce from the census they were
+derived from** — `mixed-use-up-peak/destination-panel` first invalid replication **171 against a
+declared 33**, `vertical-city-up-peak/destination-panel` **73 against a declared `undefined`**, and
+`vertical-city-up-peak`'s binding **sd 3.172435 against a declared 2.9722**. The census is
+deterministic at a fixed `MATRIX_SEED`, so those are exact and re-derivable rather than noise.
+
+These are not decorative numbers: `admissibleReplications` and `armCeilings` bound every interval
+the experiment matrix publishes, and the file says so — *"the baseline's own ceiling is what binds
+the whole table"*. One ceiling has **healed** and one has **appeared**, which the test treats as
+equally a change, in its own words.
+
+All three touch `destination-panel` and the direction is consistent with § D333 having bounded the
+panel's promise. **That attribution is offered as a hypothesis and explicitly not measured** — the
+check is to re-run the census before that fix, and nothing here rests on it. **Nothing was
+re-declared.** Updating `MATRIX_CELLS` to the measured values would re-baseline published
+statistical parameters on the strength of one census run, by a lane whose job was to turn the tier
+on. Tracked as GitHub issue #306.
+
+**Reporting the two reds as one number would be the mistake.** One found a counterexample, one found
+a stale statistical baseline. *"Two of five failing"* says the same thing about both, which is why
+the workflow's timing table names the kind beside each figure — and why the third apparent red is
+reported above as a measurement condition rather than counted here.
+
+**Seven of the nine were run, and four came back green:** `golden-runs` at 6 of 6 goldens including
+the cross-process replay (24 tests, 55.6 s); `oracle-campaign`, `CLAUDE.md`'s correctness oracle at
+full width, 11 banks at n = 128 (3 tests, 5.5 min); `perf-scaling` (9 tests, 26.9 s); and
+`perf-sweep`'s full **20 000-replication sweep** (5 tests, 4.6 min with workers) — which is #163's
+acceptance clause *"the seed-collision check has run at least once"*, discharged here rather than
+left to the first Sunday.
+
+**`perf-scaling`'s green is worth naming because it is the tier expected not to be.** Its own note
+records a flake under concurrent load, and its assertions are about a machine rather than about the
+simulator. One green run is one draw from the distribution that note describes, not evidence of
+stability, and it is reported that way.
+
+**Two were not run, and are named rather than implied.** `collective-adoption` documents a four-hour
+invocation, which is a Sunday's work rather than a lane's. `corpus-figures` is [§ D343](#d343)'s
+measurement, and taking it was explicitly not this lane's job — building it somewhere to happen was.
+A tier nobody measured is a tier whose first result arrives on a Sunday, and a ceiling nobody tested
+is a guess with a number on it.
+
+**What is not claimed.** No corpus figure is published; [§ D343](#d343) takes that once, after
+integration, and this lane's job was to build the measurement a place to happen rather than to take
+it.## D394 — `core` and `server` take the simulating project's timeout, and the file that forced it simulates nothing
+
+**Date: 2026-08-29 · Owner: Lane B, wave G · Closes: GitHub issue #149. Discharges the debt
+[§ D361](#d361) recorded and answers the question [§ D331](#d331) left open.**
+
+**Decision.** `vitest.config.ts` passes `SIMULATING_TIMEOUT_MS` to `project('core')` and
+`project('server')`. `experiments` and `cli` stay on vitest's 5 000 ms default. `SIMULATING` in
+`dev/browserTier.test.ts` gains both names, so removing either declaration fails on the commit that
+does it.
+
+### The trade is § D331's and is not re-argued
+
+The only cost is **failure latency**: a genuinely hung pure-function test now takes five minutes to
+fail instead of five seconds. § D331 weighed that and paid it, because a hang is a bug found once
+and fixed while a 5 s ceiling under load is a false red that recurs forever and teaches people to
+re-run the suite rather than read it. Nothing about that argument was ever specific to `viz`. What
+§ D331 refused was not the reasoning but the *evidence*: its survey was taken over `packages/viz/src`
+for issue #144, and widening on the strength of a measurement taken for a different question is the
+move this repository keeps having to undo. The evidence has since arrived, so the omission is closed
+rather than restated.
+
+### Re-derived on this tree rather than inherited
+
+Issue #149's own comment measured on `main` at `2c7b308`; the brief that dispatched this lane quoted
+figures from `f13d455`. Both are re-derived here on `0cd422a`, with the pattern the issue prescribes
+(`runSimulation` / `new Simulation` / `.run()` / `legsOf` / `recordRun` / `runBatch`):
+
+| | `core` | `server` | `viz`, for scale |
+|---|---|---|---|
+| test files | 112 | 13 | 232 |
+| files referencing a simulation entry point | **43** | **4** | 91 |
+| `it()` openers in those files | **628** | **115** | 2 034 |
+
+`core`'s 43 / 628 reproduces the brief exactly.
+
+**The annotation column did not reproduce and is published as a refutation.** The brief said
+**283 explicit annotations**; three counting rules over the same tree give **268**, **272** and
+**243**, and the only figure near 283 is **287**, which is the count over all 112 `core` test files
+rather than the 43 the survey scopes. The number is not wrong so much as **undefined**: it moves by
+±40 depending on whether hook timeouts count, whether the scope is the surveyed files or the
+package, and whether a multi-line closer is matched. So *"`core` is protected by N annotations"* is
+not a quantity anybody should quote, and this section deliberately does not add a fourth value to
+the pile. What matters is the shape, which every rule agrees on: **most cases in the surveyed files
+carry no timeout of their own.**
+
+### The exposure was confirmed by running it, not by reading the config back
+
+`browserTier.test.ts` reads `vitest.config.ts`'s exported object, which is the config's own opinion
+of itself. That is the right instrument for drift and the wrong one for *"does the default actually
+reach these tests?"*. So an unannotated six-second case was put in each project and run: both
+reported `Test timed out in 5000ms` before the change and passed after it. The probes were deleted;
+they exist in this record rather than in the tree.
+
+### The file that forced the change references no simulation entry point
+
+`packages/server/src/store/store.test.ts` holds **43 `it()` cases and zero per-case timeout
+annotations**, and it is the only file in the repository with a *reproduced* timeout behind it —
+§ D361 got 11, 12 and 6 failures across three concurrent `--project server` runs of a green tree,
+every one `Test timed out in 5000ms`, every one in that file. It matches **none** of the six
+patterns above. It boots PostgreSQL-in-WebAssembly per fixture.
+
+**So the survey issue #149 asks for would have missed the one case with evidence.** That is a
+second, independent argument for the project-level default, and it is stronger than the first:
+§ D331 rejected a static per-test check because it could not tell *runs a simulation* from *reads a
+recording module scope already ran*. This is the other direction — a file that is slow for a reason
+the vocabulary does not contain. A survey can only find what its pattern is written in.
+
+`server`'s membership is therefore **over-determined**: four of its files simulate *and* one of the
+other nine has already failed. `core`'s rests on the survey plus § D331's own 8-over-5 s measurement.
+
+### `SIMULATING` keeps its name, and so does the constant
+
+`SIMULATING_TIMEOUT_MS` is cited by name in § D331 and § D361, which are dated records rather than
+prose to be rewritten; renaming it would strand both sentences. The list keeps its name for the same
+reason and because simulating is still what most of the covered tests do. The place the name is
+narrower than the property — `store.test.ts` — is written into the docstring at both sites instead,
+which is the honest version of a name that has outgrown itself. The `describe` title *is* changed,
+because it renders in test output and *"a project that simulates declares a timeout a simulation
+fits in"* would have been a false sentence read aloud on every run.
+
+### `experiments` and `cli` are left out, and that is the same rule applied twice
+
+`experiments` holds `benchmark/`, `oracle/` and the validation matrix — the heaviest simulating
+suites here — and is now the only package of that weight on the default. It stays there because no
+`experiments` test has been *reported* failing at it, and adding it on the strength of a measurement
+taken for `core` would be § D331's refused move with the polarity flipped. Its two matrix files
+annotate every hook and every case themselves and say why. If one is reported flaking, this section
+is the precedent for closing it — not a reason it is already closed.
+
+### The duration headline was deliberately not re-measured
+
+Issue #149's *8 tests over 5 s, slowest 39.2 s* stands as measured on `integration/issue-wave-18`.
+This lane ran at load average **10.26 on 4 cores**, and a duration distribution taken under that is
+not a refresh of that figure — publishing it as one would be the per-branch-figure defect `CLAUDE.md`
+records five times and `RISKS.md` R38 tracks. The 2026-08-26 comment refused the same measurement for
+the same reason and was right to.
+
+### Verified by mutation, four ways, and the vacuity control is the interesting one
+
+Each name in `SIMULATING` was removed from the config in turn, and the floor was probed once:
+
+| mutation | vitest exit | result |
+|---|---|---|
+| `core` loses `testTimeout` | 1 | `expected 5000 to be greater than or equal to 120000` |
+| `server` loses `testTimeout` | 1 | same, naming `server` |
+| `viz` loses `testTimeout` | 1 | same, naming `viz` |
+| `core` set to `30_000`, below the floor | 1 | `expected 30000 to be greater than or equal to 120000` |
+
+Run unfiltered over the whole file, the `core` mutation reports **1 failed | 10 passed (11)** against
+a baseline of **11 passed (11)**: the case count is unchanged, so the mutation broke an assertion
+rather than removing a case from scope.
+
+**And in all four, the non-vacuity control passed.** *"names a project that exists, so the list above
+cannot rot into a no-op"* is green on every run in which the thing it guards is broken — which is the
+point of recording it. A guard can satisfy its own vacuity check and still not be the thing that
+detects the defect; here the two cases are genuinely independent, and only the first one fails.
+
+### What is not claimed
+
+That the list cannot shrink. Deleting a name from `SIMULATING` *and* its timeout from the config in
+one commit passes both cases, and no test can close that: the list encodes the judgement § D331
+established no static check can make. Inverting it — *every registered project declares a timeout
+unless listed exempt* — was considered and refused, because it turns adding a project into a red
+suite, and this change's whole value is that it cannot redden anything.
+
+No corpus count is published — [§ D343](#d343) takes that once, after integration.
+
+## D395 — invariant 5's round trip was not half-wired; its worked example was not a replay
+
+**Date:** 2026-08-29 · **Owner:** wave G lane C · **Rules on:** GitHub issue #175. Settles the
+disposition of `core/metrics`'s `serializeRunRecord`, `SerializeOptions` and `runSeed`.
+
+**Decision.** All three are **deleted**. `core/src/dispatch/deadCode.test.ts`'s `DEAD_CANDIDATES`
+goes **6 → 4**.
+
+**The caller question, answered flatly: there is none, and there never was one.** Re-derived at
+`0cd422a` over `packages/`, excluding `dist/`. Every reference to either symbol outside its own
+file is a docstring, a `{@link}`, a barrel re-export (`metrics/index.ts`, `browser.ts`) or a test.
+Two look-alikes, both of the shape `CLAUDE.md`'s standing requirement warns about:
+`experiments/teaching/spec.ts#runSeed` is a `readonly runSeed: number` field on
+`TeachingSeedPlan` — and the docstring above it carries a `{@link runSeed}` pointing at the field,
+which is the tag this repository's standing requirement names outright — while
+`random/streams.ts`'s example uses `runSeed` as a **local variable name**. Neither is this symbol.
+
+**Is invariant 5 at risk? No — and the trace is the reason this is a deletion rather than a
+wiring.** The invariant has two clauses and they are discharged in two different packages.
+
+| clause | where it lives | what enforces it |
+|---|---|---|
+| *every persisted run record carries its seed* | `core` | `RunRecord.seed` is non-optional; `runRecordSchema`'s `seedString` regex refuses a record without a decimal-integer seed; `reports/schema.ts#expectSeed` applies the same regex to the envelope |
+| *so any run replays exactly* | `experiments/reports` | `createStoredRun` refuses when `config.seed` and `record.seed` disagree; `parseStoredRun` re-checks that pair **and** the traffic seed **and** the traffic model on read; `replaySimulationConfig` restores the seed as a `bigint`; `assertIdenticalReplay` compares by fingerprint |
+
+**The worked example the two symbols existed to spell was false, and that is the finding.**
+`metrics/index.ts` read `writeFileSync(path, serializeRunRecord(record))` then
+`new StreamSet(runSeed(parseRunRecord(...)))`, annotated **`// replays exactly`**. It does not.
+It builds a stream set with the right master seed and replays nothing: a `RunRecord` names no
+demand template, no duration, no demand overrides, no dispatcher overrides, no runner tunables,
+and its `buildingId`, `dispatcherProfileId` and `trafficProfileId` are **optional** fields where
+`StoredRunConfig` makes all three required. Feed that stream set to a building you chose yourself
+and you have a new run agreeing with the stored one on nothing but its draws. So the pair was not
+the writer half of a replay round trip — it was the whole of a round trip that **was never a
+replay**, and nothing but that example ever called for it. `types.ts` carried the same claim in
+shorter form (*"what lets a stored record be replayed bit-for-bit (`new StreamSet(runSeed(record))`)"*)
+and already half-knew better, since it goes on to say the seed alone stopped being sufficient at
+wave 13 — naming `trafficSeed` and `trafficModel` as the gap when the gap is the whole envelope.
+
+**The register's stated reason was stale, which is worth recording separately.** It read *"the
+writer half of the documented replay round trip; persistence.ts writes through `serializeRunSet`
+instead"*. That reads as *a shipped path writes, just not through this symbol*. **Nothing writes a
+run record on a shipped path at all**: the write path's four entry points — `createStoredRun`,
+`serializeRunSet`, `writeRunSetFile` and `appendRunToFile` — have no caller outside `*.test.ts` and
+`reports/fixtures.test-helper.ts`, and `serializeStoredRun` is called only by two of those four.
+`experiments/reports/types.ts` says as much of `createStoredRun` in as many words, under *"latent
+rather than realised"*. The register was right that these two symbols
+were dead and wrong about what surrounded them. A stale reason in a register whose own assertion
+checks only whether a symbol *acquired a caller* is `CLAUDE.md`'s stated-refusal class, pointed at
+an allowlist.
+
+**The reading half is narrower than that and the difference is stated rather than rounded off**,
+because rounding it off would be this decision's own defect. `validation/goldenChild.ts` is not a
+`.test.ts` file — it is a bare-`node` executable, and it calls `readRunSetFile` and
+`replaySimulationConfig` for real, which makes `parseRunSet` and `parseStoredRun` live behind it.
+By the audits' own rule (`isTest` matches `.test.ts` and `.test-helper.ts`) those four have a
+non-test caller and are **not** dead. What is true of them is weaker and is all that is claimed
+here: `goldenChild.ts`'s only invoker is `goldenRuns.test.ts`, which spawns it precisely so the
+replay happens outside the runner's module graph. So the read path is exercised by a process the
+suite starts, and the write path is exercised by nothing outside the suite at all.
+
+**Alternatives.** (a) Wire `runSeed` into `replaySimulationConfig` in place of `BigInt(config.seed)`.
+(b) Reclassify both into `PUBLIC_API_ONLY` as surface. (c) Delete.
+
+**Chosen: (c).** (a) is cosmetic and was rejected on its own merits: `parseStoredRun` proves
+`config.seed === record.seed` on every parsed record and `createStoredRun` proves it on every
+written one, so the substitution is behaviour-identical by construction — a call inserted to clear
+an audit, which is the looks-like-a-caller defect with its polarity reversed. It would also have
+left the false `// replays exactly` claim standing, since wiring the symbol does not make the
+sentence true. (b) is moving the gate rather than meeting it: the register's own rule for the split
+is behaviour-versus-surface, and these two would qualify as surface on that reading — which is
+exactly why the move must not be made by the lane asked to dispose of them.
+
+**What the brief asserted and this refutes.** Issue #175 was filed as invariant 5 being
+*"half-wired"*, and wave F's triage re-read it as P2 on the grounds that the invariant's substance
+holds. **The triage was right and its grounds were incomplete.** The substance holds; what was
+broken was a *claim about a mechanism*, not the mechanism — and it was broken in the direction
+`CLAUDE.md` pins hardest, a sentence asserting that something replays exactly when it cannot.
+Deleting the symbols is the smaller half of the fix; withdrawing the sentence is the larger.
+
+**`SerializeOptions` goes with the function it typed.** It was live only through
+`serializeRunRecord`'s signature; left behind it would have been reported dead on the next audit
+run, which is the both-directions check working rather than an oversight corrected.
+
+**Validation.** `deadCode.test.ts` is the instrument and it was checked in three directions, each
+by a mutation that puts a case *into* scope rather than removing one. Re-introducing
+`serializeRunRecord` as an uncalled export fails *"has no export that is dead"*, naming the symbol
+and its file. Re-adding `metrics/runSeed` to the register fails **two** assertions, one of them
+*"metrics/runSeed — no longer exists"*. Adding a registered **fifth** entry — the register holds
+four now — fails the count literal `4`, with the derived size in the message reading
+*"currently holds 5"*. Exit 1 on all three; exit 0 reverted.
+
+**The register's count literal stays a literal.** The assertion above it already pins the *set*,
+so `Object.keys(DEAD_CANDIDATES).length` in the `toBe` would be a tautology and a silently added
+entry would land. The derived count goes in the **failure message**, which is the one place it
+cannot drift. Separately, the paragraph over the register said *"these seven are neither"* above a
+six-entry object — `RISKS.md` R38 — and the count is removed from the prose rather than corrected,
+because a corrected literal drifts again at the next disposition.
+
+**What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
+integration. Nothing here says the `experiments/reports` persistence subsystem *should* have a
+shipped caller; what it has and does not have is recorded above as a finding and is issue #175's
+larger neighbour, not its scope. No claim is made that `readRunSetFile`, `parseRunSet`,
+`parseStoredRun` or `replaySimulationConfig` are dead — they are not, and `goldenChild.ts` is why.
+
+
 
 ---

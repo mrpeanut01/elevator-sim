@@ -76,12 +76,17 @@ import { DATA_DIR } from './harness.js';
 /**
  * Every hook and every test here carries this, and the reason is a repo-wide asymmetry.
  *
- * `vitest.config.ts` gives the `viz` project a 300 s `testTimeout`/`hookTimeout` (issue #144) and
- * leaves `core`, `experiments`, `server` and `cli` on **vitest's 5 s default**. The config states
- * that choice for `core` — *"filed rather than done, so the next person meets a decision instead of
- * a divergence"* — and does not mention `experiments`, which is where `benchmark/`, `oracle/` and
- * this directory live: the heaviest simulating suites in the repository. A 52-cell matrix does not
- * fit in five seconds on an idle machine, let alone a loaded one, so it says so itself.
+ * `vitest.config.ts` gives `viz`, `core` and `server` a 300 s `testTimeout`/`hookTimeout` (issues
+ * #144 and #149) and leaves **`experiments` and `cli` on vitest's 5 s default**. `core` and
+ * `server` joined in § D394; before that the config carried a note saying `core` was left out
+ * deliberately, and this docstring quoted it. It is quoted no longer, because it is gone.
+ *
+ * `experiments` is where `benchmark/`, `oracle/` and this directory live: the heaviest simulating
+ * suites in the repository, and now the only package of that weight still on the default. § D394
+ * left it there **deliberately** — no `experiments` test has been reported failing at the default,
+ * and widening on the strength of a measurement taken for a different question is the move § D331
+ * refused. So a 52-cell matrix that does not fit in five seconds on an idle machine, let alone a
+ * loaded one, still has to say so itself, and does.
  */
 const TIMEOUT_MS = 300_000;
 

@@ -3,12 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { StreamSet } from '../random/streams.js';
 
 import { MetricsRecorder, type RecordablePassenger } from './recorder.js';
-import { parseRunRecord, serializeRunRecord } from './serialization.js';
+import { parseRunRecord } from './serialization.js';
 import { departureGapBracket, summarizeRun } from './summarize.js';
 import {
   METRICS_SCHEMA_VERSION,
   MetricsError,
-  runSeed,
   type CarTimings,
   type RunRecord,
 } from './types.js';
@@ -79,20 +78,24 @@ describe('RunRecord round-trips through JSON with its seed intact', () => {
   const record = populatedRecord(streams);
 
   it('survives serialize -> parse unchanged', () => {
-    const restored = parseRunRecord(serializeRunRecord(record));
+    const restored = parseRunRecord(JSON.stringify(record));
     expect(restored).toEqual(record);
   });
 
   it('keeps the seed, as a decimal string, on the record itself', () => {
     expect(record.seed).toBe('20260726');
-    const restored = parseRunRecord(serializeRunRecord(record));
+    const restored = parseRunRecord(JSON.stringify(record));
     expect(restored.seed).toBe(record.seed);
-    expect(runSeed(restored)).toBe(streams.masterSeed);
+    expect(BigInt(restored.seed)).toBe(streams.masterSeed);
   });
 
-  it('replays exactly from the restored seed (CLAUDE.md invariant 5)', () => {
-    const restored = parseRunRecord(serializeRunRecord(record));
-    const replayed = new StreamSet(runSeed(restored));
+  // Not "replays exactly", which is what this test was called until § D395 and is not what it
+  // does: it redraws the *streams*, which is invariant 5's first clause and the only one a bare
+  // record can carry. Replaying the run needs the configuration beside it — see
+  // `experiments/reports/replay.test.ts`.
+  it('redraws every stream identically from the restored seed (invariant 5, first clause)', () => {
+    const restored = parseRunRecord(JSON.stringify(record));
+    const replayed = new StreamSet(BigInt(restored.seed));
     const original = new StreamSet(SEED);
 
     const draw = (set: StreamSet): number[] => [
@@ -106,16 +109,16 @@ describe('RunRecord round-trips through JSON with its seed intact', () => {
   it('preserves a full 64-bit seed that a JSON number would have truncated', () => {
     const big = new StreamSet(0xffff_ffff_ffff_ffffn);
     const bigRecord = new MetricsRecorder({ seed: big, runId: 'big-seed' }).finish(10);
-    const restored = parseRunRecord(serializeRunRecord(bigRecord));
+    const restored = parseRunRecord(JSON.stringify(bigRecord));
 
     expect(restored.seed).toBe('18446744073709551615');
-    expect(runSeed(restored)).toBe(big.masterSeed);
+    expect(BigInt(restored.seed)).toBe(big.masterSeed);
     // The same value carried as a JSON number would not have survived the trip.
-    expect(BigInt(Number(restored.seed))).not.toBe(runSeed(restored));
+    expect(BigInt(Number(restored.seed))).not.toBe(BigInt(restored.seed));
   });
 
   it('re-analyses without re-simulating: the restored record summarizes identically', () => {
-    const restored = parseRunRecord(serializeRunRecord(record));
+    const restored = parseRunRecord(JSON.stringify(record));
     expect(summarizeRun(restored)).toEqual(summarizeRun(record));
     expect(summarizeRun(restored, { window: 'full-run' })).toEqual(
       summarizeRun(record, { window: 'full-run' }),
@@ -126,7 +129,7 @@ describe('RunRecord round-trips through JSON with its seed intact', () => {
     // Without these on the record, a re-analysis of a stored run falls back to a constant and the
     // achieved interval can read short by 15 % — see `interval.test.ts`. So they have to survive
     // the trip to disk, and the restored record has to derive the same threshold.
-    const restored = parseRunRecord(serializeRunRecord(record));
+    const restored = parseRunRecord(JSON.stringify(record));
     expect(restored.carTimings).toEqual(record.carTimings);
 
     const interval = summarizeRun(restored).achievedInterval;
@@ -137,12 +140,12 @@ describe('RunRecord round-trips through JSON with its seed intact', () => {
 
     // And a record written without them still parses and still summarizes — saying so.
     const { carTimings: _dropped, ...withoutTimings } = record;
-    const bare = parseRunRecord(serializeRunRecord(withoutTimings as RunRecord));
+    const bare = parseRunRecord(JSON.stringify(withoutTimings as RunRecord));
     expect(summarizeRun(bare).achievedInterval.departureGapBasis).toBe('fallback');
   });
 
   it('keeps every sample and every leg', () => {
-    const restored = parseRunRecord(serializeRunRecord(record));
+    const restored = parseRunRecord(JSON.stringify(record));
     expect(restored.passengers).toHaveLength(5);
     expect(restored.loadSamples).toHaveLength(2);
     expect(restored.queueSamples).toHaveLength(2);
@@ -155,7 +158,7 @@ describe('RunRecord round-trips through JSON with its seed intact', () => {
     // `car-2` produced no load sample and no boarding, because it never carried a passenger.
     // If the roster did not survive the round trip, the re-analysed load-factor distribution
     // would silently omit its idle car-seconds and read high — see LoadFactorStatistics.
-    const restored = parseRunRecord(serializeRunRecord(record));
+    const restored = parseRunRecord(JSON.stringify(record));
     expect(restored.carIds).toEqual(['car-0', 'car-1', 'car-2']);
     expect(record.loadSamples.some((sample) => sample.carId === 'car-2')).toBe(false);
     expect(summarizeRun(restored).loadFactor.carCount).toBe(3);
@@ -163,25 +166,28 @@ describe('RunRecord round-trips through JSON with its seed intact', () => {
   });
 
   it('leaves the unserved leg unserved rather than filling in a boarding time', () => {
-    const restored = parseRunRecord(serializeRunRecord(record));
+    const restored = parseRunRecord(JSON.stringify(record));
     expect(restored.passengers[4]?.boardedAt).toBeUndefined();
     expect(Object.keys(restored.passengers[4]!)).not.toContain('boardedAt');
   });
 
   it('accepts an already-parsed object as well as text', () => {
-    const asObject: unknown = JSON.parse(serializeRunRecord(record));
+    const asObject: unknown = JSON.parse(JSON.stringify(record));
     expect(parseRunRecord(asObject)).toEqual(record);
   });
 
-  it('writes compact JSON by default and pretty JSON on request', () => {
-    expect(serializeRunRecord(record)).not.toContain('\n');
-    expect(serializeRunRecord(record, { space: 2 })).toContain('\n');
+  it('writes as one line, which is what makes a result set newline-delimited', () => {
+    // `experiments/reports/persistence.ts` appends one record per line and says JSON escapes
+    // every control character inside strings, so no field can introduce a newline. That is a
+    // claim about *this* record's contents, so it is checked here on a populated one rather
+    // than only over there on a fixture.
+    expect(JSON.stringify(record)).not.toContain('\n');
   });
 });
 
 describe('parseRunRecord rejects what it cannot trust', () => {
   const streams = new StreamSet(SEED);
-  const valid = JSON.parse(serializeRunRecord(populatedRecord(streams))) as Record<string, unknown>;
+  const valid = JSON.parse(JSON.stringify(populatedRecord(streams))) as Record<string, unknown>;
 
   const withoutKey = (key: string): Record<string, unknown> => {
     const copy = { ...valid };
@@ -227,14 +233,29 @@ describe('parseRunRecord rejects what it cannot trust', () => {
   });
 });
 
-describe('runSeed', () => {
-  it('rejects a seed that is not a decimal integer', () => {
-    expect(() => runSeed({ runId: 'r', seed: '' })).toThrow(MetricsError);
-    expect(() => runSeed({ runId: 'r', seed: '0x2a' })).toThrow(/invariant 5/);
+/*
+ * `runSeed()` was deleted in `DECISIONS.md` § D395 — a fourth guard on a value `parseRunRecord`,
+ * `reports/schema.ts` and `parseStoredRun` already guard, with no caller outside its own tests.
+ * These two assertions are the ones its tests were really making, moved onto the guard that
+ * survives it. Deleting the block outright would have been the mutation that validates nothing:
+ * it removes the case from scope instead of showing the case still holds.
+ */
+describe('a parsed record hands BigInt() a seed it can take', () => {
+  it('refuses the seeds BigInt would have accepted as something else', () => {
+    const streams = new StreamSet(SEED);
+    const valid = JSON.parse(JSON.stringify(populatedRecord(streams))) as Record<string, unknown>;
+    // None of these three throws in `BigInt`, and that is the whole point: a bad seed that threw
+    // would announce itself. `BigInt('')` is `0n`, so an empty seed replays run zero in silence;
+    // `BigInt('0x2a')` is `42n`, so a hex seed replays a different run; `BigInt('-1')` is `-1n`,
+    // which is not a `StreamSet` seed at all. The parser is where they are stopped.
+    expect(() => parseRunRecord({ ...valid, seed: '' })).toThrow(MetricsError);
+    expect(() => parseRunRecord({ ...valid, seed: '0x2a' })).toThrow(MetricsError);
+    expect(() => parseRunRecord({ ...valid, seed: '-1' })).toThrow(MetricsError);
   });
 
   it('round-trips through StreamSet', () => {
     const record = new MetricsRecorder({ seed: new StreamSet(12345) }).finish(1);
-    expect(new StreamSet(runSeed(record)).masterSeed).toBe(12345n);
+    const restored = parseRunRecord(JSON.stringify(record));
+    expect(new StreamSet(BigInt(restored.seed)).masterSeed).toBe(12345n);
   });
 });

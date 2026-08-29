@@ -65,6 +65,14 @@ import {
   DEFAULT_EVERYDAY_PROFILE,
   type EverydayProfile,
 } from './profile.js';
+/*
+ * Imported for its **length**, which is the whole of GitHub issue #286's first half: the
+ * `Default speed` entry below counts the stage's rungs, and a count written down beside a
+ * structure is stale as of the next commit that moves the structure. `stageScreenModel.ts` is the
+ * stage's *pure* half — no document, no canvas, no clock — so this import costs this file nothing
+ * it was keeping, and the arrow runs one way: that module has never imported this one.
+ */
+import { STAGE_SPEEDS } from './stageScreenModel.js';
 
 /** One avatar swatch, drawable: § 15.1's six, with the picked one carrying the ink edge. */
 export interface SettingsSwatchView {
@@ -141,10 +149,21 @@ export interface SettingsScreenView {
  * place, with the other five (GitHub issue #207). A refusal only a docstring carries is still read
  * by nobody who owns a mouse, which is why the panel exists rather than the register simply going
  * quiet.
+ *
+ * **The `Default speed` entry counts the stage's rungs, and it counts them rather than saying a
+ * number** — GitHub issue #286, `RISKS.md` R38. It read *"its own **five** speeds"* from the day it
+ * was written until [§ D354](../../../../DECISIONS.md) made the ladder seven, and then went on
+ * reading *five* on a player's screen for two waves, because nothing in this repository re-derives a
+ * count written in prose. The corpus could see the sentence the whole time — this array is seeded on
+ * `honesty/surfaces.ts#EVERYDAY_BUILD_NOTES` — and none of the ten properties compares a written
+ * count against the structure it is about, so *being swept* was never going to catch it. The
+ * durable form is the one `dev/rightRail.ts` reached for the same reason: interpolate
+ * `STAGE_SPEEDS.length` and let the sentence move when the ladder does. Writing *seven* would have
+ * been this defect again with a fresher number.
  */
 export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
   'Sound — nothing in this build plays a sound, and a toggle that toggles nothing is a lie in a settings panel',
-  'Default speed — the stage has its own five speeds and resets to the same one on every run, so the preference this row would set is buildable now and is not built',
+  `Default speed — the stage has its own ${String(STAGE_SPEEDS.length)} speeds and resets to the same one on every run, so the preference this row would set is buildable now and is not built`,
   'Units — nothing in the viewer reads a metres-or-feet preference, so there is nothing for the switch to switch',
   'Post runs to the board — the boards need a server this build has none of, and no posting path reads such a switch',
   'Sign out — nothing on this surface is signed in; the name and picture above live on this device',

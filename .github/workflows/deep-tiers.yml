@@ -1,0 +1,672 @@
+# The opt-in tiers, on a stated cadence — GitHub issue #163, DECISIONS.md § D393.
+#
+# Nine test tiers in this repository are gated behind an environment variable, and until this file
+# existed **nothing set any of them, anywhere, ever**. `ci.yml` runs a bare `npm test`; no workflow
+# named `ELEVATOR_SIM_DEEP`, `ELEVATOR_SIM_FUZZ`, `ELEVATOR_SIM_HONESTY` or `CORPUS_OUT`; and no
+# workflow in this repository had a `schedule:` trigger at all. So eighteen tests existed as text and
+# as coverage nobody had. That is #142's defect — a tier gated on a variable no workflow sets — one
+# directory over, and `fuzz/deep.test.ts`'s own header had been saying *"runs on request and in CI
+# cron"* about a cron that has never existed.
+#
+# ## The count is derived, not remembered
+#
+# **Eighteen tests across nine gated blocks in nine files** on `0cd422a`, the tree this workflow was
+# written against, derived with `vitest list` — which
+# reports a `skipIf`-ed suite's children when the gate is open and omits them when it is shut, so
+# the delta between two collections *is* the tier:
+#
+# ```bash
+# npx vitest list > off.txt
+# ELEVATOR_SIM_DEEP=1 ELEVATOR_SIM_FUZZ=deep ELEVATOR_SIM_HONESTY=deep \
+#   CORPUS_TIER=deep CORPUS_OUT=/tmp/corpus.txt npx vitest list > on.txt
+# diff <(sort off.txt) <(sort on.txt)
+# ```
+#
+# Issue #163 says seventeen and names two variables. Both are undercounts and the second one
+# matters: `ELEVATOR_SIM_FUZZ=deep` is a **third** gate, and it is the one guarding the 250-case
+# fuzz campaign. A workflow that set only the two variables the issue names would have left that
+# tier exactly as unrun as it found it, while reporting green.
+#
+# `goldenRuns.test.ts` renames its own suite by tier (`golden runs (always-on tier: 4 of 6)` versus
+# `(deep tier: 6 of 6)`), so a naive diff shows seventeen of its rows as both lost and gained.
+# Normalise that label before diffing or the count comes out at 35.
+#
+# **That figure is already one behind, and it is left with its commit rather than corrected in
+# place.** The first run of `fuzz-deep` on this tree came back RED, and registering the finding added
+# one `it` inside one new `describe.skipIf` on a file already in the count — so on the tree carrying
+# this file the same command would report **nineteen tests, ten blocks, nine files**.
+#
+# **That second triple is arithmetic, not a measurement**, and saying so is the point: the eighteen
+# was read off a `vitest list` diff on `0cd422a`, the nineteen is one added case counted by hand, and
+# a lane whose whole subject is figures published without the run behind them does not get to blur
+# the two. Re-run the command above if you need the number rather than the reasoning.
+#
+# **A test count understates this.** Four of the tiers do not add tests so much as widen the ones
+# already there: the golden set goes 4 → 6, the honesty corpus 49 → 60 cases, `perfScaling`'s floor
+# and car grids widen *and* its printed fits become assertions, and `perfSweep` turns a projection
+# into an executed 20 000-replication sweep. Reading the delta as "eighteen more tests" misses that
+# the tests it shares with the always-on suite are being asked a harder question.
+#
+# ## What the seed-collision claim actually is
+#
+# #163's title says these tiers hold *"the only seed-collision check in the repo"*. Measured, that is
+# too strong, and the correction is worth carrying because the acceptance clause rests on it:
+#
+# - `runner/crn.test.ts` — *"produces distinct seeds across a large batch"*, 500 seeds, **always-on**;
+# - `validation/perfSweep.test.ts` — 200 distinct trace digests, **always-on**, in the same file;
+# - `validation/perfSweep.test.ts` — **20 000** distinct trace digests, **deep only**.
+#
+# The file's own docstring is careful where the issue title is not: *"no other suite runs enough
+# replications to see it"* is a claim about **scale**, not about existence. So what has never run is
+# the collision search at twenty thousand, and CLAUDE.md invariants 2 and 5 lean on that scale rather
+# than on the kind of check being absent below it. The `perf-sweep` job is the one that discharges
+# #163's *"the seed-collision check has run at least once on `main`"*.
+#
+# ## Cadence: weekly, and dispatchable
+#
+# Weekly rather than nightly. `collectiveAdoption.test.ts` documents its own invocation with
+# `--testTimeout=14400000` — four hours — and `perfSweep`'s deep arm carries a two-hour ceiling. A
+# nightly matrix of that is many runner-hours a week spent re-answering a question about a tree that
+# moves in waves rather than in commits, and the first thing a maintainer does with a nightly job
+# that costs that much is turn it off. Sunday 03:00 UTC, chosen to land after a week's merges rather
+# than in the middle of one.
+#
+# `workflow_dispatch` is not decoration here: it is how a wave that has just integrated asks for the
+# deep tiers without waiting for Sunday, and it is how the § D343 measurement gets taken on demand.
+# `tiers` selects one job or all of them, so re-running `perf-sweep` after a fix does not also cost
+# four hours of `collective-adoption`.
+#
+# ## Nine jobs, not one
+#
+# Three reasons, and the first is arithmetic. GitHub's job ceiling is six hours; `collectiveAdoption`
+# alone declares four. One job running every tier in sequence would risk being killed at the ceiling
+# and taking every result with it, including the cheap tiers that had already passed.
+#
+# Second: `fail-fast: false` across separate jobs means the first tier to go red does not hide the
+# other eight. The point of turning these on is to learn what they find, and a run that stops at the
+# first finding reports one.
+#
+# Third: they fail for unrelated reasons. `perfScaling.test.ts` records that its wall-clock gates
+# flaked under concurrent load — *"expected 0.887 to be greater than 0.9"* — and that *"a gate nobody
+# can trust is a gate everybody overrides"*. Isolated, that flake reddens one job named for it. Mixed
+# into a single `npm test`, it reddens the fuzz campaign and the correctness oracle too, and the next
+# reader learns to ignore the whole workflow.
+#
+# ## One platform, and that is a named limit rather than an oversight
+#
+# `ci.yml` runs two legs because its purpose is to make **pin portability** measurable: § D196
+# re-pinned 26 values that then failed in the opposite direction on another platform, so a pin that
+# holds on both is portable and one that splits the matrix is an environment-dependent oracle. Most
+# of what runs here is not that kind of assertion — distinct digests, property bounds, a
+# reconciliation tolerance, a search over rendered strings — so a second leg would double a
+# multi-hour cost to re-answer the one question this workflow does not ask.
+#
+# **`golden-runs` is the exception, and it is stated rather than glossed.** Byte-identical replay
+# *is* a pin, and this tier adds two goldens (`mixed-use-transfers`, `vertical-city-constant-iso`)
+# that `ci.yml`'s two legs never see. Those two are pinned on Linux only. The other four run on both
+# legs of `ci.yml` on every pull request, so the portability question is asked of the always-on
+# four and not of the deep two. If a future wave wants it asked of all six, the fix is a second leg
+# on this job alone — not on the matrix.
+#
+# ## What this may not do
+#
+# **It may not be able to redden the per-PR suite.** That is the property that made #163 safe to
+# take: the deep tiers are minutes-to-hours and one of them is documented flaky, so wiring them into
+# `ci.yml`'s `suite` job would trade an unrun tier for an untrusted gate. Nothing here is a required
+# check, nothing here runs on `pull_request`, and `ci.yml` is untouched.
+#
+# The one thing that *does* run per-PR is `validation/deepTiers.test.ts`, and it runs no tier: it
+# reads this file and asserts the wiring — that the schedule exists, that every gate variable on disk
+# is set here, and that every gated test file on disk is named here. A tenth gated tier landing
+# unwired is a red pull request; a tenth gated tier *failing* is not. That distinction is the whole
+# design.
+#
+# ## `--passWithNoTests=false`, on every command, and it is the most load-bearing flag here
+#
+# Every project in `vitest.config.ts` sets `passWithNoTests: true`, for the good reason that a
+# package legitimately has no tests until its phase lands. The consequence for a workflow that
+# selects tests **by path** is that a typo is silent:
+#
+# ```
+# $ npx vitest run --project experiments src/fuzz/doesNotExist.test.ts ; echo $?
+# 0
+# ```
+#
+# Green, having executed nothing. That is the defect this whole workflow exists to close, one layer
+# down — a run reporting success about a measurement it never took — and it would have been invisible
+# in the Actions tab, because a job that runs no tests and a job whose tests pass look identical from
+# outside. Measured with the flag, the same command exits **1**, and a real path still exits 0.
+#
+# So there are two defences and they catch different things. `validation/deepTiers.test.ts` compares
+# the `(project, file)` pairs in this file against the tiers derived from disk, so a typo is a red
+# pull request *before* the schedule ever fires. The flag is what makes the run itself refuse, on a
+# tree where that test has not been updated yet. Neither alone is enough: the test cannot see a
+# filter that matches nothing for a reason other than a wrong name, and the flag cannot see a tier
+# that was never named at all.
+#
+# ## What each `timeout-minutes` is, and what it is not
+#
+# A ceiling, not an expectation. Where a tier documents its own invocation the number here is read
+# off that (`collective-adoption` from `--testTimeout=14400000`, `perf-sweep` from its 7 200 000 ms
+# `it`); where it does not, it is set with headroom over what was measured while wiring this file.
+#
+# Measured 2026-08-29 on one Linux container, **under concurrent load from other tiers**, which is
+# not the runner and is why none of these is a prediction:
+#
+# | tier | measured | ceiling here |
+# |---|---|---|
+# | `fuzz-deep` (250 cases) | 20.5 min, **RED** — a real counterexample, issue #305 | 60 |
+# | `golden-runs` (6 of 6, cross-process) | 55.6 s, green | 90 |
+# | `oracle-campaign` (11 banks at n = 128) | 5.5 min, green | 120 |
+# | `matrix-census` (200 replications) | 17.0 min, **RED** — three declared figures do not reproduce, issue #306 | 120 |
+# | `perf-sweep` (20 000 replications, workers) | 4.6 min, green | 180 |
+# | `perf-scaling` (the wall-clock fits) | 26.9 s, green | 90 |
+# | `honesty-deep` (60 cases) | **32.6 min green alone**; 43.9 min and *timed out* when contended | 90 |
+#
+# **Seven of the nine were run while wiring this file. Two came back red, and they are two different
+# kinds of thing.** `fuzz-deep` found a counterexample. `matrix-census` found that declared
+# statistical parameters no longer reproduce from the census they were derived from — the sharpest
+# possible answer to *"what was this tier for?"*, since those ceilings bound every interval the
+# experiment matrix publishes.
+#
+# Reporting those as one number — *"2 of 7 failing"* — would say the same thing about a defect and a
+# stale baseline, which is the mistake this repository makes a rule about. The table names the kind
+# beside each figure for that reason, and so does the `report` job's issue body.
+#
+# **`honesty-deep` was red until it was measured a second time, and that row is why the others are
+# quoted with their conditions.** Sharing the container with two other tiers it timed out; alone it
+# passes. Alone is this job's condition — one tier per job, one runner each — so the first number
+# would have shipped a job believed red by construction on the strength of how it was measured. The
+# other figures above were taken under varying contention, so read them as ceilings on the cost
+# rather than as the cost.
+#
+# **`perf-scaling` came back green, which is worth saying because it is the one expected not to.**
+# Its own note records a flake under concurrent load (*"expected 0.887 to be greater than 0.9"*), and
+# it is the tier whose assertions are about a machine rather than about the simulator. One green run
+# is not evidence that it is stable — it is one draw from the distribution the note describes.
+#
+# **Two were not run: `collective-adoption` and `corpus-figures`.** The first documents a four-hour
+# invocation, which is a Sunday's work rather than a lane's. The second is § D343's measurement, and
+# taking it was explicitly not this lane's job — building it somewhere to happen was.
+#
+# The sweep is the interesting row: its own `it` allows two hours and it finished in under five
+# minutes, because it is the one tier that runs with `parallel: { mode: 'workers' }`. The ceiling is
+# left high anyway — a hosted runner is slower and a ceiling that has to be raised after a red run
+# has already cost the week it was meant to save.
+#
+# The other six are named in this file and were **not** run while writing it. That is stated rather
+# than implied: a tier nobody has measured is a tier whose first result arrives on a Sunday, and a
+# ceiling nobody has tested is a guess with a number on it.
+#
+# ## Aliveness — the half that is mechanised, and the half that is not
+#
+# A scheduled workflow that quietly stops is this repository's recurring failure mode, so say which
+# half of "is it still alive?" has a mechanism.
+#
+# **Mechanised.** `validation/deepTiers.test.ts` derives the gated tiers from disk and asserts this
+# file names all of them, in both directions. It is what makes `measure.corpus.test.ts` — which
+# landed in wave F already gated and already unrun — the last tier that can arrive here silently.
+#
+# **Not mechanised.** Whether the cron has *fired* cannot be checked from inside the suite: a test
+# that asked would need the network and a wall clock, and this repository forbids the second in
+# `core/` and does not do the first anywhere. GitHub also disables scheduled workflows after 60 days
+# of repository inactivity, silently. So the check is a command rather than an assertion, and it is
+# written here rather than left to be rediscovered:
+#
+# ```bash
+# gh run list --workflow=deep-tiers.yml --limit 5   # a gap wider than a week means it stopped
+# ```
+#
+# `summary` runs on every firing, passes or fails, and writes the per-tier verdict table into the run
+# summary — so the answer to "did it run, and what did it say" is one page in the Actions tab rather
+# than nine job logs.
+#
+# ## Failures reach a person
+#
+# `report` opens a GitHub issue when any tier fails, and comments on the open one instead of opening
+# a second. A scheduled run's red X is seen by nobody by default — GitHub emails only the author of
+# the last commit that touched the cron — which is the same shape as a probe reporting zero because
+# nothing was watching. An issue is where the rest of this repository's findings already live.
+name: Deep tiers
+
+on:
+  schedule:
+    # Sunday 03:00 UTC. Weekly; see the header on why not nightly.
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      tiers:
+        description: 'Which tier to run (all, or one job id)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - fuzz-deep
+          - golden-runs
+          - oracle-campaign
+          - matrix-census
+          - collective-adoption
+          - perf-sweep
+          - perf-scaling
+          - honesty-deep
+          - corpus-figures
+
+# No `cancel-in-progress`. A four-hour job cancelled by the next firing produces no result at all,
+# and two overlapping weekly runs is not a state this schedule can reach.
+concurrency:
+  group: deep-tiers-${{ github.ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The wide fuzz space. Six properties, 250 cases, minutes.
+  #
+  # Gated on ELEVATOR_SIM_FUZZ=deep — the variable issue #163 does not name, and the reason this
+  # workflow's gate list is derived from disk rather than from the issue.
+  # ---------------------------------------------------------------------------
+  fuzz-deep:
+    name: fuzz — the deep campaign
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'fuzz-deep'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Deep fuzz campaign
+        env:
+          ELEVATOR_SIM_FUZZ: deep
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=600000 src/fuzz/deep.test.ts
+
+  # ---------------------------------------------------------------------------
+  # Byte-identical replay, at 6 goldens rather than 4, plus the replay from a bare node process.
+  #
+  # `npm run build` is not optional here and not merely prudent: goldenRuns.test.ts fails with
+  # "ELEVATOR_SIM_DEEP=1 requires a built tree" if `dist/` is missing, because the cross-process
+  # case spawns node against built output rather than through vitest's aliases.
+  # ---------------------------------------------------------------------------
+  golden-runs:
+    name: goldens — 6 of 6, and across a fresh process
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'golden-runs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck and build
+        run: npm run build
+      - name: Deep goldens
+        env:
+          ELEVATOR_SIM_DEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/validation/goldenRuns.test.ts
+
+  # ---------------------------------------------------------------------------
+  # CLAUDE.md's correctness oracle at full width: every measurable bank against the closed form.
+  # ---------------------------------------------------------------------------
+  oracle-campaign:
+    name: oracle — every measurable bank
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'oracle-campaign'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Deep campaign
+        env:
+          ELEVATOR_SIM_DEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/oracle/deepCampaign.test.ts
+
+  # ---------------------------------------------------------------------------
+  # Re-derives every declared matrix ceiling and spread at 200 replications. The numbers the
+  # experiment matrix is built on, checked against the census they were derived from.
+  # ---------------------------------------------------------------------------
+  matrix-census:
+    name: matrix — the 200-replication census
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'matrix-census'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Matrix census
+        env:
+          ELEVATOR_SIM_DEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/benchmark/matrixCensus.test.ts
+
+  # ---------------------------------------------------------------------------
+  # § D209's study at its pre-registered replication count. The file's own documented invocation
+  # passes --testTimeout=14400000, so the job ceiling is set from that rather than guessed.
+  # ---------------------------------------------------------------------------
+  collective-adoption:
+    name: collective adoption — § D209 at the pre-registered count
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'collective-adoption'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Collective adoption study
+        env:
+          ELEVATOR_SIM_DEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=14400000 src/benchmark/collectiveAdoption.test.ts
+
+  # ---------------------------------------------------------------------------
+  # Twenty thousand replications, twenty thousand distinct trace digests.
+  #
+  # #163's acceptance clause — "the seed-collision check has run at least once on main" — is this
+  # job and no other. See the header for what the claim is and is not.
+  # ---------------------------------------------------------------------------
+  perf-sweep:
+    name: perf — the 20 000-replication sweep
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'perf-sweep'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Large sweep
+        env:
+          ELEVATOR_SIM_DEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=7200000 src/validation/perfSweep.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The wall-clock fits, which the file says run "only where the machine is expected to be quiet".
+  #
+  # A hosted runner is not that machine, and this job is the one most likely to be red for a reason
+  # that is not about the code. It is here anyway, in its own job, because the alternative is the
+  # state #163 describes — a tier that exists and has never run. Read a red here against the file's
+  # own note about 0.887 before opening anything.
+  # ---------------------------------------------------------------------------
+  perf-scaling:
+    name: perf — the wall-clock fits (noise-prone; see the job header)
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'perf-scaling'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Scaling fits
+        env:
+          ELEVATOR_SIM_DEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/validation/perfScaling.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The honesty search over the deep corpus — 60 cases, campaign stages, 50 replications a stage.
+  # The only tier in which `campaign/judge.ts#judgeStage` speaks at all.
+  #
+  # Run by file rather than by project on purpose. `--project viz` would also collect
+  # `dev/browserTier.test.ts`, whose CI clause fails any run where `process.env.CI` is set and no
+  # Chromium is provisioned — correct behaviour, aimed at `ci.yml`, and a red here that would be
+  # about this workflow rather than about the corpus.
+  #
+  # **This job's first red is more likely to be a clock than a defect, and `timeout-minutes` cannot
+  # prevent it.** The case declares its own ceiling as the third argument to the `it` —
+  # `1_800_000`, thirty minutes — and a per-test timeout wins over both the config default and any
+  # `--testTimeout` this file could pass. So the job ceiling below governs the *runner*, not the
+  # tier, and the tier's own 30 minutes is the binding number.
+  #
+  # **Measured twice on 2026-08-29, and the pair is the whole finding.** Contended — sharing the
+  # container with two other deep tiers — it took **43.9 min and timed out**: `Test timed out in
+  # 1800000ms`, 25 of 26 cases passing and the deep one killed. **Alone it passes**: 26 of 26,
+  # exit 0, 32.6 min for the file with the deep case inside its own 30-minute ceiling.
+  #
+  # **Alone is this job's condition**, which is why the pair had to be taken rather than the first
+  # number published: every tier here runs in its own job on its own runner, so nothing else is
+  # competing. One measurement would have shipped a job believed red by construction, and the belief
+  # would have been an artefact of how it was measured.
+  #
+  # The headroom is nonetheless thin, and the second number does not make it thick.
+  # `measure.corpus.test.ts` puts the deep tier at **~23 min** on a container, against a ceiling of
+  # 30, and a GitHub hosted runner is a smaller machine than either. So this stays the job most
+  # likely to go red for capacity rather than for a defect — and a capacity red here is a **timeout,
+  # not a refutation**: no honesty property fails, the corpus never finishes.
+  #
+  # If that happens it is a finding about the ceiling in `honesty.test.ts` and belongs in an issue
+  # against that number. It is deliberately not raised from here — a tier's declared bound is the
+  # tier's to declare, and a lane widening somebody else's to make its own workflow green would be
+  # doing the thing this repository refuses outright.
+  # ---------------------------------------------------------------------------
+  honesty-deep:
+    name: honesty — the deep corpus
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'honesty-deep'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Deep honesty corpus
+        env:
+          ELEVATOR_SIM_HONESTY: deep
+        run: npx vitest run --passWithNoTests=false --project viz src/honesty/honesty.test.ts
+
+  # ---------------------------------------------------------------------------
+  # § D343's measurement, which had a written obligation and no place to be taken.
+  #
+  # `measure.corpus.test.ts` says run it *"once, after integration, never per branch"*. Every word of
+  # that describes a scheduled run on `main` and describes nothing a pull request can do, which is
+  # why it belongs inside this workflow rather than beside it: a second workflow would be a second
+  # schedule to drift, for a job that is minutes against this file's hours.
+  #
+  # **Both tiers in one job, deliberately.** § D343's rule is that the pair is what makes either
+  # number mean anything — measured in one sitting, on one tree. Two jobs could be scheduled onto two
+  # commits, which is the per-branch defect wearing a different hat.
+  #
+  # It **publishes nothing**. The figures land as an artifact for a person to read and carry into
+  # CLAUDE.md with the tree they were measured on beside them, which is the half of RISKS.md R38 that
+  # no deriver can do for anybody. A workflow that edited that row would be a pin maintaining itself.
+  # ---------------------------------------------------------------------------
+  corpus-figures:
+    name: corpus figures — § D343, both tiers, one sitting
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'corpus-figures'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+
+      - name: Always-on tier
+        env:
+          CORPUS_OUT: ${{ runner.temp }}/corpus-always-on.txt
+        run: npx vitest run --passWithNoTests=false --project viz src/honesty/measure.corpus.test.ts
+
+      - name: Deep tier
+        env:
+          CORPUS_OUT: ${{ runner.temp }}/corpus-deep.txt
+          CORPUS_TIER: deep
+          ELEVATOR_SIM_HONESTY: deep
+        run: npx vitest run --passWithNoTests=false --project viz src/honesty/measure.corpus.test.ts
+
+      # The commit is recorded beside the figures because a corpus count without the tree it was
+      # taken on is the thing R38 exists to stop. The artifact is the whole answer, not a pointer
+      # to a log line a reporter may have swallowed.
+      - name: Name the tree the figures are true of
+        run: |
+          {
+            echo "measured on : ${{ github.sha }}"
+            echo "ref         : ${{ github.ref }}"
+            echo "workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } > "${{ runner.temp }}/corpus-provenance.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corpus-figures
+          path: |
+            ${{ runner.temp }}/corpus-always-on.txt
+            ${{ runner.temp }}/corpus-deep.txt
+            ${{ runner.temp }}/corpus-provenance.txt
+          retention-days: 90
+
+  # ---------------------------------------------------------------------------
+  # One page that says what every tier did.
+  #
+  # `always()` so a red tier is reported rather than skipped past, and no `needs` result is allowed
+  # to decide whether the summary exists.
+  # ---------------------------------------------------------------------------
+  summary:
+    name: summary
+    if: always()
+    needs:
+      - fuzz-deep
+      - golden-runs
+      - oracle-campaign
+      - matrix-census
+      - collective-adoption
+      - perf-sweep
+      - perf-scaling
+      - honesty-deep
+      - corpus-figures
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: The per-tier verdict
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          {
+            echo "## Deep tiers — ${{ github.sha }}"
+            echo
+            # No test count here on purpose. This page is written on every firing and would be the
+            # one place a stale figure could not be dated — the counts belong in the header and in
+            # § D393, each beside the commit it was taken on.
+            echo "The opt-in tiers, none of which ran in CI before issue #163."
+            echo
+            echo "| tier | result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          node -e '
+            const results = JSON.parse(process.env.RESULTS);
+            const rows = Object.entries(results)
+              .map(([id, job]) => `| \`${id}\` | **${job.result}** |`)
+              .join("\n");
+            require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, rows + "\n");
+          '
+          {
+            echo
+            echo "Aliveness: \`gh run list --workflow=deep-tiers.yml --limit 5\`. A gap wider than a"
+            echo "week means the schedule stopped — GitHub disables cron after 60 days of repository"
+            echo "inactivity, and it does so silently."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # A failure reaches a person.
+  #
+  # Without this the workflow is the page-error probe again: green or red, seen by nobody, because
+  # GitHub mails a scheduled failure only to whoever last touched the cron. One issue, reopened and
+  # commented rather than duplicated, so a tier that fails four weeks running is one thread.
+  # ---------------------------------------------------------------------------
+  report:
+    name: report a failure
+    if: always() && contains(join(needs.*.result, ','), 'failure')
+    needs:
+      - fuzz-deep
+      - golden-runs
+      - oracle-campaign
+      - matrix-census
+      - collective-adoption
+      - perf-sweep
+      - perf-scaling
+      - honesty-deep
+      - corpus-figures
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RESULTS: ${{ toJSON(needs) }}
+          # No colon in the title. It is searched back with `in:title`, and a colon in a GitHub
+          # search string reads as a qualifier — the lookup would miss and open a second issue
+          # every week, which is the opposite of one thread per finding.
+          TITLE: 'Deep tiers went red on a scheduled run'
+        run: |
+          failed="$(node -e '
+            const results = JSON.parse(process.env.RESULTS);
+            process.stdout.write(
+              Object.entries(results)
+                .filter(([, job]) => job.result === "failure")
+                .map(([id]) => "- `" + id + "`")
+                .join("\n"),
+            );
+          ')"
+          body="$(printf '%s\n\n%s\n\n%s\n\n%s\n' \
+            "The weekly deep-tier run failed. These jobs went red on \`${{ github.sha }}\`:" \
+            "$failed" \
+            "Run: $RUN_URL" \
+            "These tiers run nowhere else, so a red here is the only place the finding exists. Read \`perf-scaling\` against its own note about wall-clock flake under load before treating it as a defect; the other eight are deterministic.")"
+
+          existing="$(gh issue list --repo "$REPO" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "$body"
+          else
+            gh issue create --repo "$REPO" --title "$TITLE" --body "$body"
+          fi

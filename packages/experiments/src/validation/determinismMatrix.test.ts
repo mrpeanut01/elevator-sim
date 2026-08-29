@@ -70,18 +70,24 @@ import { DATA_DIR } from './harness.js';
 /**
  * Every hook and every test here carries this, and the reason is a repo-wide asymmetry.
  *
- * `vitest.config.ts` gives the `viz` project a 300 s `testTimeout`/`hookTimeout` (issue #144, whose
- * own docstring measured the slowest legitimate `viz` test at 49.4 s) and leaves `core`,
- * `experiments`, `server` and `cli` on **vitest's 5 s default**. The config says so explicitly for
- * `core` — *"left on vitest's default deliberately and not by oversight … filed rather than done"* —
- * and does not mention `experiments` at all, which is where `benchmark/`, `oracle/` and this
- * directory live. Those are the heaviest simulating suites in the repository.
+ * `vitest.config.ts` gives `viz`, `core` and `server` a 300 s `testTimeout`/`hookTimeout` (issue
+ * #144, whose own docstring measured the slowest legitimate `viz` test at 49.4 s, and issue #149)
+ * and leaves **`experiments` and `cli` on vitest's 5 s default**. `core` and `server` joined in
+ * § D394; this docstring used to quote the config's note explaining why `core` had not, and that
+ * note is gone.
+ *
+ * `experiments` is where `benchmark/`, `oracle/` and this directory live — the heaviest simulating
+ * suites in the repository, and the only package of that weight still on the default. That is
+ * § D394's deliberate stopping point rather than an oversight: no `experiments` test has been
+ * reported failing at the default, and § D331 refused exactly this widening-without-evidence once
+ * already.
  *
  * The consequence is measured rather than feared: under seven concurrent worktrees, six
- * `core`/`experiments` files went red purely on contention and every one passed when run alone. So
- * a simulating test in this package that does not annotate itself is a flake waiting for a busy
- * machine, and the 113 `viz` sites that annotated themselves before the default existed were right
- * to. Whether the asymmetry should be closed at the config is not this file's call.
+ * `core`/`experiments` files went red purely on contention and every one passed when run alone.
+ * Half of that evidence is now spent — the `core` half is covered at the project — and the
+ * `experiments` half is not, so a simulating test in this package that does not annotate itself is
+ * still a flake waiting for a busy machine, and the 113 `viz` sites that annotated themselves
+ * before the default existed were still right to.
  */
 const TIMEOUT_MS = 300_000;
 

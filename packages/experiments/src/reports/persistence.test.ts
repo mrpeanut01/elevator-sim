@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { METRICS_SCHEMA_VERSION, runSeed, type LoadedConfig } from '@elevator-sim/core';
+import { METRICS_SCHEMA_VERSION, type LoadedConfig } from '@elevator-sim/core';
 
 import { load, runOne, simulationConfig, storedRun } from './fixtures.test-helper.js';
 import {
@@ -88,7 +88,10 @@ describe('a stored run survives JSON exactly', () => {
 
     expect(parsed.config.seed).toBe(seed.toString());
     expect(parsed.record.seed).toBe(seed.toString());
-    expect(runSeed(parsed.record)).toBe(seed);
+    // Both copies, as `bigint`, because the replay reads one and is graded against the
+    // other: `replaySimulationConfig` takes the envelope's and `parseStoredRun` has just
+    // proved the record agrees. Above 2^53, which is where `Number()` would have lost it.
+    expect(BigInt(parsed.record.seed)).toBe(seed);
     expect(BigInt(parsed.config.seed)).toBe(seed);
   });
 

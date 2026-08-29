@@ -28,11 +28,18 @@ import { NoSuchUserError, SESSION_TTL_MS, Store, normaliseEmail } from './store.
 /**
  * **Every test in this file boots a whole PostgreSQL, and vitest's default gives it five seconds.**
  *
- * The `server` project passes no `testTimeout`, so `vitest.config.ts`'s 5 000 ms default applies —
- * the same ceiling issue #144 measured as a false red for `viz` and replaced there with 300 000 ms.
- * Nothing about that argument is specific to simulating: `PgliteSql` compiles and starts
- * PostgreSQL-in-WebAssembly per fixture, which fits inside five seconds on an idle machine and does
- * not fit under load.
+ * That was the whole protection here until § D394. The `server` project now passes
+ * `SIMULATING_TIMEOUT_MS` like `viz` and `core` do, so `vitest.config.ts`'s 5 000 ms default no
+ * longer reaches this file and **this call is local reinforcement rather than the only thing
+ * standing between the fixture and a flake**. It is kept on § D331's own rule: a site that knows it
+ * is slow is allowed to say so, and deleting it would make the file depend silently on a line in
+ * another package's config.
+ *
+ * Nothing about issue #144's argument was ever specific to simulating: `PgliteSql` compiles and
+ * starts PostgreSQL-in-WebAssembly per fixture, which fits inside five seconds on an idle machine
+ * and does not fit under load. That is why this file is the one § D394 cites — it references **no
+ * simulation entry point at all**, so the survey pattern issue #149 prescribes does not match it,
+ * and it is nonetheless the only file in the repository with a reproduced timeout behind it.
  *
  * **This is the flake the #254 lane saw once and could not reproduce in six runs.** Reproduced here
  * by running three `vitest run --project server` processes at once: 11, 12 and 6 failures across
@@ -41,10 +48,10 @@ import { NoSuchUserError, SESSION_TTL_MS, Store, normaliseEmail } from './store.
  * report suspected — those are closed one commit earlier and the timeouts survived it.
  *
  * Set for the file rather than annotated per test, because the annotation is a list and the list is
- * the defect — `vitest.config.ts`'s own note on issue #144 makes that argument at length. **The
- * right home is the `server` project entry in that file**, next to `viz`'s, and that is out of this
- * lane's allowed paths; it is owed, and § D361 names it. `core` is in the same position and its
- * config comment already says so.
+ * the defect — `vitest.config.ts`'s own note on issue #144 makes that argument at length. § D361
+ * said the right home was the `server` project entry in that file, next to `viz`'s, and that it was
+ * owed because that lane's allowed paths did not include the root config. **§ D394 discharged it**,
+ * for `core` in the same commit.
  */
 vi.setConfig({ testTimeout: 300_000, hookTimeout: 300_000 });
 

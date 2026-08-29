@@ -230,7 +230,7 @@ describe('the traffic model reaches a run', () => {
    * **Invariant 5 lives on the record, not on the result.**
    *
    * `SimulationResult` is an in-memory object that dies with the process; `RunRecord` is what
-   * `serializeRunRecord` writes and what a replay is rebuilt from. A version reported only on the
+   * `createStoredRun` stores and what a replay is compared against. A version reported only on the
    * result is a version that does not survive being stored, and a stored `v2` run rebuilt without
    * it re-runs under `v1` — a different trace at the same seed rather than a different answer. The
    * omission at `v1` is asserted on the same object, because it is what keeps every pinned record
