@@ -14,7 +14,9 @@
  * ## The suppression rule, which is the real design decision
  *
  * A batch of 50 will contain replications whose own summary refuses to stand behind a mean, on any
- * of `awtIsValid`'s four grounds. Measured on this repository's own data: Garden Apartments under
+ * of `awtIsValid`'s **five** grounds — the count was written when there were four and went stale
+ * when the abandonment ground landed, which matters here because {@link remedyFor}'s advice is
+ * about *which* of them the load moves. Measured on this repository's own data: Garden Apartments under
  * `collective` at 900 s gives **47 of 50**; Secure Tower gives **7 of 50**; Midtown Office at its
  * shipped demand gives **0 of 50**. So this is the common case, not the edge.
  *
@@ -998,6 +1000,52 @@ function capacityFindingFor(baseline: BatchArmResult, candidate: BatchArmResult)
  *
  * What is deliberately **not** suggested is changing the seed until the batch cooperates. That is
  * choosing the outcome, and a remedy that taught it would undo everything else on this surface.
+ *
+ * ## The load sentence used to promise an end state, and the control cannot reach one
+ *
+ * It read *"lower 'demand %pop/5 min' until the queues stop growing"*. `dev/batchPanel.ts`'s
+ * `remedyControl` implements *until* as **one 10 % step per press**, and the promise was measured
+ * against that step for the first time by GitHub issue #299 ([§ D392](../../../../DECISIONS.md)).
+ * It does not hold, in three separate ways, and the sentence below now says all three.
+ *
+ * **The run behind every figure in this section**, so the instruction is pinned the way a number
+ * would be: seed `20260729`, 900 simulated seconds, **n = 50** paired replications, `collective` as
+ * baseline against `eta` as candidate, the demand typed into the field (so it is
+ * `arrivalRatePctPop5min` rather than a band point), and each rung the button's own arithmetic —
+ * `Math.round(rate * 0.9 * 10) / 10`. A *dropped pair* is the complete-case rule as
+ * {@link droppedSentenceFor} counts it: either arm's `awtIsValid` false.
+ *
+ * 1. **Unreachable.** From the band point the panel opens Midtown Office on — `min`, 11 %pop/5 min
+ *    — nine presses walk `11 → 9.9 → 8.9 → 8.0 → 7.2 → 6.5 → 5.9 → 5.3 → 4.8` and drop
+ *    **50, 50, 50, 49, 46, 41, 34, 24, 17** of 50. Started at 24 instead it is **50 of 50 at every
+ *    one of those nine rungs**, all on `saturated`; reaching 2 %pop/5 min from there takes
+ *    **24 presses**. Mixed Use High Rise from 24 gives `50, 50, 50, 50, 49, 42, 31, 20, 11` and
+ *    Secure Tower `50, 49, 47, 36, 24, 14, 9, 5, 1`.
+ * 2. **Not monotone, and not merely noisy.** On Chancery House, one press from each integer rate
+ *    from 19 down to 5 — fifteen presses — **raises** the count twice: `19 → 17.1` takes 1 of 50 to
+ *    3, and `18 → 16.2` takes 0 to 1. Midtown does it at the bottom of its own ladder, where the
+ *    count the issue quotes as the goal is itself a step backwards: at n = 20, 3 %pop/5 min drops
+ *    **0 of 20** and 2 %pop/5 min drops **1 of 20**. Two causes, neither of them sampling alone.
+ *    Lowering the rate **redraws the whole passenger trace**, so the pairs after a press are
+ *    different pairs — the common-random-numbers discipline this file's own module docstring is
+ *    built on holds across dispatchers and *not* across a change of demand. And a mean is refused
+ *    on **five** grounds, of which only `saturated` follows the load down.
+ * 3. **The wrong lever entirely, on a quiet building.** Garden Apartments at its own `min`
+ *    (3 %pop/5 min) drops `4, 7, 8, 8, 11, 16, 16, 15` of 50 over seven presses — rising almost
+ *    throughout — and every refusal in that ladder is `empty-window`: *"No passenger was served
+ *    within the reporting window."* There is no queue to stop growing, and the step makes the
+ *    window emptier. Secure Tower shows the same crossover in miniature: `censored` appears at
+ *    12.8 and 11.5 %pop/5 min, where `saturated` has nearly gone.
+ *
+ * What was rejected is **changing the step**. A larger step, or one that searched for a load the
+ * rows liked, is what `remedyControl` already refuses in as many words — and finding 3 says no step
+ * size fixes this, because on Garden Apartments the direction is wrong rather than the distance. So
+ * the sentence is what changed; the button still does exactly what its label says.
+ *
+ * `remedyLadder.test.ts` holds this: it re-derives finding 2's Chancery rung and finding 3's Garden
+ * rung at n = 50, checks the Midtown endpoint is still short of zero, and asserts the sentence below
+ * makes no promise of an end state. The ladders quoted in full above are reported once and are not
+ * all re-run per suite; the rungs that carry the claim are.
  */
 function remedyFor(
   anySuppressed: boolean,
@@ -1009,9 +1057,19 @@ function remedyFor(
     parts.push(
       'A measure that could not be compared is the complete-case rule, not a failure: an estimate ' +
         'is reported only when every paired run stands behind one, so more replications make this ' +
-        'more common rather than less. The lever is the load — lower "demand %pop/5 min" until the ' +
-        'queues stop growing, or run a building that copes with its own traffic. The rows below ' +
-        'are unaffected, because they are counts of what happened rather than means.',
+        'more common rather than less. The lever is the load, and "demand %pop/5 min" is where it ' +
+        'is — but this surface will not tell you to lower it until the rows fill in, because that ' +
+        'is an end state the control has not been measured to reach. One 10 % step is measured to ' +
+        'leave the dropped-pair count unchanged, to lower it, and to raise it, on shipped ' +
+        'buildings at fifty pairs. Two reasons, and neither is bad luck. Lowering the rate redraws ' +
+        'the passengers, so the runs after a step are different runs, and the paired discipline ' +
+        'that makes a comparison honest holds across dispatchers and not across a change of ' +
+        'demand. And a mean is refused on five grounds, of which only a queue that never stopped ' +
+        'growing follows the load down: on a quiet building the ground is an empty reporting ' +
+        'window, which the step makes commoner, so there the lever points the wrong way. Read the ' +
+        'refusal each arm quotes below before pressing again — where it is not a growing queue, ' +
+        'reach for a building that copes with its own traffic instead. The other rows are ' +
+        'unaffected, because they are counts of what happened rather than means.',
     );
   }
   if (anyUnresolved) {
