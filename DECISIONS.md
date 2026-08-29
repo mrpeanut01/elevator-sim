@@ -26306,7 +26306,210 @@ holds the two rungs the sentence rests on, the Midtown endpoint, and the sentenc
 
 ---
 
-## D394 — `core` and `server` take the simulating project's timeout, and the file that forced it simulates nothing
+## D393 — the opt-in tiers get a schedule, and the instrument that keeps them on it is a test rather than the workflow
+
+**Rules on:** GitHub issue #163. Settles `.github/workflows/deep-tiers.yml`,
+`packages/experiments/src/validation/deepTiers.test.ts`, and `docs/22-charter.md` § 4's S9 row.
+
+**Decision.** Nine gated test tiers run **weekly** on `main` (Sunday 03:00 UTC) and on
+`workflow_dispatch`, as **nine separate jobs**, on **one platform**, with failures raised into a
+GitHub issue. They are **not** added to `ci.yml`'s per-PR `suite`, and the workflow may not acquire
+a `pull_request:` trigger. What runs per pull request is the *wiring* check, never a tier.
+
+**The state this replaced.** `ci.yml:159` runs a bare `npm test`. No workflow named
+`ELEVATOR_SIM_DEEP`, `ELEVATOR_SIM_FUZZ`, `ELEVATOR_SIM_HONESTY` or `CORPUS_OUT`, and **no workflow
+in this repository had a `schedule:` trigger at all**. So the tiers were text that read as coverage
+nobody had — [§ D220](#d220)'s browser-tier defect one directory over, and `fuzz/deep.test.ts`'s own
+header had been saying *"runs on request and in CI cron"* about a cron that has never existed.
+
+**The count is derived, and both published numbers were wrong.** `vitest list` collects a
+`skipIf`-ed suite's children when the gate is open and omits them when it is shut, so the delta
+between two collections *is* the tier. On `0cd422a`: **eighteen tests, nine gated blocks, nine
+files**. The issue says seventeen; the triage that verified it said ~19 across eight blocks.
+
+**The undercount that mattered is not the number.** The issue names two variables. There is a
+**third** — `ELEVATOR_SIM_FUZZ=deep` — and it guards the 250-case fuzz campaign. A workflow that set
+only the two named variables would have left that tier exactly as unrun as it found it, **while
+reporting green**.
+
+**A test count also understates the tiers**, which is why no number is offered as the measure of
+what this buys. Four of them widen the tests already there rather than adding new ones: the golden
+set goes 4 → 6, the honesty corpus 49 → 60 cases, `perfScaling`'s grids widen *and* its printed fits
+become assertions, and `perfSweep` turns a projection into an executed sweep.
+
+**Corrected: the seed-collision claim.** #163's title says these tiers hold *"the only
+seed-collision check in the repo"*. Measured, that is too strong, and the acceptance clause rests on
+it:
+
+| check | scale | tier |
+|---|---|---|
+| `runner/crn.test.ts` — *"produces distinct seeds across a large batch"* | 500 seeds | **always-on** |
+| `validation/perfSweep.test.ts` — distinct trace digests | 200 | **always-on**, same file |
+| `validation/perfSweep.test.ts` — distinct trace digests | **20 000** | **deep only** |
+
+`perfSweep`'s own docstring is careful where the title is not: *"no other suite runs enough
+replications to see it"* is a claim about **scale**, not about existence. So what had never run is
+the collision search at twenty thousand, and `CLAUDE.md`'s invariants 2 and 5 lean on that scale
+rather than on the kind of check being absent below it.
+
+**Weekly, not nightly.** `collectiveAdoption.test.ts` documents its own run with
+`--testTimeout=14400000` — four hours — and `perfSweep`'s deep arm carries a two-hour ceiling. A
+nightly matrix of that spends many runner-hours a week re-answering a question about a tree that
+moves in waves rather than in commits, and the first thing anybody does with a nightly job costing
+that much is turn it off, which returns the tiers to the state this rules on.
+
+**Nine jobs, not one.** GitHub's job ceiling is six hours and one tier alone declares four, so a
+single sequential job risks being killed at the ceiling and taking every result with it.
+`fail-fast: false` across separate jobs stops the first finding hiding the other eight. And they
+fail for unrelated reasons: `perfScaling.test.ts` records its own wall-clock flake under concurrent
+load — *"a gate nobody can trust is a gate everybody overrides"* — which, isolated, reddens one job
+named for it rather than the correctness oracle beside it.
+
+**One platform, and the exception is named rather than glossed.** `ci.yml` runs two legs to make pin
+portability measurable ([§ D196](#d196), [§ D201](#d201)). Most of what runs here is not that kind
+of assertion, so a second leg would double a multi-hour cost to re-answer the one question this
+workflow does not ask. **`golden-runs` is the exception**: byte-identical replay *is* a pin, and its
+deep tier adds two goldens `ci.yml` never sees, so those two are pinned on Linux only. Stated as a
+limit, not resolved.
+
+**The § D343 measurement lives inside this workflow rather than beside it.**
+`measure.corpus.test.ts` says run it *"once, after integration, never per branch"*, and every word of
+that describes a scheduled run on `main` and describes nothing a pull request can do. Both tiers in
+one job, because [§ D343](#d343)'s rule is that the pair is what makes either figure mean anything
+and two jobs could be scheduled onto two commits. It **publishes nothing**: the figures land as an
+artifact with the commit beside them, for a person to carry into `CLAUDE.md`. A workflow that edited
+that row would be a pin maintaining itself, and `RISKS.md` R38's remedy is a derivation with its
+tree named — which is the half no deriver can do for anybody.
+
+**The instrument is `deepTiers.test.ts`, not the workflow.** What closed [§ D220](#d220)'s browser
+defect was never the CI step; it was `dev/browserTier.test.ts` deriving the tier from disk. This
+does the same for the other nine: ten non-browser test files carry a line-initial gate, each
+declares the variables that open it, and the workflow must name the file, in the right vitest
+project, with every one of those variables set in the step that runs it — asserted in **both**
+directions, with a vacuity guard, because every case iterates the derived set and a detector
+matching nothing would assert that no tier is unwired and be green.
+
+**Detection is over-inclusive on purpose, and the reason is a defect this lane committed.** The
+crude comment/string stripper `browserTier.test.ts` calls *"deliberately over-removing"* was used
+first and **missed `collectiveAdoption.test.ts`** — an apostrophe inside a template literal opened a
+bogus string that swallowed the gate on line 398, giving nine files instead of ten, silently. The
+error is now taken in the other direction: a line-initial match on raw source, where a false
+positive forces a visible table entry and a false negative cannot happen.
+
+**`ELEVATOR_SIM_REGENERATE_GOAL_RATES` is in the table with `scheduled: false`, and it is the
+polarity trap.** It is a regeneration flag, not a tier gate: measured with `vitest list`, setting it
+**removes** a check, because `goalRates.test.ts` then rewrites the pinned counts instead of checking
+them. A scheduled run that set every variable it could find would delete a check and go green, so
+the workflow is asserted **not** to set it.
+
+**`--passWithNoTests=false`, on every command, and it is the most load-bearing flag in the file.**
+Every project in `vitest.config.ts` sets `passWithNoTests: true` — correct for a package whose phase
+has not landed — so a workflow selecting tests *by path* goes green on a typo:
+`npx vitest run --project experiments src/fuzz/doesNotExist.test.ts` exits **0** having executed
+nothing, and is indistinguishable in the Actions tab from a job whose tests passed. With the flag it
+exits **1**, and a real path still exits 0. `vitest.config.ts` is deliberately untouched — the flag
+belongs to the workflow that needs it, and that file has another owner (issue #149).
+
+**Aliveness, in two halves, one of which has no mechanism.** *Mechanised:* the wiring check above,
+so a tenth gated tier cannot arrive unwired without a red pull request. *Not mechanised:* whether
+the cron has **fired**. A test that asked would need the network and a wall clock, and GitHub
+disables scheduled workflows after 60 days of repository inactivity, silently. So that half is a
+command written into the workflow header — `gh run list --workflow=deep-tiers.yml --limit 5` — and
+saying which half is which is the point, because *"satisfied in prose and mechanised by nothing"* is
+the clause this repository already knows to distrust first.
+
+**Validated by mutation, because a zero from an unvalidated instrument is worthless.** Nine
+mutations, each keeping every case in scope — a mutation that removes a row from the iterator
+validates nothing — and each detected by the case that claims to detect it, exit 1 every time: a
+tier misspelled in its run line, a gate variable dropped from its step, the schedule deleted, a
+`pull_request:` trigger added, `--passWithNoTests=false` removed from one command, the issue-raising
+step broken, **a tenth gated tier added to disk and left unwired**, the corpus job made to commit its
+own figures, and `ELEVATOR_SIM_REGENERATE_GOAL_RATES` set on a job.
+
+Separately, **all ten workflow invocations were shown to open their gate** with `vitest list`,
+against a negative control of the same commands with the variables unset, which collect nothing.
+That control is the half that matters: without it, ten rows reading OPEN would be a probe that
+cannot tell open from shut. The `summary` and `report` jobs — the two whose breakage would look
+exactly like a normal run — were executed locally against a `needs` payload mixing failure, success,
+skipped and cancelled: both node scripts exit 0, the table renders all nine rows, and the issue body
+names the two failures and nothing else.
+
+**What turning them on found, reported rather than fixed.** `fuzz-deep` came back **RED** on the
+first run: 1 counterexample in 250 cases, `fuzz-1000130`, `[termination] run ended at
+t=3493.7775825325903, past its hard deadline of t=3493`. Not a rounding artefact — `checkTermination`
+already tolerates `EPSILON = 1e-9` against an overshoot of **0.7776 s**. The file's status table had
+published *green, 0 failures* since T22 and nothing could have re-taken it, which is `CLAUDE.md`'s
+*"a published number goes stale the same way"* on a table whose whole job was to say whether this
+tier passes. Recorded in an `OPEN` register with a ghost check, on [§ D307](#d307)'s precedent, and
+tracked as GitHub issue #305. Nothing in `fuzz/` moved: `checkTermination` is unchanged line for
+line, `EPSILON` is still `1e-9`, `PROPERTY_BOUNDS` is unmoved, the generator was not narrowed.
+
+**`honesty-deep` was red until it was measured a second time, and that is the most useful thing this
+lane learned about measuring tiers at all.** Contended — sharing the container with two other deep
+tiers — it took **43.9 min and timed out**: `Test timed out in 1800000ms`, 25 of 26 passing and the
+deep case killed, **no honesty property refuted, the corpus simply never finished**. Alone it
+**passes**: 26 of 26, exit 0, 32.6 min for the file with the deep case inside its own ceiling.
+
+**Alone is this job's condition** — one tier per job, one runner each, nothing competing — so the
+first number alone would have shipped a job believed red by construction on the strength of how it
+happened to be measured. That is this repository's own *"a pin is a claim about a machine"* wearing
+a clock instead of a float, and it is the reason the other four figures in the workflow's timing
+table are labelled as taken under contention and therefore as ceilings on the cost rather than the
+cost.
+
+The headroom is thin and the second measurement does not make it thick: the ceiling is the tier's
+own — `1_800_000` as the third argument to the `it`, which wins over the config default and over any
+`--testTimeout` a workflow could pass, so `timeout-minutes` governs the runner and not this — and
+`measure.corpus.test.ts` puts the tier at ~23 min against it, on a container larger than a hosted
+runner. **The ceiling is deliberately not raised from the workflow.** A tier's declared bound is the
+tier's to declare, and widening somebody else's to make one's own workflow green is the move this
+repository refuses outright.
+
+**`matrix-census` is the third red, and it is the sharpest answer to *what was this tier for?***
+Run once, 17.0 min, exit 1: **three declared figures do not reproduce from the census they were
+derived from** — `mixed-use-up-peak/destination-panel` first invalid replication **171 against a
+declared 33**, `vertical-city-up-peak/destination-panel` **73 against a declared `undefined`**, and
+`vertical-city-up-peak`'s binding **sd 3.172435 against a declared 2.9722**. The census is
+deterministic at a fixed `MATRIX_SEED`, so those are exact and re-derivable rather than noise.
+
+These are not decorative numbers: `admissibleReplications` and `armCeilings` bound every interval
+the experiment matrix publishes, and the file says so — *"the baseline's own ceiling is what binds
+the whole table"*. One ceiling has **healed** and one has **appeared**, which the test treats as
+equally a change, in its own words.
+
+All three touch `destination-panel` and the direction is consistent with § D333 having bounded the
+panel's promise. **That attribution is offered as a hypothesis and explicitly not measured** — the
+check is to re-run the census before that fix, and nothing here rests on it. **Nothing was
+re-declared.** Updating `MATRIX_CELLS` to the measured values would re-baseline published
+statistical parameters on the strength of one census run, by a lane whose job was to turn the tier
+on. Tracked as GitHub issue #306.
+
+**Reporting the two reds as one number would be the mistake.** One found a counterexample, one found
+a stale statistical baseline. *"Two of five failing"* says the same thing about both, which is why
+the workflow's timing table names the kind beside each figure — and why the third apparent red is
+reported above as a measurement condition rather than counted here.
+
+**Seven of the nine were run, and four came back green:** `golden-runs` at 6 of 6 goldens including
+the cross-process replay (24 tests, 55.6 s); `oracle-campaign`, `CLAUDE.md`'s correctness oracle at
+full width, 11 banks at n = 128 (3 tests, 5.5 min); `perf-scaling` (9 tests, 26.9 s); and
+`perf-sweep`'s full **20 000-replication sweep** (5 tests, 4.6 min with workers) — which is #163's
+acceptance clause *"the seed-collision check has run at least once"*, discharged here rather than
+left to the first Sunday.
+
+**`perf-scaling`'s green is worth naming because it is the tier expected not to be.** Its own note
+records a flake under concurrent load, and its assertions are about a machine rather than about the
+simulator. One green run is one draw from the distribution that note describes, not evidence of
+stability, and it is reported that way.
+
+**Two were not run, and are named rather than implied.** `collective-adoption` documents a four-hour
+invocation, which is a Sunday's work rather than a lane's. `corpus-figures` is [§ D343](#d343)'s
+measurement, and taking it was explicitly not this lane's job — building it somewhere to happen was.
+A tier nobody measured is a tier whose first result arrives on a Sunday, and a ceiling nobody tested
+is a guess with a number on it.
+
+**What is not claimed.** No corpus figure is published; [§ D343](#d343) takes that once, after
+integration, and this lane's job was to build the measurement a place to happen rather than to take
+it.## D394 — `core` and `server` take the simulating project's timeout, and the file that forced it simulates nothing
 
 **Date: 2026-08-29 · Owner: Lane B, wave G · Closes: GitHub issue #149. Discharges the debt
 [§ D361](#d361) recorded and answers the question [§ D331](#d331) left open.**
@@ -26537,5 +26740,7 @@ integration. Nothing here says the `experiments/reports` persistence subsystem *
 shipped caller; what it has and does not have is recorded above as a finding and is issue #175's
 larger neighbour, not its scope. No claim is made that `readRunSetFile`, `parseRunSet`,
 `parseStoredRun` or `replaySimulationConfig` are dead — they are not, and `goldenChild.ts` is why.
+
+
 
 ---
