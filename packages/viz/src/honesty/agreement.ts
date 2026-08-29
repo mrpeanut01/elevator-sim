@@ -383,9 +383,11 @@ const A_CLEAN_DAY: GoalObservations = Object.freeze({
  * `honesty/surfaces.ts`'s `EVERYDAY_MENU` adapter, which seeds the rail's `PLAYING AS` card. Before
  * this, that adapter drove `railModel(...)` with **no options at all**, so `rail.footer.streak`
  * rendered only the honest-absence form and the *populated* career line — the one issue #214 is
- * about — was in no corpus case at all. One fixture, two readers: the pair below and the seed there
- * compare and sweep the same week, so a corpus that has the string and a property that checks it
- * cannot drift apart.
+ * about — was in no corpus case at all. One fixture **builder**, two readers: the seed there and
+ * the pair below file a day the same way, so a change to what *a filed day* means moves the swept
+ * string and the compared figure together. The two do not use the same *week* and are not meant
+ * to — the pair drives day 4 to sit on the bar-hardening ladder and the seed drives day 1, which
+ * is the card's line as a first-week player meets it.
  */
 export function withTodayFiled(week: WeekState): WeekState {
   return closeDay(

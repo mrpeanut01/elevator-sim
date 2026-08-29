@@ -26857,9 +26857,11 @@ things were missing and only one of them is a register row.
 So the state was built. `withTodayFiled` files a day with `record: null` — a shipped `DayOutcome`
 value, named in `shift/types.ts` as the measured state of a session written by a build that had no
 record to write, not a stub — and `closeDay` is total over it. No simulation, which is the
-constraint `agreement.ts`'s *Cost* section states in seconds. **One fixture, two readers:** the
-week the pair is driven on is the week the rail seed renders, so the string in the corpus and the
-property that checks it cannot drift apart.
+constraint `agreement.ts`'s *Cost* section states in seconds. **One fixture builder, two
+readers:** the rail seed and the pair file a day the same way, so a change to what *a filed day*
+means moves the swept string and the compared figure together. Not the same *week*, and
+deliberately — the pair drives day 4 to sit on the bar-hardening ladder and the seed drives day 1,
+which is the card's line as a first-week player meets it.
 
 **The arms are one week with the axis flipped, and that is the design rather than a convenience.**
 

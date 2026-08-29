@@ -7421,9 +7421,12 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * only ever render its absence, so the **populated** career line — the two figures a player
      * with a saved week actually reads — was in no case of either tier, and the pair
      * `agreement.ts#AGREED_FIGURES` declares over it would have compared two absences and passed
-     * for the wrong reason. The week below is `withTodayFiled`'s, which is the same week that pair
-     * is driven on: one fixture, two readers, so the string in the corpus and the property that
-     * checks it cannot drift.
+     * for the wrong reason. The week below is built by `agreement.ts#withTodayFiled`, which is the
+     * **same composition** that pair's own states are built by — one fixture builder, two readers,
+     * so a change to what *a filed day* means moves the swept string and the compared figure
+     * together. It is deliberately not the same *week*: the pair drives day 4 to sit on the
+     * bar-hardening ladder, and this seeds day 1, so the corpus carries the card's line at the
+     * shape a first-week player meets.
      *
      * The three arms are the three states the card has, and each is seeded on the role its own
      * content earns — the two absences are refusals and carry no figure; the populated line is two
