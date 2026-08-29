@@ -26,16 +26,17 @@
  * | **2026-08-29**, `0cd422a` | `ELEVATOR_SIM_FUZZ=deep` (250 cases) | **RED — 1 failure**, `fuzz-1000130`, [termination], GitHub issue #305. See {@link MEASURED_1000130} |
  * | **2026-08-29**, wave H lane B | `ELEVATOR_SIM_FUZZ=deep` (250 cases) | **green**, 0 failures — the P5 defect is fixed in `core` ([§ D398](../../../../DECISIONS.md)) |
  *
- * **The green rows above were true and are not true now, and the gap is the finding rather than the
- * cost.** They were measured at T22 and never re-taken, because until GitHub issue #163 wired this
- * tier into `.github/workflows/deep-tiers.yml` there was nothing on any cadence that could re-take
- * them: `ci.yml` runs a bare `npm test`, no workflow set `ELEVATOR_SIM_FUZZ`, and no workflow in the
- * repository had a `schedule:` at all. So this table published *green* for every wave between T22
+ * **The two T22 rows were true when they were taken and had stopped being true long before anybody
+ * looked, and that gap is the finding rather than the cost.** They were measured at T22 and never
+ * re-taken, because until GitHub issue #163 wired this tier into `.github/workflows/deep-tiers.yml`
+ * there was nothing on any cadence that could re-take them: `ci.yml` runs a bare `npm test`, no
+ * workflow set `ELEVATOR_SIM_FUZZ`, and no workflow in the repository had a `schedule:` at all. So this table published *green* for every wave between T22
  * and now, over a tree that moved underneath it — which is CLAUDE.md's *"a published number goes
  * stale the same way"* on a table whose whole job was to say whether this tier passes.
  *
  * The old rows are kept with their date rather than deleted. A row that says *when* it was true is
- * worth more than a tidy one, and the pair is the argument for the schedule.
+ * worth more than a tidy one, and the sequence is the argument for the schedule. **Only the last
+ * row is a claim about this tree**; every row above it is a claim about the tree it was taken on.
  *
  * **The RED row's finding is closed**, one wave later and in `core` rather than here
  * ([§ D398](../../../../DECISIONS.md), GitHub issue #305): `Simulation.#depart` gated the instant a
