@@ -177,9 +177,9 @@ describe('every cell is a paired experiment, and says so', () => {
        *
        * That is not hypothetical. `mixed-use-up-peak`'s `destination-panel` declared 33 against a
        * budget of 50 while measuring **171**, for eighteen days: `103a8fe` re-derived that cell's
-       * front, its verdict census and its 44 interval pins in the same commit as § D333's fix and
-       * left the census record beside them unmoved. Every check in this file stayed green.
-       * See § D396, and § D397 for why this loop is the one that would have caught it.
+       * front, its verdict census and all four of that arm's interval pins in the same commit as
+       * § D333's fix, and left the census record beside them unmoved. Every check in this file
+       * stayed green. See § D396, and § D397 for why this loop is the one that would have caught it.
        *
        * Exact rather than advisory, and both halves are properties of the apparatus rather than
        * observations about a run: replication `i` is the same run at every budget

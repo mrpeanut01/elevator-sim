@@ -26841,7 +26841,8 @@ and a binding sd of **3.135430**. So:
 
 **That residual is attributed to `22a1021` and no further, and the reason is a property of this
 repository's history rather than of this lane's effort.** `22a1021` is a **root commit** — it has no
-parents; the wave-10 working tree arrived as an orphan import of 182 files and 83 343 insertions.
+parents; the wave-10 working tree arrived as an orphan import of **634 files and 265 283
+insertions**, of which 182 files and 83 343 insertions are `packages/core/src` alone.
 There is no in-branch history inside it to bisect, so *"the wave-10 tree"* is the finest grain the
 record permits. What is measured, and is the reason it is safe to re-declare anyway: **every other
 cell in the matrix is unmoved across the whole 32 days.** All six other binding spreads and all four
@@ -26904,7 +26905,7 @@ and `MATRIX_SEED`.
 **It does not reproduce, and the direction matters.** `collective` first loses its AWT at
 replication **108**, which is *inside* the 50–200 band. The stated mechanism is therefore
 **withdrawn**: the point is not inadmissible. `destination-panel` is first invalid at **2** rather
-than 3, `nearest-car` at **7**, and six further arms between **13** and **46** — so most of that
+than 3, `nearest-car` at **7**, and seven further arms between **13** and **46** — so most of that
 table would be `UNQUOTABLE`, which is a result about those arms and not a property of the cell, and
 is exactly how `mixed-use-up-peak` is handled inside the matrix.
 
@@ -26948,8 +26949,10 @@ anyway. That is a **healed** ceiling, and `matrixCensus.test.ts` — which does 
 
 **It is not a hypothetical quadrant.** `mixed-use-up-peak`'s `destination-panel` sat in it for
 eighteen days: declared 33 against a budget of 50, measuring 171. `103a8fe` re-derived that cell's
-front, its verdict census and its 44 interval pins in the same commit as the fix that healed it, and
-left the census record beside them reading 33. Every always-on check in `matrix.test.ts`,
+front, its verdict census and all four of that arm's interval pins — `awtS`, `wt95S`, `energyKJ`,
+`ttdMeanS`, the only `mixed-use-up-peak` keys that commit moved — in the same commit as the fix that
+healed it, and left the census record beside them reading 33. Every always-on check in
+`matrix.test.ts`,
 `matrixFront.test.ts` and `published.test.ts` stayed green, correctly, because not one of them was
 looking at that number.
 
