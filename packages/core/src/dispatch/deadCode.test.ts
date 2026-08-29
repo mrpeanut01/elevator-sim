@@ -492,12 +492,19 @@ function audit(): Audit {
  * opposite of the truth). Twenty-seven are public surface, recorded above with the reason each is
  * surface rather than behaviour.
  *
- * These seven are neither. Each is exported, each has a test, and **none has a caller in any
+ * The entries below are neither. Each is exported, each has a test, and **none has a caller in any
  * shipped path** — the exact shape CLAUDE.md's standing requirement describes, and the shape that
  * has landed eleven times here. They are listed rather than deleted because disposition is a
  * decision per symbol — wire it, or delete it with its test — and this audit's deliverable is the
  * classification. `viz`'s fifth audit worked the same way: it classified eight, and a later lane
  * closed all eight.
+ *
+ * **This paragraph carries no count, and that is deliberate.** It opened as *"these seven"*, went on
+ * saying seven after `car/stopFloorsOf` acquired a caller and left the register at six, and was
+ * still saying it when the next lane arrived — a number in prose beside a number in code, only one
+ * of which a test can fail on. `RISKS.md` R38. The count lives in the assertion below, which is the
+ * only copy that ratchets; anything reading this comment for a total should read
+ * `Object.keys(DEAD_CANDIDATES).length` instead.
  *
  * The sharpest is the replay pair. CLAUDE.md invariant 5 is *"every persisted run record carries
  * its seed, so any run replays exactly"*, and `metrics/index.ts` documents the round trip in a
@@ -570,7 +577,14 @@ describe('every export of the fourteen audited core modules has a caller or a st
   it('names every dead candidate, and the count is the one recorded', () => {
     const open = uncalled.filter((symbol) => symbol.key in DEAD_CANDIDATES);
     expect(open.map((symbol) => symbol.key).sort()).toEqual(Object.keys(DEAD_CANDIDATES).sort());
-    expect(open.length, 'dispose a candidate and lower this number; never raise it silently').toBe(6);
+    // The literal is the ratchet and must stay a literal: the assertion above pins the *set*, so
+    // `Object.keys(DEAD_CANDIDATES).length` here would be a tautology and a seventh entry would
+    // land silently. The register's own size goes in the message instead, where it is derived and
+    // cannot drift — R38 again, in the one place a count is allowed to be computed.
+    expect(
+      open.length,
+      `dispose a candidate and lower this number; never raise it silently. DEAD_CANDIDATES currently holds ${Object.keys(DEAD_CANDIDATES).length}`,
+    ).toBe(6);
   });
 
   it('keeps the allowlist honest: no entry may outlive the condition that justified it', () => {
