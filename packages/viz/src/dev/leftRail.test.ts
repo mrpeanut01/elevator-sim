@@ -22,7 +22,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
 import { DATA_DIR, fixtureConfig, suppressedConfig } from '../fixtures.test-helper.js';
-import { meansAreSuppressed, queueAt } from '../frame/overlay.js';
+import { meansAreSuppressed, overlayAt, queueAt } from '../frame/overlay.js';
 import { WAIT_BANDS, moodOf, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
@@ -38,6 +38,7 @@ import { recordRun } from '../record/recordRun.js';
 import { frameAt } from '../frame/frameAt.js';
 import { playheadHasReachedEnd } from '../render/canvas.js';
 import { buildingMood, moodObservationsOf } from '../render/mood.js';
+import { CASUAL_WORDS, ENGINEER_WORDS, overlayViewOf } from '../render/overlay.js';
 import { PENDING_DISPLAY, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
@@ -1036,4 +1037,126 @@ describe('the mood card publishes no whole-day reading at a part-day playhead �
       `${String(delivered)} of ${String(generated)} people got where they were going.`,
     );
   }, 600_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The rail and the panel, about one run, at one playhead — GitHub issue #297
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Two surfaces on one screen may not contradict each other about the same run.**
+ *
+ * `statRowsOf` draws `carried today N` — *passengers delivered to their destination floor since
+ * 06:00*, run-scoped. `render/overlay.ts#overlayViewOf` draws the LIVE METRICS bank list, and when
+ * no bank answered anything inside the rolling five minutes it draws a sentence in place of the
+ * list. That sentence used to read `nothing served yet` / `nobody carried yet`, and *yet* is a
+ * claim about the run: the panel denied, in words, the people the rail was counting two inches
+ * away.
+ *
+ * ## Why this case is here rather than in the panel's own file
+ *
+ * It is not a fact about either surface. `render/overlayRender.test.ts` asserts the panel's
+ * vocabulary and can see that the sentence names a window; it cannot see the rail, so it cannot
+ * see the contradiction. The nine single-surface honesty properties could not see it either — each
+ * screen was internally coherent, which is the blindness `CLAUDE.md` records for wave B's horizon
+ * defect, and `honesty/agreement.ts` excludes it by its own docstring, since this is *a
+ * disagreement in a figure no side can reach without a run*. So the case drives a run and asks
+ * **both** surfaces, which is the only way the claim is a claim.
+ *
+ * ## The condition is asserted before it is used
+ *
+ * A sweep that found no such playhead would pass while measuring nothing. So the first assertion is
+ * that the state exists on this run, at the count the issue measured, and only then is the pair
+ * checked at every one of them.
+ *
+ * The run is the issue's own: `garden-apartments`, 3 600 s, seed 20 260 827, sampled every 10 s.
+ * The building is the sparse one — 26 legs over an hour — so the window empties repeatedly while
+ * the day's total keeps climbing, which is a state a busy building never sits in and the reason the
+ * 900 s breadth fixtures never produced one. Swept at their own rates and durations, **all eight**
+ * shipped buildings report zero such playheads; this run reports 44.
+ */
+describe('the rail’s counter and the LIVE METRICS panel agree about one run — issue #297', () => {
+  /** A word that dates a claim to the run rather than to the window. */
+  const RUN_SCOPED = /\byet\b|\bso far\b|\btoday\b|\bever\b|\bnot once\b/i;
+  /** The issue's sweep spacing. */
+  const STEP_S = 10;
+
+  let config: LoadedConfig;
+  let recording: VizRecording;
+  /** The playheads where the window is empty **and** the run has carried somebody. */
+  let contested: readonly number[] = [];
+
+  beforeAll(async () => {
+    config = await loadConfig(DATA_DIR);
+    recording = recordRun(
+      fixtureConfig(config, {
+        buildingId: 'garden-apartments',
+        durationS: 3600,
+        seed: 20_260_827n,
+        onTimeout: 'report',
+      }),
+    ).recording;
+    const found: number[] = [];
+    for (let t = recording.startedAt; t <= recording.endedAt; t += STEP_S) {
+      const view = overlayViewOf(overlayAt(recording, t), frameAt(recording, t));
+      if (view.banksEmpty !== undefined && observationsAt(recording, t).carried > 0) found.push(t);
+    }
+    contested = found;
+  }, 600_000);
+
+  it('really reaches that state, or the rest of this proves nothing', () => {
+    /*
+     * The issue's measurement, re-derived rather than quoted: 44 of a 361-sample sweep, 12 % of the
+     * run. Pinned to the run that produced it, so a change that stops reaching the state fails here
+     * rather than passing an unmeasured sweep — and the two playheads the issue printed are named,
+     * because they are what a reader will check by hand.
+     */
+    expect(contested).toHaveLength(44);
+    expect(contested).toContain(1030);
+    expect(contested).toContain(1760);
+  });
+
+  it('never says the run has carried nobody while the rail is counting people', () => {
+    for (const t of contested) {
+      const observed = observationsAt(recording, t);
+      /*
+       * Asked of the rail rather than recomputed: a probe that formatted its own count would
+       * assert its own arithmetic and say nothing about the row a reader is looking at. That is
+       * `railBasisAt`'s rule in `honesty/surfaces.ts`, applied one surface over.
+       */
+      const rail = statRowsOf(observed).find((row) => row.label === 'carried today');
+      expect(rail?.value, `the rail lost its counter at ${String(t)} s`).toBe(
+        String(observed.carried),
+      );
+      expect(observed.carried).toBeGreaterThan(0);
+
+      for (const mode of ['basic', 'advanced'] as const) {
+        const view = overlayViewOf(overlayAt(recording, t), frameAt(recording, t), mode);
+        const sentence = view.banksEmpty;
+        if (sentence === undefined) throw new Error(`no empty-bank sentence at ${String(t)} s`);
+        expect(
+          RUN_SCOPED.test(sentence),
+          `at ${String(t)} s the ${mode} panel said “${sentence}” while the rail said ` +
+            `carried today ${String(observed.carried)}`,
+        ).toBe(false);
+      }
+    }
+  }, 600_000);
+
+  it('names the window it is actually about, in both registers', () => {
+    /*
+     * The other half of AC1, and the half a cue list alone would not give: dropping *yet* would
+     * satisfy the check above with a sentence that named no basis at all, which is the third kind
+     * of absence `docs/21` L-5 refuses. Both registers carry the span — Casual the way
+     * `got a car (5min)` carries it, the engineer's the way `boarded (window)` does.
+     */
+    const t = contested[0];
+    if (t === undefined) throw new Error('no contested playhead to read');
+    const casual = overlayViewOf(overlayAt(recording, t), frameAt(recording, t), 'basic');
+    const engineer = overlayViewOf(overlayAt(recording, t), frameAt(recording, t), 'advanced');
+    expect(casual.banksEmpty).toBe(CASUAL_WORDS.noneInWindow);
+    expect(engineer.banksEmpty).toBe(ENGINEER_WORDS.noneInWindow);
+    expect(CASUAL_WORDS.noneInWindow).toMatch(/5 min/);
+    expect(ENGINEER_WORDS.noneInWindow).toMatch(/window/);
+  });
 });

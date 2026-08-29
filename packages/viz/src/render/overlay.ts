@@ -94,6 +94,34 @@ export function loadTrackMax(cars: readonly { readonly loadFactor: number }[]): 
  * over the rolling window, so Casual keeps the basis — *(5min)* — rather than dropping it: a count
  * over five minutes drawn as a count over the day would be a false figure, not a friendlier one.
  * The same restraint decides the window caption below.
+ *
+ * ## The one that *was* made false by dropping the basis — GitHub issue #297
+ *
+ * {@link noneInWindow} used to read `nothing served yet` / `nobody carried yet`, and **the word
+ * *yet* is a claim about the run to date** while the state that draws it is emptiness of the
+ * *window*. `overlayAt` fills its `banks` map only from legs whose `boardedAt` falls inside
+ * `[max(startedAt, t − windowS), t]`, so a run that carried people and then had a quiet five
+ * minutes drew a sentence saying nobody had ever been carried — beside `dev/leftRail.ts`'s
+ * `carried today N`, on the same screen, counting the very people it denied.
+ *
+ * Measured on `garden-apartments`, 3 600 s, seed 20 260 827, sampling every playhead at 10 s:
+ * **44 of 361 playheads — 12.2 % of the run** — drew it while the run had carried somebody. At
+ * 1 030 s the panel said `nothing served yet` with seven people already delivered; at 1 760 s,
+ * eight, with three more standing at a landing.
+ *
+ * The fix is the one the neighbouring cells already made: **put the basis on the figure**. It is
+ * the same restraint as `boarded (window)` one line up, applied to the sentence rather than to the
+ * label, and it is deliberately *not* the other repair the issue allowed — recomputing the
+ * sentence over the run. See {@link overlayViewOf} for why that one was rejected.
+ *
+ * Casual names the span the way `got a car (5min)` names it, and inherits that label's one
+ * exposure: both spell `DEFAULT_WINDOW_S` as words. `OverlayOptions.windowS` can override it, and
+ * **no shipped caller does** — `dev/main.ts#drawStage`, `honesty/surfaces.ts#buildFrameBundle` and
+ * `live/observations.ts#observationsAt` are the three that call `overlayAt` outside a test, and all
+ * three take the default. (`drawStage` and not `renderLive`: the latter reaches `overlayAt` only
+ * through the former, and a docstring that named it would be the `{@link}` that looks like a caller
+ * and is not one.) A caller that ever passes another span has to move both strings, which is why
+ * they sit two lines apart.
  */
 export const CASUAL_WORDS = Object.freeze({
   title: 'RIGHT NOW',
@@ -104,7 +132,7 @@ export const CASUAL_WORDS = Object.freeze({
   byBank: 'BY LIFT GROUP',
   carLoad: 'HOW FULL EACH CAR IS',
   bankSuppressed: 'no average',
-  nothingYet: 'nobody carried yet',
+  noneInWindow: 'nobody carried in the last 5 min',
 });
 
 /** The same nine, as the engineer's panel has always said them. */
@@ -117,7 +145,7 @@ export const ENGINEER_WORDS = Object.freeze({
   byBank: 'BY BANK',
   carLoad: 'CAR LOAD',
   bankSuppressed: 'suppressed',
-  nothingYet: 'nothing served yet',
+  noneInWindow: 'nothing served in this window',
 });
 
 /** One label-and-value row of the observations block. Both halves are strings by the time they
@@ -189,7 +217,13 @@ export interface OverlayView {
   readonly estimate: OverlayEstimate;
   readonly bankHeading: string;
   readonly banks: readonly OverlayBankRow[];
-  /** Drawn in place of the bank rows when nobody has been carried yet. */
+  /**
+   * Drawn in place of the bank rows when **no bank answered anything inside the window**.
+   *
+   * Not *when nobody has been carried yet*, which is what this field's sentence used to say and
+   * what issue #297 was: the state is window-scoped and the sentence now says so. See
+   * {@link CASUAL_WORDS} for the measurement.
+   */
   readonly banksEmpty: string | undefined;
   readonly carHeading: string;
   readonly cars: readonly OverlayCarRow[];
@@ -257,7 +291,25 @@ export function overlayViewOf(
       mean: bank.meanWaitS === undefined ? words.bankSuppressed : `${bank.meanWaitS.toFixed(1)} s`,
       refused: bank.meanWaitS === undefined,
     })),
-    banksEmpty: metrics.banks.length === 0 ? words.nothingYet : undefined,
+    /*
+     * **The empty list says which window is empty** — GitHub issue #297.
+     *
+     * `metrics.banks` holds one row per bank that answered something inside the window, so an
+     * empty list is a fact about the window and never about the run. The sentence is scoped to
+     * match, exactly as `boarded (window)` beside it is: at `garden-apartments`, 3 600 s, seed
+     * 20 260 827 the old wording drew *nothing served yet* at 44 of 361 sampled playheads on which
+     * the run had already carried somebody, under a rail counting them as `carried today`.
+     *
+     * **The other repair the issue allowed was rejected**, and it is worth saying which. The
+     * sentence could have been *computed over the run* — carry a run-scoped served count on
+     * `OverlayMetrics` and keep `nothing served yet` for the state where it is true, falling back
+     * to a window sentence otherwise. That is a second string per register and a second question
+     * for the panel to answer, on a block whose other nineteen cells all answer *what is happening
+     * now*; it buys a sharper sentence in the opening minutes of a run and pays for it with a cell
+     * whose basis moves under the reader. Naming the basis is this repository's standing fix for
+     * two answers to one question, and it is what the neighbouring cells already did.
+     */
+    banksEmpty: metrics.banks.length === 0 ? words.noneInWindow : undefined,
     carHeading: words.carLoad,
     /* Per-car load. The one place `RV-14`'s "does not silently clip at 1" is testable: the track
        is scaled past the alarm, so an overloaded car draws past the full mark rather than at it. */
