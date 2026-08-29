@@ -686,6 +686,88 @@ describe('the drain deadline is a reported failure, never a silent truncation', 
     }
     expect(result.endedAt).toBeLessThanOrEqual(result.deadlineS);
   }, 60_000);
+
+  /**
+   * The travel path, gated on where a move **lands** rather than on where it is commanded.
+   *
+   * GitHub issue #305, [§ D398](../../../../DECISIONS.md). `#depart` used to compare the
+   * *command* instant against the deadline and then schedule `motion.arrivesAt` unconditionally,
+   * so a car commanded a second inside the deadline with a thirty-second flight put an arrival on
+   * the queue thirty seconds past the run's own hard timeout — and `runUntilEmpty` fired it,
+   * which completed the move, took a travel sample past the run's end and stepped the car into
+   * fresh dispatch work.
+   *
+   * ## Why the assertion is a travel sample and not `endedAt`
+   *
+   * `endedAt` is `max(recorder.lastEventAt, demand horizon)` and `MetricsRecorder.sampleTravel`
+   * deliberately does not advance `lastEventAt` — so a late arrival that only moved a car left
+   * `endedAt` untouched, and the defect was invisible to the obvious check. Swept over three
+   * shipped buildings, four dispatchers, four drain tails and two demand levels, **not one of the
+   * 96 cells reported `endedAt` past its deadline** while nearly every timed-out one carried
+   * travel samples past it. `endedAt` is asserted below as well because it is the shape the fuzz
+   * campaign caught (`fuzz-1000130`, a 2 096-passenger destination-panel run whose late arrival
+   * *also* registered an assignment, which is observed); the sample is what makes this test able
+   * to see the mechanism at all.
+   *
+   * ## The second assertion is about the fix that was not chosen
+   *
+   * Gating {@link Simulation.scheduleArrival} instead — letting the car depart and dropping its
+   * arrival — would leave a car in flight forever, and would break the one-to-one pairing of
+   * commanded moves to travel samples that `benchmark/energyLiveness.test.ts` checks against the
+   * fleet's own odometers. That suite only ever runs a *completed* Garden Apartments run; the
+   * pairing is asserted here on runs the deadline actually cut, which is the case that would
+   * break.
+   */
+  it('cuts a move that would land past the deadline, not merely one commanded past it', () => {
+    // Two families, because the mechanism is not specific to either: a conventional collective
+    // arm and a destination-panel arm on a sky-lobby tower — the shape `fuzz-1000130` was found
+    // in. Both must be `timed-out`, or the deadline never bit and the cell proves nothing.
+    const cells = [
+      { buildingId: 'midtown-office', profileId: 'collective', drainGraceS: 60, rate: 20 },
+      { buildingId: 'vertical-city', profileId: 'destination-panel', drainGraceS: 0, rate: 12 },
+    ] as const;
+
+    for (const cell of cells) {
+      const where = `${cell.buildingId}/${cell.profileId}`;
+      const simulation = new Simulation(
+        baseConfig(cell.buildingId, cell.profileId, {
+          durationS: 600,
+          drainGraceS: cell.drainGraceS,
+          demand: { arrivalRatePctPop5min: cell.rate },
+          reportWindow: 'full-run',
+          onTimeout: 'report',
+        }),
+      );
+      const result = simulation.run();
+
+      expect(result.status, `${where} drained on its own; the deadline never bit`).toBe(
+        'timed-out',
+      );
+      const samples = result.record.travelSamples ?? [];
+      expect(samples.length, `${where} moved no car at all`).toBeGreaterThan(0);
+
+      // The defect, in the only place it is reliably visible: a completed move recorded after the
+      // run's own hard deadline. Reported as the overshoots rather than as a count, so a
+      // regression says how far past it went.
+      const late = samples
+        .filter((sample) => sample.at > result.deadlineS)
+        .map((sample) => `${sample.carId} +${(sample.at - result.deadlineS).toFixed(3)}s`);
+      expect(late, `${where}: arrivals completed past the run's hard deadline`).toEqual([]);
+
+      // The shape `fuzz-1000130` reported. Weaker than the line above — it only fails when the
+      // late arrival happens to do something the recorder observes — and kept because it is the
+      // property the deep campaign asserts.
+      expect(result.endedAt, where).toBeLessThanOrEqual(result.deadlineS);
+
+      // Nothing is half-committed: a refused departure is not commanded at all, so the fleet's
+      // own departure counters still match the travel samples one for one. `simulation.building`
+      // is the counter `metrics/` never touches.
+      const departures = simulation.building.cars.reduce((total, car) => total + car.departures, 0);
+      expect(samples.length, `${where}: a commanded move produced no travel sample`).toBe(
+        departures,
+      );
+    }
+  }, 120_000);
 });
 
 /* -------------------------------------------------------------------------- *
