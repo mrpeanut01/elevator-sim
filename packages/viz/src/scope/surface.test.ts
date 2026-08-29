@@ -19,7 +19,7 @@ import { catalogueOf } from '../menu/catalogue.js';
 import { initialMenuState } from '../menu/menu.js';
 import { DEFAULT_SETTINGS } from '../menu/types.js';
 
-import { PROBES, RESOURCES, SINK_IS_A_MOUNT, SINK_MISSING } from './probes.test-helper.js';
+import { LATENT_PROBES, PROBES, RESOURCES, SINK_IS_A_MOUNT, SINK_MISSING } from './probes.test-helper.js';
 import { SCOPE_OF } from './surface.js';
 import { CHANGE_SCOPES, type SurfaceKey } from './types.js';
 
@@ -111,6 +111,32 @@ describe('every control has an instrument', () => {
       .sort((a, b) => a.localeCompare(b));
     const probed = (Object.keys(PROBES) as SurfaceKey[]).sort((a, b) => a.localeCompare(b));
     expect(probed, 'a control with no probe is a scope nothing checks').toEqual(controls);
+  });
+
+  it('probes exactly the latent rows, both directions', () => {
+    /*
+     * The same guarantee for the other half of the table, and it needs its own map: this case is
+     * why `LATENT_PROBES` is not folded into `PROBES`. Widening that one would have turned the
+     * sentence above into *"a control or a latent row with no probe"*, which is weaker in the
+     * direction that matters — it would stop a missing **control** probe from being red on its own.
+     *
+     * Until `scope.test.ts` gained its latent blocks, every row here was checked by nothing.
+     */
+    const declared = (Object.entries(SCOPE_OF) as [SurfaceKey, (typeof SCOPE_OF)[SurfaceKey]][])
+      .filter(([, entry]) => entry.kind === 'latent')
+      .map(([key]) => key)
+      .sort((a, b) => a.localeCompare(b));
+    const probed = (Object.keys(LATENT_PROBES) as SurfaceKey[]).sort((a, b) => a.localeCompare(b));
+    expect(probed, 'a latent row with no probe is a refusal nothing checks').toEqual(declared);
+  });
+
+  it('points every latent probe at the field its own key names', () => {
+    // A probe filed under one key while moving another field would report that key as latent on
+    // evidence about a different row — the arms would differ and the legs would agree for reasons
+    // having nothing to do with the row under test.
+    for (const [key, probe] of Object.entries(LATENT_PROBES)) {
+      expect(String(probe.field), key).toBe(key.slice('viewer.'.length));
+    }
   });
 });
 
