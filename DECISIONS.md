@@ -26374,8 +26374,9 @@ run, which is the both-directions check working rather than an oversight correct
 by a mutation that puts a case *into* scope rather than removing one. Re-introducing
 `serializeRunRecord` as an uncalled export fails *"has no export that is dead"*, naming the symbol
 and its file. Re-adding `metrics/runSeed` to the register fails **two** assertions, one of them
-*"metrics/runSeed — no longer exists"*. Adding a registered seventh entry fails the count literal
-`4`, with the derived size in the message. Exit 1 on all three; exit 0 reverted.
+*"metrics/runSeed — no longer exists"*. Adding a registered **fifth** entry — the register holds
+four now — fails the count literal `4`, with the derived size in the message reading
+*"currently holds 5"*. Exit 1 on all three; exit 0 reverted.
 
 **The register's count literal stays a literal.** The assertion above it already pins the *set*,
 so `Object.keys(DEAD_CANDIDATES).length` in the `toBe` would be a tautology and a silently added
