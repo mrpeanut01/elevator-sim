@@ -26920,7 +26920,8 @@ library, so any edit to `data/dispatcher-profiles.json` or `data/traffic-profile
 longer exists rather than a defect that was fixed. Three things separate this from that:
 
 1. **No data file was touched.** The whole diff is `core/src/model/car/car.ts`,
-   `core/src/sim/simulation.ts` and two test files.
+   `core/src/sim/simulation.ts`, two test files and this document. `data/dispatcher-profiles.json`
+   and `data/traffic-profiles.json` are byte-identical to the tree the case was found on.
 2. **The case is identical.** Same `simSeed` 288 869 761, same `destination-panel` /
    `destination-entry`, same 2 096 generated passengers, still `timed-out`, same 3 493 s deadline.
    Only the ending moved: 3 493.7776 → **3 492.7189**, from 0.778 s outside its deadline to 0.281 s
@@ -26955,8 +26956,10 @@ records"* — instead of quietly reporting about something else.
 
 The two closed blocks beside it are always-on; this one is not, and the reason § D393 gave still
 holds: it has been run on a single Linux container, once, and [§ D201](#d201) found the
-[§ D196](#d196) pins **exactly inverted** between Linux and darwin/arm64. The margin this run now
-has — 0.281 s inside its deadline — is a smaller number than that disagreement was.
+[§ D196](#d196) pins **exactly inverted** between Linux and darwin/arm64 — a pin is a claim about a
+machine as much as about a commit. This run's margin is 0.281 s inside its deadline on the one
+container it has been taken on, and nothing here establishes that the margin has the same sign on
+the other leg of the matrix.
 
 What has changed is that nothing is lost by leaving it there. The **mechanism** is covered always-on
 in `packages/core/src/sim/simulation.test.ts`, on two shipped cells, asserting a travel sample rather
