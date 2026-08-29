@@ -1058,11 +1058,12 @@ function remedyFor(
       'A measure that could not be compared is the complete-case rule, not a failure: an estimate ' +
         'is reported only when every paired run stands behind one, so more replications make this ' +
         'more common rather than less. The lever is the load, and "demand %pop/5 min" is where it ' +
-        'is — but this surface will not tell you to lower it until the rows fill in, because that ' +
-        'is an end state the control has not been measured to reach. One 10 % step is measured to ' +
-        'leave the dropped-pair count unchanged, to lower it, and to raise it, on shipped ' +
-        'buildings at fifty pairs. Two reasons, and neither is bad luck. Lowering the rate redraws ' +
-        'the passengers, so the runs after a step are different runs, and the paired discipline ' +
+        'is — but a press is one step and not a cure, and this surface will not promise you a ' +
+        'state where nothing is dropped, because the step has never been measured to reach one. ' +
+        'One 10 % drop is measured to leave the dropped-pair count unchanged, to lower it, and to ' +
+        'raise it, on shipped buildings at fifty pairs. Two reasons, and neither is bad luck. ' +
+        'Dropping the rate redraws the passengers, so the runs after a step are different runs, ' +
+        'and the paired discipline ' +
         'that makes a comparison honest holds across dispatchers and not across a change of ' +
         'demand. And a mean is refused on five grounds, of which only a queue that never stopped ' +
         'growing follows the load down: on a quiet building the ground is an empty reporting ' +
