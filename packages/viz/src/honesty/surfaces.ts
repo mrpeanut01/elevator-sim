@@ -9742,6 +9742,13 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
  * were ever drawn without them: § 12.2's *Too close to call*, which sits **beside**
  * `report.ts`'s `unresolved` and never in place of it, and the never-a-subtraction rule itself.
  *
+ * Since [§ D389](../../../../DECISIONS.md) that heading arrives here **composed with its basis** —
+ * *"Too close to call on 5 of the 8 measures below"* — because the bare phrase and `cell.answer`
+ * could both fire over one cell's rows and neither said which rows it meant (GitHub issue #301).
+ * The stem is still swept, one loop above, as a `BENCH_COPY` entry; this seed is the string the
+ * player actually reads, and seeding the constant here instead would be the surface claiming
+ * coverage of words nobody draws.
+ *
  * The per-cell figures and comparison rows are **not** re-seeded here: they are `batchReport`'s
  * own sentences, driven by `BATCH_REPORT`, and re-rendered under the suite's id by `SUITE_BENCH`.
  * Adding a third copy would put duplicates ahead of the originals and move every batch-shaped
@@ -9765,6 +9772,9 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
     // Driven through `benchFieldRefusal`, which it calls before narrowing to the tuple: a field
     // it returns `undefined` for is exactly a field that refusal names.
     'everyday/benchModel.ts#benchFieldOf',
+    // § D389's heading, driven through `benchResultViewOf`, which is the only caller: the seed
+    // below carries the composed string a player reads rather than the bare stem.
+    'everyday/benchModel.ts#benchTooCloseHeadingOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -9856,8 +9866,8 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
      * unconditionally would be the surface asserting a shrug it had not measured, which is the
      * mirror image of the defect this whole screen exists to refuse.
      */
-    for (const cellId of view.tooCloseCellIds) {
-      seeds.push({ field: `result.${cellId}.tooClose`, text: BENCH_COPY.tooCloseHeading, role: 'reason' });
+    for (const mark of view.tooClose) {
+      seeds.push({ field: `result.${mark.cellId}.tooClose`, text: mark.heading, role: 'reason' });
     }
 
     return singleRun(this.id, seeds);

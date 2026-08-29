@@ -25922,3 +25922,55 @@ that has nothing to do with the disarm. Under the same mutation `rush` lands at 
 so the new file asserts the reset through `rush`.
 
 ---
+## D389 — a bench rollup names the rows it speaks for, and the second one is left alone
+
+**Rules on:** GitHub issue #301. Settles `everyday/benchModel.ts#benchTooCloseHeadingOf`,
+`BenchResultView.tooClose`, and the heading `everyday/benchScreen.ts` draws above a cell's rows.
+
+**Decision.** § 12.2's *"Too close to call"* carries its basis: the number of drawn rows it speaks
+for and the number of rows drawn. `benchModel.ts` composes it, `benchScreen.ts` draws it, and
+`BenchResultView` no longer offers a bare list of ids for a renderer to supply words to.
+`batch/report.ts#answerFor` is **not** changed.
+
+**Why.** A cell card draws two rollups with the rows sandwiched between them, and their predicates
+are not exclusive: `Too close to call` fires on `≥ 1` row coming back `unresolved`, and `answerFor`'s
+first branch fires on `≥ 1` row coming back `resolved`. Confirmed on a fixture built for it — one
+measure separating cleanly, the rest a dead tie — which produced **1 resolved, 5 unresolved and 2
+shown** rows, `tooClose` listing the cell, and `answer` reading *"Separated on 1 of the measures
+compared — average wait."* The card opened by saying the comparison was too close to call and closed
+by saying it had separated, and **neither string named its own denominator**. That is this
+repository's *two answers to one question* shape, and its own fix for that shape is to put the basis
+on the figure.
+
+**Why the denominator is the drawn row count.** It is the number of rows between the two rollups, so
+a reader can check it by counting what is in front of them. `batch/report.ts`'s summary sentence
+carries a `total` of its own and is not drawn on this screen; a denominator a reader cannot see is
+the defect again with a bigger number.
+
+**Why `answerFor` is left alone.** It is `batch/report.ts`'s, drawn by the Engineer suite panel and
+the CLI as well as by the bench, and its separated branch already names its subset — the count *and*
+the measures, by label. Changing a shared sentence to close a one-screen contradiction would be a
+wider edit with a narrower reason. `benchModel.test.ts` asserts that branch's wording beside the
+heading, so if it ever stops naming its subset the pair is back to two unqualified claims and the
+case says so.
+
+**What is not changed.** The six verdicts stay on the rows and stay `report.ts`'s own words —
+`unresolved` and `under-budget` are different claims, and one friendly phrase over both would erase
+the difference between *"they are the same"* and *"you did not run enough days to find out"*. The
+guide's phrase survives verbatim at the front of the heading; § 12.2's copy is
+**GitHub issue #211's** to cut, not this lane's.
+
+**The issue's second clause stays refuted, and it is not re-litigated here.** #301 filed and then
+refuted *"the rows all read resolved"* by tracing: `tooCloseCellIds` was computed from
+`rows.some(row => row.verdict === 'unresolved')` and `benchScreen.ts` drew that same array printing
+`${row.label} · ${row.verdict}` verbatim, so at least one drawn row must literally read
+`· unresolved` whenever the heading appears. That trace still holds line for line after this change
+— the selection's predicate is unmoved and only its accompanying words are new.
+
+**What is not claimed.** The corpus is **not re-measured** here and no string, surface or case count
+is published; [§ D343](#d343) takes that measurement once, after the wave integrates.
+`honesty/surfaces.ts`'s bench adapter now seeds the composed heading rather than the bare constant,
+which is the string the player actually reads — the constant is still swept, one block above, as
+copy.
+
+---
