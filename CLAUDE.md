@@ -84,11 +84,38 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **569 663** | **606** | **51** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **710 660** | **4 710** | **52** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **570 217** | **606** | **51** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **711 317** | **4 710** | **52** | **0** | **green**, and the register is empty |
 
-  **Re-measured 2026-08-25 after wave C integrated**, both tiers, one sitting. Cases, simulations and
-  failures unmoved; strings **+479** and **+612**.
+  **Re-measured twice on 2026-08-29, and the pair is what makes either number mean anything.** First
+  on `f13d455` — merged `main`, wave E integrated, discharging the measurement wave E closed owing —
+  and again on the wave F integrated tree. Both tiers in one sitting each, never on a branch
+  ([§ D343](DECISIONS.md)).
+
+  | | published before | at `f13d455` (wave E) | wave F integrated |
+  |---|---|---|---|
+  | always-on strings | 569 663 | **570 217** (+554) | **570 217** (**+0**) |
+  | deep strings | 710 660 | **711 317** (+657) | **711 317** (**+0**) |
+
+  **Wave F moved the string count by zero, and that is a finding rather than a null.** Five lanes
+  changed player-facing words — a run-scoped sentence rescoped to its window, a bench heading given
+  its denominator, a remedy's promise withdrawn, a Workshop's disclosure rebuilt from two states to
+  four — and **not one of them added a string**. Every change was a reword or a substitution. The
+  bench is the clearest case: `honesty/surfaces.ts`'s seed loop went from
+  `text: BENCH_COPY.tooCloseHeading` to `text: mark.heading` over the same iteration, so one string
+  goes in and one comes out and the count *cannot* move.
+
+  **The surface sets were diffed rather than the counts compared** — base against integrated, both
+  tiers — and are **identical, 51 and 52, nothing added or removed**. That is the probe wave B had to
+  build by hand after finding this column wrong by one; it is kept now, in
+  `honesty/measure.corpus.test.ts`, which is also why these figures exist at all: `honesty.test.ts`
+  computes every one of them and prints them with `console.log`, **which vitest 4 intercepts**, so on
+  this toolchain they could not be read off a run at all. That, not indifference, is why the
+  measurement kept being skipped.
+
+  **The deep tier is still exactly one surface above always-on, and the diff names it**:
+  `campaign/judge.ts#judgeStage`, silent in one tier by construction and loud in the other. Five
+  lanes did not disturb that gap, which is what says the sets were compared rather than assumed.
 
   **The surfaces column moved +2 in each tier and it is not two new screens.** They are the two sides
   of [§ D362](DECISIONS.md)'s declared pair, which must carry the shipped expression's id or a

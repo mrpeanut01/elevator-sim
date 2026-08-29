@@ -30,9 +30,12 @@
  *
  * ## Skipped unless asked for
  *
- * Gated on `CORPUS_OUT` so the default suite neither runs it nor pays for it — the always-on tier
- * is ~2 min and the deep tier ~7, and neither buys a gate. Run it **once, after integration, never
- * per branch** ([§ D343](../../../../DECISIONS.md)):
+ * Gated on `CORPUS_OUT` so the default suite neither runs it nor pays for it, and neither tier buys
+ * a gate. **Measured on this container rather than inherited from the handoff:** the always-on tier
+ * is ~2 min and the deep tier **~23**, not the ~7 an earlier note claimed — that figure came from a
+ * 10-core Mac and was carried forward without being re-taken. Budget accordingly, and see the
+ * timeout note at the foot of the `it`. Run it **once, after integration, never per branch**
+ * ([§ D343](../../../../DECISIONS.md)):
  *
  * ```
  * CORPUS_OUT=/tmp/always-on.txt npx vitest run packages/viz/src/honesty/measure.corpus.test.ts
@@ -105,5 +108,15 @@ describe.skipIf(out === undefined)('the corpus figures, derived rather than tran
     ].join('\n');
 
     writeFileSync(out ?? '', body, 'utf8');
-  }, 900_000);
+    /*
+     * **An hour, because 15 minutes was not enough and the failure was silent-ish.** The deep tier
+     * took **1 385 s** here against a 900 s deadline, and vitest reported the test *failed* while
+     * the figures it wrote were complete and correct — `runHonestyCampaign` is synchronous, so
+     * there is nothing for a timeout to interrupt: the campaign runs to the end, `writeFileSync`
+     * lands, and only then is the deadline noticed. A reader who trusted the exit code would have
+     * thrown away a good measurement; one who trusted the file without checking `cases` would have
+     * been right by luck. The file states `cases n (n evaluated, 0 skipped)` and its own wall clock
+     * for exactly that reason — they are what distinguishes a complete run from a truncated one.
+     */
+  }, 3_600_000);
 });
