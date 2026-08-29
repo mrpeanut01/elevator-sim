@@ -26741,6 +26741,242 @@ shipped caller; what it has and does not have is recorded above as a finding and
 larger neighbour, not its scope. No claim is made that `readRunSetFile`, `parseRunSet`,
 `parseStoredRun` or `replaySimulationConfig` are dead — they are not, and `goldenChild.ts` is why.
 
+## D398 — the drain deadline gates where a move *lands*, not where it is commanded
+
+**Date:** 2026-08-29 · **Owner:** wave H lane B · **Rules on:** GitHub issue #305, the one
+counterexample the first scheduled `ELEVATOR_SIM_FUZZ=deep` run since T22 produced
+(`fuzz-1000130`, `[termination] run ended at t=3493.7775825325903, past its hard deadline of
+t=3493`), recorded as OPEN by [§ D393](#d393), which stands with its date.
+
+**Decision.** `Simulation.#depart` refuses a departure whose **arrival** would land past
+`#deadlineS`, instead of one whose **command instant** does. The arrival instant comes from a new
+`Car.plannedDepartureFor` — `departFor` with the three writes removed, both going through one
+`#planMotion` — so the instant checked is the instant the kernel is then handed.
+
+**Nothing in `packages/experiments/src/fuzz/` moved.** `checkTermination` is unchanged line for
+line, `EPSILON` is still `1e-9`, `PROPERTY_BOUNDS` is unmoved, and the generator was not narrowed.
+All four are the weaken-the-gate move and none of them was made.
+
+### The mechanism, and how it was found rather than guessed
+
+The shrink was not a diagnosis. Six steps, 167 candidate evaluations, and the reduced case reported
+the **identical** run — `timed-out`, 2 096 passengers, 3 493.8 s, the same violation to the last
+digit. A reduction that removes six things and moves no number has established that the removed
+things were never load-bearing and nothing else. What survived was the service schedule, which the
+closed `fuzz-1000384` also survives with, and the two share `service-schedule` and `sky-lobby` —
+which is the **neighbourhood the generator samples**, not the cause. It was recorded as unmeasured
+rather than written up as a mechanism, and this entry is what measuring it produced.
+
+`SimKernel.prototype.schedule` and `.cancel` were patched for the last thirty seconds of the run and
+every schedule, fire and cancel logged. Two `sim.carArrived` events were queued past the deadline —
+`low-low-1` at 3 493.7776 and `low-low-3` at 3 505.2351 — and **both fired**, because `Simulation.run`
+drains with `runUntilEmpty()`: the deadline is not a horizon the kernel enforces, it is a rule each
+scheduling site keeps.
+
+Ten sites put events on that queue. Two are bounded by construction — trace arrivals and queue
+samples never exceed the demand horizon, and the deadline is the horizon plus a non-negative grace.
+**Seven of the remaining eight gate the instant their event lands**: `#scheduleServiceEvents` and
+`#scheduleInterventions` on `entry.atS`, `#scheduleOpeningTransport` and `#scheduleTransfer` on the
+far end of the walk, `#armPatience` on when patience runs out, `#scheduleTick` on the retry, and
+`#scheduleDoor` on the next transition. `#depart` gated `at` — the instant the car is *commanded* —
+and then handed `motion.arrivesAt` to `#scheduleArrival` unconditionally. A car told to move a
+second inside the deadline carried the run a whole flight time past it.
+
+`SIM_DEFAULTS.drainGraceS` had already written the rule this restores, and in these words: the drain
+tail *"is a **hard timeout**: work scheduled past it is not scheduled at all — not a departure, not
+a dispatch retry, not a sky-lobby transfer, and not a door transition"*. The sentence was true of
+three of the four things it names. This is `CLAUDE.md`'s stale-refusal class with the polarity that
+makes it worse: a contract stating a bound the code did not keep.
+
+### Why P5 almost never sees it, which is the finding rather than the fix
+
+`endedAt` is `max(recorder.lastEventAt, demand horizon)`, and `MetricsRecorder.sampleTravel`
+**deliberately** does not advance `lastEventAt` (an instrument must not lengthen the window it
+measures). So a late arrival that only moved a car left `endedAt` untouched and `checkTermination`
+saw nothing at all.
+
+Swept over three shipped buildings × four shipped dispatchers × four drain tails × two demand
+levels — 96 cells, 600 s of demand, seed 20 260 726, on the tree carrying the defect:
+
+| | cells |
+|---|---|
+| ran | 96 (91 `timed-out`, 5 `completed`) |
+| **carried a completed move past the deadline** | **84** — every one of them `timed-out`, none of the five completed |
+| reported `endedAt` past the deadline | **0** |
+
+The largest overshoot was **39.2 s** at `vertical-city`/`destination-panel`, drain 60, rate 20 —
+about a third of a minute of a run reporting itself over. So the defect is neither rare nor
+seed-specific nor anything to do with service schedules; `fuzz-1000130` is visible only because it
+is a 2 096-passenger destination-panel run whose late arrival *also* registered a landing
+assignment, which the recorder does observe. The property caught the one case in which a general
+defect happened to surface.
+
+### The fix is strictly stronger than the gate it replaces
+
+`arrivesAt` is `at + motorStartDelayS + profile.duration + levelingSettleS`, every term
+non-negative and `profile.duration > 0`, so `at > deadlineS` implies `arrivesAt > deadlineS`: every
+departure the old gate refused, this one refuses too. The old check is subsumed rather than moved,
+which is why it is not kept beside the new one — a second gate that can never fire is a second
+authority, and this defect is what one of those looks like after it drifts.
+
+**`Car.plannedDepartureFor` exists so there is one arithmetic and not two.** The alternative was to
+rebuild the arrival instant in `Simulation` from `buildProfile` and the car's spec. That is the same
+formula in a second file, free to disagree with the one the kernel schedules against — and it is
+precisely the shape that produced this bug. `#planMotion` is `departFor`'s whole body except the
+three writes; `departFor` is `#planMotion` plus them.
+
+**`Car.departFor` keeps its callers.** `packages/viz/src/record/instrument.ts` and
+`packages/cli/src/timeline.ts` both monkey-patch `car.departFor` to record what a run looks like, so
+a fix that routed `Simulation` around it would have silently emptied both recorders. Named here
+because it is not visible from `sim/`.
+
+### Alternatives
+
+**(a) Gate `#scheduleArrival` instead** — let the car depart, drop its arrival, leave it in flight.
+Rejected, and it is the tempting one, because it matches how `#scheduleDoor` and `#scheduleTransfer`
+leave their actor mid-action. It breaks an invariant those two do not touch: `Car.departFor`
+increments `#departures` and only `completeArrival` advances the odometer and emits the travel
+sample, so a commanded move with no arrival is a departure with no sample, and
+`benchmark/energyLiveness.test.ts` asserts `samples.length === fleetDepartures` against the cars'
+own counters. Mutation-checked rather than argued: with the gate at `#scheduleArrival`,
+`midtown-office`/`collective` reports **138 samples against 141 departures**.
+
+**(b) Clamp `endedAt` to the deadline.** Rejected outright — the late arrival still fires, still
+takes a travel sample past the run's end and still steps the car into fresh dispatch work. It would
+delete the symptom `checkTermination` reads and leave the run doing the work.
+
+**(c) Declare the run legitimate and correct P5's docstring instead.** Rejected on the code:
+`SIM_DEFAULTS.drainGraceS` calls the tail a hard timeout that a departure may not cross, and
+`simulation.test.ts` already asserted `endedAt <= deadlineS` in three places. The contract was not
+ambiguous; the gate did not keep it.
+
+### Blast radius, measured
+
+`packages/core` is green: **112 files, 2 547 tests**, no assertion moved to accommodate the change.
+The change can only alter a run in which a car's move would cross the deadline, which is a
+`timed-out` run's last few seconds — all five `completed` cells in the sweep above had nothing past
+the deadline to cut. On the swept cells `endedAt` is unchanged in every cell but one
+(`vertical-city`/`collective`, drain 60, rate 8: 657.109 → 658.909), because the arrivals being cut
+were the ones the recorder was not observing anyway.
+
+`fuzz-1000130` itself: the same case — same `simSeed` 288 869 761, same `destination-panel` /
+`destination-entry`, same 2 096 passengers, still `timed-out` — now ends at **3 492.7189**, 0.281 s
+**inside** the deadline it declares, with **no violations at all**. 6 947 events becomes 6 945.
+
+### Validation
+
+`packages/core/src/sim/simulation.test.ts` carries the guard, always-on, on two shipped cells
+(`midtown-office`/`collective` and `vertical-city`/`destination-panel`) rather than on a fuzz seed —
+the defect is a property of the simulator, so the test must be able to fail without the fuzz
+machinery. It asserts on the **travel sample** rather than on `endedAt`, for the reason the table
+above gives: 0 of 96 cells would have failed an `endedAt` assertion. `endedAt` is asserted beside
+it as the shape the campaign caught.
+
+Mutated in two directions, each putting a case *into* scope:
+
+| mutation | result |
+|---|---|
+| gate back on `at > deadlineS` (the defect) | exit 1 — *"midtown-office/collective: arrivals completed past the run's hard deadline"*, listing `main-D +1.545s`, `main-B +3.549s`, `main-A +30.843s` |
+| gate moved to `#scheduleArrival` (alternative (a)) | exit 1 — *"a commanded move produced no travel sample: expected 138 to be 141"* |
+
+Both reverted; exit 0 restored.
+
+**What is not claimed.** No honesty-corpus figure is measured or published here — [§ D343](#d343)
+takes that once, after integration. The 2 000-case overnight deep pass has **not** been re-run; only
+the 250-case tier default has. Nothing here says the defect changed a published benchmark interval:
+the pinned studies were re-run and are quoted in [§ D399](#d399), and no pin was regenerated.
+
+## D399 — a register entry that has been fixed stops being a register entry, and the record that replaces it declares its own axis
+
+**Date:** 2026-08-29 · **Owner:** wave H lane B · **Rules on:** the disposition of
+`packages/experiments/src/fuzz/deep.test.ts`'s `OPEN` block for `fuzz-1000130`, now that
+[§ D398](#d398) has fixed what it recorded.
+
+**Decision.** The `OPEN` block and its ghost check are **deleted**. A `CLOSED` block replaces them,
+carrying the same reproduction against a **pinned axis of its own** (`AXIS_1000130`) and asserting
+that the case is still the case *before* asserting anything about it. The tier's status table keeps
+its RED row and gains a measured green one. The block stays **gated with the campaign**.
+
+### The ghost check is the evidence, and it was used that way
+
+The register's whole design is that it holds a finding accountable in both directions: the check
+asserts the violation **still reproduces**, so the day somebody fixes it the check goes red and the
+block must go. That is what happened, and in that order — the fix landed first, then the ghost check
+was run:
+
+```
+AssertionError: fuzz-1000130 no longer ends past its hard deadline. If that is a fix, DELETE this
+block and the RED row in the status table above … expected [] to not deeply equal []
+```
+
+Exit 1. `CLAUDE.md`: *a registered finding that has been fixed must stop being registered, or the
+register becomes decoration.*
+
+### It is a defect being fixed, not luck moving, and the two were told apart deliberately
+
+The `OPEN` entry named its own escape hatch: this case is indexed against the **live** profile
+library, so any edit to `data/dispatcher-profiles.json` or `data/traffic-profiles.json` re-maps seed
+1 000 130 onto a different building, and the ghost check would then go red about a case that no
+longer exists rather than a defect that was fixed. Three things separate this from that:
+
+1. **No data file was touched.** The whole diff is `core/src/model/car/car.ts`,
+   `core/src/sim/simulation.ts` and two test files.
+2. **The case is identical.** Same `simSeed` 288 869 761, same `destination-panel` /
+   `destination-entry`, same 2 096 generated passengers, still `timed-out`, same 3 493 s deadline.
+   Only the ending moved: 3 493.7776 → **3 492.7189**, from 0.778 s outside its deadline to 0.281 s
+   inside it.
+3. **The scenario was constructed directly, without the seed at all.** [§ D398](#d398)'s sweep
+   reproduces the mechanism on 84 of 96 shipped-building cells with no fuzz machinery in the path,
+   and the always-on regression test names two of them. A fix that only moved a seed could not do
+   that.
+
+### The record now declares its own axis, which the `OPEN` entry could not
+
+`CORPUS_DISPATCHER_PROFILE_IDS` states the rule: a fuzz case is a seed decoded against an option
+space, the dispatcher and traffic lists are two axes of that space, and *a case recorded against a
+later library declares its own list beside it*. The `OPEN` entry did not — it reproduced with the
+campaign's own `generateOptionsFrom(config, DEEP_SPACE)`, over whatever ships — and said in its own
+text that this made it perishable.
+
+`AXIS_1000130` is that list: the **thirteen** dispatcher profiles and **five** traffic profiles
+shipped on the day the case was found, in `data/` order. Passing them explicitly reproduces exactly
+what the no-argument form reproduces today, so the case below **is** the case the campaign found —
+and it stays that case when the library next moves, which is the whole point.
+
+**The existing pinned lists could not be borrowed, and that is the trap this entry exists to close.**
+They are frozen at twelve dispatchers and four traffic profiles for the T21/T22 findings; under them
+seed 1 000 130 decodes to a *different* building and reports **zero violations**, which reads exactly
+like the defect having been fixed and is not. The `OPEN` block warned about this in prose. It is now
+a mechanism: the reproduction asserts `simSeed`, dispatcher, call type and deadline first, so an axis
+that has lost its subject fails saying so — *"seed 1 000 130 no longer decodes to the case this block
+records"* — instead of quietly reporting about something else.
+
+### Still gated with the campaign, and the argument is the original one unchanged
+
+The two closed blocks beside it are always-on; this one is not, and the reason § D393 gave still
+holds: it has been run on a single Linux container, once, and [§ D201](#d201) found the
+[§ D196](#d196) pins **exactly inverted** between Linux and darwin/arm64. The margin this run now
+has — 0.281 s inside its deadline — is a smaller number than that disagreement was.
+
+What has changed is that nothing is lost by leaving it there. The **mechanism** is covered always-on
+in `packages/core/src/sim/simulation.test.ts`, on two shipped cells, asserting a travel sample rather
+than a floating-point margin; the deep block is a *record of a finding*, and a record belongs where
+the finding was made. Promoting it out of the gate stays a one-line change for the wave that
+measures it on both legs.
+
+### The status table keeps its RED row
+
+The RED row of 2026-08-29 on `0cd422a` stays, with its date and its commit, and a green row is added
+under it — **measured**, not asserted: `ELEVATOR_SIM_FUZZ=deep`, 250 cases, exit 0, 6 tests passed,
+209 s. The pair is the point. A table showing only the green row would say *this tier passes*; the
+pair says *this tier failed here, and this is the run that shows the fix*. It is the same argument
+the file already makes for keeping the stale T22 green rows with their dates.
+
+**What is not claimed.** The 2 000-case overnight pass has not been re-run — only the 250-case tier
+default. No honesty-corpus figure is measured or published ([§ D343](#d343)). No claim is made that
+the deep tier is green on any platform other than the Linux container this ran on, which is the same
+claim the RED row above it made.
+
 
 
 ---
