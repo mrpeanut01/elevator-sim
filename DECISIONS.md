@@ -26398,15 +26398,21 @@ command written into the workflow header — `gh run list --workflow=deep-tiers.
 saying which half is which is the point, because *"satisfied in prose and mechanised by nothing"* is
 the clause this repository already knows to distrust first.
 
-**Validated by mutation, because a zero from an unvalidated instrument is worthless.** Eight
+**Validated by mutation, because a zero from an unvalidated instrument is worthless.** Nine
 mutations, each keeping every case in scope — a mutation that removes a row from the iterator
 validates nothing — and each detected by the case that claims to detect it, exit 1 every time: a
 tier misspelled in its run line, a gate variable dropped from its step, the schedule deleted, a
 `pull_request:` trigger added, `--passWithNoTests=false` removed from one command, the issue-raising
-step broken, **a tenth gated tier added to disk and left unwired**, and the corpus job made to commit
-its own figures. Separately, all ten workflow invocations were shown to **open their gate** with
-`vitest list`, against a negative control of the same commands with the variables unset, which
-collect nothing.
+step broken, **a tenth gated tier added to disk and left unwired**, the corpus job made to commit its
+own figures, and `ELEVATOR_SIM_REGENERATE_GOAL_RATES` set on a job.
+
+Separately, **all ten workflow invocations were shown to open their gate** with `vitest list`,
+against a negative control of the same commands with the variables unset, which collect nothing.
+That control is the half that matters: without it, ten rows reading OPEN would be a probe that
+cannot tell open from shut. The `summary` and `report` jobs — the two whose breakage would look
+exactly like a normal run — were executed locally against a `needs` payload mixing failure, success,
+skipped and cancelled: both node scripts exit 0, the table renders all nine rows, and the issue body
+names the two failures and nothing else.
 
 **What turning them on found, reported rather than fixed.** `fuzz-deep` came back **RED** on the
 first run: 1 counterexample in 250 cases, `fuzz-1000130`, `[termination] run ended at
