@@ -26328,10 +26328,11 @@ wave 13 — naming `trafficSeed` and `trafficModel` as the gap when the gap is t
 **The register's stated reason was stale, which is worth recording separately.** It read *"the
 writer half of the documented replay round trip; persistence.ts writes through `serializeRunSet`
 instead"*. That reads as *a shipped path writes, just not through this symbol*. **Nothing writes a
-run record on a shipped path at all**: `createStoredRun`, `serializeStoredRun`, `serializeRunSet`,
-`writeRunSetFile` and `appendRunToFile` are reachable only from tests and from
-`reports/fixtures.test-helper.ts` — `experiments/reports/types.ts` says so of `createStoredRun` in
-as many words, under *"latent rather than realised"*. The register was right that these two symbols
+run record on a shipped path at all**: the write path's four entry points — `createStoredRun`,
+`serializeRunSet`, `writeRunSetFile` and `appendRunToFile` — have no caller outside `*.test.ts` and
+`reports/fixtures.test-helper.ts`, and `serializeStoredRun` is called only by two of those four.
+`experiments/reports/types.ts` says as much of `createStoredRun` in as many words, under *"latent
+rather than realised"*. The register was right that these two symbols
 were dead and wrong about what surrounded them. A stale reason in a register whose own assertion
 checks only whether a symbol *acquired a caller* is `CLAUDE.md`'s stated-refusal class, pointed at
 an allowlist.
