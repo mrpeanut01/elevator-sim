@@ -429,10 +429,11 @@ describe('a project whose tests do not fit the 5 s default declares a timeout th
       expect(
         (project as Registered).testTimeout ?? 5_000,
         `the ${name} project holds tests that do not fit vitest's 5 000 ms default under load, so ` +
-          'they must not inherit it. Hundreds of them call recordRun, runSimulation or legsOf and ' +
-          'pass no timeout of their own — and in `server` the file with a reproduction behind it ' +
-          'boots a database instead. Removing `testTimeout` from this project does not fail here — ' +
-          'it fails later, on somebody else’s busy machine, as a flake. See § D331 and § D394.',
+          'it must not inherit it. Most of them call recordRun, runSimulation or legsOf and pass no ' +
+          'timeout of their own; the one file with a reproduced timeout behind it boots a database ' +
+          'and calls none of those, which is why this is a project-level default and not a survey. ' +
+          'Removing `testTimeout` from this project does not fail here — it fails later, on ' +
+          'somebody else’s busy machine, as a flake. See § D331 and § D394.',
       ).toBeGreaterThanOrEqual(FLOOR_MS);
     }
   });
