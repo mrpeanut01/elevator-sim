@@ -241,12 +241,14 @@ describe('parseRunRecord rejects what it cannot trust', () => {
  * it removes the case from scope instead of showing the case still holds.
  */
 describe('a parsed record hands BigInt() a seed it can take', () => {
-  it('refuses every seed BigInt would have thrown on, before BigInt sees it', () => {
+  it('refuses the seeds BigInt would have accepted as something else', () => {
     const streams = new StreamSet(SEED);
     const valid = JSON.parse(JSON.stringify(populatedRecord(streams))) as Record<string, unknown>;
-    // `BigInt('')` is 0n, not a throw — an empty seed would have replayed run zero in silence.
+    // None of these three throws in `BigInt`, and that is the whole point: a bad seed that threw
+    // would announce itself. `BigInt('')` is `0n`, so an empty seed replays run zero in silence;
+    // `BigInt('0x2a')` is `42n`, so a hex seed replays a different run; `BigInt('-1')` is `-1n`,
+    // which is not a `StreamSet` seed at all. The parser is where they are stopped.
     expect(() => parseRunRecord({ ...valid, seed: '' })).toThrow(MetricsError);
-    // `BigInt('0x2a')` is 42n. A hex seed would have parsed and replayed a different run.
     expect(() => parseRunRecord({ ...valid, seed: '0x2a' })).toThrow(MetricsError);
     expect(() => parseRunRecord({ ...valid, seed: '-1' })).toThrow(MetricsError);
   });
