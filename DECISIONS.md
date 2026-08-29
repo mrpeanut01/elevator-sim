@@ -26086,4 +26086,84 @@ three widths, which is what the 1280×800 control cell and the unchanged clause-
 honesty corpus is **not re-measured** here and no string, surface or case count is published;
 § D343 takes that measurement once, after the wave integrates.
 
+## D392 — an instruction is pinned to a run like a number, and one this control cannot carry out is withdrawn rather than reworded
+
+**Rules on:** GitHub issue #299. Settles `batch/report.ts#remedyFor`'s load sentence and
+`dev/batchPanel.ts#remedyControl`'s step.
+
+**Decision.** The suppressed-row remedy **stops promising an end state**. It said *"lower 'demand
+%pop/5 min' until the queues stop growing"*; it now names the lever, says a press is one step whose
+size and **direction** are both unguaranteed, gives the two reasons, and sends the reader to the
+refusal each arm quotes. The **step is unchanged** — still one 10 % drop and one re-run.
+
+`CLAUDE.md` closes on *"if you publish a number, pin it to the run that produced it."* An
+instruction about what a control achieves is a claim of the same kind and now carries the same
+obligation: the run is in `remedyFor`'s docstring — seed `20260729`, 900 s, **n = 50**, `collective`
+against `eta`, the demand typed into the field, each rung the button's own
+`Math.round(rate * 0.9 * 10) / 10` — and `batch/remedyLadder.test.ts` re-derives the rungs the
+sentence rests on.
+
+**What the measurement said, and it refuted the promise three separate ways.** A *dropped pair* is
+the complete-case rule: either arm's `awtIsValid` false.
+
+| what | measured |
+|---|---|
+| Midtown Office from the band point the panel opens on (`min`, 11 %), nine presses | `50, 50, 50, 49, 46, 41, 34, 24, 17` of 50 |
+| Midtown Office from 24 %, the issue's ladder | **50 of 50 at all nine rungs**, all `saturated`; 24 presses reach 2 % |
+| Midtown Office at n = 20 | 5 % → 10, 4 % → 3, **3 % → 0, 2 % → 1** |
+| Mixed Use High Rise from 24 % | `50, 50, 50, 50, 49, 42, 31, 20, 11` of 50 |
+| Secure Tower from 24 % | `50, 49, 47, 36, 24, 14, 9, 5, 1` of 50 |
+| Chancery House, one press from each integer rate 19 → 5 | **2 of 15 raise the count**: `19 → 17.1` is 1 → 3, `18 → 16.2` is 0 → 1 |
+| Chancery House at 16 % and 15 % | 1 of 50 and 0 of 50 — the docstring's own existing claim, reproduced |
+| Crown Hotel, one press off its own `min` | **2 of 50 → 3**, every refusal `saturated` both sides |
+| St Jude's Hospital at its own `min` (6 %) | 3 of 50, **zero** saturated — every refusal `censored` |
+| Vertical City at its own `min` (11 %), one press | 26 of 50 → 11, all `saturated` |
+| Garden Apartments from its own `min` (3 %), seven presses | `4, 7, 8, 8, 11, 16, 16, 15` of 50, **every refusal `empty-window`** |
+
+**All eight shipped buildings were measured, not the five #299 names.** The remedy is offered on
+every building whose rate resolves, so a sentence measured on five is an instruction about the
+other three as well. The three that were added changed the finding rather than confirming it:
+**Crown Hotel raises the count on the very first press off its own `min`**, with every refusal
+`saturated` on both sides — so the non-monotonicity is not a quiet-building effect and is not
+confined to the two buildings the issue found it on. **St Jude's Hospital refuses on `censored`
+and never on `saturated`** at its own `min`, which is a *second* ground the load is not the lever
+for. Only **Vertical City** and Mixed Use High Rise behave the way the withdrawn sentence assumed:
+**two of eight**, and that is said here so the refusal reads as measured rather than as pessimism.
+
+**The Garden Apartments row is the one that decided the shape of the fix.** There the load is not
+the wrong *size* of lever, it is the wrong lever: there is no queue to stop growing, the binding
+ground is *"No passenger was served within the reporting window"*, and the ladder ends at nearly
+four times the drop count it started at — four of the seven presses strictly worse, two flat, one
+better. No step size repairs a direction. That is why the control was left alone and the sentence
+was changed, rather than the other way round — and it is the half of AC1 the issue left open as a
+choice.
+
+**Why the non-monotone rungs are structural and not sampling.** Two causes, and the first is this
+repository's own discipline pointed at itself. Lowering the rate **redraws the passenger trace**, so
+the fifty pairs after a press are fifty *different* pairs: common random numbers hold across
+dispatchers — that is what `runBatch` audits field for field — and hold across nothing else. A
+paired-t interval across a demand change would be arithmetic on unrelated runs, so **no such
+interval is offered here and none may be**, which is also why this decision publishes counts and
+never a Δ. The second is that `awtIsValid` refuses on **five** grounds and only `saturated` follows
+the load down; `censored` appears on Secure Tower at 12.8 % and 11.5 % as `saturated` recedes, and
+`empty-window` takes over Garden Apartments entirely.
+
+**What the issue got wrong, recorded because it was checked.** Its Garden Apartments ladder
+(`0, 0, 0, 1, 0, 0, 0, 0`) **does not reproduce at any band point that profile declares** — from 7 %
+it is `2, 1, 1, 3, 3, 1, 4, 4`, from 5 % `3, 3, 1, 4, 4, 4, 7, 8`, from 3 % the rising ladder above.
+The finding it was offered for is confirmed far more strongly than stated, on the same building, so
+the correction strengthens the issue rather than weakening it. Everything else in #299 reproduced
+exactly, including its own opening refutation of the observation that produced it: 5 of 50 against
+8 of 50, unpaired and across a demand change, supports no verdict, and nothing here rests on it.
+
+**Also corrected, one word, in the same file.** `batch/report.ts`'s module docstring said
+*"any of `awtIsValid`'s four grounds"*. There are five — abandonment landed with wave 13's patience
+feature — and the count is load-bearing exactly here, because the new sentence's claim is about
+*which* ground the load moves. Roughly eight further sites in the tree carry the same stale four;
+they are out of this lane's region and want their own issue.
+
+**What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
+integration. The full ladders above are reported once and are not all re-run per suite: the test
+holds the two rungs the sentence rests on, the Midtown endpoint, and the sentence itself.
+
 ---

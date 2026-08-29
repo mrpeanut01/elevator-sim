@@ -406,6 +406,23 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
    * the reader presses it again. A control that swept until the rows filled in would be choosing
    * the outcome, which is the one thing `remedyFor` refuses to teach.
    *
+   * **What "presses it again" is worth was unmeasured until GitHub issue #299, and the step did not
+   * come out well** ([§ D392](../../../../DECISIONS.md)). At n = 50 on the shipped batch form: nine
+   * presses from the band point this panel opens Midtown Office on leave 17 of 50 pairs dropped;
+   * from 24 %pop/5 min it is 50 of 50 at every rung and 24 presses to reach 2. Two of fifteen
+   * single presses on Chancery House **raise** the count, and so does the very first press off
+   * Crown Hotel's own `min` (2 of 50 → 3). And on Garden Apartments, whose refusals are empty
+   * reporting windows rather than growing queues, seven presses take it from 4 of 50 to 15 — four
+   * of them strictly worse, two flat, one better. All eight shipped buildings were measured; two
+   * behave the way the withdrawn sentence assumed.
+   *
+   * **The step was left exactly as it is, and that is a decision rather than an omission.** The
+   * tempting repair is a bigger step or a search, and § D392 rejects both: a search is what the
+   * paragraph above refuses, and no step *size* helps on a building where the direction is wrong.
+   * What changed instead is `remedyFor`'s sentence, which no longer promises an end state — so the
+   * button's label, which has always said exactly what one press does, is now the whole of what
+   * the surface claims for it. `batch/remedyLadder.test.ts` holds the rungs.
+   *
    * Not offered when the rate cannot be resolved — see {@link effectiveRatePctPop5min} — because a
    * button that lowers an unknown number by a tenth has nothing to write.
    */
