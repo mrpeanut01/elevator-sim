@@ -158,11 +158,18 @@
 # | `fuzz-deep` (250 cases) | 20.5 min, **RED** — a real counterexample, issue #305 | 60 |
 # | `golden-runs` (6 of 6, cross-process) | 55.6 s, green | 90 |
 # | `perf-sweep` (20 000 replications, workers) | 4.6 min, green | 180 |
+# | `matrix-census` (200 replications) | 17.0 min, **RED** — three declared figures do not reproduce, issue #306 | 120 |
 # | `honesty-deep` (60 cases) | 43.9 min, **RED** — *timed out*, not refuted; see that job | 90 |
 #
-# The two reds are different kinds of thing and the table says which. `fuzz-deep` found a
-# counterexample; `honesty-deep` ran out of the clock the *test itself* declares, refuting nothing.
-# Reporting them as one number would be the mistake this repository makes a rule about.
+# **Three of the five run came back red, and they are three different kinds of thing.** `fuzz-deep`
+# found a counterexample. `matrix-census` found that declared statistical parameters no longer
+# reproduce from the census they were derived from — the sharpest possible answer to *"what was this
+# tier for?"*, since those ceilings bound every interval the experiment matrix publishes.
+# `honesty-deep` ran out of the clock the *test itself* declares and refuted nothing at all.
+#
+# Reporting those as one number — *"3 of 5 failing"* — would say the same thing about a defect, a
+# stale baseline and a timeout, which is the mistake this repository makes a rule about. The table
+# names the kind beside each figure for that reason, and so does the `report` job's issue body.
 #
 # The sweep is the interesting row: its own `it` allows two hours and it finished in under five
 # minutes, because it is the one tier that runs with `parallel: { mode: 'workers' }`. The ceiling is

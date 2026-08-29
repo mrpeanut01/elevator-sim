@@ -26437,9 +26437,28 @@ prediction. **The ceiling is deliberately not raised from the workflow.** A tier
 the tier's to declare, and widening somebody else's to make one's own workflow green is the move
 this repository refuses outright.
 
-**Reporting the two reds as one number would be the mistake.** One found a counterexample; the other
-ran out of a clock. A count of failing jobs says the same thing about both, which is why the
-workflow's timing table names the kind beside the figure.
+**`matrix-census` is the third red, and it is the sharpest answer to *what was this tier for?***
+Run once, 17.0 min, exit 1: **three declared figures do not reproduce from the census they were
+derived from** — `mixed-use-up-peak/destination-panel` first invalid replication **171 against a
+declared 33**, `vertical-city-up-peak/destination-panel` **73 against a declared `undefined`**, and
+`vertical-city-up-peak`'s binding **sd 3.172435 against a declared 2.9722**. The census is
+deterministic at a fixed `MATRIX_SEED`, so those are exact and re-derivable rather than noise.
+
+These are not decorative numbers: `admissibleReplications` and `armCeilings` bound every interval
+the experiment matrix publishes, and the file says so — *"the baseline's own ceiling is what binds
+the whole table"*. One ceiling has **healed** and one has **appeared**, which the test treats as
+equally a change, in its own words.
+
+All three touch `destination-panel` and the direction is consistent with § D333 having bounded the
+panel's promise. **That attribution is offered as a hypothesis and explicitly not measured** — the
+check is to re-run the census before that fix, and nothing here rests on it. **Nothing was
+re-declared.** Updating `MATRIX_CELLS` to the measured values would re-baseline published
+statistical parameters on the strength of one census run, by a lane whose job was to turn the tier
+on. Tracked as GitHub issue #306.
+
+**Reporting the three reds as one number would be the mistake.** One found a counterexample, one
+found a stale statistical baseline, one ran out of a clock. *"Three of five failing"* says the same
+thing about all three, which is why the workflow's timing table names the kind beside each figure.
 
 **Also measured here, both green:** `golden-runs` at 6 of 6 goldens including the cross-process
 replay (24 tests, 55.6 s), and `perf-sweep`'s full **20 000-replication sweep** (5 tests, 4.6 min
