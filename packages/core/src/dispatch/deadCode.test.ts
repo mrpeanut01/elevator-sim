@@ -515,11 +515,13 @@ function audit(): Audit {
  * was wired while the writer half was not. Two things about that were wrong.
  *
  * The stated reason was stale. It said *"persistence.ts writes through `serializeRunSet` instead"*,
- * which reads as *a shipped path writes, just not through this symbol*. No shipped path writes at
- * all: `createStoredRun`, `serializeRunSet`, `writeRunSetFile` and `appendRunToFile` are reachable
- * only from tests, which `experiments/reports/types.ts` already says of `createStoredRun` in as
- * many words. The register was right that the symbols were dead and wrong about what surrounded
- * them.
+ * which reads as *a shipped path writes, just not through this symbol*. Nothing writes a run record
+ * on a shipped path at all: `createStoredRun`, `serializeRunSet`, `writeRunSetFile` and
+ * `appendRunToFile` are reachable only from tests, which `experiments/reports/types.ts` already says
+ * of `createStoredRun` in as many words. (The *reading* half is not in that state and the two are
+ * not lumped together: `validation/goldenChild.ts` is a bare-`node` executable rather than a
+ * `.test.ts` file, and it calls `readRunSetFile` and `replaySimulationConfig` for real.) The
+ * register was right that the two symbols were dead and wrong about what surrounded them.
  *
  * And the worked example was false. `new StreamSet(runSeed(parseRunRecord(...)))` was annotated
  * `// replays exactly`; it builds a stream set and replays nothing, because a `RunRecord` names no

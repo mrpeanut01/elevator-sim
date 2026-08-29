@@ -26326,14 +26326,24 @@ wave 13 — naming `trafficSeed` and `trafficModel` as the gap when the gap is t
 
 **The register's stated reason was stale, which is worth recording separately.** It read *"the
 writer half of the documented replay round trip; persistence.ts writes through `serializeRunSet`
-instead"*. That reads as *a shipped path writes, just not through this symbol*. **No shipped path
-writes at all**: `createStoredRun`, `serializeStoredRun`, `serializeRunSet`, `writeRunSetFile`,
-`appendRunToFile`, `readRunSetFile`, `parseRunSet` and `replayStoredRun` are every one of them
-reachable only from tests — `experiments/reports/types.ts` says so of `createStoredRun` in as many
-words, under *"latent rather than realised"*. The register was right that these two symbols were
-dead and wrong about what surrounded them. A stale reason in a register whose own assertion checks
-only whether a symbol *acquired a caller* is `CLAUDE.md`'s stated-refusal class, pointed at an
-allowlist.
+instead"*. That reads as *a shipped path writes, just not through this symbol*. **Nothing writes a
+run record on a shipped path at all**: `createStoredRun`, `serializeStoredRun`, `serializeRunSet`,
+`writeRunSetFile` and `appendRunToFile` are reachable only from tests and from
+`reports/fixtures.test-helper.ts` — `experiments/reports/types.ts` says so of `createStoredRun` in
+as many words, under *"latent rather than realised"*. The register was right that these two symbols
+were dead and wrong about what surrounded them. A stale reason in a register whose own assertion
+checks only whether a symbol *acquired a caller* is `CLAUDE.md`'s stated-refusal class, pointed at
+an allowlist.
+
+**The reading half is narrower than that and the difference is stated rather than rounded off**,
+because rounding it off would be this decision's own defect. `validation/goldenChild.ts` is not a
+`.test.ts` file — it is a bare-`node` executable, and it calls `readRunSetFile` and
+`replaySimulationConfig` for real, which makes `parseRunSet` and `parseStoredRun` live behind it.
+By the audits' own rule (`isTest` matches `.test.ts` and `.test-helper.ts`) those four have a
+non-test caller and are **not** dead. What is true of them is weaker and is all that is claimed
+here: `goldenChild.ts`'s only invoker is `goldenRuns.test.ts`, which spawns it precisely so the
+replay happens outside the runner's module graph. So the read path is exercised by a process the
+suite starts, and the write path is exercised by nothing outside the suite at all.
 
 **Alternatives.** (a) Wire `runSeed` into `replaySimulationConfig` in place of `BigInt(config.seed)`.
 (b) Reclassify both into `PUBLIC_API_ONLY` as surface. (c) Delete.
@@ -26374,7 +26384,8 @@ because a corrected literal drifts again at the next disposition.
 
 **What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
 integration. Nothing here says the `experiments/reports` persistence subsystem *should* have a
-shipped caller; that it has none is recorded above as a finding and is issue #175's larger
-neighbour, not its scope.
+shipped caller; what it has and does not have is recorded above as a finding and is issue #175's
+larger neighbour, not its scope. No claim is made that `readRunSetFile`, `parseRunSet`,
+`parseStoredRun` or `replaySimulationConfig` are dead — they are not, and `goldenChild.ts` is why.
 
 ---
