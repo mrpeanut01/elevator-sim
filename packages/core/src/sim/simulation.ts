@@ -3559,9 +3559,10 @@ export class Simulation {
    * seconds past the run's own hard deadline. `runUntilEmpty` drains whatever is on the queue,
    * so that arrival **fired**: it completed the move, took a travel sample past the run's end,
    * and stepped the car — which can register a landing, price a bank and assign a car, all after
-   * the run had declared itself over. Measured on shipped buildings rather than inferred: at
-   * `vertical-city`/`collective`, 600 s of demand and a 60 s tail, **fourteen** travel samples
-   * landed past the deadline and the last was **37.9 s** past it.
+   * the run had declared itself over. Measured on shipped buildings rather than inferred: over 96
+   * cells — three buildings, four dispatchers, four drain tails, two demand levels — **84 carried a
+   * completed move past their own deadline**, the worst by **39.2 s**
+   * ([§ D398](../../../../DECISIONS.md)).
    *
    * It was usually invisible, which is why it survived: `endedAt` is
    * `max(recorder.lastEventAt, demand horizon)` and `MetricsRecorder.sampleTravel` deliberately
