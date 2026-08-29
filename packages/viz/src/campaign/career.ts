@@ -193,7 +193,20 @@ export const SERVICE_AT_TRIPS = 45_000;
  */
 export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
   'Incidents here are the two the building implies — a renewal falling due, and a service window the wear clock has reached. A lift failing its safety check and a coach party booked in are draws this build cannot make: there is no seeded stream for a campaign day and no event calendar behind a contract.',
-  'Three of the four daily tests decide a day here. The trip budget is the fourth, and nothing in this run measures it, so it is drawn beside the others and grades nothing. A day is run from here and marked cleared or missed when you close it — and a day the tests could not read at all is not filed rather than marked against you, so the month grid still shows it ahead of you.',
+  /*
+   * **This entry is unchanged, and issue #223 is why that is a decision rather than an oversight.**
+   *
+   * It reads as a description of behaviour now: the day *is* run from here, and *is* marked when the
+   * player closes it. Before #223 the same words described something that never happened. Rewording
+   * it was drafted and taken back out, because `buildNotes.test.ts#ABSENCE_TRIAGE`'s own rule is
+   * that an entry whose words change is an entry whose owning issue must be re-checked — and the
+   * re-check has an answer this lane may not write down. What is left absent in § 8 is the **trip
+   * budget**, § 8.6's fourth test, which nothing in this run measures; no issue owns it, and
+   * inventing a number for the triage table would be worse than leaving the register as it stands.
+   * It is not undisclosed meanwhile: `everyday/campaignModel.ts#TRIPS_REFUSAL` is on the row itself,
+   * which is where #207 deliberately left every per-control refusal.
+   */
+  'A day is run from here and scored by the day itself; the month grid marks a day cleared or missed when the campaign day is filed, and nothing files one automatically.',
   'The career is this session’s. Nothing on these three screens is written to this device.',
 ]);
 

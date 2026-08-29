@@ -776,7 +776,8 @@ export const BUILDING_COPY = Object.freeze({
    * bar nothing measures is worse than a missing one: it tells a reader their day turned on a
    * figure that was never taken.
    */
-  testsNote: 'every one this run can read, or the day is missed',
+  testsNote:
+    'every one this run can read, or the day is missed — and a day it could not read is not filed at all',
   asBuilt: 'as built',
 } as const);
 
