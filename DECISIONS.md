@@ -25941,3 +25941,75 @@ neighbour it now calls. The throw is **unreachable through this function**: the 
 the unknown-id case first, and `today.test.ts` asserts that arm directly.
 
 ---
+
+## D391 — the Everyday stage canvas is `60vh`, which is § 2's own number and leaves no margin on purpose
+
+**Rules on:** `everyday/stageScreen.ts#STAGE_CANVAS_HEIGHT`, and
+`docs/31-support-matrix.md` § 2's second clause. Settles GitHub issue #303. Empties the clause-2 half
+of `everyday/viewportGates.browser.test.ts`'s `OUTSTANDING`.
+
+**Decision.** The stage canvas declares `height:60vh`. § 2's clause is **met**, not renegotiated.
+
+**Why.** The height was `340px` — a literal with no breakpoint, no viewport unit and no clamp — so
+the canvas was 340 px at every viewport height. Measured through the player's own path on Chromium
+headless shell r1194 by #292's instrument:
+
+| viewport | stage canvas | share of viewport height | § 2's floor |
+|---|---|---|---|
+| 1280×800 | 340 px | **42.5 %** | 60 % |
+| 360×800 | 340 px | **42.5 %** | 60 % |
+| 375×667 | 340 px | **51.0 %** | 60 % |
+
+Re-measured on the same sweep after the change: **60.0 %** at all three. That is the quantity the
+sweep reports (`canvasPct`); no pixel figure is published beside it, because `0.6 × 800` is
+arithmetic rather than a measurement and the row it replaces could quote `340 px` only because that
+was the literal.
+
+**Met rather than renegotiated, and that was a choice.** #303's first criterion allows § 2's clause
+to be renegotiated with a measurement behind it. `CLAUDE.md`'s working agreement is the tie-breaker —
+*"do not weaken an acceptance criterion to make a phase pass; raise it instead"* — so meeting the
+clause was treated as the default and renegotiation as something that would have needed an argument a
+run could not otherwise settle. There was none: the clause is satisfiable by a one-token change, and
+the sweep says so.
+
+**Why a viewport unit rather than flexing to fill.** The design handoff draws this container as
+`min-height:0` in a flex column with the canvas at `height:100%` — the stage *fills what is left* —
+and the handoff is canonical for the interface. It cannot be reproduced literally here, for a reason
+already written down: `index.html:1541` refuses a percentage height against an auto-height wrap
+because *"a percentage against an auto-height wrap falls back to the canvas's own bitmap height,
+which the per-frame resize then feeds back into the wrap — the box grows every frame."* The Everyday
+stage has exactly that shape — it sits in `.everyday-screen`, which is `overflow-y:auto` and so
+auto-height, and `sizeCanvas` writes the bitmap from the laid-out box on every resize. A definite,
+viewport-derived height is the one thing that both tracks the viewport and cannot feed back into
+itself.
+
+**Why exactly 60, and the margin that leaves.** It is the clause's own number and it is already this
+repository's answer to this question: `RX-03` fixed the Engineer surface with
+`.stage-wrap { height: 60vh; min-height: 60vh }`. One commitment, one figure, in both shells. It also
+satisfies the clause at **every** viewport height rather than at the three the matrix names, because
+`60vh` *is* 60 % of the viewport by construction.
+
+Say the cost plainly: the margin is **zero**. A layout change that put so much as a border inside the
+canvas's own box would take it under, and the gate would go red rather than the product going quietly
+non-compliant — the correct direction, and the reason no larger figure was invented to buy slack. A
+number above 60 would have been a threshold with nothing behind it. **No floor is set beneath it
+either**: `340px` would only bind below a 567 px viewport, shorter than anything the support matrix
+carries, so keeping it would have added a constant nothing in the supported range can reach — and the
+clause holds there anyway, since 340 px of a 567 px viewport is already 60 %.
+
+**What the register did, and why it is two changes rather than one.** The three clause-2 entries were
+deleted from `OUTSTANDING` on the commit that made them stop reproducing, which that file's
+both-directions assertion requires and which its own docstring asks of #240. Beside that, four
+sentences in `viewportGates.browser.test.ts` and two in `docs/31-support-matrix.md` § 2 asserted the
+failure as a present-tense fact and were corrected, with the superseded figures kept struck through
+rather than deleted. A register whose prose still says *the product fails all three* while its list
+says otherwise is the stale-claim defect arriving inside the instrument built to catch it.
+
+**What is not claimed.** Clauses 1 and 3 are **unmoved and still #240's** — eighteen entries remain,
+all of them narrow-viewport findings. The sweep's other four columns were checked rather than
+assumed: a canvas 140 px taller created no new clipping and put no control out of reach at any of the
+three widths, which is what the 1280×800 control cell and the unchanged clause-3 rows say. The
+honesty corpus is **not re-measured** here and no string, surface or case count is published;
+§ D343 takes that measurement once, after the wave integrates.
+
+---

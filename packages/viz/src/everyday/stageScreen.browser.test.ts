@@ -906,3 +906,98 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     await page.close();
   }, 240_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * The canvas is sized from the viewport — GitHub issue #303
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The height derives from the viewport, and a reintroduced literal fails here** — issue #303,
+ * § D391.
+ *
+ * `viewportGates.browser.test.ts` owns the *clause*: it measures the canvas against
+ * `docs/31-support-matrix.md` § 2's 60 % floor at the three widths the matrix names, and its
+ * register is what went from three clause-2 entries to none. This file owns the *mechanism*, and
+ * the two are deliberately not the same assertion.
+ *
+ * A gate written only against the floor is satisfied by a literal that happens to clear it — before
+ * this fix the 375×667 cell read **51.0 %**, and a `height:420px` would have read 63.0 % there and
+ * passed a floor-only check while failing at 1280×800 all over again. What § 2 actually needs is
+ * that the height **is a function of the viewport**, and the only way to see a function is to
+ * change its input.
+ *
+ * So this changes the input: one page, one mounted stage, two viewport heights, and the canvas's
+ * own box read at each. Both readings must clear 60 %, and — the half a literal cannot survive —
+ * the two must **differ**, in the direction the viewport moved. That is § D177's standing
+ * requirement pointed at a layout constant instead of at a slider: move the thing, require the
+ * output to change.
+ *
+ * The inline declaration is asserted beside the measurement rather than instead of it. A measured
+ * pair alone would also pass for a JavaScript resize handler that recomputed pixels per frame,
+ * which is the shape `sizeCanvas`'s own docstring and `index.html:1541` both refuse — a height that
+ * feeds back into the bitmap it is measured from.
+ */
+describe.skipIf(!HAS_BROWSER)('the stage canvas is sized from the viewport — issue #303', () => {
+  it('tracks viewport height at two heights, and clears § 2’s floor at both', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+    await page.waitForSelector('.everyday-stage-canvas');
+
+    /** The canvas's laid-out height and the viewport's, read in one evaluation. */
+    const readAt = async (height: number): Promise<{ canvasPx: number; viewportPx: number }> => {
+      await page.setViewportSize({ width: 1_280, height });
+      /* One frame for the resize to lay out and for the stage's own `resize` listener to re-size
+         the bitmap — the same settle every case in this file takes after a viewport move. */
+      await page.waitForTimeout(400);
+      return page.evaluate(() => ({
+        canvasPx: document.querySelector('.everyday-stage-canvas')?.getBoundingClientRect().height ?? 0,
+        viewportPx: document.documentElement.clientHeight,
+      }));
+    };
+
+    const short = await readAt(700);
+    const tall = await readAt(1_000);
+
+    // Non-vacuity: a stage that never mounted reads 0 and would satisfy every ratio below.
+    expect(short.canvasPx, 'the stage canvas has no box at 1280×700').toBeGreaterThan(0);
+    expect(tall.canvasPx, 'the stage canvas has no box at 1280×1000').toBeGreaterThan(0);
+
+    /*
+     * The clause, at both heights. `docs/31-support-matrix.md` § 2 — *"keeps the stage canvas at
+     * 60 % or more of the viewport height"*.
+     */
+    expect(short.canvasPx / short.viewportPx, '1280×700 is under § 2’s 60 % floor').toBeGreaterThanOrEqual(0.6);
+    expect(tall.canvasPx / tall.viewportPx, '1280×1000 is under § 2’s 60 % floor').toBeGreaterThanOrEqual(0.6);
+
+    /*
+     * And the half that a fixed pixel height cannot survive. `340px` — or any literal — reads the
+     * same number at both viewports and fails right here, which is issue #303's second acceptance
+     * criterion stated as a run rather than as a rule.
+     */
+    expect(
+      tall.canvasPx,
+      'the canvas is the same height at 1280×700 and at 1280×1000, so it is not derived from the ' +
+        'viewport — a fixed pixel height has been reintroduced on .everyday-stage-canvas',
+    ).toBeGreaterThan(short.canvasPx);
+    await page.close();
+  }, 240_000);
+
+  it('declares its height in a viewport unit, not in pixels', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+    await page.waitForSelector('.everyday-stage-canvas');
+    /* The inline declaration rather than the computed value: `getComputedStyle` resolves every
+       length to pixels, so it cannot tell `60vh` from `480px` and would assert nothing here. */
+    const declared = await page.evaluate(
+      () => document.querySelector<HTMLElement>('.everyday-stage-canvas')?.style.height ?? '',
+    );
+    expect(declared, 'the stage canvas declares no height at all').not.toBe('');
+    expect(
+      declared,
+      `the stage canvas declares height:${declared} — a pixel literal cannot track the viewport, ` +
+        'which is what docs/31-support-matrix.md § 2 commits to. See issue #303 and § D391.',
+    ).not.toMatch(/px\s*$/u);
+    expect(declared).toMatch(/v(h|min|max)\s*$/u);
+    await page.close();
+  }, 240_000);
+});

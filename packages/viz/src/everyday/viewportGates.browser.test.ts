@@ -65,7 +65,9 @@
  *
  * ## The register, and what it means when this file goes red
  *
- * **The product fails all three clauses at 360 px today, and this file is green.** That is
+ * **The product fails clauses 1 and 3 at 360 px today, and this file is green.** Clause 2 was in
+ * that sentence until 2026-08-29 and is not any more (#303, § D391) — it now passes at all three
+ * viewports, including the two narrow ones, because a `vh` height is not a width question. That is
  * deliberate, and it is `honesty.test.ts`'s `OUTSTANDING` precedent: the check runs, the failures
  * are measured, each is registered, and the case fails **when the set changes in either
  * direction** — a new failure is unregistered and goes red, and a failure that stops reproducing
@@ -91,7 +93,29 @@
  * | 1280×800 | main menu | 0 px | 0 px | 0 | — |
  * | 1280×800 | stage | 0 px | 0 px | 0 | 340 px = **42.5 %** |
  *
- * Three things in that table are worth reading rather than skimming.
+ * **The stage-canvas column of that table is history as of 2026-08-29, and the row below is the
+ * measurement that replaced it** — GitHub issue **#303**, § D391. `everyday/stageScreen.ts` now
+ * declares the canvas `60vh` rather than `340px`, and clause 2 passes at all three viewports:
+ *
+ * | viewport | stage canvas | share of viewport height | § 2's floor |
+ * |---|---|---|---|
+ * | 360×800 | `60vh` | **60.0 %** | 60 % |
+ * | 375×667 | `60vh` | **60.0 %** | 60 % |
+ * | 1280×800 | `60vh` | **60.0 %** | 60 % |
+ *
+ * The middle column is what `MEASURE` returns — `canvasPct`, the quantity this file has always
+ * read — and the left column is what the element declares. **No pixel figure is published beside
+ * them**, because the sweep does not report one and `0.6 × 800` is arithmetic rather than a
+ * measurement; the row it replaces could quote `340 px` only because that was the literal.
+ *
+ * Re-measured through this file's own sweep on the commit that made the change, and the three
+ * clause-2 rows left {@link OUTSTANDING} in the same commit. The table above is **kept rather than
+ * corrected in place**, because it is what the instrument found on the day it landed and the whole
+ * point of the register is that a reader can see a finding move. The other four columns are
+ * unmoved: a taller canvas created no new clipping and put no control out of reach, at any of the
+ * three widths — which is the thing to check when a layout constant grows by 140 px.
+ *
+ * Three things in the original table are worth reading rather than skimming.
  *
  * 1. **§ 3.2's column is 0 in every row, including the four that fail.** That is the issue.
  * 2. **The five controls at 360×800 are the whole main menu.** All four mode tiles — § 4's four
@@ -100,11 +124,13 @@
  *    attempted. The rail is `RAIL_WIDTH_PX = 212` at every width (`everyday/shell.ts:129`, inline,
  *    no breakpoint), against `grid-template-columns: 212px minmax(0,1fr)`, which leaves the screen
  *    region 148 px at 360 and 163 px at 375 for content that lays out at 241 px.
- * 3. **The 1280×800 stage fails clause 2 as well**, and that is not a small-screen defect:
- *    `everyday/stageScreen.ts:530` writes `height:340px` as a literal, so the Everyday stage canvas
- *    is 340 px at *every* viewport height. § 2's clause is scoped *"360 px and above"*, so 1280×800
- *    is inside it. This is outside #240's stated subject, which is the narrow layout, and it is
- *    registered here rather than filed silently.
+ * 3. **The 1280×800 stage failed clause 2 as well**, and that was not a small-screen defect:
+ *    `everyday/stageScreen.ts` wrote `height:340px` as a literal, so the Everyday stage canvas was
+ *    340 px at *every* viewport height. § 2's clause is scoped *"360 px and above"*, so 1280×800 is
+ *    inside it. That was outside #240's stated subject, which is the narrow layout, and it was
+ *    registered here rather than filed silently — then filed as **#303** and **fixed**, which is
+ *    the row above. It is the only one of these three that has moved, and the reason it could move
+ *    without #240 is exactly the reason it was filed apart from it.
  *
  * The 1280×800 rows are also this file's **positive control on clauses 1 and 3**: the same
  * instrument, the same page, reports **nothing** there. A gate that cannot come back empty is not
@@ -549,9 +575,13 @@ function failuresOf(cell: Cell): readonly string[] {
  * registered, or the register becomes decoration. When this list is empty, the four cases below
  * stop being a record and start being the gate § 2 has named since it was written on 2026-08-24.
  *
- * The one entry that is **not** #240's is the last: `everyday/stageScreen.ts:530` writes the stage
- * canvas at a literal `height:340px`, so clause 2 fails at 1280×800 as well, which is a tier-1
- * desktop viewport and outside #240's stated subject.
+ * **Every entry left in this list is #240's, and that became true on 2026-08-29.** The three that
+ * were not — the clause-2 rows at all three viewports — were `everyday/stageScreen.ts`'s literal
+ * `height:340px`, which failed at 1280×800 as well and was therefore outside #240's stated subject.
+ * They were filed as **#303**, fixed with a `60vh` height, and **deleted here on the commit that
+ * made them stop reproducing** (§ D391), which is what the paragraph above asks of #240 and what
+ * this register would be decoration without. The both-directions assertion is what forced it: with
+ * the literal put back, all three reappear as unregistered lines and this file goes red.
  *
  * **The narrowest margin in this list, named because it is the one that could move under another
  * Chromium**: `everyday-stage-speed ×7` at 360×800 against `×6` at 375×667. The seventh is the `1×`
@@ -570,7 +600,6 @@ const OUTSTANDING: readonly string[] = Object.freeze([
   '360×800 · stage · clause 3 · everyday-stage-intervene ×1',
   '360×800 · stage · clause 3 · everyday-stage-speed ×7',
   '360×800 · stage · clause 3 · everyday-stage-start ×1',
-  '360×800 · stage · clause 2 · stage canvas under 60 % of the height',
   '375×667 · main menu · clause 1 · content clipped horizontally',
   '375×667 · main menu · clause 3 · everyday-bar-primary ×1',
   '375×667 · main menu · clause 3 · everyday-mode ×4',
@@ -580,8 +609,6 @@ const OUTSTANDING: readonly string[] = Object.freeze([
   '375×667 · stage · clause 3 · everyday-stage-intervene ×1',
   '375×667 · stage · clause 3 · everyday-stage-speed ×6',
   '375×667 · stage · clause 3 · everyday-stage-start ×1',
-  '375×667 · stage · clause 2 · stage canvas under 60 % of the height',
-  '1280×800 · stage · clause 2 · stage canvas under 60 % of the height',
 ]);
 
 /* -------------------------------------------------------------------------- *
@@ -726,10 +753,15 @@ describe.skipIf(!HAS_BROWSER)('§ 2 at 360 px and above — the three clauses, m
     expect(cells.length).toBe(2);
     for (const cell of cells) {
       /*
-       * Clauses 1 and 3 only, and the exclusion is the point rather than a convenience: clause 2
-       * fails at 1280×800 too, on `everyday/stageScreen.ts:530`'s literal `height:340px`. A control
-       * cell that quietly covered all three would be a control cell that is red, which is no
-       * control at all.
+       * Clauses 1 and 3 only, and the exclusion **used to be** the point rather than a
+       * convenience: clause 2 failed at 1280×800 too, on `everyday/stageScreen.ts`'s literal
+       * `height:340px`, and a control cell that quietly covered all three would have been a
+       * control cell that is red — which is no control at all.
+       *
+       * #303 fixed that literal, so this cell would now pass on all three. The exclusion stays
+       * anyway, because widening it here would move the one gate that says *this instrument can
+       * come back empty* onto a clause that has its own case two above — and if clause 2 ever
+       * regresses, the register is what should say so, not the control.
        */
       expect(cell.reading.clippedPx, `${cell.screen} at 1280×800 clips`).toBe(0);
       expect(cell.reading.unreachable, `${cell.screen} at 1280×800 hides a control`).toEqual([]);
