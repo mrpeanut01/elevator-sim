@@ -144,11 +144,18 @@ describe.skipIf(!HAS_BROWSER)('an in-screen toggle keeps the scroll offset (issu
       offset,
     );
     const yBefore = await box.evaluate((node) => node.getBoundingClientRect().top);
+    const fold = page.viewportSize()?.height ?? 0;
     expect(
       yBefore,
-      'the checkbox is not on screen before the press, so Playwright would scroll it into view ' +
-        'and this case would measure its own scroll rather than the re-render',
+      'the checkbox is above the top of the viewport before the press, so Playwright would scroll ' +
+        'it into view and this case would measure its own scroll rather than the re-render',
     ).toBeGreaterThanOrEqual(0);
+    expect(
+      yBefore,
+      'the checkbox is below the fold before the press — same problem, other end. Both bounds are ' +
+        'asserted because a layout change would move the control one way or the other, and either ' +
+        'would turn this case into a measurement of Playwright’s scroll-into-view.',
+    ).toBeLessThan(fold);
 
     await box.click();
 

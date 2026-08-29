@@ -25921,7 +25921,22 @@ that has nothing to do with the disarm. Under the same mutation `rush` lands at 
 `300` and `door` at `183`. A case that passes for an accidental reason is a case that reports nothing,
 so the new file asserts the reset through `rush`.
 
+**The observer is connected by the interaction, not at mount, and the tier is what said so.** The
+first landed shape kept a `subtree: true` observer on `.everyday-screen` for the life of the shell.
+It was correct and it cost: `everyday/stageScreen.ts` rebuilds its figure row **every animation
+frame** inside that region, so the observer allocated records and queued a microtask sixty times a
+second through a watched day in order to answer *no* every time. Run as a 16-file sequential batch,
+`everyday/autoFile.browser.test.ts` — nine long, timing-sensitive cases over the stage — failed
+**2 of 9 twice, on different cases each time**, while passing 9 of 9 when run alone. An A/B against
+the base `shell.ts`, same batch, same machine, came back clean apart from the two cases that are
+supposed to fail without the keeper, which is what turned *probably a flake* into *attributable*.
+Connecting on demand takes the idle cost to zero and the batch to **16 files, 104 tests, all green**.
+`subtree` itself cannot be dropped: every screen's own root is a *child* of the region, so a screen
+emptying itself is a subtree mutation and a `childList`-only observer would never see the thing the
+keeper exists for.
+
 ---
+
 ## D389 — a bench rollup names the rows it speaks for, and the second one is left alone
 
 **Rules on:** GitHub issue #301. Settles `everyday/benchModel.ts#benchTooCloseHeadingOf`,

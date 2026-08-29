@@ -420,11 +420,11 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * reintroduced by its own fix. And `fixitScreen.ts`'s outcome card scrolls itself into view when
    * a run lands, in the **promise continuation** rather than in the press.
    *
-   * So: a player action inside the region arms the keeper, the first mutation batch after it
-   * restores and disarms, and everything else — an async run landing, a host connecting, the
-   * stage's per-frame figure redraw — passes through an unarmed keeper that reads no layout at all.
-   * {@link go} clears the arming with the offset it resets, because a navigation *is* a deliberate
-   * move and the keeper must not fight it.
+   * So: a player action inside the region arms the keeper **and connects its observer**, the first
+   * mutation batch after that restores, disarms and disconnects, and everything else — an async run
+   * landing, a host connecting, the stage's per-frame figure redraw — happens with no observer
+   * attached at all. {@link go} clears the arming with the offset it resets, because a navigation
+   * *is* a deliberate move and the keeper must not fight it.
    *
    * ## Both scrollers, for `go`'s own reason
    *
@@ -438,9 +438,34 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    */
   function keepScrollAcrossRerender(): MutationObserver {
     const view = doc.defaultView;
+    const observer = new MutationObserver(() => {
+      observer.disconnect();
+      if (!armed) return;
+      armed = false;
+      if (screenRegion.scrollTop !== settled.region) screenRegion.scrollTop = settled.region;
+      if (view !== null && view.scrollY !== settled.window) view.scrollTo(0, settled.window);
+    });
+    /*
+     * **The observer is connected by the interaction and disconnected by the restore**, and that is
+     * a cost decision rather than a tidiness one — see the *Why `armed`* section above for the
+     * behaviour it also gives.
+     *
+     * `everyday/stageScreen.ts` rebuilds its figure row **every animation frame**, inside this
+     * region. A `subtree: true` observer left permanently connected therefore allocates mutation
+     * records and queues a microtask sixty times a second for the whole of a watched day, to answer
+     * *no* every time. `subtree` cannot be dropped — every screen's own root is a **child** of this
+     * region, so a screen emptying itself is a subtree mutation and a `childList`-only observer on
+     * the region would never see the thing this keeper exists for. Connecting on demand is what
+     * makes the idle cost exactly zero: no interaction, no observer.
+     *
+     * An interaction that mutates nothing leaves it connected until some later mutation, which then
+     * finds a matching offset, writes nothing and disconnects. That is self-healing rather than a
+     * leak, and it is why the disconnect is the callback's first line rather than its last.
+     */
     const snapshot = (): void => {
       armed = true;
       settled = { region: screenRegion.scrollTop, window: view?.scrollY ?? 0 };
+      observer.observe(screenRegion, { childList: true, subtree: true });
     };
     /*
      * Capture phase, so the snapshot is taken **before** the screen's own handler runs and rebuilds
@@ -452,13 +477,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     for (const type of ['pointerdown', 'keydown', 'change'] as const) {
       screenRegion.addEventListener(type, snapshot, true);
     }
-    const observer = new MutationObserver(() => {
-      if (!armed) return;
-      armed = false;
-      if (screenRegion.scrollTop !== settled.region) screenRegion.scrollTop = settled.region;
-      if (view !== null && view.scrollY !== settled.window) view.scrollTo(0, settled.window);
-    });
-    observer.observe(screenRegion, { childList: true, subtree: true });
     /*
      * Returned so {@link EverydayShell.destroy} can disconnect it. The listeners go with the region
      * when the root is removed; an observer does not — it holds its target, and a second shell
