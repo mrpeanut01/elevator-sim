@@ -80,8 +80,9 @@ names as its home and which covered only #186–#193 and #206–#218.
 **A new risk class, and it is not R1.** [`RISKS.md`](RISKS.md) **R42** — *a ruling with no consumer*.
 R1 is a behaviour with no caller; this fails one level earlier and **no dead-code audit can see it,
 because a decision has no exports to scan**. Three realised instances: § D330 answered #123 and #130
-on 2026-08-09 and neither is built, and § D367 ruled on the energy bar while § D106 — the entry a
-reader lands on — carried no pointer to it, which is why four lanes read the rule and got the wrong
+on 2026-08-09 and neither was built — **#130 closed 2026-08-29**, the gate is mode-aware, the reveal
+survives a reload and the strip says what is behind it; #123 is still open — and § D367 ruled on the
+energy bar while § D106 — the entry a reader lands on — carried no pointer to it, which is why four lanes read the rule and got the wrong
 answer. The compounding half is what earned it a row: `docs/16:357` said *"Issue #123 holds the
 decision that has not been made"* and the issue's own comment said *"No decision is recorded"*, so a
 reader who checked was told **twice** that an answer which existed did not.

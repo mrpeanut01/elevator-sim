@@ -400,9 +400,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       reason:
         'Navigation state and page plumbing, not a claim about a run. `dev/surfaces.ts` decides ' +
         'which tab is present, which is focusable and whether the right rail is a column or a ' +
-        'drawer; its one authored string is the drawer toggle — `Controls ▸` / `Close controls` — ' +
-        'which names a control rather than a result, and `surfaces.test.ts` asserts it directly ' +
-        'alongside the breakpoint it must agree with. `dev/state.ts` is configuration: it answers ' +
+        'drawer; it authors two strings and neither is about a run. The drawer toggle — ' +
+        '`Controls ▸` / `Close controls` — names a control rather than a result. The second is ' +
+        '§ D330’s tab-gate notice (`4 more editors — open them from the Controls rail`, issue ' +
+        '#130), which names four controls and the route to them: it carries no figure, no count ' +
+        'of anything a run produced and no window, and its only number is how many buttons the ' +
+        'strip is holding back, counted off the `hidden` flags in the same call. Both are ' +
+        'asserted directly in `surfaces.test.ts` — the toggle beside the breakpoint it must agree ' +
+        'with, the notice over all sixteen reveals × ten active tabs — which is a stronger check ' +
+        'than a string search, and neither is a sentence this corpus’s properties can speak to. ' +
+        '`dev/state.ts` is configuration: it answers ' +
         '*what is the simulator being asked for*, and it now authors no string table at all — ' +
         '`SHIFT_LENGTHS` was its one, and § D286 deleted it in favour of `menu/partsOfDay.ts`, ' +
         'whose labels are player-facing and are **driven** by the `MENU` adapter rather than ' +
@@ -447,6 +454,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/surfaces.ts#applyRailState',
         'dev/surfaces.ts#applySurfaceState',
         'dev/surfaces.ts#drawerStateFor',
+        /*
+         * Derived through `gateNoticeText`, the private helper it hands the count to — the
+         * transitive clause working exactly as intended. It is here rather than in an adapter for
+         * the group's reason: the sentence is *where four editors are*, and this corpus judges
+         * claims about a run. The one instrument that could have spoken to it is `internal-notation`,
+         * and the notice names no id — it says *editors* and *the Controls rail*, both of which are
+         * words on the page.
+         */
+        'dev/surfaces.ts#surfaceStateFor',
         // Derived only through `drawerStateFor`'s toggle label; it returns a boolean and
         // authors nothing. Same plumbing, same reason — SH-12/KX-11's Escape decision.
         'dev/surfaces.ts#escapeClosesDrawer',

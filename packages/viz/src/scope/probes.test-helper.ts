@@ -340,18 +340,26 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
   'viewer.tab': {
     states: [(s) => ({ ...s, tab: 'run' }), (s) => ({ ...s, tab: 'report' })],
     sink: [
-      () => surfaceStateFor('run', new Set<TabName>()),
-      () => surfaceStateFor('report', new Set<TabName>()),
+      () => surfaceStateFor('run', new Set<TabName>(), 'casual'),
+      () => surfaceStateFor('report', new Set<TabName>(), 'casual'),
     ],
   },
   'viewer.revealedTabs': {
+    /*
+     * The sink is driven in **casual**, and that is the mode the field means something in.
+     * § D330 gave Engineer no gate at all, so `surfaceStateFor(…, 'engineer')` ignores this set
+     * entirely and the two arms would come back byte-identical — a sink pair that cannot differ,
+     * which `scope.test.ts` would correctly report as a control reaching nothing. Driving the
+     * gated mode is what makes the probe a probe; the ungated mode is pinned in
+     * `dev/surfaces.test.ts`, where the absence of a gate is the claim under test.
+     */
     states: [
       (s) => ({ ...s, revealedTabs: new Set<TabName>() }),
       (s) => ({ ...s, revealedTabs: new Set<TabName>(['traffic']) }),
     ],
     sink: [
-      () => surfaceStateFor('run', new Set<TabName>()),
-      () => surfaceStateFor('run', new Set<TabName>(['traffic'])),
+      () => surfaceStateFor('run', new Set<TabName>(), 'casual'),
+      () => surfaceStateFor('run', new Set<TabName>(['traffic']), 'casual'),
     ],
   },
   'viewer.railSegment': {
