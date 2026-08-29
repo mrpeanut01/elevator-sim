@@ -1,7 +1,8 @@
 /**
  * **The state while somebody else's run is on the stage.**
  *
- * GAMEPLAY § 14.1. A decision number is owed; the argument is here.
+ * GAMEPLAY § 14.1. Recorded here rather than in `DECISIONS.md`, under § D405; the directory's one
+ * ruling is § D407.
  *
  * ## Why one line is a module
  *

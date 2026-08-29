@@ -1,7 +1,8 @@
 /**
  * **The shipped reference runs — `data/reference-runs.json`, read and refused.**
  *
- * GAMEPLAY § 20.11 and § 14.1. A decision number is owed; the argument is here.
+ * GAMEPLAY § 20.11 and § 14.1. Recorded here rather than in `DECISIONS.md`, under § D405; the
+ * directory's one ruling is § D407.
  *
  * ## Why there are any at all, and why there are two
  *

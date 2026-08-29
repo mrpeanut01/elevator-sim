@@ -1,7 +1,7 @@
 /**
  * **The experiment matrix's eight operating points, in a module a browser bundle may contain.**
  *
- * ## Why this file exists — the suite's first decision, made here (a decision number is owed)
+ * ## Why this file exists — the suite's first decision, and it is § D406
  *
  * Everyday Mode's suite (docs/18 § Slice 7) runs one comparison over multiple fixed cells, and its
  * fixture list must be **imported from `MATRIX_CELLS`, never retyped**: docs/18 records that a

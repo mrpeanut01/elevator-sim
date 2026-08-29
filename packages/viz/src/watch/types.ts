@@ -1,9 +1,11 @@
 /**
  * **Watching somebody else's run — what a run record is, locally.**
  *
- * GAMEPLAY § 14.1 and ENGINE_CONTRACT § 1.5. A decision number is owed for this module and for
- * every other file in this directory; the argument is here rather than in `DECISIONS.md` because
- * the lane that wrote it was told not to claim a `## D3xx` heading it could not reserve.
+ * GAMEPLAY § 14.1 and ENGINE_CONTRACT § 1.5. **The one substitution this directory makes against
+ * § 1.5 is § D407**; everything else here is module-local and recorded where it is argued, under
+ * § D405. (The argument sat in this docstring unnumbered because the lane that wrote it was told
+ * not to claim a `## D3xx` heading it could not reserve — which is § D404, and this file is one of
+ * the sixty-four sites that rule was written for.)
  *
  * ## The one substitution this slice makes, stated first
  *

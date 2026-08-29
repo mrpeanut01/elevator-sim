@@ -1381,7 +1381,7 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
  * convenient, and a brief that says *put the argument in a docstring and say a number is owed*
  * now obliges the integrator to allocate before the branch can go green.
  */
-const DECISION_DEBT_CEILING = 56;
+const DECISION_DEBT_CEILING = 32;
 
 describe('the decision-number bookkeeping (GitHub issue #173)', () => {
   it('keeps the charter’s next-free number correct by derivation, not by transcription', () => {

@@ -191,7 +191,7 @@ export const SESSION_KEY = 'elevator-sim.session';
  * Reading versions 1–4 here invents nothing: a history whose days carry three readings is the
  * measured state of a week played before the fourth goal existed, and `wasDisplayOf` answers the
  * em dash for a quantity yesterday never measured — which is the honest answer, not a default.
- * A decision number is owed for the bump-on-new-values rule; this paragraph is the argument.
+ * The bump-on-new-values rule is § D408; this paragraph is the argument it was drawn from.
  *
  * ## Version 6 adds a key to a **nested** shape, and it is read backwards on the same evidence
  *
@@ -216,7 +216,8 @@ export const SESSION_KEY = 'elevator-sim.session';
  *   the envelope as *damaged* — the false accusation the version-3 paragraph records. Refusing it
  *   as *newer* is true; refusing it as damaged is not.
  *
- * The newer direction stays a refusal for the ordinary reason. A decision number is owed.
+ * The newer direction stays a refusal for the ordinary reason — § D408, which states both
+ * questions once for every future bump.
  *
  * ## Version 7 adds a key at **two** depths at once, and both absences determine their value
  *
@@ -248,7 +249,8 @@ export const SESSION_KEY = 'elevator-sim.session';
  *   extra-key branch refuses the envelope as *damaged* — the false accusation the version-3
  *   paragraph records. Refusing it as *newer* is true; refusing it as damaged is not.
  *
- * The newer direction stays a refusal for the ordinary reason. A decision number is owed.
+ * The newer direction stays a refusal for the ordinary reason — § D408 again, and this is its
+ * third application rather than a third rule.
  */
 export const SESSION_SCHEMA_VERSION = 7;
 

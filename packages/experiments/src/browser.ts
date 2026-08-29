@@ -311,8 +311,8 @@ export type {
  * a hand copy would be a second source of truth about which operating points
  * this project measures. The cells are pure frozen data (their one import is
  * a type from `runner/types.ts`, already on this graph); the machinery that
- * runs a cell stays on the Node barrel. The module's docstring carries the
- * decision (a decision number is owed).
+ * runs a cell stays on the Node barrel. § D406 rules it; the module's
+ * docstring carries the argument.
  *
  * Deliberately narrow: `EXCLUDED_CELLS` and the study runners are not here —
  * a name on this barrel is a promise the guard must keep, and the suite

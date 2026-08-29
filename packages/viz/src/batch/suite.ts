@@ -18,7 +18,7 @@
  *   renames a verdict.
  * - **It does not retype the fixture list.** The cells are `MATRIX_CELLS`, imported through
  *   `@elevator-sim/experiments/browser` (the module split that made that import legal is
- *   `benchmark/matrixCells.ts`, whose docstring carries the decision; a decision number is owed).
+ *   `benchmark/matrixCells.ts`, whose docstring carries the argument, and § D406 the ruling).
  *   docs/18's warning is specific: the matrix's eight are building × traffic-pattern cells over
  *   five buildings, `data/buildings/` separately holds eight buildings, and a hand-written list
  *   would disagree with the one the project measures.

@@ -1,7 +1,7 @@
 /**
  * **The reproduction gate — ENGINE_CONTRACT § 1.5's *"never replay something approximate"*.**
  *
- * A decision number is owed; the argument is here.
+ * Recorded here rather than in `DECISIONS.md`, under § D405; the directory's one ruling is § D407.
  *
  * ## What is being checked, and what is not
  *

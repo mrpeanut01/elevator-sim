@@ -1,7 +1,7 @@
 /**
  * **Watching somebody else's run — the mounted surface.** GAMEPLAY § 14.1 over `watch/`'s model.
  *
- * A decision number is owed; the argument is here.
+ * Recorded here rather than in `DECISIONS.md`, under § D405; `watch/`'s one ruling is § D407.
  *
  * ## Two things, and why they are one file
  *
