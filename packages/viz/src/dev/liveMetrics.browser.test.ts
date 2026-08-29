@@ -218,7 +218,7 @@ describe.skipIf(!HAS_BROWSER)('the live metrics card fits its own words', () => 
      * registers*. Derived from the shipped table rather than listed here, so a word that stops
      * reaching the screen is red without anybody remembering to add it.
      *
-     * `bankSuppressed` and `nothingYet` are the two that are drawn only in the states that call for
+     * `bankSuppressed` and `noneInWindow` are the two that are drawn only in the states that call for
      * them, and `honesty/surfaces.ts`'s adapter is what drives those on a refused run — a browser
      * case that manufactured a saturated building would be re-testing the view through a browser.
      */
@@ -229,7 +229,7 @@ describe.skipIf(!HAS_BROWSER)('the live metrics card fits its own words', () => 
         () => document.querySelector<HTMLElement>('#live-metrics')?.textContent ?? '',
       );
       for (const [key, word] of Object.entries(ENGINEER_WORDS)) {
-        if (key === 'bankSuppressed' || key === 'nothingYet') continue;
+        if (key === 'bankSuppressed' || key === 'noneInWindow') continue;
         expect(text, `the card lost ${key}`).toContain(word);
       }
     } finally {
