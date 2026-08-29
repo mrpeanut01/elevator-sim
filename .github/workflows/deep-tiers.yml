@@ -10,7 +10,8 @@
 #
 # ## The count is derived, not remembered
 #
-# **Eighteen tests across nine gated blocks in nine files**, derived with `vitest list` — which
+# **Eighteen tests across nine gated blocks in nine files** on `0cd422a`, the tree this workflow was
+# written against, derived with `vitest list` — which
 # reports a `skipIf`-ed suite's children when the gate is open and omits them when it is shut, so
 # the delta between two collections *is* the tier:
 #
@@ -29,6 +30,13 @@
 # `goldenRuns.test.ts` renames its own suite by tier (`golden runs (always-on tier: 4 of 6)` versus
 # `(deep tier: 6 of 6)`), so a naive diff shows seventeen of its rows as both lost and gained.
 # Normalise that label before diffing or the count comes out at 35.
+#
+# **That figure is already one behind, and it is left with its commit rather than corrected in
+# place.** The first run of `fuzz-deep` on this tree came back RED, and registering the finding
+# added a tenth gated block — so the same command on the tree carrying this file reports nineteen
+# tests, ten blocks, nine files. Both numbers are true of the tree beside them. A count published
+# without the commit it was taken on is the defect the rest of this repository has recorded five
+# times; two dated rows are cheaper than one that has to be trusted.
 #
 # **A test count understates this.** Four of the tiers do not add tests so much as widen the ones
 # already there: the golden set goes 4 → 6, the honesty corpus 49 → 60 cases, `perfScaling`'s floor

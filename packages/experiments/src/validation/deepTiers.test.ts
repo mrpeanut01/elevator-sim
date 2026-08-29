@@ -46,7 +46,12 @@
  * diff <(sort off.txt) <(sort on.txt)
  * ```
  *
- * Measured 2026-08-29 on `0cd422a`: **eighteen tests, nine gated blocks, nine files**. Issue #163
+ * Measured 2026-08-29 on `0cd422a`, **before** this lane's own work: eighteen tests, nine gated
+ * blocks, nine files. The lane then added a tenth block — `fuzz/deep.test.ts`'s register entry for
+ * the counterexample the first scheduled run found — so on this tree it is **nineteen tests, ten
+ * blocks, nine files**. Both figures are given with the tree they were taken on rather than one of
+ * them being quietly corrected, because a count published without its commit is the defect this
+ * whole lane is about. Issue #163
  * says seventeen and names two variables; both are undercounts, and the second is the one that
  * matters — `ELEVATOR_SIM_FUZZ=deep` is a **third** gate, guarding the 250-case fuzz campaign, so a
  * workflow that set only the two variables the issue names would have left that tier exactly as

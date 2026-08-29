@@ -17,12 +17,29 @@
  * unshrunk parent plus the whole reduced config — a deep finding has to survive the walk from
  * the machine that found it to the person who fixes it.
  *
- * ## Status, measured (T22)
+ * ## Status, measured
  *
- * | budget | result |
- * |---|---|
- * | `ELEVATOR_SIM_FUZZ=deep` (250 cases, the tier's own default) | **green**, 0 failures |
- * | `ELEVATOR_SIM_FUZZ_CASES=2000` (the overnight pass) | **green**, 0 failures |
+ * | when | budget | result |
+ * |---|---|---|
+ * | T22 | `ELEVATOR_SIM_FUZZ=deep` (250 cases, the tier's own default) | **green**, 0 failures |
+ * | T22 | `ELEVATOR_SIM_FUZZ_CASES=2000` (the overnight pass) | **green**, 0 failures |
+ * | **2026-08-29**, `0cd422a` | `ELEVATOR_SIM_FUZZ=deep` (250 cases) | **RED — 1 failure**, `fuzz-1000130`, [termination]. See {@link MEASURED_1000130} |
+ *
+ * **The green rows above were true and are not true now, and the gap is the finding rather than the
+ * cost.** They were measured at T22 and never re-taken, because until GitHub issue #163 wired this
+ * tier into `.github/workflows/deep-tiers.yml` there was nothing on any cadence that could re-take
+ * them: `ci.yml` runs a bare `npm test`, no workflow set `ELEVATOR_SIM_FUZZ`, and no workflow in the
+ * repository had a `schedule:` at all. So this table published *green* for every wave between T22
+ * and now, over a tree that moved underneath it — which is CLAUDE.md's *"a published number goes
+ * stale the same way"* on a table whose whole job was to say whether this tier passes.
+ *
+ * The old rows are kept with their date rather than deleted. A row that says *when* it was true is
+ * worth more than a tidy one, and the pair is the argument for the schedule.
+ *
+ * The finding is **recorded rather than fixed**, on § D307's precedent: a tier that was turned on
+ * and had to be repaired first is a different claim from one that was turned on and reported. The
+ * bounds are untouched — `checkTermination` is unchanged line for line, `EPSILON` is still `1e-9`,
+ * `PROPERTY_BOUNDS` is unmoved and the generator was not narrowed.
  *
  * T21's open P5 finding — `fuzz-1000384` — is **closed**, by a `core` fix rather than by anything
  * in this package. `checkTermination` and `PROPERTY_BOUNDS` are unchanged line for line, and the
@@ -96,6 +113,131 @@ describe.skipIf(!deepCampaignRequested())('the deep campaign', () => {
     expect(campaign.stats.generatedPassengers).toBeGreaterThan(cases * 20);
   }, 3_600_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * OPEN — the counterexample the first scheduled run of this tier would find
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **OPEN. Found 2026-08-29 on `0cd422a`, the first time this tier had been run since T22.**
+ *
+ * ```
+ * case      fuzz-1000130      simSeed 288869761
+ * topology  sky-lobby         tags: sky-lobby, access-zones, mixed-use,
+ *                                   service-schedule, service-return
+ * dispatch  destination-panel / destination-entry
+ * demand    25.3 %pop/5min over 1693 s, drain 1800 s, obstruction 0.17
+ * service   initial: all in-service
+ *           schedule: 797 s low-4 → out-of-service; 1114 s low/low-4 → in-service
+ * status    timed-out, 2096 passengers, 3493.8 simulated s
+ * as found
+ *   [termination] run ended at t=3493.7775825325903, past its hard deadline of t=3493
+ * ```
+ *
+ * Reproduce the parent with `caseFromSeed(1000130, generateOptionsFrom(config, DEEP_SPACE))` —
+ * **two arguments, not four, and the difference is not cosmetic.**
+ *
+ * ## The seed means what the library made it mean
+ *
+ * The two closed blocks below pass `CORPUS_DISPATCHER_PROFILE_IDS` and
+ * `CORPUS_TRAFFIC_PROFILE_IDS`, and copying that here produced **zero violations** — which read
+ * exactly like the defect having been fixed, and was not. `runCampaign` calls
+ * `generateOptionsFrom(config, space)` with no id lists, so the campaign searches over **every
+ * shipped profile**; `generateOptionsFrom`'s own docstring says the pinned lists exist to reproduce
+ * *recorded* cases, *"whose seed only means what it meant against the library it was found under"*.
+ * Two different axes, so seed 1 000 130 names two different buildings.
+ *
+ * That cuts both ways and the second half is the caveat on this entry. The closed cases below are
+ * pinned and will reproduce forever. **This one is not**: it was found against the live library, so
+ * any change to `data/dispatcher-profiles.json` or `data/traffic-profiles.json` can move it, and
+ * the ghost check would then go red saying *"no longer reproduces"* about a case that no longer
+ * exists rather than a defect that was fixed. If that happens, the honest reading is the one
+ * `honesty.test.ts` wrote for the same situation: **that is luck moving rather than a defect being
+ * fixed**, the class is still open, and the next run to hit it will arrive unregistered. Say which.
+ *
+ * ## Why this is not a rounding artefact, which is the first thing to rule out
+ *
+ * `checkTermination` already carries a tolerance: it fails on `endedAt > deadlineS + EPSILON`, and
+ * `EPSILON` is `1e-9`. The overshoot here is **0.7776 s** — eight orders of magnitude past it, and
+ * a fifth of a floor-to-floor flight time. The run really did keep going after the deadline it
+ * declared, rather than landing a hair over it.
+ *
+ * The deadline is the case's own arithmetic: 1693 s of demand plus an 1800 s drain is 3493 exactly.
+ * So the claim being violated is the simulator's own, and P5's docstring names the shape it expects
+ * of a legitimate ending — *"a legitimately truncated run (one whose next event would fall past the
+ * deadline, so it is not scheduled) loses at most one car event"*. This run did not decline to
+ * schedule that event.
+ *
+ * ## What the shrinker did, and what that says
+ *
+ * Six steps, 167 candidate evaluations, and the reduced case reports the **identical** run —
+ * `timed-out`, 2096 passengers, 3493.8 s, the same violation to the last digit. A shrink that
+ * removes six things and moves no number is saying the removed things were never load-bearing, so
+ * the reduction is not yet a diagnosis. What survives is the service schedule, as it did for
+ * `fuzz-1000384` below, and the two share the tags `service-schedule` and `sky-lobby`. Whether
+ * that is the mechanism or the neighbourhood the generator happens to sample is **unmeasured**, and
+ * no mechanism is offered here in place of measuring it: CLAUDE.md's rule about stated mechanisms
+ * applies to a defect's cause exactly as it applies to a result's.
+ *
+ * ## Recorded rather than fixed, and where the fix is tracked
+ *
+ * This lane turned the tier on; it did not take a licence to change what the tier asserts. Nothing
+ * in `fuzz/` moved — `checkTermination` is unchanged line for line, `EPSILON` is still `1e-9`,
+ * `PROPERTY_BOUNDS` is unmoved, and the generator was not narrowed. Moving any of those to make
+ * this pass would be weakening an acceptance criterion to make a phase pass, which is the one thing
+ * `CLAUDE.md`'s working agreements forbid outright.
+ *
+ * The ghost check below holds it accountable **in both directions**, which is the whole point of a
+ * register: it asserts the finding still reproduces, so the day somebody fixes the overshoot this
+ * case goes red and this block must be deleted. A registered finding that has been fixed must stop
+ * being registered, or the register becomes decoration.
+ *
+ * ## Why it is gated with the campaign rather than always-on
+ *
+ * The two closed blocks below are always-on, and this one deliberately is not. Their assertions
+ * were verified on the CI matrix; this one has been run on a single Linux container, once. § D201
+ * found the § D196 pins EXACTLY INVERTED between Linux and darwin/arm64 — a pin is a claim about a
+ * machine as much as about a commit — and an unverified floating-point boundary case is the worst
+ * possible candidate for an always-on assertion on a two-leg matrix. It runs where it was found,
+ * on the schedule that found it. If a later wave measures it on both legs, promoting it out of the
+ * gate is a one-line change and an honest one.
+ */
+const MEASURED_1000130 = Object.freeze({
+  fuzzSeed: 1_000_130,
+  /** The case's own arithmetic: 1693 s of demand plus an 1800 s drain. */
+  deadlineS: 3493,
+  /** Measured, not derived. `3493.7775825325903` as reported; the overshoot is 0.7776 s. */
+  endedAtS: 3493.777_582_532_590_3,
+});
+
+describe.skipIf(!deepCampaignRequested())(
+  'OPEN deep campaign counterexample fuzz-1000130 (a run past its own hard deadline)',
+  () => {
+    it('still reproduces, so the register still has something in it', () => {
+      /* The campaign's own call — see the docstring on why the four-argument form finds a
+         different building for this seed and reports the defect gone. */
+      const options = generateOptionsFrom(config, DEEP_SPACE);
+      const fuzzCase = caseFromSeed(MEASURED_1000130.fuzzSeed, options);
+      const violations = evaluateCase(fuzzCase, { config }).violations;
+
+      /*
+       * Asserted on the property and the shape rather than on the digits. The overshoot is what is
+       * open; `3493.7775825325903` is what this container reported, and pinning it here would make
+       * the register fail for a reason that is not the defect the moment a scheduler tie broke
+       * differently. The digits live in MEASURED_1000130 as the record of the finding, which is a
+       * different job from being an assertion.
+       */
+      const termination = violations.filter((violation) => violation.property === 'termination');
+      expect(
+        termination.map((violation) => violation.message),
+        'fuzz-1000130 no longer ends past its hard deadline. If that is a fix, DELETE this block ' +
+          'and the RED row in the status table above — a registered finding that has been fixed ' +
+          'must stop being registered. If it is luck moving, say which change moved it.',
+      ).not.toEqual([]);
+      expect(termination[0]?.message).toMatch(/past its hard deadline/u);
+    }, 600_000);
+  },
+);
 
 /* -------------------------------------------------------------------------- *
  * The counterexample that closed the fourth `awtIsValid` gate
