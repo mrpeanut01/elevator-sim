@@ -836,7 +836,7 @@ export interface RunRecord {
  * There is no `runSeed(record)` accessor here, and there was one until `DECISIONS.md` § D395.
  *
  * It re-tested {@link RunRecord.seed} against the decimal-integer regex and returned
- * `BigInt(record.seed)`. Four phases without a caller outside its own tests, because every
+ * `BigInt(record.seed)`. No caller outside its own tests, ever, because every
  * shipped path that needs the seed as a `bigint` reaches it through a record that has already
  * been validated — `parseRunRecord` refuses a seed this regex would reject, `reports/schema.ts`
  * applies the same regex to the envelope, and `parseStoredRun` refuses a file whose two copies

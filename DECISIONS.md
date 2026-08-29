@@ -26285,3 +26285,96 @@ integration. The full ladders above are reported once and are not all re-run per
 holds the two rungs the sentence rests on, the Midtown endpoint, and the sentence itself.
 
 ---
+
+## D395 — invariant 5's round trip was not half-wired; its worked example was not a replay
+
+**Date:** 2026-08-29 · **Owner:** wave G lane C · **Rules on:** GitHub issue #175. Settles the
+disposition of `core/metrics`'s `serializeRunRecord`, `SerializeOptions` and `runSeed`.
+
+**Decision.** All three are **deleted**. `core/src/dispatch/deadCode.test.ts`'s `DEAD_CANDIDATES`
+goes **6 → 4**.
+
+**The caller question, answered flatly: there is none, and there never was one.** Re-derived at
+`0cd422a` over `packages/`, excluding `dist/`. Every reference to either symbol outside its own
+file is a docstring, a `{@link}`, a barrel re-export (`metrics/index.ts`, `browser.ts`) or a test.
+Two look-alikes, both of the shape `CLAUDE.md`'s standing requirement warns about:
+`experiments/teaching/spec.ts#runSeed` is a `readonly runSeed: number` field on `TeachingSeeds`,
+and `random/streams.ts`'s example uses `runSeed` as a **local variable name**. Neither is this
+symbol.
+
+**Is invariant 5 at risk? No — and the trace is the reason this is a deletion rather than a
+wiring.** The invariant has two clauses and they are discharged in two different packages.
+
+| clause | where it lives | what enforces it |
+|---|---|---|
+| *every persisted run record carries its seed* | `core` | `RunRecord.seed` is non-optional; `runRecordSchema`'s `seedString` regex refuses a record without a decimal-integer seed; `reports/schema.ts#expectSeed` applies the same regex to the envelope |
+| *so any run replays exactly* | `experiments/reports` | `createStoredRun` refuses when `config.seed` and `record.seed` disagree; `parseStoredRun` re-checks that pair **and** the traffic seed **and** the traffic model on read; `replaySimulationConfig` restores the seed as a `bigint`; `assertIdenticalReplay` compares by fingerprint |
+
+**The worked example the two symbols existed to spell was false, and that is the finding.**
+`metrics/index.ts` read `writeFileSync(path, serializeRunRecord(record))` then
+`new StreamSet(runSeed(parseRunRecord(...)))`, annotated **`// replays exactly`**. It does not.
+It builds a stream set with the right master seed and replays nothing: a `RunRecord` names no
+demand template, no duration, no demand overrides, no dispatcher overrides, no runner tunables,
+and its `buildingId`, `dispatcherProfileId` and `trafficProfileId` are **optional** fields where
+`StoredRunConfig` makes all three required. Feed that stream set to a building you chose yourself
+and you have a new run agreeing with the stored one on nothing but its draws. So the pair was not
+the writer half of a replay round trip — it was the whole of a round trip that **was never a
+replay**, and nothing but that example ever called for it. `types.ts` carried the same claim in
+shorter form (*"what lets a stored record be replayed bit-for-bit (`new StreamSet(runSeed(record))`)"*)
+and already half-knew better, since it goes on to say the seed alone stopped being sufficient at
+wave 13 — naming `trafficSeed` and `trafficModel` as the gap when the gap is the whole envelope.
+
+**The register's stated reason was stale, which is worth recording separately.** It read *"the
+writer half of the documented replay round trip; persistence.ts writes through `serializeRunSet`
+instead"*. That reads as *a shipped path writes, just not through this symbol*. **No shipped path
+writes at all**: `createStoredRun`, `serializeStoredRun`, `serializeRunSet`, `writeRunSetFile`,
+`appendRunToFile`, `readRunSetFile`, `parseRunSet` and `replayStoredRun` are every one of them
+reachable only from tests — `experiments/reports/types.ts` says so of `createStoredRun` in as many
+words, under *"latent rather than realised"*. The register was right that these two symbols were
+dead and wrong about what surrounded them. A stale reason in a register whose own assertion checks
+only whether a symbol *acquired a caller* is `CLAUDE.md`'s stated-refusal class, pointed at an
+allowlist.
+
+**Alternatives.** (a) Wire `runSeed` into `replaySimulationConfig` in place of `BigInt(config.seed)`.
+(b) Reclassify both into `PUBLIC_API_ONLY` as surface. (c) Delete.
+
+**Chosen: (c).** (a) is cosmetic and was rejected on its own merits: `parseStoredRun` proves
+`config.seed === record.seed` on every parsed record and `createStoredRun` proves it on every
+written one, so the substitution is behaviour-identical by construction — a call inserted to clear
+an audit, which is the looks-like-a-caller defect with its polarity reversed. It would also have
+left the false `// replays exactly` claim standing, since wiring the symbol does not make the
+sentence true. (b) is moving the gate rather than meeting it: the register's own rule for the split
+is behaviour-versus-surface, and these two would qualify as surface on that reading — which is
+exactly why the move must not be made by the lane asked to dispose of them.
+
+**What the brief asserted and this refutes.** Issue #175 was filed as invariant 5 being
+*"half-wired"*, and wave F's triage re-read it as P2 on the grounds that the invariant's substance
+holds. **The triage was right and its grounds were incomplete.** The substance holds; what was
+broken was a *claim about a mechanism*, not the mechanism — and it was broken in the direction
+`CLAUDE.md` pins hardest, a sentence asserting that something replays exactly when it cannot.
+Deleting the symbols is the smaller half of the fix; withdrawing the sentence is the larger.
+
+**`SerializeOptions` goes with the function it typed.** It was live only through
+`serializeRunRecord`'s signature; left behind it would have been reported dead on the next audit
+run, which is the both-directions check working rather than an oversight corrected.
+
+**Validation.** `deadCode.test.ts` is the instrument and it was checked in three directions, each
+by a mutation that puts a case *into* scope rather than removing one. Re-introducing
+`serializeRunRecord` as an uncalled export fails *"has no export that is dead"*, naming the symbol
+and its file. Re-adding `metrics/runSeed` to the register fails **two** assertions, one of them
+*"metrics/runSeed — no longer exists"*. Adding a registered seventh entry fails the count literal
+`4`, with the derived size in the message. Exit 1 on all three; exit 0 reverted.
+
+**The register's count literal stays a literal.** The assertion above it already pins the *set*,
+so `Object.keys(DEAD_CANDIDATES).length` in the `toBe` would be a tautology and a silently added
+entry would land. The derived count goes in the **failure message**, which is the one place it
+cannot drift. Separately, the paragraph over the register said *"these seven are neither"* above a
+six-entry object — `RISKS.md` R38 — and the count is removed from the prose rather than corrected,
+because a corrected literal drifts again at the next disposition.
+
+**What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
+integration. Nothing here says the `experiments/reports` persistence subsystem *should* have a
+shipped caller; that it has none is recorded above as a finding and is issue #175's larger
+neighbour, not its scope.
+
+---

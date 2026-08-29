@@ -51,10 +51,12 @@
  * back in along with the traffic seed and the traffic model, and `replayStoredRun` rebuilds the
  * `SimulationConfig` and proves the replay bit-identical by fingerprint.
  *
- * `serializeRunRecord` and `runSeed` were the two symbols that example named, they were the only
- * things that called for them, and they went four phases without a caller in any shipped path.
- * They are deleted rather than wired: the round trip they described was never a replay, and
- * inventing a call site for them would have been the standing requirement's defect wearing a fix.
+ * `serializeRunRecord` and `runSeed` were the two symbols that example named, and nothing else
+ * ever called for them: `core/src/dispatch/deadCode.test.ts` has carried both in its dead-candidate
+ * register since the audit widened to fourteen directories on 2026-07-31, and neither acquired a
+ * caller in that time. They are deleted rather than wired, because the round trip they described
+ * was never a replay and inventing a call site would have been the standing requirement's defect
+ * wearing a fix.
  * `DECISIONS.md` § D395.
  */
 

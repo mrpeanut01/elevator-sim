@@ -8,9 +8,11 @@
  * - **The seed is mandatory and is a decimal string** (CLAUDE.md invariant 5). A 64-bit seed
  *   does not survive `JSON.stringify` as a `bigint` and loses precision as a `number`, so it
  *   travels as text and `BigInt()` turns it back into what `new StreamSet(...)` wants — safely,
- *   because a value that reached this module's output satisfied {@link seedString}.
- *   A record without a parseable seed is rejected rather than loaded: a dataset nobody can
- *   reproduce is worse than no dataset, because it still produces numbers.
+ *   because a record that has left {@link parseRunRecord} has satisfied {@link seedString}, and
+ *   the seeds `BigInt` would otherwise have swallowed are exactly the dangerous ones: `''` is
+ *   `0n` and `'0x2a'` is `42n`, so an unchecked seed replays a *different* run rather than
+ *   throwing. A record without a parseable seed is rejected rather than loaded: a dataset nobody
+ *   can reproduce is worse than no dataset, because it still produces numbers.
  * - **Objects are strict.** An unrecognized key is an error, matching `config/schema.ts`. A
  *   field that was silently dropped is a field somebody will later believe was recorded.
  * - **The schema version must match.** A record from a future writer is refused instead of
@@ -19,10 +21,10 @@
  *
  * **There is no writer here, and the asymmetry is the point.** Reading needs validation; writing
  * a `RunRecord` is `JSON.stringify` and nothing else. This module once exported a
- * `serializeRunRecord` wrapper around exactly that call, and it went four phases without a
- * caller outside its own tests, because a bare record is not a persistable unit: it names no
- * demand template, no duration, no demand or dispatcher overrides, and its `buildingId`,
- * `dispatcherProfileId` and `trafficProfileId` are all *optional*. What is written is
+ * `serializeRunRecord` wrapper around exactly that call, and nothing outside its own tests ever
+ * called it, because a bare record is not a persistable unit: it names no demand template, no
+ * duration, no demand or dispatcher overrides, and its `buildingId`, `dispatcherProfileId` and
+ * `trafficProfileId` are all *optional*. What is written is
  * `experiments/reports`'s envelope — `createStoredRun` wraps this record in the configuration
  * that produced it, `serializeStoredRun` writes the pair, and `replayStoredRun` rebuilds the run
  * from the pair. `core` owns the record's schema and checks it on the way in; `experiments` owns
