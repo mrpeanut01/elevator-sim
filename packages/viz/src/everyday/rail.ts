@@ -81,8 +81,10 @@ export interface RailFooter {
     readonly avatarColor: string;
     /**
      * The career line under the name — the **week's** two figures (`3 days running · best 84%`),
-     * or an honest absence when no day has been closed. Never the profile's: see
-     * {@link RailOptions.week}, and issue #214 for what it said before it had one.
+     * an honest absence when no day has been closed, or — before the host has handed a week over
+     * at all — a line that says so instead of either. Never the profile's: see
+     * {@link RailOptions.week} and {@link RailOptions.weekPending}, and issue #214 for what it
+     * said before it had one.
      */
     readonly streak: string;
   };
