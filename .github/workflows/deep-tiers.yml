@@ -152,9 +152,14 @@
 #
 # | tier | measured | ceiling here |
 # |---|---|---|
-# | `fuzz-deep` (250 cases) | 20.5 min, **RED** | 60 |
+# | `fuzz-deep` (250 cases) | 20.5 min, **RED** — a real counterexample, issue #305 | 60 |
 # | `golden-runs` (6 of 6, cross-process) | 55.6 s, green | 90 |
 # | `perf-sweep` (20 000 replications, workers) | 4.6 min, green | 180 |
+# | `honesty-deep` (60 cases) | 43.9 min, **RED** — *timed out*, not refuted; see that job | 90 |
+#
+# The two reds are different kinds of thing and the table says which. `fuzz-deep` found a
+# counterexample; `honesty-deep` ran out of the clock the *test itself* declares, refuting nothing.
+# Reporting them as one number would be the mistake this repository makes a rule about.
 #
 # The sweep is the interesting row: its own `it` allows two hours and it finished in under five
 # minutes, because it is the one tier that runs with `parallel: { mode: 'workers' }`. The ceiling is
@@ -416,6 +421,26 @@ jobs:
   # `dev/browserTier.test.ts`, whose CI clause fails any run where `process.env.CI` is set and no
   # Chromium is provisioned — correct behaviour, aimed at `ci.yml`, and a red here that would be
   # about this workflow rather than about the corpus.
+  #
+  # **This job's first red is more likely to be a clock than a defect, and `timeout-minutes` cannot
+  # prevent it.** The case declares its own ceiling as the third argument to the `it` —
+  # `1_800_000`, thirty minutes — and a per-test timeout wins over both the config default and any
+  # `--testTimeout` this file could pass. So the job ceiling below governs the *runner*, not the
+  # tier, and the tier's own 30 minutes is the binding number.
+  #
+  # The headroom is thin. `measure.corpus.test.ts` puts the deep tier at **~23 minutes**, measured
+  # on a container — about 30 % under its own ceiling — and a GitHub hosted runner is a smaller
+  # machine than that. Run here on 2026-08-29 alongside two other tiers it took **43.9 min and
+  # timed out**: `Test timed out in 1800000ms`, 25 of 26 cases passing and the deep one killed. That
+  # measurement is not this job's condition — every tier here has its own runner, so the CI shape is
+  # the tier running *alone* — but it is the shape of the failure to expect, and it is a **timeout
+  # rather than a property violation**: no honesty property was refuted, the corpus never finished.
+  #
+  # If this job goes red with `Test timed out`, that is a capacity finding about the ceiling in
+  # `honesty.test.ts` and it belongs in an issue against that number. It is deliberately not raised
+  # from here — the tier's declared ceiling is the tier's to declare, and a lane that widened
+  # somebody else's bound to make its own workflow green would be doing the thing this repository
+  # refuses outright.
   # ---------------------------------------------------------------------------
   honesty-deep:
     name: honesty — the deep corpus
