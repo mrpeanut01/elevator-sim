@@ -1225,15 +1225,19 @@ export function buildingConfigOf(
  *
  * Growth was not the only producer, and the second one is larger. A calendar period scales the same
  * floors through `calendar.ts#calendarPatch` → `growth.ts#scaledBuilding`, so on `midtown-office`
- * under `public-holiday` the brief said **1 710** about a run of **437**. One defect, two producers,
- * and a fix that named only the first would have left the bigger half standing.
+ * under `public-holiday` the brief said **1 710** about a run of **437**, and under `vacation`
+ * **1 710** about **1 026**. Commissioning is a third: a bank widened by two shafts left the
+ * brief's `Lifts` row reading **4** against a run of **6**. One defect, three producers, and a fix
+ * that named only the one the issue named would have left the two larger halves standing.
  *
  * ## So this asks the run, rather than reproducing what the run does
  *
  * The answer is `shiftRunConfigOf(...).building` — grown to the day, commissioned, scaled by the
- * calendar, with the day's incidents on it. Not a second copy of that chain: the two producers
- * above are three lines apart inside `shiftRunConfigOf`, a sibling that reproduced them would be
- * the *"two implementations that agree until somebody changes one"* failure `growth.ts`,
+ * calendar, with the day's incidents on it. Not a second copy of that chain: the three producers
+ * above sit within a few statements of each other inside `shiftRunConfigOf` and are **not
+ * separable from the demand derivation** — `calendarPatch` needs the mix the day's event actually
+ * produced, and `withIncidents` needs that patch's incidents — so a sibling that reproduced them
+ * would be the *"two implementations that agree until somebody changes one"* failure `growth.ts`,
  * `tomorrow.ts` and `calendar.ts` each already have a docstring about, and the next producer to be
  * added would have to be remembered twice. `today.ts`'s own module docstring is the rule in one
  * line: *they ask this module once, and it asks `shift/` once.*
