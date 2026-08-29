@@ -970,9 +970,13 @@ the defect this repository has recorded most often.
 5. **Iconography, illustration and any art beyond the elevation.** `guide § 19` specifies a palette,
    a type stack and a scale. It specifies no icon set, and the tree ships none. This document does
    not invent one.
-6. **Anything about sound.** [`29-audio-direction.md`](29-audio-direction.md) recommends a cut and is
-   awaiting the product owner. § 6 shares its arithmetic and reaches the same constraint for pixels;
-   it takes no position on its recommendation.
+6. **Anything about sound.** [`29-audio-direction.md`](29-audio-direction.md) recommends a cut, and
+   ~~is awaiting the product owner~~ **was overruled by [§ D344](../DECISIONS.md) on 2026-08-24**:
+   audio ships, speed-tiered, and #258 is the lane that builds it. § 6 shares its arithmetic and
+   reaches the same constraint for pixels; it takes no position on the recommendation or on the
+   ruling. **This clause was stale against § 6 of this same document**, which has cited § D344 since
+   the ladder changed — a document disagreeing with itself about one state, found while fixing three
+   other sites of the same class (GitHub issue **#286**, `RISKS.md` **R38**).
 7. **Whether a full landing's capsule stack crosses into the floor above — the arithmetic says yes in
    a wide band, and I could not render a shipped building to confirm it.** A lane rises
    `2 + capsuleH × (1 + 0.25 × (lanes − 1))` above its floor line, `capsuleH` is
