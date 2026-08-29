@@ -658,21 +658,36 @@ describe('filing the campaign day — issue #223', () => {
   const towerOf = (host: ReturnType<typeof createEverydayHost>): CampaignTower =>
     towerById(host.campaign(), 'c1')!;
 
-  it('runs the day at the length this contract is graded over, and not at the shipped default', () => {
+  it('runs the day at the length this contract is graded over, whatever the state was left at', () => {
     /*
-     * Measured on this tree, and it is the reason the seed is here rather than a tidy-up: at the
-     * shipped 1 800 s Garden Apartments produced 16, 26 and 18 arrivals on three seeds against a
-     * wake-up gate of twenty, so two of the three graded nothing and could file nothing. At the
-     * hour `c1` names, the same three give 29, 38 and 39 and all three grade.
+     * **What this guards, said exactly rather than generously.** `initialState` already seeds `c1`'s
+     * hour, because the page opens on Garden Apartments — so on a cold load this press writes the
+     * length that is already there and changes nothing. What it guards is a state left at some other
+     * length: `withBuilding` deliberately does not re-seed (`shiftLengthForContract`'s own
+     * docstring), so a player who has taken another assignment, or moved the Engineer length
+     * control, arrives at § 8's *Lock it in* carrying it.
+     *
+     * That matters because of what the length does to the grading, measured on this tree: at
+     * 1 800 s Garden Apartments produced 16, 26 and 18 arrivals on three seeds against a wake-up
+     * gate of twenty, so two of the three graded **nothing** and could file nothing. At the hour
+     * `c1` names, the same three give 29, 38 and 39 and all three grade.
+     *
+     * So the state is set to the shipped default first: a press that only agreed with what was
+     * already there would pass on a build that writes no length at all.
      */
     const h = campaignHarness(undefined);
+    h.state = { ...h.state, shiftLengthS: 1800, windowStartS: 600 };
     createEverydayHost(h.bindings).runCampaignDay('c1');
+
+    expect(shiftLengthForContract('c1')).toBeGreaterThan(1800);
     expect(h.patches[0]).toMatchObject({
       buildingId: 'garden-apartments',
       shiftLengthS: shiftLengthForContract('c1'),
+      // A contract declares a length and not a part of a day — `scenariosPanel`'s own rule.
       windowStartS: null,
     });
-    expect(shiftLengthForContract('c1')).toBeGreaterThan(1800);
+    // And the merge landed, so the run this press starts is built from it.
+    expect(h.state.shiftLengthS).toBe(shiftLengthForContract('c1'));
   });
 
   it('files the day cleared, and the purse and the record move with it', () => {
@@ -753,6 +768,48 @@ describe('filing the campaign day — issue #223', () => {
     host.closeDay();
     expect(towerOf(host).day).toBe(2);
     expect(host.campaign().today).toBe(2);
+  });
+
+  it('refuses to file tomorrow off the run today was filed from', () => {
+    /*
+     * The case the `dayClosed` **crossing** guards and the latch does not, so each of the two has a
+     * mutation that reddens it alone. The run is on a worker: *Lock it in and run day 2* returns
+     * long before there is a recording of day 2, and until it lands the run on the stage is
+     * yesterday's — already filed. A press in that window must file nothing, or day 2 is marked
+     * from the legs of day 1.
+     */
+    const host = createEverydayHost(campaignHarness(CLEAN).bindings);
+    host.runCampaignDay('c1');
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
+
+    host.runCampaignDay('c1');
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
+  });
+
+  it('files one day when a filed run is re-simulated under it', () => {
+    /*
+     * The case the **latch clear** guards and the crossing does not, so that line has a mutation of
+     * its own too. § 1.4's intervention re-runs the day and `dev/main.ts`'s `adopt` clears
+     * `filedRunId` when the new recording lands — which re-arms `closeShift`. A campaign day that
+     * filed on that second close would advance the contract twice for one morning, which is
+     * `shift/week.ts#closeDay`'s `recordGrew` argument one record up: a record growing is not a
+     * second day.
+     *
+     * The adoption is staged on the harness rather than pressed, because `intervene` crosses to
+     * `dev/main.ts`'s runner and there is none here; what is driven is the state it leaves behind.
+     */
+    const h = campaignHarness(CLEAN);
+    const host = createEverydayHost(h.bindings);
+    host.runCampaignDay('c1');
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
+
+    h.state = { ...h.state, recording: { ...CLEAN, runId: 'grown' } };
+    h.filed = undefined;
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
   });
 
   it('files nothing when the day itself refused to file', () => {

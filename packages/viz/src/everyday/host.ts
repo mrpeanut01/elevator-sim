@@ -1125,8 +1125,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
         buildingId: tower.buildingId,
         dispatcherId: tower.dispatcherId,
         /*
-         * **And the length this contract is graded over** — GitHub issue #223, and it is the
-         * difference between a campaign day that can be filed and one that usually cannot.
+         * **And the length this contract is graded over** — GitHub issue #223.
          *
          * `CampaignTower.id` **is** the contract id, so this is the same seed `scenariosPanel`'s
          * *take* writes and the same expression, not a number authored here. It matters for the
@@ -1134,6 +1133,14 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
          * `openingCareer` holds — produces a median of 18 arrivals in thirty minutes against a
          * wake-up gate of twenty, so seven of twelve seeds grade **nothing**, and a day nothing
          * graded is a day § 8's record may not mark. At the hour `c1` names, all twelve grade.
+         *
+         * **What it actually guards, stated narrowly rather than generously.** `initialState`
+         * already seeds `c1`'s hour, because the page opens on Garden Apartments — so on a cold
+         * load this writes the length that is already there and changes nothing. What it guards is
+         * a state left at another length, which is reachable and not exotic: `withBuilding`
+         * deliberately does **not** re-seed (`shiftLengthForContract`'s own docstring says why), so
+         * a player who has taken a different assignment or moved the Engineer length control
+         * carries it into § 8. The measurement above is what that would cost them.
          *
          * *Lock it in and run day N* is exactly the press that seed is for — the one moment a
          * player has asked for *this contract* rather than for *this shift length* — which is why
