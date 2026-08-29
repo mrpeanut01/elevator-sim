@@ -248,13 +248,30 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
 
   it('files nothing against the tower when the day closed was Today’s tower', async () => {
     /*
-     * The second negative control, and the one the host's latch exists for: enter the campaign,
-     * leave it for § 6's loop, run and close a day **there**, then come back. That day is not this
-     * contract's, and a record that moved would have banked somebody else's morning against it.
+     * The second negative control, and the one the host's latch exists for. It has to **start** a
+     * campaign day and then walk away from it unclosed, because a walk that never presses *Lock it
+     * in* arms nothing and would pass on a build with no latch at all: leaving by § 3.3's back row
+     * rather than by the rail is what keeps the run open while the player leaves the flow.
+     *
+     * Then § 6's loop runs and closes a day of its own. That day is not this contract's, and a
+     * record that moved would have banked somebody else's morning against it.
      */
     const page = await coldLoad();
     await enterCampaign(page);
     await openDesk(page);
+    await openContract(page);
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-stage-canvas', { timeout: 60_000 });
+    await page.waitForFunction(
+      () => document.querySelector('.everyday-bar-primary')?.textContent === 'Close the day',
+      undefined,
+      { timeout: 120_000 },
+    );
+
+    // § 3.3's back row on the campaign stage — the building, not the menu, so no day is closed.
+    await page.click('.everyday-bar-back');
+    await page.waitForSelector('.everyday-building', { timeout: 30_000 });
+    expect(await monthFigures(page)).toEqual({ day: 1, cleared: 0, missed: 0 });
 
     // Out to the main menu, then § 6's own walk — tile, front door, brief, stage — and close there.
     await toMainMenu(page);
