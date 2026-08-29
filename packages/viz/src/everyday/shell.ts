@@ -354,6 +354,112 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
 
   doc.body.append(root);
 
+  /* ---------------------------------------------------------------- *
+   * The scroll keeper — GitHub issue #298, § D388
+   * ---------------------------------------------------------------- */
+
+  /**
+   * What the player was looking at when they last touched the screen region, in both scrollers.
+   *
+   * `armed` is what makes this a keeper rather than a scroll lock: only a **player action inside
+   * the region** arms it, and one restore disarms it. See {@link keepScrollAcrossRerender}.
+   */
+  let settled = { region: 0, window: 0 };
+  let armed = false;
+
+  /**
+   * **An in-screen re-render may not move the scroll offset** — GitHub issue #298,
+   * [§ D388](../../../../DECISIONS.md).
+   *
+   * ## The defect, measured rather than described
+   *
+   * Every screen in `everyday/` redraws itself by emptying its own root and rebuilding it:
+   * `benchScreen.ts`'s checkbox handler, `fixitScreen.ts`'s repair card, and seven others. Driven
+   * against the **built bundle** at `375×667`, ticking one bench checkbox took the region from
+   * `1 518` to `86` — **1 432 px gone** — and put the control the player had just clicked
+   * **1 303 px** below where their finger still was. On the fix-it card the same interaction could
+   * not be driven to completion at all: the button kept moving out from under the pointer.
+   *
+   * ## Why it is the *focus* teardown and not the emptying, which matters for the fix
+   *
+   * The emptying alone is harmless. Measured on the bundle at six offsets across both screens, a
+   * synthetic `element.click()` — which never focuses anything — loses **0 px** every time: the
+   * container empties and refills inside one task, no layout is forced in between, and the browser
+   * has no collapsed `scrollHeight` to clamp against.
+   *
+   * A **real** click focuses the control first, and that is what makes the difference. Traced
+   * through one bundle interaction:
+   *
+   * | moment | `scrollTop` | `scrollHeight` | focus |
+   * |---|---|---|---|
+   * | `change` reaches the screen's handler | 1 518 | 3 358 | the checkbox |
+   * | `blur`, dispatched *during* the removal | **112** | **1 952** | `body` |
+   * | `replaceChildren` returns | **0** | **524** | `body` |
+   *
+   * Tearing the focus down forces a layout while the container is half empty, and the clamp lands
+   * before the screen has appended a single replacement node. So `element.click()` and a finger
+   * disagree — which is why a case built on a synthetic click would have measured nothing, and why
+   * the browser tier's cases must use the pointer.
+   *
+   * ## Why the keeper is here and not in the nine screens
+   *
+   * `shell.ts` owns the scroller (§ 3.1 — one region, one screen at a time), so it can hold the
+   * invariant once for every screen that is mounted into it, including screens nobody has written
+   * yet. Nine screens each saving and restoring their own offset is nine chances to forget, and the
+   * ninth is the one that ships: this defect **is** that argument, having survived seven waves in
+   * two files that were written months apart.
+   *
+   * ## Why `armed`, and why one restore
+   *
+   * A blanket *"put the offset back after every mutation"* would be a scroll **lock**, and it would
+   * break two deliberate scrolls this shell already makes. {@link go} resets to the top on
+   * navigation, and a menu tile is itself inside the region — so the tile press would arm the
+   * keeper and the keeper would then undo the navigation reset, which is GitHub issue #281's defect
+   * reintroduced by its own fix. And `fixitScreen.ts`'s outcome card scrolls itself into view when
+   * a run lands, in the **promise continuation** rather than in the press.
+   *
+   * So: a player action inside the region arms the keeper, the first mutation batch after it
+   * restores and disarms, and everything else — an async run landing, a host connecting, the
+   * stage's per-frame figure redraw — passes through an unarmed keeper that reads no layout at all.
+   * {@link go} clears the arming with the offset it resets, because a navigation *is* a deliberate
+   * move and the keeper must not fight it.
+   *
+   * ## Both scrollers, for `go`'s own reason
+   *
+   * Which element holds the offset depends on the viewport, and {@link go}'s docstring records the
+   * measurement: at `375×667` the document does not scroll at all and the overflow lives on
+   * `.everyday-screen`, while on CI's Chromium the document overflows too. A keeper that restored
+   * one of them would be right on one machine. Both are snapshotted and both are put back.
+   *
+   * The restore runs in the observer's microtask, which is before the next paint, so nothing the
+   * player sees ever shows the clamped position.
+   */
+  function keepScrollAcrossRerender(): void {
+    const view = doc.defaultView;
+    const snapshot = (): void => {
+      armed = true;
+      settled = { region: screenRegion.scrollTop, window: view?.scrollY ?? 0 };
+    };
+    /*
+     * Capture phase, so the snapshot is taken **before** the screen's own handler runs and rebuilds
+     * anything. `pointerdown` and `keydown` are the two ways a player reaches a control; `change`
+     * is here because a control can be driven without either — a synthetic click in a test, or an
+     * assistive technology — and a keeper that only worked for a mouse would be a keeper the tier
+     * could not drive honestly.
+     */
+    for (const type of ['pointerdown', 'keydown', 'change'] as const) {
+      screenRegion.addEventListener(type, snapshot, true);
+    }
+    new MutationObserver(() => {
+      if (!armed) return;
+      armed = false;
+      if (screenRegion.scrollTop !== settled.region) screenRegion.scrollTop = settled.region;
+      if (view !== null && view.scrollY !== settled.window) view.scrollTo(0, settled.window);
+    }).observe(screenRegion, { childList: true, subtree: true });
+  }
+
+  keepScrollAcrossRerender();
+
   /**
    * Cover the page behind this shell, and keep the screen region laid out.
    *
@@ -602,6 +708,15 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * `behavior` is left at its default: a smooth scroll here would animate on a playhead-tied redraw,
    * which `docs/28` § 6's AD-M2 refuses, and it would race the tier's next measurement.
    *
+   * ## The last two lines are not decoration, and § D388 is why
+   *
+   * {@link keepScrollAcrossRerender} puts the offset back after a mutation batch that a player
+   * action armed — and a **menu tile is inside the region**, so the press that navigates arms it.
+   * Without the disarm below, the keeper's microtask would run after this function returned and
+   * restore the offset this function had just cleared: the defect above, reintroduced by the fix
+   * for a different one. Clearing the snapshot as well as the flag is deliberate, so that a keeper
+   * armed again before the next frame restores the top rather than the screen the player left.
+   *
    * A decision number is owed.
    */
   function go(screen: EverydayScreen): void {
@@ -610,6 +725,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     doc.defaultView?.scrollTo(0, 0);
     const screenEl = root.querySelector<HTMLElement>('.everyday-screen');
     if (screenEl !== null) screenEl.scrollTop = 0;
+    armed = false;
+    settled = { region: 0, window: 0 };
   }
 
   /**
