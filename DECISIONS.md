@@ -25869,3 +25869,75 @@ roughly one string per case per tier, and **an expected rise is a warning, not a
 distinction this repository has recorded five times.
 
 ---
+
+## D390 — the brief asks the run which building it is about to use, rather than resolving one itself
+
+**Rules on:** `dev/state.ts#resolvedBuildingOf`, and what the Everyday brief, door and week screens
+are describing when they quote a building. Settles GitHub issue #300. Supersedes the second half of
+§ D234's argument for that function; the first half stands.
+
+**Decision.** `resolvedBuildingOf` returns `shiftRunConfigOf(resources, state).building` behind the
+lookup guard that keeps it total. It no longer answers from `resources.entries` by identity.
+
+**Why.** § D234 wrote the function for issue #36, and closed with: *"the shipped building, not a
+grown one. Nothing has been run, so there is no day to have grown it to."* The first clause was right
+and the second was **not a fact about the state**. `week.day` is a field; it is 3 on Wednesday
+morning whether or not Wednesday has been run, and `shiftRunConfigOf` has always grown the fabric to
+it. So there was always a day to grow to, and the sentence was answering a different question from
+the one being asked.
+
+Measured on `f13d455`, walking days 1–3 and comparing the brief's `People` row against
+`shiftRunConfigOf(...).building.totalPopulation` on the same state:
+
+| building | day 1 | day 2 | day 3 |
+|---|---|---|---|
+| `garden-apartments` | 120 = 120 | 120 vs **135** | 120 vs **145** |
+| `midtown-office` | 1 710 = 1 710 | 1 710 vs **1 900** | 1 710 vs **2 090** |
+| `chancery-house` | 612 = 612 | 612 vs **684** | 612 vs **738** |
+
+**Growth was not the only producer, and the second one is larger — which is why the fix is a
+delegation rather than a call to `grownBuilding`.** A calendar period scales the same floors through
+`calendar.ts#calendarPatch` → `growth.ts#scaledBuilding`, so on `midtown-office` under
+`public-holiday` the brief said **1 710** about a run of **437**, and under `vacation` **1 710**
+about **1 026**. Commissioning is a third: a bank widened by two shafts left the brief's `Lifts` row
+reading 4 against a run of 6. One defect, three producers, and a fix naming only the one the issue
+named would have left the two larger halves standing.
+
+The three producers are within a few statements of each other inside `shiftRunConfigOf`, and they are
+not separable from the demand derivation — `calendarPatch` needs the mix the day's event actually
+produced, and `withIncidents` needs that patch's incidents. So a sibling helper would have been a
+second copy of that chain: the *"two implementations that agree until somebody changes one"* failure
+`growth.ts`, `tomorrow.ts` and `calendar.ts` each already carry a docstring about, with the added
+property that the next producer would have to be remembered in two places. `everyday/today.ts`'s own
+module docstring is the rule in one line: *they ask this module once, and it asks `shift/` once.*
+
+**What keeps issue #36.** `growthFactor(1)` is exactly 1 and `Math.round` is the identity on the
+integers `data/` declares, so a week on day 1 with no calendar returns the shipped populations — the
+three day-1 rows above are that, measured. The issue's own framing is what this rests on: the answer
+is not *"always grow"* but *"grow when there is a day to grow to"*, and the day-1 identity is what
+makes those the same sentence. #36's actual defect — the new building's **name** beside the previous
+building's **specs** — is untouched, because both still come from the standing `state.buildingId`.
+`today.test.ts` pins it against `resources.entries`' own pre-resolved object, which is the exact
+value the old implementation returned, and that case goes red under an *always grow* mutation while
+staying green under a revert.
+
+**Cost, because this went from a lookup to an assembly.** Measured on `midtown-office`, 200 calls:
+**0.643 ms** against the old path's **0.0003 ms**. That is not a footnote here —
+`ViewerState.tomorrow` exists precisely to keep a `parseBuilding`/`resolveBuilding` off a 60 Hz
+render, so the same bar has to be cleared. It is cleared by **reaching** rather than by being cheap:
+`dev/main.ts#tick` renders at 60 Hz only while a `playback` exists; `playback` is assigned at exactly
+one place (`adopt`), every caller of which sets or already holds `state.recording`, and the one
+branch with no run to adopt writes `playback = undefined`. So `playback !== undefined` implies
+`recording !== undefined`, and `viewAt` reaches this function only on its `recording === undefined`
+arm — the two are disjoint. Everything else that asks is a discrete render: a screen mount, a
+`host.subscribe` notification, a resize.
+
+**What is not claimed.** The honesty corpus is **not re-measured** here and no string, surface or case
+count is published; § D343 takes that measurement once, after the wave integrates. The change does
+move the corpus — `derive.test.ts` classified `resolvedBuildingOf` as a text producer for the first
+time, because delegating gave it `shiftRunConfigOf`'s `throw` in its call chain — and that
+classification is an exclusion with its reason, in the same group and for the same reason as the
+neighbour it now calls. The throw is **unreachable through this function**: the lookup guard answers
+the unknown-id case first, and `today.test.ts` asserts that arm directly.
+
+---

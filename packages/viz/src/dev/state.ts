@@ -1202,27 +1202,78 @@ export function buildingConfigOf(
  * 0.63 m/s · 135 people`, where Midtown Office is 21 floors, 4 cars, 2.5 m/s and 1,710 people. A
  * player reading that is told the next challenge is the size of the tutorial.
  *
- * So: the **shipped** building, not a grown one. Nothing has been run, so there is no day to have
- * grown it to, and quoting today's population against a run that has not happened would be the
- * caption-that-does-not-describe-the-picture failure in the other direction.
+ * ## The half of that argument that was wrong, and how it was found — GitHub issue #300, § D390
+ *
+ * § D390 supersedes the closing paragraph of § D234's argument for this function and nothing else
+ * in it; the paragraph above is § D234's and still stands.
+ *
+ * The sentence that used to close the paragraph above read: *"So: the **shipped** building, not a
+ * grown one. Nothing has been run, so there is no day to have grown it to."* The first clause was
+ * right about #36 and the second was **not a fact about the state**. `week.day` is a field, not a
+ * consequence of a recording: it is 3 on Wednesday morning whether or not Wednesday has been run,
+ * and `shiftRunConfigOf` grows the fabric to it either way. So there was always a day to grow to,
+ * and *"nothing has been run"* was answering a different question from the one being asked.
+ *
+ * Measured on the tree at `f13d455`, walking days 1–3 and comparing this function's answer against
+ * `shiftRunConfigOf(...).building.totalPopulation` on the same state:
+ *
+ * | building | day 1 | day 2 | day 3 |
+ * |---|---|---|---|
+ * | `garden-apartments` | 120 = 120 | 120 vs **135** | 120 vs **145** |
+ * | `midtown-office` | 1 710 = 1 710 | 1 710 vs **1 900** | 1 710 vs **2 090** |
+ * | `chancery-house` | 612 = 612 | 612 vs **684** | 612 vs **738** |
+ *
+ * Growth was not the only producer, and the second one is larger. A calendar period scales the same
+ * floors through `calendar.ts#calendarPatch` → `growth.ts#scaledBuilding`, so on `midtown-office`
+ * under `public-holiday` the brief said **1 710** about a run of **437**. One defect, two producers,
+ * and a fix that named only the first would have left the bigger half standing.
+ *
+ * ## So this asks the run, rather than reproducing what the run does
+ *
+ * The answer is `shiftRunConfigOf(...).building` — grown to the day, commissioned, scaled by the
+ * calendar, with the day's incidents on it. Not a second copy of that chain: the two producers
+ * above are three lines apart inside `shiftRunConfigOf`, a sibling that reproduced them would be
+ * the *"two implementations that agree until somebody changes one"* failure `growth.ts`,
+ * `tomorrow.ts` and `calendar.ts` each already have a docstring about, and the next producer to be
+ * added would have to be remembered twice. `today.ts`'s own module docstring is the rule in one
+ * line: *they ask this module once, and it asks `shift/` once.*
+ *
+ * **#36 is kept by construction rather than by a branch.** `growthFactor(1)` is exactly 1, and
+ * `Math.round` is the identity on the integers `data/` declares, so a week on day 1 with no
+ * calendar returns the shipped populations — the three day-1 rows above are that, measured. What
+ * the issue asked for was not *"always grow"* but *"grow when there is a day to grow to"*, and the
+ * day-1 identity is what makes those the same sentence. #36's actual defect — the new building's
+ * name beside the previous building's specs — is untouched: both still come from the standing
+ * `state.buildingId`, and the only thing that changed is which day's version of it.
+ *
+ * ## Cost, since this went from a lookup to an assembly
+ *
+ * Measured on `midtown-office`, 200 calls: **0.643 ms** against the old path's **0.0003 ms**. That
+ * matters here rather than being a footnote, because {@link ViewerState.tomorrow} exists precisely
+ * to keep a `parseBuilding`/`resolveBuilding` off a 60 Hz render — so the same bar has to be
+ * cleared, and it is cleared by *reaching*, not by being cheap.
+ *
+ * **No 60 Hz path reaches this.** `dev/main.ts#tick` renders at 60 Hz only while a `playback`
+ * exists; `playback` is assigned at exactly one place (`adopt`), every caller of which sets or
+ * already holds `state.recording`, and the one branch that has no run to adopt writes
+ * `playback = undefined` instead. So `playback !== undefined` implies `recording !== undefined`,
+ * and `viewAt` reaches this function only on its `recording === undefined` arm — the two are
+ * disjoint. Everything else that asks is a discrete render: a screen mount, a `host.subscribe`
+ * notification, a resize.
  *
  * `undefined` when the id resolves to nothing, which is the same answer `buildingConfigOf` gives
- * and the same one the chrome already handles.
+ * and the same one the chrome already handles. Asked **first**, and that is what keeps this total:
+ * `shiftRunConfigOf` throws on exactly that id rather than returning an answer, so the lookup is
+ * the guard rather than a shortcut.
  */
 export function resolvedBuildingOf(
   resources: BrowserResources,
   state: ViewerState,
 ): ResolvedBuilding | undefined {
-  // The shipped set first and by identity, so the ordinary case costs no parse: `resources.entries`
-  // already carries each one resolved against the shipped specs.
-  const shipped = resources.entries.find((entry) => entry.config.id === state.buildingId);
-  if (shipped !== undefined) return shipped.resolved;
-  const saved = state.savedBuildings.find((entry) => entry.id === state.buildingId);
-  if (saved === undefined) return undefined;
-  return resolveBuilding(
-    parseBuilding(saved.config as unknown),
-    specsWithSaved(resources, state.savedClasses),
-  );
+  if (buildingConfigOf(resources, state.savedBuildings, state.buildingId) === undefined) {
+    return undefined;
+  }
+  return shiftRunConfigOf(resources, state).building;
 }
 
 /** The building's display name, without loading the whole document to read it. */

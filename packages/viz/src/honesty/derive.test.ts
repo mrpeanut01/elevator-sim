@@ -511,6 +511,28 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/state.ts#calendarAskInputOf',
         'dev/state.ts#shiftRunConfigOf',
         /*
+         * **Derived for the first time on 2026-08-29, and by a call rather than by a string** —
+         * GitHub issue #300, § D390. It is worth stating that way round because the usual entry
+         * in this group is a hyphenated id the scanner misreads, and this one is not: the evidence
+         * line is `via shiftRunConfigOf: reader have between them.`, which is that function's own
+         * `throw` — *"No building "x" — the page offers only what data/buildings/ and the reader
+         * have between them."*
+         *
+         * `resolvedBuildingOf` used to answer from `resources.entries` by identity and reached no
+         * sentence at all. #300 made it delegate to `shiftRunConfigOf`, so that the brief describes
+         * the building the run will use rather than the shipped one, and it inherited that
+         * function's whole text-producing chain in the same step. The chain is the reason it is
+         * here; the exclusion is the neighbour's above, unchanged and for the same reason.
+         *
+         * It authors nothing of its own. Its two arms are a `ResolvedBuilding` and `undefined`, and
+         * the `undefined` arm is what a caller gets for an unknown id — the throw it inherits is
+         * **unreachable through this function**, because the lookup guard in front of the delegate
+         * answers that case first and `today.test.ts` asserts it in both directions. What a player
+         * reads about the building it resolves is `everyday/today.ts`'s five facts and lede, driven
+         * by the Everyday adapters, and #300's own case requires those to agree with the run.
+         */
+        'dev/state.ts#resolvedBuildingOf',
+        /*
          * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads
          * the `PlayMode` members they switch on — `shift-week`, `free-play` — as prose, because
          * they are hyphenated. They return a boolean and three `WeekState`s between them and author
