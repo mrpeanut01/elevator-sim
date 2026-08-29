@@ -660,6 +660,31 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The workshop’s § 3.3 note **decision**, GitHub issue #296 — `commitmentOf`’s case one ' +
+        'group up, in the screen that consumes it. `WORKSHOP_WRITES` is a tuple of `SurfaceKey`s ' +
+        '(`viewer.dispatcherSpec`) and `WORKSHOP_REACHES` a tuple of answer codes (`draft-only`), ' +
+        'both derived only because a dot and a hyphen read as word breaks to the scanner — the ' +
+        'identical false positive `scope/commitment.ts#COMMITMENTS` is excluded for. ' +
+        '`workshopReachOf` returns one member of the second tuple and `workshopWriteReachesRun` ' +
+        'returns a **boolean**; neither authors a sentence, and that split is deliberate rather ' +
+        'than incidental. The wording a player reads is module-private in ' +
+        '`everyday/workshopScreen.ts`, beside the control, on ' +
+        '`dev/dispatcherEditor.ts#DRAFT_NOTE`’s precedent and under the same stated limitation — ' +
+        'a mount’s copy reaches the static sweep and not the driven one. The two guide sentences ' +
+        'this screen selects between are `everyday/actionBar.ts`’s and are already swept there, ' +
+        'through the § 3.3 table’s own `noteVariants`. What is checked instead of a string search ' +
+        'is stronger and lives in `everyday/workshopTravel.test.ts`: the answer these four produce ' +
+        'must agree with the legs a run actually produces, measured through ' +
+        '`shiftRunConfigOf` → `recordRun`.',
+      ids: [
+        'everyday/workshopModel.ts#WORKSHOP_WRITES',
+        'everyday/workshopModel.ts#WORKSHOP_REACHES',
+        'everyday/workshopModel.ts#workshopReachOf',
+        'everyday/workshopModel.ts#workshopWriteReachesRun',
+      ],
+    },
+    {
+      reason:
         'The refusal sentences `provenanceLineOf` used to author itself, moved one layer down by ' +
         '`docs/16` S5 so the leaderboard’s submit path cannot grow a second copy of them. They ' +
         'reach `#status` through `copyProvenance` exactly as before, so this inherits the exclusion ' +
