@@ -531,7 +531,10 @@ jobs:
           {
             echo "## Deep tiers — ${{ github.sha }}"
             echo
-            echo "Nine opt-in tiers, eighteen tests, none of which ran in CI before issue #163."
+            # No test count here on purpose. This page is written on every firing and would be the
+            # one place a stale figure could not be dated — the counts belong in the header and in
+            # § D393, each beside the commit it was taken on.
+            echo "The opt-in tiers, none of which ran in CI before issue #163."
             echo
             echo "| tier | result |"
             echo "|---|---|"
