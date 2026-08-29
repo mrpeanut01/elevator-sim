@@ -632,8 +632,16 @@ Named on screen in the products' own registers rather than only here:
   rather than *description*, which is what a screen module can reach.
 - **The daily board needs a server.** The ladder beside it is live because a rating is measured on
   this device; the board's tab carries § 12.2's labelled unavailable state.
-- **No campaign day is filed yet** from § 8's screens — running one is wired end to end, but marking
-  it cleared or missed needs `closeShift` to know which tower it belonged to.
+- ~~**No campaign day is filed yet** from § 8's screens~~ — **built (GitHub issue #223,
+  [§ D400](DECISIONS.md)), and the stated blocker was wrong, which is the half worth keeping.** This
+  row read *"marking it cleared or missed needs `closeShift` to know which tower it belonged to"*.
+  `closeShift` never needed to know: it writes `ViewerState.week`, the campaign career is
+  deliberately not on `ViewerState`, and both facts a filing needs — which tower, and what the run
+  read — are inside `everyday/host.ts`'s own closure, where `runCampaignDay` arms them and
+  `closeDay` reads them back. A sentence naming the obstacle sends the next reader to the wrong
+  file, and this one pointed at a 7 000-line module. **What is still absent in § 8** is the trip
+  budget — § 8.6's fourth test, which nothing in this run measures — disclosed on the row itself as
+  `campaignModel.ts#TRIPS_REFUSAL` and owned by no issue.
 - **§ 7.4's ghost lane** is not drawn: the host exposes no second recording.
 - **B2 and B5 of `docs/21`** (Compare/report surfaces, the six engineering briefs) are specified and
   unbuilt.

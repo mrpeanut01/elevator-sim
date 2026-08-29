@@ -26744,3 +26744,145 @@ larger neighbour, not its scope. No claim is made that `readRunSetFile`, `parseR
 
 
 ---
+
+## D400 — the campaign day files, and `closeShift` never needed to know which tower it was
+
+**Date:** 2026-08-29 · **Owner:** wave H lane C · **Rules on:** GitHub issue #223 (and the closing
+half of #181, *"closing a day records nothing"*). Supersedes `AGENT_STATUS.md`'s stated blocker.
+
+**Decision.** A completed campaign day is filed by `EverydayHost.closeDay`, which advances the
+tower's contract day through a new `campaign/career.ts` action (`file-day`) and marks it cleared or
+missed from § 8.6's own tests. **No change to `dev/main.ts#closeShift` was needed, and none was
+made.**
+
+### The stated blocker was wrong, and it is the more useful half of this entry
+
+`AGENT_STATUS.md` recorded the gap as: *"marking it cleared or missed needs `closeShift` to know
+which tower it belonged to."* Checked rather than inherited, and it does not hold:
+
+- `closeShift` writes `ViewerState.week` — the **daily loop's** record. The campaign career is
+  deliberately not on `ViewerState`, and `everyday/host.ts`'s own binding carries the argument and
+  its cost (a schema, a migration, and two records both claiming to know what day it is). Two
+  records with different lifetimes means filing a campaign day is a **second write to a second
+  record**, not a branch inside the first.
+- That second record's owner is the host closure. `runCampaignDay(towerId)` is the only function
+  that turns a tower into a run; `campaignAct` is the only writer of the career; and `closeDay` is
+  the Everyday player's *own* press. All three are on the same side of the façade, so the fact the
+  blocker said was missing was never more than one closure local away.
+- § 6.4 and § 16 rule 1 give exactly one thing permission to file — *Close the day* — and issue
+  #287 already gated the Engineer surface's three filing paths (`tick`, `Ctrl`/`Cmd`+`Enter`, the
+  report tab) off while the cover is up. So no other path can reach a campaign day, which is what
+  makes a single seam sufficient rather than merely convenient.
+
+This is § D227's shape on a **register** rather than on a docstring: a sentence naming the obstacle
+sends the next reader to the wrong file, and this one would have sent them to a 7 000-line module to
+add a fourth flag to a function that already has three silent early returns.
+
+### What moves, and what is derived
+
+`file-day` writes **two fields** — `tower.day` advances, `tower.missed` grows on a miss — and
+`career.today` with them, because § 8.6 derives a contract's own start from the career day
+(`start(t) = careerToday − (t.day − 1)`) and a day filed on one alone would slide the whole contract
+under the grid. Everything else is already derived by `campaign/economy.ts`: the purse
+(`earnedSoFar` sums `rateOnDay` over past non-missed days), the record, the month grid's ✓ and ✗,
+the renewal's clear rate, the at-risk list, `contractIsLost`, and § 8.4's standing. A latched purse
+would be a second answer to a question one of them already contains.
+
+Two refusals: a tower the career does not hold, and a month already over (`day` reaches 21 when the
+twentieth is filed, and `rateOnDay` prices twenty days while `contractEndDay` draws twenty columns,
+so a twenty-first would be a day nobody published a fee or a cell for).
+
+**Named cost, with no shipped instance.** With more than one building held, only the tower whose day
+was run advances, so the unplayed towers' derived start slides forward a career day. `openingCareer`
+holds one contract and no action acquires a second. The alternative is worse: advancing every
+tower's `day` would pay the player for days they never ran, because a day that is neither cleared
+nor missed is not representable in `cleared = day − 1 − missed`.
+
+### What decides the mark
+
+`everyday/campaignModel.ts#campaignDayVerdict`, folded over **the rows the desk and the contract
+sheet are drawing** rather than over a second set of goals — so the difficulty buttons reach the
+record instead of moving three printed numbers. Explicitly **not** `lastReport()?.verdict`: the Day
+report grades § 6's goals for the week's day against different bars, and borrowing it would leave
+every difficulty button on the contract sheet binding nothing, which is this repository's signature
+defect wearing a control. Held by a case that files the same recording twice, once easy and once
+standard, and requires the record to differ — § D177's standing requirement pointed at the filing
+seam.
+
+Three tests decide it and the fourth is a refusal. § 8.6 says *all four*; the trip budget is the
+fourth and nothing in this simulator measures it (`TRIPS_REFUSAL`), so its row carries no reading
+and is absent from the fold in **both** directions — counted as failed it would refuse every day the
+campaign ever runs, counted as held it would report a bar nobody measured as met.
+`BUILDING_COPY.testsNote` said *"all four, or the day is missed"* and now says what actually decides
+it, which is § D227 on the line a player reads before pressing.
+
+**A run the tests could not read files nothing at all.** `wasGraded` is `shift/week.ts`'s predicate,
+so a reading is `pending` below the wake-up gate and on a censored worst wait. § D234's rule has two
+halves — *unjudged is not passed*, and it *did not cost anything either* — and `CampaignDayVerdict`
+has only two values because § 8.1's arithmetic partitions past days into exactly two. So the third
+answer lives at the seam that can act on it (file nothing) rather than being flattened into a missed
+day. The rule is on `testsNote` where a player meets it.
+
+### The evidence, and the two guards that had no red of their own
+
+`career.test.ts` holds the transitions, `campaignModel.test.ts` the fold,
+`host.test.ts` the seam over two real recordings, and `campaignJourney.browser.test.ts` the whole
+stage on the player's own controls with two negative controls. Every assertion was
+mutation-validated. Two were not, at first: removing the `dayClosed` **crossing** guard and removing
+the **latch clear** each left the suite green, because each covered for the other. Two cases now
+split them — a press in the window before tomorrow's recording lands (only the crossing refuses it,
+or day 2 is marked from the legs of day 1) and an intervention re-simulating a filed day (only the
+latch clear refuses it, and `shift/week.ts#closeDay`'s `recordGrew` makes the same argument one
+record down). An assertion no single mutation can redden is an assertion held by luck.
+
+### Two corrections travelling with it
+
+- `everyday/reportScreen.ts`'s primary was `context.go('week')` unconditionally, under a label that
+  already read `Back to ⟨building⟩` in a campaign run. The one button carrying § 8's progression
+  named the tower and opened the daily loop's seven-day strip. Found while wiring this, and fixed on
+  `ctx` rather than on the label, because a destination that reads its own rendering back is a
+  destination that moves when a string does.
+- `dev/state.ts#shiftLengthForContract` said *"called from exactly two places"* and now has three
+  (§ D401). A count in prose is a fact nothing re-derives.
+
+---
+
+## D401 — a campaign day runs the length its contract is graded over
+
+**Date:** 2026-08-29 · **Owner:** wave H lane C · **Rules on:** GitHub issue #223's grading half.
+Adds a third caller to `dev/state.ts#shiftLengthForContract`.
+
+**Decision.** `EverydayHost.runCampaignDay` patches `shiftLengthS: shiftLengthForContract(tower.id)`
+and `windowStartS: null` alongside the building and the dispatcher. A `CampaignTower.id` **is** a
+contract id, so this is the same expression `dev/scenariosPanel.ts`'s *take* writes, not a number
+authored here.
+
+**Why it is needed, measured rather than argued.** § D234 already established that Garden Apartments
+does not reach `WAKE_UP_ARRIVALS` in thirty minutes — twelve seeds, median 18, seven of twelve under
+the line — and authored `c1.shiftLengthS = 3600` for it. That measurement was re-taken on this tree
+through `recordRun` at the campaign's own building: at 1 800 s, three seeds give **16, 26 and 18**
+arrivals and two of the three grade **nothing**; at 3 600 s the same three give **29, 38 and 39** and
+all three grade. A campaign day nothing graded is a day § 8's record may not mark, so without this
+the shipped opening contract would refuse to file on most seeds.
+
+**What it actually guards, stated narrowly.** `initialState` already seeds `c1`'s hour, because the
+page opens on Garden Apartments — so on a cold load this press writes the length that is already
+there and changes nothing. Measured: with the patch removed, the browser journey stays **green**, and
+that is reported rather than hidden. What it guards is a state left at another length, which is
+reachable and not exotic: `withBuilding` deliberately does **not** re-seed, so a player who has taken
+a different assignment or moved the Engineer length control carries it into § 8. The host case
+therefore sets the state to the shipped default first — a press that only agreed with what was
+already there would pass on a build that writes no length at all.
+
+**Why this is the third caller and not `withBuilding` in disguise.** `shiftLengthForContract`'s
+docstring excludes `withBuilding` because changing building from the coach select is not taking an
+assignment. *Lock it in and run day N* **is** taking one: it is the one moment a player has asked for
+this contract rather than for this shift length, which is the same sentence `scenariosPanel`'s take
+is justified by. § 8 offers no length control at all, so there is no choice here to overwrite.
+
+**What is not claimed.** This does not make the campaign day the *whole authored day*
+(`dayPatchFor`'s `wholeDayRun`). Garden Apartments declares no whole day, so that seam would answer
+`{}` and change nothing here; for a contract whose building does declare one, § 8's day and § 6's
+day are different lengths, and reconciling them is not this lane's and is not measured.
+
+---
