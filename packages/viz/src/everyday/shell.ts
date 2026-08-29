@@ -1012,7 +1012,13 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     idName.style.cssText = 'font-size:13px;font-weight:600;margin-top:1px';
     idText.append(idHeading, idName);
     cardTop.append(avatar, idText);
-    const streak = el(doc, 'div', undefined, model.footer.identity.streak);
+    /*
+     * Classed, unlike its two siblings, because it is the one line on this card whose *content* is
+     * a claim about saved state rather than a label — issue #214 — and the browser tier has to be
+     * able to read exactly what a player reads. Selecting it positionally would pass over a card
+     * that had stopped drawing it.
+     */
+    const streak = el(doc, 'div', 'everyday-identity-streak', model.footer.identity.streak);
     streak.style.cssText = `font:500 11px ${TYPE.mono};color:${C.fainter};margin-top:6px`;
     card.append(cardTop, streak);
     footer.append(card);

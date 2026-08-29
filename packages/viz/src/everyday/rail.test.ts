@@ -345,9 +345,9 @@ describe('the PLAYING AS card reports the week the host holds — issue #214', (
   it('keeps the honest absence reachable, with no career claimed and no figure invented', () => {
     /*
      * The refusal stops being the only reachable state; it does not stop being reachable. With no
-     * week at all (a cold load, no host) and with a week nobody has closed a day in, the card
-     * still says so — and says it without a digit, because § 20.11's forbidden thing is a fixture
-     * presented as a player.
+     * week and no week coming (a build with no host at all — the standalone mount a test document
+     * makes) and with a week nobody has closed a day in, the card still says so — and says it
+     * without a digit, because § 20.11's forbidden thing is a fixture presented as a player.
      */
     for (const line of [
       railFooter({ screen: 'menu', ctx: 'daily' }).identity.streak,
@@ -363,6 +363,46 @@ describe('the PLAYING AS card reports the week the host holds — issue #214', (
        */
       expect(line).not.toMatch(/keeps no career/);
     }
+  });
+
+  it('says it has not read the week yet rather than that there is none — #214’s last path', () => {
+    /*
+     * **Gap 1, at the level this module owns it.** `shell.ts#weekRailOptions` answered `{}` for
+     * two states that are not the same state: a build with no host, and a cold load whose host is
+     * still booting. The second is the one with a week in `localStorage`, and the card told that
+     * player they had saved nothing — on the front door, where a `'menu'` route redraws no rail,
+     * so it stood rather than flickering.
+     *
+     * The line is required to be *different* from the refusal rather than merely to exist: a
+     * pending state that reused {@link NO_CAREER_YET}'s words would be this defect with a flag
+     * added, and would pass any test that only asked for a string.
+     */
+    const pending = railFooter({ screen: 'menu', ctx: 'daily' }, { weekPending: true }).identity
+      .streak;
+    const absent = railFooter({ screen: 'menu', ctx: 'daily' }).identity.streak;
+    expect(pending).not.toBe(absent);
+    expect(pending).not.toContain('no days saved');
+    // § 20.11 again, and the reason this line may not carry `0 days running`: nothing has been
+    // read, so any figure here is a fixture presented as a player.
+    expect(pending).not.toMatch(/\d/);
+  });
+
+  it('lets a week that has arrived win over the flag, so the card cannot claim to still be reading', () => {
+    /*
+     * The precedence rule, asserted because the shell spreads both into one object literal and a
+     * future caller could set the flag beside a week it already holds. A card saying *reading your
+     * saved days…* over a week it has been handed would be the same class of false statement in
+     * the opposite direction — and the empty-week arm is asserted too, because that is the one a
+     * `week ?? pending` implementation would get wrong.
+     */
+    const week = weekWith(3, [dayOf(1, MET), dayOf(2, MET)]);
+    expect(
+      railFooter({ screen: 'menu', ctx: 'daily' }, { week, weekPending: true }).identity.streak,
+    ).toBe('2 days running · best 84%');
+    expect(
+      railFooter({ screen: 'menu', ctx: 'daily' }, { week: openWeek(), weekPending: true }).identity
+        .streak,
+    ).toContain('no days saved');
   });
 });
 
