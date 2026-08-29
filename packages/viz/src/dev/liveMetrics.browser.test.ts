@@ -148,6 +148,19 @@ async function overflowing(page: Page): Promise<{
   });
 }
 
+/**
+ * The width question, asked of a real face at a real width.
+ *
+ * **What this sweep reaches, measured rather than assumed — issue #297.** `stageFor` leaves the
+ * playhead in the opening seconds of the run, where no bank has answered anything inside the
+ * rolling window, so the card is drawing `ENGINEER_WORDS.noneInWindow` / `CASUAL_WORDS.noneInWindow`
+ * in place of the bank list. Probed on the narrowest and widest shipped buildings, in both
+ * registers, at 1 280 px and at the 420 px stacked layout: the sentence is present in the card's
+ * text in all eight combinations and nothing overflows. That is worth writing down because issue
+ * #297 lengthened both strings — `nothing served yet` → `nothing served in this window`, and
+ * Casual's by fourteen characters — and a wording change that no width check ever saw is exactly
+ * the defect `docs/21` § 3.4 moved this panel into the DOM to catch.
+ */
 describe.skipIf(!HAS_BROWSER)('the live metrics card fits its own words', () => {
   for (const building of BUILDING_IDS) {
     it(`draws nothing past its own edge on ${building}, in both registers`, async () => {
