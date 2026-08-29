@@ -59,6 +59,7 @@ import {
   type RailSegment,
   type TabName,
 } from './elementMap.js';
+import { setHidden, setText } from './dom.js';
 import type { DisclosureMode } from '../live/types.js';
 
 /** What one tab button should look like. */
@@ -256,9 +257,21 @@ export function applySurfaceState(elements: Elements, state: SurfaceState): void
    * reads the DOM rather than the paint — a copy, a snapshot, an assistive technology walking the
    * tree — and *4 more editors* left behind in Engineer would be the gate's own sentence surviving
    * the gate, which is the failure this notice exists to stop rather than commit.
+   *
+   * Through `dom.ts`'s guarded writers rather than by assignment, which is not tidiness. This runs
+   * from `renderAll`, so it runs on every state change of a running shift, and `setText` exists
+   * with the reason written on it: *"only when it changed, so a 60 Hz redraw does not churn the
+   * accessibility tree."* CLAUDE.md records the sharp end of the same fact one attribute over —
+   * `el.inert = true` on an already-inert element still calls `setAttribute`, still records a
+   * mutation, and hung this renderer. A `textContent` write replaces a text node, which is the more
+   * expensive half of that, and this one sits in a `nowrap` flex child of the tab strip.
+   *
+   * The tab loop above is left assigning directly. It is the same argument and it predates this,
+   * so converting it is a change with its own blast radius and no measurement behind it — named
+   * here rather than done in passing.
    */
-  elements.tabGateNote.hidden = state.gate === undefined;
-  elements.tabGateNote.textContent = state.gate?.text ?? '';
+  setHidden(elements.tabGateNote, state.gate === undefined);
+  setText(elements.tabGateNote, state.gate?.text ?? '');
 }
 
 /**
