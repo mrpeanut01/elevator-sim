@@ -2,11 +2,23 @@
  * **The dispatcher workshop, driven on the page** — the wirings a node test cannot vouch for.
  *
  * The one that matters is the standing requirement, pointed at a slider: *move the control and
- * require the run to change*. `workshopModel.test.ts` asks it of the model; this asks it of the
- * **page**, which is where § D219's five-select editor would have passed every other check. A
- * lever is dragged, and the printed cost line — composed by `costFunctionLine` from the same
- * `weights` map `profileFromSpec` writes into the next run — has to move with it, and the term
- * slider in the drawer below has to be holding the same number.
+ * require the run to change*. `workshopTravel.test.ts` asks that of the **legs**, which is the only
+ * comparison § D177 accepts and which no case in this file may make (§ D220 § 4 — *no metric is
+ * read* — and a legs comparison is a run read off the page). What this file asks of the **page** is
+ * the other half: that the screen's own account of the edit agrees with what that measurement
+ * found. Between them they are the requirement in both of its directions.
+ *
+ * **The sentence above used to end differently, and it was the reason issue #296 shipped.** It said
+ * the printed cost line was *"composed by `costFunctionLine` from the same `weights` map
+ * `profileFromSpec` writes into the next run"*, and the case below asserted on that line alone. The
+ * clause is false: `dev/state.ts#drivingProfileOf` composes the run from `levers`, `selectorSpec`
+ * and `ruleRows` and never from `dispatcherSpec`, so the printed expression moves for a run that
+ * does not. An assertion on it was an assertion on a window statistic wearing a control's clothes —
+ * green through every wave in which thirteen sliders and three flags reached nothing.
+ *
+ * The two drawers agreeing is still asserted, because it is still true and still worth keeping: a
+ * lever and a term slider are two renderings of one vector. What is asserted **beside** it now is
+ * the § 3.3 note, which is the thing a player actually reads about where their edit went.
  *
  * The rest is the disclosure ladder as a player meets it: the drawers announce their contents and
  * survive a redraw (§ 16 rule 13), the maths disclosure puts its plain sentence above its symbols
@@ -92,14 +104,25 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
   }, 120_000);
 
   /**
-   * The standing requirement, on the page.
+   * The standing requirement, on the page — the disclosure half, GitHub issue #296.
    *
    * The lever is moved by writing the range input and dispatching `input`, which is what a drag
-   * produces; the assertion is on the **printed expression**, because that is the artefact a
-   * player reads and it is composed from the weights the run is built from. A screen that had
-   * bound the lever to a local copy would pass every other case in this file and fail this one.
+   * produces. Three things then have to be true at once, and the third is the one this case exists
+   * for:
+   *
+   * 1. the printed expression moves — the drawers are two renderings of one vector;
+   * 2. the term slider in the drawer below holds the same number — the same fact, from the model;
+   * 3. **the § 3.3 note says the weights stay behind**, because they do. `workshopTravel.test.ts`
+   *    measured that on the legs at `midtown-office`, 900 s, seed 20260827, `collective`: the
+   *    patience lever writes `weights.starvation` on `viewer.dispatcherSpec`, and the run is
+   *    byte-identical at either end of its travel.
+   *
+   * Only 1 and 2 were asserted before, and both were green while the footer read *Unsaved changes
+   * travel with the run.* — which is exactly how a printed artefact composed from an ignored field
+   * passes for a control. A screen that bound the lever to a local copy still fails 1 and 2; a
+   * screen that told the truth about neither now fails 3.
    */
-  it('moves the printed cost line when a plain lever moves, and the term slider agrees', async () => {
+  it('moves the printed cost line when a plain lever moves, and says the weights stay behind', async () => {
     const page = await openWorkshop();
     await disclose(page, 'show me the maths', '.everyday-workshop-cost-line');
     const before = await page.textContent('.everyday-workshop-cost-line');
@@ -123,6 +146,47 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     await disclose(page, 'cost terms', '.everyday-workshop-term');
     const slider = page.locator('.everyday-workshop .everyday-workshop-term input[data-term-id="starvation"]');
     expect(await slider.inputValue()).toBe('64');
+
+    /*
+     * And the footer, which is the half that was missing. The assertion is on the claim rather than
+     * on the exact sentence — a lane rewording the note must not have to edit this file, and a lane
+     * that made it claim travel again must fail here whatever words it used.
+     */
+    const note = (await page.textContent('.everyday-bar-note')) ?? '';
+    expect(note, 'a weights-only edit is still being described as travelling with the run').not.toContain(
+      'travel with the run',
+    );
+    expect(note.toLowerCase()).toContain('draft');
+    await page.close();
+  }, 120_000);
+
+  /**
+   * The other direction, which is the half issue #296 does not name and § D227 rates as worse.
+   *
+   * *Keep a car downstairs* writes `GroupLevers.parking`, which `drivingProfileOf` does read — it is
+   * the one lever of the four whose move really does change the run, measured in
+   * `workshopTravel.test.ts`. The boolean this screen used to select its note with was
+   * `ruleRows.length > 0 || specIsDirty(workingSpec, source)`, which does not consult `levers` at
+   * all, so pressing this toggle left the footer reading *Nothing changed yet.* about the only edit
+   * that had landed. A bar that denies a real change is the stale refusal aimed at the working
+   * control, and it sends a player to look for a broken toggle.
+   */
+  it('says a group lever travels, which the old note called nothing changed', async () => {
+    const page = await openWorkshop();
+    const before = (await page.textContent('.everyday-bar-note')) ?? '';
+    expect(before).toContain('Nothing changed yet');
+
+    await page.click('.everyday-workshop-lever:has-text("Keep a car downstairs") button');
+    await page.waitForFunction(
+      (was) => document.querySelector('.everyday-bar-note')?.textContent !== was,
+      before,
+      { timeout: 15_000 },
+    );
+
+    expect(
+      await page.textContent('.everyday-bar-note'),
+      'the lobby lever changes the run and the footer still says nothing changed',
+    ).toContain('travel with the run');
     await page.close();
   }, 120_000);
 

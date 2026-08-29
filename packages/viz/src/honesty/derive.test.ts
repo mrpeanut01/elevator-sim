@@ -511,6 +511,28 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/state.ts#calendarAskInputOf',
         'dev/state.ts#shiftRunConfigOf',
         /*
+         * **Derived for the first time on 2026-08-29, and by a call rather than by a string** —
+         * GitHub issue #300, § D390. It is worth stating that way round because the usual entry
+         * in this group is a hyphenated id the scanner misreads, and this one is not: the evidence
+         * line is `via shiftRunConfigOf: reader have between them.`, which is that function's own
+         * `throw` — *"No building "x" — the page offers only what data/buildings/ and the reader
+         * have between them."*
+         *
+         * `resolvedBuildingOf` used to answer from `resources.entries` by identity and reached no
+         * sentence at all. #300 made it delegate to `shiftRunConfigOf`, so that the brief describes
+         * the building the run will use rather than the shipped one, and it inherited that
+         * function's whole text-producing chain in the same step. The chain is the reason it is
+         * here; the exclusion is the neighbour's above, unchanged and for the same reason.
+         *
+         * It authors nothing of its own. Its two arms are a `ResolvedBuilding` and `undefined`, and
+         * the `undefined` arm is what a caller gets for an unknown id — the throw it inherits is
+         * **unreachable through this function**, because the lookup guard in front of the delegate
+         * answers that case first and `today.test.ts` asserts it in both directions. What a player
+         * reads about the building it resolves is `everyday/today.ts`'s five facts and lede, driven
+         * by the Everyday adapters, and #300's own case requires those to agree with the run.
+         */
+        'dev/state.ts#resolvedBuildingOf',
+        /*
          * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads
          * the `PlayMode` members they switch on — `shift-week`, `free-play` — as prose, because
          * they are hyphenated. They return a boolean and three `WeekState`s between them and author
@@ -656,6 +678,31 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'scope/runIdentity.ts#EXPRESSIBLE_IN_A_SELECTION',
         'scope/runIdentity.ts#fieldsAnsweredFor',
+      ],
+    },
+    {
+      reason:
+        'The workshop’s § 3.3 note **decision**, GitHub issue #296 — `commitmentOf`’s case one ' +
+        'group up, in the screen that consumes it. `WORKSHOP_WRITES` is a tuple of `SurfaceKey`s ' +
+        '(`viewer.dispatcherSpec`) and `WORKSHOP_REACHES` a tuple of answer codes (`draft-only`), ' +
+        'both derived only because a dot and a hyphen read as word breaks to the scanner — the ' +
+        'identical false positive `scope/commitment.ts#COMMITMENTS` is excluded for. ' +
+        '`workshopReachOf` returns one member of the second tuple and `workshopWriteReachesRun` ' +
+        'returns a **boolean**; neither authors a sentence, and that split is deliberate rather ' +
+        'than incidental. The wording a player reads is module-private in ' +
+        '`everyday/workshopScreen.ts`, beside the control, on ' +
+        '`dev/dispatcherEditor.ts#DRAFT_NOTE`’s precedent and under the same stated limitation — ' +
+        'a mount’s copy reaches the static sweep and not the driven one. The two guide sentences ' +
+        'this screen selects between are `everyday/actionBar.ts`’s and are already swept there, ' +
+        'through the § 3.3 table’s own `noteVariants`. What is checked instead of a string search ' +
+        'is stronger and lives in `everyday/workshopTravel.test.ts`: the answer these four produce ' +
+        'must agree with the legs a run actually produces, measured through ' +
+        '`shiftRunConfigOf` → `recordRun`.',
+      ids: [
+        'everyday/workshopModel.ts#WORKSHOP_WRITES',
+        'everyday/workshopModel.ts#WORKSHOP_REACHES',
+        'everyday/workshopModel.ts#workshopReachOf',
+        'everyday/workshopModel.ts#workshopWriteReachesRun',
       ],
     },
     {

@@ -3,8 +3,17 @@
 Backlog snapshot, clusters, priority rationale, and batch plan for the open GitHub Issues on
 `mrpeanut01/elevator-sim`.
 
-**Snapshot taken:** 2026-08-07. **Open issues:** 29 (#90–#119; #95 does not exist). **Open PRs:** 0.
-**Working branch at snapshot:** `feat/azure-app-deployment`, clean. `npm run typecheck` passes.
+**The current snapshot is § C, at the end of this file — 2026-08-29, 89 open.**
+
+This file is three appended snapshots, and **each restarted its own numbering**, so a bare *§ 4* is
+ambiguous across them and *§ 6* named two different sections until this edit. Snapshot A (2026-08-07,
+**29** issues, #90–#119) and snapshot B are kept as history because their wave-A/B/C reasoning chose
+most of the canonicals still in force — but read them as history, not as state: 60 of today's issues
+did not exist when A was written and its batch plan has long since shipped. **The current snapshot is
+lettered rather than numbered so that a citation to it resolves.**
+
+That the header had to say so is this file's own subject arriving on the file. `RISKS.md` **R38** —
+*a count published in prose drifts, and no test re-derives it* — with a backlog snapshot as its count.
 
 This file is the orchestration record. The GitHub issue remains the public source of truth.
 
@@ -439,3 +448,126 @@ Every issue reaches one of: closed with evidence, closed as duplicate **with its
 transferred first**, or open with the unmet criterion named. **A criterion is never narrowed to make
 an issue closable** — where one is unmeetable as written (#213's AC1, #206's AC4), that is recorded
 on the issue as a criterion needing amendment, and the issue stays open until a human amends it.
+
+---
+
+# Snapshot C — 2026-08-29: 89 open, and the 26 that had no disposition at all
+
+**Taken at `f13d455`** (= `origin/main`, wave E merged). **Open issues: 89. Open PRs: 1** (#304, this
+wave). Reconciled mechanically: every open issue number was grepped against
+[`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md). **63 had a ledger row; 26 had none.**
+
+Those 26 were then verified against the code by a read-only lane (task WAVE-F-T) rather than triaged
+from their own text. That distinction is the whole point of the exercise and it paid again.
+
+## C.1 The headline: three of twenty-six fail, and two fail in the direction nobody checks
+
+**Twenty-two central claims survive in full, one in part, three do not.**
+
+- **#256 is already fixed and nobody closed it.** All four acceptance criteria are met at `f13d455`:
+  `render/canvas.ts` withdraws the `wide-only` clause *by name*, states what actually governs the
+  selector (tab open + landing picked — neither a width), declines to invent a replacement width, and
+  re-checks its conclusion on the second support. `render/viewportClaims.test.ts` asserts the class and
+  the 1279 rule are gone. **Recommended close as obsolete** — the only row in the set where the reported
+  behaviour was verified resolved rather than plausibly addressed.
+- **#237 — the only P0 in the set — rests on a false premise.** It says *"Every row of `TEST_MATRIX.md`
+  reads `planned` … none exists"*. The matrix today reads **3 passing / 14 owned / 4 planned**, and
+  **all 18 test files it names exist on disk**. Three of the four `planned` rows are unbuildable as
+  written. It needs rescoping, not building — and it is **P0 on a premise that was already false 237
+  commits ago.**
+- **#171 fails in the rare direction: it claims a blocker was *removed* and the code says it was not.**
+  `EverydayState.ctx` has exactly three writers in `everyday/shell.ts` and **all three write `'daily'`**,
+  so `ctx === 'campaign'` is produced by no route and the `stageScreenModel.ts` docstring #171
+  contradicts is **correct**. This is § D227's shape **inverted** — the docstring is true and the
+  *issue* is the stale sentence. Worth stating plainly, because the reflex is to trust the issue over
+  the docstring.
+
+**#237 and #171 are why this file now records the reciprocal of the standing habit.** *Verify before you
+build* has always meant *the issue may overstate a defect*. These two are the other polarity: an issue
+may **understate the tree**, or assert a fix that has not happened. A backlog is a set of claims about
+code, and claims go stale in both directions.
+
+## C.2 The process finding, which outranks any single row
+
+**Five of the 26 already carried adjudications — three with allocated decision numbers, § D330, § D367
+and § D372 — posted as GitHub issue comments on 2026-08-25/26. Not one reached the ledger.** Verified
+mechanically: 0 ledger mentions across all 26.
+
+So the ledger was not *missing* dispositions so much as **competing with a second record**. That is
+`RISKS.md` **R38** aimed at the orchestration layer itself, and it compounds **R42** (*a ruling with no
+consumer*): § D330 chose mode-aware tab reveal and none of its three conditions is built; § D367 ruled
+the energy bar permitted and its goal is unwritten; § D372 chose a new tutorial building.
+
+**And two of those rulings were sequenced behind #280, which merged on 2026-08-26 — so #270 and #275
+have been silently unblocked for three days and nobody re-read them.** A blocker that clears is not an
+event anything in this process watches for. It should be.
+
+## C.3 Dispositions
+
+| disposition | issues |
+|---|---|
+| **implement now** | #163, #175, #149, #130 |
+| **close as obsolete** (recommended, owner's call) | #256 |
+| **needs information / rescope** | #237, #171 |
+| **escalate to product owner** | #157, #199, #204, #252 |
+| **blocked, with the blocker named** | #239 (by #204), #250 (by #201/#202), #222 (by #221/#161) |
+| **combine, preserving unique scope** | #181 → #223 (break 1) + #169 (break 2), **keeping breaks 3–4** |
+| **schedule** | #286, #275 (AC2/AC3 only), #270, #251, #246, #245, #244, #242, #176, #167, #159 |
+
+**#181's combination is the one to read twice.** Its four breaks have four different owners in this set,
+and closing any one alone leaves the loop open: a day that files (#223) into an economy nothing reaches
+(#181's breaks 3–4) still cannot be played. **#181 must survive its own combination** — *nothing bought
+reaches a run* and *`buildId` writes a field no run reads* are the § D219 inert-control class at the
+scale of a mode's economy, and neither #223 nor #169 carries them.
+
+**#130, #270 and #275 are not escalations.** They already have rulings. They need building.
+
+## C.4 Clusters, in value-per-risk order
+
+- **A · CI and test infrastructure — #163, #149, #238, #281, #237.** Shared surface (`ci.yml`,
+  `vitest.config.ts`), none changes what the product does, and #163/#149 are purely additive — they
+  **cannot redden the per-PR suite**. Highest value-per-risk batch in the backlog. #163 is the standout:
+  a scheduled workflow setting two environment variables turns on **~19 opt-in cases** including the
+  repository's **only seed-collision check**, which invariants 2 and 5 both rest on. The issue said 17;
+  the count has drifted up to 19 while the defect has not moved.
+- **B · The stale-statement class (R38) — #230 (canonical), #286, #256, #176's figure half, #172, #173,
+  #166, #170.** Shared *root cause*, not shared file. The durable fix is identical in each: derive the
+  number from the structure. #286 from `STAGE_SPEEDS.length`; #176 corrects *"three DOM panels"* to
+  **17**; #175's *"seven"* from `Object.keys(DEAD_CANDIDATES).length`.
+- **C · The campaign loop — #223, #181, #169, #171, #234, #270, #224.** Shared files: `campaign/career.ts`
+  and `everyday/host.ts`.
+- **D · Run-context reachability — #182, #171, #220, #223.** *A cluster verification created rather than
+  found.* One fix — commit `ctx` from the tile — unblocks the § 7.5 intervention dock, the campaign
+  timeline and the rush context at once. **#182 files only `watch`; `campaign` and `rush` are equally
+  unreachable and are in no issue.**
+- **E · Launch and liveops — #241 + {#242…#246} and #247 + {#248…#252}.** Shared milestone and
+  decision-maker rather than shared files. **Nine of eleven need a product ruling before any code.**
+- **F · Content plan and dependents — #199, #232, #233, #158, #157, #159, #235, #174.** #199 sets the
+  targets #232 is literally titled against.
+- **G · Accessibility — #204 then #239.** Strictly sequential; schedule adjacently, never batch together.
+  #239's acceptance is unwritable until #204 states the standard **and its exclusions**.
+- **H · Engineer B2/B5 — #228 (canonical), #167 (narrowed), #162, #227, #178**, in that dependency order.
+
+## C.5 Found in the tree, in no issue
+
+1. **`EverydayState.ctx` has three writers and all write `'daily'`** — so `campaign` and `rush` are as
+   unreachable as `watch`, and only `watch` is filed (#182). The `ctx:` hits in `everyday/actionBar.ts`
+   are table rows keyed by context, not writers.
+2. **`TEST_MATRIX.md` has 21 rows, not the 22 the orchestration record states** — and the matrix says so
+   itself. R38 again, on the file that exists to track coverage.
+3. **A residual from #256 that the product names and no issue holds.** `packages/viz/UX.md` `RS-02`'s own
+   note records that `render/viewportClaims.test.ts` derives its breakpoint set from `index.html` and
+   sweeps `.ts` files but **does not read `UX.md`**, and its withdrawn-claim constant is spelled
+   differently from either row. So `RS-01`/`RS-02` can drift again with nothing to catch it. One line of
+   scope on a test that already exists.
+4. **`project('server')` carries `core`'s timeout exposure and `store.test.ts` has no annotations at
+   all** — so #149's `server` half is strictly worse than the `core` half its title names.
+
+## C.6 Exit criteria, unchanged and restated because they were nearly broken here
+
+Every issue reaches one of: closed with evidence, closed as duplicate **with its unique scope
+transferred first**, or open with the unmet criterion named. **A criterion is never narrowed to make an
+issue closable.** #237 is the live test of that rule: the cheap move is to rewrite its acceptance
+criteria down to what the tree already does and close it. That would be weakening a criterion to make a
+phase pass, which `CLAUDE.md` forbids outright. It is **needs-information**, and it stays open until a
+human rescopes it.

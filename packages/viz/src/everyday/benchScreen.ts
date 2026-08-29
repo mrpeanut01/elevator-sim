@@ -443,8 +443,16 @@ function mountBench(
         continue;
       }
 
-      if (view.tooCloseCellIds.includes(cell.cellId)) {
-        const heading = el(doc, 'div', 'everyday-bench-too-close', COPY.tooCloseHeading);
+      /*
+       * The model's heading, not `COPY.tooCloseHeading` — GitHub issue #301, § D389. The bare
+       * phrase said nothing about how many of the rows below it spoke for, while `cell.answer`
+       * under those same rows could be simultaneously announcing a separation. Both were true of
+       * their own subset and neither named it. `benchModel.ts` composes the basis; this file draws
+       * what it is handed, which is what *"this file authors no claim about a run"* means here.
+       */
+      const tooClose = view.tooClose.find((mark) => mark.cellId === cell.cellId);
+      if (tooClose !== undefined) {
+        const heading = el(doc, 'div', 'everyday-bench-too-close', tooClose.heading);
         heading.style.cssText = `font:500 12px ${TYPE.mono};color:${C.warmGrey};margin-top:10px`;
         card.append(heading);
       }

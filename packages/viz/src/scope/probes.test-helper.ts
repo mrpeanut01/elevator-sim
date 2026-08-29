@@ -48,7 +48,7 @@ import {
   resolveBuilding,
 } from '@elevator-sim/core/browser';
 
-import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
+import { DEFAULT_LEVERS, specFromProfile } from '../authoring/dispatcherSpec.js';
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
 import type { BrowserResources } from '../dev/data.js';
 import { disclosureOf, initialState, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
@@ -810,3 +810,218 @@ export const SINK_IS_A_MOUNT: Readonly<Record<string, string>> = Object.freeze({
  * `DEAD_CANDIDATES` idiom — and `scope.test.ts` asserts an entry cannot outlive its bug.
  */
 export const SINK_MISSING: Readonly<Record<string, string>> = Object.freeze({});
+
+/* -------------------------------------------------------------------------- *
+ * The latent probes
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Two arms over a **latent** row, and the state that realises it.
+ *
+ * `PROBES` above covers exactly the `control` rows — `surface.test.ts` asserts that in both
+ * directions — so the latent half needs its own map rather than an extension of that one. Widening
+ * `PROBES` would have turned *"a control with no probe is a scope nothing checks"* into a weaker
+ * sentence, and that assertion is the reason a control cannot be added here unnoticed.
+ *
+ * ## Why this exists
+ *
+ * Until it did, **no `latent` row had ever been driven at either end**. Every `describe` in
+ * `scope.test.ts` iterated `controls()`, so the eight rows whose whole claim is *"moving this
+ * changes no leg"* were taken on the declaration's word. That matters because
+ * `scope/commitment.ts#commitmentOf` reads the same table and three shipped surfaces derive their
+ * words from it — `dev/dispatcherEditor.ts`'s `DRAFT_NOTE` and `FAMILY_SCOPE_NOTE`, and (since
+ * [§ D386](../../../../DECISIONS.md)) `everyday/workshopScreen.ts`'s § 3.3 note. **A `latent` row
+ * that had quietly become live would be a refusal drawn over a working control**, which
+ * [§ D227](../../../../DECISIONS.md) rates as worse than a missing sentence, and it is the exact
+ * inverse of what `scope.test.ts` was built to catch.
+ *
+ * Found while fixing GitHub issue #296, which measured `viewer.dispatcherSpec` directly and found
+ * the declaration **true**. So this closes a missing instrument rather than an open defect — and an
+ * instrument written after the fact, against a table that currently passes, is one nobody has seen
+ * fail. That is what the mutation in `scope.test.ts`'s own docstring is for.
+ *
+ * ## The arms move the substantive field, never the name
+ *
+ * All four editor drafts carry a `name`, and mutating it would be the cheapest arm to write and the
+ * wrong one: a run that ignored `name` while honouring `weights` would pass. Each arm therefore
+ * moves the field that **would** move a run if the row had become live — `weights` for the
+ * dispatcher draft (the thirteen sliders issue #296 measured), `ratePctPop5min` for the traffic
+ * draft, `speedTypicalMps` for the machine draft, `floors` for the building draft.
+ */
+export interface LatentProbe {
+  /**
+   * The `ViewerState` field this row names, so the vacuity guard can read it.
+   *
+   * `surface.test.ts` requires it to equal the key with `viewer.` removed, so it cannot drift into
+   * pointing at a different field than the row it is filed under — which would let an arm that
+   * moves nothing look like an arm that moves something.
+   */
+  readonly field: keyof ViewerState;
+  /** Two states differing in exactly {@link field}. Their legs must be byte-identical. */
+  readonly states: readonly [(s: ViewerState) => ViewerState, (s: ViewerState) => ViewerState];
+  /**
+   * The same draft, carried through `realisedBy` all the way to a run. Their legs must **differ**.
+   *
+   * This is the half that tells a genuinely latent field from a wholly inert one: *"the legs do not
+   * move, and they do move once the chain that realises it is written."* Optional, because for two
+   * rows the realising state is not constructible here without reproducing a shipped save path —
+   * `scope.test.ts` names which, and covers every row either way with the derived chain check.
+   */
+  readonly realised?: readonly [(s: ViewerState) => ViewerState, (s: ViewerState) => ViewerState];
+}
+
+/** The profile a saved-and-selected arm points at — a shipped one, so no profile is invented. */
+const RIVAL_PROFILE = RESOURCES.dispatcherProfiles.profiles.find((p) => p.id === 'nearest-car');
+
+/** Likewise the building: a shipped config, resolved the way every other probe in this file does. */
+const RIVAL_BUILDING = RESOURCES.buildings.find((entry) => entry.id === 'midtown-office')?.config;
+
+/**
+ * The building the four editor-draft arms sit on, and it is a measurement rather than a preference.
+ *
+ * `baseState()` is `garden-apartments` at 900 s, and **on that base the dispatcher's cost weights
+ * change no leg at all.** Measured, under a mutation that pointed `drivingProfileOf` at
+ * `state.dispatcherSpec`: two arms carrying genuinely different driving profiles — `{waitTime: 1}`
+ * against `{distanceTravelled: 1}` — produced byte-identical legs. A four-car residential building
+ * over fifteen minutes rarely has two cars worth choosing between, so the cost function has nothing
+ * to discriminate.
+ *
+ * | base | do weights alone move the legs? |
+ * |---|---|
+ * | `garden-apartments` 900 s | **no** |
+ * | `garden-apartments` 1800 s | yes |
+ * | `midtown-office` 900 s | **yes** |
+ *
+ * That matters because an arm which cannot move a leg **even when the field is wired** is an arm
+ * that passes for the wrong reason: the vacuity guard sees two different states, the legs agree, and
+ * the case reports *latent* about a row it could not have caught. The four drafts therefore sit on
+ * `midtown-office`, where the same mutation does turn the case red. Both arms move it together, so
+ * they still differ from each other in exactly the field the row names.
+ */
+const BUSY = 'midtown-office';
+
+/**
+ * The two dispatcher drafts the latent arm moves between, and **why these two**.
+ *
+ * The first arm written here moved every weight by `+1`, which passed the vacuity guard — the states
+ * really did differ — and **could not have detected the wiring it exists to detect**. Found by the
+ * mutation rather than by review: pointing `drivingProfileOf` at `state.dispatcherSpec` reddened
+ * three neighbouring cases and left this row green, because `profileFromSpec` maps a slider position
+ * through `position / 100`, so `+1` is a 0.01 move in a cost term and changes no decision on a
+ * four-car building over 900 s.
+ *
+ * These are `collective` and `nearest-car` instead — the same two profiles `viewer.dispatcherId`'s
+ * own probe moves between, and that case asserts they produce **different legs**. So the arm's
+ * decisiveness is not argued here; it is held by a neighbouring assertion that would go red first.
+ */
+const COLLECTIVE_SPEC = (() => {
+  const profile = RESOURCES.dispatcherProfiles.profiles.find((p) => p.id === 'collective');
+  return profile === undefined ? undefined : specFromProfile(profile, profile.name);
+})();
+const RIVAL_SPEC = RIVAL_PROFILE === undefined ? undefined : specFromProfile(RIVAL_PROFILE, RIVAL_PROFILE.name);
+
+export const LATENT_PROBES: Readonly<Record<SurfaceKey, LatentProbe>> = Object.freeze({
+  'viewer.parkedWeeks': {
+    field: 'parkedWeeks',
+    // Parking a week is the write; `shiftRunConfigOf` never reads the shelf it lands on.
+    states: [(s) => ({ ...s, parkedWeeks: [] }), (s) => ({ ...s, parkedWeeks: [nextDay(nextDay(s.week))] })],
+    /*
+     * Realised by `viewer.buildingId`, and the row's own `why` states the mechanism: resuming an
+     * assignment restores its **day**, which is what `grownBuilding`'s 11 %/day is applied to, so a
+     * resumed day 5 is a different run from a fresh day 1. The arms move `week` because that is what
+     * a resume writes — the shelf is the store, the week is the thing restored from it.
+     */
+    realised: [(s) => s, (s) => ({ ...s, week: nextDay(nextDay(nextDay(nextDay(s.week)))) })],
+  },
+  'viewer.savedDispatchers': {
+    field: 'savedDispatchers',
+    states: [
+      (s) => ({ ...s, savedDispatchers: [] }),
+      (s) => ({
+        ...s,
+        savedDispatchers: RIVAL_PROFILE === undefined ? [] : [{ id: 'probe-saved', profile: RIVAL_PROFILE }],
+      }),
+    ],
+    // Saved **and** selected. The save alone is the arm above and moves nothing; naming it in
+    // `dispatcherId` is what `realisedBy` says turns it into a run.
+    realised: [
+      (s) => ({ ...s, dispatcherId: 'collective' }),
+      (s) => ({
+        ...s,
+        savedDispatchers: RIVAL_PROFILE === undefined ? [] : [{ id: 'probe-saved', profile: RIVAL_PROFILE }],
+        dispatcherId: 'probe-saved',
+      }),
+    ],
+  },
+  'viewer.savedPatterns': {
+    field: 'savedPatterns',
+    states: [
+      (s) => ({ ...s, savedPatterns: [] }),
+      (s) => ({ ...s, savedPatterns: [{ id: 'probe-pattern', spec: s.patternSpec }] }),
+    ],
+    realised: [
+      (s) => ({ ...s, pattern: 'building' }),
+      (s) => ({
+        ...s,
+        savedPatterns: [
+          { id: 'probe-pattern', spec: { ...s.patternSpec, ratePctPop5min: s.patternSpec.ratePctPop5min * 3 + 7 } },
+        ],
+        pattern: 'probe-pattern',
+      }),
+    ],
+  },
+  'viewer.savedBuildings': {
+    field: 'savedBuildings',
+    states: [
+      (s) => ({ ...s, savedBuildings: [] }),
+      (s) => ({
+        ...s,
+        savedBuildings: RIVAL_BUILDING === undefined ? [] : [{ id: 'probe-building', config: RIVAL_BUILDING }],
+      }),
+    ],
+    realised: [
+      (s) => ({ ...s, buildingId: 'garden-apartments' }),
+      (s) => ({
+        ...s,
+        savedBuildings: RIVAL_BUILDING === undefined ? [] : [{ id: 'probe-building', config: RIVAL_BUILDING }],
+        buildingId: 'probe-building',
+      }),
+    ],
+  },
+  'viewer.dispatcherSpec': {
+    field: 'dispatcherSpec',
+    /*
+     * The thirteen sliders issue #296 drove, moved together rather than one at a time: this asks
+     * whether the draft reaches a run at all, and #296 already established that no single term does.
+     */
+    states: [
+      (s) => (COLLECTIVE_SPEC === undefined ? s : { ...s, buildingId: BUSY, dispatcherSpec: COLLECTIVE_SPEC }),
+      (s) => (RIVAL_SPEC === undefined ? s : { ...s, buildingId: BUSY, dispatcherSpec: RIVAL_SPEC }),
+    ],
+  },
+  'viewer.patternSpec': {
+    field: 'patternSpec',
+    states: [
+      (s) => ({ ...s, buildingId: BUSY }),
+      (s) => ({ ...s, buildingId: BUSY, patternSpec: { ...s.patternSpec, ratePctPop5min: s.patternSpec.ratePctPop5min * 3 + 7 } }),
+    ],
+  },
+  'viewer.machineSpec': {
+    field: 'machineSpec',
+    states: [
+      (s) => ({ ...s, buildingId: BUSY }),
+      (s) => ({
+        ...s,
+        buildingId: BUSY,
+        machineSpec: { ...s.machineSpec, speedTypicalMps: s.machineSpec.speedTypicalMps / 2 + 0.3 },
+      }),
+    ],
+  },
+  'viewer.buildingSpec': {
+    field: 'buildingSpec',
+    states: [
+      (s) => ({ ...s, buildingId: BUSY }),
+      (s) => ({ ...s, buildingId: BUSY, buildingSpec: { ...s.buildingSpec, floors: s.buildingSpec.floors + 9 } }),
+    ],
+  },
+});

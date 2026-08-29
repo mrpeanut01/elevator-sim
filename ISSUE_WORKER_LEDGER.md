@@ -573,3 +573,87 @@ headline and it is the fourth consecutive wave to report it.
 
 **What no fix in this wave has:** verification against a deployed artifact. The PR's Azure preview is
 unreachable from this container — `CONNECT` returns **403**, as § D374 recorded on 2026-08-25.
+
+---
+
+## Wave F closed — the 2026-08-27 verifier's own findings
+
+**Base `f13d455`** (wave E merged). **Integration branch** `claude/github-issue-worker-5rz7vo`,
+PR **#304**. Five build lanes in worktrees, one read-only triage lane run concurrently.
+
+### Dispositions
+
+| # | P | disposition | evidence |
+|---|---|---|---|
+| **296** | P1 | **fixed — disclosure** | All clauses confirmed on the legs; widened to 13 terms and 3 flags **one at a time and all together: moved the legs 0, inert 16**. A half the issue does not name and § D227 rates worse: `workingCopyIsDirty` never read `levers`, so `lobby` — the one lever that *does* change the run — said *"Nothing changed yet."* § D386 |
+| **297** | P1 | **fixed — the sentence names its window** | Reproduces exactly: **44 of 361 playheads (12.2 %)** on `garden-apartments` 3 600 s seed 20260827. Invisible on the standard fixtures — all eight buildings report zero at the 900 s breadth rates, which is why seven waves never saw it |
+| **298** | P1 | **fixed at the seam** | 1 432 px reproduces to the pixel on a **built bundle**, not a dev server. Three refutations, one of which decided the test's shape — see below. Fixed in `shell.ts`, so it holds for all nine screens that rebuild in place. § D388 |
+| **299** | P2 | **fixed — text, pinned to a run** | Confirmed digit for digit on five buildings, then **measured on all eight because that is where the remedy is offered**. Only two of eight behave as the withdrawn sentence assumed. § D392 |
+| **300** | P2 | **fixed — asks the run** | All five rows reproduce, **and the issue named the smallest of three producers**. #36's case kept **by construction** (`growthFactor(1)` is exactly 1), not by a branch. § D390 |
+| **301** | P3 | **fixed at the model** | Confirmed by construction (1 resolved / 5 unresolved / 2 shown drew both rollups unqualified). `answerFor` deliberately **not** touched — shared with the Engineer panel and the CLI. § D389 |
+| **303** | P2 | **fixed — § 2 met, not renegotiated** | 42.5 % at 1280×800 confirmed; `340px` → `60vh`. The margin is **zero on purpose** rather than padded to a threshold with nothing behind it. Three clause-2 entries left `OUTSTANDING` on the fixing commit. § D391 |
+
+**Every lane refuted something in its own brief — the fifth consecutive wave to report it.**
+
+### The refutations that changed what was built
+
+- **#298's mechanism was incomplete, and the missing half decided the instrument.** The clamp needs a
+  layout forced *while the container is empty*, and what forces it is the **focus teardown of the
+  control just pressed**. A synthetic `element.click()` loses **0 px at every offset**, before the fix
+  as well as after — **a case built that way would have been green on the defect.**
+- **#298's *"at 1280×800 both screens fit"* is false** — 623 px and 1 071 px of overflow. The desktop
+  row was an artefact of measuring from offset 0, so desktop is a second instance rather than a control.
+- **#300 named one producer of three.** The calendar is worse than the growth it reported — *1 710
+  people about a run of 437* — and commissioning is a third.
+- **#299 understated itself.** Crown Hotel raises the dropped count on the **first** press off its own
+  minimum; St Jude's refuses on `censored` and never on `saturated`. Its `garden-apartments` ladder was
+  refuted **in the direction that strengthens the issue**.
+
+### Recorded rather than fixed
+
+- **No player can press a fix-it repair card at 375×667** — 30 px wide, 807 px tall, overlapping,
+  pushed outside the region; `elementFromPoint` answers `null`. That is why #298's `3 713 px` row could
+  not be reproduced. A **dead control**, not cramped layout. Belongs to **#240**.
+- **The PR preview is still unreachable** — `CONNECT` 403, re-measured on this PR's own stage URL
+  rather than inherited from § D374. **Fourth consecutive wave with no fix verified against a deployed
+  artifact.**
+
+### What the integrator verified rather than accepted
+
+- **Every lane's instruments were mutation-validated by the integrator.** Lane A's reported *"4 RED"*
+  measured as **3**; corrected rather than repeated. Its real proof is the two-state mutation, failing
+  with *"`["viewer.dispatcherSpec"]` reaches no run and the bar would still claim the edit travelled"*.
+- **Lane D's two `shell.browser.test.ts` failures were checked, not accepted as contention** — 15/15 in
+  isolation, exit code read directly.
+- **A local full-suite run reported `exit code 0` from the harness and `VITEST_EXIT=124` from vitest.**
+  It was killed by its own timeout and produced no result. **It is not recorded as a pass.** CI's
+  completed run is the one quoted: 465 files, 9 143 passed, 12 skipped, one failure.
+
+### The one CI failure, and what it says
+
+`viewportGateClaims.test.ts` red on `suite (macos)` at `5cc39bf`: Lane C's new browser file took the
+tier to **31** while five sites still said **30**. Re-derived rather than copied from the failure.
+
+**That count has now been wrong at five distinct values** — 25, 26, 29, 30, 31 — every one correct where
+it was taken. R38 caught by a gate built for R38, and **no mutation was needed to validate the
+instrument: CI failed on it live.**
+
+### Process, changed before dispatch rather than at integration
+
+- **Decision numbers pre-allocated D386–D392**, because the owed-decision ratchet sits at **64 with zero
+  headroom** and the standard *"say a number is owed"* brief now hands the integrator a red gate. Six
+  used; charter next-free **D393**, reconciled **four times** because every lane edited that row and each
+  was correct on its own branch.
+- **Ownership declared by function rather than by file**, so `dev/state.ts` and `batch/report.ts` each
+  carried two lanes instead of serialising four into two.
+
+### Owed to the next session
+
+- **#256 is verifiably already fixed and is not closed** — all four criteria met at `f13d455`. Closure
+  was left to the owner rather than taken.
+- **#237 (P0) and #171 need rescoping, not building.** Both rest on premises the code refutes.
+- **Five of the 26 unledgered issues carried adjudications posted as GitHub comments that never reached
+  this file**, three with allocated decision numbers. The ledger has been competing with a second
+  record; § C of `ISSUE_TRIAGE_PLAN.md` names them.
+- **#270 and #275 were silently unblocked** when #280 merged on 2026-08-26. Nothing in this process
+  watches for a blocker clearing.

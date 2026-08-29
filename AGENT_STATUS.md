@@ -797,3 +797,80 @@ conditions were green before the fix.
 **Unreachable from this container, re-confirmed today:** the PR's Azure preview. `CONNECT` returns
 **403**, exactly as § D374 recorded on 2026-08-25. So no landed fix in this wave has been verified
 against a deployed artifact, and none is described as though it had been.
+
+---
+
+## Wave F — the 2026-08-27 verifier's own findings (in flight)
+
+**Opened** 2026-08-29 on base `f13d455` = `origin/main` (wave E merged). **Integration branch:**
+`claude/github-issue-worker-5rz7vo`, PR **#304**. Five build lanes in worktrees, plus one read-only
+triage lane run **concurrently** with them.
+
+All five worktrees were confirmed provisioned at `f13d455` by the integrator, not merely asked to check
+— wave B lost two lanes to a stale base and wave E's brief added the check that caught it.
+
+| lane | task | issues | status | next action |
+|---|---|---|---|---|
+| A | WAVE-F-A | #296 (P1) | in flight | — |
+| B | WAVE-F-B | #297 (P1) | in flight | — |
+| C | WAVE-F-C | #298 (P1), #301 (P3) | in flight | — |
+| D | WAVE-F-D | #300 (P2), #303 (P2) | in flight | — |
+| E | WAVE-F-E | #299 (P2) | in flight | — |
+| T | WAVE-F-T | 26 unledgered | **complete** | recorded as `ISSUE_TRIAGE_PLAN.md` § C |
+
+### What the integrator changed in the standard brief, and why
+
+**Decision numbers were pre-allocated, D386–D392, one or two per lane.** Every brief in this repository
+has said *put the argument in a docstring, say a number is owed, the integrator allocates at merge*.
+That instruction is now **actively harmful**: `validation/documentation.test.ts`'s ratchet counts the
+literal phrase across `.ts` and `.md` and stands at **64 with zero headroom**, so a lane following the
+standard brief to the letter hands the integrator a red gate. Wave E discovered that at its own
+integration and said so; this is the first wave to act on it before dispatch rather than after.
+
+Lanes were told: use your number and write **both** the citation and the `DECISIONS.md` section, or take
+no number at all — never the phrase. `citations.test.ts` requires a cited `§ Dnnn` to resolve, so the
+two halves cannot be split across lanes.
+
+**Two files are wanted by two lanes each, and ownership is declared by function rather than by file.**
+`dev/state.ts` — Lane A owns `drivingProfileOf`, Lane D owns `resolvedBuildingOf`, ~60 lines apart.
+`batch/report.ts` — Lane E owns `remedyFor`, Lane C owns `answerFor`, ~90 lines apart. A file-level lock
+would have serialised four lanes into two.
+
+### The environment differs from the last handoff, and it is measured rather than inherited
+
+- **Node v22.22.2** against `engines.node: >=26`. The last handoff reported Node 26.5. The `EBADENGINE`
+  warning is expected and is not an error; typecheck and both test tiers pass on it here.
+- **Chromium headless shell r1194** at `/opt/pw-browsers/`, against the **1234** `playwright-core` pins.
+  `ELEVATOR_SIM_CHROMIUM` reaches it and the browser tier runs — verified on a real browser file before
+  any lane was dispatched, rather than assumed from the handoff.
+- **The PR's Azure preview is still unreachable.** `CONNECT` returns **403**, re-measured on #304's own
+  stage URL rather than carried over on [§ D374](DECISIONS.md)'s word. **Fourth consecutive wave with no
+  fix verified against a deployed artifact.**
+
+### The measurement wave E left owed, half discharged
+
+[§ D343](DECISIONS.md) takes the honesty corpus **once, after integration, never per branch**, and wave E
+closed owing it. Measured on `f13d455`, always-on tier: **49 cases · 570 217 strings · 606 simulations ·
+51 surfaces · 0 failing**, against the published **569 663** strings — **+554, everything else unmoved**,
+which is the shape wave E predicted for itself. The deep tier is still running and **`CLAUDE.md`'s row is
+not edited until both halves are measured in one sitting.**
+
+**The figures could not be read off a run at all**, which is why this kept being skipped:
+`honesty.test.ts` computes every one of them and prints them with `console.log`, which **vitest 4
+intercepts**. `honesty/measure.corpus.test.ts` (`e2626d4`) writes them to a file instead, dumps the
+surface **set** rather than only the count, asserts nothing, and is gated on `CORPUS_OUT` so the default
+suite does not pay for it. `RISKS.md` R38's own mitigation names the hole it fills — *"published study
+intervals already have a guard that re-derives them; prose counts do not"*.
+
+### The triage lane's finding that outranks its own table
+
+**Five of the 26 unledgered issues already carried adjudications — three with allocated decision numbers,
+§ D330, § D367 and § D372, posted as GitHub comments on 2026-08-25/26 — and not one reached the ledger.**
+Zero ledger mentions across all 26, confirmed mechanically. The ledger is **competing with a second
+record**, which is R38 aimed at this board rather than at the product, compounding R42 (*a ruling with no
+consumer*).
+
+**And #280 merged on 2026-08-26, silently unblocking #270 and #275.** Both issues' own comments sequence
+them behind it; nobody re-read either. **A blocker that clears is not an event this process watches
+for** — every dependency in the ledger is recorded as a blocker and none is recorded as a thing to
+re-check when its blocker lands.

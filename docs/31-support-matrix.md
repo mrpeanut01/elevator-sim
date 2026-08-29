@@ -50,8 +50,8 @@ legs, and a run in which it would silently skip is red rather than green
 
 | Platform | Browser | Evidence |
 |---|---|---|
-| Linux, x86-64 (`ubuntu-latest`) | **Chromium** headless shell, from `playwright-core` | 30 `*.browser.test.ts` files, driven through a real Vite dev server against the built `core` |
-| macOS (`macos-latest`, ARM64 today) | **Chromium** headless shell, from `playwright-core` | The same 30 `*.browser.test.ts` files, same gate |
+| Linux, x86-64 (`ubuntu-latest`) | **Chromium** headless shell, from `playwright-core` | 31 `*.browser.test.ts` files, driven through a real Vite dev server against the built `core` |
+| macOS (`macos-latest`, ARM64 today) | **Chromium** headless shell, from `playwright-core` | The same 31 `*.browser.test.ts` files, same gate |
 
 Three things about this tier that a reader will otherwise assume wrongly:
 
@@ -79,7 +79,7 @@ the result written down. **A tier-2 row with no date is a tier-3 row that has no
 |---|---|---|---|
 | Desktop Chromium at 1280×800 | Chromium | continuous | `packages/viz/src/dev/fold1280.browser.test.ts` — this is really tier 1, listed here because § 2 needs the viewport |
 | Desktop, narrow layouts at 375×667, 414×896, 767×700 — **the Engineer surface** | Chromium | 2026-07-30 (wave 12 drive phase, commit `5d4b782`) | `packages/viz/UX.md` rows `RX-03`, `RX-04b`, `RX-12`. The shell those three were fixed against is the one `@media (max-width: 767px)` restyles; `packages/viz/index.html` did not load `everyday/boot.ts` until 2026-08-12 ([§ D335](../DECISIONS.md)), so this row says nothing about the shell a player now meets first |
-| Narrow layouts at 360×800 and 375×667 — **the Everyday shell** | Chromium | continuous, since GitHub issue #292 | `packages/viz/src/everyday/viewportGates.browser.test.ts` — really tier 1. It measures all three of § 2's clauses and **currently registers 21 failures across them**, which is the state § 2 commits against and #240 is open to fix |
+| Narrow layouts at 360×800 and 375×667 — **the Everyday shell** | Chromium | continuous, since GitHub issue #292 | `packages/viz/src/everyday/viewportGates.browser.test.ts` — really tier 1. It measures all three of § 2's clauses and **currently registers 18 failures across them** — ~~*21*~~ until GitHub issue #303 closed the three clause-2 rows on 2026-08-29 ([§ D391](../DECISIONS.md)) — which is the state § 2 commits against and #240 is open to fix. Every one of the 18 is now #240's |
 
 **And that is the whole of tier 2, which is the finding.** No row in this table names Firefox, Safari,
 or Edge, because no record in this tree says the product has been opened in one. If you have driven
@@ -169,20 +169,34 @@ stated as two clauses that can each fail:
   width and a gate. 360 px is chosen because it is the narrowest width any evidence in this tree
   touches (`layout.test.ts`'s 360 px case), so committing to it costs a test rather than a redesign.
 
-  **The gate exists now, it measures all three clauses, and the product fails all three**
-  (`packages/viz/src/everyday/viewportGates.browser.test.ts`, GitHub issue #292). Measured
-  2026-08-27 on the Everyday shell: at 360×800 the screen region is 148 px against content that lays
-  out at 241, `.everyday-main` clips **93 px** on the main menu and **337 px** on the stage, **five**
-  controls on the menu cannot be brought into the viewport by any gesture — all four mode tiles, and
-  the pinned action bar's primary, `Play today's tower`, drawn at `left: 360` and so wholly outside
-  the viewport — and the stage canvas holds **42.5 %** of the height against this clause's 60 %.
-  At 375×667: 78 px, 322 px, five controls, 51.0 %. The **cost of the commitment is now visible**,
-  which is what a gate is for; the layout work is #240's and the findings are registered rather than
-  suppressed, so a new one is red and a fixed one is red as *delete this entry*.
+  **The gate exists now, it measures all three clauses, and the product fails ~~*all three*~~ two of
+  the three** (`packages/viz/src/everyday/viewportGates.browser.test.ts`, GitHub issue #292).
+  Measured 2026-08-27 on the Everyday shell: at 360×800 the screen region is 148 px against content
+  that lays out at 241, `.everyday-main` clips **93 px** on the main menu and **337 px** on the
+  stage, **five** controls on the menu cannot be brought into the viewport by any gesture — all four
+  mode tiles, and the pinned action bar's primary, `Play today's tower`, drawn at `left: 360` and so
+  wholly outside the viewport — and the stage canvas held **42.5 %** of the height against this
+  clause's 60 %. At 375×667: 78 px, 322 px, five controls, **51.0 %**. The **cost of the
+  commitment is now visible**, which is what a gate is for; the layout work is #240's and the
+  findings are registered rather than suppressed, so a new one is red and a fixed one is red as
+  *delete this entry*.
 
-  **Clause 2 also fails at 1280×800**, at **42.5 %**, because `everyday/stageScreen.ts:530` writes
-  the Everyday stage canvas as a literal `height:340px`. This clause is scoped *"360 px and above"*,
-  so a tier-1 desktop viewport is inside it, and that is outside #240's stated subject.
+  That paragraph is the 2026-08-27 measurement and its figures are left as they were taken. The
+  stage-canvas half of it has since moved, and the correction is the next paragraph rather than an
+  edit to those numbers — a dated measurement with its figures struck out records nothing.
+
+  **Clause 2 is met, and that changed on 2026-08-29** — GitHub issue #303, [§ D391](../DECISIONS.md).
+  `everyday/stageScreen.ts` declared the Everyday stage canvas as a literal `height:340px`, with no
+  breakpoint, no viewport unit and no clamp, so it held **42.5 %** at 1280×800 and at 360×800 and
+  **51.0 %** at 375×667 — failing at a tier-1 desktop viewport as well as at phone widths, which is
+  why it was filed apart from #240 rather than folded into it. It is now `60vh`, and the gate's own
+  sweep reports **60.0 %** at all three viewports. The other two clauses are unmoved and still #240's:
+  a taller canvas created no new clipping and put no control out of reach at any of the three widths.
+
+  Read the margin honestly: `60vh` **is** the clause's number, so the margin is zero by construction
+  and the same figure `RX-03` already uses on the Engineer shell. A layout change that put anything
+  inside the canvas's own box would take it under and the gate would go red — which is the direction
+  a commitment should fail in, and the reason no larger figure was invented to buy slack.
 - **Out of scope for launch, and stated as a refusal rather than a backlog item:** tap-target sizing,
   gesture affordances, a touch-first control layout, hover-dependent affordances having non-hover
   equivalents, and any claim that a phone is a *supported* way to play. **A phone user is not

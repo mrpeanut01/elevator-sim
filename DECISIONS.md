@@ -25869,3 +25869,419 @@ roughly one string per case per tier, and **an expected rise is a warning, not a
 distinction this repository has recorded five times.
 
 ---
+## D386 — the Workshop discloses which of its writes travel, and the guide's two-cell note becomes four
+
+**Rules on:** GitHub issue #296. Settles `everyday/workshopScreen.ts#workshopBar`,
+`everyday/workshopModel.ts#workshopReachOf`, and the § 3.3 note the Everyday Workshop draws over
+*Run a day with this*.
+
+**Decision.** The Workshop's weights and behaviour flags **stay latent**, and the screen stops saying
+otherwise. `dev/state.ts#drivingProfileOf` is unchanged, `scope/surface.ts` still declares
+`viewer.dispatcherSpec` `latent`, and the § 3.3 note is selected from a **four-state** answer derived
+through `scope/commitment.ts#commitmentOf` rather than from a two-state boolean over two of the
+screen's four writes.
+
+**Measured first, through the shipped path.** `shiftRunConfigOf` → `recordRun`, comparing
+`[passengerId, carId, boardedAt, arrivedAt]` for every leg, at `midtown-office`, 900 s, seed
+20 260 827, `collective` — 429 legs. All thirteen cost terms driven to 100 one at a time, all three
+behaviour flags inverted one at a time, and all sixteen together: **byte-identical**. The driving
+weights stay `{waitTime: 1}` whatever the Workshop writes. Of the four plain levers, `lobby` alone
+moves the legs, because it alone writes `GroupLevers.parking`.
+
+**Why not wiring, which AC1 also allowed.** Three reasons, in the order they were found.
+
+1. **It is the save path, which is separately owned.** *Run a day with this* carrying an unsaved draft
+   is the Engineer's *Save it and run it* minus the filing, and where the draft lands — whether it
+   takes an id, whether it reaches Compare, the suite and the Lab — is GitHub issues #228 and #167.
+   The issue says cross-reference and do not merge.
+2. **It would make the Engineer surface's disclosure false.** `dev/dispatcherEditor.ts#DRAFT_NOTE`
+   and `FAMILY_SCOPE_NOTE` are both *derived* from `commitmentOf('viewer.dispatcherSpec',
+   'writes-only') === 'draft'`. Reclassifying the field to a control empties both, removing the
+   honest scope note from the panel that has one, and leaves `runThisDispatcherStateOf`'s
+   `select`/`saveFirst` affordance describing a hand-over that has already happened.
+3. **It would silently swap the running dispatcher.** `dev/dispatcherEditor.ts`'s profile picker
+   writes `dispatcherSpec` and `editingDispatcherId` and deliberately **not** `dispatcherId`, so a
+   reader who points the editor at another profile while `collective` drives is in a supported
+   state. A `drivingProfileOf` that read the spec would make that click change the run. Guarding it
+   on `editingDispatcherId === dispatcherId` is worse, not better: the same edit would then travel or
+   not according to a pointer the player cannot see.
+
+**Why four answers and not two, or three.** § 3.3's table was transcribed from a prototype whose
+workshop had no draft — every control on it reached its toy simulator — so *Unsaved changes travel
+with the run.* and *Nothing changed yet.* are the only two states it could produce. This build has a
+field class the prototype did not, and therefore two states the table cannot describe: **draft-only**,
+and **split**. `split` earns its own answer rather than folding into either neighbour, because a
+player who moves `lobby` and `patience` in one sitting is told half the truth by both.
+
+**The guide's copy is not edited.** `everyday/actionBar.ts` **is** § 3.3, `actionBar.test.ts` holds a
+second transcription and compares cell by cell, and the guide's two sentences are not wrong — they
+were *selected* wrongly. Both survive verbatim and are still drawn, each in the state it is true of.
+The two added sentences are this build's own, module-private beside the control on
+`dev/dispatcherEditor.ts#DRAFT_NOTE`'s precedent. That is `WORKSHOP_COPY.libraryHeading`'s situation
+answered the same way ([§ D299](#d299) § 2): the prototype's panel offers six styles, this build ships
+thirteen, and hiding the difference would be saying less.
+
+**The bar was wrong in both directions, and the issue names one.** The boolean it replaced was
+`ruleRows.length > 0 || specIsDirty(workingSpec, source)`, which never consulted `levers`. So
+`patience`, `room` and `spread` — which reach no run — were reported as travelling, **and `lobby`,
+the one lever that does, was reported as *Nothing changed yet.*** A refusal aimed at the working
+control is the half [§ D227](#d227) rates as worse than a missing sentence, because it sends a player
+to look for a broken toggle. Four answers is the smallest model that is right about both.
+
+**What pins it.** `everyday/workshopTravel.test.ts` asserts the **agreement**, never the outcome: the
+scope classification, the note the screen selects, and the legs a run produces must be three
+statements of one fact. No case forbids the weights from reaching a run, so the day #228 lands and
+the field is re-scoped, the sentences change themselves and every case still passes. It also supplies
+the run that `scope/scope.test.ts` never made — that file iterates `entry.kind === 'control'` and has
+never driven a `latent` row at either end, so this classification had been a claim in a table pinned
+by nothing.
+
+**What is not claimed.** No mechanism is offered for *why* the draft is latent beyond what the code
+does — it is a draft because `drivingProfileOf` does not read it, and that is a description, not an
+explanation of a design. Everyday Mode still has **no way to hand a draft over**; that is #228 and
+#167, and `WORKSHOP_COPY.yoursEmpty` now says where a save comes from instead of promising a landing
+place. The corpus is **not re-measured** here and no string, surface or case count is published —
+[§ D343](#d343) takes that measurement once, after the wave integrates.
+
+## D388 — the screen region keeps its offset across an in-place re-render, and the shell holds it
+
+**Rules on:** GitHub issue #298. Settles `everyday/shell.ts#keepScrollAcrossRerender`, the last two
+lines of `everyday/shell.ts#go`, and `everyday/rerenderScroll.browser.test.ts`.
+
+**Decision.** The **shell** keeps the scroll offset across a screen's in-place re-render, for every
+screen mounted into `.everyday-screen`. A player action inside the region snapshots both scrollers; the
+first mutation batch after it restores them and disarms; everything else — an async run landing, a host
+connecting, the stage's per-frame figure redraw — passes through an unarmed keeper that reads no layout.
+`go` clears the arming with the offset it resets, because a navigation is a deliberate move.
+
+**Why here rather than in the nine screens.** Nine `everyday/` screens rebuild by emptying their own
+root, and three of them belong to other lanes this wave. § 3.1 gives the shell the scroller — one
+region, one screen at a time — so it can hold the invariant once, including for screens nobody has
+written yet. Nine screens each saving and restoring their own offset is nine chances to forget, and
+this defect **is** that argument: it survived seven waves in two files written months apart.
+
+**What the measurement changed about the issue as filed.** Driven against a `vite build` +
+`vite preview` of `dist-web/`, the headline figure reproduces to the pixel — a bench checkbox at
+`375×667` takes the region `1 518 → 86`, **1 432 px**, leaving the pressed control **1 303 px** below
+the finger. Two of the report's other claims do not survive:
+
+- **The stated mechanism is incomplete, and the missing half decides how a case must be written.**
+  *"Emptying the container collapses the scroll height and the browser clamps `scrollTop`"* is true only
+  when something forces a layout while the container is empty, and what forces it is the **focus
+  teardown of the control the player just pressed**. A synthetic `element.click()` focuses nothing and
+  loses **0 px** at every offset measured — six, across both screens, before the fix as well as after.
+  A case built on `element.click()` would have been green on the defect.
+- **`1280×800` is not a control.** The report explains the seven-wave survival by *"at 1280×800 both
+  screens fit"*. They do not: the bench overflows its region by **623 px** there and fix-it by
+  **1 071 px**, and a checkbox pressed at offset 400 loses the whole **400 px**. The reported `0` is an
+  artefact of measuring from the top.
+
+**What is not claimed.** The report's second row — *fix-it repair card, `375×667`, 3 713 px* — was
+**not reproduced, and could not be**: at that viewport the fix-it grid's 288 px left column pushes the
+repair cards to `x = 526` in a region 249 px wide, where each is **30 px wide and 807 px tall** and each
+overlaps its neighbour. `elementFromPoint` at the first card's centre answers `null`, and Playwright
+refuses the press as intercepted. The card is not pressable at `375×667` by any player, before this
+change or after it. That is a **worse** defect than the one filed and it is **GitHub issue #240's**, not
+this one's; it is recorded here rather than fixed. The mechanism is the same one and the keeper covers
+that screen too, demonstrated at `1280×800`, where the same press moved the offset by **283 px**
+unfixed and by **0** fixed.
+
+**The disarm is pinned by `rush`, and the reason is a lesson about the tier.**
+`builtBundle.browser.test.ts` already asserts that a tapped tile lands at the top, through **`fixit`**.
+It does not catch a missing disarm: mutation-tested by deleting those two lines and driving all four
+tiles, `fixit` lands at `0` anyway, because its mount is asynchronous and the incoming screen is a
+single *loading* line at the instant the keeper restores — so the restore clamps to zero for a reason
+that has nothing to do with the disarm. Under the same mutation `rush` lands at `300`, `towers` at
+`300` and `door` at `183`. A case that passes for an accidental reason is a case that reports nothing,
+so the new file asserts the reset through `rush`.
+
+**The observer is connected by the interaction, not at mount, and the tier is what said so.** The
+first landed shape kept a `subtree: true` observer on `.everyday-screen` for the life of the shell.
+It was correct and it cost: `everyday/stageScreen.ts` rebuilds its figure row **every animation
+frame** inside that region, so the observer allocated records and queued a microtask sixty times a
+second through a watched day in order to answer *no* every time. Run as a 16-file sequential batch,
+`everyday/autoFile.browser.test.ts` — nine long, timing-sensitive cases over the stage — failed
+**2 of 9 twice, on different cases each time**, while passing 9 of 9 when run alone. An A/B against
+the base `shell.ts`, same batch, same machine, came back clean apart from the two cases that are
+supposed to fail without the keeper, which is what turned *probably a flake* into *attributable*.
+Connecting on demand takes the idle cost to zero and the batch to **16 files, 104 tests, all green**.
+`subtree` itself cannot be dropped: every screen's own root is a *child* of the region, so a screen
+emptying itself is a subtree mutation and a `childList`-only observer would never see the thing the
+keeper exists for.
+
+---
+
+## D389 — a bench rollup names the rows it speaks for, and the second one is left alone
+
+**Rules on:** GitHub issue #301. Settles `everyday/benchModel.ts#benchTooCloseHeadingOf`,
+`BenchResultView.tooClose`, and the heading `everyday/benchScreen.ts` draws above a cell's rows.
+
+**Decision.** § 12.2's *"Too close to call"* carries its basis: the number of drawn rows it speaks
+for and the number of rows drawn. `benchModel.ts` composes it, `benchScreen.ts` draws it, and
+`BenchResultView` no longer offers a bare list of ids for a renderer to supply words to.
+`batch/report.ts#answerFor` is **not** changed.
+
+**Why.** A cell card draws two rollups with the rows sandwiched between them, and their predicates
+are not exclusive: `Too close to call` fires on `≥ 1` row coming back `unresolved`, and `answerFor`'s
+first branch fires on `≥ 1` row coming back `resolved`. Confirmed on a fixture built for it — one
+measure separating cleanly, the rest a dead tie — which produced **1 resolved, 5 unresolved and 2
+shown** rows, `tooClose` listing the cell, and `answer` reading *"Separated on 1 of the measures
+compared — average wait."* The card opened by saying the comparison was too close to call and closed
+by saying it had separated, and **neither string named its own denominator**. That is this
+repository's *two answers to one question* shape, and its own fix for that shape is to put the basis
+on the figure.
+
+**Why the denominator is the drawn row count.** It is the number of rows between the two rollups, so
+a reader can check it by counting what is in front of them. `batch/report.ts`'s summary sentence
+carries a `total` of its own and is not drawn on this screen; a denominator a reader cannot see is
+the defect again with a bigger number.
+
+**Why `answerFor` is left alone.** It is `batch/report.ts`'s, drawn by the Engineer suite panel and
+the CLI as well as by the bench, and its separated branch already names its subset — the count *and*
+the measures, by label. Changing a shared sentence to close a one-screen contradiction would be a
+wider edit with a narrower reason. `benchModel.test.ts` asserts that branch's wording beside the
+heading, so if it ever stops naming its subset the pair is back to two unqualified claims and the
+case says so.
+
+**What is not changed.** The six verdicts stay on the rows and stay `report.ts`'s own words —
+`unresolved` and `under-budget` are different claims, and one friendly phrase over both would erase
+the difference between *"they are the same"* and *"you did not run enough days to find out"*. The
+guide's phrase survives verbatim at the front of the heading; § 12.2's copy is
+**GitHub issue #211's** to cut, not this lane's.
+
+**The issue's second clause stays refuted, and it is not re-litigated here.** #301 filed and then
+refuted *"the rows all read resolved"* by tracing: `tooCloseCellIds` was computed from
+`rows.some(row => row.verdict === 'unresolved')` and `benchScreen.ts` drew that same array printing
+`${row.label} · ${row.verdict}` verbatim, so at least one drawn row must literally read
+`· unresolved` whenever the heading appears. That trace still holds line for line after this change
+— the selection's predicate is unmoved and only its accompanying words are new.
+
+**What is not claimed.** The corpus is **not re-measured** here and no string, surface or case count
+is published; [§ D343](#d343) takes that measurement once, after the wave integrates.
+`honesty/surfaces.ts`'s bench adapter now seeds the composed heading rather than the bare constant,
+which is the string the player actually reads — the constant is still swept, one block above, as
+copy.
+
+## D390 — the brief asks the run which building it is about to use, rather than resolving one itself
+
+**Rules on:** `dev/state.ts#resolvedBuildingOf`, and what the Everyday brief, door and week screens
+are describing when they quote a building. Settles GitHub issue #300. Supersedes the second half of
+§ D234's argument for that function; the first half stands.
+
+**Decision.** `resolvedBuildingOf` returns `shiftRunConfigOf(resources, state).building` behind the
+lookup guard that keeps it total. It no longer answers from `resources.entries` by identity.
+
+**Why.** § D234 wrote the function for issue #36, and closed with: *"the shipped building, not a
+grown one. Nothing has been run, so there is no day to have grown it to."* The first clause was right
+and the second was **not a fact about the state**. `week.day` is a field; it is 3 on Wednesday
+morning whether or not Wednesday has been run, and `shiftRunConfigOf` has always grown the fabric to
+it. So there was always a day to grow to, and the sentence was answering a different question from
+the one being asked.
+
+Measured on `f13d455`, walking days 1–3 and comparing the brief's `People` row against
+`shiftRunConfigOf(...).building.totalPopulation` on the same state:
+
+| building | day 1 | day 2 | day 3 |
+|---|---|---|---|
+| `garden-apartments` | 120 = 120 | 120 vs **135** | 120 vs **145** |
+| `midtown-office` | 1 710 = 1 710 | 1 710 vs **1 900** | 1 710 vs **2 090** |
+| `chancery-house` | 612 = 612 | 612 vs **684** | 612 vs **738** |
+
+**Growth was not the only producer, and the second one is larger — which is why the fix is a
+delegation rather than a call to `grownBuilding`.** A calendar period scales the same floors through
+`calendar.ts#calendarPatch` → `growth.ts#scaledBuilding`, so on `midtown-office` under
+`public-holiday` the brief said **1 710** about a run of **437**, and under `vacation` **1 710**
+about **1 026**. Commissioning is a third: a bank widened by two shafts left the brief's `Lifts` row
+reading 4 against a run of 6. One defect, three producers, and a fix naming only the one the issue
+named would have left the two larger halves standing.
+
+The three producers are within a few statements of each other inside `shiftRunConfigOf`, and they are
+not separable from the demand derivation — `calendarPatch` needs the mix the day's event actually
+produced, and `withIncidents` needs that patch's incidents. So a sibling helper would have been a
+second copy of that chain: the *"two implementations that agree until somebody changes one"* failure
+`growth.ts`, `tomorrow.ts` and `calendar.ts` each already carry a docstring about, with the added
+property that the next producer would have to be remembered in two places. `everyday/today.ts`'s own
+module docstring is the rule in one line: *they ask this module once, and it asks `shift/` once.*
+
+**What keeps issue #36.** `growthFactor(1)` is exactly 1 and `Math.round` is the identity on the
+integers `data/` declares, so a week on day 1 with no calendar returns the shipped populations — the
+three day-1 rows above are that, measured. The issue's own framing is what this rests on: the answer
+is not *"always grow"* but *"grow when there is a day to grow to"*, and the day-1 identity is what
+makes those the same sentence. #36's actual defect — the new building's **name** beside the previous
+building's **specs** — is untouched, because both still come from the standing `state.buildingId`.
+`today.test.ts` pins it against `resources.entries`' own pre-resolved object, which is the exact
+value the old implementation returned, and that case goes red under an *always grow* mutation while
+staying green under a revert.
+
+**Cost, because this went from a lookup to an assembly.** Measured on `midtown-office`, 200 calls:
+**0.643 ms** against the old path's **0.0003 ms**. That is not a footnote here —
+`ViewerState.tomorrow` exists precisely to keep a `parseBuilding`/`resolveBuilding` off a 60 Hz
+render, so the same bar has to be cleared. It is cleared by **reaching** rather than by being cheap:
+`dev/main.ts#tick` renders at 60 Hz only while a `playback` exists; `playback` is assigned at exactly
+one place (`adopt`), every caller of which sets or already holds `state.recording`, and the one
+branch with no run to adopt writes `playback = undefined`. So `playback !== undefined` implies
+`recording !== undefined`, and `viewAt` reaches this function only on its `recording === undefined`
+arm — the two are disjoint. Everything else that asks is a discrete render: a screen mount, a
+`host.subscribe` notification, a resize.
+
+**What is not claimed.** The honesty corpus is **not re-measured** here and no string, surface or case
+count is published; § D343 takes that measurement once, after the wave integrates. The change does
+move the corpus — `derive.test.ts` classified `resolvedBuildingOf` as a text producer for the first
+time, because delegating gave it `shiftRunConfigOf`'s `throw` in its call chain — and that
+classification is an exclusion with its reason, in the same group and for the same reason as the
+neighbour it now calls. The throw is **unreachable through this function**: the lookup guard answers
+the unknown-id case first, and `today.test.ts` asserts that arm directly.
+
+---
+
+## D391 — the Everyday stage canvas is `60vh`, which is § 2's own number and leaves no margin on purpose
+
+**Rules on:** `everyday/stageScreen.ts#STAGE_CANVAS_HEIGHT`, and
+`docs/31-support-matrix.md` § 2's second clause. Settles GitHub issue #303. Empties the clause-2 half
+of `everyday/viewportGates.browser.test.ts`'s `OUTSTANDING`.
+
+**Decision.** The stage canvas declares `height:60vh`. § 2's clause is **met**, not renegotiated.
+
+**Why.** The height was `340px` — a literal with no breakpoint, no viewport unit and no clamp — so
+the canvas was 340 px at every viewport height. Measured through the player's own path on Chromium
+headless shell r1194 by #292's instrument:
+
+| viewport | stage canvas | share of viewport height | § 2's floor |
+|---|---|---|---|
+| 1280×800 | 340 px | **42.5 %** | 60 % |
+| 360×800 | 340 px | **42.5 %** | 60 % |
+| 375×667 | 340 px | **51.0 %** | 60 % |
+
+Re-measured on the same sweep after the change: **60.0 %** at all three. That is the quantity the
+sweep reports (`canvasPct`); no pixel figure is published beside it, because `0.6 × 800` is
+arithmetic rather than a measurement and the row it replaces could quote `340 px` only because that
+was the literal.
+
+**Met rather than renegotiated, and that was a choice.** #303's first criterion allows § 2's clause
+to be renegotiated with a measurement behind it. `CLAUDE.md`'s working agreement is the tie-breaker —
+*"do not weaken an acceptance criterion to make a phase pass; raise it instead"* — so meeting the
+clause was treated as the default and renegotiation as something that would have needed an argument a
+run could not otherwise settle. There was none: the clause is satisfiable by a one-token change, and
+the sweep says so.
+
+**Why a viewport unit rather than flexing to fill.** The design handoff draws this container as
+`min-height:0` in a flex column with the canvas at `height:100%` — the stage *fills what is left* —
+and the handoff is canonical for the interface. It cannot be reproduced literally here, for a reason
+already written down: `index.html:1541` refuses a percentage height against an auto-height wrap
+because *"a percentage against an auto-height wrap falls back to the canvas's own bitmap height,
+which the per-frame resize then feeds back into the wrap — the box grows every frame."* The Everyday
+stage has exactly that shape — it sits in `.everyday-screen`, which is `overflow-y:auto` and so
+auto-height, and `sizeCanvas` writes the bitmap from the laid-out box on every resize. A definite,
+viewport-derived height is the one thing that both tracks the viewport and cannot feed back into
+itself.
+
+**Why exactly 60, and the margin that leaves.** It is the clause's own number and it is already this
+repository's answer to this question: `RX-03` fixed the Engineer surface with
+`.stage-wrap { height: 60vh; min-height: 60vh }`. One commitment, one figure, in both shells. It also
+satisfies the clause at **every** viewport height rather than at the three the matrix names, because
+`60vh` *is* 60 % of the viewport by construction.
+
+Say the cost plainly: the margin is **zero**. A layout change that put so much as a border inside the
+canvas's own box would take it under, and the gate would go red rather than the product going quietly
+non-compliant — the correct direction, and the reason no larger figure was invented to buy slack. A
+number above 60 would have been a threshold with nothing behind it. **No floor is set beneath it
+either**: `340px` would only bind below a 567 px viewport, shorter than anything the support matrix
+carries, so keeping it would have added a constant nothing in the supported range can reach — and the
+clause holds there anyway, since 340 px of a 567 px viewport is already 60 %.
+
+**What the register did, and why it is two changes rather than one.** The three clause-2 entries were
+deleted from `OUTSTANDING` on the commit that made them stop reproducing, which that file's
+both-directions assertion requires and which its own docstring asks of #240. Beside that, four
+sentences in `viewportGates.browser.test.ts` and two in `docs/31-support-matrix.md` § 2 asserted the
+failure as a present-tense fact and were corrected, with the superseded figures kept struck through
+rather than deleted. A register whose prose still says *the product fails all three* while its list
+says otherwise is the stale-claim defect arriving inside the instrument built to catch it.
+
+**What is not claimed.** Clauses 1 and 3 are **unmoved and still #240's** — eighteen entries remain,
+all of them narrow-viewport findings. The sweep's other four columns were checked rather than
+assumed: a canvas 140 px taller created no new clipping and put no control out of reach at any of the
+three widths, which is what the 1280×800 control cell and the unchanged clause-3 rows say. The
+honesty corpus is **not re-measured** here and no string, surface or case count is published;
+§ D343 takes that measurement once, after the wave integrates.
+
+## D392 — an instruction is pinned to a run like a number, and one this control cannot carry out is withdrawn rather than reworded
+
+**Rules on:** GitHub issue #299. Settles `batch/report.ts#remedyFor`'s load sentence and
+`dev/batchPanel.ts#remedyControl`'s step.
+
+**Decision.** The suppressed-row remedy **stops promising an end state**. It said *"lower 'demand
+%pop/5 min' until the queues stop growing"*; it now names the lever, says a press is one step whose
+size and **direction** are both unguaranteed, gives the two reasons, and sends the reader to the
+refusal each arm quotes. The **step is unchanged** — still one 10 % drop and one re-run.
+
+`CLAUDE.md` closes on *"if you publish a number, pin it to the run that produced it."* An
+instruction about what a control achieves is a claim of the same kind and now carries the same
+obligation: the run is in `remedyFor`'s docstring — seed `20260729`, 900 s, **n = 50**, `collective`
+against `eta`, the demand typed into the field, each rung the button's own
+`Math.round(rate * 0.9 * 10) / 10` — and `batch/remedyLadder.test.ts` re-derives the rungs the
+sentence rests on.
+
+**What the measurement said, and it refuted the promise three separate ways.** A *dropped pair* is
+the complete-case rule: either arm's `awtIsValid` false.
+
+| what | measured |
+|---|---|
+| Midtown Office from the band point the panel opens on (`min`, 11 %), nine presses | `50, 50, 50, 49, 46, 41, 34, 24, 17` of 50 |
+| Midtown Office from 24 %, the issue's ladder | **50 of 50 at all nine rungs**, all `saturated`; 24 presses reach 2 % |
+| Midtown Office at n = 20 | 5 % → 10, 4 % → 3, **3 % → 0, 2 % → 1** |
+| Mixed Use High Rise from 24 % | `50, 50, 50, 50, 49, 42, 31, 20, 11` of 50 |
+| Secure Tower from 24 % | `50, 49, 47, 36, 24, 14, 9, 5, 1` of 50 |
+| Chancery House, one press from each integer rate 19 → 5 | **2 of 15 raise the count**: `19 → 17.1` is 1 → 3, `18 → 16.2` is 0 → 1 |
+| Chancery House at 16 % and 15 % | 1 of 50 and 0 of 50 — the docstring's own existing claim, reproduced |
+| Crown Hotel, one press off its own `min` | **2 of 50 → 3**, every refusal `saturated` both sides |
+| St Jude's Hospital at its own `min` (6 %) | 3 of 50, **zero** saturated — every refusal `censored` |
+| Vertical City at its own `min` (11 %), one press | 26 of 50 → 11, all `saturated` |
+| Garden Apartments from its own `min` (3 %), seven presses | `4, 7, 8, 8, 11, 16, 16, 15` of 50, **every refusal `empty-window`** |
+
+**All eight shipped buildings were measured, not the five #299 names.** The remedy is offered on
+every building whose rate resolves, so a sentence measured on five is an instruction about the
+other three as well. The three that were added changed the finding rather than confirming it:
+**Crown Hotel raises the count on the very first press off its own `min`**, with every refusal
+`saturated` on both sides — so the non-monotonicity is not a quiet-building effect and is not
+confined to the two buildings the issue found it on. **St Jude's Hospital refuses on `censored`
+and never on `saturated`** at its own `min`, which is a *second* ground the load is not the lever
+for. Only **Vertical City** and Mixed Use High Rise behave the way the withdrawn sentence assumed:
+**two of eight**, and that is said here so the refusal reads as measured rather than as pessimism.
+
+**The Garden Apartments row is the one that decided the shape of the fix.** There the load is not
+the wrong *size* of lever, it is the wrong lever: there is no queue to stop growing, the binding
+ground is *"No passenger was served within the reporting window"*, and the ladder ends at nearly
+four times the drop count it started at — four of the seven presses strictly worse, two flat, one
+better. No step size repairs a direction. That is why the control was left alone and the sentence
+was changed, rather than the other way round — and it is the half of AC1 the issue left open as a
+choice.
+
+**Why the non-monotone rungs are structural and not sampling.** Two causes, and the first is this
+repository's own discipline pointed at itself. Lowering the rate **redraws the passenger trace**, so
+the fifty pairs after a press are fifty *different* pairs: common random numbers hold across
+dispatchers — that is what `runBatch` audits field for field — and hold across nothing else. A
+paired-t interval across a demand change would be arithmetic on unrelated runs, so **no such
+interval is offered here and none may be**, which is also why this decision publishes counts and
+never a Δ. The second is that `awtIsValid` refuses on **five** grounds and only `saturated` follows
+the load down; `censored` appears on Secure Tower at 12.8 % and 11.5 % as `saturated` recedes, and
+`empty-window` takes over Garden Apartments entirely.
+
+**What the issue got wrong, recorded because it was checked.** Its Garden Apartments ladder
+(`0, 0, 0, 1, 0, 0, 0, 0`) **does not reproduce at any band point that profile declares** — from 7 %
+it is `2, 1, 1, 3, 3, 1, 4, 4`, from 5 % `3, 3, 1, 4, 4, 4, 7, 8`, from 3 % the rising ladder above.
+The finding it was offered for is confirmed far more strongly than stated, on the same building, so
+the correction strengthens the issue rather than weakening it. Everything else in #299 reproduced
+exactly, including its own opening refutation of the observation that produced it: 5 of 50 against
+8 of 50, unpaired and across a demand change, supports no verdict, and nothing here rests on it.
+
+**Also corrected, one word, in the same file.** `batch/report.ts`'s module docstring said
+*"any of `awtIsValid`'s four grounds"*. There are five — abandonment landed with wave 13's patience
+feature — and the count is load-bearing exactly here, because the new sentence's claim is about
+*which* ground the load moves. Roughly eight further sites in the tree carry the same stale four;
+they are out of this lane's region and want their own issue.
+
+**What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
+integration. The full ladders above are reported once and are not all re-run per suite: the test
+holds the two rungs the sentence rests on, the Midtown endpoint, and the sentence itself.
+
+---

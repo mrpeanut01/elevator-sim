@@ -147,6 +147,55 @@ function el<K extends keyof HTMLElementTagNameMap>(
 const EYEBROW = `font:500 9.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 
 /**
+ * The cutaway's CSS height — GitHub issue **#303**, § D391.
+ *
+ * `docs/31-support-matrix.md` § 2 commits that at 360 px of CSS width **and above** the product
+ * *"keeps the stage canvas at 60 % or more of the viewport height"*. This was `340px`, a literal
+ * with no breakpoint, no viewport unit and no clamp, so the canvas held **42.5 %** at 1280×800 and
+ * at 360×800, and **51.0 %** at 375×667 — measured through the player's own path on Chromium
+ * headless shell r1194 by `viewportGates.browser.test.ts`, which registered all three.
+ *
+ * **1280×800 is the tier-1 desktop viewport**, so this was never the small-screen work: it failed
+ * identically at the width `M2_MEASUREMENT.md` drives the slice at, where there is no narrow layout
+ * to build. That is why #303 is filed apart from **#240** and why landing #240 could not have
+ * closed it.
+ *
+ * ## Why a viewport unit rather than flexing to fill
+ *
+ * The design handoff draws this container as `min-height:0` inside a flex column with the canvas at
+ * `height:100%` — the stage **fills what is left** — and the handoff is canonical for the interface.
+ * It cannot be reproduced literally here, and the reason is written down one directory over:
+ * `index.html:1541` refuses a percentage height against an auto-height wrap because *"#stage is
+ * height: 100%, and a percentage against an auto-height wrap falls back to the canvas's own bitmap
+ * height, which the per-frame resize then feeds back into the wrap — the box grows every frame."*
+ * The Everyday stage has exactly that shape: it sits in `.everyday-screen`, which is
+ * `overflow-y:auto` and therefore auto-height, and {@link sizeCanvas} writes the bitmap from the
+ * laid-out box on every resize. A definite, viewport-derived height is the one thing that both
+ * tracks the viewport and cannot feed back into itself.
+ *
+ * ## Why exactly `60vh`, and the margin that leaves
+ *
+ * It is **the clause's own number**, and it is already this repository's answer to this question:
+ * `RX-03` fixed the Engineer surface with `.stage-wrap { height: 60vh; min-height: 60vh }`
+ * (`index.html:1551`). One commitment, one figure, in both shells — a second number here would be
+ * two answers to *how tall is the stage* and no way to tell which one § 2 meant.
+ *
+ * It satisfies the clause at **every** viewport height rather than at the three the matrix names,
+ * because `60vh` *is* 60 % of the viewport by construction. Say the cost plainly: that is a margin
+ * of **zero**. A layout change that put so much as a border inside the canvas's own box would take
+ * it under, and the gate would go red rather than the product going quietly non-compliant — which
+ * is the correct direction, and the reason no larger figure was invented to buy slack. A number
+ * above 60 would have been a threshold with nothing behind it, which this file already refuses one
+ * constant over (`today.ts`'s `COMFORTABLE_PER_CAR` carries a citation for exactly that reason).
+ *
+ * **No floor is set beneath it.** `340px` would only bind below a 567 px viewport, which is shorter
+ * than anything the support matrix carries, so keeping it would have added a constant that nothing
+ * in the supported range can reach — and the clause holds there anyway, since 340 px of a 567 px
+ * viewport is already 60 %.
+ */
+const STAGE_CANVAS_HEIGHT = '60vh';
+
+/**
  * Size a canvas for the device, or refuse.
  *
  * § 14: read the bounding rect, multiply by `min(2, devicePixelRatio)`, set the transform. Never a
@@ -532,7 +581,7 @@ function mountStage(
     'overflow:hidden',
   ].join(';');
   const canvas = el(doc, 'canvas', 'everyday-stage-canvas');
-  canvas.style.cssText = 'display:block;width:100%;height:340px';
+  canvas.style.cssText = `display:block;width:100%;height:${STAGE_CANVAS_HEIGHT}`;
   const status = el(doc, 'div', 'everyday-stage-status');
   status.style.cssText = [
     'position:absolute',

@@ -436,13 +436,43 @@ describe('the live metrics view carries the metrics it was given', () => {
     expect(view.estimate.value).toBe('—');
   });
 
-  it('says nothing was served rather than drawing an empty list', () => {
+  it('says the window is empty rather than drawing an empty list', () => {
     const nobody = { ...overlayAt(RECORDING, at), banks: [] };
     const view = overlayViewOf(nobody, frame({ simTimeS: at }));
     expect(view.banks).toHaveLength(0);
-    expect(view.banksEmpty).toBe(ENGINEER_WORDS.nothingYet);
+    expect(view.banksEmpty).toBe(ENGINEER_WORDS.noneInWindow);
     // And the note is absent — not `''` — whenever there is a list to draw.
     expect(viewAt().banksEmpty).toBeUndefined();
+  });
+
+  it('scopes the empty-bank sentence to the window and not to the run — issue #297', () => {
+    /*
+     * `metrics.banks` holds one row per bank that answered something **inside the window**, so an
+     * empty list is a fact about the last five minutes and never about the day. The sentence read
+     * `nothing served yet` / `nobody carried yet` for every wave up to this one, and *yet* dates
+     * the claim to the run: measured on `garden-apartments`, 3 600 s, seed 20 260 827, it drew that
+     * at 44 of 361 sampled playheads on which the run had already carried somebody, beside a rail
+     * counting them. `dev/leftRail.test.ts` drives that pairing on a real run; this is the
+     * vocabulary half, which is what stops the words drifting back.
+     *
+     * Both registers, because a fix to one is half a fix — and the cue list is checked against the
+     * *drawn* string rather than against the table, so a register that stopped reaching the view
+     * fails here too.
+     */
+    const runScoped = /\byet\b|\bso far\b|\btoday\b|\bever\b|\bnot once\b/i;
+    const nobody = { ...overlayAt(RECORDING, at), banks: [] };
+    for (const [mode, words] of [
+      ['basic', CASUAL_WORDS],
+      ['advanced', ENGINEER_WORDS],
+    ] as const) {
+      const drawn = overlayViewOf(nobody, frame({ simTimeS: at }), mode).banksEmpty;
+      expect(drawn, `${mode} drew no empty-bank sentence`).toBe(words.noneInWindow);
+      expect(runScoped.test(drawn ?? ''), `${mode} dated the claim to the run`).toBe(false);
+    }
+    /* And it names the span, in each register's own way of saying it — dropping *yet* without
+       naming a basis would pass the clause above while claiming nothing at all. */
+    expect(CASUAL_WORDS.noneInWindow).toMatch(/5 min/);
+    expect(ENGINEER_WORDS.noneInWindow).toMatch(/window/);
   });
 });
 
@@ -999,7 +1029,7 @@ describe('the live metrics view speaks a player’s words in Casual — issue #1
       const drawn = stringsOf(view).join('\n');
       for (const [key, word] of Object.entries(mine)) {
         // These two are drawn only in the states that call for them; the rest are unconditional.
-        if (key === 'bankSuppressed' || key === 'nothingYet') continue;
+        if (key === 'bankSuppressed' || key === 'noneInWindow') continue;
         expect(drawn, `${mode} lost ${key}`).toContain(word);
       }
       for (const [key, word] of Object.entries(theirs)) {
