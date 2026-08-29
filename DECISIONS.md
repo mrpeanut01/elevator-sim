@@ -26847,12 +26847,45 @@ bare list would have accepted an eaten heading as bookkeeping.
 well as markdown, because that is where most `§ Dnnn` citations in this repository live — **3 350
 against markdown's 3 119**, so more than half the citations were unchecked.
 
+### Validation — eleven mutations, each putting a case *into* scope rather than removing one
+
+Every instrument named above was shown able to fail, and reverted:
+
+| mutation | what went red |
+|---|---|
+| a temporary site carrying the owed-decision marker | the ratchet, `6 … against a ceiling of 5` |
+| a citation to a **D999** that does not exist, in a markdown document (spelled here without the section sigil, for the reason above) | the citation gate, naming the file |
+| the same dangling **D999**, in a **`.ts` docstring** | the citation gate — **and the pre-widening gate, run against the same mutated tree, passed 4/4** |
+| § D394's heading re-merged into § D393's last sentence | *both* gates: the hole register names `394`, the citation gate names all eight citing sites |
+| a `## D418` heading | *a lane may not take a number its block does not hold* |
+| the reservation's floor moved to 404, as if lanes A–D had merged | the charter row check and the hole boundary, together |
+| the reservation closed while the wave is open | the between-waves branch, with its original `highest + 1` message intact — `expected 396 to be 418` |
+| the marker pattern narrowed to something no site says | the pattern's control string, `expected +0 to be 1` |
+| **the debt simulated to zero with the old `owed > 0` guard restored beside the new ones** | **only the old guard**, `expected 0 to be greater than 0` — which is the whole argument for replacing it |
+| a `## D387` heading, filling a registered hole | *a number registered above as a hole now heads a decision* |
+| `SKIP_DIRS` widened to swallow `packages/` | the walk's own guard, `expected 79 to be greater than 500` |
+
+The ninth is the one to keep. It is the state this issue is trying to reach, and the guard that was
+supposed to protect the gate is the only thing that fails in it.
+
 ### What is not claimed
 
 Nothing here says a wave must know its decisions in advance; a block is a reservation of *ids*, not a
 plan of *entries*, and under-spending one is expected. Nothing here changes how a decision is
 argued or where the argument lives — that is § D405. And this rule governs `DECISIONS.md` only; the
 `Tnn` lane-record series in this file are history and are never allocated from again.
+
+**Two things this wave found and did not fix, recorded so they are not re-found.** `DECISIONS.md`'s
+own preamble says *"142 entries span D1–D149"* against a file that now carries 400 headings spanning
+D1–D417; its list of gaps is correct but predates D387. It is `RISKS.md` R38 in the file this
+decision is about, and it is left standing because the preamble is outside this lane's territory and
+because the derivation above is now the authority — where the two disagree, the register is the
+measurement. Separately,
+[`docs/24-competitive-teardown.md`](docs/24-competitive-teardown.md) cites
+[`MULTI_AGENT_PLAN.md`](MULTI_AGENT_PLAN.md) § 0 for the rule *"numbers are allocated at
+integration, never inside a lane"*, and **§ 0 does not state it** — a rule cited to a section that
+does not carry it, which is the citation gate's own defect class in a form neither half of it
+checks. The rule it should have cited is this one.
 
 ---
 
