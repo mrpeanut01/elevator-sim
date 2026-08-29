@@ -1,5 +1,5 @@
 /**
- * Persisting a run, and reading one back.
+ * Reading a run record back, and what it is checked against.
  *
  * docs/03-traffic-and-statistics.md § Part 5 asks for per-run records on disk "so any run can
  * be replayed exactly and results re-analyzed without re-simulating". That makes the JSON form
@@ -7,7 +7,8 @@
  *
  * - **The seed is mandatory and is a decimal string** (CLAUDE.md invariant 5). A 64-bit seed
  *   does not survive `JSON.stringify` as a `bigint` and loses precision as a `number`, so it
- *   travels as text and `runSeed()` turns it back into the `bigint` `new StreamSet(...)` wants.
+ *   travels as text and `BigInt()` turns it back into what `new StreamSet(...)` wants — safely,
+ *   because a value that reached this module's output satisfied {@link seedString}.
  *   A record without a parseable seed is rejected rather than loaded: a dataset nobody can
  *   reproduce is worse than no dataset, because it still produces numbers.
  * - **Objects are strict.** An unrecognized key is an error, matching `config/schema.ts`. A
@@ -15,6 +16,17 @@
  * - **The schema version must match.** A record from a future writer is refused instead of
  *   being partially understood, because a mis-parsed run produces plausible statistics from
  *   the wrong data.
+ *
+ * **There is no writer here, and the asymmetry is the point.** Reading needs validation; writing
+ * a `RunRecord` is `JSON.stringify` and nothing else. This module once exported a
+ * `serializeRunRecord` wrapper around exactly that call, and it went four phases without a
+ * caller outside its own tests, because a bare record is not a persistable unit: it names no
+ * demand template, no duration, no demand or dispatcher overrides, and its `buildingId`,
+ * `dispatcherProfileId` and `trafficProfileId` are all *optional*. What is written is
+ * `experiments/reports`'s envelope — `createStoredRun` wraps this record in the configuration
+ * that produced it, `serializeStoredRun` writes the pair, and `replayStoredRun` rebuilds the run
+ * from the pair. `core` owns the record's schema and checks it on the way in; `experiments` owns
+ * what goes on disk. `DECISIONS.md` § D395.
  */
 
 import { z } from 'zod';
@@ -180,26 +192,6 @@ export const runRecordSchema = z.strictObject({
   travelSamples: z.array(travelSampleSchema).optional(),
   metadata: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
-
-/* -------------------------------------------------------------------------- *
- * Write
- * -------------------------------------------------------------------------- */
-
-export interface SerializeOptions {
-  /** Indentation for `JSON.stringify`. Omit for the compact form batch runs should store. */
-  readonly space?: number | undefined;
-}
-
-/**
- * A run record as JSON text.
- *
- * Compact by default: a 30-minute peak generates thousands of leg records per replication and
- * hundreds of replications per configuration, and pretty-printing that is megabytes of
- * whitespace.
- */
-export function serializeRunRecord(record: RunRecord, options: SerializeOptions = {}): string {
-  return JSON.stringify(record, undefined, options.space);
-}
 
 /* -------------------------------------------------------------------------- *
  * Read

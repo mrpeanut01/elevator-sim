@@ -27,12 +27,35 @@
  * summary.timeToDestination.meanS;  // TTD, spanning every leg of a sky-lobby journey
  * summary.awtIsValid;               // false when the queue diverged — suppress the CI
  *
- * writeFileSync(path, serializeRunRecord(record));
- * new StreamSet(runSeed(parseRunRecord(readFileSync(path, 'utf8'))));  // replays exactly
+ * parseRunRecord(readFileSync(path, 'utf8'));  // validated on the way in, seed included
  * ```
  *
  * Nothing here reads a wall clock (invariant 3) or draws a random number (invariant 2), and
  * the only mutable object in the module is the recorder itself.
+ *
+ * ## Persisting a run is not this module's job, and the example above used to say it was
+ *
+ * That last line read `writeFileSync(path, serializeRunRecord(record))` followed by
+ * `new StreamSet(runSeed(parseRunRecord(...)))`, annotated **`// replays exactly`**. It does not.
+ * It builds a stream set with the right master seed and replays nothing, because a `RunRecord`
+ * is a *dataset*, not a run: it names no demand template, no duration, no demand or dispatcher
+ * overrides, and its `buildingId`, `dispatcherProfileId` and `trafficProfileId` are optional
+ * fields. Feed the resulting stream set to a building you picked yourself and you have a new
+ * run that agrees with the stored one on nothing but its random draws.
+ *
+ * CLAUDE.md invariant 5 has two clauses. **The first lives here** — every record carries its
+ * seed, `parseRunRecord` refuses one that does not, and the seed travels as a decimal string so
+ * that 64 bits survive the trip. **The second — *"so any run replays exactly"* — is discharged
+ * in `experiments/reports`**, where `createStoredRun` wraps this record in the configuration
+ * that produced it and cross-checks the two seeds, `parseStoredRun` re-checks them on the way
+ * back in along with the traffic seed and the traffic model, and `replayStoredRun` rebuilds the
+ * `SimulationConfig` and proves the replay bit-identical by fingerprint.
+ *
+ * `serializeRunRecord` and `runSeed` were the two symbols that example named, they were the only
+ * things that called for them, and they went four phases without a caller in any shipped path.
+ * They are deleted rather than wired: the round trip they described was never a replay, and
+ * inventing a call site for them would have been the standing requirement's defect wearing a fix.
+ * `DECISIONS.md` § D395.
  */
 
 export {
@@ -65,7 +88,6 @@ export {
   legSecondsOf,
   rideSecondsOf,
   outOfBalanceWorkJ,
-  runSeed,
   STANDARD_GRAVITY_MPS2,
   waitSecondsOf,
   windowContains,
@@ -205,7 +227,4 @@ export {
   queueSampleSchema,
   reportWindowSchema,
   runRecordSchema,
-  serializeRunRecord,
 } from './serialization.js';
-
-export type { SerializeOptions } from './serialization.js';

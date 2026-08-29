@@ -21,7 +21,6 @@ import {
   fullRunWindow,
   outOfBalanceWorkJ,
   parseRunRecord,
-  serializeRunRecord,
   summarizeRun,
   windowContains,
   type LoadedConfig,
@@ -150,7 +149,7 @@ describe('every completed move reaches the record — the seam, counted not read
   it('survives the record round-trip, work and all', () => {
     const window = fullRunWindow(record);
     const before = summarizeRun(record, { window });
-    const after = summarizeRun(parseRunRecord(serializeRunRecord(record)), { window });
+    const after = summarizeRun(parseRunRecord(JSON.stringify(record)), { window });
     expect(after.energy).toEqual(before.energy);
     expect(before.energy.measured).toBe(true);
     expect(before.energy.workKJ).toBeGreaterThan(0);
