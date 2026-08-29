@@ -25869,3 +25869,147 @@ roughly one string per case per tier, and **an expected rise is a warning, not a
 distinction this repository has recorded five times.
 
 ---
+
+## D390 — the brief asks the run which building it is about to use, rather than resolving one itself
+
+**Rules on:** `dev/state.ts#resolvedBuildingOf`, and what the Everyday brief, door and week screens
+are describing when they quote a building. Settles GitHub issue #300. Supersedes the second half of
+§ D234's argument for that function; the first half stands.
+
+**Decision.** `resolvedBuildingOf` returns `shiftRunConfigOf(resources, state).building` behind the
+lookup guard that keeps it total. It no longer answers from `resources.entries` by identity.
+
+**Why.** § D234 wrote the function for issue #36, and closed with: *"the shipped building, not a
+grown one. Nothing has been run, so there is no day to have grown it to."* The first clause was right
+and the second was **not a fact about the state**. `week.day` is a field; it is 3 on Wednesday
+morning whether or not Wednesday has been run, and `shiftRunConfigOf` has always grown the fabric to
+it. So there was always a day to grow to, and the sentence was answering a different question from
+the one being asked.
+
+Measured on `f13d455`, walking days 1–3 and comparing the brief's `People` row against
+`shiftRunConfigOf(...).building.totalPopulation` on the same state:
+
+| building | day 1 | day 2 | day 3 |
+|---|---|---|---|
+| `garden-apartments` | 120 = 120 | 120 vs **135** | 120 vs **145** |
+| `midtown-office` | 1 710 = 1 710 | 1 710 vs **1 900** | 1 710 vs **2 090** |
+| `chancery-house` | 612 = 612 | 612 vs **684** | 612 vs **738** |
+
+**Growth was not the only producer, and the second one is larger — which is why the fix is a
+delegation rather than a call to `grownBuilding`.** A calendar period scales the same floors through
+`calendar.ts#calendarPatch` → `growth.ts#scaledBuilding`, so on `midtown-office` under
+`public-holiday` the brief said **1 710** about a run of **437**, and under `vacation` **1 710**
+about **1 026**. Commissioning is a third: a bank widened by two shafts left the brief's `Lifts` row
+reading 4 against a run of 6. One defect, three producers, and a fix naming only the one the issue
+named would have left the two larger halves standing.
+
+The three producers are within a few statements of each other inside `shiftRunConfigOf`, and they are
+not separable from the demand derivation — `calendarPatch` needs the mix the day's event actually
+produced, and `withIncidents` needs that patch's incidents. So a sibling helper would have been a
+second copy of that chain: the *"two implementations that agree until somebody changes one"* failure
+`growth.ts`, `tomorrow.ts` and `calendar.ts` each already carry a docstring about, with the added
+property that the next producer would have to be remembered in two places. `everyday/today.ts`'s own
+module docstring is the rule in one line: *they ask this module once, and it asks `shift/` once.*
+
+**What keeps issue #36.** `growthFactor(1)` is exactly 1 and `Math.round` is the identity on the
+integers `data/` declares, so a week on day 1 with no calendar returns the shipped populations — the
+three day-1 rows above are that, measured. The issue's own framing is what this rests on: the answer
+is not *"always grow"* but *"grow when there is a day to grow to"*, and the day-1 identity is what
+makes those the same sentence. #36's actual defect — the new building's **name** beside the previous
+building's **specs** — is untouched, because both still come from the standing `state.buildingId`.
+`today.test.ts` pins it against `resources.entries`' own pre-resolved object, which is the exact
+value the old implementation returned, and that case goes red under an *always grow* mutation while
+staying green under a revert.
+
+**Cost, because this went from a lookup to an assembly.** Measured on `midtown-office`, 200 calls:
+**0.643 ms** against the old path's **0.0003 ms**. That is not a footnote here —
+`ViewerState.tomorrow` exists precisely to keep a `parseBuilding`/`resolveBuilding` off a 60 Hz
+render, so the same bar has to be cleared. It is cleared by **reaching** rather than by being cheap:
+`dev/main.ts#tick` renders at 60 Hz only while a `playback` exists; `playback` is assigned at exactly
+one place (`adopt`), every caller of which sets or already holds `state.recording`, and the one
+branch with no run to adopt writes `playback = undefined`. So `playback !== undefined` implies
+`recording !== undefined`, and `viewAt` reaches this function only on its `recording === undefined`
+arm — the two are disjoint. Everything else that asks is a discrete render: a screen mount, a
+`host.subscribe` notification, a resize.
+
+**What is not claimed.** The honesty corpus is **not re-measured** here and no string, surface or case
+count is published; § D343 takes that measurement once, after the wave integrates. The change does
+move the corpus — `derive.test.ts` classified `resolvedBuildingOf` as a text producer for the first
+time, because delegating gave it `shiftRunConfigOf`'s `throw` in its call chain — and that
+classification is an exclusion with its reason, in the same group and for the same reason as the
+neighbour it now calls. The throw is **unreachable through this function**: the lookup guard answers
+the unknown-id case first, and `today.test.ts` asserts that arm directly.
+
+---
+
+## D391 — the Everyday stage canvas is `60vh`, which is § 2's own number and leaves no margin on purpose
+
+**Rules on:** `everyday/stageScreen.ts#STAGE_CANVAS_HEIGHT`, and
+`docs/31-support-matrix.md` § 2's second clause. Settles GitHub issue #303. Empties the clause-2 half
+of `everyday/viewportGates.browser.test.ts`'s `OUTSTANDING`.
+
+**Decision.** The stage canvas declares `height:60vh`. § 2's clause is **met**, not renegotiated.
+
+**Why.** The height was `340px` — a literal with no breakpoint, no viewport unit and no clamp — so
+the canvas was 340 px at every viewport height. Measured through the player's own path on Chromium
+headless shell r1194 by #292's instrument:
+
+| viewport | stage canvas | share of viewport height | § 2's floor |
+|---|---|---|---|
+| 1280×800 | 340 px | **42.5 %** | 60 % |
+| 360×800 | 340 px | **42.5 %** | 60 % |
+| 375×667 | 340 px | **51.0 %** | 60 % |
+
+Re-measured on the same sweep after the change: **60.0 %** at all three. That is the quantity the
+sweep reports (`canvasPct`); no pixel figure is published beside it, because `0.6 × 800` is
+arithmetic rather than a measurement and the row it replaces could quote `340 px` only because that
+was the literal.
+
+**Met rather than renegotiated, and that was a choice.** #303's first criterion allows § 2's clause
+to be renegotiated with a measurement behind it. `CLAUDE.md`'s working agreement is the tie-breaker —
+*"do not weaken an acceptance criterion to make a phase pass; raise it instead"* — so meeting the
+clause was treated as the default and renegotiation as something that would have needed an argument a
+run could not otherwise settle. There was none: the clause is satisfiable by a one-token change, and
+the sweep says so.
+
+**Why a viewport unit rather than flexing to fill.** The design handoff draws this container as
+`min-height:0` in a flex column with the canvas at `height:100%` — the stage *fills what is left* —
+and the handoff is canonical for the interface. It cannot be reproduced literally here, for a reason
+already written down: `index.html:1541` refuses a percentage height against an auto-height wrap
+because *"a percentage against an auto-height wrap falls back to the canvas's own bitmap height,
+which the per-frame resize then feeds back into the wrap — the box grows every frame."* The Everyday
+stage has exactly that shape — it sits in `.everyday-screen`, which is `overflow-y:auto` and so
+auto-height, and `sizeCanvas` writes the bitmap from the laid-out box on every resize. A definite,
+viewport-derived height is the one thing that both tracks the viewport and cannot feed back into
+itself.
+
+**Why exactly 60, and the margin that leaves.** It is the clause's own number and it is already this
+repository's answer to this question: `RX-03` fixed the Engineer surface with
+`.stage-wrap { height: 60vh; min-height: 60vh }`. One commitment, one figure, in both shells. It also
+satisfies the clause at **every** viewport height rather than at the three the matrix names, because
+`60vh` *is* 60 % of the viewport by construction.
+
+Say the cost plainly: the margin is **zero**. A layout change that put so much as a border inside the
+canvas's own box would take it under, and the gate would go red rather than the product going quietly
+non-compliant — the correct direction, and the reason no larger figure was invented to buy slack. A
+number above 60 would have been a threshold with nothing behind it. **No floor is set beneath it
+either**: `340px` would only bind below a 567 px viewport, shorter than anything the support matrix
+carries, so keeping it would have added a constant nothing in the supported range can reach — and the
+clause holds there anyway, since 340 px of a 567 px viewport is already 60 %.
+
+**What the register did, and why it is two changes rather than one.** The three clause-2 entries were
+deleted from `OUTSTANDING` on the commit that made them stop reproducing, which that file's
+both-directions assertion requires and which its own docstring asks of #240. Beside that, four
+sentences in `viewportGates.browser.test.ts` and two in `docs/31-support-matrix.md` § 2 asserted the
+failure as a present-tense fact and were corrected, with the superseded figures kept struck through
+rather than deleted. A register whose prose still says *the product fails all three* while its list
+says otherwise is the stale-claim defect arriving inside the instrument built to catch it.
+
+**What is not claimed.** Clauses 1 and 3 are **unmoved and still #240's** — eighteen entries remain,
+all of them narrow-viewport findings. The sweep's other four columns were checked rather than
+assumed: a canvas 140 px taller created no new clipping and put no control out of reach at any of the
+three widths, which is what the 1280×800 control cell and the unchanged clause-3 rows say. The
+honesty corpus is **not re-measured** here and no string, surface or case count is published;
+§ D343 takes that measurement once, after the wave integrates.
+
+---

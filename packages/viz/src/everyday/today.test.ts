@@ -12,19 +12,24 @@ import { fileURLToPath } from 'node:url';
 
 import {
   parseBuilding,
+  parseDispatcherProfiles,
   parseElevatorSpecs,
+  parseTrafficProfiles,
   resolveBuilding,
   type ResolvedBuilding,
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
-import { scheduledEventFor } from '../shift/calendar.js';
+import type { BrowserResources } from '../dev/data.js';
+import { initialState, resolvedBuildingOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import type { CalendarPeriod } from '../shift/calendar.js';
+import { CALENDAR_PERIODS, periodOnDays, scheduledEventFor } from '../shift/calendar.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
 import { openWeek } from '../shift/week.js';
 
-import { EM_DASH } from './figures.js';
+import { EM_DASH, groupThousands } from './figures.js';
 import { COMFORTABLE_PER_CAR, todayOf } from './today.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
@@ -187,5 +192,167 @@ describe('the rest of the record', () => {
     const record = recordFor(midtown, 5, 4);
     expect(record.asks).toEqual(goalsForDay(5).map((goal) => goal.label));
     expect(record.asks.length).toBeGreaterThan(0);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The brief describes the building the run will use — GitHub issue #300
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The join, and it is the only thing in this file that builds a `ViewerState`.
+ *
+ * Everything above drives {@link todayOf} against a building handed straight in, which is the right
+ * shape for asking whether the record composes correctly and the wrong shape for asking **which**
+ * building it composed. Issue #300 was entirely the second question: every figure in the record was
+ * a correct statement about `resolvedBuildingOf`'s answer, and `resolvedBuildingOf`'s answer was a
+ * building the run was not going to use.
+ *
+ * So these cases go through the shipped chain on both sides — `resolvedBuildingOf` for the brief,
+ * `shiftRunConfigOf` for the run — and require the two to agree. That is § D177's standing
+ * requirement pointed at a caption instead of at a slider: not *"is the figure derived correctly"*
+ * but *"is it derived from the thing the player is about to press"*.
+ */
+
+const IDS_300 = ['garden-apartments', 'midtown-office', 'chancery-house'] as const;
+
+/**
+ * Three buildings rather than `scope/probes.test-helper.ts`'s two, because the third is the one the
+ * issue measured and a growth delta on Garden Apartments is fifteen people.
+ */
+function resources300(): BrowserResources {
+  const elevatorSpecs = parseElevatorSpecs(read('elevator-specs.json'));
+  const entries = IDS_300.map((id) => {
+    const config = parseBuilding(read(`buildings/${id}.json`));
+    return { file: `${id}.json`, config, resolved: resolveBuilding(config, elevatorSpecs) };
+  });
+  const trafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
+  return {
+    elevatorSpecs,
+    trafficProfiles,
+    dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),
+    buildings: entries.map((entry) => entry.resolved),
+    entries,
+    trafficProfileIds: new Set(trafficProfiles.profiles.map((profile) => profile.id)),
+    warnings: [],
+  };
+}
+
+const RESOURCES_300 = resources300();
+
+function stateOn(buildingId: string, day: number, calendar: CalendarPeriod | null = null): ViewerState {
+  return {
+    ...initialState(RESOURCES_300, 20_260_804n),
+    buildingId,
+    shiftLengthS: 900,
+    calendar,
+    week: { ...openWeek('c1'), day, dayIdx: day - 1 },
+  };
+}
+
+/** The brief exactly as `briefScreen.ts` composes it: `todayOf` over `host.resolvedBuilding()`. */
+function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
+  return todayOf({
+    week: state.week,
+    calendar: state.calendar,
+    building: resolvedBuildingOf(RESOURCES_300, state),
+    buildingId: state.buildingId,
+    dispatcherName: 'Steady hand',
+    goals: pendingGoals(state.week.day),
+    seed: state.seed,
+  });
+}
+
+const factOn = (state: ViewerState, label: string): string | undefined =>
+  briefOn(state).facts.find((fact) => fact.label === label)?.value;
+
+describe('the brief describes the building the run will use — issue #300', () => {
+  it('agrees with the run’s own building on every day of the week, on three buildings', () => {
+    /*
+     * The case the issue asked for, walking the whole week rather than the three days it measured.
+     * Both figures the fabric can move are compared — `People`, which growth and the calendar
+     * scale, and `Lifts`, which commissioning does — because a fix that closed one producer and
+     * left another would pass a `People`-only walk and still put the wrong building on the screen.
+     *
+     * Compared against `groupThousands` of the run's own total rather than against a transcribed
+     * number: a literal here would be a second copy of `data/`, stale the day a building is edited.
+     */
+    for (const buildingId of IDS_300) {
+      for (const day of [1, 2, 3, 4, 5, 6, 7]) {
+        const state = stateOn(buildingId, day);
+        const run = shiftRunConfigOf(RESOURCES_300, state).building;
+        const where = `${buildingId} day ${String(day)}`;
+        expect(factOn(state, 'People'), where).toBe(groupThousands(run.totalPopulation));
+        const cars = run.banks.reduce((total, bank) => total + bank.cars.length, 0);
+        expect(factOn(state, 'Lifts'), where).toContain(String(cars));
+      }
+    }
+  });
+
+  it('and the week genuinely moves, so the walk above has teeth', () => {
+    /*
+     * The negative control. A `resolvedBuildingOf` that returned any *constant* building would pass
+     * the walk if the run's own population never changed either — so this requires the thing being
+     * tracked to be worth tracking. Seven distinct figures on `midtown-office`, which is the
+     * building the issue's largest gap was measured on.
+     */
+    const seen = new Set(
+      [1, 2, 3, 4, 5, 6, 7].map((day) => factOn(stateOn('midtown-office', day), 'People')),
+    );
+    expect(seen.size).toBe(7);
+  });
+
+  it('agrees under a calendar period too, where fixing growth alone would not', () => {
+    /*
+     * The second producer, and the larger one. `calendar.ts#calendarPatch` scales the same floors
+     * through `growth.ts#scaledBuilding`, so before this fix `midtown-office` under
+     * `public-holiday` read **1 710** on a run of **437** — a bigger gap than any growth day
+     * produces. It is asserted here rather than left to the walk because the walk runs with no
+     * period, and a fix that grew the building and stopped there would be green on it.
+     */
+    for (const period of Object.values(CALENDAR_PERIODS)) {
+      for (const day of [1, 3, 5]) {
+        const state = stateOn('midtown-office', day, periodOnDays(period, 1, 7));
+        const run = shiftRunConfigOf(RESOURCES_300, state).building;
+        expect(factOn(state, 'People'), `${period.id} day ${String(day)}`).toBe(
+          groupThousands(run.totalPopulation),
+        );
+      }
+    }
+  });
+
+  it('still reports the shipped population on a freshly switched building with no recording — issue #36', () => {
+    /*
+     * The clause the fix had to keep, and the reason *"always grow"* was the wrong answer. A player
+     * who has just taken an assignment has moved `buildingId` and cleared the recording without
+     * running anything; the week they land on is open at day 1, and what the brief owes them is the
+     * building as `data/` ships it — not a population invented for a day that has not arrived.
+     *
+     * It holds **by construction rather than by a branch**: `growthFactor(1)` is exactly 1 and
+     * `Math.round` is the identity on the integers `data/` declares, so day 1 with no calendar is
+     * the shipped fabric. Pinned against `resources.entries`' own pre-resolved building — the exact
+     * object the old implementation returned — so a future change that started growing day 1 fails
+     * here rather than being noticed by a player.
+     *
+     * `towerName` is asserted beside it because that is #36's own defect: the new building's name
+     * against the previous building's specs. Both must name the same building.
+     */
+    for (const buildingId of IDS_300) {
+      const state = { ...stateOn(buildingId, 1), recording: undefined };
+      const shipped = RESOURCES_300.entries.find((entry) => entry.config.id === buildingId)?.resolved;
+      expect(shipped, buildingId).toBeDefined();
+      expect(factOn(state, 'People'), buildingId).toBe(
+        groupThousands(shipped?.totalPopulation ?? -1),
+      );
+      expect(briefOn(state).towerName, buildingId).toBe(shipped?.name);
+    }
+  });
+
+  it('answers `undefined` for an id this build has no document for, as it always has', () => {
+    // The totality clause. `shiftRunConfigOf` throws on this id rather than returning an answer, so
+    // the lookup guard in front of it is load-bearing and not a shortcut.
+    const state = stateOn('a-building-this-build-does-not-have', 3);
+    expect(resolvedBuildingOf(RESOURCES_300, state)).toBeUndefined();
+    expect(briefOn(state).facts).toEqual([]);
   });
 });
