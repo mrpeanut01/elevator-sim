@@ -8527,6 +8527,17 @@ and after, because `budgetFor` derives it from a declared spread that this chang
 the re-pin moved *estimates*, never a *budget* — which is the direction that would have been
 worrying, since a budget that moves with a result is a budget being fitted to it.
 
+> **⚠️ The clause *"a declared spread that this change does not touch"* is REFUTED by
+> [§ D396](#d396) (2026-08-29). The conclusion it was offered in support of is not.** Re-censused at
+> n = 200 at `MATRIX_SEED`, `vertical-city-up-peak`'s binding spread is **2.9722** on the tree that
+> declared it and **3.0370** on the first tree carrying this change: it was touched. The budget is
+> 50 before and after for a *different* reason than the one given here — the band **floor** binds at
+> both spreads, since `budgetFor` reads 34 and then 36 against a floor of 50 — so the sentence's
+> conclusion survives its own argument. Left standing rather than rewritten, because it is the
+> reason nobody re-ran `matrixCensus.test.ts`: this lane's stated ground for not re-deriving the
+> census was that the census had nothing to re-derive. `CLAUDE.md`'s *"a stated mechanism goes stale
+> the same way"*, applied to a mechanism offered for **not** measuring.
+
 **44 of 44 is the whole cell**, and that is the expected answer rather than a surprising one: at
 `vertical-city-up-peak` every arm runs on the same eight double-deck shuttles, so no arm could have
 been spared. **0 of 308 elsewhere** is the load-bearing half, and it is the fourth independent
@@ -26742,5 +26753,220 @@ larger neighbour, not its scope. No claim is made that `readRunSetFile`, `parseR
 `parseStoredRun` or `replaySimulationConfig` are dead — they are not, and `goldenChild.ts` is why.
 
 
+
+---
+## D396 — three census figures, three different causes, and the hypothesis was right about one of them
+
+**Date:** 2026-08-29 · **Owner:** wave H lane A · **Closes:** GitHub issue #306 · **Refutes a
+clause of:** [§ D150](#d150) · **Discharges the check** [§ D393](#d393) left open when it turned the
+`matrix-census` tier on and found it red · **Not a phase verdict:** no phase status moves here, and
+no published interval is recomputed
+
+**Decision.** `benchmark/matrixCells.ts` re-declares the three census figures that no longer
+reproduce, and **only** those three. Every one is attributed to a named tree by a run before it and
+a run on it, never by the direction of the drift. The re-declaration moves **no budget, no verdict,
+no front membership and no published interval**, and that is checked rather than argued. The
+`vertical-city-up-peak` rationale's double-deck disclaimer is **withdrawn**, because it has been
+false since the day the census beside it stopped reproducing, and for the same reason.
+
+| figure | declared | measured on this tree | cause, measured |
+|---|---|---|---|
+| `mixed-use-up-peak` / `destination-panel` first-invalid | 33 | **171** | [§ D333](#d333) alone |
+| `vertical-city-up-peak` / `destination-panel` first-invalid | *(none)* | **73** | the wave-10 tree at `22a1021`; the deck half isolated by control |
+| `vertical-city-up-peak` binding spread | 2.9722 | **3.1724** | `22a1021` **then** [§ D332](#d332), two moves and not one |
+
+### The hypothesis, and why it had to be run rather than read
+
+Issue #306 offered one attribution and said in as many words that it was a hypothesis: all three
+discrepancies touch `destination-panel`, and § D333 had bounded that arm's landing-panel promise.
+**One of the three is that, and two of them are not** — one of those two moved before § D333
+existed, and the third moved twice, once before it and once for a different reason after.
+
+Everything below is `matrixCensus.test.ts` at `MATRIX_SEED = 20 260 728`, unmodified except for a
+throwaway cell filter and, where stated, a replication count — the file is **byte-identical from
+`f895a16` to this tree**, so a difference between two rows is a difference between two simulators
+and nothing else.
+
+**The control first, because without it the rest measures the wrong thing.** At `f895a16` — the
+commit that declared these numbers — the census over both affected cells at n = 200 **passes**:
+2 tests, exit 0, 526 s. The declared figures were right when they were taken. This is not a number
+that never reproduced; it is three trees moving under one that did.
+
+The factorial, all at n = 200 over both cells. `ad7670e` (§ D332) and `b8b8733` (§ D333) are
+**siblings** — both have `29ee760` as their parent, and `103a8fe` is where they merge — so one run
+each isolates them completely:
+
+| tree | mixed-use `destination-panel` | vertical-city `destination-panel` | vertical-city binding sd |
+|---|---|---|---|
+| declared (`f895a16`, and the census passes there) | 33 | *(none)* | 2.9722 |
+| `29ee760` — parent of both fixes | **33** | **73** | **3.037002** |
+| `ad7670e` — § D332 only | **33** | 73 | **3.172435** |
+| `b8b8733` — § D333 only | **171** | 73 | **3.037002** |
+| `6260dcb` — this lane's base | **171** | **73** | **3.172435** |
+
+Read down the columns. `mixed-use` moves on § D333 and on nothing else, which is also what § D332's
+own structural argument predicts: `stopFloorIdOf` is the identity function on a single-deck shaft
+and `mixed-use-high-rise` declares no `servesFloorPairs`, so § D332 **could not** have moved it.
+`vertical-city`'s spread moves on § D332 and not on § D333, which is the mirror of the same
+structure: `zoned-uppeak` and `collective` are conventional arms and `#tellThePanel` never runs for
+them, so § D333 could not have moved *that* pair either. And `vertical-city`'s panel ceiling is
+**already 73 at the parent of both**, so neither fix owns it.
+
+### The third figure, bisected to the tree and then to the mechanism
+
+The remaining move is in `f895a16..29ee760`, 377 commits. Bisected with the same census restricted
+to `vertical-city-up-peak` at n = 74 — enough replications to see a first-invalid index of 73 or its
+absence, at about a third of the cost:
+
+| tree | position in the range | binding sd (n = 74) | `destination-panel` |
+|---|---|---|---|
+| `f895a16` | before the range | 2.914588 | *(none)* |
+| `ff43489` | 53 of 377 | **2.914588** | *(none)* |
+| `22a1021` | 54 of 377 | **3.102608** | **73** |
+| `5c8b809` | 94 of 377 | 3.102608 | 73 |
+| `5ac006b` | 188 of 377 | 3.102608 | 73 |
+| `aaf1bc0` | 282 of 377 | 3.102608 | 73 |
+
+`22a1021` is where [§ D131](#d131)'s deck simulation reaches this history: `stopFloorIdOf` exists in
+no tree before it and in every tree after. **The mechanism was then tested rather than inferred.**
+Taking `22a1021`'s own tree and dropping `servesFloorPairs` from `vertical-city.json` — § D332's own
+`withoutFloorPairs` control, applied at the data — gives **no `destination-panel` ceiling at all**
+and a binding sd of **3.135430**. So:
+
+- the **ceiling at 73 is the decks**, exactly: it appears when the pairs are simulated and
+  disappears when they are not, on one tree with one variable moved;
+- the **spread's first move is not**, or not only. Pre-`22a1021` is 2.914588, `22a1021` without its
+  pairs is 3.135430, `22a1021` with them is 3.102608. The decks move the spread by about a thirtieth
+  of what the rest of that tree moves it, and in the opposite direction.
+
+**That residual is attributed to `22a1021` and no further, and the reason is a property of this
+repository's history rather than of this lane's effort.** `22a1021` is a **root commit** — it has no
+parents; the wave-10 working tree arrived as an orphan import of 182 files and 83 343 insertions.
+There is no in-branch history inside it to bisect, so *"the wave-10 tree"* is the finest grain the
+record permits. What is measured, and is the reason it is safe to re-declare anyway: **every other
+cell in the matrix is unmoved across the whole 32 days.** All six other binding spreads and all four
+other declared ceilings reproduce to the last digit at `6260dcb` — `midtown-up-peak` 4.5766 /
+`nearest-car`@174, `midtown-down-peak` 4.4899 / `nearest-car`@12, `midtown-interfloor` 9.4048,
+`garden-residential` 4.0834, `garden-down-peak` 3.6148, `secure-up-peak` 5.5574 /
+`nearest-car`@126. Whatever else moved in that tree moved the one building whose deck geometry and
+whose multi-leg sky-lobby transfers are unique to it, and moved nothing else this matrix measures.
+
+### What re-declaring costs, which is the question the issue actually asked
+
+Issue #306 refused to re-declare on the ground that doing so *"would silently re-baseline the
+statistical parameters the matrix publishes intervals under."* That was the right refusal for a lane
+that had not attributed the move, and it is checkable now rather than arguable:
+
+1. **The budget does not move, at either cell.** `budgetFor` is `ceil((z·sd/1)²)` clamped to
+   [50, 200]. At `vertical-city-up-peak` the unclamped figure goes **34 → 39** and the band **floor**
+   binds at both, so `replications` is 50 before and after. At `mixed-use-up-peak` the spread never
+   moved at all — 3.0616 at every point in the table above — because `destination-panel` is excluded
+   from the binding computation at *both* ceilings: 33 and 171 are both inside the census, and the
+   rule takes the widest arm with **zero** invalid replications.
+2. **`armCeilings` is not a statistical parameter.** Outside the two test files it is read in exactly
+   one place — `matrix.ts#runMatrixCell`, to write the *prose* of a front exclusion. It enters no
+   interval, no verdict and no front. `packages/viz` imports `MATRIX_CELLS` for `building`,
+   `traffic` and `reportWindow` and reads neither `armCeilings` nor `budgetBasis`; `cli` and
+   `server` read none of it.
+3. **The results these figures describe were re-derived when each change landed, and only the census
+   record was not.** § D150 regenerated this cell's 44 interval pins for `22a1021`; `103a8fe`
+   regenerated `mixed-use-up-peak`'s front, its verdict census and its pins for § D332 and § D333,
+   and its own message says *"destination-panel leaves mixed-use's unquotable set"*. Both checks are
+   always-on and both are green on this tree. So this is not a re-baseline; it is the half of two
+   completed re-measurements that nobody could see, because the tier that checks it is opt-in.
+
+### Two sentences that were true when written and are left saying so
+
+**§ D150's clause is refuted in place** — the note sits at that entry rather than replacing it. It
+said the budget was 50 before and after *"because `budgetFor` derives it from a declared spread that
+this change does not touch."* The spread moved 2.9722 → 3.0370 on that very change. The conclusion
+is right and the reason is not, and the reason is exactly what made re-running the census look
+unnecessary.
+
+**The `vertical-city-up-peak` rationale's double-deck disclaimer is withdrawn.** It read that the
+building's *"eight shuttle cars are configured double-deck and simulated single-deck — so every
+figure in this row is for a machine nobody ordered."* That was true at `f895a16` and became false at
+`22a1021`, the same commit that moved the two numbers beside it, and it has been false for 30 days.
+[§ D132](#d132) had already retired that disclaimer for this building by name, because its shuttle
+declares its four `servesFloorPairs`. `CLAUDE.md`'s *"a stated refusal goes stale the same way, and
+it is the more dangerous half"*, on the sentence that told a reader not to trust the row.
+
+### A third stale figure, found because the rationale being rewritten cited it
+
+That rationale gave a *reason* for running this building at 1 % rather than 2 %, and the reason is a
+census figure: `EXCLUDED_CELLS`' `vertical-city-up-peak-2pct` says the **baseline** loses its AWT at
+replication **46**, below `CLAUDE.md`'s 50-replication floor, *"so there is no admissible budget at
+this point — not an under-budgeted cell but an inadmissible one."* Nothing in this repository
+re-derives an `EXCLUDED_CELLS` mechanism — the census only reads `MATRIX_CELLS` — so it was measured
+here rather than restated, by running that operating point through the census's own code at n = 200
+and `MATRIX_SEED`.
+
+**It does not reproduce, and the direction matters.** `collective` first loses its AWT at
+replication **108**, which is *inside* the 50–200 band. The stated mechanism is therefore
+**withdrawn**: the point is not inadmissible. `destination-panel` is first invalid at **2** rather
+than 3, `nearest-car` at **7**, and six further arms between **13** and **46** — so most of that
+table would be `UNQUOTABLE`, which is a result about those arms and not a property of the cell, and
+is exactly how `mixed-use-up-peak` is handled inside the matrix.
+
+**The cell is nonetheless not admitted, and that is deliberate.** It moves to *EXCLUDED PENDING A
+CRITERION*, the footing `secure-interfloor-mix` and `mixed-use-mixed-40-30-30` already stand on:
+admitting it adds a matrix row and a published pin group, and [§ D256](#d256) requires that
+re-design to be specified **before** its numbers are read. The numbers above were read to check a
+mechanism a rationale cites, not to decide an admission, and this lane does not decide one.
+
+The same run refuted the entry's closing clause too — *"the building appears at 1 % instead, where
+every arm but `nearest-car` is clean across the census"* — which stopped being true the moment
+`destination-panel` acquired its ceiling of 73 at 1 %. Both halves are corrected in place.
+
+### What is not claimed
+
+No corpus figure is measured here — [§ D343](#d343) takes that once, after integration. Nothing here
+says any of the three product changes was wrong: all three are accepted, and all three made the
+simulator more correct rather than less. And no claim is made about *which* of the wave-10 tree's
+non-deck changes moved the spread. It is one tree, it is a root commit, and offering a plausible
+name for it would be this file's own most-repeated mistake.
+
+---
+
+## D397 — a ceiling that heals is a change, and the always-on tier had no way to see one
+
+**Date:** 2026-08-29 · **Owner:** wave H lane A · **Consequence of:** [§ D396](#d396) · **Applies:**
+`CLAUDE.md` *"a published number goes stale the same way"*
+
+**Decision.** `matrix.test.ts`'s *"suppresses rather than averages an arm whose own AWT was invalid,
+and the census predicted which"* gains a **third direction**: an arm whose declared ceiling is
+**below** its cell's budget must come back `UNQUOTABLE`. It costs no simulation — the run is the one
+`matrixOf()` already holds.
+
+**The hole, stated as the two questions that were being asked and the one that was not.** The test
+looped over the arms that came back unquotable — each must have a declared ceiling, and it must be
+below the budget — and over the declared ceilings **at or above** the budget, whose arms must be
+quotable. Nothing asked the remaining quadrant: a ceiling *below* the budget whose arm was quotable
+anyway. That is a **healed** ceiling, and `matrixCensus.test.ts` — which does ask, in its own words
+*"a ceiling that has healed is as much a change as one that appeared"* — is behind
+`ELEVATOR_SIM_DEEP=1` and had, on [§ D393](#d393)'s evidence, never been run on a recent tree.
+
+**It is not a hypothetical quadrant.** `mixed-use-up-peak`'s `destination-panel` sat in it for
+eighteen days: declared 33 against a budget of 50, measuring 171. `103a8fe` re-derived that cell's
+front, its verdict census and its 44 interval pins in the same commit as the fix that healed it, and
+left the census record beside them reading 33. Every always-on check in `matrix.test.ts`,
+`matrixFront.test.ts` and `published.test.ts` stayed green, correctly, because not one of them was
+looking at that number.
+
+**Exact rather than advisory, and both halves are properties of the apparatus.** Replication `i` is
+the same run at every budget — `harness.ts`'s `replicationSeed(seed, i)`, which is the whole basis of
+common random numbers here — and **one** invalid replication invalidates the cell, because
+`replicationRunner.ts#aggregateCell` is not a majority vote and says so. So `ceiling < replications`
+implies `UNQUOTABLE` with no tolerance anywhere in it, and the new loop is an equivalence rather than
+a heuristic: together with the loop above it, a declared ceiling and measured quotability now agree
+in both directions at every cell.
+
+**Mutation-validated by putting the defect back.** Restoring `mixed-use-up-peak`'s
+`destination-panel` ceiling to its declared 33 turns the file red on this assertion and on no other,
+naming the cell, the arm, the ceiling and the budget. Restored, green.
+
+**What this does not do.** It does not re-derive a ceiling — that is the census's job, and the census
+stays opt-in for the reason its own docstring gives. It asks only that two numbers already in the
+repository agree with each other, which is the question that was going unasked.
 
 ---
