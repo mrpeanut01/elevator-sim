@@ -141,6 +141,30 @@
 # filter that matches nothing for a reason other than a wrong name, and the flag cannot see a tier
 # that was never named at all.
 #
+# ## What each `timeout-minutes` is, and what it is not
+#
+# A ceiling, not an expectation. Where a tier documents its own invocation the number here is read
+# off that (`collective-adoption` from `--testTimeout=14400000`, `perf-sweep` from its 7 200 000 ms
+# `it`); where it does not, it is set with headroom over what was measured while wiring this file.
+#
+# Measured 2026-08-29 on one Linux container, **under concurrent load from other tiers**, which is
+# not the runner and is why none of these is a prediction:
+#
+# | tier | measured | ceiling here |
+# |---|---|---|
+# | `fuzz-deep` (250 cases) | 20.5 min, **RED** | 60 |
+# | `golden-runs` (6 of 6, cross-process) | 55.6 s, green | 90 |
+# | `perf-sweep` (20 000 replications, workers) | 4.6 min, green | 180 |
+#
+# The sweep is the interesting row: its own `it` allows two hours and it finished in under five
+# minutes, because it is the one tier that runs with `parallel: { mode: 'workers' }`. The ceiling is
+# left high anyway — a hosted runner is slower and a ceiling that has to be raised after a red run
+# has already cost the week it was meant to save.
+#
+# The other six are named in this file and were **not** run while writing it. That is stated rather
+# than implied: a tier nobody has measured is a tier whose first result arrives on a Sunday, and a
+# ceiling nobody has tested is a guess with a number on it.
+#
 # ## Aliveness — the half that is mechanised, and the half that is not
 #
 # A scheduled workflow that quietly stops is this repository's recurring failure mode, so say which
@@ -212,7 +236,10 @@ jobs:
   # ---------------------------------------------------------------------------
   fuzz-deep:
     name: fuzz — the deep campaign
-    if: inputs.tiers == 'all' || inputs.tiers == 'fuzz-deep' || inputs.tiers == ''
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'fuzz-deep'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -236,7 +263,10 @@ jobs:
   # ---------------------------------------------------------------------------
   golden-runs:
     name: goldens — 6 of 6, and across a fresh process
-    if: inputs.tiers == 'all' || inputs.tiers == 'golden-runs' || inputs.tiers == ''
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'golden-runs'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -258,7 +288,10 @@ jobs:
   # ---------------------------------------------------------------------------
   oracle-campaign:
     name: oracle — every measurable bank
-    if: inputs.tiers == 'all' || inputs.tiers == 'oracle-campaign' || inputs.tiers == ''
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'oracle-campaign'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -279,7 +312,10 @@ jobs:
   # ---------------------------------------------------------------------------
   matrix-census:
     name: matrix — the 200-replication census
-    if: inputs.tiers == 'all' || inputs.tiers == 'matrix-census' || inputs.tiers == ''
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'matrix-census'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -300,7 +336,10 @@ jobs:
   # ---------------------------------------------------------------------------
   collective-adoption:
     name: collective adoption — § D209 at the pre-registered count
-    if: inputs.tiers == 'all' || inputs.tiers == 'collective-adoption' || inputs.tiers == ''
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'collective-adoption'
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
@@ -323,7 +362,10 @@ jobs:
   # ---------------------------------------------------------------------------
   perf-sweep:
     name: perf — the 20 000-replication sweep
-    if: inputs.tiers == 'all' || inputs.tiers == 'perf-sweep' || inputs.tiers == ''
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'perf-sweep'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -348,7 +390,10 @@ jobs:
   # ---------------------------------------------------------------------------
   perf-scaling:
     name: perf — the wall-clock fits (noise-prone; see the job header)
-    if: inputs.tiers == 'all' || inputs.tiers == 'perf-scaling' || inputs.tiers == ''
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'perf-scaling'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -374,7 +419,10 @@ jobs:
   # ---------------------------------------------------------------------------
   honesty-deep:
     name: honesty — the deep corpus
-    if: inputs.tiers == 'all' || inputs.tiers == 'honesty-deep' || inputs.tiers == ''
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'honesty-deep'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -407,7 +455,10 @@ jobs:
   # ---------------------------------------------------------------------------
   corpus-figures:
     name: corpus figures — § D343, both tiers, one sitting
-    if: inputs.tiers == 'all' || inputs.tiers == 'corpus-figures' || inputs.tiers == ''
+    # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
+    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # how a null coerces in an expression.
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'corpus-figures'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -530,7 +581,10 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RESULTS: ${{ toJSON(needs) }}
-          TITLE: 'Deep tiers: a scheduled run went red'
+          # No colon in the title. It is searched back with `in:title`, and a colon in a GitHub
+          # search string reads as a qualifier — the lookup would miss and open a second issue
+          # every week, which is the opposite of one thread per finding.
+          TITLE: 'Deep tiers went red on a scheduled run'
         run: |
           failed="$(node -e '
             const results = JSON.parse(process.env.RESULTS);
@@ -547,7 +601,7 @@ jobs:
             "Run: $RUN_URL" \
             "These tiers run nowhere else, so a red here is the only place the finding exists. Read \`perf-scaling\` against its own note about wall-clock flake under load before treating it as a defect; the other eight are deterministic.")"
 
-          existing="$(gh issue list --repo "$REPO" --state open --search "$TITLE in:title" --json number --jq '.[0].number')"
+          existing="$(gh issue list --repo "$REPO" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --repo "$REPO" --body "$body"
           else
