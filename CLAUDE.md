@@ -680,3 +680,20 @@ cite why.
 - If you hit a decision the docs don't cover, record it in the relevant doc rather than
   only in a commit message.
 - Do not weaken an acceptance criterion to make a phase pass. Raise it instead.
+
+**Decision numbers are reserved for you before you start, and *the relevant doc* is usually your own
+module.** Two halves, both [§ D404](DECISIONS.md) and [§ D405](DECISIONS.md), and they exist because
+reading the agreement above as *"every decision needs a `DECISIONS.md` entry"* while having no safe
+way to claim a heading produced **sixty-four** sites saying a number was owed and none allocated.
+**Your numbers are in your own dispatch brief** — the integrator pre-allocates a contiguous block per
+lane before any lane starts, you allocate from it sequentially, and you report the highest you used.
+Do **not** take numbers from `CHARTER_PROGRAMME.md`'s *Next free decision number* row: that row is
+the integrator's input, it is stale for the whole duration of a wave, and two lanes reading it both
+computed § D336. Need more than your block? Ask; never take the number above it, because the next
+lane holds it. A number your block does not spend stays **unused permanently** and is registered in
+`documentation.test.ts#KNOWN_DECISION_HOLES` — ids here are names, so backfilling one makes it mean
+two things. And a `DECISIONS.md` entry is owed only when the decision **reaches past the module that
+took it**: when it binds code or documents that module does not own, when it moves or refuses
+something already recorded, or when a document refuses to cite itself without one. Otherwise your
+docstring *is* the record the agreement asks for — say so and cite § D405, rather than writing that a
+number is owed, which `documentation.test.ts` counts as debt against a ratchet that may only fall.
