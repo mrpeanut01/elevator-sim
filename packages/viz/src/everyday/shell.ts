@@ -436,7 +436,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * The restore runs in the observer's microtask, which is before the next paint, so nothing the
    * player sees ever shows the clamped position.
    */
-  function keepScrollAcrossRerender(): void {
+  function keepScrollAcrossRerender(): MutationObserver {
     const view = doc.defaultView;
     const snapshot = (): void => {
       armed = true;
@@ -452,15 +452,23 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     for (const type of ['pointerdown', 'keydown', 'change'] as const) {
       screenRegion.addEventListener(type, snapshot, true);
     }
-    new MutationObserver(() => {
+    const observer = new MutationObserver(() => {
       if (!armed) return;
       armed = false;
       if (screenRegion.scrollTop !== settled.region) screenRegion.scrollTop = settled.region;
       if (view !== null && view.scrollY !== settled.window) view.scrollTo(0, settled.window);
-    }).observe(screenRegion, { childList: true, subtree: true });
+    });
+    observer.observe(screenRegion, { childList: true, subtree: true });
+    /*
+     * Returned so {@link EverydayShell.destroy} can disconnect it. The listeners go with the region
+     * when the root is removed; an observer does not — it holds its target, and a second shell
+     * mounted into one document (which is the only reason `destroy` exists) would otherwise leave
+     * the first one's keeper still holding the first one's region.
+     */
+    return observer;
   }
 
-  keepScrollAcrossRerender();
+  const scrollKeeper = keepScrollAcrossRerender();
 
   /**
    * Cover the page behind this shell, and keep the screen region laid out.
@@ -1618,6 +1626,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     world: () => world,
     destroy: () => {
       stopProfileWatch();
+      scrollKeeper.disconnect();
       unmountCurrent();
       // The host wiring goes first: a destroyed shell must not hear another notification and
       // write a latch for a page it is no longer on.
