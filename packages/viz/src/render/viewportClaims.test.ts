@@ -45,7 +45,9 @@
  * `index.html` is read as text because `vitest.config.ts` is `environment: 'node'` for every
  * project — there is no jsdom here, and none is needed to ask what the shipped page declares.
  *
- * A decision number is owed; the argument is this docstring and `canvas.ts`'s.
+ * **Recorded here rather than in `DECISIONS.md`, under § D405.** The claim this file exists to
+ * keep withdrawn is § D352's; what is local to it is the narrowing above — why a general
+ * *no prose may name a width* sweep was tried and rejected, and why `index.html` is read as text.
  */
 
 import { readFileSync, readdirSync } from 'node:fs';

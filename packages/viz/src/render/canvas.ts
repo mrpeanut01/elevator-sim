@@ -458,8 +458,10 @@ export interface SceneInput {
    * a fact with one optional surface is a fact that is usually not shown, so it is drawn on the
    * landing itself and named in the banner.
    *
-   * A decision number is owed. `viewportClaims.test.ts` pins the breakpoint set, so that the next
-   * rule deleted takes a test with it instead of leaving a sentence behind.
+   * **Recorded here rather than in `DECISIONS.md`, under § D405.** The withdrawal is § D352 —
+   * *the 1280 px viewport rule was true when written, and the correction says so* — including its
+   * refusal to name a replacement width. `viewportClaims.test.ts` pins the breakpoint set, so that
+   * the next rule deleted takes a test with it instead of leaving a sentence behind.
    *
    * Derived by the caller from `landingAssignmentsAt`, for the reason {@link SceneInput.queues}
    * gives: `drawScene` stays a pure function of its inputs, and the renderer never reaches for a

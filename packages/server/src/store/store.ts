@@ -185,7 +185,11 @@ export function normaliseEmail(email: string): string {
  * all — `sql.ts` carries `query`, `exec` and `close` — and giving it one is a larger design question
  * than the route that made this reachable. What is closed here is the *reporting*: the outcome is
  * the same whether the account vanished a second before the write or a millisecond into it. A
- * decision number is owed with the route's.
+ * **Recorded here rather than in `DECISIONS.md`, under § D405.** The absence of a transaction
+ * seam is § D361's ruling — *`Store` gains no transactions, and the enumeration that says so is
+ * derived* — whose rule is that each write either maps its constraint violation onto an answer
+ * the route already has a word for, or lets the write arbitrate. This is the first of those, and
+ * `concurrency.test-helper.ts` derives the set it belongs to rather than reading it here.
  */
 export class NoSuchUserError extends Error {
   constructor(where: string) {
@@ -407,8 +411,10 @@ export class Store {
    * concurrent second deletion — and the right response to that is the same as to the first. A
    * boolean nobody branches on is an invitation to branch on it.
    *
-   * A decision number is owed for this and for the route above it; the argument is here and in
-   * `http/api.ts`.
+   * **Recorded here rather than in `DECISIONS.md`, under § D405.** This and the route above it are
+   * § D358's; what is local to this member is the shape of its answer — an id and never an
+   * address, the caller's own session among the rows it removes, and no boolean for a caller to
+   * branch on.
    */
   async deleteUser(id: string): Promise<void> {
     await this.#sql.query('DELETE FROM users WHERE id = $1', [id]);
