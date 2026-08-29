@@ -24,6 +24,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { goalsForDay } from '../shift/goals.js';
 import type { BrowserResources } from '../dev/data.js';
+import { railFooter } from '../everyday/rail.js';
 
 import {
   AGREED_FIGURES,
@@ -158,11 +159,16 @@ export const NOT_AGREED: readonly {
       'it from the `readings` themselves, and `everyday/weekView.ts#weekScreenViewOf` computes it ' +
       'from `DayOutcome.allMet` — a **persisted denormalisation** written once by ' +
       '`shift/week.ts#outcomeOf`. A restored session can therefore carry an `allMet` that ' +
-      'disagrees with the readings stored beside it, and nothing today would notice. Not built ' +
-      'here because a driven side needs a **closed day**, which needs `outcomeOf` and `closeDay` ' +
-      'over a recording — the composition `surfaces.ts#shiftBundleOf` already owns — and reaching ' +
-      'it from this module would either duplicate that composition or invert the dependency ' +
-      'between the two files.',
+      'disagrees with the readings stored beside it, and nothing today would notice. **Half of ' +
+      'the reason this entry used to give has stopped being true, and it is corrected rather ' +
+      'than left standing (§ D227):** it said a driven side needs a closed day, which needs ' +
+      '`outcomeOf` and `closeDay` over a recording. It does not — `agreement.ts#withTodayFiled` ' +
+      'files one with `record: null`, a shipped `DayOutcome` and not a stub, which is what ' +
+      'issue #214’s `career-line` pair is driven on. What still blocks *this* pair is the other ' +
+      'side: `dayReportOf` is a function of a **run**, and this module does not simulate for the ' +
+      'reason the *Cost* section gives in seconds. Building it means either a deep-tier home or a ' +
+      'side that reaches `surfaces.ts#shiftBundleOf`, which inverts the dependency between the ' +
+      'two files.',
     ids: ['shift/report.ts#dayReportOf(verdict) × everyday/weekView.ts#weekScreenViewOf(verdict)'],
   },
 ]);
@@ -279,6 +285,82 @@ describe('the register is watching something', () => {
     const none = readings([]);
     expect(none).toEqual([]);
     expect(checkSurfacesAgree(contexts[0]?.context as HonestyContext, none)).toEqual([]);
+  }, 600_000);
+
+  it('reaches a week with a career, and both arms of the day-closed gate — issue #214', () => {
+    /*
+     * **The `career-line` pair's version of the clause above, and it is the one #214 needed built.**
+     * `honesty/surfaces.ts` drove `railModel(...)` with no options at all, so the corpus held only
+     * the card's *absence* line; a pair declared over the career line on that corpus would have
+     * been silent on every case — {@link hasACareer} is `false` on a week with no closed day — and
+     * silent is byte-identical to agreeing.
+     *
+     * Both `dayClosed` arms are asserted, not just the interesting one. The two derivations gate
+     * today's figure through different expressions, and a corpus that only ever released it would
+     * go green on a rail that had dropped the gate — which is the defect `rail.test.ts`'s
+     * *withholds today's figure* case pins on five hand-written weeks and this pins on every case.
+     */
+    const career = readings().filter((text) => text.agreement?.pair === 'career-line');
+    expect(
+      career.length,
+      'no case renders the career line. `AGREEMENT_ARMS` no longer reaches a week with a closed ' +
+        'day in it, so the pair is scoped out everywhere — which reports zero violations on every ' +
+        'corpus, exactly as a pair that agrees does.',
+    ).toBeGreaterThan(0);
+
+    const arms = new Set(career.map((text) => (text.agreement?.view ?? '').split('/')[0]));
+    expect([...arms].sort()).toEqual(['day4', 'day4-filed']);
+
+    /*
+     * And the gate is **live** rather than merely present: the withheld arm and the released arm
+     * must be different strings, or both arms are testing one state under two names.
+     */
+    const lineOn = (arm: string): string | undefined =>
+      career.find((text) => text.agreement?.view.startsWith(`${arm}/`) === true)?.text;
+    expect(lineOn('day4')).toBeDefined();
+    expect(lineOn('day4')).not.toBe(lineOn('day4-filed'));
+  }, 600_000);
+
+  it('goes red when one career derivation forgets the day-closed gate', () => {
+    /*
+     * **The non-vacuity proof for #214's pair, in the shape the § D359 case uses one describe
+     * above.** The right side is left exactly as it ships; the left is replaced by the rail's own
+     * line computed as if the day were always filed — which is the shape of the mistake
+     * `RailOptions.dayClosed`'s *"defaults to `false`, which is the withholding arm"* exists to
+     * make impossible, written the other way round.
+     *
+     * The claim is not only *some violation appears*. It must appear on the arm where the gate
+     * bites and **nowhere else**: a check that also fired on `day4-filed` would be firing for a
+     * reason that is not the gate, and one that fired on `day1` would mean the pair had stopped
+     * being scoped.
+     */
+    const declared = AGREED_FIGURES.find((figure) => figure.id === 'career-line');
+    expect(declared, 'the career-line pair is gone — this case is about nothing').toBeDefined();
+    const ungated: AgreedFigure = {
+      ...(declared as AgreedFigure),
+      left: {
+        surfaceId: 'everyday/rail.ts#railFooter',
+        read: (view) =>
+          view.state.week.history.length === 0
+            ? undefined
+            : railFooter(
+                { screen: 'menu', ctx: 'daily' },
+                { week: view.state.week, dayClosed: true },
+              ).identity.streak,
+      },
+    };
+    const found = checkSurfacesAgree(
+      contexts[0]?.context as HonestyContext,
+      readings([ungated]),
+    );
+    expect(found.length).toBeGreaterThan(0);
+    for (const violation of found) expect(violation.field).toContain('day4/');
+    const message = found.map((violation) => violation.message).join('\n');
+    expect(message).toContain('everyday/rail.ts#railFooter');
+    expect(message).toContain('everyday/weekView.ts#weekScreenViewOf');
+    // The em dash is § 13's only placeholder and it is what the honest side draws for a day this
+    // sitting has not filed. Quoting both sides is what makes the violation readable.
+    expect(message).toContain('best —');
   }, 600_000);
 
   it('reaches the whole-day state, which is the only one the two shells can differ on', () => {

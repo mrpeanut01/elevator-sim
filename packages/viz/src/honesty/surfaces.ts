@@ -507,7 +507,7 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 
 import type { WaitBandBasis } from '../live/types.js';
 
-import { renderAgreements } from './agreement.js';
+import { renderAgreements, withTodayFiled } from './agreement.js';
 import { withheldStates, type WithheldState } from './generate.js';
 import type {
   HonestyCase,
@@ -7408,14 +7408,53 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     }
 
     /*
-     * § 3.2's footer, once — it does not vary by campaign shape. The identity card's streak line
-     * is the honest-absence form (no profile store exists), which is exactly the kind of sentence
-     * that goes stale the day one does.
+     * § 3.2's footer, once — it does not vary by campaign shape.
+     *
+     * **The career line is driven over all three of its states, and that is issue #214's other
+     * half.** This block drove `railModel(...)` with **no options at all** and the comment above it
+     * said the streak line *"is the honest-absence form (no profile store exists)"* — stale twice
+     * over by the time it was read: `everyday/profileStore.ts` exists, and the line stopped coming
+     * from the profile at all when #214 pointed it at the week. § D227's class, on the file whose
+     * job is to sweep for it.
+     *
+     * What the sweep could not see mattered more than the comment. With no options the card can
+     * only ever render its absence, so the **populated** career line — the two figures a player
+     * with a saved week actually reads — was in no case of either tier, and the pair
+     * `agreement.ts#AGREED_FIGURES` declares over it would have compared two absences and passed
+     * for the wrong reason. The week below is `withTodayFiled`'s, which is the same week that pair
+     * is driven on: one fixture, two readers, so the string in the corpus and the property that
+     * checks it cannot drift.
+     *
+     * The three arms are the three states the card has, and each is seeded on the role its own
+     * content earns — the two absences are refusals and carry no figure; the populated line is two
+     * figures off the week, exactly as `weekView.ts#streakLine` is seeded on the four-screen
+     * adapter.
      */
     const footer = railModel({ screen: 'menu', ctx: 'daily' }).footer;
     seeds.push({ field: 'rail.footer.playingAs', text: footer.identity.heading, role: 'label' });
     seeds.push({ field: 'rail.footer.name', text: footer.identity.name, role: 'label' });
     seeds.push({ field: 'rail.footer.streak', text: footer.identity.streak, role: 'reason' });
+    /*
+     * The cold-load state, which is not the same claim as the one above it: a host on its way
+     * answers `weekPending` and the card says it has not read the week yet. It shipped saying *no
+     * days saved yet* over a restored week for as long as the player stayed on the front door.
+     */
+    seeds.push({
+      field: 'rail.footer.streak.pending',
+      text: railModel({ screen: 'menu', ctx: 'daily' }, { weekPending: true }).footer.identity
+        .streak,
+      role: 'reason',
+    });
+    for (const dayClosed of [false, true]) {
+      seeds.push({
+        field: `rail.footer.streak.career.${dayClosed ? 'filed' : 'standing'}`,
+        text: railModel(
+          { screen: 'menu', ctx: 'daily' },
+          { week: withTodayFiled(openWeek()), dayClosed },
+        ).footer.identity.streak,
+        role: 'observation',
+      });
+    }
     seeds.push({ field: 'rail.footer.settings', text: footer.settings.label, role: 'label' });
     if (footer.settings.unavailable !== undefined) {
       seeds.push({

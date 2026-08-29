@@ -74,9 +74,12 @@
  * window — is invisible here and stays R3's and R6's to catch. `NOT_AGREED`'s two `tautology`
  * entries are the measured instances.
  *
- * **A disagreement in a figure no side can reach without a run or a closed day.** Two of those are
- * named in `NOT_AGREED` under `not-built-here`, with what each would take. Both are real contracts;
- * neither is checked by anything today.
+ * **A disagreement in a figure no side can reach without a run.** One is named in `NOT_AGREED`
+ * under `not-built-here`, with what it would take; it is a real contract and nothing checks it
+ * today. *A closed day* used to be on that list beside *a run*, and it is not any more:
+ * {@link withTodayFiled} files one with `record: null` — a shipped `DayOutcome`, not a stub — so a
+ * career surface is drivable here with nothing simulated. That is what issue #214's pair stands on,
+ * and `NOT_AGREED`'s remaining entry is narrowed to the half that is still true.
  *
  * **A disagreement between a shipped surface and a shipped *mount*.** Every side here is a pure
  * expression, because `boundaries.test.ts` confines the DOM to `dev/` and this directory runs under
@@ -88,7 +91,12 @@ import type { BrowserResources } from '../dev/data.js';
 import { shiftGoalsOf } from '../dev/leftRail.js';
 import { buildingConfigOf, initialState, type ViewerState } from '../dev/state.js';
 import { createEverydayHost, type EverydayHostBindings } from '../everyday/host.js';
+import { railFooter } from '../everyday/rail.js';
+import { weekScreenViewOf } from '../everyday/weekView.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
+import { goalsForDay, readGoals } from '../shift/goals.js';
+import type { GoalObservations, WeekState } from '../shift/types.js';
+import { closeDay, outcomeOf } from '../shift/week.js';
 
 import type { HonestyContext } from './surfaces.js';
 import type { HonestyViolation, RenderedText } from './types.js';
@@ -106,16 +114,33 @@ import type { HonestyViolation, RenderedText } from './types.js';
  */
 export interface AgreementView {
   /**
-   * `day1/period`, `day4/whole-day`. Stable, so a violation names a state a reader can rebuild.
+   * `day1/period`, `day4-filed/whole-day`. Stable, so a violation names a state a reader can
+   * rebuild.
    *
    * The id is the whole of what a view declares about itself, deliberately: a prose `what` field
    * sat here for one revision with no consumer but a test, which is the one-field-one-consumer rule
-   * `docs/10` § 1 states and the shape this repository counts. The two halves — which day, which
-   * horizon — are what a reader needs and are both in the id.
+   * `docs/10` § 1 states and the shape this repository counts. The halves — which arm of
+   * {@link AGREEMENT_ARMS}, which horizon — are what a reader needs and are both in the id.
+   *
+   * **The horizon stays the second segment.** `agreement.test.ts` reads it off `split('/')[1]` to
+   * assert that both kinds of run are reached, which is the clause that keeps § D359's pair from
+   * going vacuous, so a third dimension goes into the first segment or it silently breaks that
+   * check.
    */
   readonly id: string;
   readonly state: ViewerState;
   readonly resources: BrowserResources;
+  /**
+   * Whether **today's** run has been filed — `EverydayHost.runState().dayClosed`, as a fact about
+   * this state rather than about the week inside it.
+   *
+   * It is on the view rather than derived from `state.week` because it is not derivable from it,
+   * and that is § 16 rule 1 in one sentence: a week restored from storage can carry today's outcome
+   * while the stage holds no filed run, and *Close the day* alone sets this. Both career surfaces
+   * gate today's figure on it — through **different** expressions, which is why they are a pair —
+   * so a harness that guessed it would be choosing the answer.
+   */
+  readonly dayClosed: boolean;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -156,10 +181,15 @@ export interface AgreedFigure {
 /**
  * **The declared pairs.** Two surfaces, one state, one figure, and a reason.
  *
- * Three pairs were put to this lane as *known to matter*; **one is here and two were measured as
- * tautologies**, with the measurement written into `agreement.test.ts#NOT_AGREED` rather than left
- * for the next lane to redo. A rejected pair with a reason is worth more than a property with a
- * fake one in it.
+ * Three pairs were put to the lane that built this register as *known to matter*; **one landed and
+ * two were measured as tautologies**, with the measurement written into
+ * `agreement.test.ts#NOT_AGREED` rather than left for the next lane to redo. A rejected pair with a
+ * reason is worth more than a property with a fake one in it.
+ *
+ * The second entry is issue **#214**'s, and it arrived with the state it needs: the corpus reached
+ * no week with a closed day in it, so a pair declared over the career line would have compared two
+ * absences on every case and passed for the wrong reason. See {@link withTodayFiled} and
+ * {@link AGREEMENT_ARMS}.
  */
 export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
   {
@@ -190,7 +220,85 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
         ),
     },
   },
+  {
+    id: 'career-line',
+    figure: 'the days saved so far — the career line § 3.2’s rail card and § 14’s header publish',
+    why:
+      'Issue **#214** is this pair disagreeing. The `PLAYING AS` card said *no days saved yet* ' +
+      'beside a Your week header reading *1 day running*, because the card took its career from ' +
+      '`everyday/profileStore.ts` — a store that holds a name and a colour and has no day count ' +
+      'to hold — so the refusal was the only string that line could render. Both screens are one ' +
+      'click apart in the same rail, about the same week, and the fix pointed the card at the ' +
+      'store that keeps days. What holds it there is not the fix: the two lines are **separate ' +
+      'derivations** over one `WeekState`, and they gate today’s figure differently — ' +
+      '`rail.ts#careerLineOf` asks whether any day in the `HISTORY_DAYS` window is `day < ' +
+      'week.day || dayClosed`, and `weekView.ts#streakLineOf` takes a count off cards whose own ' +
+      'gate is `!isToday || dayClosed`. Five asserted unit weeks in `rail.test.ts` hold the two ' +
+      'equal, which is a claim about five weeks; this is the claim over every case in the corpus, ' +
+      'and it is the one a player reading both surfaces on one frame is actually owed. The whole ' +
+      'line is compared rather than the streak alone, because the withheld arm — `best —` — is ' +
+      'exactly where the two gates could part.',
+    left: {
+      surfaceId: 'everyday/rail.ts#railFooter',
+      read: (view) =>
+        hasACareer(view)
+          ? railFooter(
+              { screen: 'menu', ctx: 'daily' },
+              { week: view.state.week, dayClosed: view.dayClosed },
+            ).identity.streak
+          : undefined,
+    },
+    right: {
+      surfaceId: 'everyday/weekView.ts#weekScreenViewOf',
+      read: (view) =>
+        hasACareer(view)
+          ? weekScreenViewOf({
+              week: view.state.week,
+              /*
+               * Today's card carries it; the streak line does not. Named from the state anyway,
+               * because a harness that passed a placeholder would be building a week no player is
+               * in — and the next figure added to this pair might read it.
+               */
+              towerToday: view.state.buildingId,
+              dayClosed: view.dayClosed,
+              // The shipped pairing: a sheet stands exactly when the day is closed. The
+              // two-can-disagree arm is `weekView.test.ts`'s, where it is a claim about a control.
+              sheetStanding: view.dayClosed,
+            }).streakLine
+          : undefined,
+    },
+  },
 ]);
+
+/**
+ * Whether the `career-line` contract **applies** to this state — the pair's one scoping rule.
+ *
+ * ## Why a week with no closed day is out of scope rather than a violation
+ *
+ * On such a week the two surfaces say different things **and both are right**. The rail card draws
+ * `rail.ts#NO_CAREER_YET` — a sentence with no digit in it, because § 20.11 forbids a fixture
+ * presented as a player and *0 days running · best —* is one — while § 14's header draws the
+ * week's zeroes, which is what a screen made of seven day cards is for. That is one screen refusing
+ * a figure and another publishing it, not two answers to one question. Requiring them equal would
+ * force the rail to drop its absence, which `rail.ts`'s own rule 4 calls *the same defect facing
+ * the other way*, and a property that had to be weakened later is worse than one scoped honestly
+ * now.
+ *
+ * ## Why one gate and not one per side
+ *
+ * Both sides ask this, so the pair is either fully present or fully absent and
+ * {@link checkSurfacesAgree}'s *one side dropped it* clause cannot fire on a state that is merely
+ * out of scope. Sharing the **scope** is not sharing the **derivation**: what is compared is still
+ * two expressions reached through two shells, and the gate below reads neither of them — it reads
+ * the week.
+ *
+ * {@link AGREEMENT_ARMS} keeps this from swallowing the pair: `agreement.test.ts` asserts that the
+ * in-scope arms are reached on every fixture case, because a register entry that is out of scope
+ * everywhere is byte-identical to one that is not declared.
+ */
+function hasACareer(view: AgreementView): boolean {
+  return view.state.week.history.length > 0;
+}
 
 /* -------------------------------------------------------------------------- *
  * Reading a side
@@ -218,7 +326,9 @@ function hostBindingsFor(view: AgreementView): EverydayHostBindings {
     resources: view.resources,
     state: () => view.state,
     playheadS: () => 0,
-    dayClosed: () => false,
+    // The view's own, not a constant: it is the state's fact, and a harness that answered a
+    // different one from the side beside it would be two states pretending to be one.
+    dayClosed: () => view.dayClosed,
     runIsOwn: () => true,
     playerHasChosen: () => true,
     dayStartS: () => undefined,
@@ -236,20 +346,114 @@ function hostBindingsFor(view: AgreementView): EverydayHostBindings {
  * -------------------------------------------------------------------------- */
 
 /**
- * The days a pair is driven on — the two `surfaces.ts#shiftBundleOf` closes, and for one of its
- * reasons: two days keep **two points of the bar-hardening ladder** in the corpus, so a pair whose
- * figure moves with the day is compared at two magnitudes rather than at one.
+ * One clean authored day, as an observation — the input {@link withTodayFiled} grades.
+ *
+ * Values rather than a run, because this module does not simulate (see the *Cost* section): a day
+ * that files is a `DayOutcome`, and a `DayOutcome` is `outcomeOf` over readings. The numbers are a
+ * plausible clean shift and nothing here reads them back as a measurement — what the career
+ * surfaces publish out of the week is `streak` and `bestMinutePct`, and both come from `closeDay`'s
+ * own arithmetic over whatever was filed.
  */
-const AGREEMENT_DAYS: readonly number[] = Object.freeze([1, 4]);
+const A_CLEAN_DAY: GoalObservations = Object.freeze({
+  arrived: 400,
+  carryPct: 100,
+  minutePct: 84,
+  peakQueue: 2,
+  abandoned: 0,
+  worstWaitS: 30,
+  worstWaitIsCensored: false,
+});
 
 /**
- * Every state the pairs are driven over: each day as a **slice**, and — where the building has an
- * authored day — the same day run **whole**.
+ * The same week with **today filed onto it** — the state the `career-line` pair needs, and the one
+ * the corpus could not reach.
+ *
+ * ## Why this composition is here and not borrowed
+ *
+ * `surfaces.ts#shiftBundleOf` also closes days, and it closes them over **recordings**: it
+ * simulates. This module must not (the *Cost* section says why, in seconds), and it does not have
+ * to — `shift/week.ts#outcomeOf` takes `record: null` as a first-class value, which is the measured
+ * state of a session written by a build that had no record to write, and `closeDay` is total over
+ * it. So a filed day is reachable here with no run behind it, and the two figures both career
+ * surfaces publish (`WeekState.streak`, `WeekState.bestMinutePct`) are `closeDay`'s own arithmetic
+ * either way.
+ *
+ * ## Its non-test caller, and why it is exported
+ *
+ * `honesty/surfaces.ts`'s `EVERYDAY_MENU` adapter, which seeds the rail's `PLAYING AS` card. Before
+ * this, that adapter drove `railModel(...)` with **no options at all**, so `rail.footer.streak`
+ * rendered only the honest-absence form and the *populated* career line — the one issue #214 is
+ * about — was in no corpus case at all. One fixture, two readers: the pair below and the seed there
+ * compare and sweep the same week, so a corpus that has the string and a property that checks it
+ * cannot drift apart.
+ */
+export function withTodayFiled(week: WeekState): WeekState {
+  return closeDay(
+    week,
+    outcomeOf({
+      day: week.day,
+      dayIdx: week.dayIdx,
+      eventId: 'ordinary',
+      arrived: A_CLEAN_DAY.arrived,
+      carried: A_CLEAN_DAY.arrived,
+      minutePct: A_CLEAN_DAY.minutePct,
+      readings: readGoals(goalsForDay(week.day), A_CLEAN_DAY),
+      /*
+       * A day filed with no record and no refusal — `shift/types.ts#DayOutcome.record` names this
+       * exact pair as the measured state of a session written before the field existed. It is a
+       * shipped value rather than a stub, which matters because a career surface that behaved
+       * differently on it would be behaving differently on a real restored week.
+       */
+      record: null,
+      recordRefusal: null,
+    }),
+  );
+}
+
+/**
+ * The weeks the pairs are driven on, and what today's filing state is on each.
+ *
+ * Days 1 and 4 are `surfaces.ts#shiftBundleOf`'s two closes, kept for its reason: two days hold
+ * **two points of the bar-hardening ladder** in the corpus, so a pair whose figure moves with the
+ * day is compared at two magnitudes rather than at one. What is new is the **career** dimension,
+ * and the three arms are chosen so that the `career-line` pair meets each of the states its two
+ * derivations gate on differently:
+ *
+ * | arm | week | `dayClosed` | what the pair sees |
+ * |---|---|---|---|
+ * | `day1` | nothing closed | `false` | the pair does not apply — see {@link hasACareer} |
+ * | `day4` | today filed | `false` | both publish, and both must **withhold** today's figure |
+ * | `day4-filed` | today filed | `true` | both publish, and both must **release** it |
+ *
+ * The last two are one week with the axis flipped, which is what makes them a test of the *gate*
+ * rather than of the arithmetic: the rail asks `history.some(day => day.day < week.day ||
+ * dayClosed)` and Your week counts cards whose `show` is `!isToday || dayClosed`, and those are two
+ * expressions that happen to agree. A pair driven only on a state where both release would go green
+ * on a rail that had forgotten the gate entirely.
+ *
+ * **The arm id is the first segment of `AgreementView.id`** — see that field for why the horizon
+ * has to stay the second.
+ */
+const AGREEMENT_ARMS: readonly {
+  readonly id: string;
+  readonly day: number;
+  readonly dayClosed: boolean;
+  week(base: WeekState): WeekState;
+}[] = Object.freeze([
+  { id: 'day1', day: 1, dayClosed: false, week: (base) => base },
+  { id: 'day4', day: 4, dayClosed: false, week: withTodayFiled },
+  { id: 'day4-filed', day: 4, dayClosed: true, week: withTodayFiled },
+]);
+
+/**
+ * Every state the pairs are driven over: each arm as a **slice**, and — where the building has an
+ * authored day — the same arm run **whole**.
  *
  * The second is the one § D359's defect needs, and it is the one that can quietly vanish: three of
  * the eight shipped buildings have no authored day, so a corpus whose cases all landed on those
  * would drive only slices and the property would be green over a state in which the two shells
- * cannot differ. `agreement.test.ts` asserts the whole-day arm is reached rather than assuming it.
+ * cannot differ. `agreement.test.ts` asserts the whole-day arm is reached rather than assuming it,
+ * and asserts the same of the career arms for the same reason.
  */
 export function agreementViews(
   context: HonestyContext,
@@ -268,18 +472,22 @@ export function agreementViews(
     buildingConfigOf(resources, base.savedBuildings, buildingId),
   );
   const views: AgreementView[] = [];
-  for (const dayNumber of AGREEMENT_DAYS) {
-    const state: ViewerState = {
-      ...base,
-      buildingId,
-      week: { ...base.week, day: dayNumber },
-    };
-    views.push({ id: `day${String(dayNumber)}/period`, state, resources });
+  for (const arm of AGREEMENT_ARMS) {
+    /*
+     * `dayIdx` moves with `day`, which it did not have to before: nothing read it while the only
+     * pair was the goal ask. `weekView.ts` reads it for every card's weekday, and a week claiming
+     * to be on day 4 of a Monday would be a state no player can be in — the harness inventing the
+     * disagreement it is looking for.
+     */
+    const week = arm.week({ ...base.week, day: arm.day, dayIdx: arm.day - 1 });
+    const state: ViewerState = { ...base, buildingId, week };
+    views.push({ id: `${arm.id}/period`, state, resources, dayClosed: arm.dayClosed });
     if (day === undefined) continue;
     views.push({
-      id: `day${String(dayNumber)}/whole-day`,
+      id: `${arm.id}/whole-day`,
       state: { ...state, ...wholeDayRun(day) },
       resources,
+      dayClosed: arm.dayClosed,
     });
   }
   return views;
