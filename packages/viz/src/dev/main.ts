@@ -4231,7 +4231,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * ---------------------------------------------------------------------- */
 
   function applyNavigation(): void {
-    applySurfaceState(ui, surfaceStateFor(state.tab, state.revealedTabs));
+    applySurfaceState(ui, surfaceStateFor(state.tab, state.revealedTabs, disclosureOf(state.mode)));
     applyRailState(ui, railStateFor(state.railSegment));
     applyDrawerState(ui, drawerStateFor(window.innerWidth, state.drawerOpen));
   }
@@ -4274,7 +4274,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * that goes wrong when a tab becomes contextual.
      */
     ui.tabs.run.parentElement?.addEventListener('keydown', (event) => {
-      const next = tabAfterKey(surfaceStateFor(state.tab, state.revealedTabs), state.tab, event.key);
+      const next = tabAfterKey(
+        surfaceStateFor(state.tab, state.revealedTabs, disclosureOf(state.mode)),
+        state.tab,
+        event.key,
+      );
       if (next === undefined) return;
       event.preventDefault();
       context.openTab(next);

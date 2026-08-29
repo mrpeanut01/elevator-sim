@@ -755,6 +755,19 @@
          reading of *quieter than the tab beside it* is **disabled**, not *available*. Three of the
          ten surfaces this product has looked switched off on first load (§ D235). */
       .tab-secondary { font-size: 11.5px; padding: 6px 10px; color: var(--dimmer); }
+      /* Issue #130's affordance. `--dimmer` and 11.5 px are `.tab-secondary`'s own ink and size,
+         chosen rather than invented: this sentence sits in the same row as the tabs, on the same
+         `.stagecol` ground, and `render/theme.test.ts` already holds `--dimmer` to 4.5:1 against
+         every surface token in both themes. It is deliberately NOT `.advice` or `.rail-prose` —
+         those two are the change-scope note classes `noteContrast.test.ts` counts, and a seventh
+         static user of them would be a pairing that file has not measured. `[hidden]` is spelt out
+         because `.tabs` is a flex container and `display: flex` on a child beats the UA's
+         `[hidden] { display: none }`. */
+      .tab-gate-note {
+        align-self: center; color: var(--dimmer); font-size: 11.5px; font-weight: 500;
+        padding: 6px 4px 6px 10px; white-space: nowrap;
+      }
+      .tab-gate-note[hidden] { display: none; }
       .tabs-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
       #drawer-toggle {
         display: none; align-items: center; align-self: center;
@@ -1951,6 +1964,15 @@
             <button role="tab" id="tab-traffic" aria-selected="false" aria-controls="panel-traffic" tabindex="-1" hidden>Traffic</button>
             <button role="tab" id="tab-machines" aria-selected="false" aria-controls="panel-machines" tabindex="-1" hidden>Machines</button>
             <button role="tab" id="tab-building" aria-selected="false" aria-controls="panel-building" tabindex="-1" hidden>Building</button>
+            <!-- Issue #130 / § D330. The gate used to be explained by the HTML comment above,
+                 which no player reads: a hidden tab and an absent feature looked identical. This
+                 says how many editors are behind the rail, and `surfaces.ts#surfaceStateFor`
+                 counts them off the very `hidden` flags it has just written, so the number cannot
+                 drift from the strip (§ D227). Not a `role="tab"` and not in `.tabs-right`: it is
+                 a note, so the roving tabindex never lands on it and the ring stays the ring.
+                 Engineer has no gate, so this is `hidden` there — and it starts `hidden` because
+                 the first frame is drawn before `applyNavigation` runs. -->
+            <span class="tab-gate-note" id="tab-gate-note" hidden></span>
             <div class="tabs-right">
               <button type="button" id="drawer-toggle" aria-expanded="false" aria-controls="rail-right">Controls ▸</button>
               <button role="tab" class="tab-secondary" id="tab-compare" aria-selected="false" aria-controls="panel-compare" tabindex="-1">Compare</button>

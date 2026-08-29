@@ -14,10 +14,37 @@
  * keyboard navigation walks into a button nobody can see. That is a rule with an off-by-one in it,
  * and a rule with an off-by-one in it belongs in a pure function.
  *
- * So {@link surfaceStateFor} decides — for a given active tab and a given set of revealed
- * contextual tabs — exactly which buttons are present, which is selected, which is focusable and
- * which panels are hidden. {@link applySurfaceState} is the dumb writer. The same split
- * `controls/render.ts` established, applied to navigation.
+ * So {@link surfaceStateFor} decides — for a given active tab, a given set of revealed
+ * contextual tabs and a given disclosure mode — exactly which buttons are present, which is
+ * selected, which is focusable and which panels are hidden. {@link applySurfaceState} is the dumb
+ * writer. The same split `controls/render.ts` established, applied to navigation.
+ *
+ * ## The gate is mode-aware, and it says so on the strip — [§ D330](../../../../DECISIONS.md)
+ *
+ * GitHub issue #130. Three things were true of the gate at once: nothing told a player the four
+ * editors existed, the reveal died on reload, and a hidden tab and an absent feature look
+ * identical. § D330 chose *keep the gate, persist the reveal, add the affordance — and never gate
+ * Engineer*, because #130 and #110 pull in opposite directions and both are right: dropping the
+ * gate ships #110's complaint (Parameters in Casual opening on *58 dimensions, 38 live*) and
+ * leaving it fixes neither.
+ *
+ * All three of its binding conditions land where they can be checked rather than asserted:
+ *
+ * 1. **The reveal survives a reload.** {@link revealedTabsFrom} and {@link revealedTabsTo} are the
+ *    codec; `dev/main.ts` owns the slot, beside `elevator-sim.viewMode`, for that field's own
+ *    stated reason. Only the *set* travels — `viewer.tab` still does not, so a reload lands on the
+ *    run surface with the strip a player earned still on it.
+ * 2. **The affordance's claim is derived from the gate itself.** {@link SurfaceState.gate} counts
+ *    the `hidden` flags this function has just computed. There is one computation, so the sentence
+ *    and the strip cannot drift — § D227, which rates a stale sentence about a control worse than
+ *    a control that does nothing.
+ * 3. **Engineer has no gate at all.** `engineer` short-circuits the contextual rule, so every tab
+ *    is present on the first frame and the notice is absent. § D299 § 1: a change to Engineer may
+ *    make it easier to use, it may not make it say less.
+ *
+ * This is a **disclosure** rule and not a parity one. `mode/parity.ts` operates on
+ * `DisclosureItem`s — figures, warnings, fail states — and a contextual editor's tab button is
+ * none of those, so nothing here can hide a failure from Casual.
  */
 
 import {
@@ -28,6 +55,7 @@ import {
   type RailSegment,
   type TabName,
 } from './elementMap.js';
+import type { DisclosureMode } from '../live/types.js';
 
 /** What one tab button should look like. */
 export interface TabState {
@@ -40,28 +68,80 @@ export interface TabState {
   readonly panelHidden: boolean;
 }
 
+/**
+ * What the strip says about the editors it is still holding back — issue #130's problem 1.
+ *
+ * `undefined` rather than a zero-count member, because *"0 more editors"* is a sentence nobody
+ * should ever read: the notice exists only while there is something behind the gate, and Engineer
+ * never has one at all.
+ */
+export interface TabGateNotice {
+  /**
+   * How many contextual editors are hidden right now. **Counted off the `hidden` flags this
+   * render produced**, never off `CONTEXTUAL_TABS.length` — the active tab is always shown even
+   * before it is revealed, so a constant four would be wrong the moment a player is standing in
+   * one. § D330's second condition is that this number and the strip come from one computation.
+   */
+  readonly hiddenCount: number;
+  /** The words, derived from {@link hiddenCount}. */
+  readonly text: string;
+}
+
 export interface SurfaceState {
   readonly tabs: readonly TabState[];
   /** Visible tabs in strip order — the ring the arrow keys walk. */
   readonly ring: readonly TabName[];
+  /** The gate's own announcement, or `undefined` when the strip is holding nothing back. */
+  readonly gate: TabGateNotice | undefined;
 }
+
+/**
+ * The sentence, from the count and nothing else.
+ *
+ * Not exported, and that is the point rather than tidiness: a caller that could build this string
+ * from a number of its own would be free to build it from the *wrong* number, which is the drift
+ * § D330's second condition exists to make impossible.
+ *
+ * It names the rail by the word the rail wears — `#rail-right` is `aria-label="Controls"` and the
+ * narrow-window toggle reads *Controls ▸* — so the noun is one a player can find at either width.
+ * It is a **note and not a control**: pressing it does nothing, because the rail is already the
+ * handoff's only route to these editors (`docs/12` § 1.4 R2) and a second door in the strip would
+ * be this file overruling the handoff on what the screen looks like. The standing requirement's
+ * other half applies instead — it moves no leg, and `surfaces.test.ts` pins that refusal by a run.
+ */
+const gateNoticeText = (count: number): string =>
+  count === 1
+    ? '1 more editor — open it from the Controls rail'
+    : `${String(count)} more editors — open them from the Controls rail`;
 
 /**
  * Which tabs are present, selected and focusable.
  *
- * `revealed` is the set of contextual editors the rail has opened this session. A contextual tab
- * is revealed permanently once opened rather than hidden again on leaving it, because a reader who
- * has been to the dispatcher editor once should be able to get back without going through the rail
- * — and because a control that appears and disappears under the pointer is the interaction defect
- * this project's accessibility ledger calls out by name.
+ * `revealed` is the set of contextual editors the rail has opened. A contextual tab is revealed
+ * permanently once opened rather than hidden again on leaving it, because a reader who has been to
+ * the dispatcher editor once should be able to get back without going through the rail — and
+ * because a control that appears and disappears under the pointer is the interaction defect this
+ * project's accessibility ledger calls out by name. Since § D330 that permanence outlives the
+ * page: `dev/main.ts` restores the set at boot, so *revealed* means revealed rather than revealed
+ * until you close the tab.
+ *
+ * `disclosure` decides whether there is a gate at all. In `engineer` there is none — every tab is
+ * present from the first frame and `revealed` is not consulted, which is the § D299 § 1 clause
+ * § D330 turned into code. In `casual` the gate sequences, and sequencing is not a ceiling:
+ * nothing is unreachable, and the strip says how much is behind the rail.
  *
  * The active tab is always in the ring even when it is contextual and not yet in `revealed`;
  * a selected button nobody can focus is worse than a visible one.
  */
-export function surfaceStateFor(active: TabName, revealed: ReadonlySet<TabName>): SurfaceState {
+export function surfaceStateFor(
+  active: TabName,
+  revealed: ReadonlySet<TabName>,
+  disclosure: DisclosureMode,
+): SurfaceState {
   const contextual = new Set<TabName>(CONTEXTUAL_TABS);
+  const gated = disclosure === 'casual';
   const visible = (tab: TabName): boolean =>
-    !contextual.has(tab) || revealed.has(tab) || tab === active;
+    !gated || !contextual.has(tab) || revealed.has(tab) || tab === active;
 
   const ring = TABS.filter(visible);
   /*
@@ -72,19 +152,89 @@ export function surfaceStateFor(active: TabName, revealed: ReadonlySet<TabName>)
    */
   const focusable = ring.includes(active) ? active : ring[0];
 
+  const tabs = TABS.map((tab): TabState => {
+    const shown = visible(tab);
+    return {
+      tab,
+      selected: tab === active,
+      hidden: !shown,
+      tabIndex: shown && tab === focusable ? 0 : -1,
+      panelHidden: tab !== active,
+    };
+  });
+
+  /*
+   * The count is read back off `tabs` rather than recomputed from `revealed`. Recomputing it would
+   * be a second opinion about the same question, and the two would agree right up until somebody
+   * changed one of them — which is exactly how the sentence this repository keeps finding stale
+   * gets written.
+   */
+  const hiddenCount = tabs.filter((entry) => entry.hidden).length;
+
   return {
     ring,
-    tabs: TABS.map((tab): TabState => {
-      const shown = visible(tab);
-      return {
-        tab,
-        selected: tab === active,
-        hidden: !shown,
-        tabIndex: shown && tab === focusable ? 0 : -1,
-        panelHidden: tab !== active,
-      };
-    }),
+    tabs,
+    gate: hiddenCount === 0 ? undefined : { hiddenCount, text: gateNoticeText(hiddenCount) },
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The reveal, across a reload — § D330 condition 1
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The stored reveal, read back — total, and empty on anything it does not recognise.
+ *
+ * ## Why this is a codec here rather than a field of the session envelope
+ *
+ * `persist/types.ts#SessionSnapshot` is the **week**, restored whole or not at all, and its own
+ * docstring is explicit that its parts constrain each other. A revealed tab constrains nothing:
+ * it is a disclosure preference on exactly the footing `viewer.mode` sits on, and that field has
+ * held its own `localStorage` key since before `persist/` existed. Folding this into the envelope
+ * would mean an unreadable tab name could refuse a player's **week**, which is a wildly
+ * disproportionate failure for a fact about a tab strip.
+ *
+ * So the two-key argument in `persist/types.ts#SESSION_KEY` — *three keys is three states that can
+ * disagree* — is answered rather than ignored: it is about a week written at one instant beside
+ * settings written at another, and there is no field of either that this set is a second view of.
+ *
+ * ## Why it is total
+ *
+ * The bytes were written by whatever build the player last loaded. A tab that no longer exists, a
+ * payload that is not an array, a slot somebody edited by hand — every one of them resolves to *no
+ * reveal*, which is precisely the state a first visit is in and therefore a state the product is
+ * already correct for. There is nothing here worth a refusal a player would have to read.
+ *
+ * A `Set` is why the field was excluded from the envelope in the first place — `jsonSafety.ts`
+ * refuses one by name, because `JSON.stringify(new Set())` is `{}` and loses every entry without
+ * an error. The codec is the answer to that: an array of names on the wire, a `Set` in the state.
+ */
+export function revealedTabsFrom(stored: string | null): ReadonlySet<TabName> {
+  if (stored === null) return new Set<TabName>();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stored) as unknown;
+  } catch {
+    return new Set<TabName>();
+  }
+  if (!Array.isArray(parsed)) return new Set<TabName>();
+  const known = new Set<string>(CONTEXTUAL_TABS);
+  return new Set<TabName>(
+    parsed.filter((entry): entry is TabName => typeof entry === 'string' && known.has(entry)),
+  );
+}
+
+/**
+ * The reveal, on its way out.
+ *
+ * Filtered and ordered by {@link CONTEXTUAL_TABS} rather than written out in iteration order, so
+ * the bytes are a function of *what is revealed* and not of *what order it was opened in* — two
+ * players who have opened the same editors write the same slot. Only contextual names are stored:
+ * a primary tab in this set would be a fact with no consequence, and storing one would invite a
+ * reader to think it had one.
+ */
+export function revealedTabsTo(revealed: ReadonlySet<TabName>): string {
+  return JSON.stringify(CONTEXTUAL_TABS.filter((tab) => revealed.has(tab)));
 }
 
 /** Write a {@link SurfaceState} onto the page. Decides nothing. */
@@ -97,6 +247,14 @@ export function applySurfaceState(elements: Elements, state: SurfaceState): void
     button.tabIndex = entry.tabIndex;
     panel.hidden = entry.panelHidden;
   }
+  /*
+   * The text is cleared as well as hidden. A `hidden` node still holds its words for anything that
+   * reads the DOM rather than the paint — a copy, a snapshot, an assistive technology walking the
+   * tree — and *4 more editors* left behind in Engineer would be the gate's own sentence surviving
+   * the gate, which is the failure this notice exists to stop rather than commit.
+   */
+  elements.tabGateNote.hidden = state.gate === undefined;
+  elements.tabGateNote.textContent = state.gate?.text ?? '';
 }
 
 /**
