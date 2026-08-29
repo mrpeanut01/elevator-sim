@@ -25899,12 +25899,26 @@ the complete-case rule: either arm's `awtIsValid` false.
 | Secure Tower from 24 % | `50, 49, 47, 36, 24, 14, 9, 5, 1` of 50 |
 | Chancery House, one press from each integer rate 19 → 5 | **2 of 15 raise the count**: `19 → 17.1` is 1 → 3, `18 → 16.2` is 0 → 1 |
 | Chancery House at 16 % and 15 % | 1 of 50 and 0 of 50 — the docstring's own existing claim, reproduced |
+| Crown Hotel, one press off its own `min` | **2 of 50 → 3**, every refusal `saturated` both sides |
+| St Jude's Hospital at its own `min` (6 %) | 3 of 50, **zero** saturated — every refusal `censored` |
+| Vertical City at its own `min` (11 %), one press | 26 of 50 → 11, all `saturated` |
 | Garden Apartments from its own `min` (3 %), seven presses | `4, 7, 8, 8, 11, 16, 16, 15` of 50, **every refusal `empty-window`** |
 
-**The third row is the one that decided the shape of the fix.** On Garden Apartments the load is not
+**All eight shipped buildings were measured, not the five #299 names.** The remedy is offered on
+every building whose rate resolves, so a sentence measured on five is an instruction about the
+other three as well. The three that were added changed the finding rather than confirming it:
+**Crown Hotel raises the count on the very first press off its own `min`**, with every refusal
+`saturated` on both sides — so the non-monotonicity is not a quiet-building effect and is not
+confined to the two buildings the issue found it on. **St Jude's Hospital refuses on `censored`
+and never on `saturated`** at its own `min`, which is a *second* ground the load is not the lever
+for. Only **Vertical City** and Mixed Use High Rise behave the way the withdrawn sentence assumed:
+**two of eight**, and that is said here so the refusal reads as measured rather than as pessimism.
+
+**The Garden Apartments row is the one that decided the shape of the fix.** There the load is not
 the wrong *size* of lever, it is the wrong lever: there is no queue to stop growing, the binding
-ground is *"No passenger was served within the reporting window"*, and each press makes the window
-emptier. No step size repairs a direction. That is why the control was left alone and the sentence
+ground is *"No passenger was served within the reporting window"*, and the ladder ends at nearly
+four times the drop count it started at — four of the seven presses strictly worse, two flat, one
+better. No step size repairs a direction. That is why the control was left alone and the sentence
 was changed, rather than the other way round — and it is the half of AC1 the issue left open as a
 choice.
 
