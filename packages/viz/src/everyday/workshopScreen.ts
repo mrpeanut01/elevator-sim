@@ -6,15 +6,27 @@
  * `tokens.ts`'s § 19 values and wires the controls to `host.ts`. It authors no sentence about a
  * dispatcher, a weight or a run.
  *
- * ## Every control writes, and the writes go through one document
+ * ## Every control writes, three of the four writes reach a run, and the bar says which
  *
- * The standing requirement — *move the control and require the run to change, compared on the
- * legs* — is met one level down rather than here: the workshop writes `dispatcherSpec`,
- * `levers`, `ruleRows` and `selectorSpec`, which are the four fields
- * `dev/state.ts#shiftRunConfigOf` builds the run from, and `workshopScreen.browser.test.ts` drives
- * the screen and requires the printed cost line to move with a lever. There is no workshop-local
- * copy of anything: `host.workingSpec()` is the object the Engineer editor edits, so a weight
- * moved here is moved there, and § D219's five-select editor that bound nothing is unexpressible.
+ * The workshop writes `dispatcherSpec`, `levers`, `selectorSpec` and `ruleRows`. **Three of those
+ * four are what `dev/state.ts#shiftRunConfigOf` builds the run from**, and the sentence here used
+ * to say four — GitHub issue #296. `drivingProfileOf` composes the run's profile from
+ * `state.levers`, `state.selectorSpec` and `state.ruleRows` and never from `state.dispatcherSpec`,
+ * which `scope/surface.ts` declares `latent` and which no verb in `everyday/` can hand over
+ * (issues #228 and #167 are that gap). Measured on the legs at `midtown-office`, 900 s, seed
+ * 20260827, `collective`: all thirteen cost terms driven to 100 and all three behaviour flags
+ * inverted leave the run byte-identical, while *lobby* — a `levers.parking` write — changes it.
+ *
+ * So the standing requirement is met one level down and in **both** of its directions: a control
+ * that writes something may not claim it writes nothing, and one that writes nothing may not claim
+ * it writes something (§ D227). `workshopTravel.test.ts` is where that is asserted, by measuring
+ * each control on the legs and requiring the § 3.3 note this screen selects to agree with the
+ * measurement; `workshopScreen.browser.test.ts` drives the page for what a node test cannot reach.
+ *
+ * There is no workshop-local copy of anything: `host.workingSpec()` is the object the Engineer
+ * editor edits, so a weight moved here is moved there, and § D219's five-select editor that bound
+ * nothing is unexpressible. What #296 was is the other failure — a control correctly bound to a
+ * field nothing downstream reads, under a footer that said it travelled.
  *
  * ## Why the disclosures are `<details>` and are remembered
  *
@@ -39,7 +51,11 @@ import {
   substituted,
   type RuleRow,
 } from '../authoring/ruleSpec.js';
-import { withWeightSet, type SelectorSpec } from '../authoring/selectorSpec.js';
+import {
+  specIsDirty as selectorSpecIsDirty,
+  withWeightSet,
+  type SelectorSpec,
+} from '../authoring/selectorSpec.js';
 import { plainLeverEchoOf, plainLeverHelp, plainLeverSub } from '../mode/plainLevers.js';
 
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
@@ -67,7 +83,11 @@ import {
   switchingBlockOf,
   termDisclosureOf,
   workshopLeversOf,
+  workshopReachOf,
+  workshopWriteReachesRun,
   WORKSHOP_COPY as COPY,
+  type WorkshopReach,
+  type WorkshopWrite,
 } from './workshopModel.js';
 
 /** Which `<details>` a player has opened. Survives the redraw the DOM cannot. */
@@ -793,8 +813,15 @@ function mountWorkshop(
     /*
      * § 3.3's primary for this screen is *Run a day with this*. It is the same latching press the
      * Engineer shell's **Run this shift** makes, through the host — so the run it produces may
-     * file, and the working copy travels with it because `shiftRunConfigOf` builds the run from
-     * the four fields this screen writes rather than from a saved profile.
+     * file.
+     *
+     * **Three of the four fields this screen writes travel with it, and this comment used to say
+     * four** (GitHub issue #296). `shiftRunConfigOf` builds the run through `drivingProfileOf`,
+     * which reads `levers`, `selectorSpec` and `ruleRows` and never `dispatcherSpec` — so the
+     * weights and the behaviour flags are a draft this press does not carry, and the run resolves
+     * the dispatcher `dispatcherId` names. The § 3.3 note above the button says which is which
+     * before it is pressed; see {@link workshopBar}, and `workshopTravel.test.ts` for the
+     * measurement that keeps the note and the legs agreeing.
      */
     primary: () => {
       api.startRun();
@@ -813,28 +840,134 @@ function mountWorkshop(
  */
 let mountedHost: EverydayHost | undefined;
 
-/** Whether the working copy differs from the profile it was read from, or carries any rule. */
-function workingCopyIsDirty(): boolean {
+/**
+ * Which of {@link WORKSHOP_WRITES} stand edited against what this screen opened on.
+ *
+ * One function over all four, rather than the single *is the working copy dirty* boolean this
+ * replaced, and GitHub issue #296 is what the difference is worth. That boolean was
+ * `ruleRows.length > 0 || specIsDirty(workingSpec, source)` — it consulted two of the four fields,
+ * and the two it consulted are one that reaches a run and one that does not. Measured on the legs
+ * at `midtown-office`, 900 s, seed 20260827, `collective`, it was wrong about **every one** of the
+ * screen's four plain levers: *patience*, *room* and *spread* write the draft and were reported as
+ * travelling, and *lobby* writes `levers.parking`, is the one lever whose move really does change
+ * the run, and was reported as *Nothing changed yet* because it leaves the spec pristine. A bar
+ * that denies the only edit that landed is § D227's stale refusal aimed at the working control,
+ * which that decision rates above a missing sentence rather than below it.
+ *
+ * Each field is compared against the position a page nobody has touched holds, because that is what
+ * the note is about — *unsaved changes*, against the profile the screen was opened on:
+ *
+ * - the **draft**, against the profile it was read from, or read from one the reader has since
+ *   deleted, which `dispatcherEditor.ts#runThisDispatcherStateOf` also treats as dirty;
+ * - the **group levers**, against `DEFAULT_LEVERS` — `state.ts` seeds them there and
+ *   `workshopModel.ts#nameplateOf` counts *levers moved n of 4* against the same baseline, so the
+ *   footer and the nameplate cannot disagree about whether a lever has moved;
+ * - the **selector**, against the seed its own source profile gives it, which is
+ *   `selectorSpec.ts#specIsDirty`'s question and not a second opinion about it;
+ * - the **rules**, by count. Every profile `data/dispatcher-profiles.json` ships authors none, so a
+ *   row at all is a row the player added — `state.ts#ruleRows`' own seeding argument.
+ *
+ * With the selector's source gone there is nothing to compare it against, so it is left out; the
+ * draft is already standing in that case, so no arm of {@link workshopBar} can read as *nothing
+ * changed*.
+ */
+function standingWrites(): readonly WorkshopWrite[] {
   const api = mountedHost;
-  if (api === undefined) return false;
-  if (api.ruleRows().length > 0) return true;
+  if (api === undefined) return [];
   const source = api.editingSource();
-  return source === undefined || dispatcherSpecIsDirty(api.workingSpec(), source);
+  const moved: WorkshopWrite[] = [];
+  if (source === undefined || dispatcherSpecIsDirty(api.workingSpec(), source)) {
+    moved.push('viewer.dispatcherSpec');
+  }
+  const levers = api.groupLevers();
+  if (
+    levers.parking !== DEFAULT_LEVERS.parking ||
+    levers.express !== DEFAULT_LEVERS.express ||
+    levers.dwell !== DEFAULT_LEVERS.dwell
+  ) {
+    moved.push('viewer.levers');
+  }
+  if (
+    source !== undefined &&
+    selectorSpecIsDirty(api.selectorSpec(), source, api.selectorContext())
+  ) {
+    moved.push('viewer.selectorSpec');
+  }
+  if (api.ruleRows().length > 0) moved.push('viewer.ruleRows');
+  return moved;
 }
+
+/**
+ * The two sentences this build needs and § 3.3's table does not carry — GitHub issue #296.
+ *
+ * Module-private, beside the control they are about, on `dispatcherEditor.ts#DRAFT_NOTE`'s own
+ * precedent and for its stated reason: the decision is exported prose-free from
+ * `workshopModel.ts#workshopReachOf`, and the wording sits where the rest of this screen's wording
+ * would sit if it authored any. It is a real and stated limitation that copy held here reaches the
+ * static half of the honesty sweep and not the driven one.
+ *
+ * They exist because the guide's table has two cells and this build has four states — see
+ * {@link WorkshopReach}. Both of the guide's own sentences survive untouched in `actionBar.ts` and
+ * are still drawn, each in the state it is true of; these two cover the two states the prototype's
+ * workshop could not produce, because every control on it reached its toy simulator.
+ *
+ * The `draft-only` sentence names *the weights and the flags* rather than *the draft*, because
+ * `viewer.dispatcherSpec` is not a word a player has met — the controls are. It names the way
+ * across in the same breath, since a refusal that leaves a reader with no next move is the half of
+ * § D227 that reads as a broken screen: GitHub issues #228 and #167 are that gap, and until one of
+ * them lands the Engineer editor's *Save it and run it* is the only verb in the product that hands
+ * a draft over.
+ *
+ * Both are empty when `scope/surface.ts` stops declaring what they claim, which is
+ * `scope/commitment.ts`'s stated failure direction — an absent sentence is not a false one.
+ */
+const DRAFT_STAYS_NOTE = !workshopWriteReachesRun('viewer.dispatcherSpec')
+  ? 'The weights and the flags stay here — they are a draft, and the run uses the dispatcher you ' +
+    'started from. The levers, the switching and the rules do travel.'
+  : '';
+
+const SPLIT_NOTE = !workshopWriteReachesRun('viewer.dispatcherSpec')
+  ? 'Only some of it travels: the levers, the switching and the rules go with the run, and the ' +
+    'weights and the flags stay here as a draft.'
+  : '';
 
 /**
  * § 3.3's note cell for the workshop row, which the guide leaves in two states:
  * *Unsaved changes travel with the run.* / *Nothing changed yet.*
  *
- * Both sentences are `actionBar.ts`'s transcription of § 3.3, in the guide's order; this picks
- * between them and authors neither. It is a refinement of the resolved row rather than a row built
- * here, which is § 3.1's rule (*no screen may declare its own footer*).
+ * Both sentences are `actionBar.ts`'s transcription of § 3.3, in the guide's order, and both are
+ * still drawn — **this picks between four states rather than two and authors neither of the
+ * guide's**. It is a refinement of the resolved row rather than a row built here, which is § 3.1's
+ * rule (*no screen may declare its own footer*).
+ *
+ * The table itself is deliberately not edited. `actionBar.ts` **is** § 3.3, `actionBar.test.ts`
+ * holds a second transcription and compares them cell by cell, and the guide's two sentences are
+ * not wrong — they were selected wrongly. What this build adds for the two states the guide has no
+ * cell for is {@link DRAFT_STAYS_NOTE} and {@link SPLIT_NOTE}, which is `WORKSHOP_COPY`'s own
+ * precedent for a panel that outgrew the prototype (`libraryHeading`, § D299 § 2).
+ *
+ * A `reach` the resolved row cannot answer falls through to the row's own `note`, the same
+ * fall-through the two-state version had.
  */
 function workshopBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
   const variants = base.noteVariants ?? [];
-  const note = (workingCopyIsDirty() ? variants[0] : variants[1]) ?? base.note;
+  const note = noteForReach(workshopReachOf(standingWrites()), variants) ?? base.note;
   return { ...base, ...(note === undefined ? {} : { note }) };
+}
+
+/** The sentence for one {@link WorkshopReach} — the guide's two, then this build's two. */
+function noteForReach(reach: WorkshopReach, variants: readonly string[]): string | undefined {
+  switch (reach) {
+    case 'travels':
+      return variants[0];
+    case 'nothing':
+      return variants[1];
+    case 'draft-only':
+      return DRAFT_STAYS_NOTE === '' ? variants[0] : DRAFT_STAYS_NOTE;
+    case 'split':
+      return SPLIT_NOTE === '' ? variants[0] : SPLIT_NOTE;
+  }
 }
 
 /** The registry row — GAMEPLAY § 11's screen, mounted by `shell.ts` through `screens.ts`. */
