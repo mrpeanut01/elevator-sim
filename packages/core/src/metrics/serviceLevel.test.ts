@@ -4,7 +4,15 @@
  * ## What this is a regression on
  *
  * The counterexample is `fuzz-1001074`, found by the Phase 8 property campaign's deep tier and
- * handed back to `core` by `validation/the root DECISIONS.md` § D83. Its shrunk form is an eleven-floor,
+ * handed back to `core` by the root `DECISIONS.md` § T21-D1. (It cited a decision **83** until
+ * 2026-08-29 — written with the section sigil, which is why it is spelled without one here:
+ * `validation/citations.test.ts` resolves every `§ Dnnn` in the tree, and a dangling number quoted
+ * in prose is still a dangling number. It came from `validation/DECISIONS-T20.md`, a per-lane record
+ * folded into the root file,
+ * and the fold rewrote the path while leaving the retired file's number behind. The root file has
+ * never had a D83 — it skips 78–84 because those lanes numbered in their own series — so the
+ * citation had been unfollowable since it was written. `validation/citations.test.ts` could not see
+ * it because it read markdown only; it reads `.ts` now.) Its shrunk form is an eleven-floor,
  * single-bank, single-car, all-in-service building at 6.1 % of population per 5 minutes, and it
  * reported:
  *

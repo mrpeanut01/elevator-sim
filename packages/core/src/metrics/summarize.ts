@@ -223,8 +223,13 @@ export const DEFAULT_MAX_ABANDONMENT_FRACTION = 0.02;
  *
  * **It is deliberately the same number as `fuzz/types.ts`'s `PROPERTY_BOUNDS.starvationBoundS`,
  * and deliberately not imported from it.** The project should state one abandonment horizon, and
- * it belongs in the model rather than in a test bound — which is the handback `the root DECISIONS.md`
- * § D83 made. The fuzz property keeps its own copy on purpose: it scans the *whole record*
+ * it belongs in the model rather than in a test bound — which is the call the root `DECISIONS.md`
+ * § T21-D2 made, on the ground that the wait is the observable already normalised by the arrival
+ * rate, so the gate is stated in seconds and lives where the other AWT gates live. (This cited a
+ * decision **83** until 2026-08-29 — a number carried over from `validation/DECISIONS-T20.md` when
+ * that per-lane record was folded into the root file, which has never had one.
+ * `serviceLevel.test.ts` carries the full account, including why the digits are written here
+ * without a section sigil.) The fuzz property keeps its own copy on purpose: it scans the *whole record*
  * including legs outside the report window, it re-derives servability from the building, and a
  * constant shared between a check and the thing it checks makes the check vacuous. See
  * `the root DECISIONS.md` § T21-D3 for what P6 still catches that this does not.
