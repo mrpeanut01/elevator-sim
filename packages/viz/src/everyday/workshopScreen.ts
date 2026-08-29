@@ -948,6 +948,8 @@ const SPLIT_NOTE = !workshopWriteReachesRun('viewer.dispatcherSpec')
  *
  * A `reach` the resolved row cannot answer falls through to the row's own `note`, the same
  * fall-through the two-state version had.
+ *
+ * `DECISIONS.md` § D386 is the decision, and GitHub issue #296 is the defect.
  */
 function workshopBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);

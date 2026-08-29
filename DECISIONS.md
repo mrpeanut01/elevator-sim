@@ -25869,3 +25869,79 @@ roughly one string per case per tier, and **an expected rise is a warning, not a
 distinction this repository has recorded five times.
 
 ---
+
+## D386 — the Workshop discloses which of its writes travel, and the guide's two-cell note becomes four
+
+**Rules on:** GitHub issue #296. Settles `everyday/workshopScreen.ts#workshopBar`,
+`everyday/workshopModel.ts#workshopReachOf`, and the § 3.3 note the Everyday Workshop draws over
+*Run a day with this*.
+
+**Decision.** The Workshop's weights and behaviour flags **stay latent**, and the screen stops saying
+otherwise. `dev/state.ts#drivingProfileOf` is unchanged, `scope/surface.ts` still declares
+`viewer.dispatcherSpec` `latent`, and the § 3.3 note is selected from a **four-state** answer derived
+through `scope/commitment.ts#commitmentOf` rather than from a two-state boolean over two of the
+screen's four writes.
+
+**Measured first, through the shipped path.** `shiftRunConfigOf` → `recordRun`, comparing
+`[passengerId, carId, boardedAt, arrivedAt]` for every leg, at `midtown-office`, 900 s, seed
+20 260 827, `collective` — 429 legs. All thirteen cost terms driven to 100 one at a time, all three
+behaviour flags inverted one at a time, and all sixteen together: **byte-identical**. The driving
+weights stay `{waitTime: 1}` whatever the Workshop writes. Of the four plain levers, `lobby` alone
+moves the legs, because it alone writes `GroupLevers.parking`.
+
+**Why not wiring, which AC1 also allowed.** Three reasons, in the order they were found.
+
+1. **It is the save path, which is separately owned.** *Run a day with this* carrying an unsaved draft
+   is the Engineer's *Save it and run it* minus the filing, and where the draft lands — whether it
+   takes an id, whether it reaches Compare, the suite and the Lab — is GitHub issues #228 and #167.
+   The issue says cross-reference and do not merge.
+2. **It would make the Engineer surface's disclosure false.** `dev/dispatcherEditor.ts#DRAFT_NOTE`
+   and `FAMILY_SCOPE_NOTE` are both *derived* from `commitmentOf('viewer.dispatcherSpec',
+   'writes-only') === 'draft'`. Reclassifying the field to a control empties both, removing the
+   honest scope note from the panel that has one, and leaves `runThisDispatcherStateOf`'s
+   `select`/`saveFirst` affordance describing a hand-over that has already happened.
+3. **It would silently swap the running dispatcher.** `dev/dispatcherEditor.ts`'s profile picker
+   writes `dispatcherSpec` and `editingDispatcherId` and deliberately **not** `dispatcherId`, so a
+   reader who points the editor at another profile while `collective` drives is in a supported
+   state. A `drivingProfileOf` that read the spec would make that click change the run. Guarding it
+   on `editingDispatcherId === dispatcherId` is worse, not better: the same edit would then travel or
+   not according to a pointer the player cannot see.
+
+**Why four answers and not two, or three.** § 3.3's table was transcribed from a prototype whose
+workshop had no draft — every control on it reached its toy simulator — so *Unsaved changes travel
+with the run.* and *Nothing changed yet.* are the only two states it could produce. This build has a
+field class the prototype did not, and therefore two states the table cannot describe: **draft-only**,
+and **split**. `split` earns its own answer rather than folding into either neighbour, because a
+player who moves `lobby` and `patience` in one sitting is told half the truth by both.
+
+**The guide's copy is not edited.** `everyday/actionBar.ts` **is** § 3.3, `actionBar.test.ts` holds a
+second transcription and compares cell by cell, and the guide's two sentences are not wrong — they
+were *selected* wrongly. Both survive verbatim and are still drawn, each in the state it is true of.
+The two added sentences are this build's own, module-private beside the control on
+`dev/dispatcherEditor.ts#DRAFT_NOTE`'s precedent. That is `WORKSHOP_COPY.libraryHeading`'s situation
+answered the same way ([§ D299](#d299) § 2): the prototype's panel offers six styles, this build ships
+thirteen, and hiding the difference would be saying less.
+
+**The bar was wrong in both directions, and the issue names one.** The boolean it replaced was
+`ruleRows.length > 0 || specIsDirty(workingSpec, source)`, which never consulted `levers`. So
+`patience`, `room` and `spread` — which reach no run — were reported as travelling, **and `lobby`,
+the one lever that does, was reported as *Nothing changed yet.*** A refusal aimed at the working
+control is the half [§ D227](#d227) rates as worse than a missing sentence, because it sends a player
+to look for a broken toggle. Four answers is the smallest model that is right about both.
+
+**What pins it.** `everyday/workshopTravel.test.ts` asserts the **agreement**, never the outcome: the
+scope classification, the note the screen selects, and the legs a run produces must be three
+statements of one fact. No case forbids the weights from reaching a run, so the day #228 lands and
+the field is re-scoped, the sentences change themselves and every case still passes. It also supplies
+the run that `scope/scope.test.ts` never made — that file iterates `entry.kind === 'control'` and has
+never driven a `latent` row at either end, so this classification had been a claim in a table pinned
+by nothing.
+
+**What is not claimed.** No mechanism is offered for *why* the draft is latent beyond what the code
+does — it is a draft because `drivingProfileOf` does not read it, and that is a description, not an
+explanation of a design. Everyday Mode still has **no way to hand a draft over**; that is #228 and
+#167, and `WORKSHOP_COPY.yoursEmpty` now says where a save comes from instead of promising a landing
+place. The corpus is **not re-measured** here and no string, surface or case count is published —
+[§ D343](#d343) takes that measurement once, after the wave integrates.
+
+---

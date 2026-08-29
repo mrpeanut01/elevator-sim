@@ -947,6 +947,9 @@ export type WorkshopWrite = (typeof WORKSHOP_WRITES)[number];
  * Named rather than derived, on `scope/commitment.ts#COMMITMENTS`' own rule: a fifth answer is a
  * compile error at every exhaustive `switch` over this union, while a fifth *field* is caught by
  * {@link WORKSHOP_WRITES}' both-directions assertion instead.
+ *
+ * `DECISIONS.md` § D386 is the decision — including why the disclosure was chosen over wiring the
+ * draft, which GitHub issue #296's first criterion also allowed.
  */
 export const WORKSHOP_REACHES = Object.freeze([
   'nothing',
