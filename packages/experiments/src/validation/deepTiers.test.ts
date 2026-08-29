@@ -1,5 +1,6 @@
 /**
- * The opt-in tiers are wired to a workflow — GitHub issue #163.
+ * The opt-in tiers are wired to a workflow — GitHub issue #163,
+ * [§ D393](../../../../DECISIONS.md).
  *
  * ## What this exists to stop
  *

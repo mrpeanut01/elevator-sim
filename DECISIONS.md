@@ -26285,3 +26285,146 @@ integration. The full ladders above are reported once and are not all re-run per
 holds the two rungs the sentence rests on, the Midtown endpoint, and the sentence itself.
 
 ---
+
+## D393 — the opt-in tiers get a schedule, and the instrument that keeps them on it is a test rather than the workflow
+
+**Rules on:** GitHub issue #163. Settles `.github/workflows/deep-tiers.yml`,
+`packages/experiments/src/validation/deepTiers.test.ts`, and `docs/22-charter.md` § 4's S9 row.
+
+**Decision.** Nine gated test tiers run **weekly** on `main` (Sunday 03:00 UTC) and on
+`workflow_dispatch`, as **nine separate jobs**, on **one platform**, with failures raised into a
+GitHub issue. They are **not** added to `ci.yml`'s per-PR `suite`, and the workflow may not acquire
+a `pull_request:` trigger. What runs per pull request is the *wiring* check, never a tier.
+
+**The state this replaced.** `ci.yml:159` runs a bare `npm test`. No workflow named
+`ELEVATOR_SIM_DEEP`, `ELEVATOR_SIM_FUZZ`, `ELEVATOR_SIM_HONESTY` or `CORPUS_OUT`, and **no workflow
+in this repository had a `schedule:` trigger at all**. So the tiers were text that read as coverage
+nobody had — [§ D220](#d220)'s browser-tier defect one directory over, and `fuzz/deep.test.ts`'s own
+header had been saying *"runs on request and in CI cron"* about a cron that has never existed.
+
+**The count is derived, and both published numbers were wrong.** `vitest list` collects a
+`skipIf`-ed suite's children when the gate is open and omits them when it is shut, so the delta
+between two collections *is* the tier. On `0cd422a`: **eighteen tests, nine gated blocks, nine
+files**. The issue says seventeen; the triage that verified it said ~19 across eight blocks.
+
+**The undercount that mattered is not the number.** The issue names two variables. There is a
+**third** — `ELEVATOR_SIM_FUZZ=deep` — and it guards the 250-case fuzz campaign. A workflow that set
+only the two named variables would have left that tier exactly as unrun as it found it, **while
+reporting green**.
+
+**A test count also understates the tiers**, which is why no number is offered as the measure of
+what this buys. Four of them widen the tests already there rather than adding new ones: the golden
+set goes 4 → 6, the honesty corpus 49 → 60 cases, `perfScaling`'s grids widen *and* its printed fits
+become assertions, and `perfSweep` turns a projection into an executed sweep.
+
+**Corrected: the seed-collision claim.** #163's title says these tiers hold *"the only
+seed-collision check in the repo"*. Measured, that is too strong, and the acceptance clause rests on
+it:
+
+| check | scale | tier |
+|---|---|---|
+| `runner/crn.test.ts` — *"produces distinct seeds across a large batch"* | 500 seeds | **always-on** |
+| `validation/perfSweep.test.ts` — distinct trace digests | 200 | **always-on**, same file |
+| `validation/perfSweep.test.ts` — distinct trace digests | **20 000** | **deep only** |
+
+`perfSweep`'s own docstring is careful where the title is not: *"no other suite runs enough
+replications to see it"* is a claim about **scale**, not about existence. So what had never run is
+the collision search at twenty thousand, and `CLAUDE.md`'s invariants 2 and 5 lean on that scale
+rather than on the kind of check being absent below it.
+
+**Weekly, not nightly.** `collectiveAdoption.test.ts` documents its own run with
+`--testTimeout=14400000` — four hours — and `perfSweep`'s deep arm carries a two-hour ceiling. A
+nightly matrix of that spends many runner-hours a week re-answering a question about a tree that
+moves in waves rather than in commits, and the first thing anybody does with a nightly job costing
+that much is turn it off, which returns the tiers to the state this rules on.
+
+**Nine jobs, not one.** GitHub's job ceiling is six hours and one tier alone declares four, so a
+single sequential job risks being killed at the ceiling and taking every result with it.
+`fail-fast: false` across separate jobs stops the first finding hiding the other eight. And they
+fail for unrelated reasons: `perfScaling.test.ts` records its own wall-clock flake under concurrent
+load — *"a gate nobody can trust is a gate everybody overrides"* — which, isolated, reddens one job
+named for it rather than the correctness oracle beside it.
+
+**One platform, and the exception is named rather than glossed.** `ci.yml` runs two legs to make pin
+portability measurable ([§ D196](#d196), [§ D201](#d201)). Most of what runs here is not that kind
+of assertion, so a second leg would double a multi-hour cost to re-answer the one question this
+workflow does not ask. **`golden-runs` is the exception**: byte-identical replay *is* a pin, and its
+deep tier adds two goldens `ci.yml` never sees, so those two are pinned on Linux only. Stated as a
+limit, not resolved.
+
+**The § D343 measurement lives inside this workflow rather than beside it.**
+`measure.corpus.test.ts` says run it *"once, after integration, never per branch"*, and every word of
+that describes a scheduled run on `main` and describes nothing a pull request can do. Both tiers in
+one job, because [§ D343](#d343)'s rule is that the pair is what makes either figure mean anything
+and two jobs could be scheduled onto two commits. It **publishes nothing**: the figures land as an
+artifact with the commit beside them, for a person to carry into `CLAUDE.md`. A workflow that edited
+that row would be a pin maintaining itself, and `RISKS.md` R38's remedy is a derivation with its
+tree named — which is the half no deriver can do for anybody.
+
+**The instrument is `deepTiers.test.ts`, not the workflow.** What closed [§ D220](#d220)'s browser
+defect was never the CI step; it was `dev/browserTier.test.ts` deriving the tier from disk. This
+does the same for the other nine: ten non-browser test files carry a line-initial gate, each
+declares the variables that open it, and the workflow must name the file, in the right vitest
+project, with every one of those variables set in the step that runs it — asserted in **both**
+directions, with a vacuity guard, because every case iterates the derived set and a detector
+matching nothing would assert that no tier is unwired and be green.
+
+**Detection is over-inclusive on purpose, and the reason is a defect this lane committed.** The
+crude comment/string stripper `browserTier.test.ts` calls *"deliberately over-removing"* was used
+first and **missed `collectiveAdoption.test.ts`** — an apostrophe inside a template literal opened a
+bogus string that swallowed the gate on line 398, giving nine files instead of ten, silently. The
+error is now taken in the other direction: a line-initial match on raw source, where a false
+positive forces a visible table entry and a false negative cannot happen.
+
+**`ELEVATOR_SIM_REGENERATE_GOAL_RATES` is in the table with `scheduled: false`, and it is the
+polarity trap.** It is a regeneration flag, not a tier gate: measured with `vitest list`, setting it
+**removes** a check, because `goalRates.test.ts` then rewrites the pinned counts instead of checking
+them. A scheduled run that set every variable it could find would delete a check and go green, so
+the workflow is asserted **not** to set it.
+
+**`--passWithNoTests=false`, on every command, and it is the most load-bearing flag in the file.**
+Every project in `vitest.config.ts` sets `passWithNoTests: true` — correct for a package whose phase
+has not landed — so a workflow selecting tests *by path* goes green on a typo:
+`npx vitest run --project experiments src/fuzz/doesNotExist.test.ts` exits **0** having executed
+nothing, and is indistinguishable in the Actions tab from a job whose tests passed. With the flag it
+exits **1**, and a real path still exits 0. `vitest.config.ts` is deliberately untouched — the flag
+belongs to the workflow that needs it, and that file has another owner (issue #149).
+
+**Aliveness, in two halves, one of which has no mechanism.** *Mechanised:* the wiring check above,
+so a tenth gated tier cannot arrive unwired without a red pull request. *Not mechanised:* whether
+the cron has **fired**. A test that asked would need the network and a wall clock, and GitHub
+disables scheduled workflows after 60 days of repository inactivity, silently. So that half is a
+command written into the workflow header — `gh run list --workflow=deep-tiers.yml --limit 5` — and
+saying which half is which is the point, because *"satisfied in prose and mechanised by nothing"* is
+the clause this repository already knows to distrust first.
+
+**Validated by mutation, because a zero from an unvalidated instrument is worthless.** Eight
+mutations, each keeping every case in scope — a mutation that removes a row from the iterator
+validates nothing — and each detected by the case that claims to detect it, exit 1 every time: a
+tier misspelled in its run line, a gate variable dropped from its step, the schedule deleted, a
+`pull_request:` trigger added, `--passWithNoTests=false` removed from one command, the issue-raising
+step broken, **a tenth gated tier added to disk and left unwired**, and the corpus job made to commit
+its own figures. Separately, all ten workflow invocations were shown to **open their gate** with
+`vitest list`, against a negative control of the same commands with the variables unset, which
+collect nothing.
+
+**What turning them on found, reported rather than fixed.** `fuzz-deep` came back **RED** on the
+first run: 1 counterexample in 250 cases, `fuzz-1000130`, `[termination] run ended at
+t=3493.7775825325903, past its hard deadline of t=3493`. Not a rounding artefact — `checkTermination`
+already tolerates `EPSILON = 1e-9` against an overshoot of **0.7776 s**. The file's status table had
+published *green, 0 failures* since T22 and nothing could have re-taken it, which is `CLAUDE.md`'s
+*"a published number goes stale the same way"* on a table whose whole job was to say whether this
+tier passes. Recorded in an `OPEN` register with a ghost check, on [§ D307](#d307)'s precedent, and
+tracked as GitHub issue #305. Nothing in `fuzz/` moved: `checkTermination` is unchanged line for
+line, `EPSILON` is still `1e-9`, `PROPERTY_BOUNDS` is unmoved, the generator was not narrowed.
+
+**Also measured here, both green:** `golden-runs` at 6 of 6 goldens including the cross-process
+replay (24 tests, 55.6 s), and every gate shown open. The remaining tiers are named in the workflow
+and unmeasured by this lane, which is stated rather than implied — a tier this lane did not run is a
+tier whose first result will arrive on a Sunday.
+
+**What is not claimed.** No corpus figure is published; [§ D343](#d343) takes that once, after
+integration, and this lane's job was to build the measurement a place to happen rather than to take
+it.
+
+---

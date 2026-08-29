@@ -1,4 +1,4 @@
-# The opt-in tiers, on a stated cadence — GitHub issue #163.
+# The opt-in tiers, on a stated cadence — GitHub issue #163, DECISIONS.md § D393.
 #
 # Nine test tiers in this repository are gated behind an environment variable, and until this file
 # existed **nothing set any of them, anywhere, ever**. `ci.yml` runs a bare `npm test`; no workflow

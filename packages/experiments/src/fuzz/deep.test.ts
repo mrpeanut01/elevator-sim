@@ -23,7 +23,7 @@
  * |---|---|---|
  * | T22 | `ELEVATOR_SIM_FUZZ=deep` (250 cases, the tier's own default) | **green**, 0 failures |
  * | T22 | `ELEVATOR_SIM_FUZZ_CASES=2000` (the overnight pass) | **green**, 0 failures |
- * | **2026-08-29**, `0cd422a` | `ELEVATOR_SIM_FUZZ=deep` (250 cases) | **RED — 1 failure**, `fuzz-1000130`, [termination]. See {@link MEASURED_1000130} |
+ * | **2026-08-29**, `0cd422a` | `ELEVATOR_SIM_FUZZ=deep` (250 cases) | **RED — 1 failure**, `fuzz-1000130`, [termination], GitHub issue #305. See {@link MEASURED_1000130} |
  *
  * **The green rows above were true and are not true now, and the gap is the finding rather than the
  * cost.** They were measured at T22 and never re-taken, because until GitHub issue #163 wired this
@@ -119,7 +119,8 @@ describe.skipIf(!deepCampaignRequested())('the deep campaign', () => {
  * -------------------------------------------------------------------------- */
 
 /**
- * **OPEN. Found 2026-08-29 on `0cd422a`, the first time this tier had been run since T22.**
+ * **OPEN — GitHub issue #305, [§ D393](../../../../DECISIONS.md). Found 2026-08-29 on `0cd422a`,
+ * the first time this tier had been run since T22.**
  *
  * ```
  * case      fuzz-1000130      simSeed 288869761
