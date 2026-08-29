@@ -77,6 +77,27 @@
  * defect. So the error is taken in the other direction: a `skipIf` inside a docstring would force a
  * spurious {@link TIERS} entry, which is visible, rather than hide a real one, which is not.
  *
+ * ## Why this audit lives in `viz` rather than beside the tiers it names
+ *
+ * It was written in `packages/experiments/src/validation/` and CI refused it — `boundaries.test.ts`,
+ * CLAUDE.md **invariant 6**, on three `packages/viz/...` keys in {@link TIERS}. The refusal is right
+ * and the fix is not to soften it. Those keys are data rather than imports, but the coupling they
+ * create is real: with `viz` absent this file's declared set no longer matches the disk, so the
+ * `experiments` suite would fail for want of a package it must be able to build without.
+ *
+ * Nor could it be dodged by composing the path out of fragments. That would be rephrasing around a
+ * grep, which this repository forbids outright — the owed-decision ratchet's own docstring says so
+ * in as many words.
+ *
+ * Deriving **both** sides would remove the offending literals and gut the check with them: the
+ * declared set exists precisely so that a tier appearing on disk and nowhere in the workflow is a
+ * mismatch. Two derivations agreeing is a tautology.
+ *
+ * So it moved to the one package that may legitimately know about all of them.
+ * `boundaries.test.ts` — the very file that refused it — lives here and walks `core` and
+ * `experiments` for exactly this reason: `viz` sits at the top of the dependency graph, so a
+ * cross-package audit is at home here and nowhere else.
+ *
  * The crude stripper was tried first and it **missed `collectiveAdoption.test.ts`** — an apostrophe
  * inside a template literal opened a bogus single-quoted string that swallowed the gate on line 398.
  * Nine files instead of ten, silently. That is recorded rather than glossed because it is the exact
@@ -87,7 +108,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const WORKFLOW = join(ROOT, '.github', 'workflows', 'deep-tiers.yml');
 
 /**

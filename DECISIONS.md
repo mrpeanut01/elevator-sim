@@ -26309,7 +26309,7 @@ holds the two rungs the sentence rests on, the Midtown endpoint, and the sentenc
 ## D393 — the opt-in tiers get a schedule, and the instrument that keeps them on it is a test rather than the workflow
 
 **Rules on:** GitHub issue #163. Settles `.github/workflows/deep-tiers.yml`,
-`packages/experiments/src/validation/deepTiers.test.ts`, and `docs/22-charter.md` § 4's S9 row.
+`packages/viz/src/deepTiers.test.ts`, and `docs/22-charter.md` § 4's S9 row.
 
 **Decision.** Nine gated test tiers run **weekly** on `main` (Sunday 03:00 UTC) and on
 `workflow_dispatch`, as **nine separate jobs**, on **one platform**, with failures raised into a
