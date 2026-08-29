@@ -26424,18 +26424,26 @@ tier passes. Recorded in an `OPEN` register with a ghost check, on [§ D307](#d3
 tracked as GitHub issue #305. Nothing in `fuzz/` moved: `checkTermination` is unchanged line for
 line, `EPSILON` is still `1e-9`, `PROPERTY_BOUNDS` is unmoved, the generator was not narrowed.
 
-**`honesty-deep` is also red, and it is a different kind of red — say which.** Run on 2026-08-29 it
-took **43.9 min and timed out**: `Test timed out in 1800000ms`, 25 of 26 cases passing and the deep
-one killed. **No honesty property was refuted; the corpus never finished.** The ceiling is the
-tier's own — `1_800_000` as the third argument to the `it` — and a per-test timeout wins over both
-the config default and any `--testTimeout` a workflow could pass, so `timeout-minutes` governs the
-runner and not this. `measure.corpus.test.ts` puts the deep tier at ~23 min, about 30 % under its
-own ceiling, and a hosted runner is a smaller machine than the container that measured it. The
-number here was taken alongside two other tiers, which is **not** this job's condition — every tier
-gets its own runner — so it is reported as the shape of the failure to expect rather than as a
-prediction. **The ceiling is deliberately not raised from the workflow.** A tier's declared bound is
-the tier's to declare, and widening somebody else's to make one's own workflow green is the move
-this repository refuses outright.
+**`honesty-deep` was red until it was measured a second time, and that is the most useful thing this
+lane learned about measuring tiers at all.** Contended — sharing the container with two other deep
+tiers — it took **43.9 min and timed out**: `Test timed out in 1800000ms`, 25 of 26 passing and the
+deep case killed, **no honesty property refuted, the corpus simply never finished**. Alone it
+**passes**: 26 of 26, exit 0, 32.6 min for the file with the deep case inside its own ceiling.
+
+**Alone is this job's condition** — one tier per job, one runner each, nothing competing — so the
+first number alone would have shipped a job believed red by construction on the strength of how it
+happened to be measured. That is this repository's own *"a pin is a claim about a machine"* wearing
+a clock instead of a float, and it is the reason the other four figures in the workflow's timing
+table are labelled as taken under contention and therefore as ceilings on the cost rather than the
+cost.
+
+The headroom is thin and the second measurement does not make it thick: the ceiling is the tier's
+own — `1_800_000` as the third argument to the `it`, which wins over the config default and over any
+`--testTimeout` a workflow could pass, so `timeout-minutes` governs the runner and not this — and
+`measure.corpus.test.ts` puts the tier at ~23 min against it, on a container larger than a hosted
+runner. **The ceiling is deliberately not raised from the workflow.** A tier's declared bound is the
+tier's to declare, and widening somebody else's to make one's own workflow green is the move this
+repository refuses outright.
 
 **`matrix-census` is the third red, and it is the sharpest answer to *what was this tier for?***
 Run once, 17.0 min, exit 1: **three declared figures do not reproduce from the census they were
@@ -26456,9 +26464,10 @@ re-declared.** Updating `MATRIX_CELLS` to the measured values would re-baseline 
 statistical parameters on the strength of one census run, by a lane whose job was to turn the tier
 on. Tracked as GitHub issue #306.
 
-**Reporting the three reds as one number would be the mistake.** One found a counterexample, one
-found a stale statistical baseline, one ran out of a clock. *"Three of five failing"* says the same
-thing about all three, which is why the workflow's timing table names the kind beside each figure.
+**Reporting the two reds as one number would be the mistake.** One found a counterexample, one found
+a stale statistical baseline. *"Two of five failing"* says the same thing about both, which is why
+the workflow's timing table names the kind beside each figure — and why the third apparent red is
+reported above as a measurement condition rather than counted here.
 
 **Also measured here, both green:** `golden-runs` at 6 of 6 goldens including the cross-process
 replay (24 tests, 55.6 s), and `perf-sweep`'s full **20 000-replication sweep** (5 tests, 4.6 min

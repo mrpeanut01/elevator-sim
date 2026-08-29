@@ -159,17 +159,23 @@
 # | `golden-runs` (6 of 6, cross-process) | 55.6 s, green | 90 |
 # | `perf-sweep` (20 000 replications, workers) | 4.6 min, green | 180 |
 # | `matrix-census` (200 replications) | 17.0 min, **RED** — three declared figures do not reproduce, issue #306 | 120 |
-# | `honesty-deep` (60 cases) | 43.9 min, **RED** — *timed out*, not refuted; see that job | 90 |
+# | `honesty-deep` (60 cases) | **32.6 min green alone**; 43.9 min and *timed out* when contended | 90 |
 #
-# **Three of the five run came back red, and they are three different kinds of thing.** `fuzz-deep`
-# found a counterexample. `matrix-census` found that declared statistical parameters no longer
-# reproduce from the census they were derived from — the sharpest possible answer to *"what was this
-# tier for?"*, since those ceilings bound every interval the experiment matrix publishes.
-# `honesty-deep` ran out of the clock the *test itself* declares and refuted nothing at all.
+# **Two of the five run came back red, and they are two different kinds of thing.** `fuzz-deep` found
+# a counterexample. `matrix-census` found that declared statistical parameters no longer reproduce
+# from the census they were derived from — the sharpest possible answer to *"what was this tier
+# for?"*, since those ceilings bound every interval the experiment matrix publishes.
 #
-# Reporting those as one number — *"3 of 5 failing"* — would say the same thing about a defect, a
-# stale baseline and a timeout, which is the mistake this repository makes a rule about. The table
-# names the kind beside each figure for that reason, and so does the `report` job's issue body.
+# Reporting those as one number — *"2 of 5 failing"* — would say the same thing about a defect and a
+# stale baseline, which is the mistake this repository makes a rule about. The table names the kind
+# beside each figure for that reason, and so does the `report` job's issue body.
+#
+# **`honesty-deep` was red until it was measured a second time, and that row is why the others are
+# quoted with their conditions.** Sharing the container with two other tiers it timed out; alone it
+# passes. Alone is this job's condition — one tier per job, one runner each — so the first number
+# would have shipped a job believed red by construction on the strength of how it was measured. The
+# other four figures above were also taken under contention, so read them as ceilings on the cost
+# rather than as the cost.
 #
 # The sweep is the interesting row: its own `it` allows two hours and it finished in under five
 # minutes, because it is the one tier that runs with `parallel: { mode: 'workers' }`. The ceiling is
@@ -438,19 +444,26 @@ jobs:
   # `--testTimeout` this file could pass. So the job ceiling below governs the *runner*, not the
   # tier, and the tier's own 30 minutes is the binding number.
   #
-  # The headroom is thin. `measure.corpus.test.ts` puts the deep tier at **~23 minutes**, measured
-  # on a container — about 30 % under its own ceiling — and a GitHub hosted runner is a smaller
-  # machine than that. Run here on 2026-08-29 alongside two other tiers it took **43.9 min and
-  # timed out**: `Test timed out in 1800000ms`, 25 of 26 cases passing and the deep one killed. That
-  # measurement is not this job's condition — every tier here has its own runner, so the CI shape is
-  # the tier running *alone* — but it is the shape of the failure to expect, and it is a **timeout
-  # rather than a property violation**: no honesty property was refuted, the corpus never finished.
+  # **Measured twice on 2026-08-29, and the pair is the whole finding.** Contended — sharing the
+  # container with two other deep tiers — it took **43.9 min and timed out**: `Test timed out in
+  # 1800000ms`, 25 of 26 cases passing and the deep one killed. **Alone it passes**: 26 of 26,
+  # exit 0, 32.6 min for the file with the deep case inside its own 30-minute ceiling.
   #
-  # If this job goes red with `Test timed out`, that is a capacity finding about the ceiling in
-  # `honesty.test.ts` and it belongs in an issue against that number. It is deliberately not raised
-  # from here — the tier's declared ceiling is the tier's to declare, and a lane that widened
-  # somebody else's bound to make its own workflow green would be doing the thing this repository
-  # refuses outright.
+  # **Alone is this job's condition**, which is why the pair had to be taken rather than the first
+  # number published: every tier here runs in its own job on its own runner, so nothing else is
+  # competing. One measurement would have shipped a job believed red by construction, and the belief
+  # would have been an artefact of how it was measured.
+  #
+  # The headroom is nonetheless thin, and the second number does not make it thick.
+  # `measure.corpus.test.ts` puts the deep tier at **~23 min** on a container, against a ceiling of
+  # 30, and a GitHub hosted runner is a smaller machine than either. So this stays the job most
+  # likely to go red for capacity rather than for a defect — and a capacity red here is a **timeout,
+  # not a refutation**: no honesty property fails, the corpus never finishes.
+  #
+  # If that happens it is a finding about the ceiling in `honesty.test.ts` and belongs in an issue
+  # against that number. It is deliberately not raised from here — a tier's declared bound is the
+  # tier's to declare, and a lane widening somebody else's to make its own workflow green would be
+  # doing the thing this repository refuses outright.
   # ---------------------------------------------------------------------------
   honesty-deep:
     name: honesty — the deep corpus
