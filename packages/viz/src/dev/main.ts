@@ -286,6 +286,8 @@ import {
   drawerStateFor,
   escapeClosesDrawer,
   railStateFor,
+  revealedTabsFrom,
+  revealedTabsTo,
   segmentAfterKey,
   surfaceStateFor,
   tabAfterKey,
@@ -3381,6 +3383,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
       revealed.add(tab);
       state = { ...state, tab, revealedTabs: revealed };
       /*
+       * **And the reveal is written where it is made** — issue #130, § D330's first condition.
+       *
+       * Here rather than in `renderAll`, because this is the one moment the set can change and a
+       * writer on the render path would re-write the same bytes on every frame. `saveSlot` is
+       * total for `sessionStore`'s reason one directory over: the natural caller of a save is a
+       * player pressing a tab, and a full storage quota must not turn navigation into a dead
+       * control.
+       *
+       * Unconditional rather than guarded on *did the set actually grow* — `revealedTabsTo` is
+       * ordered by `CONTEXTUAL_TABS` and filtered to them, so pressing an already-revealed tab
+       * writes the bytes that are already there. A guard would be a second opinion about what
+       * changed, and this way there is only one.
+       */
+      saveRevealedTabs(revealed);
+      /*
        * **A navigation dismisses the drawer** — `docs/19` defect 6. Below the breakpoint the
        * right rail is an overlay covering the editor column, so *Open dispatcher editor →* opened
        * the editor **behind** the drawer that launched it, with "EDITING — …" truncated under the
@@ -4389,6 +4406,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const linked = new URLSearchParams(window.location.search).get('mode');
     const remembered = window.localStorage.getItem(MODE_KEY);
     if (!isViewMode(linked) && isViewMode(remembered)) state = { ...state, mode: remembered };
+
+    /*
+     * **The reveal, brought back** — issue #130, § D330's first condition. Beside the mode and for
+     * the mode's own reason: this is a disclosure preference, not progress, and `persist/`'s
+     * envelope is the *week*, refused whole when any part of it will not read. An unknown tab name
+     * must not be able to cost a player their week, so it lives in its own slot where the worst it
+     * can do is resolve to *nothing revealed* — the state a first visit is already in.
+     *
+     * There is no deep-link arm to answer here. `?tab=` names where to *look*, which is not
+     * persisted at all; this names what the strip *offers*, and a link that shrank the strip would
+     * be a sender taking surfaces off a recipient's page.
+     */
+    state = { ...state, revealedTabs: loadRevealedTabs() };
 
     /*
      * **Two controls, and they copy two different artefacts** — GitHub issue #118 § 2.
@@ -6398,6 +6428,63 @@ function boot(ui: Elements, resources: BrowserResources): void {
 }
 
 const MODE_KEY = 'elevator-sim.viewMode';
+
+/* ========================================================================== *
+ * The reveal's slot — issue #130, § D330 condition 1
+ * ========================================================================== */
+
+/**
+ * Where the revealed contextual tabs live.
+ *
+ * A third key on this origin, and the third is argued rather than assumed. `persist/types.ts`'s
+ * `SESSION_KEY` docstring makes the case *against* extra keys — *"three keys is three states that
+ * can disagree — a week from this build beside settings from the last one"* — and that case is
+ * about a **week**, whose parts are views of one another. Nothing in this set is a view of
+ * anything: no field of the week, the settings or the Free Play selection is derivable from which
+ * editors a player has opened, so there is no pair here that can disagree.
+ *
+ * What the envelope *would* have cost is the reason this is not in it. A session is refused whole
+ * when any part of it will not read, so a tab name this build no longer knows would take the
+ * player's week with it. `revealedTabsFrom` resolves the same bytes to *nothing revealed*, which
+ * is the state a first visit is in.
+ *
+ * Beside `elevator-sim.viewMode` and dotted like it, which is the sibling this genuinely has: both
+ * are disclosure, both are per-browser, and neither is progress.
+ */
+const REVEALED_TABS_KEY = 'elevator-sim.revealedTabs';
+
+/**
+ * Read the slot, and treat every failure as an empty one.
+ *
+ * `localStorage` **throws** rather than returning `null` where a browser is configured to block
+ * site data, and this is read during boot — so an unguarded read is a blank page for a reader
+ * whose privacy settings are none of this product's business. `persist/session.ts` makes the same
+ * argument at length for the session slot (*"the natural caller of `loadSession` is boot, where a
+ * throw is a blank page"*); this is that argument, one key over.
+ */
+function loadRevealedTabs(): ReadonlySet<TabName> {
+  try {
+    return revealedTabsFrom(window.localStorage.getItem(REVEALED_TABS_KEY));
+  } catch {
+    return new Set<TabName>();
+  }
+}
+
+/**
+ * Write the slot, and treat every failure as nothing having happened.
+ *
+ * Total for `persist/session.ts`'s stated reason: the caller is a player pressing a tab, and *"a
+ * save that threw would therefore turn a full storage quota into a dead slider"* — here, a dead
+ * tab. The reveal is still live in memory either way; what is lost is only its survival of a
+ * reload, which is exactly the state the product was in before § D330.
+ */
+function saveRevealedTabs(revealed: ReadonlySet<TabName>): void {
+  try {
+    window.localStorage.setItem(REVEALED_TABS_KEY, revealedTabsTo(revealed));
+  } catch {
+    /* Quota, a blocked origin, or a private window. Nothing here is worth a sentence on screen. */
+  }
+}
 
 /* ========================================================================== *
  * Space, and who owns it — § D234, issue #69

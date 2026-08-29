@@ -99,10 +99,27 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
     'Which surface is showing. Navigation writes nothing a run reads, and surfaceStateFor is the ' +
       'sink — one selected tab, one focusable, the rest hidden.',
   ),
+  /*
+   * **The sentence below used to be false across a reload, and that is why it is written like
+   * this now** — issue #130, § D330.
+   *
+   * It read *"opened this session … a revealed tab stays revealed"*. The second clause was
+   * `surfaces.ts`'s accessibility rule quoted accurately, and the product did not keep it: nothing
+   * persisted the set, so every reload re-hid four surfaces a player had already found. § D227
+   * rates that worse than a control that does nothing — a promise about a control, made in the
+   * table a reader consults to find out what controls do.
+   *
+   * It is true now because the reveal is stored (`dev/main.ts`, `elevator-sim.revealedTabs`), and
+   * it is pinned by a run rather than by this paragraph: `dev/surfaces.test.ts` round-trips the
+   * codec and re-derives the strip from what came back, and the browser tier reloads a real page
+   * and reads the tab off it.
+   */
   'viewer.revealedTabs': control(
     'presentation',
-    'Which contextual editor tabs the rail has opened this session. Changes the strip and nothing ' +
-      'else; a revealed tab stays revealed, which is surfaces.ts’s stated accessibility rule.',
+    'Which contextual editor tabs the rail has opened. Changes the strip and nothing else — and ' +
+      'only in Casual, since § D330 made the gate mode-aware and Engineer carries every tab from ' +
+      'the first frame. A revealed tab stays revealed, across a reload as well as within a ' +
+      'session: dev/main.ts stores the set beside the view mode.',
   ),
   'viewer.railSegment': control(
     'presentation',

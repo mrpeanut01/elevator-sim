@@ -375,6 +375,8 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
   /* --- already persisted, elsewhere ------------------------------------- */
   'viewer.mode':
     'dev/main.ts has held this under its own key, elevator-sim.viewMode, since before this module existed, and it gives a ?mode= deep link precedence over the remembered value — a precedence rule a directory that cannot read a query string may not re-litigate',
+  'viewer.revealedTabs':
+    'the contextual editor tabs a player has opened. Persisted since § D330 (issue #130) and deliberately NOT here: dev/main.ts holds it under elevator-sim.revealedTabs, beside the mode and for the mode’s reason — it is disclosure rather than progress. The row above it used to read “a ReadonlySet — the JSON trap sitting one spread away from the snapshot”, and that was the true half of a false conclusion: the Set is why it cannot go in a snapshot **as it stands**, not why the reveal has to die on reload. surfaces.ts#revealedTabsTo is the codec, an array on the wire. It stays out of this envelope because a session is refused whole — a tab name this build no longer knows would cost the player their week, where its own slot resolves the same bytes to “nothing revealed”',
 
   /* --- which game is being played ---------------------------------------- */
   'viewer.playMode':
@@ -383,8 +385,6 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
   /* --- where the reader was looking, not what they were playing ---------- */
   'viewer.tab':
     'which panel was open is not progress; restoring a reader into the pattern editor describes a session they have not started yet',
-  'viewer.revealedTabs':
-    'the contextual tabs the rail has opened, and a ReadonlySet — the JSON trap sitting one spread away from the snapshot, which is why jsonSafety.ts refuses a Set by name',
   'viewer.railSegment': 'which segment of the left rail was showing; a scroll position, not a state',
   'viewer.drawerOpen': 'whether a drawer was open, which is the shape of the window and not of the game',
   'viewer.showMaths':

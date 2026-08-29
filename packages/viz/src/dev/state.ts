@@ -386,7 +386,12 @@ export interface ViewerState {
 
   /* --- navigation --------------------------------------------------------- */
   readonly tab: TabName;
-  /** Contextual editor tabs the rail has opened. See `surfaces.ts`. */
+  /**
+   * Contextual editor tabs the rail has opened. See `surfaces.ts`.
+   *
+   * Consulted in Casual only — § D330 gave Engineer no gate — and it outlives the page: the set is
+   * stored per browser, so *revealed* means revealed rather than revealed until the tab is closed.
+   */
   readonly revealedTabs: ReadonlySet<TabName>;
   readonly railSegment: RailSegment;
   readonly drawerOpen: boolean;
@@ -1027,6 +1032,9 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     mode: 'basic',
     showMaths: true,
     tab: 'run',
+    // A first visit's reveal, not every boot's. Since § D330 (issue #130) `dev/main.ts` reads the
+    // stored set over this before the first render, so a returning player keeps the strip they
+    // earned; this module cannot do it itself, because it may not touch `localStorage`.
     revealedTabs: new Set<TabName>(),
     railSegment: 'dispatcher',
     drawerOpen: false,
