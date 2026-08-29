@@ -32,8 +32,12 @@
  *
  * 1. **The reveal survives a reload.** {@link revealedTabsFrom} and {@link revealedTabsTo} are the
  *    codec; `dev/main.ts` owns the slot, beside `elevator-sim.viewMode`, for that field's own
- *    stated reason. Only the *set* travels — `viewer.tab` still does not, so a reload lands on the
- *    run surface with the strip a player earned still on it.
+ *    stated reason. Only the *set* travels through that slot — but say what else does, because the
+ *    obvious sentence here is false: `dev/main.ts#syncUrl` keeps the address describing the state
+ *    (`SH-09`), so a reload also comes back to `?tab=…`, and the reader lands where they were. That
+ *    is why the browser case for this condition leaves the editor before it reads the strip — the
+ *    active tab is shown whether or not it was revealed, so a reload straight into the editor
+ *    proves nothing about the set.
  * 2. **The affordance's claim is derived from the gate itself.** {@link SurfaceState.gate} counts
  *    the `hidden` flags this function has just computed. There is one computation, so the sentence
  *    and the strip cannot drift — § D227, which rates a stale sentence about a control worse than

@@ -3386,10 +3386,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * **And the reveal is written where it is made** — issue #130, § D330's first condition.
        *
        * Here rather than in `renderAll`, because this is the one moment the set can change and a
-       * writer on the render path would re-write the same bytes on every frame. `saveSlot` is
-       * total for `sessionStore`'s reason one directory over: the natural caller of a save is a
-       * player pressing a tab, and a full storage quota must not turn navigation into a dead
-       * control.
+       * writer on the render path would re-write the same bytes on every frame.
+       * {@link saveRevealedTabs} is total for `persist/session.ts`'s reason one directory over: the
+       * natural caller of a save is a player pressing a tab, and a full storage quota must not turn
+       * navigation into a dead control.
        *
        * Unconditional rather than guarded on *did the set actually grow* — `revealedTabsTo` is
        * ordered by `CONTEXTUAL_TABS` and filtered to them, so pressing an already-revealed tab
@@ -4414,9 +4414,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * must not be able to cost a player their week, so it lives in its own slot where the worst it
      * can do is resolve to *nothing revealed* — the state a first visit is already in.
      *
-     * There is no deep-link arm to answer here. `?tab=` names where to *look*, which is not
-     * persisted at all; this names what the strip *offers*, and a link that shrank the strip would
-     * be a sender taking surfaces off a recipient's page.
+     * There is no deep-link arm to answer here, and the reason is not *because nothing carries a
+     * tab*. {@link syncUrl} keeps the address describing the state, so a reload **does** come back
+     * to the surface the reader was on — `?tab=dispatcher` survives where `persist/`'s ledger
+     * correctly says the *session* does not store one. The two are different questions: `?tab=`
+     * names where to look, and this names what the strip offers. A link that shrank the strip would
+     * be a sender taking surfaces off a recipient's page, which is the opposite of what a deep link
+     * is for, so this is restored unconditionally and the address decides nothing about it.
+     *
+     * That distinction is not decorative: it is why `tabGate.browser.test.ts`'s reload case has to
+     * leave the editor before it reads the strip. The active tab is shown whether or not it was
+     * revealed, so a case that reloaded straight into `?tab=dispatcher` would have been reading the
+     * address bar and calling it persistence.
      */
     state = { ...state, revealedTabs: loadRevealedTabs() };
 
