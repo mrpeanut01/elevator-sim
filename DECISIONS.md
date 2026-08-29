@@ -26509,7 +26509,9 @@ is a guess with a number on it.
 
 **What is not claimed.** No corpus figure is published; [§ D343](#d343) takes that once, after
 integration, and this lane's job was to build the measurement a place to happen rather than to take
-it.## D394 — `core` and `server` take the simulating project's timeout, and the file that forced it simulates nothing
+it.
+
+## D394 — `core` and `server` take the simulating project's timeout, and the file that forced it simulates nothing
 
 **Date: 2026-08-29 · Owner: Lane B, wave G · Closes: GitHub issue #149. Discharges the debt
 [§ D361](#d361) recorded and answers the question [§ D331](#d331) left open.**
