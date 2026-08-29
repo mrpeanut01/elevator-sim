@@ -203,6 +203,38 @@ describe.skipIf(!HAS_BROWSER)('the tab gate in Casual — issue #130', () => {
     await page.close();
   });
 
+  it('stays inside the strip at the widths the fold audit measures', async () => {
+    /*
+     * The note is `white-space: nowrap` and roughly a third of a laptop strip wide, and it sits in
+     * a `.tabs` that wraps inside a `.stagecol` with `overflow: hidden`. So the failure available
+     * to it is not a scrollbar — it is a **clipped sentence**, which is the affordance saying three
+     * quarters of something, and `docs/19` defect 7's own shape one row up.
+     *
+     * Measured rather than reasoned about, at the two widths the fold audit uses and at the
+     * drawer breakpoint's own value, where the strip also gains the *Controls ▸* button.
+     */
+    const page = await coldEngineer();
+    for (const width of [1440, 1339, 1280, 900]) {
+      await page.setViewportSize({ width, height: 800 });
+      const fits = await page.evaluate((noteId) => {
+        const note = document.getElementById(noteId);
+        const strip = note?.parentElement;
+        if (note === null || strip === null || strip === undefined) return null;
+        const a = note.getBoundingClientRect();
+        const b = strip.getBoundingClientRect();
+        return { noteRight: a.right, stripRight: b.right, noteLeft: a.left, stripLeft: b.left };
+      }, ELEMENT_IDS.tabGateNote);
+      expect(fits, `no note at ${String(width)} px`).not.toBeNull();
+      expect(fits?.noteRight ?? 0, `the note is clipped at ${String(width)} px`).toBeLessThanOrEqual(
+        (fits?.stripRight ?? 0) + 0.5,
+      );
+      expect(fits?.noteLeft ?? 0, `the note starts off-strip at ${String(width)} px`).toBeGreaterThanOrEqual(
+        (fits?.stripLeft ?? 0) - 0.5,
+      );
+    }
+    await page.close();
+  });
+
   it('a page that never opened an editor still opens gated — the reload is not a one-way latch', async () => {
     /*
      * The negative control on the case above: a fresh context has an empty slot, so the reload
