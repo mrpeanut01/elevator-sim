@@ -48,6 +48,7 @@
 
 import { readGoal, wasDisplayOf, PENDING_DISPLAY } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, GoalReading, ShiftGoal } from '../shift/types.js';
+import { wasGraded } from '../shift/week.js';
 import {
   CALENDAR_SPAN,
   CONTRACT_DAYS,
@@ -267,6 +268,45 @@ export function campaignTestRows(
       refusal: TRIPS_REFUSAL,
     },
   ];
+}
+
+/**
+ * § 6.4 step 4 — *"In a campaign run, evaluate the four tests and mark the day cleared or
+ * missed"*, over the rows the screens are drawing.
+ *
+ * ## Over the rows, rather than over a second set of goals
+ *
+ * {@link campaignTestRows} is what the desk and the contract sheet print, so the verdict is a fold
+ * over exactly the readings a player watched. Building a second `campaignTestGoals` list here and
+ * grading that would be two statements of *what day N asks* — the drift this repository has three
+ * of on the record — and it would silently stop following the difficulty the moment either copy
+ * moved.
+ *
+ * ## Three tests decide it, and the fourth is a refusal rather than a pass
+ *
+ * § 8.6 says a day is cleared only if **all four** hold; the trip budget is the fourth and nothing
+ * in this simulator measures it ({@link TRIPS_REFUSAL}). Its row carries no `reading`, so it is not
+ * in this fold at all — a row nothing measured cannot be counted as held, and counting it as failed
+ * would refuse every day the campaign ever runs. `campaign/career.ts#CAMPAIGN_ABSENCES` says so
+ * where a player reads it.
+ *
+ * ## Why `ungraded` is a third answer here and only two marks reach the record
+ *
+ * `wasGraded` is `shift/week.ts`'s predicate rather than a second copy: a reading is `pending`
+ * below the wake-up gate and on a censored worst wait, and *unjudged is not passed* — but § D234's
+ * other half is that it did not **cost** anything either. `CampaignDayVerdict` has no value for
+ * that, so this function has one and the caller files nothing when it comes back. That keeps the
+ * refusal at the seam that can act on it instead of turning an unread morning into a missed day.
+ *
+ * Non-test caller: `everyday/host.ts#createEverydayHost`'s `closeDay`, which is the only press
+ * that files a campaign day.
+ */
+export function campaignDayVerdict(
+  rows: readonly CampaignTestRow[],
+): 'cleared' | 'missed' | 'ungraded' {
+  const readings = rows.flatMap((row) => (row.reading === undefined ? [] : [row.reading]));
+  if (!wasGraded(readings)) return 'ungraded';
+  return readings.every((entry) => entry.state === 'met') ? 'cleared' : 'missed';
 }
 
 /** `3 of 4 held yesterday`, both halves derived from the rows beside it. */
@@ -726,7 +766,17 @@ export const BUILDING_COPY = Object.freeze({
     'closes, so a bad week cannot quietly become your standing order.',
   monthHeading: 'THIS MONTH',
   testsEyebrow: 'WHAT TODAY ASKS',
-  testsNote: 'all four, or the day is missed',
+  /*
+   * **This read *"all four, or the day is missed"* and the fourth grades nothing** — § D227's
+   * first direction, on the line that tells a player what closing the day will do to them.
+   *
+   * The trip budget's row ships a refusal ({@link TRIPS_REFUSAL}) because this run records how many
+   * people were carried and not how many loaded departures the machines made, and
+   * {@link campaignDayVerdict} therefore folds three readings rather than four. A note promising a
+   * bar nothing measures is worse than a missing one: it tells a reader their day turned on a
+   * figure that was never taken.
+   */
+  testsNote: 'every one this run can read, or the day is missed',
   asBuilt: 'as built',
 } as const);
 
