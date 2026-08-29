@@ -160,12 +160,12 @@ asserted at both (`packages/viz/src/everyday/viewportGates.browser.test.ts`).
 than about this machine.** Measured:
 
 ```
-grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 30
-find packages -name "*.browser.test.ts" | wc -l                            # → 30
+grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 31
+find packages -name "*.browser.test.ts" | wc -l                            # → 31
 grep -rn "firefox\|webkit\|Firefox\|WebKit\|Gecko" packages --include="*.ts"  # → no output
 ```
 
-**30 of 30** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
+**31 of 31** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
 `webkit` and `Gecko` do not occur anywhere in `packages/**/*.ts`. The tier is **single-engine by
 construction**.
 
