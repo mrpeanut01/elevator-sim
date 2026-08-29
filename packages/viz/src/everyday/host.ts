@@ -521,10 +521,12 @@ export interface EverydayHost {
    * dispatcher nobody is running, and the no-op on re-picking the standing one are all that
    * function's and none of them is restated here.
    *
-   * Takes effect on the **next** run, exactly as {@link setPlainLever} does — the simulator runs a
-   * whole day in milliseconds and plays the recording back, so there is no mid-day change
-   * (`docs/16` § 1) and the control that changes the driver is a control that changes tomorrow's
-   * question rather than today's answer.
+   * Takes effect on the **next** run — the simulator runs a whole day in milliseconds and plays the
+   * recording back, so there is no mid-day change (`docs/16` § 1) and the control that changes the
+   * driver is a control that changes tomorrow's question rather than today's answer. This used to
+   * say *exactly as {@link setPlainLever} does*, and that comparison was withdrawn rather than
+   * reworded: three of that method's four levers reach no run at all, so it is not a thing another
+   * method can be *exactly as*. See its own docstring, and GitHub issue #296.
    *
    * An id no profile carries writes nothing: `withDispatcher` leaves the spec alone, so the run is
    * built from a dispatcher that exists rather than from a name that does not.
@@ -533,8 +535,20 @@ export interface EverydayHost {
 
   /**
    * Write one plain lever — `mode/plainLevers.ts`'s seam, the identical route the Engineer
-   * editor's `pullPlainLever` takes, so the two drawers stay two renderings of one vector. Takes
-   * effect on the next run, exactly as the editor's levers do.
+   * editor's `pullPlainLever` takes, so the two drawers stay two renderings of one vector.
+   *
+   * **Only one of the four reaches a run, and this said all four did** — GitHub issue #296. The
+   * ownership table in `mode/plainLevers.ts` is the reason, read one column further along than it
+   * used to be: *lobby* owns `GroupLevers.parking`, which `dev/state.ts#drivingProfileOf` reads, so
+   * it takes effect on the next run exactly as the editor's group levers do. *patience*, *room* and
+   * *spread* own `weights.starvation`, `weights.loadFactor` and `flags.zone` — all three on
+   * `viewer.dispatcherSpec`, which `scope/surface.ts` declares `latent` and `drivingProfileOf` does
+   * not read. Measured on the legs at `midtown-office`, 900 s, seed 20260827, `collective`, the
+   * three are byte-identical at either end of their travel and *lobby* is not.
+   *
+   * That is a true statement about this seam and not a defect in it: the lever writes the field it
+   * says it writes, and the field is a draft. `everyday/workshopScreen.ts`'s § 3.3 note is where a
+   * player is told, and `workshopTravel.test.ts` is what stops this sentence going stale again.
    */
   setPlainLever(id: PlainLeverId, value: number | boolean): void;
 
@@ -984,6 +998,14 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     },
     setPlainLever: (id, value) => {
       const state = b.state();
+      /*
+       * Both fields patched every time, even though `applyPlainLever` moves exactly one of them —
+       * it returns the other by identity, so the unmoved half is a no-op merge rather than a second
+       * writer. Which half moved is what decides whether the edit reaches a run (see the interface
+       * docstring, and GitHub issue #296), and that question is answered by `scope/surface.ts`
+       * downstream rather than branched on here: a host that patched conditionally would be a
+       * second opinion about a classification that already has an owner.
+       */
       const applied = applyPlainLever(state.dispatcherSpec, state.levers, id, value);
       b.applyPatch({ dispatcherSpec: applied.spec, levers: applied.levers });
     },

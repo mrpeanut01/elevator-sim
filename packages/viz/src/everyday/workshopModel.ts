@@ -101,6 +101,7 @@ import {
   type SelectorScalarField,
   type SelectorSpec,
 } from '../authoring/selectorSpec.js';
+import { commitmentOf } from '../scope/commitment.js';
 import {
   flagRowsOf,
   leverRowsOf,
@@ -148,7 +149,23 @@ export const WORKSHOP_COPY = Object.freeze({
     'The styles above are six ways in, not the whole shelf. These are the rest, under the names ' +
     'the library gives them.',
   yoursHeading: 'YOURS',
-  yoursEmpty: 'Nothing saved yet. Move a lever or add a rule and this is where it lands.',
+  /**
+   * The shelf's empty state — and it promised a landing place this build has no verb to reach.
+   *
+   * It read *"Nothing saved yet. Move a lever or add a rule and this is where it lands."* Nothing
+   * in `everyday/` writes `savedDispatchers`: the Engineer editor's *Save as new* is the only
+   * control in the product that files a dispatcher, so a player who moved a lever here and looked
+   * for it to land was watching for something that could not arrive. GitHub issue #296's fourth
+   * criterion, and the same class as the promise its footer used to make.
+   *
+   * The replacement says where a save comes from rather than that one is coming, which is § D227's
+   * rule pointed at a promise instead of a refusal. It goes back to the first sentence when
+   * issues #228 and #167 give Everyday a save of its own.
+   */
+  yoursEmpty:
+    'Nothing saved yet. Saving a dispatcher of your own is the Engineer workshop’s Save as new — ' +
+    'this build has no save here yet. Your levers, switching and rules still travel with the next ' +
+    'run without being saved.',
   leversHeading: 'THE FOUR LEVERS',
   leversHint:
     'Four plain controls over the same numbers the drawer below holds. Move one and the cost line ' +
@@ -878,4 +895,111 @@ export function nameplateOf(input: {
       : 'proved on the bench — this build keeps no bench record for a dispatcher, so the bench ' +
         'cannot say it has seen this one',
   });
+}
+
+/* -------------------------------------------------------------------------- *
+ * §3.3's note cell — which of this screen's writes reach a run, GitHub issue #296
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The four `ViewerState` fields this screen writes, by their `scope/surface.ts` key.
+ *
+ * Listed rather than derived, and the list is itself the claim: `workshopScreen.ts` wires exactly
+ * four host methods that write state — `setWorkingSpec`, `setGroupLevers`, `setSelectorSpec` and
+ * `setRuleRows` — and `workshopTravel.test.ts` asserts this against the screen's own source in both
+ * directions, so a fifth write arriving without a row here fails rather than being described by a
+ * sentence that has not heard of it.
+ *
+ * The order is `dev/state.ts#shiftRunConfigOf`'s own composition order, which is also the order a
+ * reader meets them on the panel: the draft first, then the three that travel.
+ */
+export const WORKSHOP_WRITES = Object.freeze([
+  'viewer.dispatcherSpec',
+  'viewer.levers',
+  'viewer.selectorSpec',
+  'viewer.ruleRows',
+] as const);
+
+export type WorkshopWrite = (typeof WORKSHOP_WRITES)[number];
+
+/**
+ * What the bar can honestly say about the edits standing when the primary is pressed.
+ *
+ * Four answers rather than the guide's two, because § 3.3's table was transcribed from a prototype
+ * whose workshop had no draft: every control on it reached its toy simulator, so *unsaved changes
+ * travel with the run* and *nothing changed yet* were the only two states that existed. This build
+ * has a third field class — `viewer.dispatcherSpec` is `latent`, and `dev/state.ts#drivingProfileOf`
+ * composes the run from the other three and never from it — so the two-cell table cannot describe
+ * two of the four states a player can actually produce. That is `WORKSHOP_COPY.libraryHeading`'s
+ * situation exactly (the prototype's panel offers six styles, this build ships thirteen), and it is
+ * answered the same way: the guide's own sentences are kept and drawn where they are true, and this
+ * build adds the ones its own shape needs.
+ *
+ * - `nothing` — no write is standing. The guide's *Nothing changed yet.*
+ * - `travels` — every standing write reaches the run. The guide's *Unsaved changes travel with the
+ *   run.*, drawn where it is a true sentence.
+ * - `draft-only` — the only standing writes are the draft's, so the next run is the run the player
+ *   would have got having touched nothing.
+ * - `split` — both, and the reason this is four answers rather than three: either sentence above
+ *   would be half right about edits a player made in one sitting, and half right is what
+ *   GitHub issue #296 was.
+ *
+ * Named rather than derived, on `scope/commitment.ts#COMMITMENTS`' own rule: a fifth answer is a
+ * compile error at every exhaustive `switch` over this union, while a fifth *field* is caught by
+ * {@link WORKSHOP_WRITES}' both-directions assertion instead.
+ *
+ * `DECISIONS.md` § D386 is the decision — including why the disclosure was chosen over wiring the
+ * draft, which GitHub issue #296's first criterion also allowed.
+ */
+export const WORKSHOP_REACHES = Object.freeze([
+  'nothing',
+  'travels',
+  'draft-only',
+  'split',
+] as const);
+
+export type WorkshopReach = (typeof WORKSHOP_REACHES)[number];
+
+/**
+ * Whether one of {@link WORKSHOP_WRITES} reaches a run — decided by `scope/surface.ts`, not here.
+ *
+ * This indirection is the whole point of the function and the reason it is not four booleans
+ * written inline at the call site. A sentence about what a control reaches is a claim about the
+ * code, and this repository's standing rule is that such a claim is pinned by a run and never by
+ * another sentence — § D227, the traffic editor's *mean group size* refusal that stayed on screen
+ * for every wave after the seam went live. `scope/surface.ts` is the one table that answers *what
+ * does moving this reach*, `scope.test.ts` decides its `control` rows by running both arms and
+ * comparing the legs, and `scope/commitment.ts#commitmentOf` is the reader. So a note indexed
+ * through here inherits that pinning: the day GitHub issue #228 gives the draft a way across and
+ * `viewer.dispatcherSpec` stops being `latent`, this answer changes itself and the bar stops saying
+ * the weights stay behind.
+ *
+ * `undefined` — an `output`, or a key the table does not carry — counts as **not reaching**, and
+ * the direction is chosen rather than defaulted. The failure being guarded is a bar that promises
+ * an edit travelled, so an answer the scope table cannot give must not become that promise;
+ * `surface.test.ts` makes the second cause impossible for a field that exists.
+ */
+export function workshopWriteReachesRun(key: WorkshopWrite): boolean {
+  const commitment = commitmentOf(key, 'writes-only');
+  return commitment === 'next-run' || commitment === 're-runs-now';
+}
+
+/**
+ * The bar's answer for the set of writes currently standing.
+ *
+ * Takes the moved keys rather than the four models, so the arithmetic deciding *moved* stays beside
+ * the host that owns each field and this stays a pure statement about reach.
+ * `workshopTravel.test.ts` supplies every subset, and requires the answer to agree with a
+ * measurement on the legs for each one a player can reach with a single control.
+ */
+export function workshopReachOf(moved: Iterable<WorkshopWrite>): WorkshopReach {
+  let travels = false;
+  let stays = false;
+  for (const key of moved) {
+    if (workshopWriteReachesRun(key)) travels = true;
+    else stays = true;
+  }
+  if (travels && stays) return 'split';
+  if (travels) return 'travels';
+  return stays ? 'draft-only' : 'nothing';
 }
