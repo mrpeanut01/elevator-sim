@@ -492,29 +492,50 @@ function audit(): Audit {
  * opposite of the truth). Twenty-seven are public surface, recorded above with the reason each is
  * surface rather than behaviour.
  *
- * These seven are neither. Each is exported, each has a test, and **none has a caller in any
+ * The entries below are neither. Each is exported, each has a test, and **none has a caller in any
  * shipped path** — the exact shape CLAUDE.md's standing requirement describes, and the shape that
  * has landed eleven times here. They are listed rather than deleted because disposition is a
  * decision per symbol — wire it, or delete it with its test — and this audit's deliverable is the
  * classification. `viz`'s fifth audit worked the same way: it classified eight, and a later lane
  * closed all eight.
  *
- * The sharpest is the replay pair. CLAUDE.md invariant 5 is *"every persisted run record carries
- * its seed, so any run replays exactly"*, and `metrics/index.ts` documents the round trip in a
- * worked example — `writeFileSync(path, serializeRunRecord(record))` then
- * `new StreamSet(runSeed(parseRunRecord(...)))`. **`parseRunRecord` has a real caller and the other
- * two do not**: `experiments/reports/persistence.ts` writes through `serializeRunSet`, and the
- * singular-record writer it superseded is reachable only from its own tests. The reader half of a
- * documented round trip is wired and the writer half is not.
+ * **This paragraph carries no count, and that is deliberate.** It opened as *"these seven"*, went on
+ * saying seven after `car/stopFloorsOf` acquired a caller and left the register at six, and was
+ * still saying it when the next lane arrived — a number in prose beside a number in code, only one
+ * of which a test can fail on. `RISKS.md` R38. The count lives in the assertion below, which is the
+ * only copy that ratchets; anything reading this comment for a total should read
+ * `Object.keys(DEAD_CANDIDATES).length` instead.
  *
- * Four more have no reference anywhere outside their own file — not even a test that is not their
+ * **The register's sharpest pair — `metrics/serializeRunRecord` and `metrics/runSeed` — is closed,
+ * by deletion, and the finding that closed it is worth more than the disposition
+ * (`DECISIONS.md` § D395, GitHub issue #175).**
+ *
+ * The entry read: invariant 5 is *"every persisted run record carries its seed, so any run replays
+ * exactly"*, `metrics/index.ts` documented that round trip in a worked example, and the reader half
+ * was wired while the writer half was not. Two things about that were wrong.
+ *
+ * The stated reason was stale. It said *"persistence.ts writes through `serializeRunSet` instead"*,
+ * which reads as *a shipped path writes, just not through this symbol*. Nothing writes a run record
+ * on a shipped path at all: `createStoredRun`, `serializeRunSet`, `writeRunSetFile` and
+ * `appendRunToFile` are reachable only from tests, which `experiments/reports/types.ts` already says
+ * of `createStoredRun` in as many words. (The *reading* half is not in that state and the two are
+ * not lumped together: `validation/goldenChild.ts` is a bare-`node` executable rather than a
+ * `.test.ts` file, and it calls `readRunSetFile` and `replaySimulationConfig` for real.) The
+ * register was right that the two symbols were dead and wrong about what surrounded them.
+ *
+ * And the worked example was false. `new StreamSet(runSeed(parseRunRecord(...)))` was annotated
+ * `// replays exactly`; it builds a stream set and replays nothing, because a `RunRecord` names no
+ * demand template, no duration, no demand or dispatcher overrides, and its `buildingId`,
+ * `dispatcherProfileId` and `trafficProfileId` are optional. So the pair was not the writer half of
+ * a replay round trip — it was the whole of a round trip that was never a replay, and the two
+ * symbols existed only to spell it. Wiring them would have meant inventing a caller for a claim
+ * that had to be withdrawn either way. Invariant 5 is discharged in `experiments/reports`, both
+ * clauses, and is not weakened by their absence.
+ *
+ * What is left has no reference anywhere outside its own file — not even a test that is not its
  * own: `DEFAULT_DEPARTURE_GAP_S`, `legDurations`, `SIM_EVENT_TYPE_IDS`, `configError`.
  */
 const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
-  'metrics/serializeRunRecord':
-    'the writer half of the documented replay round trip; persistence.ts writes through serializeRunSet instead',
-  'metrics/runSeed':
-    'turns a stored seed back into the bigint StreamSet wants; named in the round-trip example, called by no shipped path',
   'metrics/DEFAULT_DEPARTURE_GAP_S': 'no reference outside its own file',
   'metrics/legDurations': 'no reference outside its own file',
   'sim/SIM_EVENT_TYPE_IDS': 'no reference outside its own file',
@@ -566,11 +587,23 @@ describe('every export of the fourteen audited core modules has a caller or a st
    * **7 → 6**, and this is the direction the comment above hopes for: `car/stopFloorsOf` acquired
    * a non-test caller when `Car.divertFrontier` needed the shaft's route nodes in travel order
    * (`DECISIONS.md` § D205). Closed by being used, not by being deleted or re-argued.
+   *
+   * **6 → 4**: `metrics/serializeRunRecord` and `metrics/runSeed`, closed the other way — deleted
+   * with the claim they existed to spell (`DECISIONS.md` § D395). Both dispositions the paragraph
+   * above offers have now been exercised, which is what stops the register reading as an
+   * allowlist.
    */
   it('names every dead candidate, and the count is the one recorded', () => {
     const open = uncalled.filter((symbol) => symbol.key in DEAD_CANDIDATES);
     expect(open.map((symbol) => symbol.key).sort()).toEqual(Object.keys(DEAD_CANDIDATES).sort());
-    expect(open.length, 'dispose a candidate and lower this number; never raise it silently').toBe(6);
+    // The literal is the ratchet and must stay a literal: the assertion above pins the *set*, so
+    // `Object.keys(DEAD_CANDIDATES).length` here would be a tautology and a seventh entry would
+    // land silently. The register's own size goes in the message instead, where it is derived and
+    // cannot drift — R38 again, in the one place a count is allowed to be computed.
+    expect(
+      open.length,
+      `dispose a candidate and lower this number; never raise it silently. DEAD_CANDIDATES currently holds ${Object.keys(DEAD_CANDIDATES).length}`,
+    ).toBe(4);
   });
 
   it('keeps the allowlist honest: no entry may outlive the condition that justified it', () => {

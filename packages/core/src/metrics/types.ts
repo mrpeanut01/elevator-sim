@@ -663,14 +663,22 @@ export interface CarTimings {
 /**
  * Everything one replication produced, and the seed that produced it.
  *
- * **CLAUDE.md invariant 5 lives on this type.** {@link seed} is not optional and is not a
- * convenience: it is what lets a stored record be replayed bit-for-bit
- * (`new StreamSet(runSeed(record))`), and `parseRunRecord` rejects a record without one
- * rather than loading a dataset nobody can reproduce.
+ * **CLAUDE.md invariant 5's first clause lives on this type.** {@link seed} is not optional and
+ * is not a convenience: it is what makes the run this record describes reproducible at all, and
+ * `parseRunRecord` rejects a record without one rather than loading a dataset nobody can
+ * reproduce.
  *
  * The seed is a **decimal string** because it is a 64-bit unsigned value: `bigint` does not
- * survive `JSON.stringify`, and `number` silently loses precision above 2^53. `runSeed()`
- * converts it back.
+ * survive `JSON.stringify`, and `number` silently loses precision above 2^53. `BigInt()`
+ * converts it back, on a record `parseRunRecord` has already checked.
+ *
+ * **The invariant's second clause — *"so any run replays exactly"* — is not discharged here, and
+ * this type used to imply that it was.** The docstring read *"it is what lets a stored record be
+ * replayed bit-for-bit (`new StreamSet(runSeed(record))`)"*, which builds a stream set and
+ * replays nothing: a record names no demand template, no duration, no demand or dispatcher
+ * overrides, and its {@link buildingId}, {@link dispatcherProfileId} and {@link trafficProfileId}
+ * are all optional. The replay is `experiments/reports/replay.ts`, off the envelope
+ * `createStoredRun` writes around this record. `DECISIONS.md` § D395.
  *
  * **The seed alone stopped being sufficient in wave 13, and this type says so rather than
  * assuming it.** A run may now separate the crowd from the machine ({@link trafficSeed}) and may
@@ -767,7 +775,7 @@ export interface RunRecord {
    * building* — Vertical City's eight double-deck shuttles run as single-deck cars, so every
    * round-trip time, interval and handling capacity stored here is for a machine nobody
    * configured. A run whose record does not carry that is a record that reads as modelled, and
-   * `serializeRunRecord` is `JSON.stringify(record)`: without this field the statement reached
+   * a record is persisted by `JSON.stringify`: without this field the statement reached
    * `SimulationResult.warnings` in memory and the console, and nothing that outlived the
    * process.
    *
@@ -824,20 +832,19 @@ export interface RunRecord {
   readonly metadata?: Readonly<Record<string, string | number | boolean>> | undefined;
 }
 
-/**
- * The master seed as a `bigint`, ready for `new StreamSet(...)`.
+/*
+ * There is no `runSeed(record)` accessor here, and there was one until `DECISIONS.md` § D395.
  *
- * @throws MetricsError if the stored seed is not a non-negative decimal integer — an
- *   unreplayable record is a broken record, not a record with a cosmetic flaw.
+ * It re-tested {@link RunRecord.seed} against the decimal-integer regex and returned
+ * `BigInt(record.seed)`. It never had a caller outside its own tests, because every shipped path
+ * that needs the seed as a `bigint` reaches it through a record that has already been
+ * validated — `parseRunRecord` refuses a seed this regex would reject, `reports/schema.ts`
+ * applies the same regex to the envelope, and `parseStoredRun` refuses a file whose two copies
+ * disagree. `replaySimulationConfig` writes `BigInt(config.seed)` and says why in its own
+ * docstring. A fourth guard on a thrice-guarded value reads as the conversion's owner and is not
+ * one; a call inserted to give it a caller would have been the `{@link}`-looks-like-a-caller
+ * defect with the polarity reversed.
  */
-export function runSeed(record: Pick<RunRecord, 'seed' | 'runId'>): bigint {
-  if (!/^\d+$/.test(record.seed)) {
-    throw new MetricsError(
-      `Run "${record.runId}" carries seed "${record.seed}", which is not a decimal integer. Every run record must carry the seed that produced it (CLAUDE.md invariant 5) or it cannot be replayed.`,
-    );
-  }
-  return BigInt(record.seed);
-}
 
 /* -------------------------------------------------------------------------- *
  * Saturation
