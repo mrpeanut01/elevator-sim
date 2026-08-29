@@ -377,8 +377,10 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * `benchScreen.ts`'s checkbox handler, `fixitScreen.ts`'s repair card, and seven others. Driven
    * against the **built bundle** at `375×667`, ticking one bench checkbox took the region from
    * `1 518` to `86` — **1 432 px gone** — and put the control the player had just clicked
-   * **1 303 px** below where their finger still was. On the fix-it card the same interaction could
-   * not be driven to completion at all: the button kept moving out from under the pointer.
+   * **1 303 px** below where their finger still was. At `1280×800` the same press at offset 400
+   * lost the whole **400 px**, and a fix-it repair card at offset 700 moved the region **283 px**
+   * the other way; the issue reported the desktop viewport as a `0 px` row, and that row is an
+   * artefact of measuring from the top rather than a fact about the viewport.
    *
    * ## Why it is the *focus* teardown and not the emptying, which matters for the fix
    *
