@@ -24620,6 +24620,26 @@ the honesty corpus**: `honesty/surfaces.ts` drives fifteen other `stageScreenMod
 one. A chip face nothing sweeps can lie indefinitely. Adding it was outside the lane's scope and is the
 real fix for the class; until then this is a label pinned by one test rather than by the search.
 
+**Closing note (2026-08-29, GitHub issue #286).** The gap above is closed: `EVERYDAY_STAGE` seeds all
+seven chip faces, so the search reads them. **Seeded and deliberately not in that adapter's `covers`**,
+on `#stageCarReadoutOf`'s ground — `derive.test.ts` derives a text producer from *prose*, two adjacent
+alphabetic words, and a chip face is `1×`, so `STAGE_SPEEDS` is in no derived set and a `covers` entry
+would be a declaration the derivation cannot find. The reason is recorded at the seed rather than the
+guard being loosened to admit it.
+
+**Say what it buys, because it is less than this paragraph implies.** It would **not** have caught the
+defect this decision fixed. No honesty property compares a label to the multiplier behind it, and none
+can: the ten are predicates over rendered strings and the multiplier is not one. What being in the
+corpus buys is that a chip which acquires a *word* is swept from that day. The label-equals-ratio rule
+is still `stageScreenModel.test.ts`'s alone — *a label pinned by one test rather than by the search*
+remains true, and the sentence is left standing rather than deleted for that reason.
+
+**The other half of that finding turned out to be the larger one.** Three sentences *about* this
+ladder went stale with it, one of them a string a player reads — and that string was in the corpus the
+whole time, on the build-information panel. Being swept is not being checked. See
+`everyday/stageLadderClaims.test.ts`, which re-derives the documents' claims from `STAGE_SPEEDS`, and
+`settingsView.ts#SETTINGS_ABSENCES`, which interpolates the count rather than stating it.
+
 ---
 
 ---
