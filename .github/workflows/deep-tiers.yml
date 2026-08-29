@@ -157,16 +157,19 @@
 # |---|---|---|
 # | `fuzz-deep` (250 cases) | 20.5 min, **RED** — a real counterexample, issue #305 | 60 |
 # | `golden-runs` (6 of 6, cross-process) | 55.6 s, green | 90 |
-# | `perf-sweep` (20 000 replications, workers) | 4.6 min, green | 180 |
+# | `oracle-campaign` (11 banks at n = 128) | 5.5 min, green | 120 |
 # | `matrix-census` (200 replications) | 17.0 min, **RED** — three declared figures do not reproduce, issue #306 | 120 |
+# | `perf-sweep` (20 000 replications, workers) | 4.6 min, green | 180 |
+# | `perf-scaling` (the wall-clock fits) | 26.9 s, green | 90 |
 # | `honesty-deep` (60 cases) | **32.6 min green alone**; 43.9 min and *timed out* when contended | 90 |
 #
-# **Two of the five run came back red, and they are two different kinds of thing.** `fuzz-deep` found
-# a counterexample. `matrix-census` found that declared statistical parameters no longer reproduce
-# from the census they were derived from — the sharpest possible answer to *"what was this tier
-# for?"*, since those ceilings bound every interval the experiment matrix publishes.
+# **Seven of the nine were run while wiring this file. Two came back red, and they are two different
+# kinds of thing.** `fuzz-deep` found a counterexample. `matrix-census` found that declared
+# statistical parameters no longer reproduce from the census they were derived from — the sharpest
+# possible answer to *"what was this tier for?"*, since those ceilings bound every interval the
+# experiment matrix publishes.
 #
-# Reporting those as one number — *"2 of 5 failing"* — would say the same thing about a defect and a
+# Reporting those as one number — *"2 of 7 failing"* — would say the same thing about a defect and a
 # stale baseline, which is the mistake this repository makes a rule about. The table names the kind
 # beside each figure for that reason, and so does the `report` job's issue body.
 #
@@ -174,8 +177,17 @@
 # quoted with their conditions.** Sharing the container with two other tiers it timed out; alone it
 # passes. Alone is this job's condition — one tier per job, one runner each — so the first number
 # would have shipped a job believed red by construction on the strength of how it was measured. The
-# other four figures above were also taken under contention, so read them as ceilings on the cost
+# other figures above were taken under varying contention, so read them as ceilings on the cost
 # rather than as the cost.
+#
+# **`perf-scaling` came back green, which is worth saying because it is the one expected not to.**
+# Its own note records a flake under concurrent load (*"expected 0.887 to be greater than 0.9"*), and
+# it is the tier whose assertions are about a machine rather than about the simulator. One green run
+# is not evidence that it is stable — it is one draw from the distribution the note describes.
+#
+# **Two were not run: `collective-adoption` and `corpus-figures`.** The first documents a four-hour
+# invocation, which is a Sunday's work rather than a lane's. The second is § D343's measurement, and
+# taking it was explicitly not this lane's job — building it somewhere to happen was.
 #
 # The sweep is the interesting row: its own `it` allows two hours and it finished in under five
 # minutes, because it is the one tier that runs with `parallel: { mode: 'workers' }`. The ceiling is

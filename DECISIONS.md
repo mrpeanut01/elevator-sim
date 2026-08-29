@@ -26469,15 +26469,23 @@ a stale statistical baseline. *"Two of five failing"* says the same thing about 
 the workflow's timing table names the kind beside each figure — and why the third apparent red is
 reported above as a measurement condition rather than counted here.
 
-**Also measured here, both green:** `golden-runs` at 6 of 6 goldens including the cross-process
-replay (24 tests, 55.6 s), and `perf-sweep`'s full **20 000-replication sweep** (5 tests, 4.6 min
-with workers) — which is #163's acceptance clause *"the seed-collision check has run at least
-once"*, discharged locally rather than left to the first Sunday. Every one of the ten workflow
-invocations was also shown to open its gate. The remaining four tiers —
-`oracle-campaign`, `matrix-census`, `collective-adoption`, `perf-scaling` — are named in the
-workflow and **were not run by this lane**, which is stated rather than implied: a tier nobody
-measured is a tier whose first result arrives on a Sunday, and a ceiling nobody tested is a guess
-with a number on it.
+**Seven of the nine were run, and four came back green:** `golden-runs` at 6 of 6 goldens including
+the cross-process replay (24 tests, 55.6 s); `oracle-campaign`, `CLAUDE.md`'s correctness oracle at
+full width, 11 banks at n = 128 (3 tests, 5.5 min); `perf-scaling` (9 tests, 26.9 s); and
+`perf-sweep`'s full **20 000-replication sweep** (5 tests, 4.6 min with workers) — which is #163's
+acceptance clause *"the seed-collision check has run at least once"*, discharged here rather than
+left to the first Sunday.
+
+**`perf-scaling`'s green is worth naming because it is the tier expected not to be.** Its own note
+records a flake under concurrent load, and its assertions are about a machine rather than about the
+simulator. One green run is one draw from the distribution that note describes, not evidence of
+stability, and it is reported that way.
+
+**Two were not run, and are named rather than implied.** `collective-adoption` documents a four-hour
+invocation, which is a Sunday's work rather than a lane's. `corpus-figures` is [§ D343](#d343)'s
+measurement, and taking it was explicitly not this lane's job — building it somewhere to happen was.
+A tier nobody measured is a tier whose first result arrives on a Sunday, and a ceiling nobody tested
+is a guess with a number on it.
 
 **What is not claimed.** No corpus figure is published; [§ D343](#d343) takes that once, after
 integration, and this lane's job was to build the measurement a place to happen rather than to take
