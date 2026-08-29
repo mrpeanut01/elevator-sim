@@ -395,27 +395,45 @@ describe('a registered vitest project that runs nowhere — GitHub issue #142', 
  * a simulation is allowed to say so, and removing them would make them depend silently on a line in
  * another file.
  */
-describe('a project that simulates declares a timeout a simulation fits in', () => {
+describe('a project whose tests do not fit the 5 s default declares a timeout they do', () => {
   /**
    * The floor, in milliseconds. See the docstring above for its provenance — it is 2.4× the slowest
    * test measured over a full run, and deliberately below the value the config sets.
    */
   const FLOOR_MS = 120_000;
 
-  /** The projects whose tests run real simulations. `viz` today; `core` is § D331's open question. */
-  const SIMULATING = ['viz'];
+  /**
+   * The projects whose tests do not fit vitest's 5 000 ms default — GitHub issue #149, § D394.
+   *
+   * `core` and `server` joined `viz` when § D331's open question was answered. The name is kept
+   * because § D331 and § D361 both cite the constant it mirrors, and because simulating is what
+   * the majority of the covered tests do — but `server`'s membership is **over-determined**, and
+   * that is the part worth reading. Four of its thirteen test files reference a simulation entry
+   * point; the file that was actually reported failing three times at 5 000 ms under load,
+   * `store/store.test.ts`, is **not one of them**. It boots a whole PostgreSQL-in-WebAssembly per
+   * fixture. So the pattern this list's own survey is written in would have missed the one file
+   * with a reproduction behind it, which is a second argument for the project-level default over
+   * anything derived per site.
+   *
+   * `experiments` and `cli` are absent on purpose: neither has been reported failing at the
+   * default, and adding them on the strength of a measurement taken for a different question is
+   * the change § D331 refused to make.
+   */
+  const SIMULATING = ['viz', 'core', 'server'];
 
-  it('gives every simulating project room for its slowest test, and not the 5 s default', async () => {
+  it('gives every listed project room for its slowest test, and not the 5 s default', async () => {
     const projects = await registeredProjects();
     for (const name of SIMULATING) {
       const project = projects.find((entry) => entry.name === name);
       expect(project, `vitest.config.ts registers no project named ${name}`).toBeDefined();
       expect(
         (project as Registered).testTimeout ?? 5_000,
-        `the ${name} project runs real simulations and its tests must not inherit vitest's 5 000 ms ` +
-          'default. Roughly ninety of them call recordRun, runSimulation or legsOf and pass no ' +
-          'timeout of their own, so removing `testTimeout` from this project does not fail here — ' +
-          'it fails later, on somebody else’s busy machine, as a flake. See § D331.',
+        `the ${name} project holds tests that do not fit vitest's 5 000 ms default under load, so ` +
+          'it must not inherit it. Most of them call recordRun, runSimulation or legsOf and pass no ' +
+          'timeout of their own; the one file with a reproduced timeout behind it boots a database ' +
+          'and calls none of those, which is why this is a project-level default and not a survey. ' +
+          'Removing `testTimeout` from this project does not fail here — it fails later, on ' +
+          'somebody else’s busy machine, as a flake. See § D331 and § D394.',
       ).toBeGreaterThanOrEqual(FLOOR_MS);
     }
   });

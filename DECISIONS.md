@@ -26285,3 +26285,132 @@ integration. The full ladders above are reported once and are not all re-run per
 holds the two rungs the sentence rests on, the Midtown endpoint, and the sentence itself.
 
 ---
+
+## D394 — `core` and `server` take the simulating project's timeout, and the file that forced it simulates nothing
+
+**Date: 2026-08-29 · Owner: Lane B, wave G · Closes: GitHub issue #149. Discharges the debt
+[§ D361](#d361) recorded and answers the question [§ D331](#d331) left open.**
+
+**Decision.** `vitest.config.ts` passes `SIMULATING_TIMEOUT_MS` to `project('core')` and
+`project('server')`. `experiments` and `cli` stay on vitest's 5 000 ms default. `SIMULATING` in
+`dev/browserTier.test.ts` gains both names, so removing either declaration fails on the commit that
+does it.
+
+### The trade is § D331's and is not re-argued
+
+The only cost is **failure latency**: a genuinely hung pure-function test now takes five minutes to
+fail instead of five seconds. § D331 weighed that and paid it, because a hang is a bug found once
+and fixed while a 5 s ceiling under load is a false red that recurs forever and teaches people to
+re-run the suite rather than read it. Nothing about that argument was ever specific to `viz`. What
+§ D331 refused was not the reasoning but the *evidence*: its survey was taken over `packages/viz/src`
+for issue #144, and widening on the strength of a measurement taken for a different question is the
+move this repository keeps having to undo. The evidence has since arrived, so the omission is closed
+rather than restated.
+
+### Re-derived on this tree rather than inherited
+
+Issue #149's own comment measured on `main` at `2c7b308`; the brief that dispatched this lane quoted
+figures from `f13d455`. Both are re-derived here on `0cd422a`, with the pattern the issue prescribes
+(`runSimulation` / `new Simulation` / `.run()` / `legsOf` / `recordRun` / `runBatch`):
+
+| | `core` | `server` | `viz`, for scale |
+|---|---|---|---|
+| test files | 112 | 13 | 232 |
+| files referencing a simulation entry point | **43** | **4** | 91 |
+| `it()` openers in those files | **628** | **115** | 2 034 |
+
+`core`'s 43 / 628 reproduces the brief exactly.
+
+**The annotation column did not reproduce and is published as a refutation.** The brief said
+**283 explicit annotations**; three counting rules over the same tree give **268**, **272** and
+**243**, and the only figure near 283 is **287**, which is the count over all 112 `core` test files
+rather than the 43 the survey scopes. The number is not wrong so much as **undefined**: it moves by
+±40 depending on whether hook timeouts count, whether the scope is the surveyed files or the
+package, and whether a multi-line closer is matched. So *"`core` is protected by N annotations"* is
+not a quantity anybody should quote, and this section deliberately does not add a fourth value to
+the pile. What matters is the shape, which every rule agrees on: **most cases in the surveyed files
+carry no timeout of their own.**
+
+### The exposure was confirmed by running it, not by reading the config back
+
+`browserTier.test.ts` reads `vitest.config.ts`'s exported object, which is the config's own opinion
+of itself. That is the right instrument for drift and the wrong one for *"does the default actually
+reach these tests?"*. So an unannotated six-second case was put in each project and run: both
+reported `Test timed out in 5000ms` before the change and passed after it. The probes were deleted;
+they exist in this record rather than in the tree.
+
+### The file that forced the change references no simulation entry point
+
+`packages/server/src/store/store.test.ts` holds **43 `it()` cases and zero per-case timeout
+annotations**, and it is the only file in the repository with a *reproduced* timeout behind it —
+§ D361 got 11, 12 and 6 failures across three concurrent `--project server` runs of a green tree,
+every one `Test timed out in 5000ms`, every one in that file. It matches **none** of the six
+patterns above. It boots PostgreSQL-in-WebAssembly per fixture.
+
+**So the survey issue #149 asks for would have missed the one case with evidence.** That is a
+second, independent argument for the project-level default, and it is stronger than the first:
+§ D331 rejected a static per-test check because it could not tell *runs a simulation* from *reads a
+recording module scope already ran*. This is the other direction — a file that is slow for a reason
+the vocabulary does not contain. A survey can only find what its pattern is written in.
+
+`server`'s membership is therefore **over-determined**: four of its files simulate *and* one of the
+other nine has already failed. `core`'s rests on the survey plus § D331's own 8-over-5 s measurement.
+
+### `SIMULATING` keeps its name, and so does the constant
+
+`SIMULATING_TIMEOUT_MS` is cited by name in § D331 and § D361, which are dated records rather than
+prose to be rewritten; renaming it would strand both sentences. The list keeps its name for the same
+reason and because simulating is still what most of the covered tests do. The place the name is
+narrower than the property — `store.test.ts` — is written into the docstring at both sites instead,
+which is the honest version of a name that has outgrown itself. The `describe` title *is* changed,
+because it renders in test output and *"a project that simulates declares a timeout a simulation
+fits in"* would have been a false sentence read aloud on every run.
+
+### `experiments` and `cli` are left out, and that is the same rule applied twice
+
+`experiments` holds `benchmark/`, `oracle/` and the validation matrix — the heaviest simulating
+suites here — and is now the only package of that weight on the default. It stays there because no
+`experiments` test has been *reported* failing at it, and adding it on the strength of a measurement
+taken for `core` would be § D331's refused move with the polarity flipped. Its two matrix files
+annotate every hook and every case themselves and say why. If one is reported flaking, this section
+is the precedent for closing it — not a reason it is already closed.
+
+### The duration headline was deliberately not re-measured
+
+Issue #149's *8 tests over 5 s, slowest 39.2 s* stands as measured on `integration/issue-wave-18`.
+This lane ran at load average **10.26 on 4 cores**, and a duration distribution taken under that is
+not a refresh of that figure — publishing it as one would be the per-branch-figure defect `CLAUDE.md`
+records five times and `RISKS.md` R38 tracks. The 2026-08-26 comment refused the same measurement for
+the same reason and was right to.
+
+### Verified by mutation, four ways, and the vacuity control is the interesting one
+
+Each name in `SIMULATING` was removed from the config in turn, and the floor was probed once:
+
+| mutation | vitest exit | result |
+|---|---|---|
+| `core` loses `testTimeout` | 1 | `expected 5000 to be greater than or equal to 120000` |
+| `server` loses `testTimeout` | 1 | same, naming `server` |
+| `viz` loses `testTimeout` | 1 | same, naming `viz` |
+| `core` set to `30_000`, below the floor | 1 | `expected 30000 to be greater than or equal to 120000` |
+
+Run unfiltered over the whole file, the `core` mutation reports **1 failed | 10 passed (11)** against
+a baseline of **11 passed (11)**: the case count is unchanged, so the mutation broke an assertion
+rather than removing a case from scope.
+
+**And in all four, the non-vacuity control passed.** *"names a project that exists, so the list above
+cannot rot into a no-op"* is green on every run in which the thing it guards is broken — which is the
+point of recording it. A guard can satisfy its own vacuity check and still not be the thing that
+detects the defect; here the two cases are genuinely independent, and only the first one fails.
+
+### What is not claimed
+
+That the list cannot shrink. Deleting a name from `SIMULATING` *and* its timeout from the config in
+one commit passes both cases, and no test can close that: the list encodes the judgement § D331
+established no static check can make. Inverting it — *every registered project declares a timeout
+unless listed exempt* — was considered and refused, because it turns adding a project into a red
+suite, and this change's whole value is that it cannot redden anything.
+
+No corpus count is published — [§ D343](#d343) takes that once, after integration.
+
+---

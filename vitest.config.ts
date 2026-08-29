@@ -61,6 +61,17 @@ const alias = {
  * A per-test static check was **considered and rejected as the mechanism** — see § D331. A
  * name-level call graph produced 1 881 false positives, and even a correct one cannot tell a test
  * that runs a simulation from one that reads a recording module scope already ran.
+ *
+ * ## It is three projects now, and the name is kept on purpose — § D394, GitHub issue #149
+ *
+ * `core` and `server` take the same constant. The name still says *simulating* because § D331 and
+ * § D361 both cite it by that name and those are dated records, not prose to be rewritten; and
+ * because it is still what the majority of the covered tests do. The one place the name is narrower
+ * than the property is worth knowing rather than renaming around: `packages/server/src/store/
+ * store.test.ts` boots a whole PostgreSQL-in-WebAssembly per fixture and **references no simulation
+ * entry point at all**, yet it is the file whose three `accounts` cases were reported timing out at
+ * 5 000 ms under load. The property this constant serves is *does not fit vitest's default on a
+ * loaded machine*; simulating is its commonest cause and not its only one.
  */
 const SIMULATING_TIMEOUT_MS = 300_000;
 
@@ -85,16 +96,30 @@ export default defineConfig({
     passWithNoTests: true,
     projects: [
       /*
-       * `core` measures the same way `viz` does — 8 tests over 5 s, slowest **39.2 s** — so it has
-       * the same exposure and is covered today only by its own explicit annotations. It is left on
-       * vitest's default **deliberately and not by oversight**: issue #144 reported flakes in `viz`
-       * and the survey that justified the number above was taken over `packages/viz/src`, so
-       * widening to `core` here would be a change nobody has evidence for yet. Filed rather than
-       * done, so the next person meets a decision instead of a divergence.
+       * `core` and `server` take the same constant as `viz` — GitHub issue #149, § D394.
+       *
+       * The comment that used to stand here said `core` was left on vitest's default *deliberately
+       * and not by oversight*, because the survey justifying the number above was taken over
+       * `packages/viz/src` and widening on the strength of a measurement taken for a different
+       * question would be evidence-free. That was the right call in § D331 and the evidence has
+       * since arrived, so the omission is closed rather than restated.
+       *
+       * Re-derived on this tree rather than inherited: **43 of `core`'s 112 test files reference a
+       * simulation entry point, holding 628 `it()` openers**, which is materially larger than the
+       * ~82 across 23 files the `viz` survey found. `server` is the sharper case — four of its
+       * thirteen test files simulate, and the file that actually failed is not one of them.
+       *
+       * Both projects were confirmed on this tree to resolve to the 5 000 ms default empirically,
+       * by running an unannotated six-second case in each and reading vitest's own
+       * `Test timed out in 5000ms`, rather than by reading this object back.
+       *
+       * `experiments` and `cli` are left alone, and that is a measurement rather than an omission:
+       * neither has been reported failing at the default, and adding them would be this section's
+       * own rejected argument with the polarity flipped.
        */
-      project('core'),
+      project('core', SIMULATING_TIMEOUT_MS),
       project('experiments'),
-      project('server'),
+      project('server', SIMULATING_TIMEOUT_MS),
       project('cli'),
       project('viz', SIMULATING_TIMEOUT_MS),
       /*
