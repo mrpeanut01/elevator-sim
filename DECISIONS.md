@@ -25869,7 +25869,6 @@ roughly one string per case per tier, and **an expected rise is a warning, not a
 distinction this repository has recorded five times.
 
 ---
-
 ## D386 — the Workshop discloses which of its writes travel, and the guide's two-cell note becomes four
 
 **Rules on:** GitHub issue #296. Settles `everyday/workshopScreen.ts#workshopBar`,
@@ -25943,6 +25942,125 @@ explanation of a design. Everyday Mode still has **no way to hand a draft over**
 #167, and `WORKSHOP_COPY.yoursEmpty` now says where a save comes from instead of promising a landing
 place. The corpus is **not re-measured** here and no string, surface or case count is published —
 [§ D343](#d343) takes that measurement once, after the wave integrates.
+
+## D388 — the screen region keeps its offset across an in-place re-render, and the shell holds it
+
+**Rules on:** GitHub issue #298. Settles `everyday/shell.ts#keepScrollAcrossRerender`, the last two
+lines of `everyday/shell.ts#go`, and `everyday/rerenderScroll.browser.test.ts`.
+
+**Decision.** The **shell** keeps the scroll offset across a screen's in-place re-render, for every
+screen mounted into `.everyday-screen`. A player action inside the region snapshots both scrollers; the
+first mutation batch after it restores them and disarms; everything else — an async run landing, a host
+connecting, the stage's per-frame figure redraw — passes through an unarmed keeper that reads no layout.
+`go` clears the arming with the offset it resets, because a navigation is a deliberate move.
+
+**Why here rather than in the nine screens.** Nine `everyday/` screens rebuild by emptying their own
+root, and three of them belong to other lanes this wave. § 3.1 gives the shell the scroller — one
+region, one screen at a time — so it can hold the invariant once, including for screens nobody has
+written yet. Nine screens each saving and restoring their own offset is nine chances to forget, and
+this defect **is** that argument: it survived seven waves in two files written months apart.
+
+**What the measurement changed about the issue as filed.** Driven against a `vite build` +
+`vite preview` of `dist-web/`, the headline figure reproduces to the pixel — a bench checkbox at
+`375×667` takes the region `1 518 → 86`, **1 432 px**, leaving the pressed control **1 303 px** below
+the finger. Two of the report's other claims do not survive:
+
+- **The stated mechanism is incomplete, and the missing half decides how a case must be written.**
+  *"Emptying the container collapses the scroll height and the browser clamps `scrollTop`"* is true only
+  when something forces a layout while the container is empty, and what forces it is the **focus
+  teardown of the control the player just pressed**. A synthetic `element.click()` focuses nothing and
+  loses **0 px** at every offset measured — six, across both screens, before the fix as well as after.
+  A case built on `element.click()` would have been green on the defect.
+- **`1280×800` is not a control.** The report explains the seven-wave survival by *"at 1280×800 both
+  screens fit"*. They do not: the bench overflows its region by **623 px** there and fix-it by
+  **1 071 px**, and a checkbox pressed at offset 400 loses the whole **400 px**. The reported `0` is an
+  artefact of measuring from the top.
+
+**What is not claimed.** The report's second row — *fix-it repair card, `375×667`, 3 713 px* — was
+**not reproduced, and could not be**: at that viewport the fix-it grid's 288 px left column pushes the
+repair cards to `x = 526` in a region 249 px wide, where each is **30 px wide and 807 px tall** and each
+overlaps its neighbour. `elementFromPoint` at the first card's centre answers `null`, and Playwright
+refuses the press as intercepted. The card is not pressable at `375×667` by any player, before this
+change or after it. That is a **worse** defect than the one filed and it is **GitHub issue #240's**, not
+this one's; it is recorded here rather than fixed. The mechanism is the same one and the keeper covers
+that screen too, demonstrated at `1280×800`, where the same press moved the offset by **283 px**
+unfixed and by **0** fixed.
+
+**The disarm is pinned by `rush`, and the reason is a lesson about the tier.**
+`builtBundle.browser.test.ts` already asserts that a tapped tile lands at the top, through **`fixit`**.
+It does not catch a missing disarm: mutation-tested by deleting those two lines and driving all four
+tiles, `fixit` lands at `0` anyway, because its mount is asynchronous and the incoming screen is a
+single *loading* line at the instant the keeper restores — so the restore clamps to zero for a reason
+that has nothing to do with the disarm. Under the same mutation `rush` lands at `300`, `towers` at
+`300` and `door` at `183`. A case that passes for an accidental reason is a case that reports nothing,
+so the new file asserts the reset through `rush`.
+
+**The observer is connected by the interaction, not at mount, and the tier is what said so.** The
+first landed shape kept a `subtree: true` observer on `.everyday-screen` for the life of the shell.
+It was correct and it cost: `everyday/stageScreen.ts` rebuilds its figure row **every animation
+frame** inside that region, so the observer allocated records and queued a microtask sixty times a
+second through a watched day in order to answer *no* every time. Run as a 16-file sequential batch,
+`everyday/autoFile.browser.test.ts` — nine long, timing-sensitive cases over the stage — failed
+**2 of 9 twice, on different cases each time**, while passing 9 of 9 when run alone. An A/B against
+the base `shell.ts`, same batch, same machine, came back clean apart from the two cases that are
+supposed to fail without the keeper, which is what turned *probably a flake* into *attributable*.
+Connecting on demand takes the idle cost to zero and the batch to **16 files, 104 tests, all green**.
+`subtree` itself cannot be dropped: every screen's own root is a *child* of the region, so a screen
+emptying itself is a subtree mutation and a `childList`-only observer would never see the thing the
+keeper exists for.
+
+---
+
+## D389 — a bench rollup names the rows it speaks for, and the second one is left alone
+
+**Rules on:** GitHub issue #301. Settles `everyday/benchModel.ts#benchTooCloseHeadingOf`,
+`BenchResultView.tooClose`, and the heading `everyday/benchScreen.ts` draws above a cell's rows.
+
+**Decision.** § 12.2's *"Too close to call"* carries its basis: the number of drawn rows it speaks
+for and the number of rows drawn. `benchModel.ts` composes it, `benchScreen.ts` draws it, and
+`BenchResultView` no longer offers a bare list of ids for a renderer to supply words to.
+`batch/report.ts#answerFor` is **not** changed.
+
+**Why.** A cell card draws two rollups with the rows sandwiched between them, and their predicates
+are not exclusive: `Too close to call` fires on `≥ 1` row coming back `unresolved`, and `answerFor`'s
+first branch fires on `≥ 1` row coming back `resolved`. Confirmed on a fixture built for it — one
+measure separating cleanly, the rest a dead tie — which produced **1 resolved, 5 unresolved and 2
+shown** rows, `tooClose` listing the cell, and `answer` reading *"Separated on 1 of the measures
+compared — average wait."* The card opened by saying the comparison was too close to call and closed
+by saying it had separated, and **neither string named its own denominator**. That is this
+repository's *two answers to one question* shape, and its own fix for that shape is to put the basis
+on the figure.
+
+**Why the denominator is the drawn row count.** It is the number of rows between the two rollups, so
+a reader can check it by counting what is in front of them. `batch/report.ts`'s summary sentence
+carries a `total` of its own and is not drawn on this screen; a denominator a reader cannot see is
+the defect again with a bigger number.
+
+**Why `answerFor` is left alone.** It is `batch/report.ts`'s, drawn by the Engineer suite panel and
+the CLI as well as by the bench, and its separated branch already names its subset — the count *and*
+the measures, by label. Changing a shared sentence to close a one-screen contradiction would be a
+wider edit with a narrower reason. `benchModel.test.ts` asserts that branch's wording beside the
+heading, so if it ever stops naming its subset the pair is back to two unqualified claims and the
+case says so.
+
+**What is not changed.** The six verdicts stay on the rows and stay `report.ts`'s own words —
+`unresolved` and `under-budget` are different claims, and one friendly phrase over both would erase
+the difference between *"they are the same"* and *"you did not run enough days to find out"*. The
+guide's phrase survives verbatim at the front of the heading; § 12.2's copy is
+**GitHub issue #211's** to cut, not this lane's.
+
+**The issue's second clause stays refuted, and it is not re-litigated here.** #301 filed and then
+refuted *"the rows all read resolved"* by tracing: `tooCloseCellIds` was computed from
+`rows.some(row => row.verdict === 'unresolved')` and `benchScreen.ts` drew that same array printing
+`${row.label} · ${row.verdict}` verbatim, so at least one drawn row must literally read
+`· unresolved` whenever the heading appears. That trace still holds line for line after this change
+— the selection's predicate is unmoved and only its accompanying words are new.
+
+**What is not claimed.** The corpus is **not re-measured** here and no string, surface or case count
+is published; [§ D343](#d343) takes that measurement once, after the wave integrates.
+`honesty/surfaces.ts`'s bench adapter now seeds the composed heading rather than the bare constant,
+which is the string the player actually reads — the constant is still swept, one block above, as
+copy.
 
 ## D390 — the brief asks the run which building it is about to use, rather than resolving one itself
 

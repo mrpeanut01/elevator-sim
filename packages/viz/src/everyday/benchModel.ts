@@ -316,6 +316,59 @@ export function benchVerdictNoteOf(fieldSize: number): string {
         'figures, and where the tests disagree is the finding.';
 }
 
+/**
+ * One cell whose verdict block has at least one `unresolved` row, and the heading it draws.
+ *
+ * A pair rather than a bare id, and [§ D389](../../../../DECISIONS.md) is why: the id alone left the
+ * screen to supply the words, and the words it supplied said nothing about how many rows they were
+ * about. See {@link benchTooCloseHeadingOf}.
+ */
+export interface BenchTooCloseMark {
+  readonly cellId: string;
+  /** §12.2's heading, carrying the basis it counts. */
+  readonly heading: string;
+}
+
+/**
+ * §12.2's *"Too close to call"*, with the rows it is about and the rows it is not — issue #301.
+ *
+ * ## The defect this closes
+ *
+ * A cell card drew two rollups with the rows sandwiched between them, and **neither named its own
+ * denominator**. Above: *Too close to call*, on `≥ 1` row coming back `unresolved`. Below:
+ * `batch/report.ts#answerFor`, whose first branch fires on `≥ 1` row coming back `resolved` —
+ * *"Separated on 1 of the measures compared — average wait."* Measured on a fixture with one
+ * `resolved` row, five `unresolved` and two `shown`, the card said **both, unqualified**: it opened
+ * by saying the comparison was too close to call and closed by saying it had separated.
+ *
+ * Each rollup was true of the subset it counted. What neither said is *which subset* — so the two
+ * read as answers to one question rather than as answers to two. This repository's own fix for that
+ * shape is to **put the basis on the figure**, and this is that: the heading now says the rows it
+ * speaks for and the rows it does not, and the answer below already names its own by label.
+ *
+ * ## Why the count is `rows.length` and not the report's `total`
+ *
+ * The denominator is the number of rows **the card draws between the two rollups**, so a reader can
+ * check it by counting what is in front of them. `batch/report.ts`'s summary sentence has a `total`
+ * of its own and is not drawn on this screen; a denominator a reader cannot see is the defect again
+ * with a bigger number.
+ *
+ * ## What this deliberately does not do
+ *
+ * It does not reword the six verdicts, and it does not touch `answerFor`. The verdicts stay on the
+ * rows — `unresolved` and `under-budget` are different claims, and one friendly phrase over both
+ * would erase the difference between *"they are the same"* and *"you did not run enough days to
+ * find out"*. `answerFor` is `batch/report.ts`'s, drawn by the Engineer suite panel and the CLI as
+ * well as here, and it already names its subset by label; changing a shared sentence to fix a
+ * one-screen contradiction would be a wider edit with a narrower reason.
+ */
+export function benchTooCloseHeadingOf(unresolvedRows: number, drawnRows: number): string {
+  return (
+    `${BENCH_COPY.tooCloseHeading} on ${String(unresolvedRows)} of the ` +
+    `${String(drawnRows)} measures below`
+  );
+}
+
 /** The whole result, as the screen draws it. */
 export interface BenchResultView {
   /** The index — `batch/suite.ts#suiteSummaryOf`, whose columns and words are all its own. */
@@ -324,7 +377,7 @@ export interface BenchResultView {
   readonly cells: readonly SuiteCellView[];
   readonly caption: string;
   /** §12.2's verdict heading where a drawn interval contains zero, per cell. */
-  readonly tooCloseCellIds: readonly string[];
+  readonly tooClose: readonly BenchTooCloseMark[];
   readonly standingNotes: readonly string[];
   readonly neverASubtraction: string;
 }
@@ -333,25 +386,36 @@ export interface BenchResultView {
  * Fold the finished cells into what the screen draws.
  *
  * Strictly weaker than the views it reads. The one thing computed here is
- * {@link BenchResultView.tooCloseCellIds}, and it is a **selection rather than a claim**: a cell is
- * listed when its drawn verdict block has at least one row whose verdict is `unresolved`, which is
+ * {@link BenchResultView.tooClose}, and it is a **selection plus its basis**: a cell is listed when
+ * its drawn verdict block has at least one row whose verdict is `unresolved`, which is
  * `report.ts`'s own word for *the interval contains zero, and the two arms are not ordered*. The
  * screen draws §12.2's *"Too close to call"* beside that word, never instead of it — the six
- * verdicts stay on the rows, because `unresolved` and `under-budget` are different claims and one
- * friendly phrase over both would erase the difference between *"they are the same"* and *"you did
- * not run enough days to find out"*.
+ * verdicts stay on the rows.
+ *
+ * It used to be a list of ids, and the heading was a constant the screen supplied. That is the
+ * shape issue #301 found: a rollup that could not say how many rows it spoke for, over rows a
+ * second rollup was simultaneously speaking for. The heading is composed here, with the counts,
+ * so the screen has nothing left to author — see {@link benchTooCloseHeadingOf}.
  */
 export function benchResultViewOf(cells: readonly SuiteCellView[]): BenchResultView {
   return Object.freeze({
     summary: suiteSummaryOf(cells),
     cells,
     caption: BENCH_COPY.matrixCaption,
-    tooCloseCellIds: Object.freeze(
+    tooClose: Object.freeze(
       cells
         .filter(
           (cell) => cell.verdictShown && cell.rows.some((row) => row.verdict === 'unresolved'),
         )
-        .map((cell) => cell.cellId),
+        .map((cell) =>
+          Object.freeze({
+            cellId: cell.cellId,
+            heading: benchTooCloseHeadingOf(
+              cell.rows.filter((row) => row.verdict === 'unresolved').length,
+              cell.rows.length,
+            ),
+          }),
+        ),
     ),
     standingNotes: BENCH_STANDING_NOTES,
     neverASubtraction: BENCH_COPY.neverASubtraction,

@@ -20,7 +20,7 @@ import { intervalPlotFor } from '../batch/intervalPlot.js';
 import { batchReport, MIN_REPLICATION_BUDGET } from '../batch/report.js';
 import { fakeArm, fakeReplication, fakeResult } from '../batch/fixtures.test-helper.js';
 import { suiteCellViewOf, suiteSummaryOf } from '../batch/suite.js';
-import type { BatchResult } from '../batch/types.js';
+import type { BatchReplication, BatchResult } from '../batch/types.js';
 
 import {
   benchBudgetNoteOf,
@@ -30,6 +30,7 @@ import {
   benchResultViewOf,
   benchTestsOf,
   benchTestsRefusal,
+  benchTooCloseHeadingOf,
   benchVerdictNoteOf,
   benchWorkLineOf,
   BENCH_COPY,
@@ -206,11 +207,61 @@ describe('the result view is strictly weaker than the report it reads', () => {
   it('lists a cell as too-close only where a drawn row is `unresolved`', () => {
     /* Two identical arms: every paired difference is exactly zero, so no row is ordered. */
     const tie = benchResultViewOf([suiteCellViewOf(CELL, fakeResult({ replications: 50 }))]);
-    expect(tie.tooCloseCellIds).toEqual([CELL.id]);
+    expect(tie.tooClose.map((mark) => mark.cellId)).toEqual([CELL.id]);
 
     /* A three-arm cell draws no verdict block at all, so it can never be listed. */
     const many = benchResultViewOf([suiteCellViewOf(CELL, threeArmResult())]);
-    expect(many.tooCloseCellIds).toEqual([]);
+    expect(many.tooClose).toEqual([]);
+  });
+
+  /**
+   * **The two rollups on one cell name the subsets they count** — GitHub issue #301, § D389.
+   *
+   * The card draws `Too close to call` above the rows and `batch/report.ts#answerFor` below them,
+   * and their predicates are `≥ 1 unresolved` and `≥ 1 resolved` — which are not exclusive. The
+   * fixture below is the state that makes both fire: one measure separates cleanly and the rest are
+   * a dead tie, so the card opens by calling the comparison too close and closes by saying it
+   * separated.
+   *
+   * The case is written against the **basis** rather than against the two verdicts, because the
+   * fix that is wanted is not *suppress one of them* — each is true of its own rows — but *say
+   * which rows*. So it fails when either headline renders with no denominator, and it pins the
+   * denominator to the number of rows the card actually draws between them, which is the figure a
+   * reader can check by counting.
+   */
+  it('names the basis of both rollups when a cell has resolved and unresolved rows', () => {
+    const cell = suiteCellViewOf(CELL, mixedResult());
+    const verdicts = cell.rows.map((row) => row.verdict);
+
+    // Non-vacuity: without both kinds of row present the two rollups cannot collide, and a green
+    // result here would mean the fixture had stopped producing the state the issue is about.
+    expect(verdicts, 'the fixture drew no separated row').toContain('resolved');
+    expect(verdicts, 'the fixture drew no unresolved row').toContain('unresolved');
+
+    const unresolved = verdicts.filter((verdict) => verdict === 'unresolved').length;
+    const view = benchResultViewOf([cell]);
+    const heading = view.tooClose.find((mark) => mark.cellId === CELL.id)?.heading;
+
+    expect(heading, 'the cell has an unresolved row and drew no too-close heading').toBeDefined();
+    expect(
+      heading,
+      'the heading is `Too close to call` with nothing after it, over rows a second rollup is ' +
+        'simultaneously calling separated. That is issue #301: two answers to one question, ' +
+        'neither naming the subset it counts.',
+    ).not.toBe(BENCH_COPY.tooCloseHeading);
+    expect(heading).toBe(benchTooCloseHeadingOf(unresolved, cell.rows.length));
+    expect(heading).toContain(`${String(unresolved)} of the ${String(cell.rows.length)}`);
+    // The guide's own phrase survives verbatim at the front of it — #211 owns this screen's copy.
+    expect(heading?.startsWith(BENCH_COPY.tooCloseHeading)).toBe(true);
+
+    /*
+     * The other half of the pair, asserted here rather than assumed: `answerFor`'s separated branch
+     * names its own count *and* lists the measures it means, so it is left alone. If that ever
+     * stops being true the two rollups are back to being one unqualified claim each, and this line
+     * is where it shows.
+     */
+    expect(cell.answer, 'the cell drew no answer to pair the heading with').not.toBeNull();
+    expect(cell.answer).toMatch(/Separated on 1 of the measures compared — average wait/u);
   });
 
   it('always carries §12’s three standing notes and the never-a-subtraction rule', () => {
@@ -221,6 +272,43 @@ describe('the result view is strictly weaker than the report it reads', () => {
     expect(view.cells).toHaveLength(0);
   });
 });
+
+/**
+ * A two-arm batch where **one** measure separates and the rest are a dead tie — issue #301.
+ *
+ * `fakeResult`'s `delta` moves every metric at once, so it can produce a cell that is all
+ * `resolved` or all `unresolved` and never one that is both. This offsets `awtS` alone: the
+ * candidate is 1.4 s ahead on average wait on every replication, and identical to the baseline on
+ * everything else, so the paired interval excludes zero on exactly one row and contains it on the
+ * rest. Measured on this fixture: **1 resolved, 5 unresolved, 2 shown**, which is the card the
+ * issue is about.
+ *
+ * The per-replication wobble is the same fixed, seedless one `fakeResult` uses, applied to both
+ * arms identically so the paired differences stay exactly `-1.4` and `0` — a difference with no
+ * variance is what makes the `resolved` row arithmetic rather than luck.
+ */
+function mixedResult(n = 50): BatchResult {
+  const build = (awtOffset: number): BatchReplication[] =>
+    Array.from({ length: n }, (_, index) => {
+      const wobble = ((index * 37) % 11) / 100;
+      return fakeReplication(index, 10 + wobble, {
+        metrics: { awtS: 10 + awtOffset + wobble },
+      });
+    });
+  return {
+    buildingId: 'fixture-building',
+    buildingName: 'Fixture Building',
+    seed: '20260729',
+    durationS: 900,
+    arrivalRatePctPop5min: null,
+    arms: [
+      fakeArm('baseline', 'collective', build(0), 'Conventional collective'),
+      fakeArm('candidate', 'eta', build(-1.4), 'Minimum estimated wait'),
+    ],
+    crn: { traceKey: 'k', checkedComparisons: n, mismatches: [], aligned: true },
+    elapsedMs: 1234,
+  };
+}
 
 /** A three-arm batch, built from the same fixtures the two-arm one uses. */
 function threeArmResult(): BatchResult {
