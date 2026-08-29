@@ -232,6 +232,20 @@ const gatedOnDisk = (): readonly string[] =>
 const workflow = (): string => readFileSync(WORKFLOW, 'utf8');
 
 /**
+ * The workflow's executable `run:` lines that invoke vitest — never its prose.
+ *
+ * The `run:` prefix is what separates the two, and it was added because the header **documents the
+ * defect with a shell transcript**: `# $ npx vitest run --project experiments
+ * src/fuzz/doesNotExist.test.ts ; echo $?`. A scan on `includes('vitest run')` alone read that line
+ * as a tenth invocation and reported the workflow unguarded. A comment about a failure is not a
+ * failure, and an instrument that cannot tell them apart is measuring the prose.
+ */
+const runLines = (): readonly string[] =>
+  workflow()
+    .split('\n')
+    .filter((line) => /^\s*run:\s/u.test(line) && line.includes('vitest run'));
+
+/**
  * The `(project, file)` pairs the workflow actually runs, read off its `run:` lines.
  *
  * Read off the command rather than off the job name, because the job name is prose and the command
@@ -240,14 +254,11 @@ const workflow = (): string => readFileSync(WORKFLOW, 'utf8');
  * docstring.
  */
 const invocations = (): readonly { project: string; file: string; line: string }[] =>
-  workflow()
-    .split('\n')
-    .filter((line) => line.includes('vitest run'))
-    .flatMap((line) => {
-      const project = /--project\s+([\w-]+)/u.exec(line)?.[1];
-      const file = /\b(src\/[\w./-]+\.test\.ts)\b/u.exec(line)?.[1];
-      return project !== undefined && file !== undefined ? [{ project, file, line }] : [];
-    });
+  runLines().flatMap((line) => {
+    const project = /--project\s+([\w-]+)/u.exec(line)?.[1];
+    const file = /\b(src\/[\w./-]+\.test\.ts)\b/u.exec(line)?.[1];
+    return project !== undefined && file !== undefined ? [{ project, file, line }] : [];
+  });
 
 /**
  * Every environment variable set by any step that runs `file`, unioned.
@@ -263,7 +274,7 @@ const gatesSetFor = (file: string): readonly string[] => {
   const lines = workflow().split('\n');
   const set = new Set<string>();
   for (const [at, line] of lines.entries()) {
-    if (!line.includes('vitest run') || !line.includes(file)) continue;
+    if (!/^\s*run:\s/u.test(line) || !line.includes('vitest run') || !line.includes(file)) continue;
     /* Walk back to this step's `env:`, stopping at the step boundary (`- name:`). */
     for (let i = at - 1; i >= 0 && !/^\s*-\s+name:/u.test(lines[i] ?? ''); i -= 1) {
       const name = /^\s{6,}([A-Z][A-Z0-9_]*)\s*:/u.exec(lines[i] ?? '')?.[1];
@@ -337,6 +348,35 @@ describe('§ 2 — the scheduled workflow runs every tier, with every gate it ne
       'the workflow runs these files without setting the variable that opens their gate. That run ' +
         'reports green having executed the always-on half only, which is a skip wearing a pass.',
     ).toEqual([]);
+  });
+
+  it('refuses a filter that matches nothing, on every command', () => {
+    /*
+     * The defect one layer down, and it is measured rather than argued. Every project in
+     * `vitest.config.ts` sets `passWithNoTests: true` — correct for a package whose phase has not
+     * landed — so a workflow that selects tests *by path* goes green on a typo:
+     *
+     *     $ npx vitest run --project experiments src/fuzz/doesNotExist.test.ts ; echo $?
+     *     0
+     *
+     * A job that ran nothing and a job whose tests passed are indistinguishable from the Actions
+     * tab. `--passWithNoTests=false` makes the same command exit 1 and leaves a real path at 0.
+     *
+     * This case and the two above catch different things, which is why both exist. They compare
+     * names against disk and cannot see a filter that matches nothing for some other reason; this
+     * one cannot see a tier that was never named. `vitest.config.ts` itself is deliberately not
+     * touched — the flag belongs to the workflow that needs it, and that file has another owner.
+     */
+    const naked = runLines()
+      .filter((line) => !line.includes('--passWithNoTests=false'))
+      .map((line) => line.trim());
+    expect(
+      naked,
+      'these commands select tests by path with passWithNoTests left on. A mistyped path exits 0 ' +
+        'having run nothing, which is this workflow’s own defect one layer down.',
+    ).toEqual([]);
+    /* And the guard is not vacuous: there are commands to have found. */
+    expect(invocations().length).toBeGreaterThanOrEqual(9);
   });
 
   it('does not set a flag whose effect is to remove a check', () => {

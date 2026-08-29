@@ -118,6 +118,29 @@
 # unwired is a red pull request; a tenth gated tier *failing* is not. That distinction is the whole
 # design.
 #
+# ## `--passWithNoTests=false`, on every command, and it is the most load-bearing flag here
+#
+# Every project in `vitest.config.ts` sets `passWithNoTests: true`, for the good reason that a
+# package legitimately has no tests until its phase lands. The consequence for a workflow that
+# selects tests **by path** is that a typo is silent:
+#
+# ```
+# $ npx vitest run --project experiments src/fuzz/doesNotExist.test.ts ; echo $?
+# 0
+# ```
+#
+# Green, having executed nothing. That is the defect this whole workflow exists to close, one layer
+# down — a run reporting success about a measurement it never took — and it would have been invisible
+# in the Actions tab, because a job that runs no tests and a job whose tests pass look identical from
+# outside. Measured with the flag, the same command exits **1**, and a real path still exits 0.
+#
+# So there are two defences and they catch different things. `validation/deepTiers.test.ts` compares
+# the `(project, file)` pairs in this file against the tiers derived from disk, so a typo is a red
+# pull request *before* the schedule ever fires. The flag is what makes the run itself refuse, on a
+# tree where that test has not been updated yet. Neither alone is enough: the test cannot see a
+# filter that matches nothing for a reason other than a wrong name, and the flag cannot see a tier
+# that was never named at all.
+#
 # ## Aliveness — the half that is mechanised, and the half that is not
 #
 # A scheduled workflow that quietly stops is this repository's recurring failure mode, so say which
@@ -202,7 +225,7 @@ jobs:
       - name: Deep fuzz campaign
         env:
           ELEVATOR_SIM_FUZZ: deep
-        run: npx vitest run --project experiments --testTimeout=600000 src/fuzz/deep.test.ts
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=600000 src/fuzz/deep.test.ts
 
   # ---------------------------------------------------------------------------
   # Byte-identical replay, at 6 goldens rather than 4, plus the replay from a bare node process.
@@ -228,7 +251,7 @@ jobs:
       - name: Deep goldens
         env:
           ELEVATOR_SIM_DEEP: '1'
-        run: npx vitest run --project experiments --testTimeout=1800000 src/validation/goldenRuns.test.ts
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/validation/goldenRuns.test.ts
 
   # ---------------------------------------------------------------------------
   # CLAUDE.md's correctness oracle at full width: every measurable bank against the closed form.
@@ -248,7 +271,7 @@ jobs:
       - name: Deep campaign
         env:
           ELEVATOR_SIM_DEEP: '1'
-        run: npx vitest run --project experiments --testTimeout=1800000 src/oracle/deepCampaign.test.ts
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/oracle/deepCampaign.test.ts
 
   # ---------------------------------------------------------------------------
   # Re-derives every declared matrix ceiling and spread at 200 replications. The numbers the
@@ -269,7 +292,7 @@ jobs:
       - name: Matrix census
         env:
           ELEVATOR_SIM_DEEP: '1'
-        run: npx vitest run --project experiments --testTimeout=1800000 src/benchmark/matrixCensus.test.ts
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/benchmark/matrixCensus.test.ts
 
   # ---------------------------------------------------------------------------
   # § D209's study at its pre-registered replication count. The file's own documented invocation
@@ -290,7 +313,7 @@ jobs:
       - name: Collective adoption study
         env:
           ELEVATOR_SIM_DEEP: '1'
-        run: npx vitest run --project experiments --testTimeout=14400000 src/benchmark/collectiveAdoption.test.ts
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=14400000 src/benchmark/collectiveAdoption.test.ts
 
   # ---------------------------------------------------------------------------
   # Twenty thousand replications, twenty thousand distinct trace digests.
@@ -313,7 +336,7 @@ jobs:
       - name: Large sweep
         env:
           ELEVATOR_SIM_DEEP: '1'
-        run: npx vitest run --project experiments --testTimeout=7200000 src/validation/perfSweep.test.ts
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=7200000 src/validation/perfSweep.test.ts
 
   # ---------------------------------------------------------------------------
   # The wall-clock fits, which the file says run "only where the machine is expected to be quiet".
@@ -338,7 +361,7 @@ jobs:
       - name: Scaling fits
         env:
           ELEVATOR_SIM_DEEP: '1'
-        run: npx vitest run --project experiments --testTimeout=1800000 src/validation/perfScaling.test.ts
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/validation/perfScaling.test.ts
 
   # ---------------------------------------------------------------------------
   # The honesty search over the deep corpus — 60 cases, campaign stages, 50 replications a stage.
@@ -364,7 +387,7 @@ jobs:
       - name: Deep honesty corpus
         env:
           ELEVATOR_SIM_HONESTY: deep
-        run: npx vitest run --project viz src/honesty/honesty.test.ts
+        run: npx vitest run --passWithNoTests=false --project viz src/honesty/honesty.test.ts
 
   # ---------------------------------------------------------------------------
   # § D343's measurement, which had a written obligation and no place to be taken.
@@ -398,14 +421,14 @@ jobs:
       - name: Always-on tier
         env:
           CORPUS_OUT: ${{ runner.temp }}/corpus-always-on.txt
-        run: npx vitest run --project viz src/honesty/measure.corpus.test.ts
+        run: npx vitest run --passWithNoTests=false --project viz src/honesty/measure.corpus.test.ts
 
       - name: Deep tier
         env:
           CORPUS_OUT: ${{ runner.temp }}/corpus-deep.txt
           CORPUS_TIER: deep
           ELEVATOR_SIM_HONESTY: deep
-        run: npx vitest run --project viz src/honesty/measure.corpus.test.ts
+        run: npx vitest run --passWithNoTests=false --project viz src/honesty/measure.corpus.test.ts
 
       # The commit is recorded beside the figures because a corpus count without the tree it was
       # taken on is the thing R38 exists to stop. The artifact is the whole answer, not a pointer
