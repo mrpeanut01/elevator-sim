@@ -84,8 +84,34 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **570 217** | **606** | **51** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **711 317** | **4 710** | **52** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **570 560** | **606** | **51** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **711 737** | **4 710** | **52** | **0** | **green**, and the register is empty |
+
+  **Wave G's move is the first this row has been able to attribute exactly, and the arithmetic is the
+  whole of it.** Measured on the integrated tree after wave G, both tiers in one sitting: strings
+  **+343** always-on and **+420** deep, with cases, simulations, surfaces and failing cases unmoved.
+
+  | | wave F | wave G | move |
+  |---|---|---|---|
+  | always-on strings | 570 217 | **570 560** | **+343** |
+  | deep strings | 711 317 | **711 737** | **+420** |
+
+  `honesty/surfaces.ts`'s `EVERYDAY_STAGE` gained the stage's **seven** speed chip faces, seeded once
+  per case. **7 × 49 = 343 and 7 × 60 = 420** — the move is the seeding and nothing else, to the
+  string. No other lane in the wave added one: the tab-gate note built for GitHub issue #130 is
+  drawn by `dev/surfaces.ts#surfaceStateFor`, which joins the navigation-plumbing exclusion rather
+  than the corpus.
+
+  **The surface sets were diffed rather than the counts compared** — identical in both tiers, and the
+  deep tier's one-surface lead is still exactly `campaign/judge.ts#judgeStage`. So a wave that seeded
+  three hundred new strings added no surface, which is what the two columns are for.
+
+  **Seeded and deliberately not `covers`.** A chip face is `1×`, and the corpus's producer test wants
+  a *prose* literal — two adjacent alphabetic words — so a `covers` entry would have tripped its first
+  guard. Worth saying what the seeding does **not** buy: it would not have caught § D354's defect,
+  because no property compares a label against its multiplier and none can. **Being swept is not
+  being checked**, and that distinction was itself a correction to a briefing that had claimed the
+  ladder's sentence was outside the corpus when it had been inside it all along.
 
   **Re-measured twice on 2026-08-29, and the pair is what makes either number mean anything.** First
   on `f13d455` — merged `main`, wave E integrated, discharging the measurement wave E closed owing —
