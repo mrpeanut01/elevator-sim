@@ -26298,9 +26298,10 @@ goes **6 → 4**.
 `0cd422a` over `packages/`, excluding `dist/`. Every reference to either symbol outside its own
 file is a docstring, a `{@link}`, a barrel re-export (`metrics/index.ts`, `browser.ts`) or a test.
 Two look-alikes, both of the shape `CLAUDE.md`'s standing requirement warns about:
-`experiments/teaching/spec.ts#runSeed` is a `readonly runSeed: number` field on `TeachingSeeds`,
-and `random/streams.ts`'s example uses `runSeed` as a **local variable name**. Neither is this
-symbol.
+`experiments/teaching/spec.ts#runSeed` is a `readonly runSeed: number` field on
+`TeachingSeedPlan` — and the docstring above it carries a `{@link runSeed}` pointing at the field,
+which is the tag this repository's standing requirement names outright — while
+`random/streams.ts`'s example uses `runSeed` as a **local variable name**. Neither is this symbol.
 
 **Is invariant 5 at risk? No — and the trace is the reason this is a deletion rather than a
 wiring.** The invariant has two clauses and they are discharged in two different packages.
