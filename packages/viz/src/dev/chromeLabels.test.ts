@@ -295,7 +295,7 @@ describe('Casual and Engineer explain themselves', () => {
     const label = associatedLabel(html, 'view-mode') ?? '';
     const title = attr(label, 'title') ?? '';
     expect(title, 'the mode label carries no long-form description').not.toBe('');
-    for (const clause of ['nameplate', 'energy proxy', 'interval spread', 'seed']) {
+    for (const clause of ['nameplate', 'energy proxy', 'interval spread', 'seed', 'editor tab']) {
       expect(title, `the description does not mention the ${clause}`).toContain(clause);
     }
     // The load-bearing reassurance: switching mode does not change the run.
@@ -311,6 +311,34 @@ describe('Casual and Engineer explain themselves', () => {
     const { BASIC_HIDES } = await import('../mode/disclosure.js');
     const { ENERGY_ID, INTERVAL_ID } = await import('../render/runSummary.js');
     expect([...BASIC_HIDES].sort()).toEqual([ENERGY_ID, INTERVAL_ID].sort());
+  });
+
+  it('is checked against the tab gate too, which is the newest thing the modes differ on', async () => {
+    /*
+     * The same direction, for the clause § D330 added (issue #130). The sentence now claims
+     * Engineer carries *every editor tab from the first frame* and Casual reveals them — so the
+     * source of truth is `surfaceStateFor` itself, driven in both modes.
+     *
+     * **No count rides in this sentence, deliberately.** The strip carries the number, derived
+     * from the very `hidden` flags it draws; a second copy of it in a `title` would be a figure
+     * with a second source, which is the drift § D227 is about and the reason § D330's second
+     * condition is worded the way it is. What the label describes is the *rule*, and this case is
+     * that the rule is real.
+     */
+    const { CONTEXTUAL_TABS, TABS } = await import('./elementMap.js');
+    const { surfaceStateFor } = await import('./surfaces.js');
+    const nothingRevealed = new Set<never>();
+
+    const engineer = surfaceStateFor('run', nothingRevealed, 'engineer');
+    expect(engineer.tabs.filter((entry) => entry.hidden)).toEqual([]);
+    expect(engineer.ring).toEqual([...TABS]);
+
+    const casual = surfaceStateFor('run', nothingRevealed, 'casual');
+    expect(casual.tabs.filter((entry) => entry.hidden).map((entry) => entry.tab)).toEqual([
+      ...CONTEXTUAL_TABS,
+    ]);
+    // …and the strip is where the count lives, which is the other half of the sentence's claim.
+    expect(casual.gate?.hiddenCount).toBe(CONTEXTUAL_TABS.length);
   });
 });
 
