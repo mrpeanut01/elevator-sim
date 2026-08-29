@@ -116,9 +116,12 @@ export function loadTrackMax(cars: readonly { readonly loadFactor: number }[]): 
  *
  * Casual names the span the way `got a car (5min)` names it, and inherits that label's one
  * exposure: both spell `DEFAULT_WINDOW_S` as words. `OverlayOptions.windowS` can override it, and
- * no shipped caller does — `dev/main.ts#renderLive`, `honesty/surfaces.ts` and
- * `live/observations.ts#observationsAt` are the three, and all three take the default. A caller
- * that ever passes another span has to move both strings, which is why they sit two lines apart.
+ * **no shipped caller does** — `dev/main.ts#drawStage`, `honesty/surfaces.ts#buildFrameBundle` and
+ * `live/observations.ts#observationsAt` are the three that call `overlayAt` outside a test, and all
+ * three take the default. (`drawStage` and not `renderLive`: the latter reaches `overlayAt` only
+ * through the former, and a docstring that named it would be the `{@link}` that looks like a caller
+ * and is not one.) A caller that ever passes another span has to move both strings, which is why
+ * they sit two lines apart.
  */
 export const CASUAL_WORDS = Object.freeze({
   title: 'RIGHT NOW',
