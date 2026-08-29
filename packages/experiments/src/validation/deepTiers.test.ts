@@ -49,10 +49,13 @@
  *
  * Measured 2026-08-29 on `0cd422a`, **before** this lane's own work: eighteen tests, nine gated
  * blocks, nine files. The lane then added a tenth block — `fuzz/deep.test.ts`'s register entry for
- * the counterexample the first scheduled run found — so on this tree it is **nineteen tests, ten
- * blocks, nine files**. Both figures are given with the tree they were taken on rather than one of
- * them being quietly corrected, because a count published without its commit is the defect this
- * whole lane is about. Issue #163
+ * the counterexample the first run of that tier found — so on this tree the same command would
+ * report **nineteen tests, ten blocks, nine files**.
+ *
+ * **The eighteen is a measurement and the nineteen is arithmetic**, and the difference is stated
+ * rather than smoothed over: the first came off a `vitest list` diff, the second is one added case
+ * counted by hand. A lane whose subject is figures published without the run behind them does not
+ * get to blur those. Issue #163
  * says seventeen and names two variables; both are undercounts, and the second is the one that
  * matters — `ELEVATOR_SIM_FUZZ=deep` is a **third** gate, guarding the 250-case fuzz campaign, so a
  * workflow that set only the two variables the issue names would have left that tier exactly as
