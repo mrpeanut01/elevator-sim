@@ -26746,3 +26746,60 @@ larger neighbour, not its scope. No claim is made that `readRunSetFile`, `parseR
 
 
 ---
+
+## D418 — `experiments` takes the simulating timeout, and the sentence that said it had no reason to is the finding
+
+**Date: 2026-08-29 · Owner: integrator, wave H · Closes: GitHub issue #310. Third application of
+[§ D331](#d331)'s argument, after [§ D394](#d394) took it to `core` and `server`.**
+
+**Decision.** `vitest.config.ts` passes `SIMULATING_TIMEOUT_MS` to `project('experiments')`. `cli`
+stays on vitest's 5 000 ms default. No test is annotated to close this, and no existing annotation is
+removed.
+
+**What was reported.** `validation/shippedRunConfig.test.ts`'s whole-tree importer scan failing at
+**5 454 ms** inside `--project experiments src/validation/` while two deep tiers ran in the
+background at load average ~12, and passing alone under that same background load.
+
+**The sentence in the config is the more interesting half.** It read *"`experiments` and `cli` are
+left alone, and that is a measurement rather than an omission: **neither has been reported failing at
+the default**"*. That was true when written and stopped being true the moment one was reported —
+[§ D227](#d227)'s stale refusal, on the file that decides whether the next reader needs to look. A
+sentence that records the absence of evidence has an expiry date that nothing was watching.
+
+**The survey, which changed the shape of the fix.** Taken on this tree with the ceiling lifted to
+900 000 ms so the numbers are *costs* rather than truncations: of **1 361** tests, **1 314** finish
+inside 2.4 s, **20** sit between 1.5 s and the 5 000 ms ceiling, 36 exceed it, and the slowest is
+**1 017 s** (`benchmark/selectionSweep.test.ts`).
+
+**The reported case is not intrinsically near its ceiling**, which is what rules annotation out. It
+costs **0.60 s**, and its whole 24-case file costs **1.04 s**; load amplified it about ninefold. So
+annotating it fixes the one case that happened to be observed under load and leaves the other
+nineteen in the same band — § D331's own rejected argument, reaching a third project unchanged.
+
+**Why 300 000 ms is right here for a different reason than it is for `viz`.** For `viz` the constant
+is about six times the observed maximum. Here the maximum is 1 017 s and the constant is a **third**
+of it. What makes it right anyway is that the population relying on the default is not the whole
+population: **every test above 5 000 ms that is green in CI today is necessarily annotated already**,
+or the default would be failing it. The slowest test that actually depends on this line is therefore
+under 5 s, and 300 000 ms is roughly sixty times it. The three tests past the constant — 1 017 s,
+559 s and 393 s — keep their own `TIMEOUT_MS`, which still wins over a project default.
+
+**A corroboration rather than an argument for annotating.** `shippedRunConfig.test.ts` already
+declares `const TIMEOUT_MS = 300_000` and applies it at three sites; its two whole-tree scans are
+simply not among them. That file had independently converged on this same number, which is the
+signal § D331 read off `viz`'s 113 sites.
+
+**Confirmed empirically in both directions**, as § D394 required of itself, rather than by reading
+the config object back: an unannotated six-second case in `experiments` reported vitest's own
+`Test timed out in 5000ms` (exit 1) before this change and passed at 6.01 s (exit 0) after it.
+
+**What is not claimed.** *The original red was not reproduced here.* On a 4-core container with
+twelve spinners the load average reached ~6.7 and the reported file's test time went 1.56 s →
+4.79 s — amplified, under the ceiling, and passing with and without the change. The 5 454 ms failure
+stands as measured under load ~12 with two deep tiers; nothing here contradicts it and nothing here
+confirms it. This decision rests on the survey and the probe, not on a red anybody re-ran.
+
+**The cost, stated rather than glossed**, is § D331's and unchanged: a genuinely hung pure-function
+test in `experiments` now takes five minutes to fail instead of five seconds. A hang is a bug found
+once and fixed; a 5 s ceiling under load is a false red on a required check that recurs forever and
+trains people to re-run the suite instead of reading it.

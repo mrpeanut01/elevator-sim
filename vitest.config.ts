@@ -113,12 +113,62 @@ export default defineConfig({
        * by running an unannotated six-second case in each and reading vitest's own
        * `Test timed out in 5000ms`, rather than by reading this object back.
        *
-       * `experiments` and `cli` are left alone, and that is a measurement rather than an omission:
-       * neither has been reported failing at the default, and adding them would be this section's
-       * own rejected argument with the polarity flipped.
+       * `experiments` joined third — GitHub issue #310, § D418 — and the sentence that used to
+       * stand here is why it is worth spelling out rather than just editing. It read:
+       * *"`experiments` and `cli` are left alone, and that is a measurement rather than an
+       * omission: **neither has been reported failing at the default**"*. That was true when it
+       * was written and stopped being true the moment one was reported, which makes it § D227's
+       * stale refusal — a sentence telling the next reader not to look, on the file that decides
+       * whether they need to.
+       *
+       * The report: `validation/shippedRunConfig.test.ts`'s whole-tree importer scan failing at
+       * **5 454 ms** inside `--project experiments src/validation/` while two deep tiers ran in
+       * the background at load average ~12, and passing alone under that same background load.
+       *
+       * **The case is not intrinsically near its ceiling, and that is the finding.** Surveyed on
+       * this tree with the ceiling lifted to 900 000 ms so the numbers are costs rather than
+       * truncations, that case costs **0.60 s** and its whole 24-case file costs **1.04 s**. Load
+       * amplified it about ninefold. So annotating it would fix the one case that happened to be
+       * observed under load and none of the others sitting in the same place, which is this
+       * section's own rejected argument for `viz` reaching `experiments` unchanged.
+       *
+       * **It is a class, and the class is measured.** Of 1 361 tests, **1 314 finish inside
+       * 2.4 s** and **20 sit between 1.5 s and the 5 000 ms ceiling**. At the amplification that
+       * produced the report, every one of those twenty exceeds the default.
+       *
+       * **The number means something different here than it does for `viz`, and reusing its
+       * justification would be wrong.** For `viz`, 300 000 ms is about six times the observed
+       * maximum. `experiments`' slowest test is `benchmark/selectionSweep.test.ts` at **1 017 s**,
+       * so 300 000 ms is a third of *its* maximum. What makes the constant right anyway is that
+       * the population relying on the default is not the whole population: every test above
+       * 5 000 ms that is green in CI today is **necessarily** annotated already, or the default
+       * would be failing it. The slowest test that actually depends on this line is therefore
+       * under 5 s, and 300 000 ms is roughly sixty times it. The three tests past the constant —
+       * 1 017 s, 559 s and 393 s — keep their own `TIMEOUT_MS`, which still wins.
+       *
+       * **No case is annotated to close this.** `shippedRunConfig.test.ts` already declares
+       * `const TIMEOUT_MS = 300_000` and already applies it at three sites; the two whole-tree
+       * scans are simply not among them. Adding a fourth would fix today's case and leave the
+       * other nineteen, so the mechanism is the default and the file's constant is left as the
+       * corroboration it is — that file had independently decided on this same number.
+       *
+       * Confirmed empirically in both directions rather than by reading this object back, as
+       * `core` and `server` were: an unannotated six-second case in `experiments` reported
+       * vitest's own `Test timed out in 5000ms` before this line (exit 1), and passes after it
+       * (6.01 s, exit 0).
+       *
+       * **The original red was not reproduced here, and that is said rather than glossed.** On a
+       * 4-core container with twelve spinners the load average reached ~6.7 and the reported
+       * file's test time went 1.56 s → 4.79 s: amplified, under the ceiling, and passing with and
+       * without this line. The 5 454 ms failure stands as measured under load ~12 with two deep
+       * tiers running. This line rests on the survey above and on the probe, not on a red anybody
+       * re-ran.
+       *
+       * `cli` is still left alone, and now that is the whole of the claim: it has not been
+       * reported failing at the default and no survey has been taken over it.
        */
       project('core', SIMULATING_TIMEOUT_MS),
-      project('experiments'),
+      project('experiments', SIMULATING_TIMEOUT_MS),
       project('server', SIMULATING_TIMEOUT_MS),
       project('cli'),
       project('viz', SIMULATING_TIMEOUT_MS),
