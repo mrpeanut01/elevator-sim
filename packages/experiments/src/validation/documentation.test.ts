@@ -1326,13 +1326,27 @@ const OPEN_RESERVATION: {
   readonly wave: string;
   readonly from: number;
   readonly to: number;
-} | null = {
-  wave: 'H',
-  from: 396,
-  // Lanes A–D hold D396–D403; lane E's block was dispatched open-ended ("D404 upward") and it
-  // reports 417 as the highest it used, which is what an open-ended block's ceiling means.
-  to: 417,
-};
+} | null = null;
+/*
+ * **Wave H's block is closed, and it is worth recording what closing it caught.**
+ *
+ * The block was D396–D417: lanes A–D held D396–D403, and lane E's was dispatched open-ended
+ * ("D404 upward"), reaching D417. Every number in it heads a decision and none is a hole, so the
+ * case below required this to be emptied and the charter row reconciled to D419 on the same
+ * commit — which is exactly the step D387 shows nobody performs when nothing asks for it.
+ *
+ * **On its first wave the ceiling check caught the integrator rather than a lane.** § D418 —
+ * `experiments` taking the simulating timeout — was written by the integrator *during* the wave
+ * and took D418, one past the block. That is the case's second assertion (*"a lane may not take a
+ * number its block does not hold"*) doing the job it was built for, on the one participant nobody
+ * had thought to check: the process's author. The number is kept rather than renumbered, because
+ * ids are names here and § D418 is already cited from `vitest.config.ts` and GitHub issue #310;
+ * what was wrong was leaving the block open around it.
+ *
+ * The lesson for the next wave is a sizing one, not a numbering one: **an integrator who works
+ * during a wave needs a number too**, so the block should be dispatched with one reserved for them
+ * rather than fitted to the lanes alone.
+ */
 
 const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [44, 'used by a per-lane record folded in without remapping — DECISIONS.md’s preamble'],
