@@ -458,8 +458,10 @@ export interface SceneInput {
    * a fact with one optional surface is a fact that is usually not shown, so it is drawn on the
    * landing itself and named in the banner.
    *
-   * A decision number is owed. `viewportClaims.test.ts` pins the breakpoint set, so that the next
-   * rule deleted takes a test with it instead of leaving a sentence behind.
+   * **Recorded here rather than in `DECISIONS.md`, under § D405.** The withdrawal is § D352 —
+   * *the 1280 px viewport rule was true when written, and the correction says so* — including its
+   * refusal to name a replacement width. `viewportClaims.test.ts` pins the breakpoint set, so that
+   * the next rule deleted takes a test with it instead of leaving a sentence behind.
    *
    * Derived by the caller from `landingAssignmentsAt`, for the reason {@link SceneInput.queues}
    * gives: `drawScene` stays a pure function of its inputs, and the renderer never reaches for a
@@ -999,7 +1001,9 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
    * the same `meansAreSuppressed`, so a PNG exported mid-run still refuses the mean on the bitmap
    * — § D294's concern — while claiming nothing about how the day ends. The engineer strings
    * themselves are unchanged, byte for byte; what moved is *when* the banner earns them, which is
-   * the distinction § D299 § 1 permits. A decision number is owed for the gate.
+   * the distinction § D299 § 1 permits. **The gate is recorded here rather than in
+   * `DECISIONS.md`, under § D405**: it is § D307's temporal rule applied to one banner, and the
+   * honesty sweep's seventh property holds it closed rather than this docstring.
    */
   if (playheadHasReachedEnd(recording, frame)) {
     if (casual) {

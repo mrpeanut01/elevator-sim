@@ -90,7 +90,9 @@
  * That is the same refusal shape as a bar that does not reproduce: unjudged is not passed. It is a
  * *raised* bar rather than a changed verdict — no stage that was refused before is cleared now —
  * and the caller that has to grow a second run is `dev/campaignPanel.ts`, which this lane does not
- * own. A decision number is owed for all of it.
+ * own. **Recorded here rather than in `DECISIONS.md`, under § D405**: this is § D355's holdout
+ * rule enforced in code rather than moved — a caller that supplies one batch gets `cleared: false`
+ * from the function itself, so the binding is the signature and not this prose.
  *
  * ## R11 and R2, structurally
  *

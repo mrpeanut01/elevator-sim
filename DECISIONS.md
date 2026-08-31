@@ -27534,6 +27534,505 @@ register, and a register covers what it names.
 
 ---
 
+## D404 — a lane's decision numbers are pre-allocated as a block at dispatch, and an unused one stays a hole
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Closes: GitHub issue #173, half one.**
+
+**Decision.** **The integrator pre-allocates a contiguous block of decision numbers to each lane in
+that lane's dispatch brief, before any lane starts work.** A lane allocates only from its own block,
+sequentially from the bottom, and reports the highest number it used. A number allocated and not
+used is **left unused permanently** and recorded in
+`packages/experiments/src/validation/documentation.test.ts#KNOWN_DECISION_HOLES`. At integration the
+integrator reconciles [`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md)'s *Next free decision number*
+row **once**, from the merged tree.
+
+### Why a lane cannot allocate its own
+
+Not because lanes are careless — because the information required is not available to them. A branch
+cannot see another branch. `main`'s highest heading is a lower bound on what is taken and never an
+upper one, so two lanes reading the same true number both compute the same next one.
+
+This is measured rather than feared. **Two lanes both claimed § D336 and one had to be renumbered at
+integration.** Before that, § D366's own preamble records the near-miss that predicted it: `main`
+ended at D360, and `integration/m2-wave-c` was already holding **D361–D365** on a branch — *unmerged,
+invisible from `main`, and unreserved*. That block only started at the right number because somebody
+thought to probe another branch by hand.
+
+The consequence a reader should carry away is the second-order one. Lanes did the safe thing: they
+stopped claiming headings and wrote the owed-decision marker in a docstring instead. **That is
+why there were sixty-four of them.** The backlog was not negligence; it was the correct local
+response to an allocation scheme that could not serve a lane, and it will come back the moment this
+rule stops being followed.
+
+### Where a lane looks, and the one place it must not
+
+**A lane's numbers are in its own dispatch brief, and nowhere else.** In particular a lane must
+**not** read `CHARTER_PROGRAMME.md`'s *Next free decision number* row and take from it. That row is
+an **integrator input** — it is how the next wave's blocks are computed — and a lane that allocates
+from it is doing exactly the racing thing this decision exists to stop. It is also, by construction,
+stale for the whole duration of a wave, because every lane's entries are unmerged while the wave is
+open.
+
+`documentation.test.ts` asserts that row equals the derived highest **+ 1**, so the reconciliation is
+checked rather than trusted. That case predates this decision and is what makes the row safe to
+treat as authoritative *between* waves.
+
+### The allocation is written where something can read it
+
+**Until this decision, the only record that wave H had reserved D396–D414 was the text of five
+dispatch briefs** — ungreppable, and gone when the wave closed. So the block is also recorded in
+`documentation.test.ts#OPEN_RESERVATION`, and three things are checked off it that were not checked
+before:
+
+- the charter row names the block's **floor** while the wave is open, which is what it actually says
+  during a wave and what the *"highest + 1"* form asserted was wrong — that form is true only of an
+  integrated tree and was red on every lane branch of this wave, all five at once;
+- **no lane writes above its block's ceiling**, which used to be discovered at integration;
+- and when every number in the block heads a decision or is a registered hole, the case **fails
+  until the reservation is closed and the charter row reconciled**. Between waves the assertion is
+  `highest + 1` byte for byte, so nothing about the settled check is relaxed.
+
+That last one is the point. Reconciling the row was a thing an integrator remembered, and D387 is
+what one un-remembered reconciliation costs.
+
+### A lane that needs more than its block asks for more
+
+It does not take the next number above its block: the lane above may hold it, and taking it silently
+is the collision in its original form. The integrator can extend a block upward when the adjacent one
+is undispatched, or grant a fresh block above the highest dispatched number. Asking costs a message;
+guessing costs a renumbering, and renumbering is what `RISKS.md` R1 forbids — ids here are **names**.
+
+### Evidence that this works, and the failure it introduced
+
+Three waves have now run on it — **F took D386–D392, G took D393–D395, and H's five lanes took
+D396–D403 and D404-upward** — with **no collision in any of them**, against two collisions in the two
+waves before it.
+
+**It introduced one new failure mode and this decision closes it in the same breath.** **D387 was
+allocated to wave F and never written.** Nothing noticed for a wave, because nothing was looking:
+`DECISION_HEADING` is anchored and a number that heads nothing simply leaves the derived set. So the
+rule above is not only *pre-allocate* — it is *pre-allocate and register what the block did not
+spend*.
+
+**The unused number is not backfilled and not returned to a pool.** Backfilling D387 with an
+unrelated later decision would make that id denote two things across time, which is precisely what
+R1 forbids and what makes the one registered duplicate (D63) a known defect rather than a style. It
+would also falsify the charter's own record that D386–D392 *was wave F's block. A hole is cheap; an
+ambiguous id is not.
+
+### The register catches the other cause too, and that is why it carries a reason per entry
+
+A number can head nothing for two reasons, and they need opposite responses. The second is a defect:
+**a heading that stopped being a heading.** Wave G's integration merged § D393's closing sentence and
+§ D394's heading onto one line, so D394 became body text; five `§ D394` citations in `.ts` files then
+named a section the file no longer carried, and **neither gate saw it** — mutation-validated by
+re-breaking the heading and watching both pass. `KNOWN_DECISION_HOLES` therefore stores a *reason*
+rather than a bare number, and an unregistered hole fails with both causes named in the message. A
+bare list would have accepted an eaten heading as bookkeeping.
+
+`validation/citations.test.ts` is the other half and was widened in the same wave to read `.ts` as
+well as markdown, because that is where most `§ Dnnn` citations in this repository live — **3 350
+against markdown's 3 119**, so more than half the citations were unchecked.
+
+### Validation — eleven mutations, each putting a case *into* scope rather than removing one
+
+Every instrument named above was shown able to fail, and reverted:
+
+| mutation | what went red |
+|---|---|
+| a temporary site carrying the owed-decision marker | the ratchet, `6 … against a ceiling of 5` |
+| a citation to a **D999** that does not exist, in a markdown document (spelled here without the section sigil, for the reason above) | the citation gate, naming the file |
+| the same dangling **D999**, in a **`.ts` docstring** | the citation gate — **and the pre-widening gate, run against the same mutated tree, passed 4/4** |
+| § D394's heading re-merged into § D393's last sentence | *both* gates: the hole register names `394`, the citation gate names all eight citing sites |
+| a `## D418` heading | *a lane may not take a number its block does not hold* |
+| the reservation's floor moved to 404, as if lanes A–D had merged | the charter row check and the hole boundary, together |
+| the reservation closed while the wave is open | the between-waves branch, with its original `highest + 1` message intact — `expected 396 to be 418` |
+| the marker pattern narrowed to something no site says | the pattern's control string, `expected +0 to be 1` |
+| **the debt simulated to zero with the old `owed > 0` guard restored beside the new ones** | **only the old guard**, `expected 0 to be greater than 0` — which is the whole argument for replacing it |
+| a `## D387` heading, filling a registered hole | *a number registered above as a hole now heads a decision* |
+| `SKIP_DIRS` widened to swallow `packages/` | the walk's own guard, `expected 79 to be greater than 500` |
+
+The ninth is the one to keep. It is the state this issue is trying to reach, and the guard that was
+supposed to protect the gate is the only thing that fails in it.
+
+### What is not claimed
+
+Nothing here says a wave must know its decisions in advance; a block is a reservation of *ids*, not a
+plan of *entries*, and under-spending one is expected. Nothing here changes how a decision is
+argued or where the argument lives — that is § D405. And this rule governs `DECISIONS.md` only; the
+`Tnn` lane-record series in this file are history and are never allocated from again.
+
+**Two things this wave found and did not fix, recorded so they are not re-found.** `DECISIONS.md`'s
+own preamble says *"142 entries span D1–D149"* against a file that now carries 400 headings spanning
+D1–D417; its list of gaps is correct but predates D387. It is `RISKS.md` R38 in the file this
+decision is about, and it is left standing because the preamble is outside this lane's territory and
+because the derivation above is now the authority — where the two disagree, the register is the
+measurement. Separately,
+[`docs/24-competitive-teardown.md`](docs/24-competitive-teardown.md) cites
+[`MULTI_AGENT_PLAN.md`](MULTI_AGENT_PLAN.md) § 0 for the rule *"numbers are allocated at
+integration, never inside a lane"*, and **§ 0 does not state it** — a rule cited to a section that
+does not carry it, which is the citation gate's own defect class in a form neither half of it
+checks. The rule it should have cited is this one.
+
+---
+
+## D405 — a decision is recorded in the relevant doc, and a numbered entry is for the ones that reach past their own module
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Closes: GitHub issue #173, half two.**
+
+**Decision.** [`CLAUDE.md`](CLAUDE.md)'s working agreement — *"If you hit a decision the docs don't
+cover, record it in the relevant doc rather than only in a commit message"* — is satisfied, for a
+decision **local to one module**, by that module's own docstring. A numbered `DECISIONS.md` entry is
+owed when **any** of the following holds, and not otherwise:
+
+1. **It binds code or documents the deciding module does not own.** A reader working elsewhere must
+   obey it and would never find the docstring.
+2. **It moves, narrows, refuses or deviates from something already recorded** — a numbered decision,
+   an invariant, or a specification the product is measured against. A numbered thing may only be
+   moved by a numbered thing, and a deviation from a spec has to be findable from the spec.
+3. **A document refuses to cite itself without one.** Several specifications here say outright that
+   they carry no `§ D` citation of themselves until an entry exists; the entry is then the
+   deliverable, and its content may be nothing more than an anchor.
+
+**A site settled under this decision cites `§ D405` and does not re-argue it.** One rule, one place.
+Thirty-odd bespoke paragraphs each explaining why *this* site needs no entry would be the
+write-it-in-four-places defect this repository keeps recording, and every one of them would go stale
+independently.
+
+### What went wrong, and it was a reading rather than a lapse
+
+The working agreement says *the relevant doc*. It was read as *`DECISIONS.md`*, and those are not the
+same claim: for a decision whose whole reach is one module, the relevant doc **is** the module. Read
+the stricter way, every argued choice in the tree owes an entry, which is unachievable — so lanes
+wrote the argument in the docstring, marked the number as owed, and moved on. Sixty-four times.
+
+**The mitigating half was real and is why this is a re-classification rather than a rescue.** Not one
+of those sites lost its argument. Every one carried the reasoning in prose beside the code it
+governs, which is the harder half of the working agreement and the half that actually helps the next
+reader. What was missing was a *number*, and a number is only worth having when somebody needs to
+cite it.
+
+### The marker is a debt, and it now costs something
+
+The owed-decision marker — the one sentence `documentation.test.ts` greps the tree for, spelled
+out there and deliberately not repeated here — is a claim that this site is incomplete. That file's
+ratchet counts them and may only fall. So a lane writing the phrase is taking on debt the wave must
+discharge, and a lane that means *this is recorded where it belongs* should say **that** instead, and
+cite this decision.
+
+**Write *about* the marker by naming it; do not utter it.** The ratchet is a grep and cannot tell a
+debt from a discussion of one, and this entry's first draft put the count up by three by quoting the
+sentence three times — the same trap that makes `documentation.test.ts` exclude its own file by path,
+arriving one level up in a file that cannot be excluded, because `DECISIONS.md` carries real markers
+of its own. It is the shape of `citations.test.ts`'s convention for a retired record's number, which
+is written *"its own decision 83"* without a section sigil: **a gate that greps prose imposes a way
+of writing about itself, and the answer is the convention rather than a cleverer pattern.** A pattern
+narrowed to miss a quotation would also miss a real site written as one.
+
+### What this does not license
+
+It does not license moving an argument out of `DECISIONS.md` into a docstring to make a count fall.
+Nothing already numbered is unnumbered by this decision, and the three criteria are tested against
+what a decision *reaches*, never against how inconvenient the entry would be. It also does not make
+a docstring optional: a module-local decision recorded in neither place is the original defect, and
+the working agreement is unchanged.
+
+---
+
+## D406 — the experiment matrix's eight cells live in their own module, because the data is browser-safe and its home was not
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering only; the decision is Everyday Mode slice 7's
+and its argument is `packages/experiments/src/benchmark/matrixCells.ts`.**
+
+**Decision.** `MATRIX_CELLS` lives in `benchmark/matrixCells.ts`, is re-exported byte-identically by
+`benchmark/matrix.ts` so every existing import path is unchanged, and is exposed on
+`packages/experiments/src/browser.ts` so `packages/viz/src/batch/suite.ts` can **import** the fixture
+list rather than retype it.
+
+**Numbered under [§ D405](#d405) criterion 1**: the rule *"never retype the cells"* binds four
+modules and one document that `matrixCells.ts` does not own, and a builder in `viz` who has not read
+that docstring is exactly the reader it has to reach. `docs/18` records what a hand copy produces —
+the matrix's eight are building × traffic-pattern cells over **five** buildings while `data/buildings/`
+holds **eight** buildings, so a list assembled from "the eight buildings" disagrees with the operating
+points this project actually measures.
+
+**The placement was measured before it was decided**, which is the part worth keeping. The cells are
+pure frozen data whose only import is a type already on the browser graph; the *module* was the
+blocker, because `matrix.ts` reaches `validation/harness.js` → `node:url` and the tuning reports →
+the runner, so re-exporting from there would put a `node:` edge into every bundle. The `data/`
+fallback `docs/18` names was rejected on its own ground: the cells embed per-cell derived budget
+bases and the prose that argues them, which are measurement records rather than reference data, and
+a JSON copy would need a schema, a loader and a validation pass nothing else wants.
+
+`browser.ts`'s surface is deliberately narrow — the list and the lookup, not `EXCLUDED_CELLS` and not
+the study runners — because a name on that barrel is a promise its guard must keep.
+
+---
+
+## D407 — a watched run is verified by re-simulation, and the pill may not say what the spec says
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering and ruling on one substitution; the design
+argument is `packages/viz/src/watch/types.ts` and its eight siblings.**
+
+**Decision.** `packages/viz/src/watch/` and `dev/watchPanel.ts` implement GAMEPLAY § 14.1 and
+ENGINE_CONTRACT § 1.5 with **one substitution, and it is the reason this is numbered**:
+`ENGINE_CONTRACT` § 1.5 says the replay is *"the identical computation the server performs to verify
+a post, which is why the pill can honestly say **verified by the server**."* **There is no server in
+this product.** The pill says `REPLAY_PILL_VERB` — *verified by re-simulation* — and `watch/view.ts`
+owns the wording.
+
+**Numbered under [§ D405](#d405) criterion 2**: this is a deviation from a specification the product
+is measured against, and a deviation recorded only in the deviating module is unfindable from the
+spec. The other nine sites in that directory are module-local and carry their arguments where they
+belong; they cite this entry rather than restating it.
+
+**The distinction is not pedantry, and the spec's own sentence says why it matters.** *Verified by
+the server* is a claim about an adversary: a forged submission was refused by a party the player does
+not control. Re-simulation on the player's own machine, over a record the player's own machine wrote,
+refuses **staleness** and refuses nothing else — a record whose figures no longer reproduce is
+caught, and a record somebody edited to match its own lie is not. Saying the stronger sentence would
+be this repository's named failure: a true-sounding claim about a check that did not happen.
+
+**What a record is** stays as the modules argue it: a `WatchRecord` is the *question* — seed,
+configuration, intervention log — never the answer, because a `VizRecording` is megabytes of step
+series that `persist/types.ts` already refuses to store on the ground that it is a pure function of
+the two. Watching is re-asking the simulator the same question.
+
+---
+
+## D408 — the session envelope's version moves for a new **value**, not only for a new key, and the newer direction stays a refusal
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the rule three paragraphs of
+`packages/viz/src/persist/types.ts` had each argued separately.**
+
+**Decision.** `SESSION_SCHEMA_VERSION` moves whenever the payload can say something an older reader
+has never seen — **whether the novelty is a key or a value** — and the two questions that decide a
+bump are asked in order at every one:
+
+1. **Does the absence determine the value?** If a build that could not write the field also could not
+   have had the thing, the completion is a *measurement* rather than a default.
+2. **Can an older build read what this one writes?** If not, the number moves.
+
+A build meeting a version it does not read refuses it as **newer**, never as **damaged**.
+
+**Numbered under [§ D405](#d405) criterion 1**: this governs every future bump by anybody, in any
+module that adds a field to a persisted shape, and `validate.ts` enforces half of it from a different
+file. It is the one rule the three paragraphs share; each application stays where it is argued.
+
+**The rule was read backwards off the evidence, which is why it is stated in both directions.**
+`validate.ts`'s extra-key branch already said *"the envelope version should have changed when that
+field landed"* — but only ever in the direction that **adds keys**. Version 5 added none: the
+worst-wait goal widened three value domains inside the week's persisted readings (`reads` gained
+`worstWaitS`, `unit` gained ` s`, the missed glyph became `×`), and a version-4 build checks those
+against **its** closed lists, so a session written by the newer build would have been refused as
+*damaged* — the exact false accusation the version-3 paragraph records. Version 6 then added a key one
+level deeper than any bump had reached (`DayOutcome.record`), and version 7 added keys at **two**
+depths at once. All three are the same rule; only the shape of the novelty changed.
+
+---
+
+## D409 — the DC-1 case is refused for the campaign, and the mechanism it wanted already ships elsewhere
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the verdict
+[`docs/33-difficulty-curve.md`](docs/33-difficulty-curve.md) § 3.3 reached and measured.**
+
+**Decision.** The DC-1 case — giving campaign stage 1 the failable count goal [§ D355](#d355) removed
+— is **refused**, on a measurement rather than on taste: the change does produce a failable count
+goal, and it breaches DC-2 or DC-2b, one or the other, unavoidably, in the same move.
+
+**Numbered under [§ D405](#d405) criterion 2**: it is a refusal to re-open something already
+numbered, and a refusal recorded only in the document that proposed it is a refusal the next lane
+will re-derive from scratch.
+
+**The refusal is scoped to the campaign and is not a verdict on the mechanism**, which is the half a
+later reader will need. The gameplay case for a failable count goal is good; what is refused is
+putting it on stage 1 of the campaign, where the curve rules bind. The mechanism already ships — in
+`data/fixit-cases.json`, on the mode whose building can actually show the fault — so nothing is lost
+by the refusal except the placement.
+
+---
+
+## The five M1 specification documents get their anchors — the block §§ D410 to D414
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Raised by GitHub issue #173.**
+
+**Why they are one block and why the entries are short.** Five M1 documents landed saying, in almost
+the same words: the owed-decision marker, then *"… and this document carries no `§ D` citation of itself
+until that entry exists"*. Each is [§ D405](#d405) criterion 3 exactly: **the anchor is the
+deliverable**. So each gets its own heading and its own number — they are five different subjects and
+a shared number would make `§ D410` ambiguous — recorded together because they were settled in one
+sitting, on the § D366 block's precedent.
+
+**These entries take no decision.** The decision in each case is the document, which landed and was
+accepted; what was missing was a citable id. Nothing below adds a ruling its document does not
+already carry, and where a document's own § is named, that § is the authority and this entry is the
+label.
+
+---
+
+## D410 — `docs/22-charter.md` is adopted, and its § 7 open items stay open
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/22-charter.md`](docs/22-charter.md) governs the game layer: its vision, its promise, its ten
+success criteria S1–S10 and its non-goals. This entry is the number § 7's first bullet asks for.
+**The other bullets of § 7 are unaffected and remain open** — the brief must link here, and README
+must quote the vision and promise verbatim — because they are edits to files that document does not
+own, and an adoption number does not discharge them.
+
+---
+
+## D411 — `docs/25-vertical-slice.md`'s slice definition is adopted
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/25-vertical-slice.md`](docs/25-vertical-slice.md) § 8's first bullet. **The seed is still not
+chosen** — § 1.6 pins the rule and X7 says what the run that chooses the integer must assert — and
+this entry does not choose it. An anchor for a slice definition is not a measurement of the slice.
+
+---
+
+## D412 — `docs/26-telemetry-and-privacy.md` § 1's posture is adopted, and it creates no telemetry module
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/26-telemetry-and-privacy.md`](docs/26-telemetry-and-privacy.md) is a specification: no `.ts`
+file, no `data/*.json` file and no shipped string. **The number does not license the schema.** The
+document's own § 11 lists what it does not settle — the lawful basis, the published privacy notice,
+whether an age statement is needed, and the visible-trouble threshold and dwell — and **all of those
+remain unsettled and are human decisions**. This entry answers the first bullet of § 11 and no other.
+
+The ordering that document argues is part of what is adopted: #202's material comes before #201's
+because the order is not recoverable. Data collected without a posture cannot be un-collected, and a
+schema written first *becomes* the posture by default.
+
+---
+
+## D413 — `docs/30-playtest-programme.md` § 2's governing rule and § 6.5's verdict gate are adopted
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/30-playtest-programme.md`](docs/30-playtest-programme.md) is a specification and **no round has
+been run against it**. Where it says *the moderator does X* it is an instruction for a round that has
+not happened, and this number does not convert one into a report of one that has. The `docs/30 Q1`–`Q12`
+series it opens in § 2.2 is cited with its document, per [§ D343](#d343).
+
+---
+
+## D414 — `docs/35-problem-per-mode.md` is adopted
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/35-problem-per-mode.md`](docs/35-problem-per-mode.md), whose header asked for a number and
+proposed **D361** — a number wave C had already taken on a branch it could not see, which is
+[§ D404](#d404)'s subject arriving in the very document that asked for it. The number is D414. The
+document's content is unchanged by the renumbering, which is the point of ids being names.
+
+---
+
+## D415 — the rule vocabulary ships eight of GAMEPLAY § 11.5's ten actions, and the two omissions are the model's refusal made once
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the refusal
+`packages/core/src/config/types.ts#RULE_ACTIONS` argues and two surfaces inherit.**
+
+**Decision.** `RULE_ACTIONS` declares **eight** ids. GAMEPLAY § 11.5 lists ten; the two it does not
+declare are **refused by omission**, and the refusal is made once — in the vocabulary, beside the
+model — rather than a second time on every screen that offers a rule.
+
+**Numbered under [§ D405](#d405) criterion 2**: it deviates from a specification the product is
+measured against, and a reader comparing § 11.5 against the shipped editor finds two rows missing
+with nothing at the spec's end to say why.
+
+**The two reasons are different and both load-bearing.**
+
+- ***skip everything above floor v* is not offered** because service range is **building fabric**
+  (`servesFloors`), and § 11.4's own header carries the boundary sentence — *zoning and service
+  ranges belong to the building, not the dispatcher*. A dispatcher-side floor mask would be a second
+  source of truth about which floors a shaft serves, which is CLAUDE.md's *three kinds of zoning are
+  distinct concepts* one layer down.
+- ***treat up-calls as urgent* is not offered** because **no term in the cost library prices
+  direction-conditional urgency**. Every wait and starvation weight prices up and down calls alike,
+  so the honest compile would move both and the label would lie. That is invariant 7's boundary read
+  in the strict direction: a genuinely new *cost term* would justify new code, and until one exists
+  the action cannot be expressed.
+
+**The reworded alternative is a design-owner decision and is not taken here.** *Treat every call as
+urgent* is expressible — it is the starvation weight — and whether to offer it is a question about
+the surface rather than about the model. It is flagged, not answered.
+
+**The omission propagates by derivation rather than by repetition**, which is the half worth
+keeping. `authoring/ruleSpec.ts` and `everyday/workshopModel.ts` both build their offered list
+**from `RULE_ACTIONS`**, so the two actions are unbuildable on either surface without either screen
+carrying a refusal of its own. Two screens each declining a row in their own words would be two
+places to keep in step.
+
+---
+
+## D416 — the Workshop deviates from the handoff twice, and both times because the simulator wins about numbers
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the two deviations
+`packages/viz/src/everyday/workshopModel.ts` argues, and the `playStyles` block under them.**
+
+**Decision.** `everyday/workshopModel.ts` does not transcribe two pieces of the design handoff's
+copy, and **the six play styles are `data/dispatcher-profiles.json`'s `playStyles` block** rather
+than a table in the renderer.
+
+**Numbered under [§ D405](#d405) criterion 2**: [`docs/12-design-handoff.md`](docs/12-design-handoff.md)
+makes the handoff canonical for the interface and exists to record *every deviation with the
+constraint that forced it*. A deviation recorded only in the deviating module is exactly what that
+document is for and does not have.
+
+**Deviation 1 — § 11.3's sign sentence is replaced, not transcribed.** The handoff says *"distance
+and a full car push a score up; a long wait pushes it down"*. That is true of its own toy simulator
+and **false of this one**: `CostTermDefinition.evaluate` must return a non-negative value — *a cost,
+never a bonus* — and the weighted sum is added, so nothing on the printed line can pull a score down.
+`mathsDisclosureOf` says what is true instead, and it is the more useful sentence anyway: every term
+is a kind of badness, and a weight decides which kind outranks which. This is CLAUDE.md's two-halves
+rule applied exactly as written — the handoff wins about what the screen looks like, the simulator
+wins about what a number means.
+
+**Deviation 2 — the style cards' trade sentences are re-authored in `data/`.** Two of
+`ENGINE_CONTRACT` § 6.2's are claims of *quality* — *"the biggest single win on a busy morning"* —
+and § 11.1's own rule for this copy is *"one plain sentence about the trade, not a claim of
+quality"*. The spec's copy fails the spec's own rule; the rule wins.
+
+**And the styles are data because invariant 7 says so.** A play style is a weight vector with a
+name. A renderer holding six names against six profile ids is the forbidden
+`if (strategy === 'nearest-car')` table with a friendlier key.
+
+---
+
+## D417 — *took the stairs* is an overlap, and every surface that names it says so
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the caption rule
+`packages/viz/src/shift/report.ts#stairsNote` argues.**
+
+**Decision.** `Observations.abandoned` counts **waits that crossed the abandonment horizon**,
+whether or not a car eventually came. It is a name for an *attribute*, never a fourth disjoint
+outcome — so **every surface that publishes it publishes the overlap with it**, from
+`Observations.abandonedCarried`, folded in the same pass as both counts so the three cannot disagree,
+and against the run's **own** horizon (`Observations.horizonS`) rather than a hard-coded fifteen
+minutes.
+
+**Numbered under [§ D405](#d405) criterion 1**: it binds four surfaces in three modules that
+`report.ts` does not own — its own note, the lever clause, `mode/casualDay.ts`'s Casual lead, and the
+goal label's window — and a fifth surface added tomorrow has to obey it without reading
+`stairsNote`'s docstring.
+
+**The defect it closes is arithmetic a reader does in their head.** The sheet printed `CARRIED 768
+of 768 who turned up` beside `TOOK THE STAIRS 348` with nothing connecting them: on a saturated
+no-patience run nobody actually leaves, so every one of those legs boards and lands inside CARRIED,
+and a reader totalling the people gets **1 116 out of 768**. Both counts were right. The captions
+treated overlapping cells as adding ones, which is this project's own standing failure — a true
+number in a frame that makes it mean something false.
+
+**It is CLAUDE.md's *beside, never folded in* rule, one register down.** Abandonment is published
+beside AWT and never inside it, on the footing `workPerServedLegKJ` sits beside raw energy; this says
+the same thing about the *caption* rather than about the statistic. The sentence *overlap, not an
+addition* is the whole reason the cell carries a note at all.
+
+---
+
 ## D418 — `experiments` takes the simulating timeout, and the sentence that said it had no reason to is the finding
 
 **Date: 2026-08-29 · Owner: integrator, wave H · Closes: GitHub issue #310. Third application of

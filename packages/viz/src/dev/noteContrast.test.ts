@@ -1,6 +1,6 @@
 /**
  * The change-scope notes are legible — a **number** per class, per theme, per ground.
- * GitHub issue #124. A decision number is owed for this file; the argument is here.
+ * GitHub issue #124. Recorded here rather than in `DECISIONS.md`, under § D405.
  *
  * ## What was missing, and why it mattered more here than for most text
  *

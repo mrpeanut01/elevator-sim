@@ -1313,8 +1313,9 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
  * the three shapes the overlap takes; none of them re-states the cell's value, and the sentence
  * *overlap, not an addition* is the whole point of the cell carrying a note at all.
  *
- * A decision number is owed for the cohort captions (this note, the lever clause, the Casual lead
- * in `mode/casualDay.ts`, and the goal label's window); this docstring is the argument.
+ * **The cohort-caption rule is § D417** — this note, the lever clause, the Casual lead in
+ * `mode/casualDay.ts` and the goal label's window all obey it, which is why it is numbered rather
+ * than left here: a fifth surface has to obey it without reading this docstring.
  */
 function stairsNote(observations: Observations, summary: VizSummary): string {
   const horizon = horizonLabelOf(observations.horizonS);

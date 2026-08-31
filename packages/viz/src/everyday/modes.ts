@@ -193,8 +193,9 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
      * refusal is a second copy of a figure that has already gone stale once in this row, and it
      * would sit in the one place no test reads — the branch that does not evaluate. The subject
      * is the screen rather than the cases behind it, which is this table's own wording rule.
-     * A decision number is owed for both halves of that: the countless refusal, and the count
-     * being bound to `data/fixit-cases.json` instead of to a reader's diligence.
+     * **Recorded here rather than in `DECISIONS.md`, under § D405** — both halves are about this
+     * table's own wording rule: the countless refusal, and the count being bound to
+     * `data/fixit-cases.json` instead of to a reader's diligence.
      */
     unavailable: unlessBuilt('the cases run, but their Everyday screen is not built yet', 'fixit'),
   }),

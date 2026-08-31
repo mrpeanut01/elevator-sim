@@ -45,7 +45,10 @@
  * one block over; an Everyday-only surface would not render it, and rule 11 is about what is
  * rendered, not what the model can say to an engineer.
  *
- * A decision number is owed for the ownership mapping above; the argument is this docstring.
+ * **Recorded here rather than in `DECISIONS.md`, under § D405.** The mapping is local to this
+ * module and checkable by identity: every lever's `serves` clause is the term's own
+ * `player.serves` from `core`, so a lever and the slider it aliases cannot describe one weight in
+ * two vocabularies.
  */
 
 import { COST_TERMS_BY_ID } from '@elevator-sim/core/browser';

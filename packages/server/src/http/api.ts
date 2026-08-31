@@ -688,7 +688,11 @@ async function me(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
  * token has always got, so trying it twice does not distinguish a deleted account from one that
  * never existed.
  *
- * A decision number is owed; the argument is here and in `Store.deleteUser`.
+ * **Recorded here rather than in `DECISIONS.md`, under § D405.** The route itself is § D358 —
+ * *an account can be deleted, and a raced write against a deleted one is a domain error* — which
+ * already rules that the id comes off the session and the route reads no other identity. What
+ * this docstring adds is local to it: which budgets are cleared, which are not, and why a 200 is
+ * returned over a token that is dead before the caller reads it.
  */
 async function deleteAccount(
   deps: ApiDeps,

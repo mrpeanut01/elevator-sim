@@ -303,7 +303,8 @@ be met by cutting a figure, S9 is not met — and the change is refused under P2
 
 Recorded here because a charter that hides its own open items is the defect it exists to prevent.
 
-- **A decision number is owed** for this adoption, and is allocated at integration.
+- ✅ **The adoption is [§ D410](../DECISIONS.md)** (2026-08-29). That entry is an anchor and takes
+  no decision of its own; the other bullets in this section are unaffected and stay open.
 - [`00-project-brief.md`](00-project-brief.md) must link here and state that this document governs
   the game layer (#186). Not done by this document — it does not own that file.
 - The vision and promise must be quoted verbatim in [`README.md`](../README.md)'s opening section

@@ -1248,6 +1248,115 @@ const decisionNumbers = (): readonly number[] =>
 const KNOWN_DUPLICATE_DECISIONS: readonly number[] = Object.freeze([63]);
 
 /**
+ * Every number below the highest that heads **no** decision, with the reason it heads none.
+ *
+ * ## Why a hole needs a register at all
+ *
+ * A duplicate is loud — two headings, one number, and a `§ Dnnn` that resolves to both. A hole is
+ * silent, and there are two ways to make one:
+ *
+ * 1. **A number is allocated and never written.** [§ D404](../../../../DECISIONS.md) pre-allocates a
+ *    block per lane at dispatch, so a lane that lands fewer entries than its block leaves the
+ *    remainder unused. **D387 is one**: wave F took D386–D392 and only six of the seven were
+ *    written. Nothing noticed for a wave.
+ * 2. **A heading stops being a heading.** Wave G's integration merged § D393's closing sentence and
+ *    § D394's heading onto one line — `it.## D394 — …` — and D394 silently left
+ *    {@link decisionNumbers}, because {@link DECISION_HEADING} is anchored at the start of a line.
+ *    Five `§ D394` citations in `.ts` files then named a section the file no longer carried, and
+ *    `citations.test.ts` read markdown only, so **neither gate saw it**. That is mutation-validated
+ *    rather than argued: with the heading re-broken, both files passed.
+ *
+ * The second is a defect and the first is not, which is exactly why the register carries a reason
+ * per entry rather than a bare list. A hole with a reason is bookkeeping; a hole without one is an
+ * eaten heading nobody has looked at yet.
+ *
+ * ## Why an unused number is left unused
+ *
+ * § D404 rules it: the hole is permanent, and it is recorded here. Backfilling D387 with an
+ * unrelated later decision would make the id mean two things across time — `RISKS.md` R1's rule for
+ * this file is that ids are **names**, not indices — and it would falsify the charter's own record
+ * that D386–D392 was wave F's block. Returning it to a pool is the same defect wearing a queue.
+ *
+ * ## The historic nine are a different cause, and the file already says so
+ *
+ * D44, D55 and D78–D84 were used by **per-lane records** — `validation/DECISIONS-T20.md` and its
+ * siblings — that were folded into this file without their numbers being remapped.
+ * `DECISIONS.md`'s own preamble records that, and prescribes the convention this repository now
+ * uses: a retired record's number is written *"its own decision 83"*, without the section sigil, so
+ * it cannot be mistaken for a heading a reader could open. Two docstrings in `core/src/metrics/`
+ * were still citing one **with** the sigil until 2026-08-29, and the widened `citations.test.ts`
+ * is what found them.
+ *
+ * That preamble is prose and this is a derivation; where they disagree, this is the measurement.
+ */
+/**
+ * The block of decision numbers this wave has reserved, or `null` between waves.
+ *
+ * ## Why the allocation has to be readable by something
+ *
+ * [§ D404](../../../../DECISIONS.md) rules that the integrator pre-allocates a contiguous block per
+ * lane at dispatch. Until this constant existed, **the only record of that allocation was the text
+ * of the dispatch briefs** — five prompts, ungreppable, gone when the wave closed. The charter's
+ * *Next free decision number* row is not that record either: it is written **after** integration, so
+ * for the whole duration of a wave it names a number the wave has already handed out.
+ *
+ * ## What it fixes, and it is not cosmetic
+ *
+ * The case below asserted `declared === highest + 1`. That is true of an integrated tree and
+ * **false on every lane branch of every wave that uses blocks**: the moment a lane writes its first
+ * entry its own branch has a higher number than the row, by construction. Wave H made it red on
+ * five branches at once. A gate that is red on every branch is the failure § D91 records for
+ * wall-clock gates — people route around it, and the case that catches a *genuinely* stale row goes
+ * with it.
+ *
+ * With a reservation open, the row is checked against the block's **floor** — which is what the row
+ * actually says during a wave — and the highest heading is checked against the block's **ceiling**,
+ * which is new: a lane that writes past its allocation is now caught rather than discovered at
+ * integration. With no reservation open the assertion is `highest + 1`, byte for byte what it has
+ * always been, so nothing about the between-waves check is relaxed.
+ *
+ * ## Emptying it is a checked step, not a habit
+ *
+ * When every number in the block heads a decision or is a registered hole, the wave's numbering is
+ * done and the case below **fails until this is set to `null` and the charter row reconciled**. That
+ * reconciliation was previously a thing an integrator remembered; D387 is what happens when one is
+ * not remembered, and it went unnoticed for a wave.
+ */
+const OPEN_RESERVATION: {
+  readonly wave: string;
+  readonly from: number;
+  readonly to: number;
+} | null = {
+  wave: 'H',
+  from: 396,
+  // Lanes A–D hold D396–D403; lane E's block was dispatched open-ended ("D404 upward") and it
+  // reports 417 as the highest it used, which is what an open-ended block's ceiling means.
+  to: 417,
+};
+
+const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
+  [44, 'used by a per-lane record folded in without remapping — DECISIONS.md’s preamble'],
+  [55, 'used by a per-lane record folded in without remapping — DECISIONS.md’s preamble'],
+  [78, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
+  [79, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
+  [80, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
+  [81, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
+  [82, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
+  [
+    83,
+    'the T20-era per-lane records’ own numbering; two core/src/metrics docstrings cited it as a ' +
+      'section of this file until 2026-08-29, and are retargeted at § T21-D1 and § T21-D2',
+  ],
+  [84, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
+  [
+    387,
+    'allocated to wave F in the block D386–D392 and never written. Left unused permanently under ' +
+      '§ D404: ids are names here, so backfilling it would make it denote two things across time ' +
+      'and would falsify the charter’s record of what wave F took.',
+  ],
+]);
+
+/**
  * Sites saying a decision number is owed, at the last measurement.
  *
  * A **ratchet**, not a pin: the count may fall freely and may not rise. An exact pin would go red
@@ -1271,8 +1380,25 @@ const KNOWN_DUPLICATE_DECISIONS: readonly number[] = Object.freeze([63]);
  * not a defect in it — but it means allocation is no longer deferrable to whenever it is
  * convenient, and a brief that says *put the argument in a docstring and say a number is owed*
  * now obliges the integrator to allocate before the branch can go green.
+ *
+ * ## 64 → 5, wave H, and the ceiling is the count rather than a round number
+ *
+ * Measured with this case's own expression at each step: **64 → 56 → 32 → 5**, on the commits that
+ * settled the sites. § D404 built the mechanism and § D405 ruled what an entry is *for* — the
+ * working agreement says *the relevant doc*, and for a decision whose whole reach is one module the
+ * relevant doc **is** the module — after which most of the backlog was re-classified rather than
+ * written up, and eight sites turned out to be answered by decisions that already existed.
+ *
+ * **The five that remain are named, because an unexplained remainder is where a backlog restarts.**
+ * They are the sites lane E's territory excluded, not sites it judged: two in `CLAUDE.md`'s Phase 9
+ * row (the honesty string counts moved by #127 and #137, and #137's per-side counts) and three in
+ * `DECISIONS.md` below D404 (#137's counts again inside § D322, issue #140's run-identity refusal
+ * inside § D323, and § D366's preamble, which merely **quotes** the issue title and is not a debt at
+ * all). The last one is worth its own sentence: this ratchet counts a discussion of the marker as a
+ * use of it, which is why the convention for writing about it is to name it rather than utter it —
+ * see § D405. Over-counting is the safe direction for a ratchet; under-counting is not.
  */
-const DECISION_DEBT_CEILING = 64;
+const DECISION_DEBT_CEILING = 5;
 
 describe('the decision-number bookkeeping (GitHub issue #173)', () => {
   it('keeps the charter’s next-free number correct by derivation, not by transcription', () => {
@@ -1291,12 +1417,47 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
         'place a lane can reserve one; without it GitHub issue #173 has no answer at all.',
     ).not.toBeNull();
 
+    const row = Number((declared as RegExpExecArray)[1]);
+
+    if (OPEN_RESERVATION === null) {
+      expect(
+        row,
+        `DECISIONS.md's highest decision is D${String(highest)}, so the next free number is ` +
+          `D${String(highest + 1)}. The charter says otherwise, and a lane that trusts it will ` +
+          'reuse a number that is taken.',
+      ).toBe(highest + 1);
+      return;
+    }
+
+    // A wave is open, so see OPEN_RESERVATION: the row names the block's floor until the
+    // integrator reconciles it, and `highest + 1` is not a claim any single branch can make.
     expect(
-      Number((declared as RegExpExecArray)[1]),
-      `DECISIONS.md's highest decision is D${String(highest)}, so the next free number is ` +
-        `D${String(highest + 1)}. The charter says otherwise, and a lane that trusts it will ` +
-        'reuse a number that is taken.',
-    ).toBe(highest + 1);
+      row,
+      `wave ${OPEN_RESERVATION.wave} reserved D${String(OPEN_RESERVATION.from)}–` +
+        `D${String(OPEN_RESERVATION.to)}, so the charter row should still name the block's floor, ` +
+        `D${String(OPEN_RESERVATION.from)}. It names D${String(row)}. Either the row was ` +
+        'reconciled while the wave is still open, or the reservation above is wrong.',
+    ).toBe(OPEN_RESERVATION.from);
+
+    expect(
+      highest,
+      `D${String(highest)} is above wave ${OPEN_RESERVATION.wave}'s reservation, which ends at ` +
+        `D${String(OPEN_RESERVATION.to)}. A lane may not take a number its block does not hold — ` +
+        'the next lane holds it, and § D404 says to ask rather than to take.',
+    ).toBeLessThanOrEqual(OPEN_RESERVATION.to);
+
+    const numbering = new Set(numbers);
+    const unfinished: number[] = [];
+    for (let n = OPEN_RESERVATION.from; n <= OPEN_RESERVATION.to; n += 1) {
+      if (!numbering.has(n) && !KNOWN_DECISION_HOLES.has(n)) unfinished.push(n);
+    }
+    expect(
+      unfinished.length,
+      `every number in wave ${OPEN_RESERVATION.wave}'s block now heads a decision or is a ` +
+        'registered hole, so the wave’s numbering is finished. Set OPEN_RESERVATION to null and ' +
+        `reconcile the charter row to D${String(highest + 1)} on the same commit — that ` +
+        'reconciliation is what D387 shows nobody remembers when nothing asks for it.',
+    ).toBeGreaterThan(0);
   });
 
   it('lets no second decision number head two decisions', () => {
@@ -1327,6 +1488,53 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
     }
   });
 
+  it('heads a decision with every number up to the highest, or registers why it does not', () => {
+    const numbers = decisionNumbers();
+    const seen = new Set(numbers);
+
+    /*
+     * **Bounded at the open reservation's floor, not at the highest heading, and the difference is
+     * the whole reason this case can run on a branch.**
+     *
+     * Under § D404 the integrator pre-allocates a block per lane at dispatch, so while a wave is
+     * open every lane's branch holds entries the others cannot see. Bounded at the highest heading,
+     * this case would report *every other lane's unmerged block* as an unregistered hole — five
+     * lanes, eight numbers, on every branch of every wave. A gate that is red on every branch by
+     * construction is the failure § D91 records for wall-clock gates: people learn to ignore it.
+     *
+     * Below the floor, a number that heads nothing is a hole and needs a reason. At or above it, a
+     * number that heads nothing has simply not been merged yet, which is a fact about the wave
+     * rather than about the file — and the case above holds the wave accountable for it, by
+     * refusing to let the reservation be closed while any of its numbers is unaccounted for.
+     */
+    const boundary = OPEN_RESERVATION === null ? Math.max(...numbers) + 1 : OPEN_RESERVATION.from;
+
+    const holes: number[] = [];
+    for (let n = 1; n < boundary; n += 1) if (!seen.has(n)) holes.push(n);
+
+    const unregistered = holes.filter((n) => !KNOWN_DECISION_HOLES.has(n));
+    expect(
+      unregistered,
+      'a number below the highest heads no decision and is not registered above. Two causes, and ' +
+        'they need opposite responses: a heading that a merge or an edit stopped being a heading ' +
+        '(§ D394 — restore it, and note that every § Dnnn citation to it was dangling meanwhile), ' +
+        'or a number allocated to a lane that never wrote it (D387, written here without a ' +
+        'section sigil because it is a hole — leave it unused and add it ' +
+        'to KNOWN_DECISION_HOLES with that reason, per § D404). Guessing which is which is the ' +
+        'whole job; a bare number in the register hides an eaten heading.',
+    ).toEqual([]);
+
+    // The other direction, on `honesty.test.ts`'s OUTSTANDING rule and the duplicate register's:
+    // a register that can only grow is decoration. A hole that has been filled must leave it.
+    const filled = [...KNOWN_DECISION_HOLES.keys()].filter((n) => seen.has(n));
+    expect(
+      filled,
+      'a number registered above as a hole now heads a decision. Delete it from ' +
+        'KNOWN_DECISION_HOLES on the commit that filled it — but read § D404 first, because ' +
+        'filling one of these deliberately is exactly what that decision forbids.',
+    ).toEqual([]);
+  });
+
   it('does not let the "a decision number is owed" backlog grow', () => {
     /*
      * **The matcher's own file is excluded, and it has to be.** This case states the phrase it
@@ -1337,15 +1545,45 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
      * Excluded by path rather than by making the pattern cleverer: a pattern contrived to miss its
      * own text would also miss a real site written the same way.
      */
-    const owed = filesUnder(ROOT)
-      .filter((path) => !path.endsWith(join('validation', 'documentation.test.ts')))
-      .map((path) => (readFileSync(path, 'utf8').match(/decision number is owed/gu) ?? []).length)
+    const marker = /decision number is owed/gu;
+    const scanned = filesUnder(ROOT).filter(
+      (path) => !path.endsWith(join('validation', 'documentation.test.ts')),
+    );
+    const owed = scanned
+      .map((path) => (readFileSync(path, 'utf8').match(marker) ?? []).length)
       .reduce((total, n) => total + n, 0);
 
-    expect(owed, 'nothing matched, so this ratchet is watching nothing').toBeGreaterThan(0);
+    /*
+     * **The non-vacuity guard is on the instrument, not on the defect, and that is a repair.**
+     *
+     * It used to read `expect(owed).toBeGreaterThan(0)` — *nothing matched, so this ratchet is
+     * watching nothing*. The intent was right and the subject was wrong: that assertion is
+     * satisfied by **any single site anywhere**, so it never proved the scan reached the tree; and
+     * it goes red on the commit that settles the last one, which is the commit this whole gate
+     * exists to reward. A gate that fails when its subject is fixed teaches exactly one lesson —
+     * delete the assertion — and deleting it removes the only protection against a scan that reads
+     * nothing.
+     *
+     * So the two things that can silently break are asserted directly. The walk must find files:
+     * a `SKIP_DIRS` entry that swallowed `packages/`, or a suffix filter that stopped matching,
+     * would otherwise take `owed` to zero and *pass*. And the pattern must still match a real
+     * site's wording, checked against a control string rather than against the tree — a pattern
+     * edited to something narrower is the other way this reaches zero while the sites remain.
+     *
+     * With both in place, **`owed === 0` is a legitimate green** and means what it says.
+     */
+    expect(scanned.length, 'the walk found no files, so this ratchet is scanning nothing')
+      .toBeGreaterThan(500);
+    const control = 'A decision number is owed for the omission pair; the argument lives elsewhere.';
+    expect(
+      control.match(marker)?.length ?? 0,
+      'the marker pattern no longer matches a real site’s wording, so a tree full of them would ' +
+        'read as zero. This control is one of the sentences that was actually in the tree.',
+    ).toBe(1);
+
     expect(
       owed,
-      `${String(owed)} sites say a decision number is owed, against a ceiling of ` +
+      `${String(owed)} sites carry the owed-decision marker, against a ceiling of ` +
         `${String(DECISION_DEBT_CEILING)}. This is a ratchet: settle one and lower the ceiling on ` +
         'the same commit. It rose 38 → 64 during a single wave whose merge said every known issue ' +
         'had burned down, which is why it is a gate rather than a note (GitHub issue #173).',

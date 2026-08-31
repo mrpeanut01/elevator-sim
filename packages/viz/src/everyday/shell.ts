@@ -745,7 +745,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * for a different one. Clearing the snapshot as well as the flag is deliberate, so that a keeper
    * armed again before the next frame restores the top rather than the screen the player left.
    *
-   * A decision number is owed.
+   * Recorded here rather than in `DECISIONS.md`, under § D405 — the disarm is one function's interaction
+   * with § D388's keeper, and the browser tier drives it.
    */
   function go(screen: EverydayScreen): void {
     state = { ...state, screen };

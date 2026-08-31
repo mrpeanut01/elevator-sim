@@ -160,8 +160,10 @@ export interface StageSpeed {
  *
  * So four rungs — 1, 4, 8 and 30 — sit inside § D344's discrete-cue budget and three — 90, 240 and
  * 600 — sit outside it, which is the speed tiering that ruling describes rather than a coincidence
- * this table happens to permit. **A decision number is owed** for the deviation and for the default
- * below; the argument is here.
+ * this table happens to permit. **Both the ladder and the default below are § D354** — *the stage
+ * speed ladder is honest, and the default is a decision rather than a constant* — which rules the
+ * seven rungs, the equal-to-multiplier labels and the opening 30 outright. This docstring is the
+ * local reading of that decision, under § D405, and takes none of its own.
  *
  * Frozen and exported so the screen, its tests and any sweep read the same seven rows; the index
  * into it is the whole of the transport's state. It is typed as a **non-empty tuple** so that

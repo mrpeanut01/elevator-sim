@@ -90,19 +90,67 @@ const SKIP_DIRS: ReadonlySet<string> = new Set([
   '.claude',
 ]);
 
-function markdownFiles(dir: string, acc: string[] = []): string[] {
+function filesWithSuffix(suffix: string, dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
-      markdownFiles(join(dir, entry.name), acc);
-    } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      filesWithSuffix(suffix, join(dir, entry.name), acc);
+    } else if (entry.isFile() && entry.name.endsWith(suffix)) {
       acc.push(join(dir, entry.name));
     }
   }
   return acc;
 }
 
-const DOCUMENTS: readonly string[] = Object.freeze(markdownFiles(ROOT).sort());
+const DOCUMENTS: readonly string[] = Object.freeze(filesWithSuffix('.md', ROOT).sort());
+
+/**
+ * Every `.ts` file this repository owns — the corpus the `§ Dnnn` case reads **beside** the markdown.
+ *
+ * ## Why this exists, and it is not a tidy-up
+ *
+ * The `§ Dnnn` case below iterated `DOCUMENTS` only, so a citation written in a docstring was
+ * unchecked. That is not a small remainder: measured on this tree, the `.ts` corpus carries
+ * **3 350** `§ Dnnn` citations against markdown's **3 119**, so *more than half of the references
+ * this gate exists to police were outside it*.
+ *
+ * It was found the way this file's own header describes — by eye, during an audit, not by a test.
+ * Wave G's integration merged § D393's closing sentence and § D394's heading onto one line
+ * (`it.## D394 — …`), D394 stopped being a heading, and five citations to it — three in
+ * `packages/server/src/store/store.test.ts`, two in `validation/operationalInvariants.test.ts` —
+ * named a section the file no longer carried. Every one of the five is in a `.ts` file, so this
+ * gate read none of them and stayed green over the whole wave.
+ *
+ * Widening it immediately reported **two** further dangling citations that had been in the tree
+ * since 2026-07-28 — `packages/core/src/metrics/summarize.ts` and
+ * `packages/core/src/metrics/serviceLevel.test.ts`, both naming a decision **83** this file has
+ * never carried — which is the measure of how long a blind half stays blind. Both came from
+ * `validation/DECISIONS-T20.md`, a per-lane record folded into this one; the fold rewrote the
+ * *path* and left the *number*, which belonged to the retired file's own sequence. They are
+ * retargeted at [§ T21-D1](../../../../DECISIONS.md) and § T21-D2, the entries that carry the
+ * material, and this file's own numbering skips 78–84 precisely because those lanes numbered in
+ * their own series.
+ *
+ * ## This file is **not** excluded from its own check, and that is a choice
+ *
+ * `validation/documentation.test.ts` excludes itself by path, because the phrase its ratchet counts
+ * is also its subject and cannot be paraphrased away. The opposite holds here: this file makes
+ * several real citations that a reader must be able to follow, so exempting it would blind the gate
+ * where it is most read. A dangling number named in *prose* is avoidable — write the digits without
+ * the section sigil, as the paragraph above does — and that is the fix rather than an exclusion.
+ * The first run of the widened gate reported this file for exactly that, which is how the choice
+ * came to be made.
+ *
+ * ## Fences are not stripped here, deliberately
+ *
+ * `withoutFences` exists because a fenced block in a *document* is an example rather than a claim.
+ * A `.ts` file has no top-level fences: a fenced sample inside a docstring sits behind a ` * `
+ * gutter, so the markdown fence pattern — anchored at up to three leading spaces — never reaches
+ * it, and running it here would be a no-op that read as a policy. What a `.ts` file has instead is
+ * block comments, and **a citation inside one is a real citation** — it is the form nearly every
+ * one of these takes. So the source text is read as it stands.
+ */
+const SOURCES: readonly string[] = Object.freeze(filesWithSuffix('.ts', ROOT).sort());
 
 const relativeToRoot = (absolute: string): string =>
   absolute.slice(ROOT.length).replaceAll('\\', '/');
@@ -240,6 +288,11 @@ describe('a cited repository path can be followed', () => {
    * That is the same failure the two above exist for, one level finer: a citation that looks
    * followable and is not.
    *
+   * **It reads `.ts` as well as markdown, and that half was missing until 2026-08-29.** See
+   * {@link SOURCES} for the measurement and for what widening it found on its first run. The short
+   * version: most `§ Dnnn` citations in this repository are in docstrings, and none of them were
+   * checked — including all five citations to the § D394 heading a merge had eaten.
+   *
    * **Retired lane records are deliberately out of scope.** `§ T16-D7`, `§ T22-D1`, `§ T30-D3` and
    * their siblings are section numbers from per-lane documents that were consolidated into
    * `DECISIONS.md` and deleted; the numbers are preserved because they are how those decisions were
@@ -258,19 +311,33 @@ describe('a cited repository path can be followed', () => {
     /* `§ D110–§ D125` and `§ D116](../DECISIONS.md)` both occur; capture the number only, and
        require a non-digit boundary so `§ D11` cannot match inside `§ D110`. */
     const missing: string[] = [];
-    for (const file of DOCUMENTS) {
-      const source = withoutFences(readFileSync(file, 'utf8'));
+    let citations = 0;
+    for (const file of [...DOCUMENTS, ...SOURCES]) {
+      // Markdown only: see SOURCES for why a `.ts` file is read as it stands.
+      const raw = readFileSync(file, 'utf8');
+      const source = file.endsWith('.md') ? withoutFences(raw) : raw;
       for (const match of source.matchAll(/§\s*D(\d+)(?!\d)/g)) {
+        citations += 1;
         const number = Number(match[1]);
         if (!headings.has(number)) missing.push(`${relativeToRoot(file)} → § D${number}`);
       }
     }
 
+    // The guard on the guard, in both halves. A skip list that swallowed `packages/` or a walk
+    // that stopped at `.md` would otherwise make this case pass by reading half the tree — which
+    // is exactly the state it was in until the `.ts` corpus was added to it.
+    expect(SOURCES.length, 'the .ts walk found nothing — the walk is broken').toBeGreaterThan(500);
+    expect(
+      citations,
+      'no § Dnnn citation was read at all, so this case asserts nothing',
+    ).toBeGreaterThan(1000);
+
     expect(
       [...new Set(missing)].sort(),
       'a § Dnnn reference naming a decision that DECISIONS.md does not carry. The link to the file ' +
         'resolves; the section is the half that carries the meaning, and it was unchecked until a ' +
-        'citation to an unassigned § D144 was written by hand and caught by eye.',
+        'citation to an unassigned § D144 was written by hand and caught by eye. Docstrings are ' +
+        'read too, and they are where most of these live.',
     ).toEqual([]);
   });
 });

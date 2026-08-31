@@ -46,7 +46,8 @@
  * of a pair. The holdout batch is deliberately **not** returned: nothing outside `judge.ts` should
  * be drawing figures off it, and a caller that cannot reach it cannot mix the two.
  *
- * A decision number is owed for the extraction and for the skip.
+ * Recorded here rather than in `DECISIONS.md`, under § D405. The extraction and the skip are both
+ * about what this module returns, and `judge.ts` already defines a null holdout as a refusal.
  */
 
 import { batchReport, type BatchReport } from '../batch/report.js';

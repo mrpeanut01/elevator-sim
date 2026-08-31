@@ -2,7 +2,8 @@
  * **What the shell looks like while somebody else's run is on it — GAMEPLAY § 14.1's table, as a
  * value.**
  *
- * A decision number is owed; the argument is here.
+ * Recorded here rather than in `DECISIONS.md`, under § D405. The pill's verb is § D407's, and this
+ * module owns its wording.
  *
  * ## Why this is a view model and not eight strings in `dev/main.ts`
  *

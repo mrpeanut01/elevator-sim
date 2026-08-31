@@ -7,8 +7,9 @@ shipped string, and **this document does not create a telemetry module.** A spec
 ships a module is a production issue wearing a specification's clothes, and M1's own character
 clause ([`CHARTER_PROGRAMME.md`](../CHARTER_PROGRAMME.md) § M1) refuses it.
 
-**A decision number is owed** for the posture in § 1. It is allocated at integration, never inside a
-lane, and this document carries no `§ D` citation of itself until that entry exists.
+**The posture in § 1 is [§ D412](../DECISIONS.md)** (2026-08-29). That entry is an anchor: it adopts
+the posture and the ordering this document argues, and it does **not** license the schema — § 11's
+remaining items stay unsettled.
 
 **#202's material comes first in this document, and the order is the point rather than a
 preference.** Issue #202 must land before any telemetry ships because that order is not
@@ -897,7 +898,7 @@ it.
 Recorded here because a specification that hides its own open items is the defect it exists to
 prevent.
 
-- **A decision number is owed** for § 1's posture, and is allocated at integration.
+- ✅ **§ 1's posture is [§ D412](../DECISIONS.md)** (2026-08-29), which adopts it and nothing more.
 - **The lawful basis, the published privacy notice, and whether an age statement is needed** are
   human decisions and are not taken here (§ 1.3). No data class in § 7 is special-category, and the
   product's one existing moderation surface — a player-chosen display name on a board — is

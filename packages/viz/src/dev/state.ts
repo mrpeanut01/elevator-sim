@@ -856,9 +856,10 @@ export function withBuilding(
 /**
  * Put down whatever week is on screen and open Free Play's — GitHub issue #125.
  *
- * **A decision number is owed for this function.** The argument is here rather than in
- * `DECISIONS.md` because the lane that wrote it was told not to claim a `## D3xx` heading it could
- * not reserve; the numbered entry, when it lands, should say no more than this docstring does.
+ * **Recorded here rather than in `DECISIONS.md`, under § D405** — the hand-off is local to this
+ * function and its own tests. (It used to say a number was owed *because the lane was told not to
+ * claim a `## D3xx` heading it could not reserve*, which is the clearest statement of § D404's
+ * cause anywhere in the tree, and is why that decision quotes this site.)
  *
  * ## The defect
  *

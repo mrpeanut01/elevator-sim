@@ -1,7 +1,8 @@
 /**
  * **Turning a run into a record, and a record back into a run.**
  *
- * GAMEPLAY § 14.1, ENGINE_CONTRACT § 1.5. A decision number is owed; the argument is here.
+ * GAMEPLAY § 14.1, ENGINE_CONTRACT § 1.5. Recorded here rather than in `DECISIONS.md`, under
+ * § D405; the directory's one ruling is § D407.
  *
  * ## The one question this module answers twice
  *

@@ -530,7 +530,9 @@ export function stageLayoutFor(options: {
  * which is how the parity check and the pre-playhead call sites read a whole run) the line is the
  * whole-run one, unchanged. `honesty/surfaces.ts` drives both registers at five playheads and
  * declares a whole-run line drawn early as `basis: 'whole-run'`, so the temporal property holds
- * this seam closed rather than this docstring. A decision number is owed for the register split.
+ * this seam closed rather than this docstring — which is why the register split is **recorded
+ * here rather than in `DECISIONS.md`, under § D405**: it is § D307's temporal rule applied to one
+ * line, and a property asserts it.
  */
 export interface TransportStatusProgress {
   /** The playhead, simulated seconds. */
