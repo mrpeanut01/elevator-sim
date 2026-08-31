@@ -26997,6 +26997,7 @@ claim the RED row above it made.
 
 ---
 
+
 ## D396 — three census figures, three different causes, and the hypothesis was right about one of them
 
 **Date:** 2026-08-29 · **Owner:** wave H lane A · **Closes:** GitHub issue #306 · **Refutes a
@@ -27213,6 +27214,181 @@ naming the cell, the arm, the ceiling and the budget. Restored, green.
 **What this does not do.** It does not re-derive a ceiling — that is the census's job, and the census
 stays opt-in for the reason its own docstring gives. It asks only that two numbers already in the
 repository agree with each other, which is the question that was going unasked.
+
+---
+
+## D402 — the rail's cold paint stops answering *there is no career* to *I have not been asked yet*
+
+**Date:** 2026-08-29 · **Owner:** wave H lane D · **Rules on:** GitHub issue #214, acceptance
+criterion 1 — *the rail reflects the actual saved state*. Settles what
+`everyday/shell.ts#weekRailOptions` answers before `dev/main.ts` publishes the host.
+
+**Decision.** The card's absence splits into **two lines**. `RailOptions.weekPending` is *a week is
+on its way* and draws `rail.ts#CAREER_PENDING` — a sentence with no career in it and no digit in
+it; a build with no host slot at all keeps `NO_CAREER_YET`, which is the honest answer there. And
+`shell.ts#connectDataHost` redraws the rail when the career line moves, so the pending state lasts
+exactly as long as the boot does.
+
+**The defect, and why it was not the one the issue opened on.** The headline contradiction — the
+card reading a `profile` field no producer ever wrote — was closed on `2c7b308`. What survived was
+one line:
+
+```ts
+if (dataHost === undefined) return {};
+```
+
+in a docstring that said *"the week is a fact about the host, so it is read at draw time and no
+host answers `{}`"*. Both halves are accurate; the trouble is that `{}` means two different things
+one function apart. On `campaignRailOptions` it is a **silence** — the `CAMPAIGN` group is not
+drawn, and a desk row labelled from nothing would be the invented-label defect. Here it is a
+**claim**: `rail.ts` renders *no days saved yet — close a day and it lands here* over it.
+
+So every cold load with a week in `localStorage` (`elevator-sim.session`, `schemaVersion: 7`) told
+that player they had saved nothing. It did not flicker past, which is the half worth reading twice:
+a `'menu'` route mounts no screen, `connectDataHost`'s redraw arm fires only for a mounted screen,
+and nothing else redraws a rail — so on § 3.2's front door the false claim stood for the whole
+visit.
+
+**What was refuted while finding it, and is not fixed here.** Three playtest readers reported the
+sidebar *inventing* progress — `2 days running · best 100%` after no play. That is false. The
+figures are genuinely restored from storage, and a truly fresh context holds nothing and keeps the
+card on its empty state. Nothing in this decision changes that behaviour.
+
+**Alternatives considered.**
+
+- *Read the session in the shell.* Rejected. `persist/` has one reader and `dev/main.ts` is it. A
+  second one is two answers to *what week is this* on the very screen that exists to have one, and
+  `restoreSession` carries notices and a failure path that would then have two owners.
+- *Merge the two stores.* Rejected outright — `everyday/profile.ts` argues at length why the
+  profile is not a fourth key in `persist/`'s envelope, and #214's fix is that the card asks the
+  store that keeps days, not that the stores become one.
+- *Redraw the rail unconditionally on every host notification.* Rejected. A notification is every
+  path through `dev/main.ts`'s `renderAll()`, and `drawRail` calls `replaceChildren`, which takes
+  focus off whatever rail row a keyboard player is on. The redraw is guarded on the career line
+  having moved — a pure string derivation through `railFooter`, which is also why `careerLineOf`
+  stays module-private: exporting it would put a second text producer under `everyday/rail.ts` for
+  `honesty/derive.ts` to classify.
+- *Draw nothing while pending.* Rejected. A blank third line is a card that changes height and
+  says nothing a reader can act on; the shell already has the opposite precedent one function away
+  in `drawHostPending`, which draws `host.ts#HOST_PENDING_REASON` rather than blanking a region.
+
+**Why the pending line carries no figure.** § 20.11's forbidden thing is a fixture presented as a
+player, and `0 days running · best —` on a week nobody has read yet is one. The line is prose.
+
+**Validation, and every assertion was mutation-checked.**
+
+| mutation | what went red |
+|---|---|
+| `CAREER_PENDING = NO_CAREER_YET` | `rail.test.ts` — *says it has not read the week yet rather than that there is none* |
+| `weekPending` checked before `week` | `rail.test.ts` — *lets a week that has arrived win over the flag* |
+| the redraw deleted from `connectDataHost` | `shell.browser.test.ts` × 2, below |
+
+The browser pair is what says the fix is on the shipped path rather than in the model. With the
+redraw deleted, the cold-load footer case reads `YPLAYING ASyoureading your saved days…` and fails
+the assertion that has stood there since the card was written — which is the front door's real
+behaviour under the defect, with the sentence swapped. The mid-run case then closes a day through
+the host and requires the career line to move off both no-week states; under the same mutation it
+fails with *the card still says nothing is saved over a filed day*. That is the standing
+requirement — **move the control and require the run to change** — pointed at the one control that
+writes a career, and read on the rail rather than on a window statistic.
+
+Both no-week literals are read out of `railFooter` in the test rather than quoted, because both are
+module-private and a copy would keep passing after somebody rewords the card. The streak line gains
+a class (`.everyday-identity-streak`) for the same reason: a positional selector passes over a card
+that has stopped drawing the line at all.
+
+**What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
+integration; this lane's seeding moves both tiers. Nothing here says the pending state is
+*unreachable* in the product: it is reachable, it is what a player sees for the length of
+`dev/main.ts`'s async boot, and the mutation above is what measured that.
+
+
+---
+
+## D403 — the career line enters the corpus, and the pair that watches it is declared with the state it needs
+
+**Date:** 2026-08-29 · **Owner:** wave H lane D · **Rules on:** GitHub issue #214, acceptance
+criterion 3 — a corpus property over the two surfaces that disagreed. Extends
+[§ D362](#d362)'s `surfaces-disagree`.
+
+**Decision.** `honesty/agreement.ts#AGREED_FIGURES` gains a second pair, `career-line`:
+`everyday/rail.ts#railFooter` against `everyday/weekView.ts#weekScreenViewOf`. And
+`honesty/surfaces.ts`'s `EVERYDAY_MENU` seeds the card's career line in **all three** of its states
+rather than driving `railModel` with no options at all.
+
+**Why the declaration alone would have passed vacuously, which is the whole of this entry.** Two
+things were missing and only one of them is a register row.
+
+1. `surfaces.ts` drove `railModel({ screen: 'menu', ctx: 'daily' })` with no options, so
+   `rail.footer.streak` could only ever render the absence. **The populated career line — the two
+   figures a player with a saved week reads — was in no case of either tier.**
+2. `agreementViews` built weeks with empty histories, on which the pair is out of scope. A pair
+   that is out of scope everywhere reports zero violations on every corpus, which is
+   byte-identical to a pair that agrees.
+
+So the state was built. `withTodayFiled` files a day with `record: null` — a shipped `DayOutcome`
+value, named in `shift/types.ts` as the measured state of a session written by a build that had no
+record to write, not a stub — and `closeDay` is total over it. No simulation, which is the
+constraint `agreement.ts`'s *Cost* section states in seconds. **One fixture builder, two
+readers:** the rail seed and the pair file a day the same way, so a change to what *a filed day*
+means moves the swept string and the compared figure together. Not the same *week*, and
+deliberately — the pair drives day 4 to sit on the bar-hardening ladder and the seed drives day 1,
+which is the card's line as a first-week player meets it.
+
+**The arms are one week with the axis flipped, and that is the design rather than a convenience.**
+
+| arm | week | `dayClosed` | what the pair sees |
+|---|---|---|---|
+| `day1` | nothing closed | `false` | out of scope — both surfaces are right and differ |
+| `day4` | today filed | `false` | both publish, and both must **withhold** today's figure |
+| `day4-filed` | today filed | `true` | both publish, and both must **release** it |
+
+The last two differ only in the flag, which makes them a test of the **gate** rather than of the
+arithmetic: `rail.ts#careerLineOf` asks `day.day < week.day || dayClosed` over the `HISTORY_DAYS`
+window and `weekView.ts#streakLineOf` takes a count off cards whose own gate is `!isToday ||
+dayClosed`. A pair driven only where both release goes green on a rail that has dropped the gate
+entirely. The horizon stays the **second** segment of the view id, because `agreement.test.ts`
+reads it off `split('/')[1]` to assert that § D359's pair still reaches both kinds of run.
+
+**Why an empty week is out of scope rather than a violation.** There the two surfaces say different
+things and **both are right**: the card draws a sentence with no digit in it (§ 20.11 forbids
+`0 days running · best —` on a week nobody has played) and § 14's header draws the week's zeroes,
+which is what a screen made of seven day cards is for. Requiring them equal would force the rail to
+drop its absence — `rail.ts`'s own rule 4 calls that *the same defect facing the other way*. Both
+sides share the **scope** gate and neither shares the **derivation**, so `checkSurfacesAgree`'s
+*one side dropped it* clause cannot fire on a state that is merely out of scope, and
+`agreement.test.ts` asserts the in-scope arms are reached on every fixture case.
+
+**Validation — the property was made to fail on a source mutation, not a test-local variant.**
+Dropping the `dayClosed` gate from `rail.ts#careerLineOf` turns `honesty.test.ts` itself red, with
+`surfaces-disagree` reporting on `agree(career-line)@day4/period.right`:
+
+> One says “1 day running · best 84%”; the other says “1 day running · best —”.
+
+Reverted, the tier is green. Two further clauses in `agreement.test.ts` were checked independently:
+a test-local variant that always passes `dayClosed: true` must produce violations on `day4/` and
+**nowhere else** (a check that also fired on `day4-filed` would be firing for a reason that is not
+the gate), and the two arms' rendered lines must be different strings, which the same source
+mutation also breaks.
+
+**One stale sentence closed in passing, § D227's class.** The comment over the seed block said the
+streak line *"is the honest-absence form (no profile store exists)"* — stale twice over:
+`everyday/profileStore.ts` exists, and the line stopped coming from the profile when #214 pointed
+it at the week. On the file whose job is to sweep for exactly that.
+
+**And one register entry corrected rather than left standing.** `agreement.test.ts#NOT_AGREED`'s
+verdict pair was refused because *"a driven side needs a closed day, which needs `outcomeOf` and
+`closeDay` over a recording"*. Half of that has stopped being true. The entry now says what still
+blocks it — `dayReportOf` is a function of a **run**, and this module does not simulate — rather
+than a reason that has been overtaken.
+
+**What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
+integration. The seeding moves the string counts in both tiers, and the pair's two `surfaceId`s
+move the surfaces column in both tiers by the same mechanism [§ D362](#d362) records: a declared
+pair must carry the shipped expression's id or a violation could not name which surface disagreed.
+No claim is made that the corpus can now see disagreements between undeclared surfaces; it is a
+register, and a register covers what it names.
+
 
 ---
 

@@ -26,6 +26,13 @@
  *    player who missed every day has still saved days; today's figure waits on `dayClosed` for
  *    `weekView.ts`'s reason; and with an empty week the honest absence is still what is drawn —
  *    a fix that made the refusal unreachable would be the same defect facing the other way.
+ * 5. **The absence and the *not yet read* are two lines, not one.** Issue #214's last surviving
+ *    path: on a cold load the shell has a host slot and no host, and the card said *no days saved
+ *    yet* over a week sitting in storage — for as long as the player stayed on the front door,
+ *    because a `'menu'` route redraws no rail. {@link RailOptions.weekPending} is that state and it
+ *    draws a sentence that claims nothing about the career. `everyday/weekView.ts` has no such
+ *    line and needs none: § 14's screen is a registered screen, and the shell draws
+ *    `host.ts#HOST_PENDING_REASON` in its place until the host lands.
  *
  * And one rule about what is *absent*: **Tune the tower is not a rail item.** It is reached from
  * the brief and from the report's third lever. The guide notes an earlier draft listed it here and
@@ -74,8 +81,10 @@ export interface RailFooter {
     readonly avatarColor: string;
     /**
      * The career line under the name — the **week's** two figures (`3 days running · best 84%`),
-     * or an honest absence when no day has been closed. Never the profile's: see
-     * {@link RailOptions.week}, and issue #214 for what it said before it had one.
+     * an honest absence when no day has been closed, or — before the host has handed a week over
+     * at all — a line that says so instead of either. Never the profile's: see
+     * {@link RailOptions.week} and {@link RailOptions.weekPending}, and issue #214 for what it
+     * said before it had one.
      */
     readonly streak: string;
   };
@@ -135,10 +144,27 @@ export interface RailOptions {
    * {@link RailOptions.inCampaign} rather than latched, because a career that had to be threaded
    * separately is a career that goes stale by a frame.
    *
-   * With none — a cold load, or a build with no host — the card keeps its honest absence, which is
-   * the state that used to be the only one.
+   * With none — a build with no host — the card keeps its honest absence, which is the state that
+   * used to be the only one. **A cold load is no longer in that list**: a host on its way answers
+   * {@link RailOptions.weekPending} instead, because *not read yet* and *nothing to read* are two
+   * different things to say to a player who has a week saved.
    */
   readonly week?: WeekState | undefined;
+  /**
+   * Whether a week is **on its way** — a host slot the shell holds that `dev/main.ts` has not
+   * published into yet.
+   *
+   * Read with {@link RailOptions.week}, never instead of it: `week` present wins, so a caller
+   * cannot leave the card claiming to be reading something it has already been handed. It matters
+   * only in the seconds of a cold load, and it matters because that is when the card was wrong —
+   * `shell.ts#weekRailOptions` answered `{}` there and the card said *no days saved yet* over a
+   * restored week, on a screen (§ 3.2's front door) whose rail nothing redraws.
+   *
+   * **Defaults to `false`, which is the state that claims least about the future**: a caller with
+   * no host and no week is a build that keeps no career, and telling that player their days are
+   * loading would be a promise nothing is going to keep.
+   */
+  readonly weekPending?: boolean | undefined;
   /**
    * Whether **today's** run has been filed — `EverydayHost.runState().dayClosed`.
    *
@@ -279,6 +305,31 @@ export function railGroups(
 const NO_CAREER_YET = 'no days saved yet — close a day and it lands here';
 
 /**
+ * The card's third line **before the host has answered** — issue #214's last surviving path.
+ *
+ * ## Why the absence had to split in two
+ *
+ * {@link NO_CAREER_YET} is a claim: *there is no career*. That is true of a week whose history is
+ * empty and false of a player whose week is sitting in `localStorage` waiting for `dev/main.ts` to
+ * finish its async boot — and the shell drew it in **both** states, because the shell's
+ * `weekRailOptions` answered `{}` while there was no host and `{}` reached here as *no week*. On
+ * the front door the rail is never redrawn on a `'menu'` route, so the false half did not flicker
+ * past: it stood until the player navigated. That is acceptance criterion 1 of #214 — *the rail
+ * reflects the actual saved state* — failing on a narrower path than the one the issue opened on.
+ *
+ * The fix is not a second reading of the store. It is that *I have not been told* stops being said
+ * with the words for *there is nothing to tell*: a slot that will fill answers this, an absent
+ * host answers {@link NO_CAREER_YET}, and `shell.ts#connectDataHost` redraws the rail the moment
+ * the week arrives. The two states are one line apart on the card and a whole claim apart to a
+ * player, which is the distinction `campaignRailOptions` already makes by drawing no group at all.
+ *
+ * No digit in it, for {@link NO_CAREER_YET}'s reason: a figure drawn while nothing has been read
+ * would be § 20.11's fixture presented as a player, and *"0 days running"* is the exact shape of
+ * that. Module-private for {@link NO_CAREER_YET}'s reason as well.
+ */
+const CAREER_PENDING = 'reading your saved days…';
+
+/**
  * The `PLAYING AS` card's third line — the week's own two figures, or the absence.
  *
  * ## Why the gate is *a day was closed* and not *the streak is non-zero*
@@ -301,8 +352,13 @@ const NO_CAREER_YET = 'no days saved yet — close a day and it lands here';
  * § 14 draws exactly that many cards and a card outside it is a figure with nothing to check it
  * against.
  */
-function careerLineOf(week: WeekState | undefined, dayClosed: boolean): string {
-  if (week === undefined || week.history.length === 0) return NO_CAREER_YET;
+function careerLineOf(
+  week: WeekState | undefined,
+  dayClosed: boolean,
+  weekPending: boolean,
+): string {
+  if (week === undefined) return weekPending ? CAREER_PENDING : NO_CAREER_YET;
+  if (week.history.length === 0) return NO_CAREER_YET;
   const oldest = week.day - (HISTORY_DAYS - 1);
   const publishable = week.history.some(
     (day) => day.day >= oldest && (day.day < week.day || dayClosed),
@@ -320,12 +376,18 @@ function careerLineOf(week: WeekState | undefined, dayClosed: boolean): string {
  * {@link RailOptions.week}, and never the profile's: the two stores are separate for the reason
  * `profile.ts` gives at length, and the defect that made this file worth reading twice was the card
  * asking the store that holds no days how many days there were. An authored fixture presented as a
- * player is what the handoff's § 20.11 forbids, so with no week the line is
- * {@link NO_CAREER_YET} — still reachable, no longer the only thing reachable.
+ * player is what the handoff's § 20.11 forbids, so a week with no closed day in it draws
+ * {@link NO_CAREER_YET} — still reachable, no longer the only thing reachable — and a week that has
+ * not arrived yet draws {@link CAREER_PENDING}, which is a third state rather than a softer second
+ * one.
  */
 export function railFooter(state: EverydayState, options: RailOptions = {}): RailFooter {
   const name = options.profile?.name ?? DEFAULT_EVERYDAY_PROFILE.name;
-  const streak = careerLineOf(options.week, options.dayClosed ?? false);
+  const streak = careerLineOf(
+    options.week,
+    options.dayClosed ?? false,
+    options.weekPending ?? false,
+  );
   return {
     identity: {
       heading: 'PLAYING AS',

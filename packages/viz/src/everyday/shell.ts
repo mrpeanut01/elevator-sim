@@ -67,7 +67,7 @@ import { HOST_PENDING_REASON } from './host.js';
 import type { EverydayHost, EverydayHostSlot } from './host.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { everydayProfileStore } from './profileStore.js';
-import { railModel } from './rail.js';
+import { railFooter, railModel } from './rail.js';
 import type { RailModel } from './rail.js';
 import { routeFor, SCREEN_NAMES, screenModuleFor, unbuiltReasonFor } from './screens.js';
 import type { EverydayScreenContext, EverydayScreenHandle } from './screens.js';
@@ -814,7 +814,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * § 3.2's career line, from the week the host holds — issue #214.
    *
    * The same shape as {@link campaignRailOptions} and for the same reason: the week is a fact about
-   * the *host*, so it is read at draw time and no host answers `{}`. What made #214 worth a lane is
+   * the *host*, so it is read at draw time rather than latched. What made #214 worth a lane is
    * that the card was not reading a stale week — it was reading the **profile store**, which holds
    * a name and a colour and has no day count to hold, so its refusal was unconditional. The two
    * stores stay two (`profile.ts` argues why the profile is not a fourth key in `persist/`'s
@@ -822,10 +822,50 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    *
    * `dayClosed` travels with it because *Close the day* alone sets it and a restored week can carry
    * today's outcome without it — the same authority § 14's own cards answer to.
+   *
+   * ## The line this function used to be, and why it was the rest of #214
+   *
+   * It read `if (dataHost === undefined) return {}`, in a docstring that said *no host answers
+   * `{}`* — and the two sentences were about different things. `{}` on
+   * {@link campaignRailOptions} is a **silence**: the `CAMPAIGN` group is not drawn. `{}` here is a
+   * **claim**: `rail.ts` renders *no days saved yet* over it. So on every cold load with a week in
+   * `localStorage` the front door said the player had saved nothing, and said it until they
+   * navigated, because a `'menu'` route draws no screen and nothing else redraws the rail.
+   *
+   * The two arms below are the fix, and the discriminator is one the shell already holds: a
+   * **slot** with no host in it is a week on its way ({@link RailOptions.weekPending}, drawn as a
+   * sentence that claims nothing), and no slot at all is a build that keeps no career — the
+   * standalone mount a test document makes, where the honest absence is the honest answer. Neither
+   * arm reads storage: `persist/` has one reader and `dev/main.ts` is it, and a second one would be
+   * two answers to *what week is this* on the very screen that exists to have one.
    */
-  function weekRailOptions(): { week?: WeekState; dayClosed?: boolean } {
-    if (dataHost === undefined) return {};
+  function weekRailOptions(): { week?: WeekState; dayClosed?: boolean; weekPending?: boolean } {
+    if (dataHost === undefined) return options.host === undefined ? {} : { weekPending: true };
     return { week: dataHost.week(), dayClosed: dataHost.runState().dayClosed };
+  }
+
+  /**
+   * What the `PLAYING AS` card's career line said the last time the rail was drawn.
+   *
+   * The guard on {@link connectDataHost}'s redraw, and it is a guard rather than an unconditional
+   * `drawRail` because a host notification is every path through `dev/main.ts`'s `renderAll()` —
+   * frequent, and `drawRail` calls `replaceChildren`, which takes the focus off whatever rail row
+   * a keyboard player is on. Redrawing exactly when the line moves keeps the rule *the rail
+   * reflects the actual saved state* without turning a run into a rail that rebuilds under the
+   * cursor.
+   */
+  let careerLineDrawn: string | undefined;
+
+  /**
+   * The career line as it would be drawn **now** — one derivation, asked without touching the DOM.
+   *
+   * Through {@link railFooter} rather than through `rail.ts`'s own `careerLineOf`, which is
+   * module-private on purpose: exporting it would put a second text producer under
+   * `everyday/rail.ts` for `honesty/derive.ts` to classify. Only the week options are passed
+   * because only they can move this line, which `rail.test.ts` asserts.
+   */
+  function careerLineNow(): string {
+    return railFooter(state, weekRailOptions()).identity.streak;
   }
 
   function drawRail(): void {
@@ -838,6 +878,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
         ? {}
         : { profile: { name: stored.name, avatarColor: stored.avatarColor } }),
     });
+    careerLineDrawn = model.footer.identity.streak;
 
     /* The brand block — the little lift glyph beside the two-line name, per the prototype. */
     const brand = el(doc, 'div');
@@ -971,7 +1012,13 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     idName.style.cssText = 'font-size:13px;font-weight:600;margin-top:1px';
     idText.append(idHeading, idName);
     cardTop.append(avatar, idText);
-    const streak = el(doc, 'div', undefined, model.footer.identity.streak);
+    /*
+     * Classed, unlike its two siblings, because it is the one line on this card whose *content* is
+     * a claim about saved state rather than a label — issue #214 — and the browser tier has to be
+     * able to read exactly what a player reads. Selecting it positionally would pass over a card
+     * that had stopped drawing it.
+     */
+    const streak = el(doc, 'div', 'everyday-identity-streak', model.footer.identity.streak);
     streak.style.cssText = `font:500 11px ${TYPE.mono};color:${C.fainter};margin-top:6px`;
     card.append(cardTop, streak);
     footer.append(card);
@@ -1596,12 +1643,24 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * when a run the player started lands on the stage and disarms when the day files. The redraw
    * arm covers the one early state {@link drawHostPending} draws: a registered screen mounted
    * before the host existed gets its real mount the moment it does.
+   *
+   * **The rail is the second thing synced, and it is issue #214's other half.** The `PLAYING AS`
+   * card's career line is the week's, and the week arrives here — so a rail painted before this
+   * ran is a rail drawn from no week at all. The front door is where that bit: a `'menu'` route
+   * mounts no screen, so the redraw arm above never fires there and the cold paint stood. Guarded
+   * by {@link careerLineDrawn} rather than unconditional, for the reason that field carries.
+   *
+   * It is not only the arrival. *Close the day* moves the week through this same notification, so
+   * the card's *2 days running · best 84%* lands without a reload — the wiring
+   * `profileStore.subscribe(drawRail)` already gives the name and the avatar, applied to the store
+   * that keeps days.
    */
   function connectDataHost(next: EverydayHost): void {
     dataHostUnsubscribe?.();
     dataHost = next;
     const sync = (): void => {
       runOpen = next.runState().open;
+      if (careerLineNow() !== careerLineDrawn) drawRail();
     };
     sync();
     dataHostUnsubscribe = next.subscribe(sync);
