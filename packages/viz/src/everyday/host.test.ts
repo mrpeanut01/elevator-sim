@@ -18,12 +18,22 @@ import {
   parseTrafficProfiles,
   resolveBuilding,
 } from '@elevator-sim/core/browser';
-import { describe, expect, it } from 'vitest';
+import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
+import { beforeAll, describe, expect, it } from 'vitest';
 
+import { towerById, type CampaignTower } from '../campaign/career.js';
+import { clearedDays, purseOf } from '../campaign/economy.js';
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
 import { shiftGoalsOf } from '../dev/leftRail.js';
-import { initialState, profileById, type ViewerState } from '../dev/state.js';
+import {
+  initialState,
+  profileById,
+  shiftLengthForContract,
+  type ViewerState,
+} from '../dev/state.js';
+import { DATA_DIR, fixtureConfig } from '../fixtures.test-helper.js';
+import { recordRun } from '../record/recordRun.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
 import type { ShapedDayReport } from '../shift/report.js';
@@ -545,5 +555,301 @@ describe('the slot — how the host crosses from dev/main’s boot to the shell'
       'early',
       'late',
     ]);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § 6.4 step 4 — the campaign day is filed. GitHub issue #223.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The seam `AGENT_STATUS.md` said was missing, driven through the façade that has it.**
+ *
+ * The register recorded the gap as *"marking it cleared or missed needs `closeShift` to know which
+ * tower it belonged to"*. It does not: `closeShift` writes `ViewerState.week`, the campaign career
+ * is deliberately not on `ViewerState`, and both facts a filing needs — which tower, and what the
+ * run read — are on this side of the façade the whole time. So the cases below press
+ * `runCampaignDay` and `closeDay` and read the career back, which is the entire mechanism.
+ *
+ * ## Why the recordings are real runs
+ *
+ * The verdict is a fold over `observationsAt(recording, recording.endedAt)`, so a stub recording
+ * would grade nothing and every case here would pass on a build that files nothing. Both recordings
+ * are `garden-apartments` — the one building {@link openingCareer} holds — for one simulated hour,
+ * which is the length `runCampaignDay` now seeds and the length § 8's tests can be read at.
+ *
+ * {@link BUSY} exists because the shipped crowd clears every difficulty: measured on this tree at
+ * 3 600 s, `arrivalRatePctPop5min` 6 → 20 all give 100 % carried, a worst wait under 85 s and a peak
+ * queue under 11, which holds even `impossible`'s bars. At 30 the worst wait is 219 s, which misses
+ * a standard month's 180 and holds an easy month's 240 — so it is the one pair that can show the
+ * difficulty reaching the record.
+ */
+describe('filing the campaign day — issue #223', () => {
+  /** A run every § 8.6 test can read, and holds. */
+  let CLEAN: VizRecording;
+  /** The same building under a crowd that misses a standard month and holds an easy one. */
+  let BUSY: VizRecording;
+
+  let loaded: LoadedConfig;
+
+  beforeAll(async () => {
+    loaded = await loadConfig(DATA_DIR);
+    const base: SimulationConfig = fixtureConfig(loaded, {
+      buildingId: 'garden-apartments',
+      durationS: 3600,
+      seed: 424242n,
+      onTimeout: 'report',
+    });
+    CLEAN = recordRun(base, { recordDecisions: false }).recording;
+    BUSY = recordRun(
+      { ...base, demand: { arrivalRatePctPop5min: 30 } },
+      { recordDecisions: false },
+    ).recording;
+  }, 300_000);
+
+  interface CampaignHarness {
+    readonly bindings: EverydayHostBindings;
+    readonly patches: Partial<ViewerState>[];
+    state: ViewerState;
+    /** `filedRunId === recording.runId`, as `dev/main.ts` holds it. */
+    filed: string | undefined;
+  }
+
+  /**
+   * A harness whose `closeDay` files the way `closeShift` does — and whose `applyPatch` **merges**.
+   *
+   * Both halves matter. The merge is what makes `runCampaignDay`'s building and length patch land,
+   * so a later read sees the state the press wrote rather than the state before it. And `closeDay`
+   * latches by `runId` exactly as `dev/main.ts` does, so a second press on a filed sheet returns
+   * having written nothing — which is the gate this seam reads back rather than predicts.
+   */
+  function campaignHarness(recording: VizRecording | undefined, refuses = false): CampaignHarness {
+    const patches: Partial<ViewerState>[] = [];
+    const h: CampaignHarness = {
+      patches,
+      state: { ...base(), recording },
+      filed: undefined,
+      bindings: {
+        resources,
+        state: () => h.state,
+        playheadS: () => 0,
+        dayClosed: () =>
+          h.state.recording !== undefined && h.filed === h.state.recording.runId,
+        runIsOwn: () => true,
+        playerHasChosen: () => true,
+        dayStartS: () => undefined,
+        startRun: () => {},
+        intervene: () => {},
+        closeDay: () => {
+          if (refuses || h.state.recording === undefined) return;
+          h.filed = h.state.recording.runId;
+        },
+        openRunTab: () => {},
+        applyPatch: (patch) => {
+          patches.push(patch);
+          h.state = { ...h.state, ...patch };
+        },
+        onChange: () => () => {},
+      },
+    };
+    return h;
+  }
+
+  const towerOf = (host: ReturnType<typeof createEverydayHost>): CampaignTower =>
+    towerById(host.campaign(), 'c1')!;
+
+  it('runs the day at the length this contract is graded over, whatever the state was left at', () => {
+    /*
+     * **What this guards, said exactly rather than generously.** `initialState` already seeds `c1`'s
+     * hour, because the page opens on Garden Apartments — so on a cold load this press writes the
+     * length that is already there and changes nothing. What it guards is a state left at some other
+     * length: `withBuilding` deliberately does not re-seed (`shiftLengthForContract`'s own
+     * docstring), so a player who has taken another assignment, or moved the Engineer length
+     * control, arrives at § 8's *Lock it in* carrying it.
+     *
+     * That matters because of what the length does to the grading, measured on this tree: at
+     * 1 800 s Garden Apartments produced 16, 26 and 18 arrivals on three seeds against a wake-up
+     * gate of twenty, so two of the three graded **nothing** and could file nothing. At the hour
+     * `c1` names, the same three give 29, 38 and 39 and all three grade.
+     *
+     * So the state is set to the shipped default first: a press that only agreed with what was
+     * already there would pass on a build that writes no length at all.
+     */
+    const h = campaignHarness(undefined);
+    h.state = { ...h.state, shiftLengthS: 1800, windowStartS: 600 };
+    createEverydayHost(h.bindings).runCampaignDay('c1');
+
+    expect(shiftLengthForContract('c1')).toBeGreaterThan(1800);
+    expect(h.patches[0]).toMatchObject({
+      buildingId: 'garden-apartments',
+      shiftLengthS: shiftLengthForContract('c1'),
+      // A contract declares a length and not a part of a day — `scenariosPanel`'s own rule.
+      windowStartS: null,
+    });
+    // And the merge landed, so the run this press starts is built from it.
+    expect(h.state.shiftLengthS).toBe(shiftLengthForContract('c1'));
+  });
+
+  it('files the day cleared, and the purse and the record move with it', () => {
+    const h = campaignHarness(CLEAN);
+    const host = createEverydayHost(h.bindings);
+    const before = towerOf(host);
+
+    host.runCampaignDay('c1');
+    host.closeDay();
+
+    const after = towerOf(host);
+    expect(after.day).toBe(before.day + 1);
+    expect(after.missed).toBe(0);
+    expect(clearedDays(after)).toBe(1);
+    expect(purseOf(after)).toBeGreaterThan(purseOf(before));
+    expect(host.campaign().today).toBe(2);
+  });
+
+  it('files the day missed when a test the run read did not hold', () => {
+    const h = campaignHarness(BUSY);
+    const host = createEverydayHost(h.bindings);
+
+    host.runCampaignDay('c1');
+    host.closeDay();
+
+    const after = towerOf(host);
+    expect(after.day).toBe(2);
+    expect(after.missed).toBe(1);
+    expect(clearedDays(after)).toBe(0);
+  });
+
+  it('follows the tower’s difficulty, so the contract sheet’s buttons reach the record', () => {
+    /*
+     * § D177's standing requirement at the filing seam: **one** recording, one control moved, and
+     * the thing that has to change is the day the record kept — not a printed bar. An easy month's
+     * 240 s ceiling holds this run's 219 s worst wait and a standard month's 180 does not.
+     */
+    const easy = createEverydayHost(campaignHarness(BUSY).bindings);
+    easy.campaignAct({ kind: 'set-difficulty', towerId: 'c1', difficultyId: 'easy' });
+    easy.runCampaignDay('c1');
+    easy.closeDay();
+    expect(towerOf(easy).missed).toBe(0);
+
+    const standard = createEverydayHost(campaignHarness(BUSY).bindings);
+    standard.runCampaignDay('c1');
+    standard.closeDay();
+    expect(towerOf(standard).difficultyId).toBe('standard');
+    expect(towerOf(standard).missed).toBe(1);
+  });
+
+  it('files nothing for a day Today’s tower started', () => {
+    const h = campaignHarness(CLEAN);
+    const host = createEverydayHost(h.bindings);
+    host.startRun();
+    host.closeDay();
+    expect(towerOf(host).day).toBe(1);
+    expect(host.campaign().today).toBe(1);
+  });
+
+  it('files nothing against a tower the player walked out on', () => {
+    /*
+     * The cross-flow case, and the reason the latch is cleared by § 6's own presses rather than
+     * only set by § 8's: run a campaign day, leave for Today's tower, close **that** day. Without
+     * the clear this banked somebody else's morning against the contract.
+     */
+    const host = createEverydayHost(campaignHarness(CLEAN).bindings);
+    host.runCampaignDay('c1');
+    host.startRun();
+    host.closeDay();
+    expect(towerOf(host).day).toBe(1);
+  });
+
+  it('files once, however many times the primary is pressed', () => {
+    const host = createEverydayHost(campaignHarness(CLEAN).bindings);
+    host.runCampaignDay('c1');
+    host.closeDay();
+    host.closeDay();
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
+    expect(host.campaign().today).toBe(2);
+  });
+
+  it('refuses to file tomorrow off the run today was filed from', () => {
+    /*
+     * The case the `dayClosed` **crossing** guards and the latch does not, so each of the two has a
+     * mutation that reddens it alone. The run is on a worker: *Lock it in and run day 2* returns
+     * long before there is a recording of day 2, and until it lands the run on the stage is
+     * yesterday's — already filed. A press in that window must file nothing, or day 2 is marked
+     * from the legs of day 1.
+     */
+    const host = createEverydayHost(campaignHarness(CLEAN).bindings);
+    host.runCampaignDay('c1');
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
+
+    host.runCampaignDay('c1');
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
+  });
+
+  it('files one day when a filed run is re-simulated under it', () => {
+    /*
+     * The case the **latch clear** guards and the crossing does not, so that line has a mutation of
+     * its own too. § 1.4's intervention re-runs the day and `dev/main.ts`'s `adopt` clears
+     * `filedRunId` when the new recording lands — which re-arms `closeShift`. A campaign day that
+     * filed on that second close would advance the contract twice for one morning, which is
+     * `shift/week.ts#closeDay`'s `recordGrew` argument one record up: a record growing is not a
+     * second day.
+     *
+     * The adoption is staged on the harness rather than pressed, because `intervene` crosses to
+     * `dev/main.ts`'s runner and there is none here; what is driven is the state it leaves behind.
+     */
+    const h = campaignHarness(CLEAN);
+    const host = createEverydayHost(h.bindings);
+    host.runCampaignDay('c1');
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
+
+    h.state = { ...h.state, recording: { ...CLEAN, runId: 'grown' } };
+    h.filed = undefined;
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
+  });
+
+  it('files nothing when the day itself refused to file', () => {
+    // `closeShift`'s three silent early returns, as one binding that writes nothing: a campaign day
+    // may not be marked by a press that produced no sheet.
+    const host = createEverydayHost(campaignHarness(CLEAN, true).bindings);
+    host.runCampaignDay('c1');
+    host.closeDay();
+    expect(towerOf(host).day).toBe(1);
+  });
+
+  it('files nothing for a morning the tests could not read, and does not mark it against the player', () => {
+    const short = recordRun(
+      fixtureConfig(loaded, {
+        buildingId: 'garden-apartments',
+        durationS: 600,
+        seed: 424242n,
+        onTimeout: 'report',
+      }),
+      { recordDecisions: false },
+    ).recording;
+    const h = campaignHarness(short);
+    const host = createEverydayHost(h.bindings);
+    host.runCampaignDay('c1');
+    host.closeDay();
+
+    // The day itself closed — this is a refusal to *mark a contract*, not a refusal to file a day.
+    expect(h.filed).toBe(short.runId);
+    expect(towerOf(host).day).toBe(1);
+    expect(towerOf(host).missed).toBe(0);
+  });
+
+  it('tells the campaign screens, so a filed day redraws the desk it was filed from', () => {
+    const host = createEverydayHost(campaignHarness(CLEAN).bindings);
+    let notified = 0;
+    host.subscribe(() => {
+      notified += 1;
+    });
+    host.runCampaignDay('c1');
+    host.closeDay();
+    expect(notified).toBeGreaterThan(0);
   });
 });

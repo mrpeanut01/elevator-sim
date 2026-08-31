@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  BUILDING_COPY,
   CALENDAR_GLYPHS,
   CONTRACT_COPY,
   MONTH_LEGEND,
@@ -22,6 +23,7 @@ import {
   UNFINISHED,
   buildingView,
   calendarView,
+  campaignDayVerdict,
   campaignTestGoals,
   campaignTestRows,
   careerStageLabel,
@@ -39,7 +41,13 @@ import {
   type CampaignCareer,
   type CampaignTower,
 } from '../campaign/career.js';
-import { CONTRACT_DAYS, DIFFICULTIES, clearedDays, purseOf } from '../campaign/economy.js';
+import {
+  CONTRACT_DAYS,
+  DIFFICULTIES,
+  clearedDays,
+  purseOf,
+  type Difficulty,
+} from '../campaign/economy.js';
 import type { DayOutcome, GoalObservations } from '../shift/types.js';
 import { outcomeOf } from '../shift/week.js';
 import { readGoals } from '../shift/goals.js';
@@ -689,3 +697,87 @@ describe('a works day takes no car out of service (issue #264)', () => {
    */
 });
 
+
+/* -------------------------------------------------------------------------- *
+ * § 6.4 step 4 — what marks the day. GitHub issue #223.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The fold `everyday/host.ts`'s *Close the day* hands to `campaign/career.ts`.
+ *
+ * Driven over {@link campaignTestRows} rather than over hand-built readings, because the whole
+ * argument for the function's shape is that the verdict is a fold of **the rows the desk and the
+ * contract sheet are drawing**. A case that assembled its own readings would pass on a build where
+ * the screens print one set of bars and the record is marked from another.
+ */
+describe('what marks a campaign day', () => {
+  const tower = (): CampaignTower => openingCareer('eta').towers[0]!;
+  const verdictAt = (difficulty: Difficulty, observed: GoalObservations | undefined) =>
+    campaignDayVerdict(campaignTestRows(difficulty, tower(), observed, []));
+
+  it('clears a day on which every test it can read held', () => {
+    expect(verdictAt(DIFFICULTIES.standard, GOOD)).toBe('cleared');
+  });
+
+  it('misses a day on one failed test, and names the one that decided it', () => {
+    const longWait = { ...GOOD, worstWaitS: DIFFICULTIES.standard.tests.worstS + 1 };
+    expect(verdictAt(DIFFICULTIES.standard, longWait)).toBe('missed');
+    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), longWait, []);
+    expect(rows.filter((row) => row.reading?.state === 'missed').map((row) => row.id)).toEqual([
+      'worst',
+    ]);
+  });
+
+  it('follows the difficulty rather than a second copy of the bars', () => {
+    /*
+     * § D177's standing requirement pointed at the contract sheet's difficulty buttons: the same
+     * run, two difficulties, and the **filed** result has to move or the control is decoration.
+     * 80 % away holds a standard month's 75 and misses a hard one's 82.
+     */
+    const marginal = { ...GOOD, minutePct: 80 };
+    expect(verdictAt(DIFFICULTIES.standard, marginal)).toBe('cleared');
+    expect(verdictAt(DIFFICULTIES.hard, marginal)).toBe('missed');
+  });
+
+  it('does not count the trip budget against a day, in either direction', () => {
+    /*
+     * The fourth test grades nothing ({@link TRIPS_REFUSAL}), so it is absent from the fold rather
+     * than failed by it — a row counted as missed would refuse every day the campaign ever runs,
+     * and a row counted as held would be a bar nobody measured being reported as met.
+     */
+    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []);
+    expect(rows.at(-1)?.reading).toBeUndefined();
+    expect(campaignDayVerdict(rows)).toBe('cleared');
+    expect(campaignDayVerdict(rows.slice(0, 3))).toBe('cleared');
+  });
+
+  it('refuses a morning the tests never read, rather than marking it against the player', () => {
+    // Below the wake-up gate every reading is pending — § D234's *unjudged is not passed*, and its
+    // other half: it did not cost anything either.
+    expect(verdictAt(DIFFICULTIES.standard, { ...GOOD, arrived: 4 })).toBe('ungraded');
+    // And with no run at all there is nothing to grade.
+    expect(verdictAt(DIFFICULTIES.standard, undefined)).toBe('ungraded');
+  });
+
+  it('refuses a censored worst wait, because a bound that might overstate proves nothing', () => {
+    expect(verdictAt(DIFFICULTIES.standard, { ...GOOD, worstWaitIsCensored: true })).toBe(
+      'ungraded',
+    );
+  });
+
+  it('says on the desk what decides a day, without promising the bar nothing measures', () => {
+    /*
+     * § D227 on the line a player reads before pressing: this note said *all four* over a fourth
+     * test that grades nothing. Asserted against the fold rather than against a literal, so the
+     * two cannot drift apart again.
+     */
+    expect(BUILDING_COPY.testsNote).not.toContain('four');
+    const graded = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []).filter(
+      (row) => row.reading !== undefined,
+    );
+    expect(graded).toHaveLength(3);
+    expect(buildingView(inputOf(openingCareer('eta'), { observations: GOOD }))?.tests.note).toBe(
+      BUILDING_COPY.testsNote,
+    );
+  });
+});

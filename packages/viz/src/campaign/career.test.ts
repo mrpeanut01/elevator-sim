@@ -33,11 +33,16 @@ import {
   towerById,
 } from './career.js';
 import {
+  CONTRACT_DAYS,
+  DIFFICULTIES,
   REFURBISHMENT,
+  calendarRow,
   clearedDays,
   committedUnits,
+  contractIsLost,
   fittedLevel,
   purseOf,
+  rateOnDay,
   renewalOffer,
   standingOf,
   wearHeadOf,
@@ -500,5 +505,132 @@ describe('§ 8.12’s snapshots, as the regression fixtures the design asks for'
     expect(midtown.trips).toBeGreaterThan(SERVICE_AT_TRIPS);
     expect(wearOf(midtown)).toBeLessThan(1);
     expect(wearOf({ ...midtown, serviceAt: SERVICE_AT_TRIPS })).toBeGreaterThan(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § 6.4 step 4 — the day is filed. GitHub issue #223.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What `everyday/host.ts`'s *Close the day* does to the record, as transitions.
+ *
+ * The verdict itself is not decided here — `everyday/campaignModel.ts#campaignDayVerdict` folds
+ * § 8.6's tests and its own suite holds it. What these cases hold is the half § 8.1 makes
+ * expensive to get wrong: two fields move and **every** other figure is derived from them, so a
+ * day filed here has to be visible in the purse, the grid, the allowance and the renewal without
+ * anything else being written.
+ */
+describe('filing a campaign day', () => {
+  const first = (career: CampaignCareer): CampaignTower => towerById(career, 'c1')!;
+
+  it('advances the contract day and the career day together, and marks the day cleared', () => {
+    const before = openingCareer('eta');
+    const after = applyCampaignAction(before, {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'cleared',
+    });
+
+    expect(first(after).day).toBe(first(before).day + 1);
+    expect(first(after).missed).toBe(0);
+    expect(clearedDays(first(after))).toBe(1);
+    /*
+     * Together, and that is § 8.6's arithmetic rather than tidiness: a contract's own start is
+     * derived as `careerToday − (day − 1)`, so a day filed on one and not the other would slide the
+     * whole contract under the grid instead of filling one cell of it.
+     */
+    expect(after.today).toBe(before.today + 1);
+    expect(calendarRow(after.today, first(after)).find((cell) => cell.towerDay === 1)?.mark).toBe(
+      'cleared',
+    );
+  });
+
+  it('marks a missed day, which the grid draws and the allowance counts', () => {
+    const after = applyCampaignAction(openingCareer('eta'), {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'missed',
+    });
+
+    expect(first(after).missed).toBe(1);
+    expect(clearedDays(first(after))).toBe(0);
+    expect(calendarRow(after.today, first(after)).find((cell) => cell.towerDay === 1)?.mark).toBe(
+      'missed',
+    );
+  });
+
+  it('pays the purse for a cleared day and nothing for a missed one — derived, never latched', () => {
+    const before = openingCareer('eta');
+    const rate = rateOnDay(DIFFICULTIES[first(before).difficultyId], 0);
+    expect(rate).toBeGreaterThan(0);
+
+    const cleared = applyCampaignAction(before, {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'cleared',
+    });
+    const missed = applyCampaignAction(before, {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'missed',
+    });
+
+    expect(purseOf(first(cleared))).toBe(purseOf(first(before)) + rate);
+    expect(purseOf(first(missed))).toBe(purseOf(first(before)));
+  });
+
+  it('ends the contract once the allowance is used, without latching a flag', () => {
+    const allowance = DIFFICULTIES[first(openingCareer('eta')).difficultyId].miss;
+    let career = openingCareer('eta');
+    for (let day = 0; day <= allowance; day += 1) {
+      career = applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict: 'missed' });
+    }
+    expect(first(career).missed).toBe(allowance + 1);
+    expect(contractIsLost(first(career))).toBe(true);
+  });
+
+  it('files the month’s last day and then refuses, because day twenty-one has no fee and no cell', () => {
+    let career = openingCareer('eta');
+    for (let day = 0; day < CONTRACT_DAYS; day += 1) {
+      career = applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict: 'cleared' });
+    }
+    expect(first(career).day).toBe(CONTRACT_DAYS + 1);
+    expect(clearedDays(first(career))).toBe(CONTRACT_DAYS);
+    // The month is over; § 8.9's renewal is the next press, not a twenty-first day.
+    expect(needOf(first(career))?.kind).toBe('renewal');
+    expect(applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict: 'cleared' })).toBe(
+      career,
+    );
+  });
+
+  it('refuses a tower the career does not hold, and moves nothing', () => {
+    const before = openingCareer('eta');
+    expect(
+      applyCampaignAction(before, { kind: 'file-day', towerId: 'c6', verdict: 'cleared' }),
+    ).toBe(before);
+  });
+
+  it('moves the tower it was told about and no other', () => {
+    const before = SECOND_MONTH;
+    const after = applyCampaignAction(before, {
+      kind: 'file-day',
+      towerId: 'c6',
+      verdict: 'cleared',
+    });
+    expect(towerById(after, 'c6')!.day).toBe(towerById(before, 'c6')!.day + 1);
+    expect(towerById(after, 'c1')).toEqual(towerById(before, 'c1'));
+    expect(towerById(after, 'c7')).toEqual(towerById(before, 'c7'));
+  });
+
+  it('carries a filed record into § 8.9’s renewal offer and into the standing it banks', () => {
+    let career = openingCareer('eta');
+    for (const verdict of ['cleared', 'cleared', 'missed'] as const) {
+      career = applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict });
+    }
+    const tower = first(career);
+    // Two of the three days held, which is what the agent prices the renewal from.
+    expect(renewalOffer(tower).clearRate).toBeCloseTo(2 / 3, 10);
+    expect(standingOf(career.carry, career.towers)).toBe(2 * 2 - 3);
   });
 });

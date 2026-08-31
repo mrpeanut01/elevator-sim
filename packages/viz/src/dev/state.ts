@@ -141,10 +141,18 @@ export const DEFAULT_SHIFT_LENGTH_S = 1800;
  * The shift a scenario opens on — its own, when it authors one, else the shipped default.
  * § D234, issue #27.
  *
- * Called from exactly two places, and the pair is the decision: {@link initialState}, because the
- * page opens on `CONTRACTS[0]`, and `scenariosPanel`'s `take`, because taking an assignment
- * restarts the week and is the one moment a player has asked for this scenario rather than for
- * this shift length.
+ * Called from **three** places, and the set is the decision rather than the count:
+ * {@link initialState}, because the page opens on `CONTRACTS[0]`; `scenariosPanel`'s `take`,
+ * because taking an assignment restarts the week and is the one moment a player has asked for this
+ * scenario rather than for this shift length; and — since GitHub issue #223 —
+ * `everyday/host.ts#runCampaignDay`, which is § 8's *Lock it in and run day N* and is that same
+ * moment on the campaign's side of the door. A campaign tower's id **is** a contract id, § 8 offers
+ * no length control for the seed to overwrite, and the measurement below is why it needs one: the
+ * one building `openingCareer` holds is the one building this constant exists for.
+ *
+ * (This paragraph read *"called from exactly two places"* until that third caller landed. A count
+ * in prose is a fact nothing re-derives — § D227 — so it is stated here as the set and its reasons,
+ * which is what a reader adding a fourth actually needs.)
  *
  * It is deliberately **not** called from `withBuilding`. Changing building from the coach select is
  * not taking an assignment — the player is on day 4 with a streak and they still are — and

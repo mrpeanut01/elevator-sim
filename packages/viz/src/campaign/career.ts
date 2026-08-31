@@ -156,6 +156,23 @@ export interface PendingBooking {
   readonly level: number;
 }
 
+/**
+ * § 8.6's two marks — *"`Close the day` evaluates the four tests and marks the day cleared or
+ * missed"*.
+ *
+ * **Two, and there is deliberately no third.** § 8.1's whole arithmetic is
+ * `cleared = day − 1 − missed`, so the record partitions every past day into exactly these two;
+ * `economy.ts#calendarRow` reads the same sentence a second time to place the marks on the grid.
+ * A third value would have to be representable in that subtraction, and it is not.
+ *
+ * The consequence is stated where it bites rather than hidden here: a run the tests could not read
+ * — an empty morning under `shift/goals.ts`'s wake-up gate, or a worst wait the run censored — is
+ * **not filed at all**, because *unjudged is not passed* and *unjudged did not cost anything
+ * either* ([§ D234](../../../../DECISIONS.md)) are both true and neither of these two marks can say
+ * so. {@link CAMPAIGN_ABSENCES} carries that sentence to the player.
+ */
+export type CampaignDayVerdict = 'cleared' | 'missed';
+
 /** § 8.10's ceiling — three lost contracts and the agency stops calling. */
 export const LOST_CONTRACTS_MAX = 3;
 
@@ -176,6 +193,19 @@ export const SERVICE_AT_TRIPS = 45_000;
  */
 export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
   'Incidents here are the two the building implies — a renewal falling due, and a service window the wear clock has reached. A lift failing its safety check and a coach party booked in are draws this build cannot make: there is no seeded stream for a campaign day and no event calendar behind a contract.',
+  /*
+   * **This entry is unchanged, and issue #223 is why that is a decision rather than an oversight.**
+   *
+   * It reads as a description of behaviour now: the day *is* run from here, and *is* marked when the
+   * player closes it. Before #223 the same words described something that never happened. Rewording
+   * it was drafted and taken back out, because `buildNotes.test.ts#ABSENCE_TRIAGE`'s own rule is
+   * that an entry whose words change is an entry whose owning issue must be re-checked — and the
+   * re-check has an answer this lane may not write down. What is left absent in § 8 is the **trip
+   * budget**, § 8.6's fourth test, which nothing in this run measures; no issue owns it, and
+   * inventing a number for the triage table would be worse than leaving the register as it stands.
+   * It is not undisclosed meanwhile: `everyday/campaignModel.ts#TRIPS_REFUSAL` is on the row itself,
+   * which is where #207 deliberately left every per-control refusal.
+   */
   'A day is run from here and scored by the day itself; the month grid marks a day cleared or missed when the campaign day is filed, and nothing files one automatically.',
   'The career is this session’s. Nothing on these three screens is written to this device.',
 ]);
@@ -465,7 +495,12 @@ export type CampaignAction =
   /** § 8.4 — *cancel and nothing is spent*. */
   | { readonly kind: 'cancel-booking' }
   /** § 8.2's desk decision. */
-  | { readonly kind: 'answer-need'; readonly towerId: string; readonly optionId: string };
+  | { readonly kind: 'answer-need'; readonly towerId: string; readonly optionId: string }
+  /**
+   * § 6.4 step 4 — *"In a campaign run, evaluate the four tests and mark the day cleared or
+   * missed"*, as the one thing that moves a contract forward. See {@link fileDay}.
+   */
+  | { readonly kind: 'file-day'; readonly towerId: string; readonly verdict: CampaignDayVerdict };
 
 /**
  * Apply an action. Total, pure, and **refusing rather than throwing**: an action the record cannot
@@ -511,6 +546,8 @@ export function applyCampaignAction(
       return { ...career, pendingBooking: undefined };
     case 'answer-need':
       return answerNeed(career, action.towerId, action.optionId);
+    case 'file-day':
+      return fileDay(career, action.towerId, action.verdict);
   }
 }
 
@@ -523,6 +560,67 @@ function mapTower(
   return {
     ...career,
     towers: career.towers.map((tower) => (tower.id === towerId ? edit(tower) : tower)),
+  };
+}
+
+/**
+ * File the day the player just closed — GAMEPLAY § 8.5's *"a missed day increments the building's
+ * `missed`, costs three standing, and moves it closer to the end of the contract"*, and the one
+ * action that moves a contract forward.
+ *
+ * ## Two fields move, and everything else is derived from them
+ *
+ * `tower.day` advances and `tower.missed` grows on a miss. **Nothing else is written**, and that is
+ * the decision rather than an omission — `economy.ts` already derives every consequence from these
+ * two:
+ *
+ * - the purse, because `earnedSoFar` sums `rateOnDay` over the past days that were not missed, so a
+ *   cleared day pays this contract's rate for the week it fell in and a missed one pays nothing;
+ * - the record (`clearedDays`), the month grid's ✓ and ✗ (`calendarRow`), the renewal's clear rate
+ *   (`renewalOffer`), the at-risk list and `contractIsLost`;
+ * - § 8.4's standing, which is banked as `carry` when the contract finishes and is already
+ *   `clearedDays × 2 − missed × 3` in both arms of {@link answerNeed}.
+ *
+ * A latched purse or a latched cleared count would be a second answer to a question one of them
+ * already contains — `careerIsOver`'s own argument, one function down.
+ *
+ * ## Why the career day moves with it
+ *
+ * § 8.6 keys the rolling calendar off `career.today` and derives a contract's own start from it
+ * (`start(t) = careerToday − (t.day − 1)`), so the two have to advance together or a filed day
+ * would slide the whole contract under the grid rather than filling one cell of it.
+ *
+ * **What that costs with more than one building held, said rather than discovered.** Only the tower
+ * whose day was run advances, so the unplayed towers' derived start slides forward by one career
+ * day. This build has no shipped instance — {@link openingCareer} holds one contract and no action
+ * acquires a second — and the alternative is worse: advancing every tower's `day` would pay the
+ * player for days they never ran, because a day that is neither cleared nor missed is not
+ * representable in `cleared = day − 1 − missed`.
+ *
+ * ## The two refusals
+ *
+ * A tower this career does not hold, and a month that is already over — `tower.day` is 1…20 while
+ * the contract runs, and reaches 21 when its last day is filed. Past that the next press is § 8.9's
+ * renewal, not another day: `rateOnDay` prices twenty days and `contractEndDay` draws twenty
+ * columns, so a twenty-first would be a day nobody published a fee or a cell for. Refusing by
+ * returning the record unchanged is this reducer's own convention, and the surface refuses first —
+ * § 3.3's contract row goes to *Start the month again* once the month is over.
+ */
+function fileDay(
+  career: CampaignCareer,
+  towerId: string,
+  verdict: CampaignDayVerdict,
+): CampaignCareer {
+  const tower = towerById(career, towerId);
+  if (tower === undefined) return career;
+  if (tower.day > CONTRACT_DAYS) return career;
+  return {
+    ...mapTower(career, towerId, (current) => ({
+      ...current,
+      day: current.day + 1,
+      missed: verdict === 'missed' ? current.missed + 1 : current.missed,
+    })),
+    today: career.today + 1,
   };
 }
 
