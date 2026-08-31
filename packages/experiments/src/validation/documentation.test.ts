@@ -1322,11 +1322,27 @@ const KNOWN_DUPLICATE_DECISIONS: readonly number[] = Object.freeze([63]);
  * reconciliation was previously a thing an integrator remembered; D387 is what happens when one is
  * not remembered, and it went unnoticed for a wave.
  */
-const OPEN_RESERVATION: {
+type DecisionReservation = {
   readonly wave: string;
   readonly from: number;
   readonly to: number;
-} | null = null;
+};
+
+/*
+ * **The `as` is load-bearing — do not simplify it to `= null`.**
+ *
+ * A `const` annotated with a union and initialised with the bare literal `null` is narrowed by
+ * control-flow analysis to `null` at every use, so the whole open-wave branch below becomes
+ * `never` and `tsc -b` fails with eleven `Property 'wave' does not exist on type 'never'`. Vitest
+ * transpiles rather than type-checks, so that build break passes the tests it belongs to and is
+ * caught by CI instead — which is how it was found, on this very line, one push after this
+ * mechanism landed.
+ *
+ * Asserting the union keeps both arms of the switch type-checked while no wave is open, which is
+ * the whole point: the next integrator opens a block by replacing `null` with an object literal
+ * and nothing else has to compile for the first time.
+ */
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
  *
