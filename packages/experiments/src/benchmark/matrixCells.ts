@@ -268,10 +268,10 @@ export const MATRIX_CELLS: readonly MatrixCell[] = Object.freeze([
     armCeilings: Object.freeze({
       'nearest-car': 24,
       'predictive-balanced': 81,
-      'destination-panel': 33,
+      'destination-panel': 171,
     }),
     rationale:
-      'The incoming-only regime DECISIONS.md § D100 established as the one comparable point on this building — its own mixed 40/30/30 scenario admits no paired comparison at all, and that refusal is structural rather than load-driven. Three arms saturate inside the band and two of them below this budget, so nearest-car and destination-panel are UNQUOTABLE here with their ceilings printed. The band floor binds the budget: the spread would buy a 1.0 s half-width at 36, and CLAUDE.md does not permit 36.',
+      'The incoming-only regime DECISIONS.md § D100 established as the one comparable point on this building — its own mixed 40/30/30 scenario admits no paired comparison at all, and that refusal is structural rather than load-driven. Three arms saturate inside the band and one of them below this budget, so nearest-car is UNQUOTABLE here with its ceiling printed. destination-panel read 33 until GitHub issue #306: DECISIONS.md § D333 bounded the landing panel\'s promise, the arm that was the only one able to suffer that defect stopped saturating here, and its ceiling is 171 — measured on the fix and on the commit before it rather than inferred (§ D396). The band floor binds the budget: the spread would buy a 1.0 s half-width at 36, and CLAUDE.md does not permit 36.',
   }),
   Object.freeze({
     id: 'vertical-city-up-peak',
@@ -282,14 +282,14 @@ export const MATRIX_CELLS: readonly MatrixCell[] = Object.freeze([
     replications: 50,
     budgetBasis: Object.freeze({
       bindingArmId: 'zoned-uppeak',
-      sdOfDifference: 2.9722,
-      unclampedReplications: 34,
+      sdOfDifference: 3.1724,
+      unclampedReplications: 39,
       clamped: 'floor' as const,
     }),
     admissibleReplications: undefined,
-    armCeilings: Object.freeze({ 'nearest-car': 109 }),
+    armCeilings: Object.freeze({ 'nearest-car': 109, 'destination-panel': 73 }),
     rationale:
-      'The fifth building, at 1 % rather than 2 %: censused at 2 % the BASELINE loses its AWT at replication 46, below the 50-replication floor, so that point cannot carry an admissible budget at all and 1 % is the rate at which it can. Every run of this building carries the standing double-deck disclaimer — its eight shuttle cars are configured double-deck and simulated single-deck — so every figure in this row is for a machine nobody ordered, and that is a property of the building rather than of this matrix.',
+      'The fifth building, at 1 % rather than 2 %: at 2 % most of this table falls over early — see EXCLUDED_CELLS, whose stated mechanism for that point is re-measured and withdrawn by the same run that re-took these two numbers — and 1 % is the rate at which every arm but nearest-car and destination-panel is clean across the census. Every figure in this row is measured with the DECKS SIMULATED, and the sentence that stood here said the opposite: it carried the standing double-deck disclaimer, "configured double-deck and simulated single-deck, so every figure in this row is for a machine nobody ordered", which DECISIONS.md § D131 made false and § D132 retired for this building by name, since its shuttle declares its four servesFloorPairs. Both numbers above moved on the tree that made that sentence false and neither was re-taken until GitHub issue #306 (§ D396): destination-panel\'s ceiling of 73 is the decks, isolated by a control that drops the pairs on one tree; the spread went 2.9722 to 3.0370 there and then to 3.1724 at § D332. The budget is 50 at every one of those points, because the band floor bound it before and binds it now.',
   }),
 ]);
 
@@ -326,7 +326,7 @@ export const EXCLUDED_CELLS: readonly ExcludedCell[] = Object.freeze([
     id: 'vertical-city-up-peak-2pct',
     building: 'vertical-city',
     mechanism:
-      'The BASELINE loses its AWT at replication 46, below CLAUDE.md\'s 50-replication floor, so there is no admissible budget at this point — not an under-budgeted cell but an inadmissible one. destination-panel is worse still, first invalid at replication 3 with 39 of 200 saturated. The building appears at 1 % instead, where every arm but nearest-car is clean across the census.',
+      'WITHDRAWN AND REPLACED, and the ground has changed from inadmissible to deferred — GitHub issue #306, DECISIONS.md § D396. This read: "The BASELINE loses its AWT at replication 46, below CLAUDE.md\'s 50-replication floor, so there is no admissible budget at this point — not an under-budgeted cell but an inadmissible one. destination-panel is worse still, first invalid at replication 3 with 39 of 200 saturated." Re-censused at n = 200 at MATRIX_SEED on the tree carrying § D131\'s simulated decks, § D332 and § D333: the baseline first loses its AWT at replication 108, not 46, which is INSIDE CLAUDE.md\'s 50-200 band — so the stated mechanism no longer holds and this point is not inadmissible. destination-panel is first invalid at 2 rather than 3, nearest-car at 7, and seven further arms between 13 and 46, so most of the table would be UNQUOTABLE here; that is a result about those arms rather than about the cell, which is exactly how mixed-use-up-peak is handled in the matrix. The cell is therefore EXCLUDED PENDING A CRITERION rather than excluded by a measurement, on the same footing as the two entries above: admitting it adds a matrix row and a published pin group, and § D256 requires that re-design to be specified before the numbers are read. The building appears at 1 % instead, where every arm but nearest-car and destination-panel is clean across the census.',
   }),
   Object.freeze({
     id: 'mixed-use-mixed-40-30-30',
