@@ -134,4 +134,44 @@ describe.skipIf(!HAS_BROWSER)('the Everyday settings screen', () => {
     expect(persisted).toBe(true);
     await page.close();
   });
+
+  /**
+   * **The Units pill, end to end — GitHub issue #170's Units half, [§ D448](../../../../DECISIONS.md).**
+   *
+   * Three claims, and the third is the one that needs a browser. The pill flips; the choice reaches
+   * this device's own slot (a *word*, not a figure — the whole safety argument in one assertion);
+   * and **a machine specification on another screen reads the other unit**, which is the difference
+   * between a preference that is stored and a preference that is honoured. `settingsView.test.ts`
+   * can see the first, `units.test.ts` the second, and neither can see the third: only a real
+   * navigation puts the drawing board's rating plate in front of the value the pill just wrote.
+   */
+  it('flips Units, keeps a word in this device’s slot, and the plate reads feet', async () => {
+    const page = await coldLoad();
+    await openSettings(page);
+
+    expect(await page.textContent('.everyday-settings-units')).toBe('metres');
+    await page.click('.everyday-settings-units');
+    expect(await page.textContent('.everyday-settings-units')).toBe('feet');
+
+    /*
+     * A word in the Everyday slot, beside the profile and never on it: identity travels with a
+     * posted run and a display preference must not ride along with it.
+     */
+    const stored = await page.evaluate(() => {
+      const raw = window.localStorage.getItem('elevator-sim.everyday-profile');
+      if (raw === null) return undefined;
+      return (JSON.parse(raw) as { units?: unknown }).units;
+    });
+    expect(stored).toBe('imperial');
+
+    /* The consumer. § 13.2's rating plate, reached through the rail the way a player reaches it. */
+    await page.click('nav.everyday-rail button:has-text("Design a building")');
+    await page.waitForSelector('.everyday-designer-plate', { timeout: 30_000 });
+    const plate = (await page.textContent('.everyday-designer-plate')) ?? '';
+    expect(plate).toContain('ft/s');
+    expect(plate).not.toContain('m/s');
+    // Converted, not relabelled: the load row is reference data and is untouched by the preference.
+    expect(plate).toContain('lb');
+    await page.close();
+  });
 });

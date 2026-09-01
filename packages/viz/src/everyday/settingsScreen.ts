@@ -308,8 +308,23 @@ function mount(host: HTMLElement, _context: EverydayScreenContext): EverydayScre
   }
 
   /**
-   * The Motion row, or its honest stand-in — rebuilt whole because its existence is the thing
-   * that changes: the bridge arrives once (`onEngineerSettingsProvided`) and the pill flips.
+   * The section's rows, and the Motion row's honest stand-in when there is one — rebuilt whole
+   * because a row's *existence* is the thing that changes: the bridge arrives once
+   * (`onEngineerSettingsProvided`) and Motion appears beside Units.
+   *
+   * **The stand-in and the rows are drawn together, never one instead of the other**, and that is
+   * a correction rather than a style. While this section held one row, an absent bridge meant an
+   * empty section and the note could stand alone behind an early return. It holds two now and only
+   * one of them depends on the bridge, so returning after the note would drop the **Units** row
+   * from the screen while `settingsView.ts` said it was there — a screen disagreeing with its own
+   * pure half about a control a player can press, which is § D359's shape inside one screen.
+   *
+   * **Nothing in the suite catches that, and it is said here rather than assumed away.** The pure
+   * half is asserted (`settingsView.test.ts`: the booting window draws the note *and* the Units
+   * row); the DOM half cannot be, because § D220 § 3's document tier does not exist and the
+   * browser tier cannot reach this window — the bridge has always arrived by the time a page is
+   * loaded enough to click. This defect was in this lane's own first draft and was found by
+   * reading, not by a red test.
    */
   function redrawPlaying(): void {
     view = viewNow();
@@ -318,7 +333,6 @@ function mount(host: HTMLElement, _context: EverydayScreenContext): EverydayScre
       const waiting = el(doc, 'div', 'everyday-settings-motion-absent', view.playing.absentNote);
       waiting.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;max-width:64ch`;
       playingRegion.append(waiting);
-      return;
     }
     for (const rowView of view.playing.rows) {
       const row = el(doc, 'div', 'everyday-settings-toggle');
