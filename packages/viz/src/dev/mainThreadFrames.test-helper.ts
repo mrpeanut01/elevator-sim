@@ -77,7 +77,18 @@ export const BLOCKED_FRAME_GAP_MS = 400;
 /** One frame the sampler saw: when it was rendered, and what the watched control's face said. */
 interface FrameMark {
   readonly t: number;
-  /** `textContent` of the first match for the selector, or `''` when nothing matched. */
+  /**
+   * `textContent` of the first **rendered** match for the selector, or `''`.
+   *
+   * *Rendered* rather than merely present, and it is measured with `getClientRects().length`
+   * rather than assumed. **This was a correction, not a precaution.** The first draft read
+   * `textContent` off any match, and `dev/watchPanel.ts`'s picker hides itself with
+   * `style.display = 'none'` rather than emptying itself — so a row left mid-check stays in the
+   * document, wearing its busy label, for as long as the overlay is down. Driven against a
+   * deliberately broken runner that put every run back on the main thread, the Watch case passed:
+   * the busy frames it found were all after the press had finished, on a button nobody could see.
+   * An instrument that reports a state the reader cannot see is worse than no instrument.
+   */
   readonly label: string;
   readonly disabled: boolean;
 }
@@ -111,8 +122,9 @@ export async function recordFrames(page: Page, selector = ''): Promise<void> {
     const w = window as FrameWindow;
     const marks: FrameMark[] = [];
     const tick = (): void => {
-      const node =
-        watched === '' ? null : document.querySelector<HTMLElement>(watched);
+      const found = watched === '' ? null : document.querySelector<HTMLElement>(watched);
+      // Rendered, not merely present — see `FrameMark.label`.
+      const node = found !== null && found.getClientRects().length > 0 ? found : null;
       marks.push({
         t: performance.now(),
         label: node?.textContent ?? '',
