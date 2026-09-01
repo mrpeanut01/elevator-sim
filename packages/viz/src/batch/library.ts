@@ -109,6 +109,15 @@ import {
  * to be sayable at the control *and* survivable inside the worker, and an exception crossing a
  * thread boundary is flattened to a string by `dev/batchWorker.ts` — which is how a reader ends up
  * being told a batch failed without being told which dispatcher was at fault.
+ *
+ * **The sentences are written for a player and not for this file's author**, which is a correction
+ * rather than a style note: their loudest renderer is `everyday/benchScreen.ts`, a Casual screen,
+ * and the first draft said things like *"which this build's data/dispatcher-profiles.json already
+ * ships"* — a file path on a surface whose reader has never seen one. What each of them names now
+ * is the dispatcher and the move that clears it. The **parse** refusal still quotes `core`'s schema
+ * message verbatim, notation and all, and says whose message it is: that is `editedProfile.ts`'s
+ * own rule — *"whatever `core` refuses, this refuses, with `core`'s own message"* — and a second,
+ * friendlier paraphrase of a loader error is how two answers to *why not* come to disagree.
  */
 export type BatchLibraryOutcome =
   | { readonly ok: true; readonly library: DispatcherProfiles }
@@ -137,18 +146,19 @@ export function batchLibraryOf(
       return {
         ok: false,
         reason:
-          `your dispatcher “${profile.name}” carries the id “${profile.id}”, which this build's ` +
-          `data/dispatcher-profiles.json already ships. Two dispatchers under one id cannot both ` +
-          `be run: the arm would resolve to one of them and a weight-set selector to the other, ` +
-          `and the report would name whichever it found first. Rename it in the workshop.`,
+          `“${profile.name}” shares an id with a dispatcher this build already ships. Two ` +
+          `dispatchers under one id cannot both be run — a comparison would name whichever it ` +
+          `found first — so it is refused rather than guessed at. Save it again under a new name ` +
+          `in the workshop and it can go through.`,
       };
     }
     if (seen.has(profile.id)) {
       return {
         ok: false,
         reason:
-          `two of your saved dispatchers carry the id “${profile.id}”. A batch names its arms by ` +
-          `id, so a comparison between them could not say which one it ran.`,
+          `two of the dispatchers you have saved share one id. A comparison names its arms by id, ` +
+          `so it could not say which of the two it ran. Save one of them again under a new name ` +
+          `and it can go through.`,
       };
     }
     seen.add(profile.id);
@@ -164,8 +174,8 @@ export function batchLibraryOf(
     return {
       ok: false,
       reason:
-        `a dispatcher you saved is not one this build can author: ` +
-        `${error instanceof Error ? error.message : String(error)}`,
+        `one of the dispatchers you have saved is not one this build can run, and the reason is ` +
+        `the loader's own: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 

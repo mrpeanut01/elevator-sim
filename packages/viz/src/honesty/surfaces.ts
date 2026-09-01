@@ -40,6 +40,7 @@ import {
   RULE_ACTIONS,
   RULE_CONDITION_WORDS,
   RULE_CONDITIONS,
+  type DispatcherProfile,
   type DispatcherProfiles,
   type ElevatorSpecs,
   type ResolvedBuilding,
@@ -51,6 +52,11 @@ import { credentialLensFor, describeCredentialLens, LENS_LEGEND, LENS_OPERATIONA
 import { checkAccessCompatibility, credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { describePinnedQueues, pinnedQueuesAt, type PinnedQueue } from '../frame/pinnedQueue.js';
+import {
+  batchLibraryOf,
+  SHIPPED_GROUP_LABEL,
+  YOURS_GROUP_LABEL,
+} from '../batch/library.js';
 import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
 import { SuiteError, suiteCellViewOf, suitePlanOf, suiteSummaryOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult, type BatchWorkerMessage } from '../batch/types.js';
@@ -2468,6 +2474,86 @@ const EDITED_PROFILE: SurfaceAdapter = {
         seeds.push({ field: `resolveEditedProfile.${label}.reason`, text: resolved.reason, role: 'reason' });
       }
     }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The dispatcher library a batch resolves its arms against, **refusing** — issues #167 and #228,
+ * [§ D443](../../../../DECISIONS.md).
+ *
+ * Driven rather than excluded, and the precedent is one file over: `EDITED_PROFILE` above drives
+ * `controls/editedProfile.ts`'s three refusals for exactly this reason — a pure function whose
+ * whole output on the unhappy path is prose a player reads, drawn by mounts that are themselves
+ * excluded on DOM ground. Excluding this one while driving its twin would leave the search blind to
+ * half of one subject.
+ *
+ * **Its loudest renderer is a Casual screen**, which is what makes the sweep worth having here.
+ * `everyday/benchScreen.ts` admits the shelf before it starts a worker, so these sentences land on
+ * the bench, not only in an Engineer error slot — and the first draft of them said things like
+ * *"this build's data/dispatcher-profiles.json"*, which is the register `internal-notation` exists
+ * to catch.
+ *
+ * Three points, two refusals and the pass, because the refusals are the strings:
+ *
+ * - **a shadowed id** — a saved dispatcher wearing a shipped one's slug;
+ * - **two saved dispatchers under one id**;
+ * - **the pass**, which authors no sentence at all and is seeded so that the adapter cannot come to
+ *   report a refusal on every case and be indistinguishable from one that always refuses.
+ *
+ * The **parse** refusal is deliberately not seeded. Its text is `core`'s schema message with a
+ * short attribution in front, so seeding it would put a `zod` diagnostic into the corpus and grade
+ * `parse.ts` through this surface — and the sentence this file is answerable for is the
+ * attribution, which the pass and the two refusals above already establish the register of.
+ *
+ * The group labels are covered here rather than at a fourth adapter: they are this module's own
+ * exports and they name the two halves of the library this module makes.
+ */
+const BATCH_LIBRARY: SurfaceAdapter = {
+  id: 'batch/library.ts#batchLibraryOf',
+  covers: ['batch/library.ts#batchLibraryOf', 'batch/library.ts#SHIPPED_GROUP_LABEL'],
+  render(context) {
+    const base = context.profiles[0];
+    if (base === undefined) return [];
+    const seeds: TextSeed[] = [
+      { field: 'groupLabel.shipped', text: SHIPPED_GROUP_LABEL, role: 'label' },
+      { field: 'groupLabel.yours', text: YOURS_GROUP_LABEL, role: 'label' },
+    ];
+
+    /*
+     * The player's own dispatcher, built the way the workshop builds one — `profileFromSpec` over a
+     * spec read off a shipped profile — so the name in the refusal is a name a reader could have
+     * typed rather than a fixture literal.
+     */
+    const mine = (id: string, name: string): DispatcherProfile =>
+      profileFromSpec(specFromProfile(base, name), { id, base });
+
+    const shadowed = batchLibraryOf(context.dispatcherProfiles, [mine(base.id, 'Kestrel')]);
+    if (!shadowed.ok) {
+      seeds.push({ field: 'batchLibraryOf.shadowed-id.reason', text: shadowed.reason, role: 'reason' });
+    }
+
+    const twice = batchLibraryOf(context.dispatcherProfiles, [
+      mine('yours-1', 'Kestrel'),
+      mine('yours-1', 'Merlin'),
+    ]);
+    if (!twice.ok) {
+      seeds.push({ field: 'batchLibraryOf.duplicate-id.reason', text: twice.reason, role: 'reason' });
+    }
+
+    /*
+     * The pass, seeded as the **name the report will print for the arm**. It is the only string
+     * this surface produces on the happy path, and it is the one a comparison puts in front of a
+     * reader — `BatchArmResult.dispatcherProfileName` is read off the resolved profile.
+     */
+    const accepted = batchLibraryOf(context.dispatcherProfiles, [mine('yours-1', 'Kestrel')]);
+    if (accepted.ok) {
+      const resolved = accepted.library.profiles.find((profile) => profile.id === 'yours-1');
+      if (resolved !== undefined) {
+        seeds.push({ field: 'batchLibraryOf.accepted.name', text: resolved.name, role: 'label' });
+      }
+    }
+
     return singleRun(this.id, seeds);
   },
 };
@@ -10156,6 +10242,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   EDITOR,
   CONTROLS,
   EDITED_PROFILE,
+  BATCH_LIBRARY,
   REPLAY,
   BATCH_REPORT,
   GOAL_REPORT,

@@ -29869,3 +29869,38 @@ belongs to whoever owns `dev/main.ts`'s tab wiring.
 
 **No latch on the refill.** `prefill` is latched because it is a courtesy a reader may overrule; a
 missing option is not. The two behaviours sit behind one signal and neither is the other's default.
+
+### The refusals are player-facing prose, and they are **searched** rather than excluded
+
+`honesty/derive.test.ts` found two new text producers — `batchLibraryOf` and the group labels — and
+they are driven by a `BATCH_LIBRARY` adapter rather than entered in `NOT_PLAYER_FACING`. The
+precedent is one file over: `EDITED_PROFILE` drives `controls/editedProfile.ts`'s three refusals,
+which are the same shape on the same subject, and excluding one while driving its twin would leave
+the search blind to half of one thing.
+
+**Writing them for the search found a defect in them first.** The loudest renderer of these
+sentences is `everyday/benchScreen.ts` — a **Casual** screen, because the bench admits the shelf
+before starting a worker — and the first draft read *"which this build's
+data/dispatcher-profiles.json already ships"*: a file path in front of a reader who has never seen
+one, which is what `internal-notation` exists to catch. They now name the dispatcher by the name the
+player gave it and name the move that clears it. **The parse refusal still quotes `core`'s schema
+message verbatim**, notation and all, with a short attribution in front — `editedProfile.ts`'s rule
+(*"whatever `core` refuses, this refuses, with `core`'s own message"*), because a friendlier
+paraphrase of a loader error is a second answer to *why not*.
+
+**The corpus figures will move, and the prediction is arithmetic** ([§ D343](#d343) reserves the
+measurement for the integrator, once, after integration; this lane does not take it). The adapter
+seeds **five strings per case** and runs **no simulation**: the two group labels, the two refusals,
+and the accepted profile's name. So:
+
+| column | prediction |
+|---|---|
+| always-on strings | **+245** — exactly 5 × 49 |
+| deep strings | **+300** — exactly 5 × 60 |
+| surfaces | **+1 in each tier**, `batch/library.ts#batchLibraryOf`, nothing removed |
+| cases, simulations, failing cases | **unmoved** |
+| the deep tier's one-surface lead | **unchanged** — the new surface is in both tiers |
+
+The string move is exactly attributable for wave G's reason and not wave H's: the seeds are a
+constant per case rather than a state-dependent count, so if either number is not the integer above,
+something other than this adapter moved and the difference is the thing to look at.

@@ -284,22 +284,35 @@ describe('batchLibraryOf', () => {
     if (outcome.ok) expect(outcome.library).toBe(config.dispatcherProfiles);
   });
 
-  it('refuses a saved dispatcher whose id a shipped one already has', () => {
+  it('refuses a saved dispatcher whose id a shipped one already has, by the reader’s name for it', () => {
+    /*
+     * **The player's name, not the id, and that is the fix rather than the flavour.** A reader who
+     * has to act on this sentence knows their dispatcher as *Sneaky*; `eta` is a slug that appears
+     * on no screen they have opened. It also names the move that clears it, because a refusal that
+     * says only *no* leaves a player with nothing to do — `everyday/benchScreen.ts` draws this on a
+     * Casual screen, which is what the first draft of this sentence had not accounted for.
+     */
     const shadow = savedProfile('collective', 'eta', 'Sneaky', { waitTime: 100 });
     const outcome = batchLibraryOf(config.dispatcherProfiles, [shadow]);
     expect(outcome.ok).toBe(false);
     if (!outcome.ok) {
-      expect(outcome.reason).toContain('eta');
+      expect(outcome.reason).toContain('Sneaky');
       expect(outcome.reason).toContain('already ships');
+      expect(outcome.reason, 'the refusal says no and not what to do about it').toContain('new name');
+      // The slug is deliberately absent: it is this file's word for the thing, not the reader's.
+      expect(outcome.reason).not.toContain('data/');
     }
   });
 
   it('refuses two saved dispatchers under one id', () => {
     const a = savedProfile('collective', 'yours-1', 'One', { waitTime: 100 });
-    const b = savedProfile('collective', 'yours-1', 'Two', { travelDistance: 100 });
+    const b = savedProfile('collective', 'yours-1', 'Two', { distanceTravelled: 100 });
     const outcome = batchLibraryOf(config.dispatcherProfiles, [a, b]);
     expect(outcome.ok).toBe(false);
-    if (!outcome.ok) expect(outcome.reason).toContain('yours-1');
+    if (!outcome.ok) {
+      expect(outcome.reason).toContain('share one id');
+      expect(outcome.reason).toContain('new name');
+    }
   });
 
   it("refuses a weight on a term the library does not declare, in the parser's own words", () => {
@@ -321,6 +334,14 @@ describe('batchLibraryOf', () => {
     if (!outcome.ok) {
       expect(outcome.reason).toContain('unknown cost term "waitTimeeee"');
       expect(outcome.reason).toContain('Declared terms:');
+      /*
+       * **This one keeps the loader's notation and says so**, where the two refusals above drop it.
+       * The distinction is `editedProfile.ts`'s rule rather than a taste: *"whatever `core`
+       * refuses, this refuses, with `core`'s own message."* A friendlier paraphrase of a schema
+       * error is a second answer to *why not*, and this repository has a rule about those. What is
+       * owed instead is attribution, so a reader knows the notation is not this screen's voice.
+       */
+      expect(outcome.reason).toContain("the loader's own");
     }
   });
 
