@@ -573,3 +573,99 @@ issue closable.** #237 is the live test of that rule: the cheap move is to rewri
 criteria down to what the tree already does and close it. That would be weakening a criterion to make a
 phase pass, which `CLAUDE.md` forbids outright. It is **needs-information**, and it stays open until a
 human rescopes it.
+
+---
+
+# Snapshot D — 2026-09-01, 70 open, the six untriaged and a refuted premise
+
+Snapshot C described 89 open issues on 2026-08-29. Today the list holds **70**, and **six of them
+had reached no artifact at all**: #315, #316, #317, #318, #320 and #321, all filed on 2026-09-01
+out of waves J and K. This snapshot triages those six. It does not re-open C's clusters, which
+remain the standing account of the other sixty-four.
+
+## D.1 Reconciliation first, because it found more than the six
+
+Every open issue number was checked against both `ISSUE_WORKER_LEDGER.md` and
+`CHARTER_PROGRAMME.md`. Sixty of seventy appear in at least one. **Ten appear in neither**, and they
+are not one group:
+
+- **#315, #316, #317, #318, #320, #321** — filed today, never triaged. This snapshot's subject.
+- **#157, #283** — untracked in the artifacts, but **in flight in open pull request #319**
+  (wave K), which carries new decisions D445 and D446 against #157 by name. Not a gap in the work,
+  a gap in the record.
+- **#93, #159** — genuinely untracked and genuinely unaddressed. The older backlog's two holes.
+
+**#93 is a combine candidate and is recorded as one rather than actioned.** Its four features
+(challenge-this-run, opt-in dispatcher transparency, personal-best highlight, weekly-challenge
+unification) sit inside the scope of **#221** *turn on the social layer*, with feature 2 overlapping
+**#226** ghost racing and feature 4 overlapping **#161**. #221 is the canonical on the same grounds
+snapshot A used throughout: it names the mechanism, #93 names the desired outcome. **The combine is
+not performed here.** #93 carries four acceptance criteria that #221 does not currently state, and
+§ C.6's rule is that unique scope transfers *before* a duplicate closes. Transferring it is a
+product-owner action.
+
+## D.2 The batch, and why it is four lanes rather than six
+
+| issue | type | priority | disposition | lane |
+|---|---|---|---|---|
+| #315 | defect | **P1** | implement now | A |
+| #316 | defect (unfinished behaviour) | P2 | implement now | B |
+| #317 | defect (CI) | P1 | implement now | C |
+| #320 | stale claim (§ D227 class) | P2 | implement now | C |
+| #321 | tooling defect | P2 | implement now | D |
+| #318 | **premise refuted** | P3 | **needs-decision, deferred** | none |
+
+**#317 and #320 are one lane because they share `vitest.config.ts`.** They are *related, not
+duplicate* — different projects, different files, separate acceptance criteria — so both stay open
+and both are worked, but a single owner edits the shared file. That is § C.6's rule applied to a
+file rather than to a scope.
+
+**#315 is the batch's P1 on user impact alone.** Every `garden-apartments` submission is refused as
+unreproducible because `packages/viz` sets `reportWindow: shiftReportWindowFor(buildingId)` and
+`packages/server`'s `configFor` sets none. The player did nothing wrong and the run is genuinely
+theirs. The reason it went unseen is the instructive part: `midtown-office` agrees on both sides,
+and `midtown-office` is the building the tests drive.
+
+## D.3 #318's premise is false, and the check it asks for already exists
+
+#318 closes with *"That last clause is the point of filing this: the collision survived because
+**no check looks for it**."* **That is not true of this tree**, and the disposition follows from
+the measurement rather than from a reading:
+
+- `packages/experiments/src/validation/documentation.test.ts` holds
+  `it('lets no second decision number head two decisions')` at line 1602, asserting in **both**
+  directions — an unregistered duplicate fails, and a registered duplicate that stops reproducing
+  must leave the register or the register becomes decoration.
+- `D63` is **deliberately registered** in `KNOWN_DUPLICATE_DECISIONS` with the reason written out:
+  ids here are names, `RISKS.md` R1, renumbering breaks every reference.
+- The register landed in `f38823c` on **2026-08-26**, six days before #318 was filed.
+- It runs green rather than skipped: `1 passed`, exit 0, measured today.
+
+So the third of #318's three "done" clauses is **already satisfied**, and the first — an empty
+`uniq -d` — is in direct tension with the recorded decision not to renumber. What survives is a
+narrower and legitimate question: whether D63's ambiguity should be *closed* by **retitling the
+newer heading**, a remedy the existing test's own failure message explicitly sanctions, rather than
+left registered.
+
+**One correction to my own first reading, recorded because the file's subject is stale counts.**
+A looser grep (`^## D[0-9]\+ `) reports `D125` as a second duplicate. It is not one:
+`DECISION_HEADING` is `/^## D(\d+) —/`, and `## D125 preface — …` is a preface to one decision
+rather than a second heading. The duplicate set is `{63}`, as registered.
+
+**#318 is deferred rather than worked**, on a second ground as well: it edits `DECISIONS.md` and
+`documentation.test.ts`, and **open pull request #319 edits both**. Working it now would collide
+with an unmerged wave.
+
+## D.4 The serialization map for this batch
+
+PR #319's seventy-two changed files were enumerated and diffed against every lane's allowed set.
+It touches `DECISIONS.md`, `CHARTER_PROGRAMME.md`, `documentation.test.ts`, and a wide span of
+`packages/viz/src/everyday/**` — and it touches **none** of `vitest.config.ts`, `.gitignore`,
+`.worktree-setup.sh`, `packages/viz/src/menu/**`, `packages/viz/src/campaign/judge.test.ts`,
+`packages/server/**`, `packages/core/**` or `packages/viz/src/shift/**`. Lanes A, B, C and D are
+therefore clear of it; #318 is not, which is why it waits.
+
+**Lane C is scheduled alone rather than concurrently, and that is a measurement constraint rather
+than a courtesy.** #317 and #320 are both about how much headroom a suite has under contention.
+Running them beside three other lanes' suites would corrupt the very number they exist to take —
+which is #321's second hazard arriving at the batch that contains #321.
