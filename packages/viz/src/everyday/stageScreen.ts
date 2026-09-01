@@ -57,6 +57,8 @@
  * *Run this shift* performs, so the day it produces may file.
  */
 
+import type { DispatcherProfile } from '@elevator-sim/core/browser';
+
 import { Playback } from '../playback/playback.js';
 import { systemClock } from '../playback/clock.js';
 import type { Frame, VizRecording } from '../contract/types.js';
@@ -747,9 +749,25 @@ function mountStage(
    * model — this block only decides which element they go in, which is the split `dev/main.ts` keeps
    * for the same control on the Engineer strip.
    *
-   * The list is read **once, at mount**. § 7.6 says *any style or saved dispatcher*, and the saved
-   * shelf cannot grow while this screen holds the page — the workshop that writes it is another
-   * screen, and entering it unmounts this one.
+   * **The list is re-read on every host notification, and the first draft of this comment said it
+   * could not need to be.** It claimed the saved shelf cannot grow while this screen holds the page,
+   * because the workshop that writes it is another screen. That is false in the one direction that
+   * matters: § 3.2's door covers the Everyday root rather than hiding it (a canvas under
+   * `display:none` never recovers its box), so this screen stays **mounted** while the player is in
+   * the Engineer world — where they can save a dispatcher. A list read once at mount would then
+   * refuse to offer a driver that exists, under a picker that says *any style or saved dispatcher*.
+   *
+   * So {@link refreshSwitchOptions} rebuilds the options when the shelf's ids **or names** move and
+   * at no other time: an element rebuilt every frame is an element whose menu closes as the player
+   * opens it, which is `dev/watchPanel.ts`'s own reason for keying its cells. It runs on every host
+   * notification, which is what a save produces.
+   *
+   * **Said as a limitation rather than presented as coverage**: what is *pinned* by a run is that
+   * the picker's options come from the façade at all — `stageScreen.browser.test.ts` reads them off
+   * the page and hands the day to one of them. That a shelf grown in the *other world* reaches this
+   * list is implemented and not asserted, because no method on the façade writes the shelf: saving a
+   * dispatcher is `dev/dispatcherEditor.ts`'s press, and driving it from here would be a cross-world
+   * case for one list.
    *
    * The picker opens on the dispatcher the player has standing rather than on a stranger, so the
    * first thing it says is true of the day they are watching. That is often *not* a no-op press: a
@@ -757,7 +775,8 @@ function mountStage(
    * and handing the day to that name is a real change — which is exactly the case an id comparison
    * got wrong on the other surface.
    */
-  const switchable = host.dispatchers();
+  let switchable: readonly DispatcherProfile[] = [];
+  let renderedShelf: string | undefined;
   const switchPicker = el(doc, 'select', 'everyday-stage-switch-pick');
   switchPicker.style.cssText = [
     `border:1px solid ${C.rule}`,
@@ -770,14 +789,32 @@ function mountStage(
     'max-width:100%',
   ].join(';');
   switchPicker.setAttribute('aria-label', STAGE_SWITCH_PICKER_LABEL);
-  for (const profile of switchable) {
-    const option = el(doc, 'option', undefined, profile.name);
-    option.value = profile.id;
-    switchPicker.append(option);
-  }
-  switchPicker.value = host.selection().dispatcherId;
-  if (switchPicker.value === '' && switchable[0] !== undefined) {
-    switchPicker.value = switchable[0].id;
+  /**
+   * The shelf, rebuilt only when it has moved — see the block comment above for why once is wrong.
+   *
+   * The player's own selection survives a rebuild wherever the profile still exists; when it does
+   * not — they were pointed at a dispatcher that has just been deleted — the picker falls back to
+   * the standing one rather than to whatever ended up first, so what it names is still a fact about
+   * the day.
+   */
+  function refreshSwitchOptions(): void {
+    const latest = host.dispatchers();
+    const shelf = latest.map((profile) => `${profile.id}\u0001${profile.name}`).join('\u0000');
+    switchable = latest;
+    if (shelf === renderedShelf) return;
+    renderedShelf = shelf;
+    const wanted = switchPicker.value;
+    switchPicker.replaceChildren(
+      ...latest.map((profile) => {
+        const option = el(doc, 'option', undefined, profile.name);
+        option.value = profile.id;
+        return option;
+      }),
+    );
+    const keep = latest.some((profile) => profile.id === wanted) ? wanted : host.selection().dispatcherId;
+    switchPicker.value = latest.some((profile) => profile.id === keep) ? keep : (latest[0]?.id ?? '');
+    switchPicker.hidden = latest.length === 0;
+    switchButton.hidden = latest.length === 0;
   }
   const switchButton = el(doc, 'button', 'everyday-stage-intervene');
   switchButton.type = 'button';
@@ -803,7 +840,8 @@ function mountStage(
   interventionRefusal.style.cssText = `font-size:11.5px;color:${C.label}`;
   interventions.append(
     ...interventionButtons,
-    ...(switchable.length === 0 ? [] : [switchPicker, switchButton]),
+    switchPicker,
+    switchButton,
     interventionStamp,
     interventionRefusal,
   );
@@ -985,6 +1023,13 @@ function mountStage(
             dayIdx: host.week().dayIdx,
           });
     context.refreshBar();
+    /*
+     * The shelf, on the notification a save produces — the other half of {@link refreshSwitchOptions}'s
+     * argument. A dispatcher saved in the Engineer world while this screen sits covered arrives here
+     * and nowhere else: `draw` does not run while another world has the page, and the picker's own
+     * `change` event fires only when a player touches it.
+     */
+    syncSwitchArm();
     syncTransport();
     requestFrame();
   }
@@ -1089,6 +1134,7 @@ function mountStage(
 
   /** The handover arm re-asked from the live facts — for the picker, and for the mount. */
   function syncSwitchArm(): void {
+    refreshSwitchOptions();
     const target = switchTarget();
     const view = stageInterventionsOf({
       interventions: host.interventions(),
@@ -1361,13 +1407,13 @@ function mountStage(
    * the reason `ctx` is a parameter of the screen rather than a field of the run.
    */
   if (context.ctx !== 'watch' && stageEntryStartsARun(host.runState())) host.startRun();
-  onHostChange();
   /*
-   * The handover arm, once, before any frame — `draw` returns early with no recording, so without
-   * this the button would sit on the awaiting-run stage with no words on it. § 7.6's fourth rule is
-   * about controls that cannot act *saying so*, and a blank button says nothing at all.
+   * The handover arm is drawn from inside this call, before any frame — `draw` returns early with
+   * no recording, so without it the button would sit on the awaiting-run stage with no words on it.
+   * § 7.6's fourth rule is about controls that cannot act *saying so*, and a blank button says
+   * nothing at all.
    */
-  syncSwitchArm();
+  onHostChange();
 
   return {
     unmount: () => {
