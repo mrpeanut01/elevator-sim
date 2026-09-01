@@ -541,6 +541,80 @@ const WHOLE_DAY: SubmittedRun = Object.freeze({
   seed: '20260804',
 });
 
+/**
+ * An Everyday run: § 11.5's rules on a cell where they bite, and § 7.6's parking press.
+ *
+ * `midtown-office` at 3 % rather than {@link RUN}'s `garden-apartments`, and the reason is measured:
+ * on Garden at 6 % over 900 s neither field moves the run by a single leg, so a route test built on
+ * it would have gone green over a server that dropped both. `verify.test.ts#EVERYDAY_RUN` carries
+ * the numbers.
+ */
+const EVERYDAY: SubmittedRun = Object.freeze({
+  ...RUN,
+  buildingId: 'midtown-office',
+  arrivalRatePctPop5min: 3,
+  ruleRows: Object.freeze([
+    Object.freeze({ when: 'lobby-queue-passes' as const, whenValue: 12, then: 'hold-at-lobby' as const }),
+    Object.freeze({ when: 'call-waited' as const, whenValue: 60, then: 'jump-queue' as const }),
+  ]),
+  interventions: Object.freeze([
+    Object.freeze({ atS: 225, change: Object.freeze({ kind: 'park-cars-lobby' as const }) }),
+  ]),
+});
+
+describe('posting a run that carries a written dispatcher and a played day', () => {
+  it('boards it, on the route rather than in the verifier', async () => {
+    /*
+     * The end of the wire this issue is about. Before it, `scope/runIdentity.ts` refused every state
+     * carrying a rule row or an intervention, so § 11's whole workshop produced dispatchers that were
+     * unpostable by construction — and a client that had posted one anyway would have been told its
+     * figures did not replay, which is this product's one accusation aimed at somebody who did
+     * nothing wrong.
+     */
+    const account = await signIn();
+    const posted = await call('POST', '/api/scores', { token: account.token, body: honest(EVERYDAY) });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+  }, 120_000);
+
+  it('refuses a run whose stored inputs cannot reproduce its metrics, rather than boarding it', async () => {
+    /*
+     * **The mutation the widening has to survive**, driven through the route: the metrics of the run
+     * above, submitted against a rule list that is not the one that produced them. A server that
+     * accepted the fields and then replayed without them would answer 201 here and rank a figure no
+     * stored input can reach — which is the leaderboard's founding property broken by the very
+     * change that made the leaderboard usable.
+     */
+    const account = await signIn();
+    const truth = honest(EVERYDAY);
+    const swapped = {
+      run: { ...EVERYDAY, ruleRows: [{ when: 'car-fuller-than', whenValue: 0.5, then: 'no-new-pickups' }] },
+      claimed: truth.claimed,
+    };
+    const posted = await call('POST', '/api/scores', { token: account.token, body: swapped });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(422);
+    expect(bodyOf(posted)['error']).toBe('metrics-do-not-reproduce');
+  }, 120_000);
+
+  it('refuses a mid-run dispatcher switch before it costs a replay', async () => {
+    // The cheap gate, on the route: a submission that could smuggle a weight vector must be a 400
+    // out of `submissionIssues` rather than a 422 out of a simulation it was allowed to command.
+    const account = await signIn();
+    const truth = honest(EVERYDAY);
+    const smuggled = {
+      run: {
+        ...EVERYDAY,
+        interventions: [
+          { atS: 300, change: { kind: 'switch-dispatcher', profile: server.config.dispatcherProfilesById.get('eta') } },
+        ],
+      },
+      claimed: truth.claimed,
+    };
+    const posted = await call('POST', '/api/scores', { token: account.token, body: smuggled });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(400);
+    expect(bodyOf(posted)['error']).toBe('invalid-submission');
+  }, 120_000);
+});
+
 describe('posting a whole authored day', () => {
   /*
    * **The end-to-end case for GitHub issue #267, and it is deliberately not a test of a constant.**
