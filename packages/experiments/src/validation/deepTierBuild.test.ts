@@ -141,11 +141,13 @@ describe('§ D419 — every scheduled `experiments` tier runs on a built tree', 
      * exactly that happened: a declaration was inverted expecting a red and the iterator skipped
      * the row instead.
      *
-     * Six is the count on the tree this landed on — every `experiments` job in the workflow. It is
-     * a floor rather than an equality so that adding a tenth tier is not a red here; the ordering
-     * case below is what such a tier has to satisfy.
+     * **Seven** is the count on the tree this landed on — `fuzz-deep`, `golden-runs`,
+     * `oracle-campaign`, `matrix-census`, `collective-adoption`, `perf-sweep`, `perf-scaling`. Six
+     * of them gained their build step here; `golden-runs` already had one. It is a floor rather
+     * than an equality so that an eighth tier is not a red here on arrival; the ordering case below
+     * is what such a tier has to satisfy.
      */
-    expect(experimentsJobs(workflowSource()).length).toBeGreaterThanOrEqual(6);
+    expect(experimentsJobs(workflowSource()).length).toBeGreaterThanOrEqual(7);
   });
 
   it('builds before it runs the tier, in every job that runs one', () => {
