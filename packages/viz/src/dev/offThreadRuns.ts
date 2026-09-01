@@ -53,9 +53,16 @@
  * argues this at length and it is the same argument here. And the crossing is
  * `structuredClone`, asserted byte-identical **per surface** rather than in general:
  * `record/recordRun.test.ts` holds the fixture case, `fixit/run.test.ts` holds both of a case's
- * configs for all eighteen shipped cases, and `watch/reference.test.ts` holds the watch config. A
- * JSON transport is run beside each and required to fail, because a test that only asserts
- * *structured clone works* would pass just as happily against a transport that did not.
+ * configs for all eighteen shipped cases, and `watch/reference.test.ts` holds the watch config —
+ * where it also re-checks the reproduction **gate's verdict** across the boundary, because a gate
+ * that disagreed with itself would refuse a row for the transport's reasons rather than the
+ * record's.
+ *
+ * The lossy JSON transport is run beside the first two and required to fail, because a test that
+ * only asserted *structured clone works* would pass just as happily against a transport that did
+ * not. It is **not** repeated in `watch/reference.test.ts`, and that is stated rather than left to
+ * be noticed: a negative control belongs once per config *shape*, and a watch config is a
+ * `shiftRunConfigOf` config — the shape `record/recordRun.test.ts` already covers.
  *
  * ## The ordering, and why an ask is a list rather than a call per run
  *
