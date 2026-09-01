@@ -346,6 +346,13 @@ export interface EverydayProgressStatus {
  * happened, and that the bytes are still there. The last clause is not reassurance — it is the
  * behaviour: {@link loadProgress} does not clear a slot it refuses, so a build that can read those
  * bytes still can, and the next successful save is what replaces them.
+ *
+ * **`unavailable` promises less than it may turn out to deliver, and that is deliberate.** A store
+ * whose `read` throws will usually refuse a `write` too, so the honest thing to say at boot is *what
+ * you do now lasts until this tab closes*. If a write then succeeds anyway, the claim corrects
+ * itself rather than standing: {@link EverydayProfileStore.progressNotice} is re-set from every
+ * write, so the sentence is gone the moment the store proves it wrong. A refusal that could not be
+ * withdrawn by evidence would be § D227's defect with a friendly face.
  */
 export const PROGRESS_REFUSALS = Object.freeze({
   unavailable:
@@ -399,6 +406,12 @@ function progressIssue(value: unknown): string | undefined {
  * unreadable is bytes this build did not write, and restoring the solved set out of it would be
  * this repository's own *quietly repair the payload* defect: the player would be shown a partial
  * career with nothing saying a part is missing.
+ *
+ * Every shape failure collapses to one sentence, and {@link progressIssue}'s precise reason reaches
+ * no screen. That is on purpose: *a rated case has no seed* is a fact about bytes, not about a
+ * player's afternoon, and four different sentences for one situation would be four ways of saying
+ * *this build cannot read what you earned*. The reasons exist so that a developer can tell the four
+ * apart, and `gauntlet/ladder.test.ts` and `everyday/profile.test.ts` are what read them.
  */
 export function loadProgress(store: SessionStore): EverydayProgressStatus {
   const envelope = readEnvelope(store);
