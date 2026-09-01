@@ -28140,9 +28140,25 @@ where before this change the same deletion left it entirely green.
 `preview()` keeps each file's own port and the file isolation the tier already had, so
 `browserTier.test.ts`'s port guard applies unchanged.
 
-**The cost, measured on this host.** The tier was **268.98 s** for 33 files and 191 tests before, and
-**251.41 s** for 33 files and 192 tests after. The build is skipped when there is no Chromium, because the tier is
-skipped then too.
+**The cost, measured on this host, and the stability measured across runs rather than in one.** The
+tier was **268.98 s** for 33 files and 191 tests before. After — 33 files, 192 tests, exit 0 every
+time:
+
+| run | wall | 1-minute load average |
+|---|---|---|
+| quiet 1 | 186.6 s | 9.16 |
+| quiet 2 | 199.3 s | 9.00 |
+| quiet 3 | 183.1 s | 10.57 |
+| under eight extra spinners, 1 | 253.2 s | 16.12 |
+| under eight extra spinners, 2 | 249.8 s | 14.60 |
+
+**Cheaper, not dearer**, which is not obvious and is the reason for measuring it: one `vite build` is
+added and **29 dev-server startups are removed**, and a preview server over a prebuilt tree answers a
+page in one request where a dev server answers it in hundreds. Five runs rather than one because a
+harness that serves a real artifact has to be shown stable across runs — the third finding below was
+found that way and would have survived any single green.
+
+The build is skipped when there is no Chromium, because the tier is skipped then too.
 
 **The gate moved one module down, and that is a move rather than a copy.** A `globalSetup` runs in
 vitest's main process before any suite exists, and importing `browserTier.test-helper.ts` from there
