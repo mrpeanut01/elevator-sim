@@ -74,6 +74,7 @@ import {
   benchBudgetNoteOf,
   benchEntrantsOf,
   benchFieldRefusal,
+  benchPlanOf,
   benchResultViewOf,
   benchTestsOf,
   benchTestsRefusal,
@@ -9929,6 +9930,40 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
     const noTests = benchTestsRefusal([]);
     if (noTests !== undefined) {
       seeds.push({ field: 'tests.refusal', text: noTests, role: 'reason', provenance: 'authored' });
+    }
+
+    /*
+     * `benchPlanOf`'s refusals, driven by manufacturing the state that produces each — `SUITE_BENCH`
+     * does the same for `suitePlanOf` and for the same reason, and `benchPlanOf` is likewise not in
+     * `covers`: its prose lives in `throw` messages, which the producer derivation does not
+     * attribute to an export, and a `covers` entry the derivation cannot find is a coverage claim
+     * for nothing. The screen draws these in its error slot, so they are a player's strings.
+     *
+     * The field-of-under-two guard is not driven here: the type forbids it, only a deserialised
+     * state reaches it, and manufacturing one would need a cast. `SUITE_BENCH` leaves its twin
+     * undriven on the same ground rather than dressing a cast as coverage.
+     */
+    const benchField = [
+      { armId: 'arm-0', dispatcherProfileId: 'collective' },
+      { armId: 'arm-1', dispatcherProfileId: 'eta' },
+    ] as const;
+    for (const [name, caseIds] of [
+      ['planRefusal.noTests', []],
+      ['planRefusal.duplicateTick', firstCase === undefined ? [] : [firstCase.id, firstCase.id]],
+      ['planRefusal.unknownCase', ['⟨a case this build does not ship⟩']],
+    ] as const) {
+      if (caseIds.length === 0 && name !== 'planRefusal.noTests') continue;
+      try {
+        benchPlanOf(
+          benchSet,
+          { caseIds, replications: 50, field: benchField },
+          (towerId) => context.buildings.find((b) => b.id === towerId)?.name ?? towerId,
+        );
+      } catch (error: unknown) {
+        if (error instanceof SuiteError) {
+          seeds.push({ field: name, text: error.message, role: 'reason' });
+        }
+      }
     }
 
     /* ---- the budget: every choice's work line, and both notes ---- */
