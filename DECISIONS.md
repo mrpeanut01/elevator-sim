@@ -29726,3 +29726,188 @@ mean.** It is unmeasured, and a second plausible sentence in place of a measurem
 
 **Both registers are empty and both tiers are green**, so the verdict column means today what it was
 written to mean: 0 failing cases *and* nothing held in `honesty.test.ts`'s `OUTSTANDING`.
+
+---
+
+## D445 — the bench's suite is the forty, and the contract wins because the ladder's own caveat sends a reader there
+
+**Date: 2026-09-01 · Owner: wave K lane B · GitHub issue #157 · Binds `ENGINE_CONTRACT.md` § 12.3,
+`everyday/benchModel.ts`, `batch/suite.ts`, `benchmark/matrixCells.ts`, `data/proof-cases.json` and
+`docs/18`.**
+
+**Decision.** `ENGINE_CONTRACT.md` § 12.3's forty proof cases have **three readers**: the gauntlet
+(`gauntlet/run.ts`), the ladder's disclosure (`gauntlet/ladder.ts#whatAreTheFortyOf`) and the
+**Everyday bench** (`everyday/benchModel.ts`), which ran `MATRIX_CELLS` and now runs the forty. The
+Engineer's suite panel (`dev/suitePanel.ts`) keeps `MATRIX_CELLS` and is **not** a fourth reader.
+The seed does not move with the list: § 1's table gives one rule per reader, and the bench keeps its
+own.
+
+### Why this was a decision and not a wiring job
+
+The two lists are not the same *kind* of list, and the issue said so. `MATRIX_CELLS` are eight
+**measured operating points** over five buildings, each carrying a derived replication budget and
+the 200-replication census that argued it — the points every published interval in this project was
+measured at. The forty are **fixed-forever proof cases**, eight towers × five crowd shapes, seeded
+`hash(towerId, crowdIndex)`, *whose whole value is that they never move*. A bench that silently
+swapped one for the other would change what its intervals are intervals **about**. That is a
+statistical-validity question, so the argument had to be made on validity rather than on obedience.
+
+### The contract wins, and here is the argument rather than the citation
+
+**1. § 14.2 already decided it, in the form that settles a tie inside the handoff.** § 12.1 tabulates
+eight named test shapes; § 14.2 says *"The eight buildings and five shapes are the **same fixtures
+the bench uses** (§12.1) — one set of proof cases, not two."* The handoff does not disagree with the
+simulator here; it disagrees with **itself**, and it supplies its own tie-break. CLAUDE.md's rule
+(*the handoff wins about what the screen looks like, the simulator wins about what a number means*)
+would have pointed the same way regardless: which fixtures an interval is estimated over is
+emphatically a question about what a number means.
+
+**2. The ladder's own caveat sends a reader to the bench, and the bench was pointed elsewhere.**
+`gauntlet/rating.ts#RATING_CAVEAT` is drawn under **every** rating: *"A rating orders this table; a
+gap between two rows is not a measured difference … The bench is where two dispatchers are compared
+on matched crowds with an interval."* A bench measuring a different set of buildings and crowds
+cannot answer the question that sentence raises. This is the substantive defect — not that a
+document was disobeyed, but that the product's own instruction pointed at an instrument aimed
+somewhere else. It is the reason *both suites* was rejected: offering two incomparable suites on
+the screen whose closing rule is **never present a two-run subtraction as a comparison** adds a way
+to confuse two measurements, on the one screen that exists to prevent that.
+
+**3. The matrix could not offer the screen's own tests, and the screen said otherwise.**
+`MATRIX_CELLS` covers **five** buildings and holds no cell on Chancery House, Crown Hotel or St Jude
+at all, so four of § 12.1's eight named shapes named a building the matrix does not measure, and of
+the remaining four only about two matched a cell's pattern. `BENCH_COPY.testsAbsent` told the player
+that **two** shapes were missing. Under the forty, six of the eight are reachable and the absent two
+are *exactly* the two that sentence names — *a lift out of service* and *a sky-lobby transfer*,
+neither of which is a crowd shape, because each changes the building rather than the people. The
+copy was written for the fixtures the contract asks for and had been shipping against the ones the
+code had. That is [§ D227](#d227)'s class — a stale *statement about what an instrument covers* —
+on a player-facing screen, and it is the finding this lane would report even if the ruling had gone
+the other way.
+
+**4. Nothing was given up, and that was measured rather than assumed.** The per-cell derived budget
+is the one real argument for keeping the matrix in the bench, and **the bench never read it**: no
+module in `packages/viz` touches `MatrixCell.replications`, `budgetBasis`, `armCeilings` or
+`admissibleReplications`. It consumed a cell's building, horizon, demand block, report window, id
+and label — every one of which a proof case carries. `SuiteRequest.replications` says why in its own
+docstring: *"one number for the whole suite rather than each cell's own derived budget, because this
+is the player's control"*.
+
+### The budget question, answered plainly
+
+**The bench's budget is asserted, not derived — and it was asserted before this ruling and is
+asserted no differently after it.** It is the player's choice from § 12.1's four (10 / 30 / 50 /
+200), and what makes it honest is not a derivation but a **refusal**: below `MIN_REPLICATION_BUDGET`
+every separating row comes back `under-budget` with the winner deliberately unnamed, and
+`benchBudgetNoteOf` draws two distinct sentences (below thirty, a claim about the instrument; below
+fifty, a claim about what the report will do). A gate is unaffected by which fixtures it gates. The
+forty have no derived budgets and the bench has not lost one, because it never had one to lose.
+
+### The seed does not move with the list
+
+That is [§ D446](#d446), split out because it is separately citable and is the clause most at risk
+of being undone by a reader who takes *one list, three readers* to mean *one list, one seed*.
+
+### No published figure moves, and that was checked before the edit
+
+`benchmark/published.ts` keys the matrix's pins `cell/arm/metric` off `MATRIX_CELLS`, and every one
+is produced by `packages/experiments`' own runner from a `MatrixCellResult`. The browser bench
+produces no `MatrixCellResult` and **no pin reads a browser**, so what the bench measures cannot move
+a published interval. `MATRIX_CELLS` itself is untouched: the eight cells, their derived budgets,
+their `armCeilings` and the study over them are exactly as they were.
+
+### The losing sentences, corrected in the same commits
+
+`BENCH_COPY.testsHint` (*"the operating points every published figure in this project was measured
+at"*) and `testsAbsent` (the two-absent claim, false by four to six under the matrix);
+`everyday/benchModel.ts`'s *"the tests **are** the matrix"*; `batch/suite.ts`'s fixture-list clause,
+which now names the split and says that everything below `suitePlanOf` is shared;
+`benchmark/matrixCells.ts`'s *"its fixture list must be imported from `MATRIX_CELLS`"*, which named
+the wrong list for the wrong screen (the *never retyped* half is untouched and binds both);
+`docs/18`'s *"the bench's suite is not yet the third reader"*; and `data/proof-cases.json`'s *"THE
+SEED RULE IS NOT IN THIS FILE"*, which described one rule where § 1 has two.
+
+**The vendored `ENGINE_CONTRACT.md` and `GAMEPLAY_AND_NAVIGATION.md` are not edited.** § 12.1's table
+of eight named shapes is the clause the code departs from, and the vendored handoff is a record that
+does not move (docs/12's rule, restated in docs/18). The departure is recorded here and in
+`docs/18`, and six of the eight shapes are in fact reachable under the forty — which is four more
+than were reachable under the matrix.
+
+### What a reader should distrust about this
+
+The forty include cells the matrix **excluded for being unresolvable** — no proof case is dropped for
+being hard to resolve, which is the point of the set. So a bench cell can now come back with a
+suppressed mean where a matrix cell would not have. That is reported honestly (`suppressed` is one of
+`report.ts`'s six verdicts, and it is a different claim from `unresolved`), and it is a *less
+informative* bench at those cells rather than an *invalid* one. What has not been measured is **how
+often** across the forty, at which budgets. That is a real gap and no sentence here should be read as
+closing it.
+
+### A new copy line, and why it is on the screen rather than in a docstring
+
+`BENCH_COPY.testsSeedNote` — *"Same buildings and same crowd shapes as the ladder, different
+crowds…"*. A reader comparing a bench figure with a ladder rating will otherwise assume they are the
+same measurement, and the whole value of the shared list is that a finding carries from one screen to
+the other. The sentence that makes that safe has to be where the reader is.
+
+---
+
+## D446 — the bench runs the ladder's cases and not the ladder's crowds
+
+**Date: 2026-09-01 · Owner: wave K lane B · GitHub issue #157 · The seed half of
+[§ D445](#d445) · Binds `gauntlet/proofCases.ts`, `gauntlet/run.ts`, `everyday/benchModel.ts` and
+`data/proof-cases.json`.**
+
+**Decision.** The Everyday bench and the gauntlet run the **same forty proof cases** and **must not
+share their seeds**. The gauntlet keeps § 1's `hash(towerId, crowdIndex)`, fixed forever; the bench
+uses its own, `gauntlet/proofCases.ts#benchSeedOf`. `proofCaseRequestOf` **requires** a seed rather
+than defaulting to the case's own, so every caller says in the call which of the two rules it is
+using. The two seed **sets** are asserted disjoint over the shipped forty.
+
+### Why this is not pedantry about a table
+
+§ 1's table already carries two rules over this one fixture set — `hash(towerId, crowdIndex)` for the
+gauntlet, *"fixed forever; a rating is only comparable if the cases never move"*, and
+`hash(testId, repIndex)` for the bench, *"the same for every entrant — that is what matched crowds
+means"*. So § 12.3's *one list, three readers* is a claim about **fixtures** and never about traces,
+and the contract is internally consistent on the point.
+
+But the table is not the reason. **CLAUDE.md § Tuning discipline** is: *"Hold out traffic seeds. Tune
+on one seed set, validate on a disjoint one, or you overfit the weight vector to specific passenger
+traces and the gain vanishes on new traffic."* The bench is where a player iterates on a dispatcher.
+The gauntlet is what rates it and posts the rating to a standing public ladder. A bench sharing the
+gauntlet's seeds would let a player tune a dispatcher against the **exact forty runs it is about to
+be rated on**, and the rating would be a measurement on the training set — a number that would not
+survive contact with any other traffic, published as a standing claim.
+
+**Same operating points, disjoint traces** is the textbook arrangement. It is also strictly better
+than what shipped before § D445, where the fixtures differed as well and a bench result therefore
+said nothing about a rating at all: the hold-out property is *new*, not preserved.
+
+### What makes it hold rather than be intended
+
+Three things, and the first is the one that will still be true in a year.
+
+1. **`proofCaseRequestOf` requires the seed.** It defaulted to `proofCase.seed`. A default is one of
+   two rules worn silently by the other reader — [§ D227](#d227)'s shape — so it is now a required
+   parameter, and making it required is what made `tsc` name all four call sites rather than leaving
+   three of them correct by luck.
+2. **CRN is untouched, and that is why the change is safe.** *"The same for every entrant"* is
+   `runBatch`'s, not the request's: one seed per replication index, drawn once and shared by every
+   arm (*"this line is the whole of CRN"*). Changing which seed a request carries changes the crowd;
+   it cannot change whether the arms meet the same one.
+3. **Disjointness is asserted, not reasoned.** `proofCases.test.ts` checks the two seed **sets** over
+   the shipped forty — set disjointness rather than pairwise inequality, because a bench seed
+   colliding with *some other* case's gauntlet seed is the same defect one row over. Two hashes of
+   two different strings are only *probably* different, and a probability is not an argument. The
+   bench rule is also pinned by value, for `proofSeedOf`'s reason: changing it silently moves every
+   crowd the bench has ever run.
+
+### The sentence a player reads
+
+`BENCH_COPY.testsSeedNote`, drawn above the tick list: *"Same buildings and same crowd shapes as the
+ladder, different crowds. The bench is where you try things out and the ladder is what rates them,
+so they must not share their arrivals…"*. A reader comparing a bench figure with a ladder rating
+will otherwise assume they are the same measurement — and the whole value of the shared list is that
+a finding carries from one screen to the other, so the sentence that makes that safe has to be where
+the reader is rather than in a docstring.
+

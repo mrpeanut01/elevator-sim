@@ -297,9 +297,23 @@ mistakes them for oversights:
   `gauntlet/rating.ts` and drawn by `everyday/boardScreen.ts`. The eight towers are the eight this
   build **ships**: § 12.3 names Harbour Point and Ashgate Mixed-Use, `data/buildings/` holds
   neither, and the file's `$comment` records the substitution and what moving a case would cost.
-  **The bench's suite is not yet the third reader** — `dev/suitePanel.ts` still runs `MATRIX_CELLS`,
-  which are measured operating points and a different question; § 12.3's *one list, three readers*
-  therefore has two, and `gauntlet/proofCases.test.ts` holds the property for the readers that exist.
+  **The bench's suite is the third reader as of [§ D445](../DECISIONS.md)** (GitHub issue #157). It
+  read `MATRIX_CELLS` — measured operating points, a different question — so § 12.3's *one list,
+  three readers* had two. `everyday/benchModel.ts#benchTestsOf` now derives the forty and
+  `benchPlanOf` plans them; `gauntlet/proofCases.test.ts` holds the property over all three readers,
+  in both directions. **`dev/suitePanel.ts` keeps `MATRIX_CELLS` and is not a fourth reader**: § 12.3
+  names the *bench's* suite, § 12 is the Everyday bench, and the Engineer surface asks the matrix's
+  question at the matrix's points. Two things the ruling turned on, both measured rather than
+  argued: the bench never read a cell's derived budget (nothing in `packages/viz` touches
+  `MatrixCell.replications`, `budgetBasis`, `armCeilings` or `admissibleReplications`), so the move
+  cost no derivation; and `MATRIX_CELLS` covers five buildings and holds no cell on Chancery House,
+  Crown Hotel or St Jude, so **at most two of § 12.1's eight named shapes were reachable** while the
+  screen's own `testsAbsent` sentence told the player two were missing. Under the forty six are
+  reachable and the absent two are exactly the two that sentence names — the copy was written for
+  the fixtures the contract asks for and had been shipping against the ones the code had, which is
+  [§ D227](../DECISIONS.md)'s class on a player-facing screen. The seed does **not** move with the
+  list: § 1's table carries one rule per reader, and the bench uses its own (`benchSeedOf`) so a
+  player cannot tune against the exact runs the ladder is about to rate them on.
 - **Two rule actions** (*skip everything above floor v*, *treat up-calls as urgent*) — omitted
   with reasons: service range is building fabric, and no cost term prices direction-conditional
   urgency, so either would be a label that lies.
@@ -370,6 +384,13 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   fixture list. Honesty-corpus string counts are deliberately **not** re-measured here: a figure
   measured per branch is stale on merge (CLAUDE.md's rule), and the SUITE_BENCH adapter will move
   both tiers' counts when the integrated tree is measured.
+
+  **Superseded in one clause by [§ D445](../DECISIONS.md):** *"the ticks render from
+  `MATRIX_CELLS`"* is still true of `dev/suitePanel.ts` and is no longer true of the Everyday bench,
+  which renders the forty proof cases. `batch/suite.ts` is unchanged and is now the Engineer
+  panel's planner; everything below `suitePlanOf` — `suiteCellViewOf`, `suiteSummaryOf`, the six
+  verdicts — is shared by both, which is why the move touched no arithmetic. *"Per-cell derived
+  budgets: not built"* is unchanged and is the reason the move cost nothing.
 - **Slice 6, first pass — LANDED.** Fix-a-building, scored on **two single runs sharing the
   traffic seed** rather than the prototype's closed-form model, with § 9's thresholds unchanged
   and § 10.4's basis line printed verbatim. The engine is pure (`fixit/types.ts`, `parse.ts`,

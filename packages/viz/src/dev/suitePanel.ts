@@ -19,6 +19,17 @@
  * imported — never retyped — so a cell added to the matrix appears here with no edit to this file
  * or to `index.html`.
  *
+ * ## This panel is deliberately not one of § 12.3's readers
+ *
+ * `ENGINE_CONTRACT.md` § 12.3 says the forty proof cases have *one list, three readers* — the
+ * gauntlet, the ladder's disclosure and **the bench's suite**. § 12 is the *Everyday* bench, and
+ * `everyday/benchScreen.ts` became that third reader in [§ D445](../../../../DECISIONS.md). This is
+ * the Engineer surface, and it keeps the matrix: it asks *"is this better where this project can
+ * resolve a difference?"*, at the eight operating points every published interval was measured at,
+ * which is a question the forty are explicitly not chosen to answer — no proof case is dropped for
+ * being hard to resolve, and `gauntlet/proofCases.ts` says why. Making this a fourth reader would
+ * point the Engineer's instrument away from the numbers it exists to check.
+ *
  * ## Cancellation and budgets
  *
  * Cancel terminates the in-flight worker and reports nothing, `batchPanel`'s own rule: a stopped

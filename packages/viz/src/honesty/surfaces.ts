@@ -74,6 +74,7 @@ import {
   benchBudgetNoteOf,
   benchEntrantsOf,
   benchFieldRefusal,
+  benchPlanOf,
   benchResultViewOf,
   benchTestsOf,
   benchTestsRefusal,
@@ -8926,6 +8927,47 @@ const LIVE_METRICS: SurfaceAdapter = {
  * -------------------------------------------------------------------------- */
 
 /**
+ * A stand-in for the forty, for the two adapters that render a reader of them.
+ *
+ * Placeholder labels, in the `⟨…⟩` register this corpus already uses for a substituted cell: a
+ * shipped crowd label here would be the second copy of the fixture list that
+ * `gauntlet/proofCases.ts` exists to prevent, **in the file that checks for one**. The tower ids
+ * and names are the corpus case's own buildings, so the names on screen are real and the fixture
+ * list is not.
+ *
+ * One function rather than one per adapter, since § D445 made the bench a reader too and two
+ * inline copies of a placeholder set is the same defect at one remove.
+ */
+function placeholderProofSet(
+  towers: readonly { readonly id: string; readonly name: string }[],
+): ProofCaseSet {
+  return {
+    version: 1,
+    towers: towers.map((building, index) => ({
+      id: building.id,
+      arrivalRatePctPop5min: 1 + index,
+      why: '⟨why this building is in the set⟩',
+    })),
+    crowds: [
+      {
+        id: 'shape-a',
+        label: '⟨first crowd shape⟩',
+        tests: '⟨what the first shape tests⟩',
+        durationS: 900,
+        demand: { directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 } },
+      },
+      {
+        id: 'shape-b',
+        label: '⟨second crowd shape⟩',
+        tests: '⟨what the second shape tests⟩',
+        durationS: 900,
+        demand: { directionalSplit: { incoming: 0, outgoing: 1, interfloor: 0 } },
+      },
+    ],
+  };
+}
+
+/**
  * **The forty proof cases, the rating they produce, and the ladder that shows it.**
  *
  * ## Why this belongs in a corpus about honesty more than most surfaces do
@@ -8992,35 +9034,7 @@ const GAUNTLET: SurfaceAdapter = {
   render(context) {
     const seeds: TextSeed[] = [];
     const towers = context.buildings.slice(0, 2);
-    /*
-     * Placeholder labels, in the `⟨…⟩` register this corpus already uses for a substituted cell.
-     * A shipped crowd label here would be the second copy of the fixture list that
-     * `gauntlet/proofCases.ts` exists to prevent, in the file that checks for it.
-     */
-    const set: ProofCaseSet = {
-      version: 1,
-      towers: towers.map((building, index) => ({
-        id: building.id,
-        arrivalRatePctPop5min: 1 + index,
-        why: '⟨why this building is in the set⟩',
-      })),
-      crowds: [
-        {
-          id: 'shape-a',
-          label: '⟨first crowd shape⟩',
-          tests: '⟨what the first shape tests⟩',
-          durationS: 900,
-          demand: { directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 } },
-        },
-        {
-          id: 'shape-b',
-          label: '⟨second crowd shape⟩',
-          tests: '⟨what the second shape tests⟩',
-          durationS: 900,
-          demand: { directionalSplit: { incoming: 0, outgoing: 1, interfloor: 0 } },
-        },
-      ],
-    };
+    const set = placeholderProofSet(towers);
     const nameOf = (towerId: string): string =>
       towers.find((building) => building.id === towerId)?.name ?? towerId;
 
@@ -9865,6 +9879,15 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
     // § D389's heading, driven through `benchResultViewOf`, which is the only caller: the seed
     // below carries the composed string a player reads rather than the bare stem.
     'everyday/benchModel.ts#benchTooCloseHeadingOf',
+    /*
+     * § D445's planner. Covered rather than excluded, and the distinction was **measured rather
+     * than inherited**: this entry first said the derivation could not find it, copied by analogy
+     * from `SUITE_BENCH`'s note about `suitePlanOf`, and `derive.test.ts` reported it as an
+     * unclassified producer of its own prose on the next run. The two are not alike — `benchPlanOf`
+     * composes a case's label through `caseNameOf` as well as throwing — so the analogy was the
+     * defect. Its refusals are driven below, by manufacturing the state that produces each.
+     */
+    'everyday/benchModel.ts#benchPlanOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -9897,13 +9920,69 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
       }
     }
 
-    /* ---- the tests, and the empty-tick refusal ---- */
-    for (const test of benchTestsOf(['midtown-up-peak'])) {
-      seeds.push({ field: `test.${test.cellId}`, text: test.label, role: 'label' });
+    /*
+     * ---- the tests, and the empty-tick refusal ----
+     *
+     * The tests are the forty (§ D445), so the fixture is the same placeholder set the ladder's
+     * adapter drives, ticked on its first case. The seeded string is `caseNameOf`'s — the ladder's
+     * own name for a case — which is the point of the two readers sharing one list.
+     */
+    const benchSet = placeholderProofSet(context.buildings.slice(0, 2));
+    const firstCase = proofCasesOf(benchSet)[0];
+    for (const test of benchTestsOf(
+      benchSet,
+      firstCase === undefined ? [] : [firstCase.id],
+      (towerId) => context.buildings.find((b) => b.id === towerId)?.name ?? towerId,
+    )) {
+      seeds.push({ field: `test.${test.caseId}`, text: test.label, role: 'label' });
     }
-    const noTests = benchTestsRefusal([]);
-    if (noTests !== undefined) {
-      seeds.push({ field: 'tests.refusal', text: noTests, role: 'reason', provenance: 'authored' });
+    /*
+     * Both branches of `benchTestsRefusal`, because it has two now (§ D445): *pick at least one*
+     * when there are tests, and *the forty are still arriving* when the fetch has not landed. A
+     * producer with an undriven branch is a string path nothing has read.
+     */
+    for (const [name, offered] of [
+      ['tests.refusal', 40],
+      ['tests.loading', 0],
+    ] as const) {
+      const refusal = benchTestsRefusal([], offered);
+      if (refusal !== undefined) {
+        seeds.push({ field: name, text: refusal, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /*
+     * `benchPlanOf`'s refusals, driven by manufacturing the state that produces each — `SUITE_BENCH`
+     * does the same for `suitePlanOf`. Unlike `suitePlanOf` it **is** in `covers`, because the
+     * derivation finds it and the coverage claim is therefore real; the note beside that entry
+     * records how the opposite was briefly written here by analogy. The screen draws these in its
+     * error slot, so they are a player's strings.
+     *
+     * The field-of-under-two guard is not driven here: the type forbids it, only a deserialised
+     * state reaches it, and manufacturing one would need a cast. `SUITE_BENCH` leaves its twin
+     * undriven on the same ground rather than dressing a cast as coverage.
+     */
+    const benchField = [
+      { armId: 'arm-0', dispatcherProfileId: 'collective' },
+      { armId: 'arm-1', dispatcherProfileId: 'eta' },
+    ] as const;
+    for (const [name, caseIds] of [
+      ['planRefusal.noTests', []],
+      ['planRefusal.duplicateTick', firstCase === undefined ? [] : [firstCase.id, firstCase.id]],
+      ['planRefusal.unknownCase', ['⟨a case this build does not ship⟩']],
+    ] as const) {
+      if (caseIds.length === 0 && name !== 'planRefusal.noTests') continue;
+      try {
+        benchPlanOf(
+          benchSet,
+          { caseIds, replications: 50, field: benchField },
+          (towerId) => context.buildings.find((b) => b.id === towerId)?.name ?? towerId,
+        );
+      } catch (error: unknown) {
+        if (error instanceof SuiteError) {
+          seeds.push({ field: name, text: error.message, role: 'reason' });
+        }
+      }
     }
 
     /* ---- the budget: every choice's work line, and both notes ---- */
@@ -9926,7 +10005,7 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
      * because this is the surface a player reads them on; the per-row sentences below them are
      * `batchReport`'s and are deliberately not re-seeded (see the adapter docstring).
      */
-    const cell = { id: 'midtown-up-peak', label: 'Midtown Office, up-peak 1 %' };
+    const cell = { id: firstCase?.id ?? 'case-a', label: firstCase === undefined ? '⟨test⟩' : '⟨tower⟩ · ⟨crowd shape⟩' };
     const two = suiteCellViewOf(cell, context.batch);
     const third = context.batch.arms[1];
     const many =

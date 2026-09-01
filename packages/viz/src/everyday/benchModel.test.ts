@@ -14,19 +14,30 @@
  *    appears **beside** `unresolved`, never in place of it or of `under-budget`.
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { intervalPlotFor } from '../batch/intervalPlot.js';
 import { batchReport, MIN_REPLICATION_BUDGET } from '../batch/report.js';
 import { fakeArm, fakeReplication, fakeResult } from '../batch/fixtures.test-helper.js';
-import { suiteCellViewOf, suiteSummaryOf } from '../batch/suite.js';
-import type { BatchReplication, BatchResult } from '../batch/types.js';
+import { suiteCellViewOf, suiteSummaryOf, SuiteError } from '../batch/suite.js';
+import type { BatchArmRequest, BatchReplication, BatchResult } from '../batch/types.js';
+import { DATA_DIR } from '../fixtures.test-helper.js';
+import {
+  benchSeedOf,
+  parseProofCases,
+  proofCasesOf,
+  type ProofCaseSet,
+} from '../gauntlet/proofCases.js';
 
 import {
   benchBudgetNoteOf,
   benchEntrantsOf,
   benchFieldOf,
   benchFieldRefusal,
+  benchPlanOf,
   benchResultViewOf,
   benchTestsOf,
   benchTestsRefusal,
@@ -38,6 +49,25 @@ import {
   BENCH_REPLICATION_CHOICES,
   BENCH_STANDING_NOTES,
 } from './benchModel.js';
+
+const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8')) as unknown;
+
+const BUILDINGS = readdirSync(join(DATA_DIR, 'buildings'))
+  .filter((name) => name.endsWith('.json'))
+  .map((name) => read(join(DATA_DIR, 'buildings', name)) as { id: string; name: string });
+
+/** The shipped forty, so this suite fails on the real list rather than on a fixture of it. */
+const SET: ProofCaseSet = parseProofCases(read(join(DATA_DIR, 'proof-cases.json')), {
+  buildingIds: new Set(BUILDINGS.map((building) => building.id)),
+});
+
+const nameOf = (towerId: string): string =>
+  BUILDINGS.find((building) => building.id === towerId)?.name ?? towerId;
+
+const FIELD: readonly [BatchArmRequest, BatchArmRequest] = [
+  { armId: 'arm-0', dispatcherProfileId: 'collective' },
+  { armId: 'arm-1', dispatcherProfileId: 'eta' },
+];
 
 const SHELF = [
   { id: 'collective', name: 'Conventional collective' },
@@ -83,21 +113,122 @@ describe('§12.1 — the field is two at least and four at most', () => {
   });
 });
 
-describe('§12.1 — the tests come from the matrix, not from a second list', () => {
-  it('offers a test per matrix cell and ticks exactly what was asked for', () => {
-    const tests = benchTestsOf(['midtown-up-peak']);
-    expect(tests.length).toBeGreaterThan(0);
-    expect(tests.filter((test) => test.ticked).map((test) => test.cellId)).toEqual([
-      'midtown-up-peak',
-    ]);
-    // The label names the pattern, which the id alone does not — two ticks on one building differ
-    // by exactly that.
-    expect(tests[0]?.label).toContain(',');
+describe('§12.3 — the tests are the forty, and this reader derives every one of them', () => {
+  const first = proofCasesOf(SET)[0];
+  if (first === undefined) throw new Error('no proof cases');
+
+  it('offers a test per proof case and ticks exactly what was asked for', () => {
+    const tests = benchTestsOf(SET, [first.id], nameOf);
+    expect(tests).toHaveLength(proofCasesOf(SET).length);
+    expect(tests.filter((test) => test.ticked).map((test) => test.caseId)).toEqual([first.id]);
+  });
+
+  it('is the same list the ladder rates on, in the same order — one list, two readers', () => {
+    expect(benchTestsOf(SET, [], nameOf).map((test) => test.caseId)).toEqual(
+      proofCasesOf(SET).map((proofCase) => proofCase.id),
+    );
+  });
+
+  it('names a test the way the ladder does — the tower’s name, then the crowd’s label', () => {
+    /*
+     * The point of the shared list is that a reader can carry a finding from one screen to the
+     * other, and they cannot if the two spell a case differently. `caseNameOf` is the one source,
+     * so this asserts the composition rather than the string.
+     */
+    const test = benchTestsOf(SET, [], nameOf)[0];
+    expect(test?.towerName).toBe(nameOf(first.tower.id));
+    expect(test?.label).toBe(`${nameOf(first.tower.id)} · ${first.crowd.label}`);
+  });
+
+  it('groups tower-major, so eight groups of five arrive rather than forty flat rows', () => {
+    const towers = benchTestsOf(SET, [], nameOf).map((test) => test.towerName);
+    const runs = towers.filter((name, index) => name !== towers[index - 1]);
+    expect(runs).toHaveLength(SET.towers.length);
+    expect(new Set(runs).size).toBe(SET.towers.length);
   });
 
   it('refuses an empty tick list in §12.1’s own words', () => {
-    expect(benchTestsRefusal([])).toBe('No tests ticked. Pick at least one.');
-    expect(benchTestsRefusal(['midtown-up-peak'])).toBeUndefined();
+    expect(benchTestsRefusal([], 40)).toBe('No tests ticked. Pick at least one.');
+    expect(benchTestsRefusal([first.id], 40)).toBeUndefined();
+  });
+
+  it('says the forty are still arriving rather than blaming the reader for an empty list', () => {
+    /*
+     * The list is fetched, so there is a beat where it is empty. Telling a reader to *"pick at
+     * least one"* from nothing is a small lie about what is on the screen — § 12.2's rule that
+     * every unavailable state is labelled, applied to the one this screen has.
+     */
+    expect(benchTestsRefusal([], 0)).toBe(BENCH_COPY.testsLoading);
+    expect(benchTestsRefusal([], 0)).not.toBe(BENCH_COPY.noTests);
+  });
+});
+
+describe('§1 — the bench runs the ladder’s cases and not the ladder’s crowds', () => {
+  const cases = proofCasesOf(SET);
+  const first = cases[0];
+  if (first === undefined) throw new Error('no proof cases');
+
+  it('plans one request per ticked case, carrying the case’s building, horizon and shape', () => {
+    const plans = benchPlanOf(SET, { caseIds: [first.id], replications: 50, field: FIELD }, nameOf);
+    expect(plans).toHaveLength(1);
+    const plan = plans[0];
+    expect(plan?.test.id).toBe(first.id);
+    expect(plan?.request.buildingId).toBe(first.tower.id);
+    expect(plan?.request.durationS).toBe(first.crowd.durationS);
+    expect(plan?.request.demand?.directionalSplit).toEqual(first.crowd.demand.directionalSplit);
+    expect(plan?.request.replications).toBe(50);
+    expect(plan?.request.arms).toEqual(FIELD);
+  });
+
+  it('seeds every case by §1’s BENCH rule, never by the gauntlet’s', () => {
+    /*
+     * CLAUDE.md § Tuning discipline. A bench sharing the gauntlet's seeds would let a player tune
+     * against the exact runs they are about to be rated on. Asserted over the whole forty, and as
+     * set disjointness rather than pairwise inequality — a bench seed matching *some other* case's
+     * gauntlet seed is the same defect one row over.
+     */
+    const plans = benchPlanOf(
+      SET,
+      { caseIds: cases.map((entry) => entry.id), replications: 50, field: FIELD },
+      nameOf,
+    );
+    const benchSeeds = plans.map((plan) => plan.request.seed);
+    expect(benchSeeds).toEqual(cases.map((entry) => benchSeedOf(entry)));
+    const gauntletSeeds = new Set(cases.map((entry) => entry.seed));
+    expect(benchSeeds.filter((seed) => gauntletSeeds.has(seed))).toEqual([]);
+    expect(new Set(benchSeeds).size).toBe(cases.length);
+  });
+
+  it('ticking a different case changes the population the run is over', () => {
+    /*
+     * The standing requirement — move the control and require the run to change — on the tick.
+     * Two cases on the same tower differ only in their crowd, which is the pair a tick that wrote
+     * nothing but a label would pass.
+     */
+    const sameTower = cases.filter((entry) => entry.tower.id === first.tower.id);
+    const second = sameTower[1];
+    if (second === undefined) throw new Error('a tower with one crowd');
+    const [a] = benchPlanOf(SET, { caseIds: [first.id], replications: 50, field: FIELD }, nameOf);
+    const [b] = benchPlanOf(SET, { caseIds: [second.id], replications: 50, field: FIELD }, nameOf);
+    expect(a?.request.buildingId).toBe(b?.request.buildingId);
+    expect(a?.request.demand).not.toEqual(b?.request.demand);
+    expect(a?.request.seed).not.toBe(b?.request.seed);
+  });
+
+  it('never sets the level twice — `runBatch` refuses the combination by name', () => {
+    const [plan] = benchPlanOf(SET, { caseIds: [first.id], replications: 50, field: FIELD }, nameOf);
+    expect(plan?.request.arrivalRatePctPop5min).toBeNull();
+    expect(plan?.request.demandLevel).toBeUndefined();
+    expect(plan?.request.demand?.arrivalRatePctPop5min).toBe(first.tower.arrivalRatePctPop5min);
+  });
+
+  it('refuses a plan that cannot be a suite, rather than running a smaller one', () => {
+    const at = (caseIds: readonly string[], field = FIELD): (() => unknown) => () =>
+      benchPlanOf(SET, { caseIds, replications: 50, field }, nameOf);
+    expect(at([])).toThrow(SuiteError);
+    expect(at([first.id, first.id])).toThrow(/ticked twice/);
+    expect(at([first.id], [FIELD[0]] as unknown as typeof FIELD)).toThrow(/at least two/);
+    expect(at(['no-such-tower/no-such-crowd'])).toThrow(/no proof case/);
   });
 });
 
