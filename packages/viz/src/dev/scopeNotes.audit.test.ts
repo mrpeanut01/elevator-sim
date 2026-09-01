@@ -250,6 +250,13 @@ const WITHOUT_A_NOTE: Readonly<Record<string, string>> = Object.freeze({
   'viewer.commissioning':
     'another product’s screen — the commissioning board, which is a between-games choice made ' +
     'before a week exists to steer.',
+  'viewer.campaignFitOut':
+    'no block, and no control either — GAMEPLAY § 8’s fitted kit is derived from the tower’s own ' +
+    'bookings by campaign/fitOut.ts#fitOutOf and written only by everyday/host.ts#runCampaignDay, ' +
+    'which presses Run in the same call. A scope note says *this takes effect on the next run*, ' +
+    'and there is no next run to warn about: the press that writes it is the press that runs it. ' +
+    'What a player is told instead is what § 8.2 already tells them — a tier’s nights, and the ' +
+    'shop row reading under works until they are past.',
   'viewer.week':
     'no block — the day boundary itself, written by closeShift and by taking a contract.',
   'viewer.patience':
