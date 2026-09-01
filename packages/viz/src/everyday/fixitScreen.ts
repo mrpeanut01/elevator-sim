@@ -205,6 +205,22 @@ let ask: string | undefined;
 /** A run that threw, said where the reader is. Cleared by the next ask. */
 let runFailure: string | undefined;
 
+/**
+ * The mount a landed run should redraw — the live one, not the one that asked.
+ *
+ * **An asynchronous run outlives its mount, and that is a bug an asynchronous run creates.** The
+ * callbacks used to close over the mounting `render`, which refuses on `alive === false`; so a
+ * player who pressed `Run the day` and left through the § 3.3 bar before it landed came back to a
+ * screen that never drew the outcome, on a case that had run. It self-healed on the next press of
+ * anything, which is the worst version of a defect: intermittent and invisible.
+ *
+ * The store this screen already keeps is module-scope for the same reason — a run's answer belongs
+ * to the case, not to the sitting — so the *drawing* of it is held the same way. `undefined` while
+ * no mount is up, which is honest: a run that lands with the screen closed writes its answer into
+ * the session and draws nothing, and the next mount reads the session.
+ */
+let live: { readonly redraw: () => void; readonly refreshBar: () => void; readonly root: HTMLElement } | undefined;
+
 /** Whether {@link ensureRestored} has already run. Once per tab, like the case file's own load. */
 let restored = false;
 
@@ -293,15 +309,10 @@ function selectFirstUnsolved(): void {
  * work: the abandoned case is silent, and the next draw of it starts a fresh ask rather than
  * finding a flag that says it is already measuring.
  *
- * `redraw` is the mount's own `render`, passed in because this lives outside the mount closure
- * with the rest of the module store — an ask can outlive the mount that started it, and
- * `render` refuses on `alive === false`.
+ * The redraw goes through {@link live} rather than through the mount that asked, because an ask
+ * can outlive its mount — see that field.
  */
-function measureAsBuilt(
-  loadedFixit: LoadedFixit,
-  entry: FixitCase,
-  redraw: () => void,
-): void {
+function measureAsBuilt(loadedFixit: LoadedFixit, entry: FixitCase): void {
   const key = `${entry.id}:open`;
   if (ask === key || ask?.endsWith(':press') === true) return;
   ask = key;
@@ -312,12 +323,12 @@ function measureAsBuilt(
     onDone: ([asBuilt]) => {
       ask = undefined;
       if (asBuilt !== undefined) sessionOf(entry).asBuilt = asBuilt;
-      redraw();
+      live?.redraw();
     },
     onFailed: (message) => {
       ask = undefined;
       runFailure = message;
-      redraw();
+      live?.redraw();
     },
   });
 }
@@ -376,6 +387,21 @@ function mountFixit(
     'align-items:start',
   ].join(';');
   host.append(root);
+
+  /*
+   * This mount becomes the one a landed run redraws — see {@link live}. Registered here rather
+   * than at the end so a run that lands during the case file's own fetch already has somewhere to
+   * draw; `render` refuses while `alive` is false either way, so the two guards agree.
+   */
+  live = {
+    redraw: () => {
+      render();
+    },
+    refreshBar: () => {
+      context.refreshBar();
+    },
+    root,
+  };
 
   function render(): void {
     if (!alive) return;
@@ -504,7 +530,7 @@ function mountFixit(
 
   function mainColumn(loadedFixit: LoadedFixit, entry: FixitCase): HTMLElement {
     const session = sessionOf(entry);
-    if (session.asBuilt === undefined) measureAsBuilt(loadedFixit, entry, render);
+    if (session.asBuilt === undefined) measureAsBuilt(loadedFixit, entry);
     const spend = spendOf(entry, session.state);
     const summary = fixitSpendSummary(entry, spend);
 
@@ -981,18 +1007,18 @@ function mountFixit(
         // In both directions — see `keepSolved`. A case that has just stopped being FIXED stops
         // being kept, or a reload would restore a badge this run has already taken away.
         keepSolved();
-        if (!alive) return;
-        render();
-        context.refreshBar();
-        root.querySelector('.everyday-fixit-outcome')?.scrollIntoView({ block: 'nearest' });
+        // Through `live`, never through this mount: the player may have left and come back, and
+        // the screen that must draw this outcome is the one on the page now.
+        live?.redraw();
+        live?.refreshBar();
+        live?.root.querySelector('.everyday-fixit-outcome')?.scrollIntoView({ block: 'nearest' });
       },
       onFailed: (message) => {
         ask = undefined;
         running = false;
         runFailure = message;
-        if (!alive) return;
-        render();
-        context.refreshBar();
+        live?.redraw();
+        live?.refreshBar();
       },
     });
   }
@@ -1014,6 +1040,13 @@ function mountFixit(
   return {
     unmount: () => {
       alive = false;
+      /*
+       * Cleared only if this mount is still the live one. A shell that mounted the replacement
+       * before unmounting the outgoing screen would otherwise have the old mount's teardown
+       * delete the new mount's registration, and a landed run would draw nowhere — the same
+       * defect one layer up.
+       */
+      if (live?.root === root) live = undefined;
     },
     primary,
   };
