@@ -29276,3 +29276,202 @@ screen is inside that sweep with nobody having to remember a selector, which is 
 week*) and its card names the player, and neither describes the day on the stage. That is
 `watch/shell.ts`'s own line — *does this surface describe, identify or attribute the day on the
 stage?* — and it is drawn in writing rather than left to whoever adds the next surface.
+
+## D439 — a board is keyed by the date or by the player, and the digest that used to key it keeps the job it was right for
+
+**Date: 2026-09-01 · Owner: wave J lane E, GitHub issue #179 · Moves [§ D214](#d214) § 4's board
+identity and [§ D288](#d288)'s window clause; does not move either digest's bytes.**
+
+**Decision.** `packages/server/src/leaderboard/submission.ts#configHashOf` answered two questions
+with one 32-character value, and only one of the answers was its to give.
+
+`ENGINE_CONTRACT.md` § 12.1:
+
+> **No player-settable parameter may enter a board key.** A key of building × dispatcher × traffic
+> template × arrival rate × run length fragments into thousands of one-entry boards where everyone is
+> permanently first. Arbitrary configurations post to a personal-record log instead.
+
+The digest was that key exactly, plus a window. Every axis in it is one a player picks, so every
+distinct selection minted a leaderboard whose only entrant was the person who invented it — and the
+product's own `http/api.ts` said so approvingly: *"one configuration — dispatcher included — across
+seeds … choosing a different one moves a player to a different board rather than up the one they are
+on."*
+
+So the value is **split rather than deleted**:
+
+| question | answer, now | answer, before |
+|---|---|---|
+| what data was this row measured against? | `boardKey.ts#runDataHashOf` | `configHashOf` |
+| which board is this row on? | `boardKey.ts#placeSubmission` | `configHashOf` |
+
+`placeSubmission` returns `daily:<date>` for a run that **is** the day's fixture, and
+`personal:<user id>` for everything else. The dispatcher is in neither: on the daily board it is the
+axis being compared, and in a personal log it is unnecessary because the log is one player's.
+
+**The verification property survives, and it is pinned to a literal rather than argued.** § D205 and
+§ D213 are the reason the digest exists — a recorded case losing its subject when `data/` moved, twice
+in one branch — and that reason is about *"does this row still describe the run it names"*, which is a
+verification question and not a board question. `runDataHashOf` digests the same canonical string over
+the same fields in the same sorted order, and `verify.test.ts` still asserts a whole-period reference
+run hashes to **`d77c9681da72ea7aea293a204a1b55ff`**, the same hex it asserted before the split.
+Three fields have now been added to `SubmittedRun` without moving it — `windowStartS`, and § D440's
+`ruleRows` and `interventions` — because each is written as `undefined` when the run did not use it and
+`canonicalJson` drops `undefined` entries. An entry stored before any of the three names exactly the
+data it always named.
+
+**What this costs, stated rather than glossed.** Two properties this repository deliberately built
+are now weaker, and both were built on the premise that a board is a configuration:
+
+- **[§ D286](#d286) / issue #267's *"a ten-hour run never competes against a thirty-minute one"*.**
+  The *distinction* survives — the two runs carry different data hashes — and the *board partition*
+  does not: neither is the day's fixture, so both land in the same personal log. That is the trade the
+  contract asks for, and it repays `RISKS.md` R32 and issue #222, whose subject is the empty board a
+  unique length used to mint.
+- **`menu/boardRun.ts`'s *"the dispatcher is a property of the board, not of the row"*.** False now,
+  and the module's own `agreed` check is what catches it rather than a reader: a page whose rows
+  disagree gets no configuration sentence, so the reveal goes **quiet** on a daily board rather than
+  naming a dispatcher that ran some of the rows. Quiet is correct and is not finished — a daily
+  board's reveal should name the axes the rows agree on and put the dispatcher on each row — and that
+  is a screen change recorded here as owed rather than made silently.
+
+**The day's fixture, and what is invented and what is read.** § 12.1 keys the daily board by the date
+and § 12.1's next sentence requires that *"rows within a board must have met the identical crowd, or
+the sort is a ranking of luck"*, so a per-date fixture and a per-date seed are **required by the
+contract** rather than chosen here. What is chosen is their form: `chancery-house` on `office-day` run
+whole, which is § 2's own fixture in the ids this server ships, and a seed that is the date's digits,
+which is already this repository's seed convention (*seed 20260804*). § 1's printed `424242` is the
+prototype's constant and is the one thing a per-date key cannot use.
+
+`windowStartS: 0` beside `durationS: 36000` is forced rather than stylistic: `office-day` is an
+authored phase list and `core` refuses `templateOverrides.durationS` on one by name ([§ D275](#d275)),
+so a fixture written the other way would be a daily board whose every submission threw inside the
+replay. It is also the pair the viewer's own whole-day control produces
+(`shift/dayLength.ts#wholeDayRun`), which is what makes it a fixture a client can reach rather than a
+shape only the server can write.
+
+**The ladder is declared and unbuilt, and that is in a table rather than in a union.** § 12.1's third
+key is `dispatcher id`, scored as a mean over the fixed forty proof cases. One `SubmittedRun` is one
+case, so no submission this endpoint can receive is a ladder entry: it needs a forty-case route, a
+fold to a rating, and a board whose rows are dispatchers. `BOARD_KEYS` transcribes all three keys with
+a fourth column the contract does not have — **which route reaches this key** — and the ladder's is
+`null`. `boardKey.test.ts` asserts both directions: every row with a route is produced, and the row
+without one is produced by nothing. A `'ladder'` branch of `BoardPlacement` that nothing returned would
+be this repository's signature defect with a contract quotation over it.
+
+**What is unmeasured and is left so.** Nothing here decides whether a daily board should hold several
+rows from one player under different dispatchers. `UNIQUE (board_key, data_hash, user_id, seed)`
+permits it, and that is a game-design question this issue did not authorise; the alternative — one row
+per player per board — would need a rule for which of their runs is *the* one, and no such rule exists.
+
+---
+
+## D440 — an Everyday run is postable, and every refusal that shrank is pinned by a replay
+
+**Date: 2026-09-01 · Owner: wave J lane E, GitHub issue #179 · Shrinks two of
+[§ D129](#d129)'s refusals in `scope/runIdentity.ts`; leaves the rest standing and adds one.**
+
+**Decision.** `SubmittedRun` expressed none of what an Everyday dispatcher is, so
+`scope/runIdentity.ts` correctly refused every state carrying a rule list or an intervention log —
+and the consequence was that a player who wrote a single rule row could never appear on any board.
+The whole of § 11's workshop produced dispatchers that were **unpostable by construction**.
+
+The wire now carries both, and each refusal is decided by a run rather than by a sentence
+([§ D227](#d227)).
+
+**`ruleRows` — the refusal is gone.** Its stated ground was *"no field of `RunSubmission`, no CLI flag
+and no deep-link parameter expresses a rule list"*, and that fact has changed. The server writes the
+player's rows onto **its own** resolved profile (`verify.ts#profileWithRules`), which is the same pair
+of writes `authoring/ruleSpec.ts#profileWithRules` makes and the only pair `core` accepts —
+`resolveDispatchConfig` refuses a `rules` section under any policy but `'rules'`, and refuses that
+policy with no rows — so the duplication is a transcription of a constraint rather than a second
+opinion.
+
+A rule list is not the inline-object cheat `submission.ts` was written against. A row is two ids and
+two values drawn from closed lists `core` declares — nine conditions, eight actions, a `values` array
+each — so the whole space a submission can express is a finite product of shipped vocabulary.
+`submissionIssues` refuses anything outside it before a simulation starts, which is the cheap gate's
+own job: an unauthenticated shape error must not command CPU.
+
+**`interventions` — the refusal shrank from *any log* to two kinds, and it grew a ground.** The arm
+had recorded two grounds and said which was temporary:
+
+1. *"No field of `RunSubmission` … expresses a log … the day the wire grows one this ground comes
+   back out."* It has, and it did.
+2. *"A `switch-dispatcher` entry carries a whole weight vector inline."* Called structural, and it is:
+   the wire could only carry a switch as a **shipped profile id**, which is a different field from the
+   one the viewer needs locally, because its driving profile is routinely a derived object no id
+   resolves.
+
+The third was found while shrinking. An `answer-incident` answers a campaign incident, and
+`shift/incidents.ts` writes that incident onto the *building* as `serviceEvents` from the week's day
+and the calendar. Neither travels. A replay built from ids alone therefore holds **the answer and not
+the thing answered** — the option's own service events would be the only mode changes in the run — so
+this is a missing **cause**, not a missing field, and no widening of `SubmittedRun` would close it.
+`SUBMITTABLE_INTERVENTION_KINDS` names the one kind that travels rather than the two that do not,
+because an allow-list refuses a kind added tomorrow and a deny-list would let it through silently.
+
+**The run that decides all of it, and the cell that would have decided nothing.**
+`verify.test.ts` builds the config the way `dev/state.ts#shiftRunConfigOf` builds one — by hand, term
+for term, because `viz` must build and test with `packages/server` absent — takes the metrics off it
+as the **claim**, and requires `verifySubmission` to accept. On `midtown-office` at 3 % over 900 s,
+seed 20260804:
+
+| run | `awtS` |
+|---|---|
+| plain | **23.0038** |
+| two rule rows | **26.1676** |
+| one `park-cars-lobby` at 225 s | **26.2945** |
+
+On `garden-apartments` at 6 % over 900 s — the file's own reference run — all three are
+**17.404761904761926**. The rules never fire and stage 7 is never consulted, so every case above
+would have passed over a server that dropped both fields, and the wire would have been the twelfth
+dead seam: carried, validated, changing nothing. The cell is named in the fixture's docstring for
+that reason.
+
+The direction is *worse*, and saying so is the point: a rule a player wrote is not required to help
+them, and a wire that only carried improvements would be a scoreboard rather than a simulator.
+
+**The mutation, because acceptance is not the property.** A submission whose claim is the ruled run's
+and whose stored rows are a different list is refused `metrics-do-not-reproduce` — at the verifier and
+again over the real route in `api.test.ts`. So is one whose claim is a logged day stored as an
+untouched one. A server that accepted the fields and replayed without them would board both.
+
+**What is still refused, and why each ground is still true.**
+
+| field | ground |
+|---|---|
+| `viewer.commissioning` | § D129's measurement: a fabric on the wire is a two-floor tower with sixteen cars |
+| `viewer.calendar` | a `CalendarPeriod` is a code table with no `data/` digest |
+| `viewer.patience` | no field carries a curve, and abandonment moves the mean it would be judged on |
+| `viewer.levers` | a lever writes door timing onto the building and weights onto the profile; no field |
+| `viewer.savedClasses`, `viewer.buildingId`, `viewer.dispatcherId`, `viewer.pattern` | saved on one device |
+| `viewer.week` | growth and the day's event |
+| `viewer.campaignFitOut` | § 8's kit is a building edit and a dispatcher edit |
+| `viewer.selectorSpec` | a submission carries a dispatcher id, not a selector |
+| `viewer.outOfServiceCarIds` | nothing in a selection holds a car |
+
+None of these is lifted, and none is loosened. `ruleRows` keeps a refusal of its own in the shape the
+three *"saved on this device alone"* ones already have: a row naming a condition or a value this build
+does not declare is unreproducible **by value** rather than by field, and is reachable because a
+`ViewerState` is rehydrated from a browser's own storage.
+
+**The two consumers have stopped asking the same question, and the module says so.**
+`runIdentityIssues` serves both the submit path and `dev/main.ts#provenanceLineOf`, whose docstring
+opens *"Those are the same question."* The CLI has no flag for a rule list or a log and no plausible
+one — four scalars per row, a time series — so the shared predicate answers *can the artefacts that
+resolve against `data/` reproduce this run at all*, and the CLI refuses the rest **for itself**, beside
+the refusal `partFlagFor` already makes about a window on a template with no clock. That is one
+predicate plus an artefact-local clause, not two answers to one question; `runIdentity.test.ts` drives
+the pair together, because a test that saw only one of them would pass over a build where both had
+gone quiet.
+
+**A stale sentence corrected in passing.** `scope/permits.ts` justified `ranked`'s row with *"nothing
+else survives the server's replay"*. Two `within-day` fields now do. The row is unchanged and correct
+— its one non-test caller is `fieldsAnsweredFor`, where a forbidden scope means the field is *asked
+about* and `CARRY_CHECKS` gives the answer — but the reason was a claim about the wire, and the wire
+moved.
+
+**Not claimed.** No Everyday client path is asserted to produce a postable ruled run end to end. The
+submit path sends the fields and the server replays them; whether the Everyday shell's own flow
+reaches `submitScore` with a written dispatcher is a question about `everyday/`, which this lane did
+not touch.

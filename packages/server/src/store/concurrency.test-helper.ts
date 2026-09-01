@@ -622,7 +622,7 @@ export interface Site {
   readonly deleteRisk: readonly string[];
   /**
    * Column lists a write of this member can collide with — **after** subtracting what the statement
-   * already arbitrates. An `ON CONFLICT (config_hash, user_id, seed) DO UPDATE` is the database
+   * already arbitrates. An `ON CONFLICT (board_key, data_hash, user_id, seed) DO UPDATE` is the database
    * deciding, so that constraint is not a risk; an `ON CONFLICT (id)` on a table whose *natural* key
    * is what two concurrent callers collide on leaves the natural key here, which is how the second
    * defect in `recordEntry` was found.

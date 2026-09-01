@@ -24,7 +24,12 @@
  * longer exists", and say the right thing to a player who did nothing wrong.
  */
 
-import { runSimulation, type RunSummary, type SimulationConfig } from '@elevator-sim/core';
+import {
+  runSimulation,
+  type RuleRowConfig,
+  type RunSummary,
+  type SimulationConfig,
+} from '@elevator-sim/core';
 
 import type { ClaimedMetrics, Submission, SubmittedRun } from './submission.js';
 
@@ -82,12 +87,15 @@ export function configFor(
 ): SimulationConfig | RejectionCode {
   const building = resources.buildingsById.get(run.buildingId);
   if (building === undefined) return 'unknown-building';
-  const dispatcherProfile = resources.dispatcherProfilesById.get(run.dispatcherProfileId);
-  if (dispatcherProfile === undefined) return 'unknown-dispatcher';
+  const shipped = resources.dispatcherProfilesById.get(run.dispatcherProfileId);
+  if (shipped === undefined) return 'unknown-dispatcher';
   const template = resources.trafficProfiles.demandTemplates.find(
     (entry) => entry.id === run.demandTemplateId,
   );
   if (template === undefined) return 'unknown-template';
+
+  // The player's rules over the **server's** profile. Never a profile the submission carried.
+  const dispatcherProfile = profileWithRules(shipped, run.ruleRows ?? []);
 
   return {
     building,
@@ -130,7 +138,46 @@ export function configFor(
     ...(run.windowStartS === null
       ? { durationS: run.durationS }
       : { windowStartS: run.windowStartS, windowEndS: run.windowStartS + run.durationS }),
+    /*
+     * The run record's log — § 1.4, and **spread rather than written as `interventions: run.…`**,
+     * for the reason `viz`'s `shiftRunConfigOf` gives at the same line: `core` promises a run with
+     * no `interventions` key is byte-identical to one built before the field existed and pins it
+     * with a fingerprint, so an empty log has to carry *no key at all* rather than an empty array.
+     * That is what lets every score posted before this field re-verify unchanged.
+     */
+    ...((run.interventions ?? []).length === 0 ? {} : { interventions: run.interventions }),
   } as SimulationConfig;
+}
+
+/**
+ * The Everyday rules written onto a profile — the server's half of § 11.5's compile.
+ *
+ * ## Why this is here and not imported, and why it is not a second answer
+ *
+ * `viz`'s `authoring/ruleSpec.ts#profileWithRules` does the same two writes, and `viz` may not be
+ * imported from this package — § D215 § 3 states the prohibition in the other direction and
+ * `menu/client.test.ts` is built around it. Two implementations of one decision is this
+ * repository's signature defect, so what stops these two drifting is that **neither of them is
+ * free to choose**: `core`'s `resolveDispatchConfig` refuses a `rules` section authored under any
+ * policy but `'rules'`, and refuses `selection.policy: 'rules'` with no rows. The pair of writes
+ * below is the only pair `core` accepts, which makes this a transcription of a constraint rather
+ * than an opinion — and `verify.test.ts` drives the *other* half of the claim by replaying a
+ * client's own ruled run and requiring the metrics to agree to {@link METRIC_EPSILON}.
+ *
+ * **Empty rows return the profile by object identity**, matching `viz`'s contract exactly: a
+ * submission with no rules resolves to the profile `data/dispatcher-profiles.json` ships, and the
+ * replay is bit-for-bit the run it was before this function existed.
+ */
+export function profileWithRules(
+  profile: SimulationConfig['dispatcherProfile'],
+  rows: readonly RuleRowConfig[],
+): SimulationConfig['dispatcherProfile'] {
+  if (rows.length === 0) return profile;
+  return {
+    ...profile,
+    rules: { rows: [...rows] },
+    selection: { ...(profile.selection ?? {}), policy: 'rules' },
+  };
 }
 
 /** The four ranked metrics plus the validity flag, read off a summary the server produced. */
