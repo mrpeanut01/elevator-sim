@@ -1076,10 +1076,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * inserted into the page above the header — `parentElement?.insertBefore`, this package's one
    * insertion idiom — and the header itself is inverted by a class while a run is being watched.
    *
-   * `simulate` is `recordRun` on the main thread rather than through `shiftRunner`. That is the
-   * same trade `dev/fixitPanel.ts` states: a run costs ~0.2–1.5 s on the shipped buildings, the
-   * whole output is one replay, and a worker round-trip for it is complexity this slice does not
-   * need. Named as a limitation rather than discovered.
+   * The gate's run is on a worker — GitHub issue #165. This paragraph used to state a cost
+   * instead (*"~0.2–1.5 s on the shipped buildings"*, carried from `dev/fixitPanel.ts`) and it is
+   * deleted rather than reworded: a stated cost that has been paid is § D227's stale refusal. The
+   * measurement that replaced it is in `dev/watchPanel.ts`'s own header, and it found that
+   * sentence understated by more than threefold on the worst row this picker can offer.
    */
   const watchPanel = mountWatchPanel({
     document,
@@ -1087,7 +1088,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     stateNow: () => state,
     loadReferenceRuns: () =>
       loadReferenceRuns((id: string) => buildingNameOf(resources, state.savedBuildings, id)),
-    simulate: (config) => recordRun(config).recording,
+    spawnRunWorker,
     buildingNameOf: (id) => buildingNameOf(resources, state.savedBuildings, id),
     dispatcherNameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
     onWatch: (run, view, recording) => {

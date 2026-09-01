@@ -23,7 +23,7 @@ import { shiftRunConfigOf } from '../dev/state.js';
 import { CALENDAR_PERIODS, calendarDayFor, periodOnDays } from '../shift/calendar.js';
 import type { VizRecording } from '../contract/types.js';
 
-import { checkedRun, filedDayRuns } from './library.js';
+import { checkedRun, filedDayRuns, watchGateAfter, watchGateBefore } from './library.js';
 import {
   PERIOD_BOOKS_THE_EVENT,
   WATCH_RECORD_CARRIES,
@@ -469,4 +469,76 @@ describe('the reproduction gate', () => {
     );
     expect(checked.run.blocked?.ground).toBe('no-record');
   });
+
+  /*
+   * GitHub issue #165 split the gate so `dev/watchPanel.ts` could run its simulation on a worker
+   * while `everyday/host.ts#watchRun` keeps calling the whole thing. Two gates is exactly the
+   * divergence CLAUDE.md's standing requirement is about, and it would be invisible: both shells
+   * would answer, and only the rows they refuse would disagree. So the composition is required to
+   * agree with the halves on every arm the gate has — including the two that must **not** reach a
+   * simulation, which are asserted by handing in a simulator that throws.
+   */
+  it('is the same gate whether it is called whole or in halves, on all four arms', () => {
+    const record = watchRecordOf(baseState(), RESOURCES);
+    expect(record).toBeDefined();
+    if (record === undefined) return;
+    const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
+    const good = rowFor(record, recording);
+    const stale: WatchableRun = { ...good, posted: { ...good.posted, carried: good.posted.carried + 3 } };
+    const unreadable = rowFor({ ...record, buildingId: 'no-such-tower' }, recording);
+    const [noRecord] = filedDayRuns(
+      [
+        {
+          ...baseState().week,
+          history: [
+            {
+              day: 1,
+              dayIdx: 0,
+              weekday: 'Monday' as const,
+              eventId: 'ordinary' as const,
+              arrived: 30,
+              carried: 30,
+              minutePct: 90,
+              readings: [],
+              record: null,
+              recordRefusal: null,
+              allMet: true,
+            },
+          ],
+        },
+      ],
+      () => 'Garden Apartments',
+    );
+    expect(noRecord).toBeDefined();
+    if (noRecord === undefined) return;
+
+    for (const [name, row, needsRun] of [
+      ['reproduces', good, true],
+      ['does-not-reproduce', stale, true],
+      ['unreadable-record', unreadable, false],
+      ['no-record', noRecord, false],
+    ] as const) {
+      const whole = checkedRun(row, RESOURCES, baseState(), (config) =>
+        needsRun
+          ? recordRun(config).recording
+          : (() => {
+              throw new Error(`the ${name} arm must refuse before it simulates`);
+            })(),
+      );
+      const gate = watchGateBefore(row, RESOURCES, baseState());
+      const halves =
+        gate.kind === 'settled'
+          ? gate.checked
+          : watchGateAfter(row, recordRun(gate.config).recording);
+      expect(gate.kind, `${name}: the halves disagree about whether a run is needed`).toBe(
+        needsRun ? 'simulate' : 'settled',
+      );
+      expect(halves.run.blocked, `${name}: the halves reached a different verdict`).toEqual(
+        whole.run.blocked,
+      );
+      expect(halves.recording === undefined, `${name}: one half kept a replay the other did not`).toBe(
+        whole.recording === undefined,
+      );
+    }
+  }, 120_000);
 });
