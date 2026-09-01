@@ -641,7 +641,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/data.ts#loadReferenceRuns',
         'dev/watchPanel.ts#mountWatchPanel',
         'dev/watchPanel.ts#WATCHING_HEADER_CLASS',
+        /*
+         * GitHub issue #165 split `checkedRun` into its two halves so `dev/watchPanel.ts` could run
+         * the gate's simulation on a worker. All three are the same seam and carry the same words —
+         * every refusal either of them returns is `watch/record.ts`'s or `watch/reproduce.ts`'s,
+         * both driven — so they take the entry the whole gate already had rather than an exclusion
+         * of their own, which would read as a second seam that is not there.
+         */
         'watch/library.ts#checkedRun',
+        'watch/library.ts#watchGateAfter',
+        'watch/library.ts#watchGateBefore',
         'watch/library.ts#filedDayRuns',
         'watch/record.ts#PERIOD_BOOKS_THE_EVENT',
         'watch/record.ts#stateFromWatchRecord',
@@ -1146,8 +1155,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`dev/shiftRunner.test.ts` drives the shipped runner through a worker it answers for and ' +
         'asserts both, including the clause that stops the elapsed counter being read as progress; ' +
         'that is weaker than the search and is stated as a limitation rather than presented as ' +
-        'coverage.',
-      ids: ['dev/shiftRunner.ts#createShiftRunner'],
+        'coverage.\n\n' +
+        '`createOffThreadRunner` joins it on exactly that ground and with one narrower sentence ' +
+        '— *the run worker failed to start: …* — which three surfaces quote inside a refusal of ' +
+        'their own (GitHub issue #165). It is the same unreachability: producing that string means ' +
+        'a worker that did not load, and the corpus hands an adapter a finished recording. ' +
+        '`dev/offThreadRuns.test.ts` drives it through a worker it answers for, including the ' +
+        'failed-to-start arm and the ordering claims a moved run makes possible; that is weaker ' +
+        'than the search and is said as a limitation rather than offered as coverage.',
+      ids: ['dev/offThreadRuns.ts#createOffThreadRunner', 'dev/shiftRunner.ts#createShiftRunner'],
     },
     {
       reason:

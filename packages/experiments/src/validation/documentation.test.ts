@@ -1509,6 +1509,16 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
       'it measures. It sits inside wave J’s block and not at its top — § D441 and § D442 close the block, ' +
       'so the charter row names D443 and points at no hole.',
   ],
+  [
+    450,
+    'wave K allocated it to lane D, which spent § D449 on GitHub issue #165 whole — the three surfaces ' +
+      'moved off the painting thread, the measurement that corrected their stated costs, and the two ' +
+      'consequences that reach past them (`runFixitPair` deleted, `checkedRun` split) — and reported the ' +
+      'number unspent. Registered rather than backfilled because ids here are names (§ D430). This is the ' +
+      'third consecutive wave a lane has returned its second number, and the reason is the same each time: ' +
+      'one issue closed end to end is one decision however many modules it touches. It sits inside wave ' +
+      'K’s block and not at its top, which § D430’s other half requires.',
+  ],
 ]);
 
 /**

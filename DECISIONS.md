@@ -30091,6 +30091,87 @@ three arms, doubled), 12 for the class band (two figures over three arms, double
 readout (two arms), and 2 for the daily loop (one fact over two days). Cases, simulations, surfaces,
 suppressed runs and failing cases all unmoved.
 
+## D449 — three stated costs, measured rather than quoted, and one of them was an understatement
+
+**Date: 2026-09-01 · Owner: wave K lane D · GitHub issue #165.**
+
+**Decision.** The three surfaces that still ran `recordRun` synchronously on the thread that paints
+— both Fix-a-building shells and Watch's reproduction gate — go through a worker, and the cost
+sentences that stood in for a measurement are **deleted rather than reworded**
+([§ D227](#d227): a stated cost that has been paid is a stale refusal, and it is the more dangerous
+half because it tells the next reader not to touch the thing).
+
+This entry exists rather than a docstring under [§ D405](#d405) for one reason: the figures below
+are published in four modules, they **correct** figures three of those modules previously stated as
+fact, and CLAUDE.md's rule is that a published number is pinned to the run that produced it. The
+run is `packages/viz/src/dev/measure.surfaceRuns.test.ts`, env-gated on `SURFACE_RUNS_OUT` and
+writing to a file rather than logging, because vitest 4 intercepts `console.log` — the same trap
+that made `honesty/measure.corpus.test.ts` necessary. This is `RISKS.md` R38's shape on prose costs
+rather than on prose counts, and the deriver is the remedy R38 itself names.
+
+**What the issue quoted, and what the run says.** Blocking wall clock over the shipped population,
+Node v22.22.2, beside the transport that replaces it (`structuredClone` of the config out and the
+recording back, which is the *upper bound* on the main thread's remaining share for
+`dev/shiftRunner.ts`'s own reason — a `postMessage` splits the clone and this does not measure the
+split):
+
+| surface | stated | measured, blocking | transport |
+|---|---|---|---|
+| Fix-a-building, opening a case (1 run) | *"~0.5–1.5 s per run"* | **11–474 ms**, median 87 | 1.9–40.9 ms |
+| Fix-a-building, `Run the day` (the pair) | *"~0.5–1.5 s per run × 2"* | **24–846 ms**, median 146 | 3.2–72.0 ms |
+| Watch, the two shipped reference rows | *"~0.2–1.5 s"* | **6 ms and 150 ms** | 1.2 and 10.7 ms |
+| Watch, a filed `vertical-city` day at 7 200 s | — | **4 351 ms** | 387.6 ms |
+
+**Two of the three were overstatements and the third was an understatement, and the third is the
+finding.** Watch's sentence was measured on the cheap half of its own population. The rows a first
+visit can offer are the two reference runs, and both come in *under* the range it claimed; but a
+picker row is a **filed day**, which is whatever the player ran, up to
+`menu/types.ts#LONGEST_OFFERED_RUN_S` on any tower they have played. That row blocks for three
+times the stated ceiling, and 387 ms of the remaining transport is the recording's own clone. A
+cost quoted from the population that is easy to reach is the same defect as a refusal that has gone
+stale: both tell a reader the thing is smaller than it is.
+
+**4 351 ms is a floor on that, not a worst case, and the table says a filed day rather than *the
+worst* row for that reason.** It runs Vertical City on the building's own demand;
+[`dev/shiftRunner.ts`](packages/viz/src/dev/shiftRunner.ts) measured the same tower at the same
+7 200 s under `constant-iso` at **21–31 s** on `collective`, and a day run that way can be filed
+like any other. What this row establishes is that the stated ceiling was already exceeded well
+before the heaviest thing the menu allows.
+
+**The Everyday open run is the one nobody could see.** It ran inside `mainColumn`, so it had no busy
+state and could not have had one — nothing can paint while it runs. Measured through the browser
+tier on the shipped artifact, clicking a rail row stopped the page for **128 ms**; pressing the
+primary stopped it for **947 ms over 13 frames**, and the Engineer panel's press for
+**644–1 227 ms over 11–18 frames** across four samples. After: **126 ms over 158 frames** and
+**113–247 ms**.
+
+**Watch's browser-tier gain is inside the noise, and that is published rather than smoothed.**
+72–100 ms over 9–11 frames before, 38–102 ms over 22–52 frames after — the frame *count* moves and
+the gap does not, because the only rows the tier can reach are the two cheap ones. The case for
+moving that surface is the 4 351 ms row, not this tier. `dev/mainThreadFrames.test-helper.ts` says
+so where its threshold is defined, so nobody reads that bound as evidence it cannot supply.
+
+**Consequences that reach past the three surfaces.**
+
+- `fixit/run.ts#runFixitPair` is **deleted**. With both shells on the worker nothing outside a test
+  called it, and a behaviour with no non-test caller is exactly what `docs/05-roadmap.md`'s standing
+  requirement is about — the instructive instance being the whole of `tuning/`, which said so in its
+  own docstring while the roadmap called the phase green. `fixit/cases.test.ts` runs the pair
+  itself; what it must not reimplement — `fixitRunPlanOf`, and now `FIXIT_RUN_SWITCHES` — it still
+  calls. **This is not a twelfth dead seam**: it never shipped as one, because it was deleted on the
+  commit that made it one.
+- `watch/library.ts#checkedRun` is **split** into `watchGateBefore` and `watchGateAfter`, and
+  `checkedRun` is those two composed. One shell runs the gate's simulation on a worker and the other
+  keeps it synchronous, and two gates would be exactly the divergence CLAUDE.md's standing
+  requirement is about — invisible, because both would answer and only the rows they refuse would
+  disagree. `watch/record.test.ts` requires the composition to agree with the halves on all four
+  arms, including the two that must refuse before they simulate.
+- `dev/offThreadRuns.OffThreadRun` requires `recordDecisions` rather than defaulting it, and the
+  requirement is load-bearing: `recordRun` defaults it to **true**, the Watch gate relied on that
+  default, and a decision log is *in* the recording — so a convenient default of `false` would have
+  handed the stage a different replay than the synchronous gate produced, and the reproduction check
+  downstream compares recordings. `dev/shiftRunner.ts`'s protocol already made the same rule for the
+  same two fields: *passed rather than defaulted so the far side decides nothing*.
 
 ## D451 — an absence that has half stopped being true is deleted whole and re-taken, never trimmed
 

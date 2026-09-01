@@ -79,5 +79,37 @@ describe('the shipped reference runs', () => {
       expect(checked.run.blocked).toBeNull();
       expect(checked.recording).toBeDefined();
     }, 120_000);
+
+    /**
+     * The gate's run is on a worker since GitHub issue #165, so the config it runs is
+     * `structuredClone`d out and its recording cloned back. CLAUDE.md invariant 5 is what that
+     * could break, **silently**: a transport that dropped a field would still produce a run and
+     * only the legs would say so — and this gate's whole job is to decide whether a record
+     * reproduces, so a run that crossed badly would refuse a row that is perfectly fine.
+     *
+     * Compared on the legs first (§ D177), then whole. `record/recordRun.test.ts` runs the lossy
+     * JSON transport beside its own case and requires it to fail; that negative control belongs
+     * once per shape rather than once per fixture, and a watch config is a `shiftRunConfigOf`
+     * config — the same shape it already covers.
+     */
+    it(`is the same run after a structured clone — “${run.label}”`, () => {
+      const record = run.record;
+      expect(record).not.toBeNull();
+      if (record === null) return;
+      const config = watchRunConfigOf(baseState(), RESOURCES, record);
+      const direct = recordRun(config).recording;
+      const cloned = recordRun(structuredClone(config)).recording;
+      const legs = (recording: typeof direct): string =>
+        JSON.stringify(
+          recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1]),
+        );
+      expect(legs(cloned)).toBe(legs(direct));
+      expect(JSON.stringify(cloned)).toBe(JSON.stringify(direct));
+      expect(cloned.seed).toBe(direct.seed);
+      // And the gate reaches the same verdict about the cloned run, which is the thing the
+      // player actually meets: a reproduction check that disagreed with itself across the
+      // boundary would refuse a row for the transport's reasons rather than the record's.
+      expect(postedResultOf(cloned)).toEqual(run.posted);
+    }, 120_000);
   }
 });

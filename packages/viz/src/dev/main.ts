@@ -14,6 +14,7 @@
  * | `authoring/*` | the four editor mounts, and `shiftRunConfigOf` |
  * | `record/decisionLog.ts` | `recordRun` — called by `dev/shiftWorker.ts` for the shift, and directly by {@link runChallenge} for a challenge's seeds |
  * | `dev/shiftRunner.ts`, `dev/shiftWorker.ts` | {@link runShift} and {@link verifyCurrent}, which no longer simulate on this thread |
+ * | `dev/offThreadRuns.ts` | `dev/fixitPanel.ts` and `dev/watchPanel.ts`, both handed {@link boot}'s one `spawnRunWorker` — GitHub issue #165 |
  * | `dev/surfaces.ts` | {@link applyNavigation} |
  * | `frame/overlay.ts` | {@link drawStage} and the landing selector |
  * | `record/document.ts` | **Load recording**, **Save recording** and **Verify replay** |
@@ -1046,6 +1047,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * optional, so `index.html` is unchanged and `elementMap.test.ts`'s contract is untouched.
    */
   /**
+   * A worker that runs one simulation and hands the recording back — `dev/shiftWorker.ts`.
+   *
+   * One factory for all three of its near sides: `createShiftRunner` below, and
+   * `dev/offThreadRuns.ts` inside the Fix-a-building and Watch panels (GitHub issue #165). Hoisted
+   * here rather than written out per caller because `new Worker(new URL(…))` is a **bundler seam** —
+   * Vite rewrites that exact expression — and three copies of it are three chances for one to be
+   * spelled differently and silently fall back to a runtime fetch.
+   */
+  const spawnRunWorker = (): Worker =>
+    new Worker(new URL('./shiftWorker.ts', import.meta.url), { type: 'module' });
+
+  /**
    * Fix-a-building — GAMEPLAY § 10, mounted like the menu: a TypeScript-built overlay, so
    * `index.html` and `elementMap.test.ts`'s contract are untouched. The case file is fetched on
    * first open (`loadFixitCases`'s own note on why it is not part of boot).
@@ -1054,6 +1067,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     document,
     resources,
     loadCases: () => loadFixitCases(resources),
+    spawnRunWorker,
   });
 
   /**
@@ -1064,10 +1078,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * inserted into the page above the header — `parentElement?.insertBefore`, this package's one
    * insertion idiom — and the header itself is inverted by a class while a run is being watched.
    *
-   * `simulate` is `recordRun` on the main thread rather than through `shiftRunner`. That is the
-   * same trade `dev/fixitPanel.ts` states: a run costs ~0.2–1.5 s on the shipped buildings, the
-   * whole output is one replay, and a worker round-trip for it is complexity this slice does not
-   * need. Named as a limitation rather than discovered.
+   * The gate's run is on a worker — GitHub issue #165. This paragraph used to state a cost
+   * instead (*"~0.2–1.5 s on the shipped buildings"*, carried from `dev/fixitPanel.ts`) and it is
+   * deleted rather than reworded: a stated cost that has been paid is § D227's stale refusal. The
+   * measurement that replaced it is in `dev/watchPanel.ts`'s own header, and it found that
+   * sentence understated by more than threefold on a filed day this picker will offer.
    */
   const watchPanel = mountWatchPanel({
     document,
@@ -1075,7 +1090,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     stateNow: () => state,
     loadReferenceRuns: () =>
       loadReferenceRuns((id: string) => buildingNameOf(resources, state.savedBuildings, id)),
-    simulate: (config) => recordRun(config).recording,
+    spawnRunWorker,
     buildingNameOf: (id) => buildingNameOf(resources, state.savedBuildings, id),
     dispatcherNameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
     onWatch: (run, view, recording) => {
@@ -2909,7 +2924,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   };
 
   const shiftRunner = createShiftRunner({
-    spawn: () => new Worker(new URL('./shiftWorker.ts', import.meta.url), { type: 'module' }),
+    spawn: spawnRunWorker,
     clock,
     onStatus: (text) => {
       setText(ui.transport.status, text);

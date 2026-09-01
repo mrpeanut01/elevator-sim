@@ -1,9 +1,19 @@
 /**
- * What running a case **is** — the two configs, the pair of runs, and the measurement.
+ * What running a case **is** — the two configs and the measurement.
  *
  * `campaign/stageRun.ts`'s rule, transplanted: this module is the only statement anywhere of how
- * a case's runs are built, the panel calls it, and the validation suite calls it. A test that
+ * a case's runs are built, both panels call it, and the validation suite calls it. A test that
  * assembled its own `SimulationConfig` would vouch for a reimplementation of the call site.
+ *
+ * ## What it no longer does: run them
+ *
+ * It exported `runFixitPair` — two `recordRun` calls — until GitHub issue #165 put both
+ * Fix-a-building surfaces on `dev/offThreadRuns.ts`. Neither shell simulates on the thread that
+ * paints any more, so nothing outside a test called that function, and a behaviour with no
+ * non-test caller is the defect `docs/05-roadmap.md`'s standing requirement is about — the
+ * instructive instance being the whole of `tuning/`, which said so in its own docstring while the
+ * roadmap called the phase green. It is deleted rather than annotated. What must not be
+ * reimplemented is {@link fixitRunPlanOf}, and every caller still goes through it.
  *
  * ## The basis
  *
@@ -36,7 +46,6 @@ import {
 } from '@elevator-sim/core/browser';
 
 import type { VizLeg, VizRecording } from '../contract/types.js';
-import { recordRun, type RecordedRun } from '../record/recordRun.js';
 import type { FixitMeasurement } from './engine.js';
 import type { ComplaintMeasure, ComplaintScope, FigureSpec, FixitCase, FixitPatch, FixitState } from './types.js';
 
@@ -281,13 +290,23 @@ function configOf(
   };
 }
 
-/** The pair, run. Decisions are not recorded — two runs' worth would be carried to no reader. */
-export function runFixitPair(plan: FixitRunPlan): { readonly before: RecordedRun; readonly after: RecordedRun } {
-  return {
-    before: recordRun(plan.asBuilt, { recordDecisions: false }),
-    after: recordRun(plan.asRepaired, { recordDecisions: false }),
-  };
-}
+/**
+ * `recordRun`'s switches for a fixit run, settled once and passed by every caller.
+ *
+ * Decisions are **not** recorded: two runs' worth would be carried to no reader, and since issue
+ * #165 they would be carried across a thread boundary to no reader. No car is held out of service
+ * — a case's fabric patch is the whole of what it changes, and a held car would be a second,
+ * unstated edit to the building the complaint is about.
+ *
+ * Stated here rather than defaulted on the far side, which is `dev/shiftRunner.ts`'s own rule for
+ * the same two fields: *passed rather than defaulted so the far side decides nothing*. It is also
+ * why `dev/offThreadRuns.ts` requires both — a default of `false` there would have silently
+ * changed the Watch surface's recording, which wants them.
+ */
+export const FIXIT_RUN_SWITCHES = Object.freeze({
+  recordDecisions: false,
+  outOfServiceCarIds: Object.freeze([]) as readonly string[],
+});
 
 /* -------------------------------------------------------------------------- *
  * Measurement — the complaint and the rest, from the legs

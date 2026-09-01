@@ -26,8 +26,15 @@
  * The reproduction gate has to run a simulation, and this module has to stay testable under plain
  * Node with no worker and no canvas — the whole of `dev/` exists because *a decision that needs a
  * document cannot be tested*. So {@link checkedRun} takes the simulator as a parameter and
- * `dev/watchPanel.ts` hands it `recordRun`. That also makes the gate's two branches drivable
- * without contriving a stale fixture: a test hands in a simulator that answers a different run.
+ * `everyday/host.ts#watchRun` hands it `recordRun`. That also makes the gate's two branches
+ * drivable without contriving a stale fixture: a test hands in a simulator that answers a
+ * different run.
+ *
+ * Since GitHub issue #165 the gate is also available as its two **halves** —
+ * {@link watchGateBefore} and {@link watchGateAfter} — because `dev/watchPanel.ts` runs the
+ * simulation on a worker and cannot hand in a synchronous function. {@link checkedRun} is those
+ * halves composed, so there is still exactly one gate; a second copy of the decision is precisely
+ * what would let one shell refuse a row the other watches.
  */
 
 import type { VizRecording } from '../contract/types.js';
@@ -215,23 +222,57 @@ export interface CheckedRun {
   readonly recording: VizRecording | undefined;
 }
 
-export function checkedRun(
+/**
+ * The half of the gate that needs no simulation — either a verdict already, or the config to run.
+ *
+ * Split out for GitHub issue #165, and the split is what lets one caller run the simulation on a
+ * worker while the other keeps it synchronous. {@link checkedRun} is these two halves composed and
+ * is still the whole gate; `dev/watchPanel.ts` calls the halves because its run is asynchronous
+ * now, and `everyday/host.ts#watchRun` still calls the composition because its `EverydayHost`
+ * contract is synchronous. **There is one gate either way** — the halves are not a second copy of
+ * the decision, and `watch/record.test.ts` asserts the composition agrees with them.
+ *
+ * Two rows are refused here and cost no run at all, which is why this half exists as a half: a row
+ * that is already blocked has nothing to re-simulate, and a record this build cannot read cannot
+ * be turned into a config to run.
+ */
+export type WatchGate =
+  | { readonly kind: 'settled'; readonly checked: CheckedRun }
+  | { readonly kind: 'simulate'; readonly config: SimulationConfig };
+
+export function watchGateBefore(
   run: WatchableRun,
   resources: BrowserResources,
   base: ViewerState,
-  simulate: (config: SimulationConfig) => VizRecording,
-): CheckedRun {
-  if (run.blocked !== null || run.record === null) return { run, recording: undefined };
+): WatchGate {
+  if (run.blocked !== null || run.record === null) {
+    return { kind: 'settled', checked: { run, recording: undefined } };
+  }
 
   const unreadable = recordUnreadableReason(run.record, resources);
   if (unreadable !== null) {
     return {
-      run: { ...run, blocked: { ground: 'unreadable-record', reason: unreadable } },
-      recording: undefined,
+      kind: 'settled',
+      checked: {
+        run: { ...run, blocked: { ground: 'unreadable-record', reason: unreadable } },
+        recording: undefined,
+      },
     };
   }
 
-  const recording = simulate(watchRunConfigOf(base, resources, run.record));
+  return { kind: 'simulate', config: watchRunConfigOf(base, resources, run.record) };
+}
+
+/**
+ * The half that reads the recording — § 1.5's reproduction check, and nothing else.
+ *
+ * Called with whatever {@link watchGateBefore} asked to be run, however it was run. A recording
+ * that crossed a worker boundary is required to reach the same verdict as one that did not, which
+ * `watch/reference.test.ts` asserts per shipped reference row: a gate that disagreed with itself
+ * across a `structuredClone` would refuse a row for the transport's reasons rather than the
+ * record's, and the player would be told their own day does not reproduce.
+ */
+export function watchGateAfter(run: WatchableRun, recording: VizRecording): CheckedRun {
   const refusal = reproductionRefusalFor(run.posted, postedResultOf(recording));
   if (refusal !== null) {
     return {
@@ -240,4 +281,15 @@ export function checkedRun(
     };
   }
   return { run, recording };
+}
+
+export function checkedRun(
+  run: WatchableRun,
+  resources: BrowserResources,
+  base: ViewerState,
+  simulate: (config: SimulationConfig) => VizRecording,
+): CheckedRun {
+  const gate = watchGateBefore(run, resources, base);
+  if (gate.kind === 'settled') return gate.checked;
+  return watchGateAfter(run, simulate(gate.config));
 }

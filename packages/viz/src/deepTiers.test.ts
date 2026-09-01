@@ -200,6 +200,17 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       '"the seed-collision check has run at least once on main" — is this file and no other',
     scheduled: true,
   },
+  'packages/viz/src/dev/measure.surfaceRuns.test.ts': {
+    gates: ['SURFACE_RUNS_OUT'],
+    reason:
+      '\u00a7 D449\u2019s deriver \u2014 what a run costs the thread that paints, per shipped fixit case ' +
+      'and per watchable row, beside the transport that replaces it. GitHub issue #165 tabulated ' +
+      'three surfaces against costs their own lanes had written down and nobody had re-derived, ' +
+      'and one of the three was an understatement by more than threefold. A prose cost goes stale ' +
+      'exactly the way the corpus counts do, so it rides in the corpus-figures job for RISKS.md ' +
+      'R38\u2019s reason: the remedy is a derivation, never a pin',
+    scheduled: true,
+  },
   'packages/viz/src/honesty/honesty.test.ts': {
     gates: ['ELEVATOR_SIM_HONESTY'],
     reason:

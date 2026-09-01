@@ -4,7 +4,7 @@
  * Rule 6: *"The diagnosed fix must move the complaint by ≥ 80 % on its own, and must not cost the
  * rest of the building more than two points. Check this against a real run before shipping the
  * case."* Every case in `data/fixit-cases.json` is run here, through **the same**
- * `fixitRunPlanOf`/`runFixitPair`/`measuredOf`/`classifyOutcome` chain the panel uses
+ * `fixitRunPlanOf`/`measuredOf`/`classifyOutcome` chain both panels use
  * (`stageRun.ts`'s lesson: a test that assembled its own request would vouch for a
  * reimplementation of the call site).
  *
@@ -83,14 +83,15 @@ import {
 } from './engine.js';
 import { parseFixitCases } from './parse.js';
 import {
+  FIXIT_RUN_SWITCHES,
   figureValuesOf,
   fixitRunPlanOf,
   measuredOf,
-  runFixitPair,
   type FixitResources,
+  type FixitRunPlan,
 } from './run.js';
 import type { FixitCase, FixitCases, FixitState } from './types.js';
-import type { RecordedRun } from '../record/recordRun.js';
+import { recordRun, type RecordedRun } from '../record/recordRun.js';
 
 const SUITE_TIMEOUT = 300_000;
 
@@ -148,6 +149,25 @@ function caseOf(id: string): FixitCase {
   const entry = cases.cases.find((candidate) => candidate.id === id);
   if (entry === undefined) throw new Error(`the shipped file has no case "${id}"`);
   return entry;
+}
+
+/**
+ * The pair, run — locally, since GitHub issue #165.
+ *
+ * `fixit/run.ts` exported `runFixitPair` until both Fix-a-building shells moved their runs to
+ * `dev/offThreadRuns.ts`. Nothing outside this file called it after that, and a behaviour with no
+ * non-test caller is the defect `docs/05-roadmap.md`'s standing requirement is about — so it was
+ * deleted rather than kept for a suite's convenience.
+ *
+ * Nothing is reimplemented by this helper: what the suite must not restate is
+ * {@link fixitRunPlanOf}, which builds the configs, and {@link FIXIT_RUN_SWITCHES}, which settles
+ * `recordRun`'s two switches. Both are the shipped module's and both are called here.
+ */
+function runFixitPair(plan: FixitRunPlan): { readonly before: RecordedRun; readonly after: RecordedRun } {
+  return {
+    before: recordRun(plan.asBuilt, FIXIT_RUN_SWITCHES),
+    after: recordRun(plan.asRepaired, FIXIT_RUN_SWITCHES),
+  };
 }
 
 /** Boarding/alighting identity of a run, for the compared-on-the-legs assertions. */
