@@ -135,7 +135,6 @@ import {
   buildingConfigOf,
   resolvedBuildingOf,
   shiftDemandTemplateId,
-  profileById,
   shiftLengthForContract,
   specsWithSaved,
   withDispatcher,
@@ -1369,14 +1368,24 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       if (checked.run.blocked !== null || checked.recording === undefined) return checked.run;
       /*
        * The dispatcher's display name is resolved here rather than inside `watchingViewOf`, which
-       * loads nothing — `watch/view.ts`'s own split. `dispatcherById` is the honest lookup, so a
-       * record naming a profile this build no longer ships shows the id rather than somebody else's
-       * name; the row would in fact have been refused already by `recordUnreadableReason`, and this
-       * is the fallback rather than the answer.
+       * loads nothing — `watch/view.ts`'s own split.
+       *
+       * **The honest lookup, and deliberately not `dev/state.ts#profileById`**, which the Engineer
+       * picker uses for the same cell. That function is *total*: an id it cannot find returns the
+       * **first shipped profile**, so a record naming a dispatcher this build no longer ships would
+       * put a name the record does not use under § 14.1's `THEIR DISPATCHER` — a false statement
+       * about the thing asked after, which is the rule {@link EverydayHost.dispatcherById}'s own
+       * docstring states. The state is unreachable in both shells (`recordUnreadableReason` refuses
+       * such a row before the gate runs), so this is the arm that is never taken being right rather
+       * than plausible; the id is what stands where a name would, because the id is what is true.
        */
       const record = checked.run.record;
       const profile =
-        record === null ? undefined : profileById(b.resources, b.state().savedDispatchers, record.dispatcherId);
+        record === null
+          ? undefined
+          : allDispatchers(b.resources, b.state().savedDispatchers).find(
+              (candidate) => candidate.id === record.dispatcherId,
+            );
       b.enterWatch(
         checked.run,
         watchingViewOf(checked.run, profile?.name ?? record?.dispatcherId ?? ''),
