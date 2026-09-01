@@ -28199,12 +28199,21 @@ scope will be applied where it does not hold.
 a tenth tier would falsify silently. It is derived now, and it is the count of *failing* jobs other
 than the flaky one, which is the number the sentence is actually about.
 
-**Verified by driving it rather than by reading it.** The generator is extracted from the workflow
-file itself — not copied — and exercised over three job-result sets: `perf-sweep` alone (the
-2026-08-30 shape) produces *"`perf-scaling` … is NOT among the failures above, so its note does not
-apply here"*; `perf-scaling` alone produces the caveat scoped with *"read THAT job, and only that
-one"*; both plus `matrix-census` produces the caveat **and** *"The other 2 failing job(s) are
-deterministic"*.
+**Verified by driving it rather than by reading it, and the check ships.**
+`validation/deepTierReport.test.ts` extracts the generator from the workflow file — never a copy, or
+it would be asserting things about itself — and executes it over three job-result sets:
+`perf-sweep` alone (the 2026-08-30 shape) produces *"`perf-scaling` … is NOT among the failures
+above, so its note does not apply here"*; `perf-scaling` alone produces the caveat scoped with
+*"read THAT job, and only that one"*; both plus `matrix-census` produces the caveat **and** *"The
+other 2 failing job(s) are deterministic"*. A test that merely asserted the workflow *contains* a
+phrase would pass over a generator emitting it unconditionally, which is the defect itself.
+
+**The mutation run changed the test.** Regressed to the superseded sentence, the case that exists
+for this did **not** trip its refusal of `read THAT job` — those are different words for the same
+mistake — and was saved by a positive assertion beside it. So the imperative is now refused *by
+name* (`Read \`perf-scaling\``) as well as generically, and a second mutation that keeps reading
+`RESULTS` while emitting the old sentence was driven to confirm it. A refusal that cannot recognise
+the thing it was written about is decoration.
 
 **A constraint worth recording for the next person editing that step.** The generator runs as
 `node -e '…'` inside a single-quoted shell word, so **it may contain no apostrophe** — including in
