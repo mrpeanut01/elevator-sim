@@ -10,10 +10,15 @@
  * The claim is *close the tab, come back, and the buildings you fixed are still fixed*, and the only
  * way to make that claim is to load the page, do the thing, **reload**, and look again.
  *
- * `everyday/profile.test.ts` keeps the half this file structurally cannot: what the slot does with a
- * version-1 envelope, a corrupt one, and a payload past `PROGRESS_BUDGET_CHARACTERS`. Fabricating
- * those needs a `SessionStore` a player cannot produce on demand. The two files are the same claim
- * from the two ends.
+ * `everyday/profile.test.ts` keeps what this file cannot, and the split is drawn by what a page can
+ * be made to hold rather than by convenience. A corrupt store and a version-1 envelope are both a
+ * string in `localStorage`, so both are driven here **and** there. The **oversized** store is only
+ * there: crossing `PROGRESS_BUDGET_CHARACTERS` needs about fifty stored ratings, and seeding them
+ * through `page.evaluate` would mean transcribing the budget constant into this file — a copied
+ * number that goes stale the moment the constant moves, which is the defect this repository counts.
+ * So the write-refusal path is asserted where the constant lives, exactly, and its ordering (refuse
+ * **before** the store is touched) is mutation-validated there; what is asserted on the page is the
+ * read-refusal path a player can actually arrive at with a browser somebody else's build wrote to.
  *
  * ## Which artifact, and why it is the built one
  *
