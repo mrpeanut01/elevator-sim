@@ -54,6 +54,11 @@
 import { displayNameIssueOf } from '../menu/account.js';
 import { savedRatingIssue, type SavedRating } from '../gauntlet/ladder.js';
 import type { SessionStore } from '../persist/types.js';
+import {
+  DEFAULT_EVERYDAY_UNITS,
+  isEverydayUnits,
+  type EverydayUnits,
+} from './units.js';
 
 /**
  * § 15.1's six curated colours — *sun, terracotta, moss, sky, ochre, slate* — in the prototype's
@@ -166,7 +171,7 @@ export function everydayProgressWith(
 const PROFILE_KEY = 'elevator-sim.everyday-profile';
 
 /** The envelope's shape number — refused in both directions, `persist/`'s rule. */
-const PROFILE_SCHEMA_VERSION = 2;
+const PROFILE_SCHEMA_VERSION = 3;
 
 /**
  * The shapes this build will read, as against the one it writes.
@@ -174,15 +179,27 @@ const PROFILE_SCHEMA_VERSION = 2;
  * `persist/types.ts`'s `SESSION_SCHEMA_VERSIONS_READ` and its argument: *what is written* and *what
  * is read* are two different questions, and collapsing them makes every added key a reason to throw
  * away a player's name. Version 2 added a **sibling** key and changed nothing about `profile`, so a
- * version-1 envelope is read by {@link withProgress} rather than migrated field by field.
+ * version-1 envelope is read by {@link withProgress} rather than migrated field by field. Version 3
+ * added a second sibling the same way ({@link withUnits}), which is why both migrations are one
+ * line each and neither touches a payload it did not add.
  */
-const PROFILE_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2]);
+const PROFILE_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3]);
 
-/** Version 2: the version, the profile, and the progress beside it — three siblings. */
+/**
+ * Version 3: the version, the profile, the progress and the units preference — four siblings.
+ *
+ * **The units preference is a sibling of `profile`, never a field on it, and that placement is the
+ * whole safety argument for GitHub issue #170's Units half** ([§ D448](../../../../DECISIONS.md)).
+ * {@link EverydayProfile} is identity — the name and colour that travel with every posted run
+ * (§ 15.1's own lede says so) — and a display preference folded into it would ride along with a
+ * submission and end up compared against runs taken under the other preference. It is a sibling for
+ * the same reason `progress` is: a different question with a different reader.
+ */
 interface ProfileEnvelope {
   readonly schemaVersion: number;
   readonly profile: EverydayProfile;
   readonly progress: EverydayProgress;
+  readonly units: EverydayUnits;
 }
 
 /**
@@ -240,9 +257,29 @@ function withProgress(record: Record<string, unknown>, version: number): Record<
   return { ...record, progress: EMPTY_EVERYDAY_PROGRESS };
 }
 
-/** A read that got as far as the envelope's two payload keys, or the reason it did not. */
+/**
+ * A version 1 or 2 envelope, given the one key version 3 added — GitHub issue #170's Units half.
+ *
+ * {@link withProgress}'s shape and the same objection answered the same way: is
+ * {@link DEFAULT_EVERYDAY_UNITS} a value the absence **determines**, or a guess? It is determined,
+ * and by the defect this key exists to close. Before version 3 nothing in the viewer read a
+ * metres-or-feet preference at all — that is the whole of what issue #170 reported — so every
+ * machine specification any earlier build ever drew was in metres. `metric` is not a default chosen
+ * for a player who might have wanted feet; it is what they were looking at.
+ */
+function withUnits(record: Record<string, unknown>, version: number): Record<string, unknown> {
+  if (version >= 3) return record;
+  return { ...record, units: DEFAULT_EVERYDAY_UNITS };
+}
+
+/** A read that got as far as the envelope's three payload keys, or the reason it did not. */
 type EnvelopeRead =
-  | { readonly ok: true; readonly profile: unknown; readonly progress: unknown }
+  | {
+      readonly ok: true;
+      readonly profile: unknown;
+      readonly progress: unknown;
+      readonly units: unknown;
+    }
   | { readonly ok: false; readonly reason: EnvelopeRefusal };
 
 /**
@@ -289,8 +326,13 @@ function readEnvelope(store: SessionStore): EnvelopeRead {
     // merely newer than they are.
     return { ok: false, reason: 'version' };
   }
-  const completed = withProgress(record, version);
-  return { ok: true, profile: completed['profile'], progress: completed['progress'] };
+  const completed = withUnits(withProgress(record, version), version);
+  return {
+    ok: true,
+    profile: completed['profile'],
+    progress: completed['progress'],
+    units: completed['units'],
+  };
 }
 
 /**
@@ -319,6 +361,25 @@ export function loadProfile(store: SessionStore): EverydayProfile | undefined {
   if (displayNameIssueOf(name) !== undefined) return undefined;
   if (!AVATAR_SWATCHES.some((swatch) => swatch.color === avatarColor)) return undefined;
   return Object.freeze({ name, avatarColor });
+}
+
+/**
+ * The stored units preference, or {@link DEFAULT_EVERYDAY_UNITS}.
+ *
+ * **Total where {@link loadProfile} is partial, and the difference is what each absence means.** A
+ * profile that cannot be read leaves the player unnamed, which is a state the settings screen has
+ * to say something about; a units preference that cannot be read leaves them reading metres, which
+ * is § 13's default and needs no sentence. There is nothing for a screen to tell a player here, so
+ * there is no `undefined` for it to have to handle.
+ *
+ * Every refusing path lands on the default for the same reason: a value this build cannot vouch
+ * for was written by something other than this build's save path, and restoring it would put a
+ * preference on the settings pill that the pill's own two faces do not contain.
+ */
+export function loadUnits(store: SessionStore): EverydayUnits {
+  const envelope = readEnvelope(store);
+  if (!envelope.ok) return DEFAULT_EVERYDAY_UNITS;
+  return isEverydayUnits(envelope.units) ? envelope.units : DEFAULT_EVERYDAY_UNITS;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -477,6 +538,7 @@ export function saveEveryday(
   store: SessionStore,
   profile: EverydayProfile,
   progress: EverydayProgress,
+  units: EverydayUnits,
 ): EverydaySave {
   let progressText: string;
   try {
@@ -497,6 +559,7 @@ export function saveEveryday(
     schemaVersion: PROFILE_SCHEMA_VERSION,
     profile,
     progress,
+    units,
   };
   try {
     store.write(PROFILE_KEY, JSON.stringify(envelope));
@@ -529,6 +592,21 @@ export interface EverydayProfileStore {
    * those two are told apart.
    */
   progress(): EverydayProgress;
+  /**
+   * How machine specifications read on this device — § 15.1's *Units* row, GitHub issue #170.
+   *
+   * Total, unlike {@link current}: there is no *before anything was set* state to report, because
+   * § 13's answer with nothing stored is `metric` and that is a value rather than an absence.
+   */
+  units(): EverydayUnits;
+  /**
+   * Set it, and hear whether it survives the tab — {@link set}'s contract, for the same reason.
+   *
+   * **A presentation write, and it is worth saying beside the setter.** Nothing this returns or
+   * stores reaches a run: the preference is read only by `everyday/units.ts`'s formatters, which
+   * return strings. See [§ D448](../../../../DECISIONS.md).
+   */
+  setUnits(units: EverydayUnits): boolean;
   /**
    * The sentence the fix screen and the ladder draw about kept progress, or `null`.
    *
@@ -569,6 +647,7 @@ export function createProfileStore(backing: SessionStore | undefined): EverydayP
       : loadProgress(backing);
   let progress = restored.progress;
   let notice = restored.notice;
+  let units = backing === undefined ? DEFAULT_EVERYDAY_UNITS : loadUnits(backing);
   const listeners = new Set<() => void>();
   const announce = (): void => {
     for (const listener of [...listeners]) listener();
@@ -580,7 +659,7 @@ export function createProfileStore(backing: SessionStore | undefined): EverydayP
    */
   const persist = (): boolean => {
     if (backing === undefined) return false;
-    const written = saveEveryday(backing, current ?? DEFAULT_EVERYDAY_PROFILE, progress);
+    const written = saveEveryday(backing, current ?? DEFAULT_EVERYDAY_PROFILE, progress, units);
     notice = written.notice;
     return written.ok;
   };
@@ -597,6 +676,13 @@ export function createProfileStore(backing: SessionStore | undefined): EverydayP
       return () => {
         listeners.delete(listener);
       };
+    },
+    units: () => units,
+    setUnits: (next) => {
+      units = next;
+      const durable = persist();
+      announce();
+      return durable;
     },
     progress: () => progress,
     progressNotice: () => notice,
