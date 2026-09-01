@@ -29726,3 +29726,146 @@ mean.** It is unmeasured, and a second plausible sentence in place of a measurem
 
 **Both registers are empty and both tiers are green**, so the verdict column means today what it was
 written to mean: 0 failing cases *and* nothing held in `honesty.test.ts`'s `OUTSTANDING`.
+
+## D443 — a dispatcher a player built is one more entry in the library, and the batch resolves it there
+
+**Date: 2026-09-01 · Owner: wave K, lane A · GitHub issues
+[#167](https://github.com/mrpeanut01/elevator-sim/issues/167) § 3.1 (4) and
+[#228](https://github.com/mrpeanut01/elevator-sim/issues/228).**
+
+**Decision.** The player's saved dispatchers ride on the **worker message** as profile documents,
+`batch/library.ts#batchLibraryOf` folds them into the dispatcher-profile *file* the batch resolves
+against, and **`batch/runBatch.ts` is unchanged**. A saved dispatcher is not a new kind of arm; it is
+one more entry in `data/dispatcher-profiles.json`'s own shape, and it earns that by surviving the
+file's own parser.
+
+### The defect, as a wire rather than as a complaint
+
+`dev/dispatcherEditor.ts#save` appends to `ViewerState.savedDispatchers` and `persist/` stores it.
+Every **single**-run surface then works, because `dev/state.ts#drivingProfileOf` carries the profile
+*object* into `SimulationConfig`. Every **batch** surface failed, because a batch crosses a
+`postMessage` carrying an *id* and `dev/batchWorker.ts` calls `loadBrowserResources()` on the far
+side — which loads `data/` and nothing anybody authored. `armProfile` then said:
+
+> dispatcher profile "yours-1" for arm "candidate" is not in this build's data/. A batch cannot run
+> an arm it cannot resolve.
+
+That one line is the whole of #113 § 1's *"both surfaces point at a locked door"*: Compare, the
+suite, the Lab, the Everyday bench and the gauntlet all run through that function.
+
+**The Everyday bench is the sharpest case and is why this is a defect rather than a gap.**
+`everyday/benchScreen.ts` fills its field from `host.dispatchers()`, which **is** `allDispatchers(…)`
+and has carried saved profiles since it was written. So the bench offered a saved dispatcher, let a
+reader put it in the field, and failed at *Run the suite* with an engine sentence about `data/`. A
+control that cannot be honoured being offered anyway is `docs/16` S7 inverted, and it had been
+shipping.
+
+### Why the library is a resource and not a field of `BatchRequest`
+
+`BatchRequest` is *what to run* and names things by id, a building among them. `BatchResources` is
+*"the resolved objects a batch needs. Assembled by the caller; never fetched here."* A dispatcher the
+player authored is a resolution, not an instruction. Putting it there also keeps a stored request
+replayable-by-description: a request that named `yours-1` **and** embedded a copy would be two
+sources for one dispatcher, and the copy is the one that goes stale.
+
+The consequence is that the runner did not change at all. `armProfile` was already reading the
+library rather than a shipped array; the library was simply short.
+
+### The evidence is on the legs, and the cell is a measurement rather than a taste
+
+`batch/library.test.ts` compares `[passengerId, carId, boardedAt]` per rider — never a window
+statistic, § D177's own rule — over configs built by `runBatch`'s own exported `armConfigOf`, so the
+comparison is of what a batch actually runs rather than of a reconstruction.
+
+The cell was chosen by sweeping seven buildings × four demand settings × two horizons and counting
+how many legs change car when the saved weight vector moves from `waitTime` to `distanceTravelled`:
+
+| cell | legs | legs whose car changes |
+|---|---|---|
+| `garden-apartments`, own profile, 900 s | **6** | **0** |
+| `chancery-house`, own profile, 900 s | 222 | 137 |
+| **`midtown-office`, own profile, 900 s** | **448** | **360** |
+| `vertical-city`, own profile, 900 s | 1 851 | 1 525 |
+
+**The first row is the finding.** `garden-apartments`/900 s is the cell the rest of `batch/` measures
+at and was this test's first choice: six riders in fifteen minutes, so there is never more than one
+call outstanding and *every* dispatcher answers it with the same car. Two completely different
+dispatchers produce byte-identical legs there. A leg-level test written at that cell would have gone
+green on a seam carrying nothing — this lane's own failure mode, arriving in the test.
+
+**Both directions, because only the pair is evidence.** A spec read off `collective` and saved
+*unchanged* must reproduce `collective` byte for byte on the legs (`specRoundTrips`' claim, checked
+through the batch), and one with a weight moved must not. Without the first, *"the legs differ"*
+could be a save path that mangles a profile.
+
+**A flag as well as a weight** — `DispatcherFlags.bypass` writes `answer.bypassLoadThreshold`, a
+different field in a different stage, so a merge carrying `weights` and dropping the rest passes the
+weight case and fails this one. It needs the cell more than the weights do: at `midtown-office` on
+the building's own profile it moves 266 of 448 legs; at 3 %pop/5 min it moves **none**, and at
+`chancery-house` and `crown-hotel` it moves none at any setting under 900 s. A load threshold cannot
+bite until a car fills.
+
+**And the negative pin: a batch carrying a player's dispatcher may not move the arm it is compared
+against.** `batchLibraryOf` parses the merged document as a *gate* and then rebuilds the library from
+the loaded file's own profile objects plus the parsed saved ones, so *"better than collective"* means
+the same thing on every machine.
+
+### Three findings recorded rather than papered over
+
+1. **A third refusal was written and deleted.** `resolveWeights` was called to catch a weight on a
+   term the library does not declare, on the reasoning that `weights` is
+   `z.record(identifier, z.number())` and a misspelling is a valid identifier. It can never fire:
+   `dispatcherProfilesSchema` cross-checks every weight against the file's own `terms`, and `core`'s
+   `policy.test.ts` asserts `DECLARED_TERM_IDS` **equals** that array. A guard that cannot fire is
+   decoration. It was found by a typo in this lane's own test — `travelDistance` for
+   `distanceTravelled` — refused by the parser one line before the guard written for it.
+
+2. **The parse refusal guards the half it was not written for.** `persist/validate.ts#dispatcherIssue`
+   already runs the same parser over each restored shelf entry and **drops** the failures by name. It
+   is `dev/dispatcherEditor.ts#save` that has no check: it writes `profileFromSpec`'s output straight
+   to the shelf, catching only what that conversion throws. **The single-run path has no equivalent
+   at all** — an unauthorable saved profile reaches `resolveDispatchConfig` and throws mid-run. Left
+   to the editor's own lane rather than patched at a batch, because a second validator there would be
+   the two-answers defect this module exists to avoid.
+
+3. **`kind: 'run'` is two protocols.** The guard that requires every batch post site to carry the
+   shelf accused `dev/shiftRunner.ts`, which is right to send nothing: a `ShiftWorkerRequest` carries
+   a whole `SimulationConfig` with the dispatcher profile as an object. That asymmetry is the whole
+   subject above, found again from the other end. The guard now keys on the file speaking the batch
+   worker's contract rather than on a field's spelling.
+
+### What is offered and what is refused, precisely
+
+**Reached, and each with a named non-test caller:** Compare (`dev/batchPanel.ts`), the suite
+(`dev/suitePanel.ts`), the Lab (`dev/campaignPanel.ts`), the Everyday bench
+(`everyday/benchScreen.ts`), the gauntlet (`gauntlet/run.ts`, from `everyday/boardScreen.ts`). The
+ghost arm needed nothing: `dev/ghostRun.ts` has resolved *your latest saved* from the profile object
+since it was written.
+
+**Not reached, and its refusal already stands on its own face:** the **Everyday** workshop has no
+Save. `everyday/workshopModel.ts#yoursEmpty` says so — *"Saving a dispatcher of your own is the
+Engineer workshop's Save as new — this build has no save here yet"* — and that sentence is still
+true, so it is not touched. It is left rather than half-built because #180's transfer into #228
+names four behaviours § 11.1 requires of Save (overwrite, save-as-a-copy, auto-versioned names, the
+warning before an overwrite), and *"saves and persists"* admits an implementation that satisfies
+#228 and none of them.
+
+### The guard, and why it is derived
+
+Five surfaces post a batch and each was edited by hand; a sixth added next year will not be, which is
+this defect arriving from its own fix. `library.test.ts` finds the post sites **on disk** —
+`src/index.test.ts`'s discipline, *"the entry-point set derived from the directory rather than five
+hand-written names"* — and requires each to carry the shelf, with a non-vacuity floor so the scan
+going quiet cannot report success about no surfaces at all.
+
+### Two things deliberately not added
+
+**No handle method nobody calls.** The refill was briefly on `BatchPanelHandle`, on the argument that
+a shell could drive it. `dev/main.ts` **discards** that handle — which is how `prefill` came to be a
+configurable behaviour with no caller (issue #119 item 7) — and assigns `CampaignPanelHandle` to a
+variable it never reads, so `refresh()` has no non-test caller either. Each panel refills from its
+own `hidden`-attribute observer instead. **The stale campaign handle is reported, not repaired**: it
+belongs to whoever owns `dev/main.ts`'s tab wiring.
+
+**No latch on the refill.** `prefill` is latched because it is a courtesy a reader may overrule; a
+missing option is not. The two behaviours sit behind one signal and neither is the other's default.
