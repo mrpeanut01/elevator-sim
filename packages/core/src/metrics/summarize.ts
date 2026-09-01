@@ -1298,13 +1298,6 @@ function bracketOrEmpty(timings: CarTimings): BracketAttempt {
 export const FALLBACK_DEPARTURE_GAP_S = 26.5;
 
 /**
- * @deprecated Renamed to {@link FALLBACK_DEPARTURE_GAP_S}, which says what it is. Kept as an
- * alias so existing importers keep compiling; there is no separate "default" any more —
- * a threshold is either derived from {@link CarTimings} or it is this fallback.
- */
-export const DEFAULT_DEPARTURE_GAP_S = FALLBACK_DEPARTURE_GAP_S;
-
-/**
  * {@link achievedIntervalOf}'s threshold, and where it came from. Pure.
  *
  * Four outcomes, matching {@link DepartureGapBasis}. The one that needs explaining is

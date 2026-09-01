@@ -533,10 +533,19 @@ function audit(): Audit {
  * clauses, and is not weakened by their absence.
  *
  * What is left has no reference anywhere outside its own file — not even a test that is not its
- * own: `DEFAULT_DEPARTURE_GAP_S`, `legDurations`, `SIM_EVENT_TYPE_IDS`, `configError`.
+ * own: ~~`DEFAULT_DEPARTURE_GAP_S`,~~ `legDurations`, `SIM_EVENT_TYPE_IDS`, `configError`.
  */
 const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
-  'metrics/DEFAULT_DEPARTURE_GAP_S': 'no reference outside its own file',
+  // `metrics/DEFAULT_DEPARTURE_GAP_S` was here — "no reference outside its own file" — until
+  // GitHub issue #166 disposed of it by deletion. It was a `@deprecated` alias for
+  // `FALLBACK_DEPARTURE_GAP_S` kept, in its own words, "so existing importers keep compiling",
+  // and there were no importers: the only references outside `summarize.ts` were the two barrel
+  // re-exports, which `CLAUDE.md`'s standing requirement says are not callers. So the stated
+  // reason for the alias had lapsed, which is the condition this register exists to make
+  // visible — a `@deprecated` note is a refusal aimed at the next reader ("do not use this, it is
+  // only here for someone else"), and a refusal whose subject no longer exists is § D227's class.
+  // The two barrel lines went with it; the historical references in `analytical/validation.test.ts`
+  // and `metrics/consistency.test.ts` are dated records of the 10 s defect and stay.
   'metrics/legDurations': 'no reference outside its own file',
   'sim/SIM_EVENT_TYPE_IDS': 'no reference outside its own file',
   'config/configError': 'no reference outside its own file',
@@ -592,6 +601,12 @@ describe('every export of the fourteen audited core modules has a caller or a st
    * with the claim they existed to spell (`DECISIONS.md` § D395). Both dispositions the paragraph
    * above offers have now been exercised, which is what stops the register reading as an
    * allowlist.
+   *
+   * **4 → 3**: `metrics/DEFAULT_DEPARTURE_GAP_S`, deleted with its two barrel lines (GitHub issue
+   * #166). Same disposition as the pair above and for a sharper reason: the symbol carried a
+   * `@deprecated` note whose stated ground — *"so existing importers keep compiling"* — had no
+   * importers behind it, so the note was instructing a reader about a constituency that did not
+   * exist.
    */
   it('names every dead candidate, and the count is the one recorded', () => {
     const open = uncalled.filter((symbol) => symbol.key in DEAD_CANDIDATES);
@@ -603,7 +618,7 @@ describe('every export of the fourteen audited core modules has a caller or a st
     expect(
       open.length,
       `dispose a candidate and lower this number; never raise it silently. DEAD_CANDIDATES currently holds ${Object.keys(DEAD_CANDIDATES).length}`,
-    ).toBe(4);
+    ).toBe(3);
   });
 
   it('keeps the allowlist honest: no entry may outlive the condition that justified it', () => {
