@@ -267,6 +267,29 @@ export async function startShippedSite(options: {
   return {
     origin,
     close: async (): Promise<void> => {
+      /*
+       * **`closeAllConnections()` first, and it is a fix rather than tidiness.**
+       *
+       * `httpServer.close()` stops accepting and then waits for every open connection to end. A
+       * Playwright page holds a keep-alive socket for as long as it is open, so a file that closes
+       * its site before its browser waits for a socket that will not close until the browser does —
+       * and the callback never fires. Watched failing: `builtBundle.browser.test.ts` closed the site
+       * first, and one tier run in two reported `Hook timed out in 120000ms` at that line with all
+       * **192 tests passing**, which is a two-minute red for a reason that is not about the product.
+       *
+       * The ordering in the calling file is fixed too — browser first, then site, as the other
+       * twenty-eight already did — but ordering is a rule somebody has to remember, and this is the
+       * half that does not depend on remembering. It is also a difference the dev server hid:
+       * `ViteDevServer.close()` tears its own sockets down, and `preview()` hands back the raw
+       * `httpServer`, which does not.
+       *
+       * Optional-called through a narrow structural type because Vite types `httpServer` as a union
+       * that includes `Http2SecureServer`, which has no `closeAllConnections`. This tier never gets
+       * one — nothing here configures HTTPS — so the call is present in practice and the `?.` is
+       * what the union costs rather than a doubt about whether it runs.
+       */
+      const socketed = server.httpServer as { closeAllConnections?: () => void };
+      socketed.closeAllConnections?.();
       await new Promise<void>((resolve, reject) => {
         server.httpServer.close((error) => (error === undefined ? resolve() : reject(error)));
       });

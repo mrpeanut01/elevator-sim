@@ -28197,6 +28197,19 @@ impossible rather than unlikely**, and `browserTier.test.ts` now fails any tier 
 `build(` again. It went unnoticed from 2026-08-26 because the only two files that could trigger it
 ran rarely, which is GitHub issue #163's shape one level in.
 
+**A third, found by running the tier repeatedly rather than once — which is why it was run
+repeatedly.** On the second of two consecutive runs, `builtBundle.browser.test.ts` reported
+`Hook timed out in 120000ms` at its `afterAll` with **all 192 tests passing**: a two-minute red about
+nothing the product does. `httpServer.close()` stops accepting and then waits for every open
+connection to end, a Playwright page holds a keep-alive socket for as long as it is open, and that
+file closed its **site before its browser**. The dev server hid this — `ViteDevServer.close()` tears
+its own sockets down, while `preview()` hands back the raw `httpServer`, which does not. Fixed twice
+over: the two files that had the ordering wrong now close the browser first, as the other
+twenty-seven already did, and `startShippedSite`'s `close` calls `closeAllConnections()` first so the
+ordering is discipline rather than the only defence. **One green run would not have found it**, which
+is the general point: a harness that serves a real artifact has to be shown stable across runs, not
+across one.
+
 **A second, independent unreliability in the same case, and it is filed as a defect in the case
 rather than in the product.** `suite (linux)` failed on
 `everyday/builtBundle.browser.test.ts` — *"the fixit screen drew no heading to measure"* — on a

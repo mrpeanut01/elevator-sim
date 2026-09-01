@@ -162,8 +162,12 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
   }, 300_000);
 
   afterAll(async () => {
-    await site?.close();
+    // The browser first, then the site. `httpServer.close()` waits for open connections, and a
+    // live page holds a keep-alive socket — closing the site first hung this hook for the full
+    // 120 s with every case passing. `startShippedSite` also force-closes, so this ordering is the
+    // discipline rather than the only defence.
     await browser?.close();
+    await site?.close();
   });
 
   /** The scroll offset a player is actually looking through — both scrollers, summed. */
