@@ -29767,9 +29767,12 @@ screen already holds every dispatcher through the data façade; the answer is no
 dock is a panel that does not exist and the incident it would offer — a live one, with options
 carrying costs against the building's purse — has no producer in this build. `campaign/career.ts`
 authors two needs, a renewal and a service window, and both are decisions about the *career* taken
-between days rather than about the day on the stage. Building the arm without the dock would have
-meant inventing the incident it answers, which is a larger decision than an intervention row and not
-this lane's to take.
+between days rather than about the day on the stage. That is not this lane's reading of the code:
+`CAMPAIGN_ABSENCES`' first entry says it outright and is triaged to GitHub issue **#169** —
+*"Incidents here are the two the building implies … there is no seeded stream for a campaign day and
+no event calendar behind a contract."* So the second arm is blocked on an absence another issue
+already owns, and building it would have meant inventing the incident it answers, which is a larger
+decision than an intervention row and not this lane's to take.
 
 **And the arm that landed produces a day that cannot be posted.** `SUBMITTABLE_INTERVENTION_KINDS`
 admits `park-cars-lobby` alone, and `scope/runIdentity.ts` refuses a `switch-dispatcher` entry

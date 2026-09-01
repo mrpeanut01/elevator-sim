@@ -777,7 +777,7 @@ export const STAGE_ABSENCES: readonly string[] = Object.freeze([
   STAGE_NO_GHOST,
   'no campaign dock — a campaign day reaches this stage, and the money-and-incident panel that belongs beside it is not drawn',
   'no camera — the cutaway draws the whole building at once, so there is nothing to pan and nothing to follow',
-  'no answer to a live incident — a day can carry one, stamped with the moment it was given, and this screen offers none: answering needs the money-and-incident panel above, and that panel is what is missing',
+  'no answer to a live incident — a day can carry one, stamped with the moment it was given, and this screen offers none: the answer comes from the money-and-incident panel above, which is not drawn, over an incident this build does not raise while a day is running',
 ]);
 
 /* -------------------------------------------------------------------------- *
