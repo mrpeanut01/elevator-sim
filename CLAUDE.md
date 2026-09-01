@@ -76,16 +76,52 @@ verdict:
   deep **60 cases, 327 805 strings, 31 surfaces, 4 650 simulations, 10 violations in one case**. Two
   of those were already wrong in the published row — the deep tier's surface count is **31**, not 30,
   because `campaign/judge.ts#judgeStage` speaks in no other tier, and *0 violations* had stopped
-  being true of the deep half the day the temporal axis landed. The current figures, re-measured on
-  both tiers after issues #127 and #137 — the second of which fixed what the first found, so the
-  strings moved a third time (a decision number is owed for each; the arguments are in
-  `honesty/surfaces.ts`, `honesty/run.ts`, `shift/types.ts#ReportFigure.count` and
-  `dev/reportPanel.ts#DeltaRowView`):
+  being true of the deep half the day the temporal axis landed. The current figures, **measured on the
+  integrated tree after wave J** against a base that was re-measured first ([§ D442](DECISIONS.md));
+  the run that first moved them was issues #127 and #137, the second of which fixed what the first
+  found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
+  `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **571 205** | **606** | **53** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **712 547** | **4 710** | **54** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **572 667** | **606** | **54** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **714 553** | **4 710** | **55** | **0** | **green**, and the register is empty |
+
+  **Wave J moved the strings and one surface, and a lane predicted the move before it was taken**
+  ([§ D442](DECISIONS.md)). Measured once on the integrated tree, both tiers in one sitting, after
+  five lanes had merged — and the base at `df36e7c` was re-measured first in a detached worktree,
+  where it **reproduced its published row exactly in both tiers** (49 / 571 205 / 606 / 53 / 0 and
+  60 / 712 547 / 4 710 / 54 / 0). That is the fourth consecutive wave the base has been confirmed
+  rather than trusted.
+
+  | | base `df36e7c` | wave J | move |
+  |---|---|---|---|
+  | always-on strings | 571 205 | **572 667** | **+1 462** |
+  | deep strings | 712 547 | **714 553** | **+2 006** |
+  | always-on surfaces | 53 | **54** | **+1** |
+  | deep surfaces | 54 | **55** | **+1** |
+  | always-on suppressed runs | 9 | **12** | **+3** |
+  | deep suppressed runs | 20 | **21** | **+1** |
+
+  **The surface sets were diffed rather than the counts compared.** Exactly one was added in each
+  tier — `everyday/watchStage.ts#everydayWatchingCopyOf`, lane C's — and nothing was removed. The
+  deep tier's one-surface lead survived and the diff names it: `campaign/judge.ts#judgeStage` is the
+  only surface in deep and not in always-on, and nothing is in always-on and not in deep.
+
+  **The string move is not decomposable per lane, and that is structural rather than unmeasured.**
+  Lane D's fit-out axis changes the legs of every fitted case, so state-dependent renderers on
+  *other* lanes' surfaces emit different counts against different runs; the contributions are not
+  additive even in principle. Lane D measured +90 on its own branch, where lane C's surface did not
+  exist to be perturbed, and that figure cannot be subtracted out. Neither move divides evenly by
+  its case count. Wave G's exact attribution was possible because a chip face is seeded once per
+  case; claiming the same precision here would be manufacturing it. **What is attributable is
+  attributed exactly**: the surface, by set difference, to lane C.
+
+  **The substantive finding is the suppression move.** Three always-on cases publish a quotable mean
+  **as built** and have it refused once the tower is fitted. A purchase changes whether R3 has
+  anything to say about the run — which a corpus of as-built towers could not see, and which is the
+  coverage hole wave I found by a null result. **No mechanism is offered for why**; it is unmeasured,
+  and a plausible sentence in place of a measurement is what [§ D256](DECISIONS.md) refuses.
 
   **Wave I moved every one of these figures by zero, and the reason is a gap rather than a
   non-event.** Measured once on the integrated tree, both tiers in one sitting, after five lanes had
@@ -107,12 +143,16 @@ verdict:
   last, so every pinned seed keeps the configuration it had and a share of them now run a tower that
   has bought something. Which kit is a survey rather than a preference — all sixteen shipped tiers
   swept over all 49 always-on cases and compared **on the legs**, because § D427's table is measured
-  at the campaign's `garden-apartments`/3 600 s and this corpus runs 600–900 s. **The figures in this
-  row are not re-measured here**: § D343 puts that on the integrator, once, after integration, both
-  tiers in one sitting. Two things to expect when it is. The **strings move and nothing else does** —
-  a fitted case runs no extra simulation and renders no new surface. And the **suppressed-runs count
-  moves**, because three always-on cases publish a quotable mean as built and have it refused once
-  the tower is fitted, which is a class of thing a corpus of as-built towers could not see.
+  at the campaign's `garden-apartments`/3 600 s and this corpus runs 600–900 s. That lane did not
+  re-measure this row — § D343 puts that on the integrator — but it **published a forecast of what
+  the measurement would find, and the integrated tree matched it**: cases and simulations unmoved,
+  failing cases 0, strings moving by no per-case constant, `suppressed runs` 9 → 12 on the always-on
+  tier, and a `fit-outs` line reading `as-built=30 machines-2=8 machines-2+control-3=11` — the
+  suppression count and the fit-out draw both to the case. Read one clause precisely: *"the strings
+  move and nothing else does"* is true **of that lane's change**, and the surface this row gained is
+  lane C's watching copy, named by set difference rather than inferred from the count. A prediction
+  that survives an independent measurement is the only thing a lane can honestly say about the corpus
+  under § D343, and it is worth more than a figure taken on a branch.
 
   **Wave H is the first time this row's *previous* figures were confirmed rather than trusted, and
   that is the finding rather than the move.** Before publishing the new pair, the base commit

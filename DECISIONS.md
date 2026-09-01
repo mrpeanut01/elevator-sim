@@ -29604,3 +29604,125 @@ moved.
 submit path sends the fields and the server replays them; whether the Everyday shell's own flow
 reaches `submitScore` with a written dispatcher is a question about `everyday/`, which this lane did
 not touch.
+
+
+## D441 — two lanes can each be right and be wrong together, and only a derivation catches it
+
+**Date: 2026-09-01 · Owner: integrator, wave J · Three instances in one integration, with three
+different detection outcomes.**
+
+**Decision.** A figure or a resource that lanes choose independently must be **derived from the tree
+at check time**, never compared against a value written down. A guard that asks *does the document
+say 34?* passes when two lanes have each correctly moved it from 33 to 34; a guard that asks *what
+does the tree hold?* fails, which is the only useful answer.
+
+**The class.** Two lanes branch from one base. Each makes a change that is locally correct, verified,
+and green on its own branch. Neither can see the other. At integration the two changes are both
+present and the result is wrong — and because the lanes wrote *the same* text, **git produces no
+conflict**. A merge marker is a signal that two lanes disagreed; this class is two lanes agreeing on
+something that stops being true once both land. Nothing in the merge machinery can see it.
+
+Wave J produced three instances, and the interesting part is that they were caught by three different
+mechanisms of three different strengths:
+
+**One — the browser-tier file count. Caught by a derivation.** Lanes B and C each added one
+`*.browser.test.ts` file and each published **34**, correct on each branch. The tree holds **35**.
+`viewportGateClaims.test.ts` reads the count off disk and names every live site, so it went red at
+integration and listed all seven. This is [`RISKS.md`](RISKS.md) R38's own shape landing on the row
+R38 exists to protect — and note the figure went stale on a merge that added **no line** to either
+document, which a review of the diff could not have caught.
+
+The ratio was re-verified rather than renumbered: both new files call `chromium.launch()` as a
+literal and the tree holds no `firefox` or `webkit`, so **35 of 35** is a measurement. The dated
+figures were left alone — § 5's *"~157 s when the tier held 25"* is a correct record of a
+measurement then, and striking it through would claim a correction that has not happened.
+
+**Two — the browser-tier port. Caught by a derivation, and it is the dangerous one.** Lanes B and C
+each took the lowest free port on its own branch; both took **5217**. `dev/browserTier.test.ts`
+caught it. Without that guard it would **not have failed loudly**: `strictPort: false` lets the
+loser move, so the tier comes up as two servers on one origin serving each other's pages, and the
+symptom is an intermittent wrong-page assertion rather than an error. `watchStage` moved to 5218 —
+the gap the tier already had between 5217 and 5219 — and which of the two files moved is arbitrary
+and recorded as such.
+
+**Three — `EverydayHostBindings`. Caught by the compiler, which is why it is the easy one.** Lane C
+widened the interface with six spectator members; lane A added two campaign fixtures constructing it
+as a literal. `tsc -b` failed on both files at the merge. This instance is in the entry to mark the
+contrast: **where a type expresses the constraint, the class is caught for free.** The first two
+were caught only because somebody had previously built a guard that derives. The count and the port
+are not expressible as types, which is exactly why they needed the guards they had.
+
+**What this does not license.** The six bindings were supplied to lane A's fixtures **honestly**,
+not uniformly. Five throw, because a silent stub answering `enterWatch` or `simulateRecord` would
+let a later change reach the spectator state through a campaign test and still pass — this
+repository's signature defect with a green tick over it. `watching()` returns `undefined` because
+that is *true* of those fixtures, not because `undefined` is convenient. Making a build error go
+away is not the same as making the code right, and the difference is visible only in what the stub
+claims.
+
+**The rule, stated for the next integrator.** Before merging a wave, ask what each pair of lanes
+could have chosen independently: a count, a port, an id, a seed, a fixture name, a schema version.
+For each, check that something **derives** it. Where nothing does, that is the wave's next guard,
+and it is worth more than the fix it would have prevented.
+
+## D442 — wave J's corpus move, attributed where attribution is possible and refused where it is not
+
+**Date: 2026-09-01 · Owner: integrator, wave J · The measurement [§ D343](#d343) requires, taken
+once on the integrated tree.**
+
+**Decision.** The honesty corpus was measured once after integration, both tiers in one sitting, on
+the integrated tree and never on a branch — and the base at `df36e7c` was re-measured first in a
+detached worktree so that a move could be told from a correction.
+
+**The base reproduced its published row exactly, in both tiers.** 49 / 571 205 / 606 / 53 / 0 and
+60 / 712 547 / 4 710 / 54 / 0. That is the **fourth** consecutive wave the base has been confirmed
+rather than trusted, and the check is cheap next to the five occasions this column has been wrong.
+
+| | base `df36e7c` | integrated | move |
+|---|---|---|---|
+| always-on strings | 571 205 | **572 667** | **+1 462** |
+| deep strings | 712 547 | **714 553** | **+2 006** |
+| always-on surfaces | 53 | **54** | **+1** |
+| deep surfaces | 54 | **55** | **+1** |
+| always-on suppressed runs | 9 | **12** | **+3** |
+| deep suppressed runs | 20 | **21** | **+1** |
+| cases, simulations, failing cases | 49 / 60, 606 / 4 710, 0 | **unmoved** | **0** |
+
+**The surface sets were diffed rather than the counts compared**, in both tiers. Exactly one surface
+was added — `everyday/watchStage.ts#everydayWatchingCopyOf`, lane C's — and **nothing was removed**.
+The deep tier's one-surface lead survived and the diff names it: `campaign/judge.ts#judgeStage` is
+the only surface in deep and not in always-on, and nothing is in always-on and not in deep. A wave
+that added a surface to both tiers did not disturb that gap, which is how a real move is told apart
+from a correction.
+
+**The string move is not decomposable per lane, and that is a structural claim rather than an
+unmeasured one.** Lane D's axis changes the legs of every fitted case, and state-dependent renderers
+on *other* lanes' surfaces — lane C's new watching copy among them — emit a different number of
+strings against a different run. So the lanes' contributions are not additive even in principle:
+lane D measured +90 on its own branch, where lane C's surface did not exist to be perturbed, and
+that figure cannot be subtracted from +1 462 to leave lanes A–C's share. Neither move divides
+evenly by its case count (+1 462 / 49 and +2 006 / 60 are not integers), and no arithmetic makes
+them one. Wave G's exact attribution was possible because a chip face is seeded once per case;
+claiming the same precision here would be manufacturing it.
+
+**What is attributable is attributed exactly**: the surface, by set difference, to lane C.
+
+**A lane predicted this measurement before it was taken, and the record is worth keeping.** Lane D
+published a forecast in its report — cases unmoved, simulations unmoved, failing cases 0, strings
+moving by no per-case constant, the surface sets unmoved *by its own change*, `suppressed runs`
+9 → 12 on the always-on tier, and a new `fit-outs` line reading
+`as-built=30 machines-2=8 machines-2+control-3=11`. **Every one of those is what the integrated tree
+measured**, including the suppression count and the fit-out draw to the case. A prediction that
+survives an independent measurement is worth more than a figure taken on a branch, and it is the
+only form in which a lane can say anything about the corpus under § D343.
+
+**The substantive finding is the suppression move**, and it is the corpus doing its job. Three
+always-on cases publish a quotable mean **as built** and have it refused once the tower is fitted;
+the deep tier moves by one. A purchase changes whether R3 has anything to say about the run — which
+a corpus of as-built towers could not see, and which is precisely the coverage hole wave I found by
+a null result and § D437 closed. **No mechanism is offered for why fitting a tower suppresses its
+mean.** It is unmeasured, and a second plausible sentence in place of a measurement is the defect
+[§ D256](#d256) exists to refuse.
+
+**Both registers are empty and both tiers are green**, so the verdict column means today what it was
+written to mean: 0 failing cases *and* nothing held in `honesty.test.ts`'s `OUTSTANDING`.
