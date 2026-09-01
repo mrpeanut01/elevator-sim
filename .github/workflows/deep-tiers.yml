@@ -198,6 +198,47 @@
 # than implied: a tier nobody has measured is a tier whose first result arrives on a Sunday, and a
 # ceiling nobody has tested is a guess with a number on it.
 #
+# **Every figure in that table was taken on a tree that had already been built, and the sweep's row
+# is the one where that mattered.** *4.6 min, green* was true of the machine it was measured on and
+# false of this workflow, which ran `npm ci` and no build. On the first scheduled firing
+# `perf-sweep` went red in **four seconds** — see the section below. A measurement taken in a
+# working directory carries that directory's state into the number, which is the same lesson
+# § D343 writes about the corpus figures one file over.
+#
+# ## A tier that runs replications needs a built tree — GitHub issue #309, § D419
+#
+# **Every `--project experiments` job here runs `npm run build` before its tier.** `golden-runs` had
+# it from the start, for a reason its own block states; the other six did not, and `perf-sweep`
+# is the one that proved the reason general rather than special.
+#
+# The mechanism, and it is not about vitest's timeouts:
+#
+# - vitest resolves `@elevator-sim/*` through the aliases in `vitest.config.ts`, i.e. to package
+#   **source**, which is why the always-on suite needs no build.
+# - `runner/parallel.ts` spawns replications on `node:worker_threads`, and `goldenRuns.test.ts`
+#   spawns a bare `node`. Neither is vitest. Both resolve `@elevator-sim/core` through
+#   `node_modules`, i.e. to `packages/core/dist`, which `npm ci` does not create.
+# - So on an unbuilt tree the pool dies at spawn with `Cannot find module
+#   '…/@elevator-sim/core/dist/index.js'` before a single replication runs.
+#
+# **Why the build is on every experiments job rather than only on the two known to need it.**
+# Whether a tier reaches a worker pool is not readable from the tier's own source.
+# `RUNNER_DEFAULTS.parallelMode` is `'auto'` and `minReplicationsForWorkers` is 64, so a spec that
+# says nothing about parallelism spawns workers as soon as the guaranteed work clears the threshold;
+# `validation/harness.ts` pins `'serial'`, which is why the census and the oracle survive today; and
+# `perfSweep.test.ts` asks for `'workers'` outright. A per-file derivation would therefore be a
+# guess that goes stale the first time a helper changes its default. The job-level property is
+# decidable from this file alone, and `validation/deepTierBuild.test.ts` decides it.
+#
+# **The cost, measured rather than waved at**: `npm run build` from a fully cleaned tree is
+# **11.2 s** on a 4-core container (`tsc -b`, five packages). Against tiers measured in tens of
+# minutes to four hours that is under a percent, and it buys a typecheck on the commit each tier is
+# judging — `ci.yml` makes the same trade in the same words.
+#
+# The two jobs in the other project are deliberately **not** given a build step: they run under
+# `--project viz`, they reach core through vitest's aliases to source, and nothing in them spawns a
+# worker thread or a child process. A build there would be cost with no property behind it.
+#
 # ## Aliveness — the half that is mechanised, and the half that is not
 #
 # A scheduled workflow that quietly stops is this repository's recurring failure mode, so say which
@@ -282,6 +323,10 @@ jobs:
           node-version: '26'
           cache: npm
       - run: npm ci
+      # Every `--project experiments` job builds first — see the header, § "A tier that runs
+      # replications needs a built tree". Not optional and not merely prudent.
+      - name: Typecheck and build
+        run: npm run build
       - name: Deep fuzz campaign
         env:
           ELEVATOR_SIM_FUZZ: deep
@@ -334,6 +379,10 @@ jobs:
           node-version: '26'
           cache: npm
       - run: npm ci
+      # Every `--project experiments` job builds first — see the header, § "A tier that runs
+      # replications needs a built tree". Not optional and not merely prudent.
+      - name: Typecheck and build
+        run: npm run build
       - name: Deep campaign
         env:
           ELEVATOR_SIM_DEEP: '1'
@@ -358,6 +407,10 @@ jobs:
           node-version: '26'
           cache: npm
       - run: npm ci
+      # Every `--project experiments` job builds first — see the header, § "A tier that runs
+      # replications needs a built tree". Not optional and not merely prudent.
+      - name: Typecheck and build
+        run: npm run build
       - name: Matrix census
         env:
           ELEVATOR_SIM_DEEP: '1'
@@ -382,6 +435,10 @@ jobs:
           node-version: '26'
           cache: npm
       - run: npm ci
+      # Every `--project experiments` job builds first — see the header, § "A tier that runs
+      # replications needs a built tree". Not optional and not merely prudent.
+      - name: Typecheck and build
+        run: npm run build
       - name: Collective adoption study
         env:
           ELEVATOR_SIM_DEEP: '1'
@@ -392,6 +449,13 @@ jobs:
   #
   # #163's acceptance clause — "the seed-collision check has run at least once on main" — is this
   # job and no other. See the header for what the claim is and is not.
+  #
+  # **On 2026-08-30 that clause was still undischarged, and this job is why** — issue #309, § D419.
+  # It went red in **four seconds** on its first scheduled firing and had never once executed the
+  # sweep. Not a timeout: `RunnerError: Worker failed to initialize: Cannot find module
+  # '…/node_modules/@elevator-sim/core/dist/index.js'`, thrown by `runner/parallel.ts` the moment
+  # the pool spawned. The four always-on cases in the same file passed, because they are serial and
+  # resolve core through vitest's alias to source.
   # ---------------------------------------------------------------------------
   perf-sweep:
     name: perf — the 20 000-replication sweep
@@ -408,6 +472,12 @@ jobs:
           node-version: '26'
           cache: npm
       - run: npm ci
+      # THE line this job died without — GitHub issue #309, § D419. Its deep arm is the one tier
+      # that runs `parallel: { mode: 'workers' }`, a worker thread resolves `@elevator-sim/core`
+      # through `node_modules` to core's BUILT output, and on a tree that has never been built
+      # there is none: `Cannot find module …/packages/core/dist/index.js`, in four seconds.
+      - name: Typecheck and build
+        run: npm run build
       - name: Large sweep
         env:
           ELEVATOR_SIM_DEEP: '1'
@@ -436,6 +506,10 @@ jobs:
           node-version: '26'
           cache: npm
       - run: npm ci
+      # Every `--project experiments` job builds first — see the header, § "A tier that runs
+      # replications needs a built tree". Not optional and not merely prudent.
+      - name: Typecheck and build
+        run: npm run build
       - name: Scaling fits
         env:
           ELEVATOR_SIM_DEEP: '1'
@@ -658,11 +732,45 @@ jobs:
                 .join("\n"),
             );
           ')"
+          # The guidance is computed from the jobs that actually failed — GitHub issue #309, § D420.
+          #
+          # It used to be one fixed sentence telling every reader to read `perf-scaling` against its
+          # wall-clock flake note. On 2026-08-30 `perf-scaling` PASSED and `perf-sweep` failed, and
+          # the issue this job filed still sent its reader to the passing job. That is worse than
+          # silence: the note it points at explains a red away, so a reader who follows it onto the
+          # wrong job comes back with "known flake" about a defect. A caveat that does not name its
+          # own scope is a caveat that will be applied where it does not hold.
+          guidance="$(node -e '
+            const results = JSON.parse(process.env.RESULTS);
+            const failed = Object.entries(results)
+              .filter(([, job]) => job.result === "failure")
+              .map(([id]) => id);
+            const flaky = "perf-scaling";
+            const others = failed.filter((id) => id !== flaky).length;
+            const head =
+              "These tiers run nowhere else, so a red here is the only place the finding exists.";
+            const timing =
+              "A job that went red in seconds failed BEFORE its tier started — read its first " +
+              "error rather than the tier notes, which are about results this run never produced.";
+            const scope = failed.includes(flaky)
+              ? "`" + flaky + "` is among the failures above, and it is the one tier whose " +
+                "assertions are about the machine rather than about the simulator: read THAT job, " +
+                "and only that one, against its own note about wall-clock flake under load before " +
+                "treating it as a defect." +
+                (others > 0
+                  ? " The other " + String(others) + " failing job(s) are deterministic, so a red " +
+                    "there is a finding."
+                  : "")
+              : "`" + flaky + "` is the only tier with a documented wall-clock flake and it is NOT " +
+                "among the failures above, so its note does not apply here: every job listed is " +
+                "deterministic, and a red is a finding rather than noise.";
+            process.stdout.write(head + " " + scope + "\n\n" + timing);
+          ')"
           body="$(printf '%s\n\n%s\n\n%s\n\n%s\n' \
             "The weekly deep-tier run failed. These jobs went red on \`${{ github.sha }}\`:" \
             "$failed" \
             "Run: $RUN_URL" \
-            "These tiers run nowhere else, so a red here is the only place the finding exists. Read \`perf-scaling\` against its own note about wall-clock flake under load before treating it as a defect; the other eight are deterministic.")"
+            "$guidance")"
 
           existing="$(gh issue list --repo "$REPO" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
           if [ -n "$existing" ]; then
