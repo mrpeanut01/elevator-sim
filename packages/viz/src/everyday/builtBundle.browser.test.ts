@@ -67,7 +67,7 @@
  * |---|---|---|
  * | `/elevator-specs.json` | 200 `application/json` | 200 `application/json` |
  * | `/buildings/midtown-office.json` | **200 `application/json`** | the SPA fallback, `text/html` |
- * | `/buildings/README.md` | **200 `text/markdown`** | the SPA fallback |
+ * | the buildings README — `data/buildings/README.md` on disk, requested at /buildings/README.md because `publicDir` is `data/` | **200 `text/markdown`** | the SPA fallback |
  *
  * A viewer that started fetching a seventh document would therefore work on every machine in this
  * repository and fail in production — and `dev/data.ts#fetchJson` would report it as *"did not parse

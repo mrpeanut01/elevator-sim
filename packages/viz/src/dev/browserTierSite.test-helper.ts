@@ -40,7 +40,7 @@
  * |---|---|---|
  * | `/elevator-specs.json` | 200 `application/json` | 200 `application/json` |
  * | `/buildings/midtown-office.json` | **200 `application/json`** | **the SPA fallback, `text/html`** |
- * | `/buildings/README.md` | **200 `text/markdown`** | the SPA fallback |
+ * | the buildings README — `data/buildings/README.md` on disk, requested at /buildings/README.md because `publicDir` is `data/` | **200 `text/markdown`** | the SPA fallback |
  * | `/src/everyday/host.ts` | 200 `text/javascript` | the SPA fallback |
  *
  * So a viewer that started fetching a seventh document would work on every machine in this
