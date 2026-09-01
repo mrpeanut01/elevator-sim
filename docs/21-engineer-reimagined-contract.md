@@ -349,9 +349,23 @@ dropped-pairs sentence; not one word of justification was cut.
    `resolved` row on a first run. The triple is chosen by measurement, not taste: a lane runs the
    candidate defaults and pins the result the way `benchmark/published.ts` pins figures.
    Seam: `dev/defaults.ts`.
-2. **The remedy is a control.** Where the report's remedy sentence names the lever (*lower demand
+2. ~~**The remedy is a control.**~~ Where the report's remedy sentence names the lever (*lower demand
    %pop/5 min*), a button beside the verdict applies it and re-runs. Seam: `dev/batchPanel.ts`,
    writing the existing `demand` field — no new config.
+
+   **This item was already built when this contract was written, and the item is kept struck
+   through rather than deleted** (GitHub issue #172 item 6). `dev/batchPanel.ts#remedyControl`
+   landed in `fa9679e` on **2026-08-08**, four days before the `0a6815d` this section's own preamble
+   names as *verified against the tree*. So it belongs above, under **Already true**, and it was
+   listed below as work to do. It is the mirror of the class this repository records most often —
+   not a sentence that outlived its subject, but one that arrived after it — and it costs the same
+   thing: a lane reading § 3 for work would have started on a button that exists. The verification
+   this preamble claims was the thing that did not happen; saying so is worth more than a tidy list.
+
+   **What the item asked for and what shipped are not identical, and the difference is the useful
+   part.** The button applies the lever and re-runs, as written. What has since changed is
+   `remedyFor`'s *sentence*, which no longer promises an end state — a remedy that named an outcome
+   was claiming more than one re-run can support. `batch/remedyLadder.test.ts` holds the rungs.
 3. **No tab steal.** A finishing single run may not switch the centre column while a batch is
    running or its results are on screen; the affordance is a `Day report ready →` chip.
    Seam: `dev/main.ts#reportOpensItself` (l.5893) — the pure decision already exists; it gains the

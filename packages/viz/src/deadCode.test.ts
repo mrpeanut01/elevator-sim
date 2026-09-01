@@ -52,6 +52,21 @@
  *    written-never-read *binding*; the instrument for that class is the driven run-change test
  *    (§ D177), which is lane V's deliverable this wave, not this file's. Asserted below only
  *    that it is not an export, so this audit's silence about it is never read as coverage.
+ *
+ *    **Two ordinal series run through this repository and *thirteenth* is one of them, not both**
+ *    — GitHub issue #172 item 8, recorded here because this is where they visibly collide.
+ *    `GAPS.md`'s series counts every seam found and reaches **thirteen** with the bank filter,
+ *    which is the series this line quotes. `CLAUDE.md`'s counts *eleven in code plus two in
+ *    `data/`* and keeps the two halves apart, which is why four sites in `packages/viz`
+ *    (`shift/growth.ts`, `dev/state.ts` twice, `dev/browserTier.test-helper.ts`) call the next
+ *    hypothetical in-code one **the twelfth**. Neither is wrong on its own terms and the running
+ *    total is readable off neither, which is the finding rather than a nit.
+ *
+ *    **No ordinal is renumbered to resolve it, and that is deliberate.** `CLAUDE.md` records the
+ *    rule: *the ninth* and *the eleventh* name specific instances, so renumbering would break
+ *    every reference in exchange for a total nobody needs. What is fixed is the ambiguity — a
+ *    reader meeting *thirteenth* beside *twelfth* now learns they are two counts rather than two
+ *    answers. Reconciling `CLAUDE.md`'s own paragraph is outside any single module's reach.
  * 3. **Two-hop liveness** is inherited from the shared scanner (§ D125): a dead symbol calling a
  *    live-looking sibling keeps the sibling alive at one hop. Stated, not fixed.
  * 4. **Non-TypeScript callers.** `index.html`'s stylesheet consumes tokens the `.ts` corpus cannot
