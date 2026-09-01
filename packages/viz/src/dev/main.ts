@@ -1531,7 +1531,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const result = await client.boards();
       boardView = result.ok
         ? {
-            boards: result.value.map((board) => ({ configHash: board.configHash, entries: board.entries })),
+            boards: result.value.map((board) => ({ boardKey: board.boardKey, entries: board.entries })),
             selected: undefined,
             page: undefined,
             notice: result.value.length === 0 ? 'No scores have been posted yet.' : undefined,
@@ -1959,7 +1959,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
       case 'open-board': {
         if (client === undefined) return;
-        const hash = intent.configHash;
+        const hash = intent.boardKey;
         boardView = { ...boardView, selected: hash, page: undefined, notice: 'Loading…' };
         drawMenu();
         void client.board(hash, 'awtS').then((result) => {
@@ -2470,6 +2470,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
         // replay. § D285.
         windowStartS: state.windowStartS,
         seed: state.seed.toString(),
+        /*
+         * § 11.5's rules and § 1.4's log, spread rather than written as `ruleRows: state.ruleRows`
+         * — GitHub issue #179.
+         *
+         * The spread is the same decision `shiftRunConfigOf` makes at the same two fields and for
+         * the same reason: `core` pins a run with no `interventions` key byte-identical to one built
+         * before the field existed, `profileWithRules` returns the profile by object identity for an
+         * empty list, and the server drops an empty list from its digest. Writing `[]` on the wire
+         * would be a claim the run never made, and would re-digest every score already posted.
+         *
+         * `state`, never the menu, for the reason the two lines above give: this is what the run was
+         * *simulated with*, and `runIdentityIssues` has already refused any state whose log holds a
+         * kind the wire may not carry.
+         */
+        ...(state.ruleRows.length === 0 ? {} : { ruleRows: state.ruleRows }),
+        ...(state.interventions.length === 0 ? {} : { interventions: state.interventions }),
       },
       claimed: claim.claimed,
     });
@@ -3700,6 +3716,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
     applyPatch: (patch) => {
       context.update(patch);
     },
+    /*
+     * § 14.1's six bindings, and every one of them is the *same* seam the Engineer picker presses —
+     * GitHub issue #182, § D436. `mountWatchPanel` above is handed `loadReferenceRuns`,
+     * `recordRun`, `enterWatch`, `stopWatching` and `playThisCrowd`; these are those five plus a
+     * read of the `watching` field, so the two shells enter, leave and convert a watch through one
+     * implementation. A second entry point would be a second answer to *whose day is on screen*,
+     * which is the property `dev/watchPanel.ts` is one file for.
+     */
+    loadReferenceRuns: () =>
+      loadReferenceRuns((id: string) => buildingNameOf(resources, state.savedBuildings, id)),
+    simulateRecord: (config) => recordRun(config).recording,
+    enterWatch: (run, view, recording) => {
+      enterWatch(run, view, recording);
+    },
+    stopWatching: () => {
+      stopWatching();
+    },
+    playThisCrowd: (run) => {
+      playThisCrowd(run);
+    },
+    watching: () =>
+      watching === undefined ? undefined : { run: watching.run, view: watching.view },
     onChange: (listener) => {
       everydayHostListeners.push(listener);
       return () => {
@@ -6768,6 +6806,34 @@ export function provenanceLineOf(state: ViewerState, resources: BrowserResources
 
   const part = partFlagFor(state, resources, template);
   if (part.kind === 'refused') reasons.push(part.reason);
+
+  /*
+   * **What only a submission can say** — GitHub issue #179, and `partFlagFor`'s shape one field
+   * over.
+   *
+   * `scope/runIdentity.ts` used to refuse a written rule list and a non-empty intervention log for
+   * both of this question's consumers, because neither artefact could express them. `SubmittedRun`
+   * now carries both and the server replays them, so the shared predicate correctly stops refusing —
+   * and **the CLI still has no flag for either**, and no plausible one: a rule row is four scalars
+   * and a log is a time series, where `elevator-sim run` takes a building, a dispatcher, a seed and
+   * a span.
+   *
+   * So the refusal moves here rather than disappearing. It is the same argument the function already
+   * makes about a part with no clock: a line that reproduces a *different* run is worse than no
+   * line, and the whole point of the control is that the reader could not otherwise reproduce it.
+   */
+  if (state.ruleRows.length > 0) {
+    reasons.push(
+      `${String(state.ruleRows.length)} Everyday rule(s) drive this run's dispatcher, and ` +
+        `${CLI_COMMAND} has no flag for a rule list — the line would run the profile's own weights`,
+    );
+  }
+  if (state.interventions.length > 0) {
+    reasons.push(
+      `${String(state.interventions.length)} mid-run intervention(s) are on this day's record, and ` +
+        `${CLI_COMMAND} has no flag for an intervention log — the line would run the day untouched`,
+    );
+  }
 
   if (reasons.length > 0) return { ok: false, reasons };
   // The CLI's own echo order — `planRun`'s `commandLine` puts `--template`, then `--rate`, then

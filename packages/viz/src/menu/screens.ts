@@ -162,7 +162,7 @@ export type MenuIntent =
    * and that is a press on the picker rather than on the menu.
    */
   | { readonly kind: 'open-watch' }
-  | { readonly kind: 'open-board'; readonly configHash: string }
+  | { readonly kind: 'open-board'; readonly boardKey: string }
   /**
    * Take a board row's own configuration and run it — GitHub issue #93 § 1.
    *
@@ -495,7 +495,7 @@ export interface MenuViewInput {
    * predicate `provenanceLineOf` asks.
    */
   readonly rankingRefusal?: string | undefined;
-  readonly boards?: readonly { readonly configHash: string; readonly entries: number }[] | undefined;
+  readonly boards?: readonly { readonly boardKey: string; readonly entries: number }[] | undefined;
   /**
    * The board a player has opened, or `undefined` when none is — GitHub issue #93.
    *
@@ -2087,13 +2087,13 @@ const COMMISSIONING_BRIEF =
 function leaderboardBody(input: MenuViewInput): Body {
   const boards = input.boards ?? [];
   const rows: MenuAffordance[] = boards.map((board) => ({
-    id: `leaderboard.${board.configHash}`,
-    label: `${board.configHash.slice(0, 8)}…`,
+    id: `leaderboard.${board.boardKey}`,
+    label: `${board.boardKey.slice(0, 8)}…`,
     detail: `${String(board.entries)} posted`,
     kind: 'navigate' as const,
     scope: 'presentation' as const,
     enabled: true,
-    intent: { kind: 'open-board' as const, configHash: board.configHash },
+    intent: { kind: 'open-board' as const, boardKey: board.boardKey },
   }));
 
   /*

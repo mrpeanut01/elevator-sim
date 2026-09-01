@@ -41,9 +41,12 @@
 
 import {
   proofCaseCountOf,
+  ratedCaseIssue,
+  ratingOf,
   ratingFigureOf,
   RATING_BASIS,
   RATING_CAVEAT,
+  type RatedCase,
   type RatingSummary,
 } from './rating.js';
 import { proofCasesOf, type ProofCase, type ProofCaseSet } from './proofCases.js';
@@ -127,6 +130,113 @@ export interface LadderEntry {
    */
   readonly fingerprint: string;
   readonly summary: RatingSummary;
+}
+
+/* -------------------------------------------------------------------------- *
+ * A rating that survives the tab — GitHub issue #224, [§ D434](../../../../DECISIONS.md)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A {@link LadderEntry} as it is kept between sittings: **its forty cases and nothing folded**.
+ *
+ * ## What is deliberately not stored, and why that is the whole of this type
+ *
+ * `RatingSummary` carries five values — `rating`, `casesRated`, `casesRun`, `complete` and
+ * `weakest` — that {@link ratingOf} *computes* from the cases and the total. Writing them down
+ * would create five figures a store could hold in disagreement with the cases beside them: a
+ * rating of `91.2%` over a `cases` array whose scores mean `88.4`, a `weakest` naming a case that
+ * is not the worst one, a `complete: true` over thirty-nine. Nothing would notice, because the
+ * ladder draws the *stored* aggregate and never re-derives it.
+ *
+ * So the stored form is the evidence and the aggregate is rebuilt by {@link ladderEntryOf} through
+ * the same `ratingOf` a live gauntlet uses. There is one arithmetic, and a restored row and a
+ * freshly-run row cannot disagree about a mean.
+ *
+ * `casesTotal` **is** stored, and it is not an exception to that: `ratingOf`'s own docstring says
+ * why it is a parameter rather than `cases.length` — the interesting incomplete rating is the one
+ * where a case never ran and therefore has no row. It cannot be derived from what is here.
+ *
+ * `fingerprint` is stored for § 11.7's *edited since*, which is the reason a rating survives a
+ * reload usefully at all: a restored rating that could not be compared against the dispatcher as it
+ * stands now would be a figure with no way of telling the player it is stale.
+ */
+export interface SavedRating {
+  readonly dispatcherId: string;
+  readonly dispatcherName: string;
+  readonly isReference: boolean;
+  readonly fingerprint: string;
+  /** {@link RatingSummary.casesTotal} — the denominator, which the rows cannot supply. */
+  readonly casesTotal: number;
+  /** The forty, each with its seed. Invariant 5: a stored rating replays exactly. */
+  readonly cases: readonly RatedCase[];
+}
+
+/** A live entry reduced to what is kept. The only route into a {@link SavedRating}. */
+export function savedRatingOf(entry: LadderEntry): SavedRating {
+  return {
+    dispatcherId: entry.dispatcherId,
+    dispatcherName: entry.dispatcherName,
+    isReference: entry.isReference,
+    fingerprint: entry.fingerprint,
+    casesTotal: entry.summary.casesTotal,
+    cases: entry.summary.cases,
+  };
+}
+
+/**
+ * Why a value read back out of storage is not a {@link SavedRating}, or `undefined` when it is one.
+ *
+ * Total, and it refuses whole rather than repairing: a rating with one unreadable case is not a
+ * rating over thirty-nine, because `rating.ts` says in terms that a mean over a different set is a
+ * different quantity. The reason names the case's own complaint so a reader is not told only that
+ * *something* was wrong with forty rows.
+ */
+export function savedRatingIssue(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return 'a saved rating is not an object';
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of ['dispatcherId', 'dispatcherName', 'fingerprint'] as const) {
+    const text = record[key];
+    if (typeof text !== 'string' || text === '') return `a saved rating has no ${key}`;
+  }
+  if (typeof record['isReference'] !== 'boolean') {
+    return 'a saved rating does not say whether it is a reference run';
+  }
+  const casesTotal = record['casesTotal'];
+  if (typeof casesTotal !== 'number' || !Number.isInteger(casesTotal) || casesTotal < 0) {
+    return 'a saved rating’s case total is not a count';
+  }
+  const cases = record['cases'];
+  if (!Array.isArray(cases)) return 'a saved rating carries no list of cases';
+  if (cases.length > casesTotal) {
+    // A gauntlet reports at most one row per case, so more rows than cases is not a shape this
+    // product can write — and `ratingOf` would fold it into `casesRated` above `casesTotal`, which
+    // is `41 of 40` on a player's screen.
+    return 'a saved rating has more cases than the set it claims to be over';
+  }
+  for (const entry of cases as readonly unknown[]) {
+    const issue = ratedCaseIssue(entry);
+    if (issue !== undefined) return issue;
+  }
+  return undefined;
+}
+
+/**
+ * A kept rating, folded back into the row the ladder draws.
+ *
+ * The one caller is `everyday/boardScreen.ts`, restoring what the last sitting earned. Every figure
+ * on the row comes out of `ratingOf`, so a restored rating and a rating computed a second ago are
+ * the same object built the same way — see {@link SavedRating} for why that matters.
+ */
+export function ladderEntryOf(saved: SavedRating): LadderEntry {
+  return {
+    dispatcherId: saved.dispatcherId,
+    dispatcherName: saved.dispatcherName,
+    isReference: saved.isReference,
+    fingerprint: saved.fingerprint,
+    summary: ratingOf(saved.cases, saved.casesTotal),
+  };
 }
 
 /** One row of the ladder, every cell already worded. */

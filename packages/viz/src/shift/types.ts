@@ -16,10 +16,12 @@
  * **A goal reads an observation. Never a mean, and never anything `awtIsValid` could suppress.**
  *
  * {@link GoalObservations} is the structural form of that rule. It is the *only* type
- * `readGoal` accepts, and it carries six numbers and a censoring flag. Four of the numbers are
+ * `readGoal` accepts, and it carries seven numbers and a censoring flag. Four of the numbers are
  * the design's own (`design.html` :1428–1439): a carried share, an away-inside-a-minute share, a
  * peak queue depth and an abandonment count; the fifth gradeable one is the worst wait the
- * casual handoff's fourth test grades (§ 8.6). There is no `meanWaitS` on it, no `wait95S`, no
+ * casual handoff's fourth test grades (§ 8.6), and the sixth is the loaded-departure count its
+ * *fourth campaign* test grades (§ 7, GitHub issue #169) — the one that is optional, because its
+ * absence is a gate. There is no `meanWaitS` on it, no `wait95S`, no
  * `meanTimeToDestinationS` — so a goal that wanted to grade a suppressible estimate could not be
  * written against this type without changing the type, which is a visible diff and a decision
  * somebody has to make out loud. CLAUDE.md: *"If a configuration saturates, flag it and suppress
@@ -284,6 +286,12 @@ export interface ShiftEvent {
  * retired goal wrote. Removing the id would refuse every session that ever closed an odd day.
  * The *field* it names is also still read on every sheet: `report.ts`'s *took the stairs* figure
  * and its add-a-car lever both consume `Observations.abandoned`.
+ *
+ * `loadedDepartures` joined for the casual handoff's fourth campaign test — `ENGINE_CONTRACT.md`
+ * § 7's `trips ≤ tests.trips` (GitHub issues #169, #313). No goal in `goals.ts#goalsForDay` reads
+ * it: the daily loop still asks four things and this is not one of them. It is
+ * `everyday/campaignModel.ts#campaignTestGoals`' fourth bar and nothing else's, which is why the
+ * id is here and the bar is over there.
  */
 export const GOAL_OBSERVATION_IDS = [
   'carryPct',
@@ -291,6 +299,7 @@ export const GOAL_OBSERVATION_IDS = [
   'peakQueue',
   'abandoned',
   'worstWaitS',
+  'loadedDepartures',
 ] as const;
 
 export type GoalObservationId = (typeof GOAL_OBSERVATION_IDS)[number];
@@ -298,12 +307,12 @@ export type GoalObservationId = (typeof GOAL_OBSERVATION_IDS)[number];
 /**
  * Everything a goal may read — **and structurally nothing that `awtIsValid` could suppress**.
  *
- * Seven fields: five gradeable, and two gates. Every gradeable one is a *count*, a ratio of
+ * Eight fields: six gradeable, and two gates. Every gradeable one is a *count*, a ratio of
  * counts, or a maximum of measured durations: how many turned up, what share got carried, what
  * share was away inside a minute, how deep the worst landing got, how many gave up, how long the
- * worst-served rider stood. None of them is an estimate over a cohort, so none of them is refused
- * on a saturated run, so a goal can be graded on a day the building was outrun — which is the day
- * a reader most needs a verdict.
+ * worst-served rider stood, how many loaded departures the machines made. None of them is an
+ * estimate over a cohort, so none of them is refused on a saturated run, so a goal can be graded on
+ * a day the building was outrun — which is the day a reader most needs a verdict.
  *
  * `worstWaitS` is the one whose honesty needs a second gate. A maximum is only exact once the leg
  * it belongs to has resolved; while the worst wait on the board belongs to somebody still
@@ -311,6 +320,12 @@ export type GoalObservationId = (typeof GOAL_OBSERVATION_IDS)[number];
  * `live/types.ts#LiveObservations.worstWaitIsCensored`), so {@link worstWaitIsCensored} rides
  * beside it and `goals.ts#readGoal` refuses to grade the pair. It is a **gate, not a goal**: it
  * is deliberately not in {@link GOAL_OBSERVATION_IDS}, exactly as {@link arrived} is not.
+ *
+ * {@link loadedDepartures} carries its own refusal instead of a second field, and that is the same
+ * argument in a cheaper shape: it is **optional**, and its absence *is* the gate. A recording that
+ * carries no travel record cannot say how many trips the machines made, and *nobody wrote it down*
+ * may not be graded as *none were made* — a trip budget is an `at-most` bar, so a fabricated zero
+ * would pass it on every run nobody measured, which is the one direction that must never be free.
  *
  * See the module docstring for why this type's *shape* is the enforcement and not a comment.
  */
@@ -356,6 +371,19 @@ export interface GoalObservations {
    * maximum grades neither `met` nor `missed`; see the interface docstring and `readGoal`.
    */
   readonly worstWaitIsCensored: boolean;
+  /**
+   * Loaded car departures so far — `ENGINE_CONTRACT.md` § 5's `trips`, and § 7's fourth test.
+   *
+   * A **count**, folded at the playhead by `live/observations.ts` from the instants `core` recorded,
+   * so it is not an estimate over a cohort and nothing can suppress it.
+   *
+   * **Optional, and the absence is the gate rather than a zero.** `undefined` means the fold had no
+   * travel record to cut — a recording built by hand, or an observation assembled by a surface that
+   * never read one — and `goals.ts#readGoal` returns `pending` there, exactly as it does for a
+   * censored worst wait. It is the only optional member of this type, which is the point: every
+   * other field is a count somebody took, and this one has a state for *nobody took it*.
+   */
+  readonly loadedDepartures?: number | undefined;
 }
 
 /**

@@ -88,6 +88,9 @@ function observations(overrides: Partial<LiveObservations> = {}): LiveObservatio
     horizonS: 900,
     worstWaitSoFarS: 42,
     worstWaitIsCensored: false,
+    // § 5's `trips` at the playhead. A number rather than `undefined`, so this fixture stands for a
+    // recording the current schema produced rather than for one nobody instrumented.
+    loadedDepartures: 34,
     ...overrides,
   };
 }

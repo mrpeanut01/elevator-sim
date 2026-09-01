@@ -1421,6 +1421,20 @@ type DecisionReservation = {
  * the whole point: the next integrator opens a block by replacing `null` with an object literal
  * and nothing else has to compile for the first time.
  */
+/*
+ * No wave is open. The annotation is load-bearing and must stay: a bare `= null` narrows the const
+ * to `null`, the open-wave arm below becomes `never`, and `tsc -b` fails with eleven
+ * `Property 'wave' does not exist on type 'never'`. Vitest transpiles rather than type-checks, so
+ * that break passes the tests it belongs to and is caught by CI instead — which is how it was found,
+ * on this very line, one push after this mechanism landed. Do not simplify it away.
+ *
+ * Wave J's block was D431-D442: lanes A-E held D431-D440, two apiece, and the integrator held
+ * D441-D442. D438 is a hole, registered above; every other number heads a decision. The charter row
+ * is reconciled to D443 on this same commit, which is the half D387 shows nobody remembers when
+ * nothing asks for it. (D387 is named without the section sigil on purpose: it is a registered hole,
+ * a citation promises a heading a reader can follow, and § D430 settled that a hole is named and
+ * never cited. That gate caught this very line.)
+ */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
@@ -1469,6 +1483,16 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
       'splitting it, and reported the number unspent. Registered rather than backfilled because ids here are ' +
       'names (§ D430). It sits inside wave I’s block and not at its top: § D429 and § D430 close the block, ' +
       'so the charter row names D431 and points at no hole.',
+  ],
+  [
+    438,
+    'wave J allocated it to lane D, which folded its second subject — the sixteen-tier fit-out survey, ' +
+      'the two cells not drivable at this corpus’s seams, and the deep-tier inert cells — into § D437 as ' +
+      'paragraphs rather than splitting it, and reported the number unspent. Registered rather than ' +
+      'backfilled because ids here are names (§ D430), and this is the second consecutive wave in which a ' +
+      'lane’s second number went unspent for the same reason: a survey is one decision however many cells ' +
+      'it measures. It sits inside wave J’s block and not at its top — § D441 and § D442 close the block, ' +
+      'so the charter row names D443 and points at no hole.',
   ],
 ]);
 

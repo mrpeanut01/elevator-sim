@@ -830,6 +830,74 @@ export function energyStatistics(
 }
 
 /* -------------------------------------------------------------------------- *
+ * Loaded departures — ENGINE_CONTRACT § 5's `trips`
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Every move the fleet made with somebody aboard, as the instants those moves ended.**
+ *
+ * `docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md` § 5 lists `trips` — *count of car
+ * departures under load* — among the run metrics, and § 8.3 spends it: `wear = min(1.3, trips /
+ * serviceAt)`. Nothing in this project measured it until this function, which is why the campaign's
+ * fourth daily test shipped ungraded and its wear clock shipped constant (GitHub issues #169, #313).
+ *
+ * ## A list of instants rather than a count, and that is the whole design
+ *
+ * A count would have to be a count *over a window*, and the surface that needs this reads it at a
+ * **playhead** — the campaign's test row is drawn while the day is still running. A window figure
+ * published at an instant short of the run's end is the violation class the honesty sweep's temporal
+ * axis exists to find ([the root DECISIONS.md](../../../../DECISIONS.md) § D307), and
+ * `shift/types.ts#GoalObservations.worstWaitS` carries the same warning in as many words. So this
+ * returns the instants and lets the caller cut them wherever its playhead stands; `viz`'s
+ * `live/observations.ts` folds them exactly as it folds legs.
+ *
+ * ## Which instant, and why it is the arrival
+ *
+ * A {@link TravelSample} is stamped with the moment the car **levelled**, and this reproduces that
+ * stamp rather than reconstructing a departure time. Two reasons, both of them stated so they can be
+ * attacked. The record carries no departure instant to reproduce — `Car.completeArrival` returns a
+ * {@link TravelReading} of four fields and none of them is a clock — so a departure time here would
+ * be a subtraction this module invented. And {@link energyStatistics} already charges a move whole
+ * to the window it *finished* in, so a second convention four lines away would make
+ * *"of the moves, this many were loaded"* a sentence about two different populations. The cost is
+ * stated rather than hidden: a car still in flight when the playhead passes has not yet contributed
+ * its trip, which is at most one move per car and never more.
+ *
+ * ## Loaded means somebody was aboard
+ *
+ * `loadKg > 0`, and {@link TravelSample.loadKg} is exact for the move rather than sampled during it
+ * — the load only changes at a stop. Empty repositioning drives are excluded, which is what makes
+ * this a wear budget a player can act on: § 8.6's tension for the row is *"it punishes running
+ * half-empty cars up and down to look responsive"*, and a count that included the empty runs would
+ * punish exactly the same behaviour twice while making a fully-loaded morning look identical to a
+ * fleet driving itself around.
+ *
+ * ## `undefined` samples are not zero samples
+ *
+ * {@link energyStatistics}' rule, for its reason: the recorder omits `travelSamples` rather than
+ * writing `[]`, so a record without them is one nobody instrumented and *"the cars did not move"* is
+ * a different fact from *"nobody wrote down whether they did"*. `undefined` in, `undefined` out.
+ *
+ * Non-test caller: `packages/viz/src/record/recordRun.ts#describeRun`, which puts the instants on the
+ * recording as `VizRecording.loadedDepartures`.
+ */
+export function loadedDepartureTimes(
+  samples: readonly TravelSample[] | undefined,
+): readonly SimTime[] | undefined {
+  if (samples === undefined || samples.length === 0) return undefined;
+  const times: SimTime[] = [];
+  for (const sample of samples) {
+    if (sample.loadKg > 0) times.push(sample.at);
+  }
+  // Sorted here rather than assumed: `MetricsRecorder` appends in event order, which is ascending
+  // in the shipped path, but a record parsed from a file is whatever the file said. A consumer that
+  // binary-searches or breaks early on the first instant past its playhead needs the order to be a
+  // promise rather than a habit.
+  times.sort((a, b) => a - b);
+  return Object.freeze(times);
+}
+
+/* -------------------------------------------------------------------------- *
  * Load factor over time
  * -------------------------------------------------------------------------- */
 

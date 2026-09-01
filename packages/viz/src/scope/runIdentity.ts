@@ -13,6 +13,25 @@
  * that is not 1, an event that changes anything, a held car, a moved lever — and the submit path
  * was about to enumerate them again.
  *
+ * ## They are the same question **minus what only one artefact can say** — GitHub issue #179
+ *
+ * The two artefacts have stopped having the same vocabulary, and pretending otherwise would put the
+ * defect back. `SubmittedRun` now carries `ruleRows` and `interventions`; **the CLI has no flag for
+ * either**, and there is no plausible one — a rule list is four scalars per row and an intervention
+ * log is a time series. So a state carrying rules is reproducible by a submission and not by a
+ * command line.
+ *
+ * What this module answers is therefore the **shared** question: *can the artefacts that resolve
+ * against `data/` reproduce this run at all?* An artefact that additionally cannot spell something
+ * refuses it **for itself**, where the flags are decided — and `provenanceLineOf` already had
+ * exactly that shape before this issue, in `partFlagFor`: a windowed run on a template with no clock
+ * gets a CLI refusal that the submit path correctly does not make. Rules and a log join it there.
+ *
+ * That is the opposite of two answers to one question. The shared predicate stays single, and the
+ * CLI-only half stays in the CLI-only function, so the failure this module exists to prevent — a
+ * client looser than the server, posting a run that comes back an accusation — is still decided in
+ * one place.
+ *
  * **Two answers to this question is not a tidiness problem; it is the one disagreement a
  * replay-verified leaderboard cannot survive.** A client that is *stricter* than the server refuses
  * something the server would have taken and nobody ever finds out. A client that is *looser* posts a
@@ -117,6 +136,8 @@
  * the trade, and it is the right way round only because the alternative is a board on which a fabric
  * no screen would have offered outranks every honest run on it.
  */
+
+import { RULE_ACTION_WORDS, RULE_CONDITION_WORDS } from '@elevator-sim/core/browser';
 
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 // The two are aliased at every site that needs both — `authoring/selectorSpec.ts`'s naming hazard.
@@ -234,61 +255,105 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
       : `${String(state.outOfServiceCarIds.length)} car(s) are held out of service, and nothing in a selection holds one`,
 
   /**
-   * The intervention log — Everyday Mode's run record, on `outOfServiceCarIds`' exact footing,
-   * and **a refusal about the wire, not about the log**. Contract § 1.4 is explicit that an
-   * intervention never invalidates a run, and the product now honours that where the record can
-   * actually travel: a filed day's `WatchRecord` carries the log
-   * (`watch/record.ts#WATCH_RECORD_CARRIES`) and the reproduction gate replays it, so an
-   * intervened day banks, files and re-verifies exactly as an untouched one does. What stays
-   * refused is this surface alone — the leaderboard submission and the CLI line.
+   * The intervention log — Everyday Mode's run record, and **the refusal that shrank rather than
+   * the one that went**.
    *
-   * The empty log carries: `shiftRunConfigOf` writes no `interventions` key for it, and `core`
-   * pins that run byte-identical to one built before the field existed. A non-empty log does
-   * not, on two grounds that must not be conflated because only one of them is temporary:
+   * ## What the two grounds were, and which of them stopped being true
    *
-   * 1. **No field of `RunSubmission`, no CLI flag and no deep-link parameter expresses a log.**
-   *    The consequence is the contract's replay-verification clause pointed the other way: the
-   *    server would re-simulate the seed *without* the log, get different legs, and refuse an
-   *    honest run as `metrics-do-not-reproduce`. For `park-cars-lobby` and `answer-incident`
-   *    entries — plain scalars — this is a missing field, and the day the wire grows one this
-   *    ground comes back out.
-   * 2. **A `switch-dispatcher` entry carries a whole weight vector inline**, and
-   *    `submission.ts`'s founding rule is *ids rather than inline objects* — a submission
-   *    carrying its own vector is the same cheat as one carrying its own two-floor tower with
-   *    sixteen cars, posted to a board keyed by the dispatcher it only started under. That
-   *    ground is structural: the wire could only ever carry a switch as a *shipped profile id*
-   *    resolved against the server's own `data/`, which is a different field from the one the
-   *    arm needs locally (the viewer's driving profile is routinely a derived object no id
-   *    resolves — see `core`'s `InterventionChange` docstring).
+   * This arm refused every non-empty log, on two grounds it was careful to keep apart because only
+   * one of them was temporary:
    *
-   * The message names the second ground only when the log actually contains a switch, because a
-   * refusal citing a cheat the player did not make is the accusation-shaped defect this module
-   * exists to avoid.
+   * 1. **No field of `RunSubmission`, no CLI flag and no deep-link parameter expresses a log** —
+   *    *"the day the wire grows one this ground comes back out"*. The wire has grown one
+   *    (`SubmittedRun.interventions`), the server passes it to `SimulationConfig.interventions`, and
+   *    `verify.test.ts` replays a logged run to the client's own metrics on `midtown-office` at
+   *    3 %, where the log moves `awtS` from 23.0038 to 26.2945. So this ground is out, exactly as it
+   *    said it would be.
+   * 2. **A `switch-dispatcher` entry carries a whole weight vector inline**, and `submission.ts`'s
+   *    founding rule is *ids rather than inline objects*. That ground was called structural and it
+   *    is: the wire could only ever carry a switch as a *shipped profile id*, which is a different
+   *    field from the one the arm needs locally, because the viewer's driving profile is routinely a
+   *    derived object no id resolves. It stands.
+   *
+   * **And a third has been found, which is why this is not simply ground 2.** An `answer-incident`
+   * answers a campaign incident, and `shift/incidents.ts` writes that incident onto the *building*
+   * as `serviceEvents`, decided from the week's day and the calendar. Neither travels. A replay
+   * built from ids alone therefore has the **answer and not the thing answered** — the option's own
+   * service events would be the only mode changes in the run — so this is a missing *cause* rather
+   * than a missing field, and carrying it would be worse than refusing it. `packages/server`'s
+   * `SUBMITTABLE_INTERVENTION_KINDS` names the one kind that travels, for the same reason and in the
+   * same direction: an allow-list, so a kind added tomorrow is refused until somebody decides.
+   *
+   * The empty log still carries: `shiftRunConfigOf` writes no `interventions` key for it, and `core`
+   * pins that run byte-identical to one built before the field existed.
+   *
+   * The message names only the kinds actually present, because a refusal citing a cheat the player
+   * did not make is the accusation-shaped defect this module exists to avoid.
    */
   interventions: (state) => {
-    if (state.interventions.length === 0) return undefined;
-    const base =
-      `${String(state.interventions.length)} mid-run intervention(s) are on this day's record, ` +
-      'and no selection or submission carries an intervention log — a replay without it is a different run';
-    return state.interventions.some((entry) => entry.change.kind === 'switch-dispatcher')
-      ? `${base}; a mid-run dispatcher switch also carries its weight vector inline, which a submission of ids may never hold`
-      : base;
+    const refused = [...new Set(state.interventions.map((entry) => entry.change.kind))]
+      .filter((kind) => kind !== 'park-cars-lobby')
+      .sort((left, right) => left.localeCompare(right));
+    if (refused.length === 0) return undefined;
+    const clauses = refused.map((kind) =>
+      kind === 'switch-dispatcher'
+        ? 'a mid-run dispatcher switch carries its weight vector inline, which a submission of ids may never hold'
+        : 'an incident answer names service events for an incident no selection or submission carries, so a replay would hold the answer and not the thing answered',
+    );
+    /*
+     * `an intervention of kind` / `interventions of kind`, rather than an article before each name:
+     * *a “answer-incident”* is the shape a template produces when it puts an article in front of a
+     * value it does not know the first letter of, and this string is read by a player.
+     */
+    const noun = refused.length === 1 ? 'an intervention of kind' : 'interventions of kind';
+    const kinds = listOf(refused.map((kind) => `“${kind}”`));
+    return `this day's record holds ${noun} ${kinds}, and ${listOf(clauses)}`;
   },
 
   /**
-   * The Everyday rules — `interventions`' exact footing, one mechanism over.
+   * The Everyday rules — `interventions`' exact footing, one mechanism over, and **the refusal that
+   * went entirely**.
    *
-   * The empty list carries: `profileWithRules` returns the driving profile by object identity,
-   * so the run is the run the submitted dispatcher id already implies. A written list does not —
-   * no field of `RunSubmission`, no CLI flag and no deep-link parameter expresses a rule list —
-   * and the failure direction is `patience`'s: the server would re-simulate the seed on the
-   * profile's own weights, get different legs, and refuse an honest run as
-   * `metrics-do-not-reproduce`.
+   * ## Why it went, and why that is not a guard being removed
+   *
+   * The refusal read *"no field of `RunSubmission`, no CLI flag and no deep-link parameter expresses
+   * a rule list — a replay without them is a different run"*, and every clause of it was true. Its
+   * consequence was that a player who wrote one row could never appear on any board, so the whole of
+   * § 11's workshop produced dispatchers that were unpostable by construction.
+   *
+   * `SubmittedRun.ruleRows` is the field. The server writes the player's rows onto **its own**
+   * resolved profile — `verify.ts#profileWithRules`, which is the same pair of writes
+   * `authoring/ruleSpec.ts#profileWithRules` makes, and is the only pair `core` accepts, because
+   * `resolveDispatchConfig` refuses a `rules` section under any policy but `'rules'` and refuses
+   * that policy with no rows. `verify.test.ts` replays a written list to the client's own metrics on
+   * `midtown-office` at 3 %, where the rules move `awtS` from 23.0038 to 26.1676 — a cell chosen
+   * because on `garden-apartments` at 6 % the rows never fire and a test there would have proved
+   * nothing.
+   *
+   * **A rule list is not the inline-object cheat, and that is what makes it postable where a fabric
+   * is not.** A row is two ids and two values from closed lists `core` declares — nine conditions,
+   * eight actions, a `values` array each — so the whole space a submission can express is a finite
+   * product of shipped vocabulary. A building is not.
+   *
+   * ## What is left, which is a question about the value rather than the field
+   *
+   * A row naming a condition or a value this build does not declare is one the server refuses by
+   * name before it will simulate, and `core` refuses again at resolve. That is a *"saved on this
+   * device alone"* refusal in the shape the three at the foot of this module already have: the field
+   * is perfectly legal to move and this particular value is not reproducible. It is reachable
+   * because a `ViewerState` can be rehydrated from a browser's own storage, which is
+   * `watch/record.ts#recordUnreadableReason`'s worry one artefact over.
    */
-  ruleRows: (state) =>
-    state.ruleRows.length === 0
-      ? undefined
-      : `${String(state.ruleRows.length)} Everyday rule(s) drive this run's dispatcher, and no selection or submission carries a rule list — a replay without them is a different run`,
+  ruleRows: (state) => {
+    const unknown = state.ruleRows.filter(
+      (row) => RULE_CONDITION_WORDS[row.when] === undefined || RULE_ACTION_WORDS[row.then] === undefined,
+    );
+    if (unknown.length === 0) return undefined;
+    return (
+      `${String(unknown.length)} Everyday rule(s) name a condition or an action this build does ` +
+      'not declare, so no submission could be replayed against them'
+    );
+  },
 
   levers: (state) =>
     state.levers.parking === DEFAULT_LEVERS.parking &&

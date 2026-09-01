@@ -28853,3 +28853,876 @@ number outside it, **D431**, which no register claims.
 hole, which happened for the first time in this wave. Wave H's block closed with every number spent,
 so the interaction could not appear; the next integrator would have met it as a red gate with no
 explanation, exactly as D387 was met.
+
+---
+
+## D431 — `trips` is one measurement with two lifetimes, and `core` takes it
+
+**Date: 2026-09-01 · Owner: wave J lane A · Closes GitHub issue #169 item 2 and issue #313's first
+half. Corrects a refusal under [§ D227](#d227).**
+
+**Decision.** `ENGINE_CONTRACT.md` § 5's `trips` — *count of car departures under load* — is measured
+in `core`, as **the instants the loaded moves ended** rather than as a count:
+`metrics/summarize.ts#loadedDepartureTimes`. `VizRecording.loadedDepartures` carries them at schema
+**10**, `live/observations.ts` cuts them at the playhead, and
+`shift/types.ts#GoalObservations.loadedDepartures` is what a goal reads. Two consumers, both landing
+in the same change because a field with no consumer is this repository's signature defect:
+
+- **§ 8.6's fourth daily test grades.** `everyday/campaignModel.ts#campaignTestGoals` returns four
+  goals instead of three, and `campaignTestRows` is one map over them.
+- **§ 8.3's wear clock advances.** `campaign/career.ts#fileDay` adds the filed day's count to
+  `CampaignTower.trips`, carried on the `file-day` action by `everyday/host.ts#closeDay`.
+
+**The two are deliberately not folded together, and that is the load-bearing half.** They share
+arithmetic and are different fields with different lifetimes: the test grades **one day** against
+`tests.trips`, and the clock accumulates **a contract's** days against `serviceAt`. Nothing reads one
+through the other. A single field would have had to be reset by the service window (§ 8.3) and by the
+close of every day (§ 7), and those are different events.
+
+**Why a list of instants and not a count.** The campaign's test row is drawn on the building desk
+*while the day is still playing*, so the figure has to answer at a playhead. A window figure published
+at an instant short of `endedAt` is the violation class the honesty sweep's temporal axis exists to
+find ([§ D307](#d307)), and `GoalObservations.worstWaitS` already carries that warning in as many
+words. The consumer cuts; `core` does not.
+
+**Why the arrival instant stamps a departure.** A `TravelSample` is stamped when the car **levelled**,
+and the record carries no departure time to reproduce — `Car.completeArrival` returns four fields and
+none is a clock. `energyStatistics` already charges a move whole to the window it finished in, so a
+second convention four lines away would make *"of the moves, this many were loaded"* a sentence about
+two populations. The cost is stated rather than hidden: a car in flight at the playhead has not yet
+contributed its trip, which is at most one move per car.
+
+**It is whole-run where `VizEnergy.starts` is windowed**, and that is forced by the same requirement:
+a figure cut to the reporting window could not answer at a playhead outside it. The two are two stated
+cohorts and no ordering holds between them — measured on `chancery-house`'s breadth recording, **265**
+loaded departures against **97** windowed starts, and on `vertical-city`'s, **899** against **385**.
+`live/observations.test.ts` checks the count against the fleet's motions instead, and says why.
+
+**Absence is a gate, and this is the direction that matters.** `GoalObservations.loadedDepartures` is
+the type's **one optional member**. A trip budget is an `at-most` bar, so folding *nobody wrote it
+down* to a zero would grade **met** on every run nobody measured — a pass awarded for a measurement
+never taken. `shift/observations.ts` therefore refuses to default it, `readGoal` returns `pending`
+over the absent value, and `fileDay` holds the wear clock where it is rather than filing a day of no
+wear. `shift/observations.test.ts` exists for that one property, because the defect is one character
+of ergonomics away at all times.
+
+**A refusal was deleted rather than reworded.** `everyday/campaignModel.ts#TRIPS_REFUSAL` said *"not
+measured — this run records how many people were carried and how long they stood, and not how many
+loaded departures the machines made"*. It became false, and § D227 binds both ways: a control that
+writes something may not claim it writes nothing. The `CampaignTestRow.refusal` field went with it —
+it existed for that one row — and a row that cannot be graded on some particular day now says so the
+way the other three do, with a `pending` reading and an em dash. `campaign/career.ts`'s absence
+register carried the same claim in a comment and is corrected there.
+
+**What is measured and is content for somebody else.** § 8.3 sizes `daysLeft` at *1 400 trips a
+working day*. A campaign day at the campaign's own cell — `garden-apartments`, one hour, seed
+424 242 — produces **16** loaded departures over **29** arrivals, so the printed figure goes 32 → 32
+while the clock moves underneath it, and a service window is on the order of **2 800** contract days
+away. Two of § 8's own numbers fall out of that and neither is this lane's to move: *1 400 a working
+day* is off by roughly ninetyfold at the cell § 8 actually runs, and the tier bars (`tests.trips`,
+620 / 520 / 470 / 430) are unmissable there by a factor of thirty. `campaign/wearClock.test.ts`
+asserts the direction that is true (`≤`) and records the disagreement rather than scaling the count on
+its way in, which would have been inventing a number and hiding the disagreement inside it.
+
+**A first draft of this entry attributed the 265/97 pair to `garden-apartments` and then reused 265 as
+the campaign day's own count.** Both were wrong — 265/97 is `chancery-house`'s breadth recording, and
+the campaign cell produces 16 — and it is recorded rather than quietly fixed, because it is exactly
+the defect [`RISKS.md`](RISKS.md) R38 tracks: a measured figure carried across to a second claim it
+was never measured for. Catching it took a probe; re-reading the sentence would not have.
+
+**Not claimed.** Nothing here says what a good trip budget is, and `DIFFICULTIES`' four `tests.trips`
+figures are the design handoff's own and are unmoved. What *is* now measured is that they cannot be
+missed at the campaign's own cell — 16 against 430 at the tightest tier — and moving them is a
+difficulty decision this lane may not take.
+
+---
+
+## D432 — the campaign's build select is a record, and it says so
+
+**Date: 2026-09-01 · Owner: wave J lane A · Closes GitHub issue #313's second half by refusing it,
+under [§ D227](#d227) and [§ D177](#d177).**
+
+**Decision.** `CampaignTower.buildId` does not reach a run, will not be wired to one here, and now
+**says so on the control itself** — `everyday/campaignModel.ts#BUILD_REFUSAL`, drawn under the select
+on both surfaces that offer it. The refusal is pinned by a run rather than by another sentence:
+`campaign/buildStandingOrder.test.ts` drives `everyday/host.ts#runCampaignDay` over all five shapes at
+the campaign's own cell and requires `legsOf` to be **identical**.
+
+**Why refused rather than wired.** The design file authors `build` as a descriptive line per building
+— `docs/design/elevator-sim-casual.dc.html` gives Garden Apartments `build: 'As built'` beside its
+quirk — and its own prototype writes the select into `st.builds[t.id]` and reads it back only to mark
+an option selected. `ENGINE_CONTRACT.md` § 8 gives it no expression at all. So there is no mechanism
+in the handoff that this build dropped. Inventing one would be game design taken in a lane, and the
+obvious invention is worse than none: pointing the five shapes at the group levers would hand a player
+for free what § 8.2's `control` tier charges six units and a night for. What changes a building's
+fabric in § 8 is the shop, which is bought and which does reach the run ([§ D427](#d427)).
+
+**The proof is § D177's comparison run in the refusing direction**, and two things make it evidence
+rather than a tautology. It goes through the **shipped press** — `runCampaignDay`, not a hand-rolled
+patch reproducing what that function currently writes — so the day somebody wires `buildId` into it,
+the file reddens and the sentence on the select has to be rewritten rather than quietly becoming
+false. And the cell is **proved able to show a change**: the positive control is the other select in
+the same group, at the same cell, through the same press, on the same seed. That is `fitOut.test.ts`'s
+own rule — three of sixteen shop tiers move nothing at this cell for physical reasons, so an identical
+pair with no positive control beside it means nothing.
+
+**A mutation that survives, recorded rather than left to be rediscovered.** Wiring `buildId` into
+`shiftLengthS` (`+ 60` on any build but `as-built`) leaves the file green, because `legsOf` at 3 600 s
+and 3 660 s on this building returns the same string — the demand is spent well before the hour is,
+and the tail is drain. That is § D427's own trap arriving as a *mutation* that cannot bite rather than
+a measurement that cannot; the test's docstring names it and names the mutation that does bite.
+
+**The distinction this keeps.** An action the reducer **refuses** and an action that lands on a field
+nothing reads are two different defects with the same symptom ([§ D219](#d219)). `set-build` still
+writes the record, and the test asserts that first, so what is being reported is the second.
+
+**Not claimed.** No judgement that the select should exist. Removing it would fight
+`docs/12-design-handoff.md`'s rule that the handoff wins every disagreement about what the screen
+looks like; § 8.1 draws two inline selects and this build draws two.
+
+## D433 — earned progress goes in the Everyday slot, not the Engineer session, and a refusal to restore it is a sentence
+
+**Date: 2026-09-01 · Owner: wave J lane B, GitHub issue #224 · Extends [§ D402](#d402)'s reading of
+what the Everyday store is for.**
+
+**Decision.** The set of solved fix cases and the gauntlet ratings are kept in
+`everyday/profile.ts`'s slot, as a **second payload key beside the profile**, at schema version 2.
+They are not a fourth key in `persist/`'s session envelope, and they are not a third
+`localStorage` key of their own.
+
+`everyday/profile.ts` already argued the first half — *the slot is deliberately not a fourth key
+inside `persist/`'s session envelope* — and issue #224 is the first change that could have made
+that argument stale rather than merely repeated it, because it is the first thing an Everyday
+screen earns that is worth keeping. The argument holds, and the test it holds under is this: a
+`persist/` session is **written whole at one instant** and is the Engineer shell's week, its menu
+settings and its free-play selection. A fix-it press is not part of that instant. Splicing it in
+would make one version number the property of two products, which is the failure the original
+paragraph names.
+
+A third key was refused for the reason `persist/types.ts#SESSION_KEY` gives about the mode key: two
+slots is two states that can disagree, and the profile and the progress are read on the same frame
+by the same rail. So it is **one slot, two payloads, refused under two rules** — `persist/`'s own
+`session`-beside-`library` shape, one product over.
+
+**This departs from the route the issue's own scope named, and says so rather than quietly taking
+another.** `ISSUE_WORKER_LEDGER.md` records issue #164 folding into #224 having transferred *"the
+`persist/validate.ts` migration blocker … and the pre-written fix site"*, which points at the
+Engineer envelope. That route is refused on the paragraph above, and refusing it costs the
+transferred scope nothing that matters: the migration blocker was *a versioned envelope needs a
+migration before it can grow a key*, which is true of this slot too and is discharged here by
+`withProgress` and its version-1 case; and the size-budget argument is discharged by
+`PROGRESS_BUDGET_CHARACTERS`. What does not survive the departure is the file the fix was expected
+to land in, and only that.
+
+**The migration, and the test an older envelope has to pass.** Version 1 has no `progress` key, and
+`withProgress` completes it with an empty one. That is `persist/session.ts`'s
+`withWindowStart`/`withParkedWeeks` family and it has to survive their objection: is empty a value
+the absence **determines**, or a guess about something nobody wrote down? It is determined, and by
+the defect this key closes. Before version 2 the solved set lived in `everyday/fixitScreen.ts`'s
+module scope and the ratings in `everyday/boardScreen.ts`'s, and **both ended with the tab** — each
+file said so in a named absence. At the instant a version-1 envelope was written there was no
+stored progress to record, and every reload under that build opened with none. An empty progress is
+what the player had.
+
+Two consequences are asserted rather than assumed. A version-1 envelope **keeps its name and
+picture**: the whole cost of the migration to a player who had one is nothing. And the migrated
+profile is carried into the version-2 envelope the *next* write produces — which is the half a
+migration usually gets wrong, because reading the old shape is not the same as keeping what it
+held, and the write that stores the first solved building is the one that could lose the name.
+
+**One writer, and it takes both payloads.** `saveProfile(store, profile)` is **deleted** rather
+than kept beside the new writer. One slot means one `write`, so a writer handed half the envelope
+has to invent the other half, and there are only two ways to do it: re-read the slot, which writes
+back a value a keystroke may already have replaced, or write an empty one, which deletes a player's
+afternoon on a name change. Both are asserted against, in both directions.
+
+**A refusal to restore progress is a sentence, and that is not decoration.** A profile that will
+not restore falls back to a name the player can see is wrong and retype. Progress cannot do that:
+**an empty solved set and an empty ladder are exactly what a player who has done nothing sees**, so
+a silent refusal reads as *your afternoon did not happen*. So every refusing path — a store that
+throws, bytes that do not parse, a version this build does not read, a shape it cannot vouch for,
+a page with no storage at all, and a payload past the budget — produces words, and the fix screen
+and the ladder draw them. `absent` is the one path that answers empty **and** stays silent, because
+there a player really has earned nothing.
+
+The budget is `PROGRESS_BUDGET_CHARACTERS`, checked **before** the store is touched, which is
+`persist/session.ts`'s `library-too-large` ordering and its reason sharpened: there is one slot and
+`write` replaces it whole, so a save that quietly dropped oversized progress would be *deleting*
+what is already stored rather than declining to add to it.
+
+**The number is chosen from what the product can produce, and the first draft was not.** A stored
+rating measures **7 801 characters** — measured rather than estimated, over the shipped set's shape.
+A budget taken as a twentieth of the conservative quota, by analogy with the library's fifth, holds
+**16** ratings, and `data/dispatcher-profiles.json` ships **13** dispatchers, all of them rateable,
+with a player's own on top. So the analogy produced a ceiling a player reaches by doing the ordinary
+thing, which is a defect with a sentence attached rather than a safety margin. It is **384 000**:
+49 ratings, the thirteen shipped plus thirty-six authored. `everyday/profile.test.ts` asserts the
+inequality — *more ratings than this build ships dispatchers* — rather than the count, because the
+count moves with a dispatcher's name length and pinning it would pin a figure nobody can reproduce.
+
+It is still under the library's 512 000, and that asymmetry is deliberate: the library holds work a
+player authored and cannot recover, this holds work a player can re-earn by running the forty again,
+so where the two compete for one origin's quota this is the one that yields.
+
+**What is not kept, and it is most of the session.** The per-case `FixitState` selections and the
+cached as-built `RecordedRun`s stay session-local. A working draft a player is in the middle of is
+not progress, and a recording is megabytes of legs. Only the badge survives — and it still follows
+the **latest** run in both directions (`fixit/engine.ts#fixedBadgeAfter`, `docs/20` defect 16): a
+restored case arrives badged and is re-badged, including out of FIXED, by the next run it has.
+Restoring a badge does not make it a high-water mark, which is the defect that rule was written
+for.
+
+**Measured rather than argued, and the tier is named.** A node case that writes a value and reads
+it back proves serialisation, and serialisation is not survival — it passes identically against a
+store held in a module-scope `Map`, which is the defect this issue was opened about. So the claim
+is made where it can be false: `everyday/progress.browser.test.ts` drives the **shipped bundle**
+(§ D425), solves a building, **reloads the page** and looks again. Removing the write reddens it;
+removing the restore reddens it; breaking the migration reddens it in both tiers; and silencing the
+refusal reddens the corrupt-store case on the page.
+
+**Not claimed.** Nothing here says the two stores should ever merge, and nothing says the Engineer
+session should learn about Everyday progress. And one seam is driven by node tests only, stated
+rather than implied: `everyday/boardScreen.ts#onFinished`'s call to `savedRatingOf` cannot be
+reached in the browser tier without running the forty, which is minutes.
+
+---
+
+## D434 — a stored rating is its forty cases, and the mean is rebuilt rather than written down
+
+**Date: 2026-09-01 · Owner: wave J lane B, GitHub issue #224 · Applies [§ D433](#d433)'s slot to the
+ladder.**
+
+**Decision.** `gauntlet/ladder.ts#SavedRating` keeps a rating's **cases and its denominator**, and
+stores none of the five figures `ratingOf` computes from them — not `rating`, not `casesRated`, not
+`casesRun`, not `complete`, not `weakest`. A restored row is rebuilt by `ladderEntryOf` through the
+same `ratingOf` a live gauntlet folds with.
+
+**Why.** Writing the aggregate down creates five figures a store can hold in disagreement with the
+evidence beside them: a rating of `91.2%` over cases whose scores mean `88.4`, a `weakest` naming a
+case that is not the worst one, a `complete: true` over thirty-nine. **Nothing would notice**,
+because the ladder draws the stored aggregate and never re-derives it — which is this repository's
+published-number defect with a `localStorage` key in place of a document. Keeping the evidence and
+recomputing means there is one arithmetic, and a row restored from last week and one computed a
+second ago cannot disagree about a mean.
+
+It also keeps invariant 5 where it belongs. Every `RatedCase` carries the seed it ran under, so a
+kept rating is a claim that **replays exactly**; `ratedCaseIssue` refuses a case with no seed at the
+storage boundary rather than restoring an unrepeatable figure onto a standing table.
+
+**The one figure that is stored, and why it is not an exception.** `casesTotal` cannot be derived
+from what is kept. `ratingOf`'s own docstring says why it is a parameter rather than `cases.length`:
+the interesting incomplete rating is the one where a case **never ran** — a cancelled gauntlet, a
+failed worker — and that case has no row at all, so a restore reading `cases.length` would report
+`40 of 40` on a gauntlet that ran twelve. That was not a hypothetical here: every existing case in
+`gauntlet/ladder.test.ts` had the two numbers equal, so the substitution was **silent** until a
+twelve-of-forty case was written for it.
+
+**`fingerprint` is stored for the same class of reason.** § 11.7's *edited since* is a comparison
+against the dispatcher as it stands **now**, so without the digest a restored rating would be a
+figure with no way of telling the player it is stale — present rather than usable.
+
+**What the restore does not do.** It does not repair. A rating with one unreadable case is refused
+whole, because `rating.ts` says in terms that a mean over a different set is a different quantity;
+and a progress payload whose ratings are unreadable takes the solved set down with it, because
+showing a player part of a career with nothing saying a part is missing is the quiet-repair defect
+wearing a friendlier face. The one thing deliberately **not** refused is a solved id naming a case
+this build no longer ships: `fixitCaseRailModel` derives every row and its `{fixed}/{total}` count
+from the loaded case file, so such an id matches nothing and inflates nothing, and refusing the set
+over a catalogue edit would lose a player's afternoon to a data change they did not make.
+
+## D435 — where § 3.3 and § 14.1 disagree on one screen, the defect condition wins
+
+**Date: 2026-09-01 · Owner: wave J lane C · GitHub issue #182 · Deviates from
+`GAMEPLAY_AND_NAVIGATION.md` § 3.3, line 188.**
+
+**The disagreement.** § 3.3's `stage · watching` row prints its note verbatim:
+
+> Their record, replayed. Nothing here is scored, and **your** own day is untouched.
+
+§ 14.1, about the screen that row is pinned under, says in terms:
+
+> **No first-person copy anywhere in the mode.** Not `you`, not `your run`, not `your best`. The
+> word `you` on a watched run is a defect.
+
+The two are the same document contradicting itself, and until this wave nothing had to choose:
+`everyday/actionBar.ts` transcribed the row and no shell could reach `ctx: 'watch'` to draw it. The
+route built for issue #182 draws it in the pinned bar under the § 14.1 stage.
+
+**Decision.** § 14.1 wins. `WATCHING_NOTE` ships as *"Their record, replayed. Nothing here is
+scored, and the day on this device is untouched."*, and `GUIDE_WATCHING_NOTE` keeps § 3.3's sentence
+beside it, transcribed and never drawn.
+
+**Why that way round.** § 14.1 states a **defect condition** — a thing a test can fail, and one this
+repository already fails on `watchingStrings`, on `shellWatchingStrings` and on the Engineer tier's
+rendered page. § 3.3 states **copy**. A rule that can be checked outranks a sentence that cannot, and
+`docs/12`'s documented-deviation pattern is what a build does when the handoff disagrees with itself.
+The precedent is one directory over and identical in shape: [§ D407](#d407) substituted
+`VERIFIED BY RE-SIMULATION` for § 14.1's own `VERIFIED BY THE SERVER`, because the guide's cell
+asserted a check that does not happen here.
+
+**What is preserved.** All three of the cell's claims: the run is *their record*, it is *replayed*,
+and *nothing here is scored*. The fourth clause is kept as a claim about the **device** rather than
+about the reader — `watch/shell.ts#RAIL_EYEBROW_WATCHING`'s own move (*The week on this device*) —
+and it is true for that module's stated reason: `watch/session.ts#watchingStateOf` carries `week`,
+`report`, `tomorrow` and `interventions` by reference and moves none of them.
+
+**How the deviation is stopped from outliving its reason.** `everyday/actionBar.test.ts` holds the
+guide's cell in the second transcription that exists to catch drift, and asserts **both** directions:
+that the guide's sentence is still first-person, and that the shipped one is not. A future revision
+of the handoff that drops the pronoun turns this case red on the day it lands, and the fix is then to
+delete the deviation rather than to keep it because nobody re-read it. That is [§ D227](#d227)'s rule
+— a refusal is pinned by a run, never by another sentence — pointed at a test instead of at a
+control.
+
+**Not claimed.** No other § 3.3 cell is deviated from, and the guide's table is otherwise
+transcription. The one row the table does not contain at all (`report`/`watch`) is unchanged and
+still carries `guide: false`.
+
+---
+
+## D436 — a route away from a dead seam is the same defect, and its absence is deleted with it
+
+**Date: 2026-09-01 · Owner: wave J lane C · GitHub issue #182.**
+
+**What was true.** `packages/viz/src/watch/` was complete and good: a record is the *question*
+(`{seed, config, interventions[]}`) rather than a recording, it is replayed rather than re-run with
+the viewer's own dispatcher, a row that does not reproduce its four posted figures loses its button
+rather than replaying something approximate ([§ D407](#d407), ENGINE_CONTRACT § 1.5), and § 14.1's
+no-first-person rule is grepped over the value the shell draws from.
+
+It was reachable from the **Engineer** shell alone. `everyday/types.ts` declared `'watch'` as § 18's
+fourth run context, `everyday/actionBar.ts` carried the whole § 3.3 `stage · watching` row,
+`everyday/rail.ts` carried its subline, and `everyday/host.ts` named the gap in its own register of
+absences — *"no watch entry — § 14's spectator flow has no Everyday surface yet"*. What was missing
+was one thing: `everyday/shell.ts` set `ctx` from the tile a player commits to and could produce only
+`daily`, `campaign` or `rush`.
+
+**The decision, and why it is recorded rather than left to a docstring.** This is
+`docs/05-roadmap.md`'s standing requirement in its second form — not *a behaviour with no caller*,
+but **a caller with no route to it** — which is the shape `accessZones` had and which this repository
+keeps a register of. The register is why the instance is named. The route:
+
+- **`everyday/host.ts`** gains five methods — `watchableRuns`, `watchRun`, `watching`,
+  `stopWatching`, `playThisCrowd` — and the stated absence is **deleted on the same commit**. A
+  stated absence that has stopped being true is [§ D227](#d227)'s defect with its polarity reversed.
+- **`dev/main.ts`** implements six bindings, every one of them onto a seam `dev/watchPanel.ts`
+  already presses. Two shells, one `enterWatch`, one `stopWatching`, one `playThisCrowd` — a second
+  implementation would be a second answer to *whose day is on screen*.
+- **`everyday/weekScreen.ts`** draws the rows, directly under the block that says why the board has
+  none. § 14.1 opens *"A board row is a run, and a run can be watched"*, and the rows this build has
+  are the days this device filed and the reference runs it ships.
+- **`everyday/stageScreen.ts`** draws § 14.1's table from `watch/view.ts` — the ink band, the
+  initial, their name, `THEIR DISPATCHER`, the source line, the posted figures, the pill — and
+  disables § 7.6's intervention rows.
+- **`everyday/shell.ts`** owns the context: `enterWatch()` sets it, and `go()` clears it and calls
+  `stopWatching` on **any** move off the stage.
+
+**Two findings from building it, both of which a reader should have before touching this code.**
+
+*The entry rule would have undone the whole route.* `stageEntryStartsARun` reads `open`, which is
+false for *"a watched or file-loaded run — somebody else's"*, and `dayClosed`, which a watch leaves
+false. So it answers **true** on the way into a watch, and the mount's first act would have been
+`host.startRun()` — the player's own day simulated over the record they had just pressed `Watch it`
+on, with the spectator band naming somebody else over it. The rule is right and the call site had to
+ask § 18's second question. Measured rather than argued: with the guard removed, the stage header
+goes from the record's `06:00 · FILLING` to the player's own `08:00 · STEADY` inside four seconds
+while the band still names the record.
+
+*One exit was not enough.* `requestLeave` handles `⤺ Stop watching`; every rail row calls `go`
+directly. A row pressed while a record was on the stage left `ctx: 'watch'` standing over a screen
+that is not a stage, with the watched run on `state.recording` and the player's own day still
+snapshotted inside `dev/main.ts` — the state § 3.4 exempts a watch from *warning* about, and
+therefore the one nothing else was going to catch. The clear is centralised in `go` and the button
+now only chooses the destination.
+
+**§ 20.15's instruction this build cannot carry out, withdrawn rather than reworded.** The guide:
+*"`Play this crowd yourself` must open the brief for **that day's** fixture, not today's, when the
+row belongs to an archived day."* The conversion this build has carries the record's selection and
+deliberately **not** its week day — `dev/main.ts#playThisCrowd`'s own stated omission, because the
+day number belongs to the watched week and would grow the spectator's building by somebody else's
+schedule. `shift/growth.ts` grows a tower 11 % per day and `shift/events.ts#eventFor(day, dayIdx)`
+derives the day's event from the pair, so on a row from another day the crowd set up is **not** the
+one on the stage.
+
+So the primary is resolved **inert with a sentence naming the mechanism** on any row whose record is
+not the day standing here — `everyday/watchStage.ts#playThisCrowdRefusalFor` — and live on one that
+is. That is [§ D392](#d392)'s rule (an instruction a control cannot carry out is withdrawn rather
+than reworded) rather than [§ D227](#d227)'s, because the control is not inert everywhere: it works,
+on the rows where it can keep its promise. Both directions are driven, because a control withdrawn in
+every state is a control the player never gets and § 14.1 calls this one *"the whole reason watching
+exists"*. § 6.1's replay of an archived day (GitHub issue #177) is what would make it live
+everywhere, and it is not built.
+
+**Two limits, stated rather than discovered.** *Another player's* posted run is not a source — that
+needs the wire, and there is no server; the picker's own lede says so on its face. And the reference
+runs are labelled `reference run · not a player` from `WatchableRun.source` rather than from the file
+they were read out of, which is § 20.11 kept by construction.
+
+**The grep, and the trap it was written for.** § 14.1's rule is enforced over
+`watch/view.ts#watchingStrings` and `watch/shell.ts#shellWatchingStrings`, and the Engineer browser
+tier sweeps five named selectors. **A second screen drawing the same run through a different path
+passes all of it.** Measured: with a first-person clause added to the Everyday watching stage,
+`watch/view.test.ts` reports 13 passed and `dev/watch.browser.test.ts` 1 passed, both green, while a
+player reads the word § 14.1 calls a defect.
+
+The Everyday sweep is therefore a **region rather than a list**:
+`everyday/watchStage.browser.test.ts` reads the rendered text of `.everyday-screen` and
+`.everyday-bar` — the two boxes § 3.1 gives the shell sole ownership of, which every screen it mounts
+draws inside — plus the one rail cell that names the run. A string added anywhere on the watching
+screen is inside that sweep with nobody having to remember a selector, which is the property
+`docs/20` defect 7 records the absence of.
+
+**Not claimed.** The rest of the rail is outside the sweep and says so: its rows name screens (*Your
+week*) and its card names the player, and neither describes the day on the stage. That is
+`watch/shell.ts`'s own line — *does this surface describe, identify or attribute the day on the
+stage?* — and it is drawn in writing rather than left to whoever adds the next surface.
+
+## D437 — the honesty corpus runs fitted towers, and which kit is a survey rather than a preference
+
+**Date: 2026-09-01 · Owner: lane D, wave J · Closes GitHub issue #312. Answers the null result
+[§ D427](#d427) predicted and did not get, and re-measures that decision's tier table at cells it was
+never taken at.**
+
+**Decision.** `HonestyCase` gains `fitOutId`, a `honesty/fitOut.ts#HONESTY_KITS` id or `null` for a
+tower **as built**. `honesty/run.ts` resolves it once per case and applies it to everything that is
+the run — the recording, the pairing run § D310's delta block needs, both batch arms, and the
+building the context describes — through the shipped `campaign/fitOut.ts` appliers rather than a
+second copy of them. The library the editors draw (`buildings`, `buildingDocument`,
+`dispatcherProfiles`, `elevatorSpecs`) stays as shipped: a kit is bought against one building for one
+contract, and a fit-out that rewrote the library would put a purchase on four buildings nobody bought
+it for.
+
+**What was wrong.** § D427 made a campaign purchase reach the run and said in advance what that would
+do here: *"any corpus case that ever carries a non-`AS_BUILT` fit-out would move."* The corpus was
+then measured on the integrated tree against a re-measured base and **every figure was identical**.
+None did. So the corpus held **no case in which anything had been bought** — every campaign case the
+ten honesty properties saw was a tower as built, and none of them had ever read a string produced by
+a run whose doors, machines, cars, shafts, control or tenancy were fitted out. A surface can be
+honest about a tower as built and dishonest about a fitted one, and nothing would have noticed. That
+is a hole in the corpus's coverage of GAMEPLAY § 8 found **by a null result rather than by a
+violation**, which is the thing the Phase 9 status row exists to make visible.
+
+**An axis, not a case, and the precedent is cited with its own measured null.** `HONESTY_MODES`
+(§ D194) is the shape: its second value produced **zero** new strings the day it landed, and that
+stopped being true later, when the Day report and the live-metrics panel became mode-aware. The value
+of generating an axis is that it is driven from the day a fitted surface lands rather than from the
+day somebody remembers to check it; one new case would be a screen the search reads once, on one
+building, at one horizon. This axis is **not** that null — it moves the run at every always-on case it
+is drawn on, which is asserted on the legs rather than argued.
+
+**Drawn last.** After `mode`, which was itself drawn last for this reason: the 49 pinned seeds keep
+the building, dispatcher pair, horizon, demand, batch shape and mode they already had and gain a
+field. A corpus whose cases moved under a new axis would have had its regression history silently
+rewritten, and the failures those seeds are pinned for would be about configurations nobody had ever
+run.
+
+**Which kit is a measurement, and it had to be re-taken.** § D427's table is measured at
+`garden-apartments`/3 600 s — the campaign's own cell, which is what `everyday/host.ts#runCampaignDay`
+writes. This corpus runs five buildings at **600–900 s** in the always-on tier, and
+`scope/probes.test-helper.ts` already records that `doors` L1 is **inert** at
+`garden-apartments`/900 s. A kit inherited from § D427's table would have been a kit measured where
+this corpus never runs. So `honesty/measure.fitOut.test.ts` sweeps **all sixteen shipped tiers over
+all 49 always-on cases**, as built and fitted, comparing the legs — passenger, car and boarding
+instant, `scope/probes.test-helper.ts#legsOf`'s string and § D177's rule, never a window statistic:
+
+| tier | legs move | tier | legs move |
+|---|---|---|---|
+| `doors` L1 | 38 | `machines` L1 | 41 |
+| `doors` L2 | 38 | `machines` L2 | **49** |
+| `doors` L3 | 40 | `machines` L3 | **49** |
+| `control` L1 | not drivable at this corpus's seams | `cars` L1 | **0** |
+| `control` L2 | 31 | `cars` L2 | 26 |
+| `control` L3 | 33 | `shafts` L1 / L2 | 44 |
+| `tenants` L1 | 24 | `tenants` L2 | not drivable at this corpus's seams |
+| `tenants` L3 | 27 | | |
+
+**`cars` L1 moves 0 of 49, which extends § D427's finding rather than repeating it.** That decision
+found the tier inert at the campaign's cell and live at the same cell at 15 % of population per
+5 min. Here it is inert at **every** cell: no always-on horizon fills a car, so *16-person cars* is an
+empty control across a whole tier. `machines` L1 is inert on exactly the eight `secure-tower` cases
+and nowhere else, which is a fact about one building's fleet.
+
+**Two tiers are not drivable at this corpus's seams, and that is a refusal pinned by a run.**
+`control` L1 is `zonesTheTower`, which `leversWithKit` writes onto a `GroupLevers` that
+`authoring/dispatcherSpec.ts#profileFromSpec` turns into a profile — a case names a **shipped**
+profile and builds no spec. `tenants` L2 is `arrivalRateFactor`, and a case's demand is either an
+explicit rate or `null` for the building's own profile, so multiplying `null` would mean resolving a
+schedule into a constant: a second change to the run beside the one being measured. `honesty.test.ts`
+asserts no shipped kit carries either field, so the exclusion is § D227's rule obeyed rather than a
+sentence a reader has to trust.
+
+**Two kits, over two seams, and the second is bought *on top of* the first.** `machines` L2 is the
+seed because with L3 it is the only rung that moves 49 of 49 — a kit inert on a case is a case that
+adds strings without adding coverage. But § 8 has two appliers and they are separate seams:
+`fittedBuilding` edits the tower, `profileWithKit` edits the dispatcher, and `machines` L2 names no
+`dispatch` field, so a corpus driving only it would leave `profileWithKit` at its identity branch
+forever. `control` L3 alone moves only 33 of 49, so it is bought beside a tier that always moves
+rather than instead of one.
+
+**That is the *turn the whole shop on* mistake unless something checks each category alone, and
+something does — measured, not argued.** `probes.test-helper.ts` states the risk: *"an arm that
+turned the whole shop on would still be green if five of the six categories had come unwired."*
+Unwiring the dispatcher seam alone was run: the corpus-wide *"the fit-out axis moves the run"* case
+**stayed green**, because `machines` L2 carries the move, and only the per-category probe went red.
+That is the argument for the probe existing, taken as a measurement rather than offered as one.
+
+**What it cost, and what it did not.** Branch-local, always-on tier: strings **571 205 → 571 295**
+(+90), and **simulations, surfaces and failing cases all unmoved** — 606, 53 and 0, with the surface
+sets diffed rather than the counts compared and found identical. A fitted case runs the same number
+of simulations as an as-built one; it resolves one extra building. These figures are **branch-local
+and are not published to `CLAUDE.md`**: § D343 puts that measurement on the integrator, once, after
+integration, both tiers in one sitting.
+
+**One column moved that nobody predicted, and it is the most interesting thing here.** Suppressed
+runs went **9 of 49 → 12 of 49**. Three cases — 9022, 9024 and 9034, all `mixed-use-high-rise` under
+`machines-2+control-3` — publish a quotable mean as built and have it **refused** once the tower is
+fitted. So a purchase changes whether R3 has anything to say about the run at all, which is exactly
+the class of thing a corpus of as-built towers could not see. No mechanism is offered for it: this
+repository's own rule is that a sentence about *why* something performs a certain way is either
+measured or declared unmeasured, and this one is unmeasured.
+
+**Seeded is not checked, and the difference is a fault.** `faults.ts#fittedTowerMeanLeak` is
+`suppressedMeanLeak` with one guard in front of it — *a tower as built has bought nothing to lie
+about* — so it is a no-op on every as-built case by construction. `faults.test.ts` asserts both
+directions on one case: fitted, it produces a fresh R3 violation; the same case with `fitOutId: null`,
+it produces none. A fault that fired either way would prove the property works and say nothing about
+whether the fitted half of the corpus reaches it. Its fixture is a **fitted and suppressed** case, and
+whether the corpus still produces one is itself a measurement, so the fixture loop throws with that
+sentence rather than skipping.
+
+**The shrinker can put a tower back as built**, second in the reducer order, and what that buys is a
+diagnosis rather than wall clock: a violation that survives the reduction was never about the
+fit-out, and one that does not survive it is a violation only a fitted tower produces.
+
+**Four deep-tier cases are fitted and inert, and each is a named cell rather than a failure** —
+§ D427's own precedent, which asserts an empty cell beside a cell where the same tier moves. Two are
+`crown-hotel` and `st-jude-hospital`, whose only bank is mixed-fleet, so `campaign/fitOut.ts#choicesFor`
+refuses to flatten it and the `machines` tier buys nothing there; the other two are `chancery-house`,
+whose six cars are **already** `gearless-traction` at 5 m/s — a tower that has what the tier sells.
+All three are stage buildings, reachable in no other tier, which is why the corpus-wide legs assertion
+is scoped to the always-on tier where the survey was taken.
+
+**Not claimed.** That the properties would *catch* a real fitted-surface defect — only that they read
+a fitted run's strings, and that one of them can be made to fire there. Nothing here changes a
+property, and `honesty/properties.ts` is untouched.
+
+## D439 — a board is keyed by the date or by the player, and the digest that used to key it keeps the job it was right for
+
+**Date: 2026-09-01 · Owner: wave J lane E, GitHub issue #179 · Moves [§ D214](#d214) § 4's board
+identity and [§ D288](#d288)'s window clause; does not move either digest's bytes.**
+
+**Decision.** `packages/server/src/leaderboard/submission.ts#configHashOf` answered two questions
+with one 32-character value, and only one of the answers was its to give.
+
+`ENGINE_CONTRACT.md` § 12.1:
+
+> **No player-settable parameter may enter a board key.** A key of building × dispatcher × traffic
+> template × arrival rate × run length fragments into thousands of one-entry boards where everyone is
+> permanently first. Arbitrary configurations post to a personal-record log instead.
+
+The digest was that key exactly, plus a window. Every axis in it is one a player picks, so every
+distinct selection minted a leaderboard whose only entrant was the person who invented it — and the
+product's own `http/api.ts` said so approvingly: *"one configuration — dispatcher included — across
+seeds … choosing a different one moves a player to a different board rather than up the one they are
+on."*
+
+So the value is **split rather than deleted**:
+
+| question | answer, now | answer, before |
+|---|---|---|
+| what data was this row measured against? | `boardKey.ts#runDataHashOf` | `configHashOf` |
+| which board is this row on? | `boardKey.ts#placeSubmission` | `configHashOf` |
+
+`placeSubmission` returns `daily:<date>` for a run that **is** the day's fixture, and
+`personal:<user id>` for everything else. The dispatcher is in neither: on the daily board it is the
+axis being compared, and in a personal log it is unnecessary because the log is one player's.
+
+**The verification property survives, and it is pinned to a literal rather than argued.** § D205 and
+§ D213 are the reason the digest exists — a recorded case losing its subject when `data/` moved, twice
+in one branch — and that reason is about *"does this row still describe the run it names"*, which is a
+verification question and not a board question. `runDataHashOf` digests the same canonical string over
+the same fields in the same sorted order, and `verify.test.ts` still asserts a whole-period reference
+run hashes to **`d77c9681da72ea7aea293a204a1b55ff`**, the same hex it asserted before the split.
+Three fields have now been added to `SubmittedRun` without moving it — `windowStartS`, and § D440's
+`ruleRows` and `interventions` — because each is written as `undefined` when the run did not use it and
+`canonicalJson` drops `undefined` entries. An entry stored before any of the three names exactly the
+data it always named.
+
+**What this costs, stated rather than glossed.** Two properties this repository deliberately built
+are now weaker, and both were built on the premise that a board is a configuration:
+
+- **[§ D286](#d286) / issue #267's *"a ten-hour run never competes against a thirty-minute one"*.**
+  The *distinction* survives — the two runs carry different data hashes — and the *board partition*
+  does not: neither is the day's fixture, so both land in the same personal log. That is the trade the
+  contract asks for, and it repays `RISKS.md` R32 and issue #222, whose subject is the empty board a
+  unique length used to mint.
+- **`menu/boardRun.ts`'s *"the dispatcher is a property of the board, not of the row"*.** False now,
+  and the module's own `agreed` check is what catches it rather than a reader: a page whose rows
+  disagree gets no configuration sentence, so the reveal goes **quiet** on a daily board rather than
+  naming a dispatcher that ran some of the rows. Quiet is correct and is not finished — a daily
+  board's reveal should name the axes the rows agree on and put the dispatcher on each row — and that
+  is a screen change recorded here as owed rather than made silently.
+
+**The day's fixture, and what is invented and what is read.** § 12.1 keys the daily board by the date
+and § 12.1's next sentence requires that *"rows within a board must have met the identical crowd, or
+the sort is a ranking of luck"*, so a per-date fixture and a per-date seed are **required by the
+contract** rather than chosen here. What is chosen is their form: `chancery-house` on `office-day` run
+whole, which is § 2's own fixture in the ids this server ships, and a seed that is the date's digits,
+which is already this repository's seed convention (*seed 20260804*). § 1's printed `424242` is the
+prototype's constant and is the one thing a per-date key cannot use.
+
+`windowStartS: 0` beside `durationS: 36000` is forced rather than stylistic: `office-day` is an
+authored phase list and `core` refuses `templateOverrides.durationS` on one by name ([§ D275](#d275)),
+so a fixture written the other way would be a daily board whose every submission threw inside the
+replay. It is also the pair the viewer's own whole-day control produces
+(`shift/dayLength.ts#wholeDayRun`), which is what makes it a fixture a client can reach rather than a
+shape only the server can write.
+
+**The ladder is declared and unbuilt, and that is in a table rather than in a union.** § 12.1's third
+key is `dispatcher id`, scored as a mean over the fixed forty proof cases. One `SubmittedRun` is one
+case, so no submission this endpoint can receive is a ladder entry: it needs a forty-case route, a
+fold to a rating, and a board whose rows are dispatchers. `BOARD_KEYS` transcribes all three keys with
+a fourth column the contract does not have — **which route reaches this key** — and the ladder's is
+`null`. `boardKey.test.ts` asserts both directions: every row with a route is produced, and the row
+without one is produced by nothing. A `'ladder'` branch of `BoardPlacement` that nothing returned would
+be this repository's signature defect with a contract quotation over it.
+
+**What is unmeasured and is left so.** Nothing here decides whether a daily board should hold several
+rows from one player under different dispatchers. `UNIQUE (board_key, data_hash, user_id, seed)`
+permits it, and that is a game-design question this issue did not authorise; the alternative — one row
+per player per board — would need a rule for which of their runs is *the* one, and no such rule exists.
+
+---
+
+## D440 — an Everyday run is postable, and every refusal that shrank is pinned by a replay
+
+**Date: 2026-09-01 · Owner: wave J lane E, GitHub issue #179 · Shrinks two of
+[§ D129](#d129)'s refusals in `scope/runIdentity.ts`; leaves the rest standing and adds one.**
+
+**Decision.** `SubmittedRun` expressed none of what an Everyday dispatcher is, so
+`scope/runIdentity.ts` correctly refused every state carrying a rule list or an intervention log —
+and the consequence was that a player who wrote a single rule row could never appear on any board.
+The whole of § 11's workshop produced dispatchers that were **unpostable by construction**.
+
+The wire now carries both, and each refusal is decided by a run rather than by a sentence
+([§ D227](#d227)).
+
+**`ruleRows` — the refusal is gone.** Its stated ground was *"no field of `RunSubmission`, no CLI flag
+and no deep-link parameter expresses a rule list"*, and that fact has changed. The server writes the
+player's rows onto **its own** resolved profile (`verify.ts#profileWithRules`), which is the same pair
+of writes `authoring/ruleSpec.ts#profileWithRules` makes and the only pair `core` accepts —
+`resolveDispatchConfig` refuses a `rules` section under any policy but `'rules'`, and refuses that
+policy with no rows — so the duplication is a transcription of a constraint rather than a second
+opinion.
+
+A rule list is not the inline-object cheat `submission.ts` was written against. A row is two ids and
+two values drawn from closed lists `core` declares — nine conditions, eight actions, a `values` array
+each — so the whole space a submission can express is a finite product of shipped vocabulary.
+`submissionIssues` refuses anything outside it before a simulation starts, which is the cheap gate's
+own job: an unauthenticated shape error must not command CPU.
+
+**`interventions` — the refusal shrank from *any log* to two kinds, and it grew a ground.** The arm
+had recorded two grounds and said which was temporary:
+
+1. *"No field of `RunSubmission` … expresses a log … the day the wire grows one this ground comes
+   back out."* It has, and it did.
+2. *"A `switch-dispatcher` entry carries a whole weight vector inline."* Called structural, and it is:
+   the wire could only carry a switch as a **shipped profile id**, which is a different field from the
+   one the viewer needs locally, because its driving profile is routinely a derived object no id
+   resolves.
+
+The third was found while shrinking. An `answer-incident` answers a campaign incident, and
+`shift/incidents.ts` writes that incident onto the *building* as `serviceEvents` from the week's day
+and the calendar. Neither travels. A replay built from ids alone therefore holds **the answer and not
+the thing answered** — the option's own service events would be the only mode changes in the run — so
+this is a missing **cause**, not a missing field, and no widening of `SubmittedRun` would close it.
+`SUBMITTABLE_INTERVENTION_KINDS` names the one kind that travels rather than the two that do not,
+because an allow-list refuses a kind added tomorrow and a deny-list would let it through silently.
+
+**The run that decides all of it, and the cell that would have decided nothing.**
+`verify.test.ts` builds the config the way `dev/state.ts#shiftRunConfigOf` builds one — by hand, term
+for term, because `viz` must build and test with `packages/server` absent — takes the metrics off it
+as the **claim**, and requires `verifySubmission` to accept. On `midtown-office` at 3 % over 900 s,
+seed 20260804:
+
+| run | `awtS` |
+|---|---|
+| plain | **23.0038** |
+| two rule rows | **26.1676** |
+| one `park-cars-lobby` at 225 s | **26.2945** |
+
+On `garden-apartments` at 6 % over 900 s — the file's own reference run — all three are
+**17.404761904761926**. The rules never fire and stage 7 is never consulted, so every case above
+would have passed over a server that dropped both fields, and the wire would have been the twelfth
+dead seam: carried, validated, changing nothing. The cell is named in the fixture's docstring for
+that reason.
+
+The direction is *worse*, and saying so is the point: a rule a player wrote is not required to help
+them, and a wire that only carried improvements would be a scoreboard rather than a simulator.
+
+**The mutation, because acceptance is not the property.** A submission whose claim is the ruled run's
+and whose stored rows are a different list is refused `metrics-do-not-reproduce` — at the verifier and
+again over the real route in `api.test.ts`. So is one whose claim is a logged day stored as an
+untouched one. A server that accepted the fields and replayed without them would board both.
+
+**What is still refused, and why each ground is still true.**
+
+| field | ground |
+|---|---|
+| `viewer.commissioning` | § D129's measurement: a fabric on the wire is a two-floor tower with sixteen cars |
+| `viewer.calendar` | a `CalendarPeriod` is a code table with no `data/` digest |
+| `viewer.patience` | no field carries a curve, and abandonment moves the mean it would be judged on |
+| `viewer.levers` | a lever writes door timing onto the building and weights onto the profile; no field |
+| `viewer.savedClasses`, `viewer.buildingId`, `viewer.dispatcherId`, `viewer.pattern` | saved on one device |
+| `viewer.week` | growth and the day's event |
+| `viewer.campaignFitOut` | § 8's kit is a building edit and a dispatcher edit |
+| `viewer.selectorSpec` | a submission carries a dispatcher id, not a selector |
+| `viewer.outOfServiceCarIds` | nothing in a selection holds a car |
+
+None of these is lifted, and none is loosened. `ruleRows` keeps a refusal of its own in the shape the
+three *"saved on this device alone"* ones already have: a row naming a condition or a value this build
+does not declare is unreproducible **by value** rather than by field, and is reachable because a
+`ViewerState` is rehydrated from a browser's own storage.
+
+**The two consumers have stopped asking the same question, and the module says so.**
+`runIdentityIssues` serves both the submit path and `dev/main.ts#provenanceLineOf`, whose docstring
+opens *"Those are the same question."* The CLI has no flag for a rule list or a log and no plausible
+one — four scalars per row, a time series — so the shared predicate answers *can the artefacts that
+resolve against `data/` reproduce this run at all*, and the CLI refuses the rest **for itself**, beside
+the refusal `partFlagFor` already makes about a window on a template with no clock. That is one
+predicate plus an artefact-local clause, not two answers to one question; `runIdentity.test.ts` drives
+the pair together, because a test that saw only one of them would pass over a build where both had
+gone quiet.
+
+**A stale sentence corrected in passing.** `scope/permits.ts` justified `ranked`'s row with *"nothing
+else survives the server's replay"*. Two `within-day` fields now do. The row is unchanged and correct
+— its one non-test caller is `fieldsAnsweredFor`, where a forbidden scope means the field is *asked
+about* and `CARRY_CHECKS` gives the answer — but the reason was a claim about the wire, and the wire
+moved.
+
+**Not claimed.** No Everyday client path is asserted to produce a postable ruled run end to end. The
+submit path sends the fields and the server replays them; whether the Everyday shell's own flow
+reaches `submitScore` with a written dispatcher is a question about `everyday/`, which this lane did
+not touch.
+
+
+## D441 — two lanes can each be right and be wrong together, and only a derivation catches it
+
+**Date: 2026-09-01 · Owner: integrator, wave J · Three instances in one integration, with three
+different detection outcomes.**
+
+**Decision.** A figure or a resource that lanes choose independently must be **derived from the tree
+at check time**, never compared against a value written down. A guard that asks *does the document
+say 34?* passes when two lanes have each correctly moved it from 33 to 34; a guard that asks *what
+does the tree hold?* fails, which is the only useful answer.
+
+**The class.** Two lanes branch from one base. Each makes a change that is locally correct, verified,
+and green on its own branch. Neither can see the other. At integration the two changes are both
+present and the result is wrong — and because the lanes wrote *the same* text, **git produces no
+conflict**. A merge marker is a signal that two lanes disagreed; this class is two lanes agreeing on
+something that stops being true once both land. Nothing in the merge machinery can see it.
+
+Wave J produced three instances, and the interesting part is that they were caught by three different
+mechanisms of three different strengths:
+
+**One — the browser-tier file count. Caught by a derivation.** Lanes B and C each added one
+`*.browser.test.ts` file and each published **34**, correct on each branch. The tree holds **35**.
+`viewportGateClaims.test.ts` reads the count off disk and names every live site, so it went red at
+integration and listed all seven. This is [`RISKS.md`](RISKS.md) R38's own shape landing on the row
+R38 exists to protect — and note the figure went stale on a merge that added **no line** to either
+document, which a review of the diff could not have caught.
+
+The ratio was re-verified rather than renumbered: both new files call `chromium.launch()` as a
+literal and the tree holds no `firefox` or `webkit`, so **35 of 35** is a measurement. The dated
+figures were left alone — § 5's *"~157 s when the tier held 25"* is a correct record of a
+measurement then, and striking it through would claim a correction that has not happened.
+
+**Two — the browser-tier port. Caught by a derivation, and it is the dangerous one.** Lanes B and C
+each took the lowest free port on its own branch; both took **5217**. `dev/browserTier.test.ts`
+caught it. Without that guard it would **not have failed loudly**: `strictPort: false` lets the
+loser move, so the tier comes up as two servers on one origin serving each other's pages, and the
+symptom is an intermittent wrong-page assertion rather than an error. `watchStage` moved to 5218 —
+the gap the tier already had between 5217 and 5219 — and which of the two files moved is arbitrary
+and recorded as such.
+
+**Three — `EverydayHostBindings`. Caught by the compiler, which is why it is the easy one.** Lane C
+widened the interface with six spectator members; lane A added two campaign fixtures constructing it
+as a literal. `tsc -b` failed on both files at the merge. This instance is in the entry to mark the
+contrast: **where a type expresses the constraint, the class is caught for free.** The first two
+were caught only because somebody had previously built a guard that derives. The count and the port
+are not expressible as types, which is exactly why they needed the guards they had.
+
+**What this does not license.** The six bindings were supplied to lane A's fixtures **honestly**,
+not uniformly. Five throw, because a silent stub answering `enterWatch` or `simulateRecord` would
+let a later change reach the spectator state through a campaign test and still pass — this
+repository's signature defect with a green tick over it. `watching()` returns `undefined` because
+that is *true* of those fixtures, not because `undefined` is convenient. Making a build error go
+away is not the same as making the code right, and the difference is visible only in what the stub
+claims.
+
+**The rule, stated for the next integrator.** Before merging a wave, ask what each pair of lanes
+could have chosen independently: a count, a port, an id, a seed, a fixture name, a schema version.
+For each, check that something **derives** it. Where nothing does, that is the wave's next guard,
+and it is worth more than the fix it would have prevented.
+
+## D442 — wave J's corpus move, attributed where attribution is possible and refused where it is not
+
+**Date: 2026-09-01 · Owner: integrator, wave J · The measurement [§ D343](#d343) requires, taken
+once on the integrated tree.**
+
+**Decision.** The honesty corpus was measured once after integration, both tiers in one sitting, on
+the integrated tree and never on a branch — and the base at `df36e7c` was re-measured first in a
+detached worktree so that a move could be told from a correction.
+
+**The base reproduced its published row exactly, in both tiers.** 49 / 571 205 / 606 / 53 / 0 and
+60 / 712 547 / 4 710 / 54 / 0. That is the **fourth** consecutive wave the base has been confirmed
+rather than trusted, and the check is cheap next to the five occasions this column has been wrong.
+
+| | base `df36e7c` | integrated | move |
+|---|---|---|---|
+| always-on strings | 571 205 | **572 667** | **+1 462** |
+| deep strings | 712 547 | **714 553** | **+2 006** |
+| always-on surfaces | 53 | **54** | **+1** |
+| deep surfaces | 54 | **55** | **+1** |
+| always-on suppressed runs | 9 | **12** | **+3** |
+| deep suppressed runs | 20 | **21** | **+1** |
+| cases, simulations, failing cases | 49 / 60, 606 / 4 710, 0 | **unmoved** | **0** |
+
+**The surface sets were diffed rather than the counts compared**, in both tiers. Exactly one surface
+was added — `everyday/watchStage.ts#everydayWatchingCopyOf`, lane C's — and **nothing was removed**.
+The deep tier's one-surface lead survived and the diff names it: `campaign/judge.ts#judgeStage` is
+the only surface in deep and not in always-on, and nothing is in always-on and not in deep. A wave
+that added a surface to both tiers did not disturb that gap, which is how a real move is told apart
+from a correction.
+
+**The string move is not decomposable per lane, and that is a structural claim rather than an
+unmeasured one.** Lane D's axis changes the legs of every fitted case, and state-dependent renderers
+on *other* lanes' surfaces — lane C's new watching copy among them — emit a different number of
+strings against a different run. So the lanes' contributions are not additive even in principle:
+lane D measured +90 on its own branch, where lane C's surface did not exist to be perturbed, and
+that figure cannot be subtracted from +1 462 to leave lanes A–C's share. Neither move divides
+evenly by its case count (+1 462 / 49 and +2 006 / 60 are not integers), and no arithmetic makes
+them one. Wave G's exact attribution was possible because a chip face is seeded once per case;
+claiming the same precision here would be manufacturing it.
+
+**What is attributable is attributed exactly**: the surface, by set difference, to lane C.
+
+**A lane predicted this measurement before it was taken, and the record is worth keeping.** Lane D
+published a forecast in its report — cases unmoved, simulations unmoved, failing cases 0, strings
+moving by no per-case constant, the surface sets unmoved *by its own change*, `suppressed runs`
+9 → 12 on the always-on tier, and a new `fit-outs` line reading
+`as-built=30 machines-2=8 machines-2+control-3=11`. **Every one of those is what the integrated tree
+measured**, including the suppression count and the fit-out draw to the case. A prediction that
+survives an independent measurement is worth more than a figure taken on a branch, and it is the
+only form in which a lane can say anything about the corpus under § D343.
+
+**The substantive finding is the suppression move**, and it is the corpus doing its job. Three
+always-on cases publish a quotable mean **as built** and have it refused once the tower is fitted;
+the deep tier moves by one. A purchase changes whether R3 has anything to say about the run — which
+a corpus of as-built towers could not see, and which is precisely the coverage hole wave I found by
+a null result and § D437 closed. **No mechanism is offered for why fitting a tower suppresses its
+mean.** It is unmeasured, and a second plausible sentence in place of a measurement is the defect
+[§ D256](#d256) exists to refuse.
+
+**Both registers are empty and both tiers are green**, so the verdict column means today what it was
+written to mean: 0 failing cases *and* nothing held in `honesty.test.ts`'s `OUTSTANDING`.

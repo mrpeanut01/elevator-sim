@@ -27,15 +27,25 @@
  * The disclosure's building names come from `data/buildings/` through a resolver, which is why no
  * tower name appears in this file (`gauntlet/proofCases.test.ts` asserts that across the tree).
  *
- * ## The forty run on a worker, and the rating is session-local
+ * ## The forty run on a worker, and the rating outlives the tab
  *
  * `runGauntlet` is handed `new Worker(new URL('../dev/batchWorker.ts', …))` — the same worker the
  * bench uses, for the same measured reason (`dev/batchWorker.ts`: one replication is a synchronous
  * `Simulation.run()`, 196 ms of dropped frames on Vertical City, and forty of those would be a
- * minute or more of a page that does not answer a click). Ratings live in module scope, exactly as
- * `everyday/fixitScreen.ts`'s solved set does and with the same named absence: no seam in
- * `persist/` stores one, so a rating survives leaving the screen and ends with the tab. The day the
- * session slot grows a ratings key, this store is what it replaces.
+ * minute or more of a page that does not answer a click).
+ *
+ * This section used to name an absence — *ratings live in module scope … a rating ends with the
+ * tab* — and GitHub issue #224 closed it. {@link RATINGS} is still the map the screen draws from,
+ * because a ladder is a *standing* rating and one row per dispatcher is the rule; what changed is
+ * that the map is seeded from `everyday/profile.ts`'s slot on first mount and written back on every
+ * finished gauntlet ([§ D433](../../../../DECISIONS.md)).
+ *
+ * **What is kept is the forty cases, not the mean** ([§ D434](../../../../DECISIONS.md)): the row's
+ * figures are rebuilt by `gauntlet/ladder.ts#ladderEntryOf` through the same `ratingOf` a live
+ * gauntlet folds with, so a restored row and one computed a second ago cannot disagree about an
+ * arithmetic. `fingerprintOf` is what makes a restored rating usable rather than merely present —
+ * § 11.7's *edited since* is a comparison against the dispatcher **as it stands now**, and that
+ * comparison is the same one whether the digest arrived from storage or from this sitting.
  */
 
 import type { DispatcherProfile, ResolvedBuilding } from '@elevator-sim/core/browser';
@@ -43,7 +53,9 @@ import type { DispatcherProfile, ResolvedBuilding } from '@elevator-sim/core/bro
 import { loadBrowserResources, loadProofCases, type BrowserResources } from '../dev/data.js';
 import {
   caseNamesOf,
+  ladderEntryOf,
   ladderRowsOf,
+  savedRatingOf,
   sendGateOf,
   whatAreTheFortyOf,
   LADDER_CAVEAT,
@@ -57,6 +69,8 @@ import type { ProofCaseSet } from '../gauntlet/proofCases.js';
 import { RATING_BASIS } from '../gauntlet/rating.js';
 import { runGauntlet, type GauntletHandle, type GauntletWorker } from '../gauntlet/run.js';
 
+import { everydayProgressWith } from './profile.js';
+import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
 import {
   EVERYDAY_COLORS as C,
@@ -123,13 +137,34 @@ function towerFactsOf(building: ResolvedBuilding): TowerFacts {
 }
 
 /**
- * Ratings measured on this device, this session. See the module docstring for the named absence.
+ * Ratings measured on this device — this sitting's, and every earlier one's.
  *
  * Keyed by dispatcher id, so a second gauntlet on the same dispatcher replaces its row rather than
  * adding one — a ladder is a *standing* rating and two rows for one dispatcher would be two claims
- * about one thing.
+ * about one thing. The same rule holds in the bytes, through
+ * `everyday/profile.ts#everydayProgressWith`; this map used to be the only place it held, and the
+ * two would drift the day a lane changed one of them.
  */
 const RATINGS = new Map<string, LadderEntry>();
+
+/** Whether {@link ensureRestored} has already run. Once per tab, like the proof-case load. */
+let restored = false;
+
+/**
+ * Seed {@link RATINGS} from what the last sitting earned — GitHub issue #224.
+ *
+ * Into the same map the live gauntlet writes, so `ladderRowsOf` receives one kind of entry and
+ * every rule about staleness, sorting and the incomplete note applies to a restored row unchanged.
+ * A second list beside it would have needed the sort and the *edited since* comparison applied
+ * twice, and § 14's table would have been two tables drawn on top of each other.
+ */
+function ensureRestored(): void {
+  if (restored) return;
+  restored = true;
+  for (const saved of everydayProfileStore().progress().ratings) {
+    RATINGS.set(saved.dispatcherId, ladderEntryOf(saved));
+  }
+}
 
 /** Loaded once per tab, as `everyday/fixitScreen.ts` caches its own. */
 let loaded: Promise<{ resources: BrowserResources; set: ProofCaseSet }> | undefined;
@@ -157,6 +192,8 @@ const NOTE = `font-size:13px;line-height:1.55;color:${C.warmGrey};margin:${Strin
 
 function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScreenHandle {
   const doc = host.ownerDocument;
+  // Before the first draw reads RATINGS — a restored ladder must be there on the first paint.
+  ensureRestored();
   const root = el(doc, 'div');
   root.className = 'everyday-board';
   root.style.cssText = 'max-width:860px';
@@ -362,7 +399,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       },
       onFinished: (summary) => {
         if (disposed) return;
-        RATINGS.set(candidate.id, {
+        const entry: LadderEntry = {
           dispatcherId: candidate.id,
           dispatcherName: profile.name,
           isReference: resources.dispatcherProfiles.profiles.some(
@@ -370,7 +407,15 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
           ),
           fingerprint: fingerprintOf(profile),
           summary,
-        });
+        };
+        RATINGS.set(candidate.id, entry);
+        /*
+         * Kept here rather than in `runGauntlet`, which is pure of storage on purpose: the run
+         * reports a rating and this screen decides what a rating is for. `everydayProgressWith`
+         * holds the one-row-per-dispatcher rule in the bytes, matching the map above.
+         */
+        const store = everydayProfileStore();
+        store.setProgress(everydayProgressWith(store.progress(), savedRatingOf(entry)));
         running = undefined;
         progressLine = undefined;
         tab = 'ladder';
@@ -504,6 +549,21 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       },
       caseNameOf: (caseId) => names.get(caseId) ?? caseId,
     });
+
+    /*
+     * What the player is owed about their kept ratings — GitHub issue #224, and the reason it is
+     * drawn **above** the table rather than in the footnotes: `LADDER_EMPTY` says *nothing has been
+     * through the gauntlet on this device yet*, which is a claim about the player and is false when
+     * a store that holds ratings could not be read. The notice is the sentence that keeps that
+     * claim honest, and it is `everyday/profile.ts`'s so the fix screen says the same thing.
+     */
+    const kept = everydayProfileStore().progressNotice();
+    if (kept !== null) {
+      const line = el(doc, 'p', kept);
+      line.className = 'everyday-ladder-progress-notice';
+      line.style.cssText = `${NOTE};margin-top:${String(G.section)}px`;
+      body.append(line);
+    }
 
     if (rows.length === 0) {
       const empty = el(doc, 'p', LADDER_EMPTY);

@@ -615,6 +615,19 @@ jobs:
           ELEVATOR_SIM_HONESTY: deep
         run: npx vitest run --passWithNoTests=false --project viz src/honesty/measure.corpus.test.ts
 
+      # § D437's survey, in this job for § D343's reason one axis over.
+      #
+      # `honesty/fitOut.ts` publishes a table of which of the sixteen § 8.2 shop tiers move this
+      # corpus's runs, and that table is what chose the seeded kits. It is a prose count over a tree,
+      # so it goes stale exactly the way the figures above do — a building whose fleet changes, or a
+      # tier whose delta moves, silently makes a row wrong — and RISKS.md R38's remedy is a
+      # derivation rather than a pin. Two minutes beside the corpus tiers, on `main`, after
+      # integration, and it publishes nothing: the artifact is for a person to read.
+      - name: Fit-out tier survey
+        env:
+          FITOUT_OUT: ${{ runner.temp }}/fit-out-tiers.txt
+        run: npx vitest run --passWithNoTests=false --project viz src/honesty/measure.fitOut.test.ts
+
       # The commit is recorded beside the figures because a corpus count without the tree it was
       # taken on is the thing R38 exists to stop. The artifact is the whole answer, not a pointer
       # to a log line a reporter may have swallowed.
@@ -632,6 +645,7 @@ jobs:
           path: |
             ${{ runner.temp }}/corpus-always-on.txt
             ${{ runner.temp }}/corpus-deep.txt
+            ${{ runner.temp }}/fit-out-tiers.txt
             ${{ runner.temp }}/corpus-provenance.txt
           retention-days: 90
 

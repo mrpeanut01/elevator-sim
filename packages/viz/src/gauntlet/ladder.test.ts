@@ -8,7 +8,10 @@ import { describe, expect, it } from 'vitest';
 import {
   caseNameOf,
   caseNamesOf,
+  ladderEntryOf,
   ladderRowsOf,
+  savedRatingIssue,
+  savedRatingOf,
   sendGateOf,
   whatAreTheFortyOf,
   LADDER_CAVEAT,
@@ -17,7 +20,7 @@ import {
   type LadderEntry,
 } from './ladder.js';
 import { proofCasesOf, type ProofCaseSet } from './proofCases.js';
-import type { RatingSummary } from './rating.js';
+import { ratingOf, type RatedCase, type RatingSummary } from './rating.js';
 
 const SET: ProofCaseSet = {
   version: 1,
@@ -198,5 +201,146 @@ describe('a case’s name', () => {
     const names = caseNamesOf(SET, nameOf);
     expect(names.size).toBe(4);
     expect(names.get('tower-b/two')).toBe('Tower B · The evening');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A rating that survives the tab — issue #224, § D434
+ * -------------------------------------------------------------------------- */
+
+/** One rated case, with everything invariant 5 and R13 want on it. */
+function rated(index: number, score: number | null): RatedCase {
+  return {
+    caseId: `tower-a/case-${String(index)}`,
+    buildingId: 'tower-a',
+    crowdId: 'one',
+    seed: `seed-${String(index)}`,
+    score,
+    noScoreReason: score === null ? 'nobody was carried in this case' : null,
+  };
+}
+
+/** A live entry over four cases, one of which measured nothing. */
+function liveEntry(): LadderEntry {
+  const cases = [rated(0, 91), rated(1, 74), rated(2, null), rated(3, 88)];
+  return {
+    dispatcherId: 'mine',
+    dispatcherName: 'Mine',
+    isReference: false,
+    fingerprint: 'waitTime=1',
+    summary: ratingOf(cases, 4),
+  };
+}
+
+describe('a stored rating is its cases, and the mean is rebuilt from them', () => {
+  it('keeps the cases and the denominator, and stores no folded figure', () => {
+    const saved = savedRatingOf(liveEntry());
+    expect(saved.cases).toHaveLength(4);
+    expect(saved.casesTotal).toBe(4);
+    /*
+     * The claim § D434 rests on: nothing `ratingOf` computes is written down. A stored `rating`,
+     * `casesRated`, `complete` or `weakest` would be a figure a store could hold in disagreement
+     * with the cases beside it, and the ladder draws the stored aggregate rather than re-deriving
+     * it — so nothing would notice.
+     */
+    for (const folded of ['rating', 'casesRated', 'casesRun', 'complete', 'weakest']) {
+      expect(Object.keys(saved), folded).not.toContain(folded);
+    }
+  });
+
+  it('restores to the identical entry — one arithmetic, two arrival routes', () => {
+    const live = liveEntry();
+    const restored = ladderEntryOf(savedRatingOf(live));
+    expect(restored).toEqual(live);
+    // And through the surface a player reads, which is the only thing that could differ silently.
+    const context = { fingerprintOf: () => 'waitTime=1', caseNameOf: nameOf };
+    expect(ladderRowsOf([restored], context)).toEqual(ladderRowsOf([live], context));
+  });
+
+  it('carries the fingerprint, so a restored rating can still go stale', () => {
+    /*
+     * § 11.7's *edited since* is the reason a kept rating is worth keeping rather than merely
+     * present: without the digest the row would stand over a dispatcher the player has since
+     * changed and say nothing about it.
+     */
+    const restored = ladderEntryOf(savedRatingOf(liveEntry()));
+    const rows = ladderRowsOf([restored], {
+      fingerprintOf: () => 'waitTime=9',
+      caseNameOf: nameOf,
+    });
+    expect(rows[0]?.staleness).toBe('edited since');
+  });
+
+  it('holds an incomplete rating as incomplete rather than rounding it up', () => {
+    // R13 through the round trip: the case that served nobody is not averaged as a zero, and the
+    // rating says it is over three of four.
+    const restored = ladderEntryOf(savedRatingOf(liveEntry()));
+    expect(restored.summary.casesRated).toBe(3);
+    expect(restored.summary.complete).toBe(false);
+    expect(restored.summary.rating).toBeCloseTo((91 + 74 + 88) / 3, 10);
+  });
+
+  it('keeps the denominator, because a case that never ran has no row to count', () => {
+    /*
+     * The one figure {@link SavedRating} stores that {@link ratingOf} does not compute, and the
+     * case that says why. `ratingOf`'s own docstring: *"a rating that derived its denominator from
+     * the rows it happened to receive would report `40 of 40` on a gauntlet that ran twelve."* A
+     * restore reading `cases.length` instead would do exactly that, silently, and every other case
+     * in this file would stay green — because in all of them the two numbers are equal.
+     */
+    const twelve = Array.from({ length: 12 }, (_unused, index) => rated(index, 80));
+    const short: LadderEntry = {
+      dispatcherId: 'mine',
+      dispatcherName: 'Mine',
+      isReference: false,
+      fingerprint: 'waitTime=1',
+      summary: ratingOf(twelve, 40),
+    };
+    const restored = ladderEntryOf(savedRatingOf(short));
+    expect(restored.summary.casesTotal).toBe(40);
+    expect(restored.summary.complete).toBe(false);
+    // The cell a player reads, which is where the wrong denominator would have shown up.
+    expect(
+      ladderRowsOf([restored], { fingerprintOf: () => 'waitTime=1', caseNameOf: nameOf })[0]
+        ?.proofCases,
+    ).toBe('12 of 40');
+  });
+});
+
+describe('a saved rating is refused when this build cannot vouch for it', () => {
+  const good = savedRatingOf(liveEntry());
+
+  it('accepts what this module wrote', () => {
+    expect(savedRatingIssue(good)).toBeUndefined();
+  });
+
+  it('refuses a case with no seed — invariant 5 at the storage boundary', () => {
+    const issue = savedRatingIssue({ ...good, cases: [{ ...rated(0, 91), seed: '' }] });
+    expect(issue).toBe('a rated case has no seed');
+  });
+
+  it('refuses a case that both has a score and says why it has none', () => {
+    expect(
+      savedRatingIssue({
+        ...good,
+        cases: [{ ...rated(0, 91), noScoreReason: 'nobody was carried' }],
+      }),
+    ).toContain('says why it has none');
+    expect(
+      savedRatingIssue({ ...good, cases: [{ ...rated(0, null), noScoreReason: null }] }),
+    ).toContain('says why it has none');
+  });
+
+  it('refuses more cases than the set it claims to be over', () => {
+    // `41 of 40` on a player's screen, otherwise: `ratingOf` folds every row it is handed.
+    expect(savedRatingIssue({ ...good, casesTotal: 2 })).toContain('more cases than the set');
+  });
+
+  it('refuses a rating with no dispatcher, no digest, or no list at all', () => {
+    expect(savedRatingIssue({ ...good, dispatcherId: '' })).toContain('dispatcherId');
+    expect(savedRatingIssue({ ...good, fingerprint: '' })).toContain('fingerprint');
+    expect(savedRatingIssue({ ...good, cases: 'forty' })).toContain('no list of cases');
+    expect(savedRatingIssue({ ...good, isReference: 'yes' })).toContain('reference run');
+    expect(savedRatingIssue('a rating')).toContain('not an object');
   });
 });

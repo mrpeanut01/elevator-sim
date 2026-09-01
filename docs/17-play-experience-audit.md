@@ -327,7 +327,10 @@ Each is a real thing found by walking the product, left with an owner rather tha
 3. ~~**The leaderboard's competitive axis is the seed.**~~ **Closed.** § 4.3's challenge board is
    built and wired end to end ([§ D218](../DECISIONS.md) is the criterion, dated before the code):
    the server fixes the building, the traffic, the run length and a seed set, and the dispatcher is
-   what varies. The config board stays and keeps saying what it is. The § 5.5 tension is answered
+   what varies. **The config board is gone** — [§ D439](../DECISIONS.md) found it was
+   `ENGINE_CONTRACT.md` § 12.1's forbidden key, a digest of building × dispatcher × template × rate
+   × length, which is to say a leaderboard per selection with its inventor first on it; a run is now
+   on the day's board or in its player's own log. The § 5.5 tension is answered
    structurally rather than promised — a seed set with its `n` on every row, four metrics never
    blended, and Compare still the only surface allowed to order two dispatchers.
 4. ~~**`showEnergyAxis` and `theme` reach nothing**~~, and were carried in a register with a

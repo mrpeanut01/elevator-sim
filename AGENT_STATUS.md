@@ -639,9 +639,13 @@ Named on screen in the products' own registers rather than only here:
   deliberately not on `ViewerState`, and both facts a filing needs — which tower, and what the run
   read — are inside `everyday/host.ts`'s own closure, where `runCampaignDay` arms them and
   `closeDay` reads them back. A sentence naming the obstacle sends the next reader to the wrong
-  file, and this one pointed at a 7 000-line module. **What is still absent in § 8** is the trip
-  budget — § 8.6's fourth test, which nothing in this run measures — disclosed on the row itself as
-  `campaignModel.ts#TRIPS_REFUSAL` and owned by no issue.
+  file, and this one pointed at a 7 000-line module. **The trip budget was the last thing absent in
+  § 8 and it is absent no longer** — § 8.6's fourth test grades from wave J
+  ([§ D431](DECISIONS.md#d431), GitHub issue #169), off a `core` measurement of
+  `ENGINE_CONTRACT.md` § 5's own run metric; `campaignModel.ts#TRIPS_REFUSAL` is deleted rather than
+  reworded, and the same wave gave § 8.3's wear clock the writer it had never had. The sentence
+  above said the row was *owned by no issue*, which was true when it was written and stopped being
+  true when #169 was filed.
 - **§ 7.4's ghost lane** is not drawn: the host exposes no second recording.
 - **B2 and B5 of `docs/21`** (Compare/report surfaces, the six engineering briefs) are specified and
   unbuilt.

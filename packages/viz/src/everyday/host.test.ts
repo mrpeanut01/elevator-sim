@@ -39,6 +39,10 @@ import { recordRun } from '../record/recordRun.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
 import type { ShapedDayReport } from '../shift/report.js';
+import { watchRunConfigOf } from '../watch/record.js';
+import { postedResultOf } from '../watch/reproduce.js';
+import type { PostedResult, WatchableRun, WatchRecord } from '../watch/types.js';
+import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import { createEverydayHost, EVERYDAY_HOST, type EverydayHostBindings } from './host.js';
 
@@ -88,6 +92,12 @@ interface Harness {
   /** Every patch `applyPatch` received, in order. */
   readonly patches: Partial<ViewerState>[];
   state: ViewerState;
+  /** What `loadReferenceRuns` answers — § 14.1's second source, as a fixture. */
+  references: readonly WatchableRun[];
+  /** What the reproduction gate's simulator answers. See the § 14.1 cases below. */
+  simulate: (config: SimulationConfig) => VizRecording;
+  /** The session `enterWatch` opened, read back by `watching()`. */
+  watching: { readonly run: WatchableRun; readonly view: WatchingView } | undefined;
 }
 
 function harnessOf(
@@ -106,6 +116,11 @@ function harnessOf(
     calls,
     patches,
     state,
+    references: [],
+    simulate: () => {
+      throw new Error('this harness was not given a simulator');
+    },
+    watching: undefined,
     bindings: {
       resources,
       state: () => harness.state,
@@ -130,6 +145,31 @@ function harnessOf(
         calls.push('applyPatch');
         patches.push(patch);
       },
+      /*
+       * § 14.1's six, recorded rather than refused — GitHub issue #182. `watchRun`'s composition is
+       * driven below, and what it is asserted on is the *order* of these calls: the gate runs, and
+       * `enterWatch` is reached only when it passed.
+       */
+      loadReferenceRuns: () => {
+        calls.push('loadReferenceRuns');
+        return Promise.resolve(harness.references);
+      },
+      simulateRecord: (config) => {
+        calls.push('simulateRecord');
+        return harness.simulate(config);
+      },
+      enterWatch: (run) => {
+        calls.push(`enterWatch:${run.id}`);
+        harness.watching = { run, view: watchingViewOf(run, 'Steady hand') };
+      },
+      stopWatching: () => {
+        calls.push('stopWatching');
+        harness.watching = undefined;
+      },
+      playThisCrowd: (run) => {
+        calls.push(`playThisCrowd:${run.id}`);
+      },
+      watching: () => harness.watching,
       onChange: (listener) => {
         calls.push('onChange');
         void listener;
@@ -651,6 +691,15 @@ describe('filing the campaign day — issue #223', () => {
           patches.push(patch);
           h.state = { ...h.state, ...patch };
         },
+        /* § 14.1 is not this harness's subject; the campaign cases press none of these. */
+        loadReferenceRuns: () => Promise.resolve([]),
+        simulateRecord: () => {
+          throw new Error('the campaign harness does not simulate a record');
+        },
+        enterWatch: () => {},
+        stopWatching: () => {},
+        playThisCrowd: () => {},
+        watching: () => undefined,
         onChange: () => () => {},
       },
     };
@@ -924,5 +973,142 @@ describe('filing the campaign day — issue #223', () => {
     host.runCampaignDay('c1');
     host.closeDay();
     expect(notified).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * **§ 14.1's five methods** — GitHub issue **#182**, [§ D436](../../../../DECISIONS.md).
+ *
+ * The absence this replaced read *"no watch entry — § 14's spectator flow has no Everyday surface
+ * yet"*, and the reason the composition is driven here rather than only in the browser is that the
+ * one thing that can go wrong is an **ordering**: § 1.5 refuses to replay something approximate, so
+ * a `watchRun` that entered the spectator state and *then* checked would put a stranger's chrome
+ * over the player's own day for however long the check took.
+ *
+ * Both branches run a real simulation and a real reproduction. A gate fed a stub is a gate that
+ * tests its own mock.
+ */
+describe('§ 14.1 — the spectator entry', () => {
+  /** A record of the state the harness stands on, so `watchRunConfigOf` re-asks the same question. */
+  function recordOf(state: ViewerState): WatchRecord {
+    return {
+      version: 2,
+      seed: String(state.seed),
+      buildingId: state.buildingId,
+      dispatcherId: state.dispatcherId,
+      pattern: state.pattern,
+      demandTemplateId: null,
+      arrivalRatePctPop5min: null,
+      shiftLengthS: 600,
+      windowStartS: null,
+      day: state.week.day,
+      dayIdx: state.week.dayIdx,
+      outOfServiceCarIds: [],
+      interventions: [],
+      ruleRows: [],
+    };
+  }
+
+  const rowOf = (record: WatchRecord | null, posted: PostedResult): WatchableRun => ({
+    id: 'reference-under-test',
+    source: 'reference',
+    label: 'The house baseline',
+    buildingName: 'Garden Apartments',
+    subtitle: 'the shipped dispatcher, on the shipped morning',
+    record,
+    posted,
+    blocked: null,
+  });
+
+  const NO_FIGURES: PostedResult = { arrived: 0, carried: 0, minutePct: 0, worstWaitS: 0 };
+
+  /** The four figures the gate compares, folded exactly as `watch/reproduce.ts` folds them. */
+  const postedOf = (recording: VizRecording): PostedResult => postedResultOf(recording);
+
+  it('offers the filed days first and the reference runs after them', async () => {
+    const h = harnessOf(base());
+    h.references = [rowOf(recordOf(h.state), NO_FIGURES)];
+    const rows = await createEverydayHost(h.bindings).watchableRuns();
+    /* No day has been closed on this state, so the references are the whole list. */
+    expect(rows.map((row) => row.source)).toEqual(['reference']);
+    expect(h.calls).toContain('loadReferenceRuns');
+  });
+
+  /*
+   * A failed fetch costs the reference rows and nothing else. The filed days are already in hand,
+   * and a picker that threw would show none of them — one absent source turning into an empty
+   * screen, which is the shape `weekView.ts` keeps two absences apart to avoid.
+   */
+  it('still answers when the reference fetch fails', async () => {
+    const h = harnessOf(base());
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      loadReferenceRuns: () => Promise.reject(new Error('offline')),
+    };
+    await expect(createEverydayHost(bindings).watchableRuns()).resolves.toEqual([]);
+  });
+
+  it('enters the spectator state on a record that reproduces, and only after the gate', () => {
+    const h = harnessOf(base());
+    h.state = { ...h.state, shiftLengthS: 600, windowStartS: null };
+    const record = recordOf(h.state);
+    const recording = recordRun(watchRunConfigOf(h.state, resources, record)).recording;
+    h.simulate = () => recording;
+    const host = createEverydayHost(h.bindings);
+
+    const answer = host.watchRun(rowOf(record, postedOf(recording)));
+
+    expect(answer.blocked, 'a record that reproduces was refused').toBeNull();
+    /* The order is the assertion: the gate runs, and the entry happens after it. */
+    expect(
+      h.calls.filter((call) => call.startsWith('simulateRecord') || call.startsWith('enterWatch')),
+    ).toEqual(['simulateRecord', 'enterWatch:reference-under-test']);
+    expect(host.watching()?.run.id).toBe('reference-under-test');
+    /* And the view is the one derivation both shells draw — § 14.1's pill, not a second one. */
+    expect(host.watching()?.view.pill).toContain('REPLAY');
+  });
+
+  it('refuses a record that does not reproduce, and enters nothing', () => {
+    const h = harnessOf(base());
+    h.state = { ...h.state, shiftLengthS: 600, windowStartS: null };
+    const record = recordOf(h.state);
+    const recording = recordRun(watchRunConfigOf(h.state, resources, record)).recording;
+    h.simulate = () => recording;
+    const host = createEverydayHost(h.bindings);
+
+    const posted = postedOf(recording);
+    const answer = host.watchRun(rowOf(record, { ...posted, carried: posted.carried + 1 }));
+
+    expect(answer.blocked?.ground).toBe('does-not-reproduce');
+    /* The reason names the figure that moved — a refusal that says only *no* sends a reader hunting. */
+    expect(answer.blocked?.reason).toContain('people carried');
+    expect(h.calls).not.toContain('enterWatch:reference-under-test');
+    expect(host.watching()).toBeUndefined();
+  });
+
+  /*
+   * The two grounds that need no simulation are marked on the way out of `watch/library.ts`, and a
+   * row already carrying one must not be re-checked: running a whole day to reach a conclusion
+   * already in hand is the cost `dev/watchPanel.ts` states and declines to pay twice.
+   */
+  it('does not simulate a row that is already blocked', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    const blocked: WatchableRun = {
+      ...rowOf(null, NO_FIGURES),
+      blocked: { ground: 'no-record', reason: 'nothing to re-simulate' },
+    };
+    expect(host.watchRun(blocked).blocked).not.toBeNull();
+    expect(h.calls).not.toContain('simulateRecord');
+  });
+
+  it('hands the two presses straight through, so one implementation serves both shells', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    const row = rowOf(recordOf(h.state), NO_FIGURES);
+    host.playThisCrowd(row);
+    host.stopWatching();
+    expect(h.calls).toContain('playThisCrowd:reference-under-test');
+    expect(h.calls).toContain('stopWatching');
   });
 });

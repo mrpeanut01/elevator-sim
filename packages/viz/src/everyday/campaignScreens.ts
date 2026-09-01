@@ -54,6 +54,7 @@ import {
 import type { EverydayState } from './types.js';
 import { openTowerOf, type BuildId, type CampaignTower } from '../campaign/career.js';
 import type { DifficultyId, ShopCategoryId } from '../campaign/economy.js';
+import { observationsAt } from '../live/observations.js';
 
 /* -------------------------------------------------------------------------- *
  * Module store — the two facts a `bar()` needs and a mount cannot pass it
@@ -230,7 +231,31 @@ function observationsOfHost(host: EverydayHost): CampaignInput['observations'] {
     abandoned: valueOf('abandoned') ?? 0,
     worstWaitS,
     worstWaitIsCensored: false,
+    ...tripsOfHost(host),
   };
+}
+
+/**
+ * The day's loaded car departures at the playhead, for § 8.6's fourth test.
+ *
+ * **Read from the recording rather than from a reading**, because there is no reading to read: the
+ * reassembly above recovers each field from the daily loop's own four goals, and no goal in
+ * `shift/goals.ts#goalsForDay` reads `loadedDepartures` — the trip budget is the campaign's bar and
+ * the daily loop does not ask it. So this is the one field that has to come from the fold directly.
+ *
+ * The playhead is the host's own (`runState().playheadS`), which is the instant `goalsToday()` was
+ * folded at, so the four rows on a desk are four facts about one moment.
+ *
+ * Spread as a fragment rather than assigned, so the absent case travels as *absent*: a recording
+ * carrying no travel record must leave the field off and let `readGoal` refuse, and writing
+ * `loadedDepartures: undefined` under `exactOptionalPropertyTypes` is a different thing from not
+ * writing it.
+ */
+function tripsOfHost(host: EverydayHost): { readonly loadedDepartures?: number } {
+  const recording = host.recording();
+  if (recording === undefined) return {};
+  const live = observationsAt(recording, host.runState().playheadS);
+  return live.loadedDepartures === undefined ? {} : { loadedDepartures: live.loadedDepartures };
 }
 
 /* -------------------------------------------------------------------------- *
@@ -270,7 +295,14 @@ function standingOrderControls(
       redraw();
     },
   );
-  wrap.append(dispatcher, build);
+  /*
+   * The refusal rides under the build select and not under the pair — GitHub issue #313. Both
+   * controls sit in this wrapper and only one of them is inert on the day, so a note under the group
+   * would read as *neither of these does anything*, which is the opposite defect.
+   */
+  const buildNote = el(doc, 'div', 'everyday-campaign-build-note', view.buildNote);
+  buildNote.style.cssText = `font-size:12px;color:${C.label};max-width:74ch`;
+  wrap.append(dispatcher, build, buildNote);
   return wrap;
 }
 
@@ -294,12 +326,14 @@ function testRows(doc: Document, rows: readonly CampaignTestRow[]): HTMLElement 
     const was = el(doc, 'span', 'everyday-campaign-was', `was ${row.was}`);
     was.style.cssText = `${MONO};color:${C.label}`;
     head.append(glyph, label, target, was);
+    /*
+     * No refusal arm any more — GitHub issue #169. The fourth row used to carry a sentence saying
+     * nothing measured it, drawn here in terracotta under the tension; it grades now, so the
+     * sentence is gone rather than reworded (`campaignModel.ts#campaignTestGoals`). A row that
+     * cannot be graded on some particular day says so through `row.reading`, which is what the
+     * glyph and the `—` above already draw.
+     */
     item.append(head, note(doc, row.tension));
-    if (row.refusal !== undefined) {
-      const refusal = el(doc, 'div', 'everyday-campaign-test-refusal', row.refusal);
-      refusal.style.cssText = `font-size:12px;color:${C.terracotta};margin-top:5px;max-width:74ch`;
-      item.append(refusal);
-    }
     list.append(item);
   }
   return list;

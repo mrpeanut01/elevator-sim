@@ -4,9 +4,11 @@ import { MetricsRecorder, type RecordablePassenger } from './recorder.js';
 import {
   DEFAULT_LONG_WAIT_THRESHOLD_S,
   buildJourneys,
+  energyStatistics,
   fullRunWindow,
   handlingCapacityOf,
   loadFactorStatistics,
+  loadedDepartureTimes,
   peakArrivalWindow,
   resolveWindow,
   selectJourneysInWindow,
@@ -22,6 +24,7 @@ import {
   type LoadSample,
   type PassengerRecord,
   type RunRecord,
+  type TravelSample,
 } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -923,5 +926,73 @@ describe('summarizeRun carries its provenance', () => {
       HAND_WAITS.slice(0, 10).reduce((total, wait) => total + wait, 0) / 10,
       12,
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Loaded departures — ENGINE_CONTRACT § 5's `trips`
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **What `loadedDepartureTimes` counts as a trip, and what it refuses to.**
+ *
+ * The empty-versus-absent distinction is the one worth reading twice: it is the difference between
+ * *the machines made no loaded trips* and *nobody wrote down whether they did*, and the consumer
+ * (`viz`'s campaign trip budget) is an `at-most` bar, so folding the second into a zero would award
+ * a pass for a measurement nobody took.
+ */
+describe('loaded departures', () => {
+  const sample = (at: number, loadKg: number, carId = 'A'): TravelSample =>
+    Object.freeze({
+      at,
+      carId,
+      distanceM: 10,
+      direction: 'up' as const,
+      loadKg,
+      ratedLoadKg: 1000,
+      workJ: 1000,
+    });
+
+  it('counts the moves that carried somebody, and no others', () => {
+    const times = loadedDepartureTimes([
+      sample(10, 0),
+      sample(20, 75),
+      sample(30, 0),
+      sample(40, 150),
+    ]);
+    // The two empty repositioning drives are out: a fleet driving itself around is not wear a
+    // player put on it, and § 8.6's own tension for the row is about half-empty cars.
+    expect(times).toEqual([20, 40]);
+  });
+
+  it('returns them ascending whatever order the record held them in', () => {
+    // A record parsed from a file is whatever the file said; a consumer that breaks early on the
+    // first instant past its playhead needs the order to be a promise rather than a habit.
+    expect(loadedDepartureTimes([sample(90, 80, 'B'), sample(30, 80, 'A'), sample(60, 80, 'C')]))
+      .toEqual([30, 60, 90]);
+  });
+
+  it('is `undefined` for a record nobody instrumented, and empty for a fleet that carried nobody', () => {
+    expect(loadedDepartureTimes(undefined)).toBeUndefined();
+    // An empty array can only come from a caller building a record by hand — the recorder omits
+    // the field — so it is treated as the same absence.
+    expect(loadedDepartureTimes([])).toBeUndefined();
+    // And a fleet that moved with nobody aboard measured zero trips, which is a number.
+    expect(loadedDepartureTimes([sample(10, 0), sample(20, 0)])).toEqual([]);
+  });
+
+  it('is a subset of the moves `energyStatistics` counts as starts, over one window', () => {
+    /*
+     * The two share a convention and this is what says so: both are stamped at the instant the car
+     * levelled, so *of the moves, this many were loaded* is a sentence about one population. A
+     * departure-stamped trip count would silently make it two.
+     */
+    const samples = [sample(10, 0), sample(20, 75), sample(30, 0), sample(40, 150)];
+    const energy = energyStatistics(samples, {
+      window: { id: 'full-run', startS: 0, endS: 100 },
+      servedLegCount: 4,
+    });
+    expect(energy.starts).toBe(4);
+    expect(loadedDepartureTimes(samples)).toHaveLength(2);
   });
 });

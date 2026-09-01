@@ -100,7 +100,31 @@ export interface CampaignTower extends TowerEconomy {
   readonly quirk: string;
   /** The standing order's dispatcher — the id a run is built from. */
   readonly dispatcherId: string;
-  /** § 8.1's *build* column — which of the shop's shapes the standing order aims at. */
+  /**
+   * § 8.1's *build* column — which of the shop's shapes the standing order aims at.
+   *
+   * **It reaches no run, it is not going to, and that is recorded rather than left to be
+   * rediscovered** — GitHub issue #313, § D227. `everyday/host.ts#runCampaignDay` builds a campaign
+   * day from four facts about a tower: its `buildingId`, its `dispatcherId`, the kit
+   * `campaign/fitOut.ts#fitOutOf` folds out of what it has actually had fitted, and the length
+   * `shift/contracts.ts` declares for its contract. None of the four is a function of this field, so
+   * the legs of the day are identical whichever build is picked — measured at the campaign's own
+   * cell in `buildStandingOrder.test.ts`, against a control on the *other* select in the same group
+   * that does move them.
+   *
+   * **Why it is a refusal rather than a defect to fix.** The design file authors `build` as a
+   * descriptive line per building — `docs/design/elevator-sim-casual.dc.html` gives Garden Apartments
+   * `build: 'As built'` beside its quirk — and its own prototype writes the select into
+   * `st.builds[t.id]` and reads it back only to mark the option selected. `ENGINE_CONTRACT.md` § 8
+   * gives it no expression at all: what changes a building's fabric there is § 8.2's shop, which is
+   * bought, has costs and nights, and does reach the run ([§ D427](../../../../DECISIONS.md)). So
+   * there is no mechanism in the handoff that this build dropped; wiring one would be inventing game
+   * design, and wiring *this* one to the levers would hand a player for free what the `control`
+   * tier charges six units and a night for.
+   *
+   * The player is told, on the control itself — `everyday/campaignModel.ts#BUILD_REFUSAL`, drawn
+   * under the select on both surfaces that offer it. A control that writes nothing must say so.
+   */
   readonly buildId: BuildId;
   /** 1-based contract days carrying a flagged bad event. Empty in this build — see the docstring. */
   readonly flaggedDays: readonly number[];
@@ -199,12 +223,17 @@ export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
    * It reads as a description of behaviour now: the day *is* run from here, and *is* marked when the
    * player closes it. Before #223 the same words described something that never happened. Rewording
    * it was drafted and taken back out, because `buildNotes.test.ts#ABSENCE_TRIAGE`'s own rule is
-   * that an entry whose words change is an entry whose owning issue must be re-checked — and the
-   * re-check has an answer this lane may not write down. What is left absent in § 8 is the **trip
-   * budget**, § 8.6's fourth test, which nothing in this run measures; no issue owns it, and
-   * inventing a number for the triage table would be worse than leaving the register as it stands.
-   * It is not undisclosed meanwhile: `everyday/campaignModel.ts#TRIPS_REFUSAL` is on the row itself,
-   * which is where #207 deliberately left every per-control refusal.
+   * that an entry whose words change is an entry whose owning issue must be re-checked.
+   *
+   * **The trip budget was the thing this comment named as still absent, and it is not absent any
+   * more** — GitHub issue #169. § 8.6's fourth test grades from this wave, off
+   * `ENGINE_CONTRACT.md` § 5's own run metric, so the sentence that said *nothing in this run
+   * measures it* is deleted rather than left standing beside a row that now prints a figure: § D227
+   * binds both ways, and a stale refusal is the more dangerous half. `campaignModel.ts#TRIPS_REFUSAL`
+   * went with it, because the per-control refusal #207 left on the row itself was the same claim.
+   *
+   * The entry's own three sentences are untouched and still true, which is why nothing here moved
+   * into or out of the player-facing list.
    */
   'A day is run from here and scored by the day itself; the month grid marks a day cleared or missed when the campaign day is filed, and nothing files one automatically.',
   'The career is this session’s. Nothing on these three screens is written to this device.',
@@ -499,8 +528,18 @@ export type CampaignAction =
   /**
    * § 6.4 step 4 — *"In a campaign run, evaluate the four tests and mark the day cleared or
    * missed"*, as the one thing that moves a contract forward. See {@link fileDay}.
+   *
+   * `trips` is the day's own loaded car departures — `ENGINE_CONTRACT.md` § 5's run metric — and it
+   * rides on the action rather than being read from anywhere, because this module holds no
+   * recording and must not learn to. The filer supplies it; see {@link fileDay} for why this is the
+   * press that carries it and for what happens when the day could not measure one.
    */
-  | { readonly kind: 'file-day'; readonly towerId: string; readonly verdict: CampaignDayVerdict };
+  | {
+      readonly kind: 'file-day';
+      readonly towerId: string;
+      readonly verdict: CampaignDayVerdict;
+      readonly trips: number | undefined;
+    };
 
 /**
  * Apply an action. Total, pure, and **refusing rather than throwing**: an action the record cannot
@@ -547,7 +586,7 @@ export function applyCampaignAction(
     case 'answer-need':
       return answerNeed(career, action.towerId, action.optionId);
     case 'file-day':
-      return fileDay(career, action.towerId, action.verdict);
+      return fileDay(career, action.towerId, action.verdict, action.trips);
   }
 }
 
@@ -568,11 +607,11 @@ function mapTower(
  * `missed`, costs three standing, and moves it closer to the end of the contract"*, and the one
  * action that moves a contract forward.
  *
- * ## Two fields move, and everything else is derived from them
+ * ## Three fields move, and everything else is derived from them
  *
- * `tower.day` advances and `tower.missed` grows on a miss. **Nothing else is written**, and that is
- * the decision rather than an omission — `economy.ts` already derives every consequence from these
- * two:
+ * `tower.day` advances, `tower.missed` grows on a miss, and `tower.trips` takes the day's loaded car
+ * departures. **Nothing else is written**, and that is the decision rather than an omission —
+ * `economy.ts` already derives every consequence from the first two:
  *
  * - the purse, because `earnedSoFar` sums `rateOnDay` over the past days that were not missed, so a
  *   cleared day pays this contract's rate for the week it fell in and a missed one pays nothing;
@@ -583,6 +622,35 @@ function mapTower(
  *
  * A latched purse or a latched cleared count would be a second answer to a question one of them
  * already contains — `careerIsOver`'s own argument, one function down.
+ *
+ * ## The wear clock, and on whose authority it moves here
+ *
+ * `tower.trips` is § 8.3's `wear = min(1.3, trips / serviceAt)` and `daysLeft = round((serviceAt −
+ * trips) / 1400)`. **Nothing incremented it** — GitHub issue #313 — so `wearOf`, `failureOddsPct`,
+ * `serviceDaysLeft` and `wearHeadOf` were four consumers of a constant, and every check they passed
+ * was vacuous. That is `accessZones`' polarity ([§ D265](../../../../DECISIONS.md)): not a behaviour
+ * with no caller, but a caller with no behaviour to reach.
+ *
+ * Who should move it and when is `ENGINE_CONTRACT.md`'s rather than this module's inference. § 5
+ * defines `trips` as *count of car departures under load* — a **run** metric, one figure per day
+ * played — and § 8.3 spends the accumulation of them, sized against `serviceAt ≈ 45 000` trips at
+ * *"1400 trips a working day"*. So the quantity is the day's, and the moment is the day's filing:
+ * closing a day is the only event § 8 has that turns a run into a record, and it is already the one
+ * thing that moves a contract forward. Nothing else may move it — a press that spent units cannot
+ * wear a machine down, and neither can a day that was watched and never filed.
+ *
+ * **A day that could not be measured adds nothing rather than adding zero.** `trips` arrives
+ * `undefined` when the run carried no trip count at all (`shift/types.ts`'s
+ * `GoalObservations.loadedDepartures`, whose absence is a gate); the clock then holds where it is.
+ * Adding a zero would be the same arithmetic and a different claim — *the machines made no trips
+ * today* — about a day nobody counted, and `daysLeft` would go on publishing a figure derived from
+ * it.
+ *
+ * **Negative and non-finite counts are refused** rather than clamped at the consumer. `wearOf`
+ * already floors nothing and `serviceDaysLeft` clamps only at zero, so a caller handing this a
+ * `NaN` would poison the whole § 8.3 block through four functions before anybody saw it; the guard
+ * is here, where the value enters the record, and it is the reducer's own convention — an action the
+ * record cannot legally take returns the record it was given.
  *
  * ## Why the career day moves with it
  *
@@ -610,15 +678,19 @@ function fileDay(
   career: CampaignCareer,
   towerId: string,
   verdict: CampaignDayVerdict,
+  trips: number | undefined,
 ): CampaignCareer {
   const tower = towerById(career, towerId);
   if (tower === undefined) return career;
   if (tower.day > CONTRACT_DAYS) return career;
+  const worn =
+    trips === undefined || !Number.isFinite(trips) || trips < 0 ? 0 : Math.round(trips);
   return {
     ...mapTower(career, towerId, (current) => ({
       ...current,
       day: current.day + 1,
       missed: verdict === 'missed' ? current.missed + 1 : current.missed,
+      trips: current.trips + worn,
     })),
     today: career.today + 1,
   };

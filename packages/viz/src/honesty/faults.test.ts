@@ -28,18 +28,25 @@ beforeAll(async () => {
 }, 300_000);
 
 /**
- * Two cases, and both are needed.
+ * Three cases, and each is needed.
  *
  * `QUOTABLE` is a run whose summary stands behind its estimates; `SUPPRESSED` is one that refuses
  * them. R3's fault can only be injected into the second — there is no suppressed figure to
  * un-suppress on the first — and R13's clause one can only be injected into the first, because a
  * suppressed run has no estimate to take the count off. A single fixture would have made one of
  * the two faults silently a no-op, which is the shape this file exists to refuse.
+ *
+ * The third is `FITTED_SUPPRESSED` — suppressed **and** running a § 8 fit-out — and it exists for
+ * the same reason one axis over. `fittedTowerMeanLeak` is a no-op on a tower as built by
+ * construction, so on either of the first two fixtures it would prove nothing while looking green.
+ * The last two candidate seeds were appended for it, and appended rather than inserted so the
+ * first-match rule above still picks the fixtures it always picked.
  */
-const CANDIDATE_SEEDS = [9001, 9004, 9009, 9016, 9023, 9031, 9040, 9047];
+const CANDIDATE_SEEDS = [9001, 9004, 9009, 9016, 9023, 9031, 9040, 9047, 9005, 9011];
 
 let quotable: HonestyCase;
 let suppressed: HonestyCase;
+let fittedSuppressed: HonestyCase;
 
 beforeAll(() => {
   for (const seed of CANDIDATE_SEEDS) {
@@ -47,11 +54,19 @@ beforeAll(() => {
     const outcome = evaluateCase(honestyCase, resources);
     if (outcome.suppressed) suppressed ??= honestyCase;
     else quotable ??= honestyCase;
+    if (outcome.suppressed && honestyCase.fitOutId !== null) fittedSuppressed ??= honestyCase;
   }
   if (quotable === undefined || suppressed === undefined) {
     throw new Error(
       'the fault fixtures need one quotable and one suppressed run among the candidate seeds; ' +
         'the corpus no longer produces both, which is itself a finding about the search space',
+    );
+  }
+  if (fittedSuppressed === undefined) {
+    throw new Error(
+      'the fault fixtures need one case that is both fitted and suppressed among the candidate ' +
+        'seeds; the corpus no longer produces one, which is itself a finding about the fit-out ' +
+        'axis — see honesty/fitOut.ts',
     );
   }
 }, 300_000);
@@ -105,9 +120,18 @@ describe('every property fires when the thing it protects is broken', () => {
   });
 
   for (const property of HONESTY_PROPERTIES) {
-    for (const { name, fault } of FAULTS[property]) {
+    for (const { name, fault, fixture: wanted } of FAULTS[property]) {
       it(`${property} — ${name}`, () => {
-        const fixture = FIXTURE_FOR[property] === 'suppressed' ? suppressed : quotable;
+        /*
+         * The fault's own declaration wins over the property's, and only a fault that **narrows**
+         * what it fires on declares one. See `faults.ts#FAULTS`' `fixture` field.
+         */
+        const fixture =
+          wanted === 'fitted-suppressed'
+            ? fittedSuppressed
+            : FIXTURE_FOR[property] === 'suppressed'
+              ? suppressed
+              : quotable;
 
         const clean = evaluateCase(fixture, resources);
         const cleanHits = clean.violations.filter((found) => found.property === property);
@@ -139,6 +163,48 @@ describe('every property fires when the thing it protects is broken', () => {
       }, 120_000);
     }
   }
+
+  it('a fitted tower is checked and not merely swept — the fault fires fitted and is silent as built', () => {
+    /*
+     * **The claim § D437 exists to make, asserted in both directions on one case.**
+     *
+     * § D427's null result found that no corpus case had ever carried a non-`AS_BUILT` fit-out, so
+     * the ten properties had never read a string produced by a fitted run. Seeding the axis fixes
+     * *swept*; only this fixes *checked*. `fittedTowerMeanLeak` is `suppressedMeanLeak` with one
+     * guard in front of it — a tower as built has bought nothing to lie about — so:
+     *
+     * - on the **fitted** case it produces a fresh R3 violation, which is a property firing on a
+     *   fitted run;
+     * - on the **same case with `fitOutId: null`** it produces none, which is what says the firing
+     *   came from the fitted half of the corpus rather than from the case being interesting.
+     *
+     * The as-built arm is asserted against the clean run rather than against zero, for the reason
+     * the loop above gives: the register is empty today and the comparison is the form that
+     * survives the next finding.
+     */
+    const fault = FAULTS['suppressed-mean'].find((entry) => entry.name === 'fittedTowerMeanLeak')?.fault;
+    expect(fault, 'fittedTowerMeanLeak is no longer registered').toBeDefined();
+    const faulted: HonestyResources = { ...resources, corruptTexts: fault };
+
+    expect(fittedSuppressed.fitOutId, 'the fixture must be a fitted tower').not.toBeNull();
+    const hits = (outcome: ReturnType<typeof evaluateCase>): number =>
+      outcome.violations.filter((found) => found.property === 'suppressed-mean').length;
+
+    const cleanFitted = evaluateCase(fittedSuppressed, resources);
+    const brokenFitted = evaluateCase(fittedSuppressed, faulted);
+    expect(brokenFitted.suppressed, 'the fixture must still refuse its estimates').toBe(true);
+    expect(hits(brokenFitted)).toBeGreaterThan(hits(cleanFitted));
+
+    /*
+     * The same case as built. It is put back by the one field, so nothing else about the case
+     * moves — the seed, the building, the dispatchers, the horizon and the demand are the fitted
+     * case's own, which is what makes the silence attributable to the fit-out and to nothing else.
+     */
+    const asBuilt = { ...fittedSuppressed, fitOutId: null };
+    const cleanAsBuilt = evaluateCase(asBuilt, resources);
+    const brokenAsBuilt = evaluateCase(asBuilt, faulted);
+    expect(hits(brokenAsBuilt)).toBe(hits(cleanAsBuilt));
+  }, 300_000);
 
   it('negative control: the clean run does not fail the properties the faults target', () => {
     // Without this, every assertion above would pass on a harness that reported every property

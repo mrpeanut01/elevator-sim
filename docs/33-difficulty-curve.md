@@ -150,14 +150,35 @@ not on merit: it needs a per-contract measurement over eight buildings that nobo
 can be adopted later without re-specifying anything above, because the address changes and the rule
 does not. (c) This.
 
-**One consequence to state, so the lane that lands it is not surprised.** The trip-budget row
-(`tests.trips`) is **ungraded today** — `campaignModel.ts#TRIPS_REFUSAL` says the run records how many
-people were carried and how long they stood, and not how many loaded departures the machines made. It
-therefore has no `goalsForDay` counterpart and no measurement behind it. It is a **stake-shaped row on
-a difficulty-shaped screen**, and the honest disposition is to keep it varying with the tier *only if*
-it stays ungraded, since an ungraded row moves no verdict. **If it is ever graded, it falls under
-DC-R1 immediately and must stop varying by tier.** That conditional is the whole of what this document
-says about it.
+**One consequence to state, so the lane that lands it is not surprised — and the conditional in it has
+now fired.** The trip-budget row (`tests.trips`) *was* **ungraded**, and this paragraph said so:
+`campaignModel.ts#TRIPS_REFUSAL` reported that the run records how many people were carried and how
+long they stood, and not how many loaded departures the machines made, so the row had no measurement
+behind it. The honest disposition was to keep it varying with the tier *only if* it stayed ungraded,
+since an ungraded row moves no verdict, and **if it were ever graded it would fall under DC-R1
+immediately and have to stop varying by tier.**
+
+**It is graded from wave J** ([§ D431](../DECISIONS.md#d431), GitHub issue #169): `core` measures
+`ENGINE_CONTRACT.md` § 5's `trips`, `GoalObservations` carries it, and `campaignTestGoals` returns
+four `ShiftGoal`s rather than three. `TRIPS_REFUSAL` is deleted. So the row moves a verdict, and the
+conditional above binds it.
+
+**What that changes here is a count and not a kind**, which is the part worth reading before acting on
+it. `tests.away`, `tests.worstS` and `tests.queue` are graded and vary by tier *today*, so this
+section's specified remedy — read the campaign's day tests from `goalsForDay` and delete
+`Difficulty.tests` — was already owed for three rows and is now owed for four. Nothing about the
+fourth row is a new breach of a kind the other three do not already have.
+
+**One thing the fourth row needs that the other three do not**, stated so the lane that lands § 1.4 is
+not surprised twice: `goalsForDay` has **no trip goal**. Its four bars are the carry share, the minute
+share, the landing queue and the worst wait, and the day ramp § 1.4 adopts has nothing to offer a trip
+budget. Deleting `Difficulty.tests` therefore requires authoring a day-indexed trip ladder, and
+authoring one requires knowing what a day's trips actually are at the campaign's own cell — measured
+in [§ D431](../DECISIONS.md#d431) as **16** on `garden-apartments` over its contract hour, against the
+four tier bars of 620 / 520 / 470 / 430 and against § 8.3's own *1 400 trips a working day*. Those
+three numbers disagree by one and two orders of magnitude — the bar cannot be missed at that cell and
+the wear clock would take some 2 800 contract days to reach a window — and that disagreement is
+content this document's owner has to settle rather than something a grading lane may pick a side in.
 
 ### 1.5 A finding about § D345's own sequencing note, reported and not acted on
 
@@ -1496,7 +1517,7 @@ excluding zero at 50–200 replications under common random numbers, and it stop
 | **O2** | Whether a day's bar should move with the **building** rather than with the day (`docs/32` § 9 Q6) | § 1.4 chose the day ramp and said why the building answer is the more interesting one. It needs a per-contract measurement over eight buildings that nobody has taken |
 | **O3** | The DC-3 witness vectors themselves | nine of ten stages have none. Finding them is a search per stage, and the register's `OUTSTANDING` block is where that debt is visible until it is paid |
 | **O4** | Whether stages 8, 9 and 10 should widen their `editable` lists or change their `teaches` | DC-2b says they must do one; which one is a content decision |
-| **O5** | The trip-budget row | ungraded today, so it moves no verdict and § 1.4 leaves it varying by tier. **The moment it is graded it falls under DC-R1** |
+| **O5** | The trip-budget row | **graded from wave J** ([§ D431](../DECISIONS.md#d431), issue #169), so the conditional this row carried has fired and it moves a verdict like the other three. § 1.4 has the correction: the breach is now four rows rather than three and is unchanged in kind, and the remedy it specifies needs a day-indexed trip ladder `goalsForDay` does not have |
 | **O6** | Endless rush | `docs/32` § 1.4 records it as unshipped. A demand ramp with no ceiling is the one mode whose whole content is a difficulty curve, and it has none here because it has no code |
 | **O8** | **The second batch has no shipped caller** | O7's residual. `campaign/judge.ts` asks for a holdout batch and `campaign/stageRun.ts` builds the request for it; `dev/campaignPanel.ts` runs one batch and hands over one, so every stage it judges comes back *not validated* — the refusal is honest and it is not a verdict a player can act on. Wiring the panel to run both is a lane of its own, and until it lands the gate is enforced in the suite and refused in the product |
 | **O7** | ~~The campaign judges on the seeds the player tunes against~~ — **CLOSED**, GitHub issue **#255** | It was closed the way this row said it would have to be: by judging on the holdout. `campaign/judge.ts` clears a stage only when every goal is met on the tuning batch **and** on a second batch over `stage.holdoutSeeds`, against that seed set's own published counts — so `data/scenario-goals.json`'s `holdout` block, which had been validated, published, quoted in the briefing and read by nothing that could change a verdict, is now half of what a bar is. The seed is checked rather than named, so the tuning batch handed over twice is refused. **The one measured witness no longer clears** (§ 2.4), which is the closure showing its work. What is *not* closed and is now O8: `dev/campaignPanel.ts` runs one batch, so the shipped Campaign tab cannot supply the second one and reports the stage as unvalidated until it is wired |

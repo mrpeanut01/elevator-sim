@@ -60,6 +60,7 @@ export function runHonestyCampaign(options: HonestyCampaignOptions): HonestyCamp
   const surfaces: Record<string, number> = {};
   const buildings: Record<string, number> = {};
   const modes: Record<string, number> = {};
+  const fitOuts: Record<string, number> = {};
   let texts = 0;
   let simulations = 0;
   let skipped = 0;
@@ -81,6 +82,9 @@ export function runHonestyCampaign(options: HonestyCampaignOptions): HonestyCamp
 
     buildings[honestyCase.buildingId] = (buildings[honestyCase.buildingId] ?? 0) + 1;
     modes[honestyCase.mode] = (modes[honestyCase.mode] ?? 0) + 1;
+    /* `as-built` rather than a blank key, so the half that bought nothing is a name a reader can grep. */
+    const kit = honestyCase.fitOutId ?? 'as-built';
+    fitOuts[kit] = (fitOuts[kit] ?? 0) + 1;
     for (const surface of outcome.surfacesExercised) surfaces[surface] = (surfaces[surface] ?? 0) + 1;
     texts += outcome.textCount;
     simulations += outcome.simulations;
@@ -132,6 +136,7 @@ export function runHonestyCampaign(options: HonestyCampaignOptions): HonestyCamp
       surfaces: Object.freeze(surfaces),
       buildings: Object.freeze(buildings),
       modes: Object.freeze(modes),
+      fitOuts: Object.freeze(fitOuts),
       temporal: Object.freeze({ ...temporal }),
       withheld: Object.freeze({ cells: withheldCells, states: withheldStatesSeen }),
     }),
@@ -152,6 +157,8 @@ export function formatHonestyStats(stats: HonestyCampaignStats): string {
     `suppressed runs  ${String(stats.suppressedCases)} of ${String(stats.evaluated)}`,
     `buildings        ${entries(stats.buildings)}`,
     `modes            ${entries(stats.modes)}`,
+    // The fit-out axis's own distribution — § D437, and `HonestyCampaignStats.fitOuts`'s reason.
+    `fit-outs         ${entries(stats.fitOuts)}`,
     `surfaces         ${String(Object.keys(stats.surfaces).length)} produced at least one string`,
     /*
      * The temporal axis's own size, printed for the reason the rest of this block is: a property
@@ -207,6 +214,12 @@ export function formatFailure(failure: HonestyShrinkResult): string {
  *
  * `mode` is no longer on this list: `HONESTY_MODES` names both values, so the pinned cases
  * distribute across Basic and Advanced and the corpus assertion requires both to appear.
+ *
+ * **Nor is the fit-out** ([§ D437](../../../../DECISIONS.md)). A third of these seeds now run a
+ * tower that has bought something, drawn from `fitOut.ts#HONESTY_KITS`, and each kit was chosen by
+ * measuring the shipped tiers **at these cells** rather than at the campaign's — so every fitted
+ * case in this tier moves the legs, which `honesty.test.ts` asserts rather than assumes. Before that
+ * every case here was a tower **as built**, which is the hole § D427's null result found.
  */
 export const STANDARD_CORPUS: readonly number[] = Object.freeze([
   9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008, 9009, 9010, 9011, 9012, 9013, 9014, 9015, 9016,

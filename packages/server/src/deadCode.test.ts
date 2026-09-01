@@ -93,7 +93,12 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   ['factsResolver', 'server/src/bootstrap.ts', 'same file'],
   ['verifySubmission', 'server/src/http/api.ts', 'import'],
   ['submissionIssues', 'server/src/http/api.ts', 'import'],
-  ['configHashOf', 'server/src/http/api.ts', 'import'],
+  // § 12.1's split: the placement decides the board, the digest names the data, and the table of
+  // keys is on the wire so a client can label the one that has no route yet.
+  ['placeSubmission', 'server/src/http/api.ts', 'import'],
+  ['runDataHashOf', 'server/src/http/api.ts', 'import'],
+  ['dailyFixtureAt', 'server/src/http/api.ts', 'import'],
+  ['BOARD_KEYS', 'server/src/http/api.ts', 'import'],
   // § D241's magic link, which replaced the password path rather than sitting beside it. Every
   // symbol the old flow had — `hashPassword`, `passwordMatches`, `passwordIssues`, `PasswordHash`,
   // the scrypt parameters, `signConfirmation`, `verifyConfirmation` — is **deleted**, so there is
@@ -159,7 +164,8 @@ describe('every export of server/ has a caller or a stated reason', () => {
       'http/serve',
       'store/Store',
       'leaderboard/verifySubmission',
-      'leaderboard/configHashOf',
+      'leaderboard/runDataHashOf',
+      'leaderboard/placeSubmission',
       'accounts/signLoginToken',
       'accounts/verifyLoginToken',
       'accounts/FixedWindowLimiter',

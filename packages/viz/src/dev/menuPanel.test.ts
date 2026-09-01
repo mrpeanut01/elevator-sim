@@ -1476,10 +1476,10 @@ describe('an empty leaderboard shows what a board is', () => {
     const loaded = await catalogue();
     const { root } = render({ ...initialMenuState(loaded), screen: 'leaderboard' }, loaded, {
       leaderboard: () => ({
-        boards: [{ configHash: 'abcdef0123456789', entries: 1 }],
+        boards: [{ boardKey: 'abcdef0123456789', entries: 1 }],
         selected: 'abcdef0123456789',
         page: {
-          configHash: 'abcdef0123456789',
+          boardKey: 'abcdef0123456789',
           metric: 'awtS',
           note: 'One configuration across seeds.',
           entries: [
@@ -1504,14 +1504,14 @@ describe('an empty leaderboard shows what a board is', () => {
 /**
  * One configuration board, as `GET /api/board` answers it.
  *
- * Two rows differing **only in seed**, which is the only axis a board leaves open: `configHashOf`
+ * Two rows differing **only in seed**, which is one axis a board may leave open: `runDataHashOf`
  * digests the other six fields, so two rows that differed in any of them could not be on one board.
  * Ada is second, so *which of these is mine* and *how far behind the top* have answers to find that
  * are not simply "the first row".
  */
 const LEADERBOARD_BOARD = (): BoardPage =>
   ({
-    configHash: 'abcdef0123456789',
+    boardKey: 'abcdef0123456789',
     metric: 'awtS',
     note: 'Ranked on the named metric alone. The others are shown beside it and never combined.',
     entries: [
@@ -1556,8 +1556,8 @@ const beatControl = (root: Recorded, player: string): Recorded | undefined =>
 
 const openBoard = (page: BoardPage): Partial<MenuPanelHost> => ({
   leaderboard: () => ({
-    boards: [{ configHash: page.configHash, entries: page.entries.length }],
-    selected: page.configHash,
+    boards: [{ boardKey: page.boardKey, entries: page.entries.length }],
+    selected: page.boardKey,
     page,
     notice: undefined,
   }),

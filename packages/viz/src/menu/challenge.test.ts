@@ -203,16 +203,32 @@ describe('the run configuration is the one the server will replay', () => {
     // Nothing the client assigns is absent from the server's own source.
     expect(builtKeys.filter((key) => !keys.has(key))).toEqual([]);
     /*
-     * And exactly one pair goes the other way. `durationS` and the window are **alternatives** —
-     * § D285, and `configFor` picks one branch — so a config that names a length cannot also name a
-     * part of a day, and no challenge names one: `CHALLENGE_ROTATION` is authored entirely on hour
-     * records, which already are the part of the day they mean.
+     * And exactly three go the other way, each because a **challenge** cannot name it.
+     *
+     * `durationS` and the window are **alternatives** — § D285, and `configFor` picks one branch —
+     * so a config that names a length cannot also name a part of a day, and no challenge names one:
+     * `CHALLENGE_ROTATION` is authored entirely on hour records, which already are the part of the
+     * day they mean.
+     *
+     * `interventions` is the third and it joined for a different reason — GitHub issue #179, which
+     * put ENGINE_CONTRACT § 1.4's run record on the leaderboard wire. A challenge submission carries
+     * a dispatcher id and a set of seeds and nothing else: `challenge/verify.ts#runFor` builds its
+     * `SubmittedRun` with neither the log nor a rule list, deliberately, because a challenge board
+     * says *"these players, on these seeds, in this order"* and a player who brought a mid-run
+     * intervention the challenge did not name would be on a different question. So the key is
+     * absent here **by construction**, exactly as `windowStartS` is, and this list is where that
+     * stays true rather than becoming an oversight.
+     *
+     * (`ruleRows` is not in either set: it is not a `SimulationConfig` key at all. The server folds
+     * it into `dispatcherProfile` through `verify.ts#profileWithRules`, so a challenge that ever
+     * wants rules widens `ChallengeSubmission`, not this comparison.)
      *
      * Asserted as an exact set rather than filtered out, so this stays the mechanism it was: a
      * *new* key added anywhere in `configFor` — including inside the window arm — still fails here
      * rather than being quietly absorbed by an exclusion.
      */
     expect([...keys].filter((key) => !builtKeys.includes(key)).sort()).toEqual([
+      'interventions',
       'windowEndS',
       'windowStartS',
     ]);

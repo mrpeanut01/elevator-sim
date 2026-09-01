@@ -125,6 +125,36 @@ export const suppressedMeanInProse: TextFault = (texts, context) => {
   );
 };
 
+/**
+ * **R3 on a tower that has bought something — § D437's axis, shown to be checked rather than swept.**
+ *
+ * ## Why a third R3 fault, when two already exist
+ *
+ * Because *being swept is not being checked*, and this repository has recorded getting that
+ * distinction wrong before. § D427's null result found that no corpus case had ever carried a
+ * non-`AS_BUILT` fit-out, so the ten properties had never read a fitted run's strings; the axis puts
+ * fitted runs in front of them. A seeded case that no property can fail is decoration, and the only
+ * way to know which of the two this is, is to break a **fitted** surface on purpose and watch a
+ * property fire.
+ *
+ * ## The guard is the whole fault
+ *
+ * It is {@link suppressedMeanLeak} with one line in front of it: *a tower as built has bought
+ * nothing to lie about.* So on every as-built case in the corpus this fault is a **no-op** — which
+ * is what makes it decisive rather than merely red. `faults.test.ts` asserts both directions on one
+ * case: fitted, it produces a fresh R3 violation; the same case with `fitOutId: null`, it produces
+ * none. A fault that fired either way would prove the property works and say nothing about whether
+ * the fitted half of the corpus reaches it.
+ *
+ * The fixture it needs is therefore a **fitted and suppressed** case, which the corpus does produce
+ * — and *whether it does* is itself a measurement, so `faults.test.ts` throws with that sentence
+ * rather than skipping if it stops.
+ */
+export const fittedTowerMeanLeak: TextFault = (texts, context) => {
+  if (context.case.fitOutId === null) return texts;
+  return suppressedMeanLeak(texts, context);
+};
+
 /** R2 — a single-run surface ordering two dispatchers. */
 export const comparativeOnOneRun: TextFault = (texts, context) =>
   replaceFirst(
@@ -438,12 +468,33 @@ export const oneRailSaysNothing: TextFault = (texts) => {
  * is R6's structural and textual checks, where one breaks the gate on a figure whose producer
  * declared it whole-run and the other leaves the gate shut and puts the whole day's count inside a
  * sentence the surface declared true of the instant.
+ *
+ * `suppressed-mean` now carries a **third**, and it is about the corpus rather than about R3: the
+ * fit-out axis put fitted runs in front of the properties for the first time (§ D437), and
+ * {@link fittedTowerMeanLeak} is what says they are checked there rather than merely rendered.
  */
-export const FAULTS: Readonly<Record<HonestyProperty, readonly { readonly name: string; readonly fault: TextFault }[]>> =
-  Object.freeze({
+export const FAULTS: Readonly<
+  Record<
+    HonestyProperty,
+    readonly {
+      readonly name: string;
+      readonly fault: TextFault;
+      /**
+       * The fixture this one fault needs, when it is not the property's own.
+       *
+       * Per fault rather than per property, because a fault may narrow what it fires on:
+       * {@link fittedTowerMeanLeak} is a no-op on a tower as built by construction, so driving it on
+       * the property's shared `suppressed` fixture would make it silently prove nothing — which is
+       * the exact false negative `faults.test.ts` exists to refuse.
+       */
+      readonly fixture?: 'fitted-suppressed';
+    }[]
+  >
+> = Object.freeze({
     'suppressed-mean': [
       { name: 'suppressedMeanLeak', fault: suppressedMeanLeak },
       { name: 'suppressedMeanInProse', fault: suppressedMeanInProse },
+      { name: 'fittedTowerMeanLeak', fault: fittedTowerMeanLeak, fixture: 'fitted-suppressed' },
     ],
     'single-run-comparative': [{ name: 'comparativeOnOneRun', fault: comparativeOnOneRun }],
     'probability-word': [{ name: 'probabilityWordLeak', fault: probabilityWordLeak }],

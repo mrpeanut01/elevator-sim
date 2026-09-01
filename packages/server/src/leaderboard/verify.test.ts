@@ -11,7 +11,8 @@ import { describe, expect, it, beforeAll } from 'vitest';
 
 import { loadConfig, runSimulation, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 
-import { configHashOf, digestOf, submissionIssues, type Submission } from './submission.js';
+import { runDataHashOf } from './boardKey.js';
+import { digestOf, submissionIssues, type Submission, type SubmittedRun } from './submission.js';
 import {
   METRIC_EPSILON,
   configFor,
@@ -60,6 +61,262 @@ function honest(): Submission {
   if (typeof config === 'string') throw new Error(`fixture does not resolve: ${config}`);
   return { run: RUN, claimed: metricsOf(runSimulation(config).summary) };
 }
+
+/* -------------------------------------------------------------------------- *
+ * The Everyday run: a written dispatcher and a played day
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The two rows a player would write in § 11.5's editor, in first-match order.
+ *
+ * Values from the vocabulary's own `values` lists, because anything else is refused by
+ * `submissionIssues` before a simulation starts and by `resolveDispatchConfig` after it.
+ */
+const RULES = Object.freeze([
+  Object.freeze({ when: 'lobby-queue-passes' as const, whenValue: 12, then: 'hold-at-lobby' as const }),
+  Object.freeze({ when: 'call-waited' as const, whenValue: 60, then: 'jump-queue' as const }),
+]);
+
+/** One press of § 7.6's parking control, a quarter of the way into the run. */
+const LOG = Object.freeze([Object.freeze({ atS: 225, change: Object.freeze({ kind: 'park-cars-lobby' as const }) })]);
+
+/**
+ * The cell these cases run on, and **it is not {@link RUN}** — which is a finding rather than a
+ * convenience.
+ *
+ * Driven on `garden-apartments` at 6 % over 900 s, both fields move the run by **exactly nothing**:
+ * `awtS` is 17.404761904761926 with the rules, with the log, and with neither. Sparse traffic over
+ * two hydraulic cars never puts twelve people in the lobby, never leaves a call waiting sixty
+ * seconds, and gives stage 7 nothing to reposition — so the rules never fire and the parking
+ * instruction changes no decision. Every case below would have passed on that cell and proved
+ * nothing at all, which is the shape of a wire that carries a field the kernel ignores.
+ *
+ * `midtown-office` at 3 % over 900 s is § D129's own probe cell, `awtIsValid` there is `true`, and
+ * both fields bite: `23.0038` plain, `26.1676` ruled, `26.2945` with the log, at seed 20260804. The
+ * direction is *worse*, which is exactly right and worth saying — a rule a player wrote is not
+ * required to help them, and a wire that only carried improvements would be a scoreboard rather than
+ * a simulator.
+ */
+const EVERYDAY_RUN = Object.freeze({
+  ...RUN,
+  buildingId: 'midtown-office',
+  arrivalRatePctPop5min: 3,
+});
+
+/**
+ * The configuration a **client** builds for a run carrying rules and a log — written out here term
+ * for term rather than obtained from `configFor`.
+ *
+ * The duplication is the test. `configFor` is the thing under test, so a claim computed through it
+ * would be the verifier agreeing with itself; what has to be true is that a config assembled the way
+ * `packages/viz`'s `dev/state.ts#shiftRunConfigOf` assembles one reaches the same figures. So the
+ * two writes the viewer makes are made here — `authoring/ruleSpec.ts#profileWithRules` puts
+ * `rules.rows` and `selection.policy: 'rules'` on the profile, and `shiftRunConfigOf` spreads
+ * `interventions` only when the log is non-empty — and the metrics that come out are submitted as
+ * the *claim*. If `configFor` differed from the viewer in any term, `metricsAgree` would fail and
+ * this test would go red, which is exactly the failure an honest player would otherwise meet as a
+ * 422 they could do nothing about.
+ *
+ * `viz` is not imported and cannot be: it is a browser bundle and this package opens a socket and a
+ * database, so the rule `menu/challenge.ts` states — *`viz` must build and test with
+ * `packages/server` absent* — runs in this direction too. `scope/runIdentity.test.ts` holds the
+ * other end by reading this package's source text, which is `menu/client.test.ts`'s own method.
+ */
+function asTheClientBuildsIt(run: SubmittedRun): SimulationConfig {
+  const building = config.buildingsById.get(run.buildingId);
+  const profile = config.dispatcherProfilesById.get(run.dispatcherProfileId);
+  if (building === undefined || profile === undefined) throw new Error('fixture does not resolve');
+  const rows = run.ruleRows ?? [];
+  return {
+    building,
+    dispatcherProfile:
+      rows.length === 0
+        ? profile
+        : { ...profile, rules: { rows: [...rows] }, selection: { ...(profile.selection ?? {}), policy: 'rules' } },
+    trafficProfiles: config.trafficProfiles,
+    elevatorSpecs: config.elevatorSpecs,
+    dispatcherProfiles: config.dispatcherProfiles,
+    seed: BigInt(run.seed),
+    demandTemplate: run.demandTemplateId as SimulationConfig['demandTemplate'],
+    onTimeout: 'report',
+    ...(run.arrivalRatePctPop5min === null
+      ? {}
+      : { demand: { arrivalRatePctPop5min: run.arrivalRatePctPop5min } }),
+    ...(run.windowStartS === null
+      ? { durationS: run.durationS }
+      : { windowStartS: run.windowStartS, windowEndS: run.windowStartS + run.durationS }),
+    ...((run.interventions ?? []).length === 0 ? {} : { interventions: run.interventions }),
+  } as SimulationConfig;
+}
+
+/** What a client that ran `run` would claim, measured its own way. */
+function claimedByTheClient(run: SubmittedRun): Submission {
+  return { run, claimed: metricsOf(runSimulation(asTheClientBuildsIt(run)).summary) };
+}
+
+describe('an Everyday run is submittable, and the server reaches the same figures', () => {
+  it('replays a written rule list to the client’s own metrics', () => {
+    /*
+     * The refusal this replaces said *"no selection or submission carries a rule list — a replay
+     * without them is a different run"*, and every clause of it was true. The consequence was that a
+     * player who wrote one row could never appear on any board and the whole of § 11's workshop
+     * produced dispatchers that were unpostable by construction.
+     *
+     * What makes it safe to lift is this case rather than the field: the server rebuilds the
+     * dispatcher from **its own** `data/` and writes the player's rows onto it, and the figures agree
+     * with the client's to `METRIC_EPSILON`.
+     */
+    const ruled: SubmittedRun = { ...EVERYDAY_RUN, ruleRows: RULES };
+    const verification = verifySubmission(claimedByTheClient(ruled), resources);
+    expect(verification.ok, JSON.stringify(verification)).toBe(true);
+  });
+
+  it('replays an intervention log to the client’s own metrics', () => {
+    // ENGINE_CONTRACT § 1.4 clause 2, which the product could not keep until the log was on the
+    // wire: *"The server re-simulates the record, log included, and refuses a submission whose
+    // metrics do not reproduce."*
+    const played: SubmittedRun = { ...EVERYDAY_RUN, interventions: LOG };
+    const verification = verifySubmission(claimedByTheClient(played), resources);
+    expect(verification.ok, JSON.stringify(verification)).toBe(true);
+  });
+
+  it('replays both together, because a player who writes rules also plays the day', () => {
+    const both: SubmittedRun = { ...EVERYDAY_RUN, ruleRows: RULES, interventions: LOG };
+    const verification = verifySubmission(claimedByTheClient(both), resources);
+    expect(verification.ok, JSON.stringify(verification)).toBe(true);
+  });
+
+  it('makes a difference to the run, so accepting it is not accepting a no-op', () => {
+    /*
+     * **The half that decides whether any of the above means anything.** A field the kernel ignored
+     * would pass every case above trivially — the claim and the replay would agree because neither
+     * saw it — and the wire would be the *twelfth* dead seam: carried, validated, and changing
+     * nothing. So the legs are compared, which is `CLAUDE.md`'s standing requirement pointed at a
+     * wire instead of at a slider: move the control and require the run to change.
+     */
+    const plain = metricsOf(runSimulation(asTheClientBuildsIt(EVERYDAY_RUN)).summary);
+    const ruled = metricsOf(runSimulation(asTheClientBuildsIt({ ...EVERYDAY_RUN, ruleRows: RULES })).summary);
+    const played = metricsOf(runSimulation(asTheClientBuildsIt({ ...EVERYDAY_RUN, interventions: LOG })).summary);
+    expect(ruled).not.toEqual(plain);
+    expect(played).not.toEqual(plain);
+    // Named rather than only compared, so the cell's own numbers are in the file that depends on
+    // them and a cell edited to one where the fields go quiet is red here rather than vacuous.
+    expect(plain.awtS).toBeCloseTo(23.0038, 3);
+    expect(ruled.awtS).toBeCloseTo(26.1676, 3);
+    expect(played.awtS).toBeCloseTo(26.2945, 3);
+  });
+
+  it('is byte-identical to the run before the fields existed when both are empty', () => {
+    // The other direction, and the reason `[]` may not be written as a key. Every score posted
+    // before these fields must still re-verify, and it does because an empty list carries nothing.
+    const empty = metricsOf(
+      runSimulation(asTheClientBuildsIt({ ...EVERYDAY_RUN, ruleRows: [], interventions: [] })).summary,
+    );
+    expect(empty).toEqual(metricsOf(runSimulation(asTheClientBuildsIt(EVERYDAY_RUN)).summary));
+    expect(
+      verifySubmission(claimedByTheClient({ ...EVERYDAY_RUN, ruleRows: [], interventions: [] }), resources).ok,
+    ).toBe(true);
+  });
+
+  it('refuses a submission whose stored rules cannot reproduce its metrics', () => {
+    /*
+     * **The mutation that says the widening is a wire and not a hole.** The claim is what the run
+     * with `RULES` produced; the submission stores a *different* rule list. If `configFor` ignored
+     * `ruleRows` — or applied them to something other than the run — this would board. It does not:
+     * the server replays what was stored, gets other legs, and refuses.
+     *
+     * A rejection is still not an accusation, and the wording is asserted for the same reason it is
+     * two hundred lines above: the player who lands here most often is one on an older build.
+     */
+    const honestClaim = claimedByTheClient({ ...EVERYDAY_RUN, ruleRows: RULES });
+    const swapped: Submission = {
+      run: { ...EVERYDAY_RUN, ruleRows: [{ when: 'car-fuller-than', whenValue: 0.5, then: 'no-new-pickups' }] },
+      claimed: honestClaim.claimed,
+    };
+    const verification = verifySubmission(swapped, resources);
+    expect(verification.ok).toBe(false);
+    if (verification.ok) return;
+    expect(verification.code).toBe('metrics-do-not-reproduce');
+  });
+
+  it('refuses a submission whose stored log cannot reproduce its metrics', () => {
+    // The same mutation one field over: the metrics of a day somebody intervened in, stored as a day
+    // nobody touched. A server that dropped the log would board this.
+    const honestClaim = claimedByTheClient({ ...EVERYDAY_RUN, interventions: LOG });
+    const stripped: Submission = { run: EVERYDAY_RUN, claimed: honestClaim.claimed };
+    const verification = verifySubmission(stripped, resources);
+    expect(verification.ok).toBe(false);
+    if (verification.ok) return;
+    expect(verification.code).toBe('metrics-do-not-reproduce');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * What the wire still will not carry
+ * -------------------------------------------------------------------------- */
+
+describe('the two intervention kinds a submission may not carry', () => {
+  it('refuses a mid-run dispatcher switch, because it carries a weight vector inline', () => {
+    /*
+     * `submission.ts`'s founding rule — *ids rather than inline objects* — with the object being a
+     * whole `DispatcherProfile` instead of a two-floor tower with sixteen cars. A switch could only
+     * travel as a shipped profile **id** resolved against this server's `data/`, and that is a
+     * different field from the one the viewer needs locally, where the driving profile is routinely
+     * a derived object no id resolves.
+     *
+     * Refused by the **cheap** gate, before anything simulates: a submission that could smuggle a
+     * vector must not be able to command a replay on the way to being refused.
+     */
+    const profile = config.dispatcherProfilesById.get('eta');
+    const issues = submissionIssues({
+      run: {
+        ...RUN,
+        interventions: [{ atS: 300, change: { kind: 'switch-dispatcher', profile: profile! } }],
+      },
+      claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+    });
+    expect(issues.join(' ')).toMatch(/switch-dispatcher.*may not carry/u);
+  });
+
+  it('refuses an incident answer, because the incident it answers is not on the wire', () => {
+    /*
+     * Not a missing field: a missing **cause**. `viz`'s `shift/incidents.ts` writes the day's
+     * incident onto the building as `serviceEvents`, decided from the week's day and the calendar,
+     * and neither travels. A replay built from ids alone has no incident, so the answer's own
+     * service events would be the only mode changes in the run — a different day, accepted as this
+     * one. Carrying the answer without its cause would be worse than refusing it.
+     */
+    const issues = submissionIssues({
+      run: {
+        ...RUN,
+        interventions: [{ atS: 300, change: { kind: 'answer-incident', option: 'Send it back', serviceEvents: [] } }],
+      },
+      claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+    });
+    expect(issues.join(' ')).toMatch(/answer-incident.*may not carry/u);
+  });
+
+  it('refuses a rule outside the shipped vocabulary before it can command a simulation', () => {
+    // The bound that makes a rule list unlike a building: nine conditions, eight actions, and a
+    // declared value list for each. Everything else is refused by name.
+    const issues = submissionIssues({
+      run: { ...RUN, ruleRows: [{ when: 'invent-a-condition' as never, then: 'nearest-car' }] },
+      claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+    });
+    expect(issues.join(' ')).toMatch(/not a declared rule condition/u);
+  });
+
+  it('refuses a value the vocabulary does not declare, which is where a smuggled number would go', () => {
+    // `whenValue` is the only place in a rule row a *number* travels, so it is the only place a
+    // player could put one the editor never offered. `core` refuses it at resolve; this refuses it
+    // before the replay.
+    const issues = submissionIssues({
+      run: { ...RUN, ruleRows: [{ when: 'call-waited', whenValue: 1, then: 'jump-queue' }] },
+      claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+    });
+    expect(issues.join(' ')).toMatch(/whenValue is not one of the values/u);
+  });
+});
 
 describe('a submission is accepted only if it replays', () => {
   it('accepts the truth, and stores the server’s figures rather than the claim', () => {
@@ -305,10 +562,20 @@ describe('a windowed run can be posted, and is replayed over the part it names',
 });
 
 /* -------------------------------------------------------------------------- *
- * The board's identity
+ * What a row was measured against
  * -------------------------------------------------------------------------- */
 
-describe('a board is keyed by what it measures', () => {
+/*
+ * These cases used to be titled *a board is keyed by what it measures*, and the digest they exercise
+ * used to be the board key. `ENGINE_CONTRACT.md` § 12.1 forbids that key in as many words, so the
+ * value kept its bytes and lost its second job: it now says **what data a stored row was measured
+ * against**, and `boardKey.test.ts` decides which board the row is on.
+ *
+ * The cases survive the rename because every claim they made was a true claim about the digest and a
+ * false one only about the word *board*. The last of them is the load-bearing one: the digest is
+ * asserted against a literal hex string, so the split is proved to have moved no byte.
+ */
+describe('an entry names the data it was measured against', () => {
   const facts = {
     buildingDigest: 'aaa',
     dispatcherDigest: 'bbb',
@@ -316,39 +583,40 @@ describe('a board is keyed by what it measures', () => {
     trafficModel: 'v1',
   };
 
-  it('puts two runs of the same configuration on the same board, whatever the seed', () => {
-    // A board is a leaderboard ACROSS seeds. Hashing the seed would give every player a private
-    // board of one.
-    expect(configHashOf({ ...RUN, seed: '1' }, facts)).toBe(configHashOf({ ...RUN, seed: '999' }, facts));
+  it('measures two runs of one configuration against the same data, whatever the seed', () => {
+    // The seed is the run, not the data. Hashing it here would make the digest an identity for the
+    // replication rather than for what the replication was measured against.
+    // (`boardKey.ts#isDailyFixtureRun` is where the seed does matter, and says why.)
+    expect(runDataHashOf({ ...RUN, seed: '1' }, facts)).toBe(runDataHashOf({ ...RUN, seed: '999' }, facts));
   });
 
-  it('starts a new board when the data it measured changes', () => {
+  it('changes when the data it measured changes', () => {
     // The § D205 / § D213 lesson with money on it: a building edited under a live board would leave
     // every stored score describing a run that no longer exists — and failing to re-verify, so
-    // honest old entries would start looking like forgeries.
-    const moved = configHashOf(RUN, { ...facts, buildingDigest: 'aaa2' });
-    expect(moved).not.toBe(configHashOf(RUN, facts));
+    // honest old entries would start looking like forgeries. The digest is what makes that visible.
+    const moved = runDataHashOf(RUN, { ...facts, buildingDigest: 'aaa2' });
+    expect(moved).not.toBe(runDataHashOf(RUN, facts));
   });
 
   it('separates runs that differ in any input that could move the result', () => {
-    const base = configHashOf(RUN, facts);
-    expect(configHashOf({ ...RUN, durationS: 1800 }, facts)).not.toBe(base);
-    expect(configHashOf({ ...RUN, arrivalRatePctPop5min: 8 }, facts)).not.toBe(base);
-    expect(configHashOf({ ...RUN, dispatcherProfileId: 'eta' }, facts)).not.toBe(base);
+    const base = runDataHashOf(RUN, facts);
+    expect(runDataHashOf({ ...RUN, durationS: 1800 }, facts)).not.toBe(base);
+    expect(runDataHashOf({ ...RUN, arrivalRatePctPop5min: 8 }, facts)).not.toBe(base);
+    expect(runDataHashOf({ ...RUN, dispatcherProfileId: 'eta' }, facts)).not.toBe(base);
     // `null` — the building's own profile — is a distinct selection, not the absence of one.
-    expect(configHashOf({ ...RUN, arrivalRatePctPop5min: null }, facts)).not.toBe(base);
+    expect(runDataHashOf({ ...RUN, arrivalRatePctPop5min: null }, facts)).not.toBe(base);
     // ...and the engine's own model version, because a v1 score and a v2 score are not comparable
     // however identical the rest is.
-    expect(configHashOf(RUN, { ...facts, trafficModel: 'v2' })).not.toBe(base);
+    expect(runDataHashOf(RUN, { ...facts, trafficModel: 'v2' })).not.toBe(base);
   });
 
-  it('ranks two parts of one day apart, because they are different runs', () => {
-    // § D285. A morning window and a lunch window over the same seed measure different traffic;
-    // ranking them together would be comparing a rush hour with a lull and calling one dispatcher
-    // better. The whole-period run is a third thing again.
-    const base = configHashOf(RUN, facts);
-    const morning = configHashOf({ ...RUN, windowStartS: 30 * 60 }, facts);
-    const lunch = configHashOf({ ...RUN, windowStartS: 255 * 60 }, facts);
+  it('tells two parts of one day apart, because they are different runs', () => {
+    // § D285. A morning window and a lunch window over the same seed measure different traffic, so
+    // a row that recorded one under the other's digest would name data it was never measured
+    // against. The whole-period run is a third thing again.
+    const base = runDataHashOf(RUN, facts);
+    const morning = runDataHashOf({ ...RUN, windowStartS: 30 * 60 }, facts);
+    const lunch = runDataHashOf({ ...RUN, windowStartS: 255 * 60 }, facts);
     expect(new Set([base, morning, lunch]).size).toBe(3);
   });
 
@@ -356,43 +624,68 @@ describe('a board is keyed by what it measures', () => {
    * GitHub issue #267's safety property, and the reason widening `ACCEPTED_DURATIONS_S` is not a
    * ranking bug: **a ten-hour run never competes against a thirty-minute one.**
    *
-   * Verified by construction rather than assumed — `configHashOf` puts `durationS` in the canonical
-   * string it digests, so every accepted length is its own board. The case above already proves the
-   * general rule at 1 800 s; this one names the whole day, because that is the length the issue is
-   * about and a general rule nobody instantiated is how a specific regression hides.
+   * Verified by construction rather than assumed — `runDataHashOf` puts `durationS` in the canonical
+   * string it digests, so every accepted length has its own digest. The case above already proves
+   * the general rule at 1 800 s; this one names the whole day, because that is the length the issue
+   * is about and a general rule nobody instantiated is how a specific regression hides.
    *
-   * The cost of the property is the empty board it creates, which is `RISKS.md` R32 and GitHub
-   * issue #222 rather than something this test can fix.
+   * **The empty board this used to create is gone**, and it is worth saying which half of #267
+   * survived. The property that a ten-hour run is not confused with a thirty-minute one is this
+   * digest's and stands. The *cost* — `RISKS.md` R32's board of one, minted by a length nobody else
+   * picked — was the board key being this digest, and a run that is not the day's fixture now lands
+   * in its player's own log instead.
    */
-  it('gives a whole authored day its own board, so it never ranks against a slice', () => {
-    const wholeDay = configHashOf({ ...RUN, durationS: 36_000, windowStartS: 0 }, facts);
-    const twoHours = configHashOf({ ...RUN, durationS: 7_200, windowStartS: 0 }, facts);
-    const halfHour = configHashOf({ ...RUN, durationS: 1_800, windowStartS: 0 }, facts);
+  it('gives a whole authored day its own digest, so it is never confused with a slice', () => {
+    const wholeDay = runDataHashOf({ ...RUN, durationS: 36_000, windowStartS: 0 }, facts);
+    const twoHours = runDataHashOf({ ...RUN, durationS: 7_200, windowStartS: 0 }, facts);
+    const halfHour = runDataHashOf({ ...RUN, durationS: 1_800, windowStartS: 0 }, facts);
     expect(new Set([wholeDay, twoHours, halfHour]).size).toBe(3);
   });
 
   it('treats a window starting at zero as a selection, not as its absence', () => {
     // `0` is *the run starts at the top of the day*, `null` is *there is no window*. They are two
     // different statements and `?? undefined` is what keeps them apart — `|| undefined` would fold
-    // the first into the second and silently rank a windowed run on the whole-period board.
-    expect(configHashOf({ ...RUN, windowStartS: 0 }, facts)).not.toBe(configHashOf(RUN, facts));
+    // the first into the second and record a windowed run under the whole-period run's digest.
+    expect(runDataHashOf({ ...RUN, windowStartS: 0 }, facts)).not.toBe(runDataHashOf(RUN, facts));
   });
 
-  it('leaves every board that already exists exactly where it was', () => {
+  it('leaves every entry that already exists naming exactly the data it always named', () => {
     /*
-     * The regression this field could most easily have caused, and the reason `configHashOf` writes
-     * the window as `undefined` rather than `null` when there is none.
+     * **This is the assertion that says the split moved no byte**, and it is the same assertion it
+     * was before the split — which is the point of leaving the literal alone.
      *
-     * Every score posted before the window existed was a whole-period run. Adding a key to the
-     * canonical string would have moved all of them to a new board — honest entries relocated for a
-     * selection their players never made, on a leaderboard whose entire premise is that a board
-     * survives everything except a change to what it measured.
+     * Three fields have now been added to `SubmittedRun` without moving this hex: `windowStartS`,
+     * and this wave's `ruleRows` and `interventions`. Each is written into the canonical string as
+     * `undefined` when the run did not use it, and `canonicalJson` drops `undefined` entries, so a
+     * whole-period run with no rules and no log digests to **exactly** the string it digested when
+     * none of the three existed. Adding a key unconditionally would have re-digested every honest
+     * entry ever stored, for selections their players never made.
      *
      * Asserted against the literal digest rather than against a recomputation, because a
-     * recomputation would change with the code and prove nothing. This hex is what a
-     * whole-period `RUN` on these facts hashed to before `windowStartS` existed.
+     * recomputation would change with the code and prove nothing.
      */
-    expect(configHashOf(RUN, facts)).toBe('d77c9681da72ea7aea293a204a1b55ff');
+    expect(runDataHashOf(RUN, facts)).toBe('d77c9681da72ea7aea293a204a1b55ff');
+    // Explicitly, rather than only by RUN's shape: the two new fields at their empty values are the
+    // same string as their absence.
+    expect(runDataHashOf({ ...RUN, ruleRows: [], interventions: [] }, facts)).toBe(
+      'd77c9681da72ea7aea293a204a1b55ff',
+    );
+  });
+
+  it('does move when a run actually carries rules or a log, because those moved the result', () => {
+    // The other half of the field's contract. An empty list must not fork the digest and a written
+    // one must: a row that recorded a ruled run under the plain run's digest would name data the
+    // run was not measured against.
+    const base = runDataHashOf(RUN, facts);
+    const ruled = runDataHashOf(
+      { ...RUN, ruleRows: [{ when: 'call-waited', whenValue: 60, then: 'jump-queue' }] },
+      facts,
+    );
+    const logged = runDataHashOf(
+      { ...RUN, interventions: [{ atS: 300, change: { kind: 'park-cars-lobby' } }] },
+      facts,
+    );
+    expect(new Set([base, ruled, logged]).size).toBe(3);
   });
 
   it('does not fork a board over key order in a record', () => {

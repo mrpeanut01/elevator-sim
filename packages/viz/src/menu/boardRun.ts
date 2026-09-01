@@ -14,17 +14,27 @@
  *
  * ## Two facts about a board that decide the whole design, and neither is obvious
  *
- * **1. The dispatcher is a property of the board, not of the row.** `packages/server`'s
- * `leaderboard/submission.ts#configHashOf` digests `buildingId`, `dispatcherProfileId`,
- * `demandTemplateId`, `arrivalRatePctPop5min`, `durationS` and `windowStartS` — everything except
- * the seed — and a board *is* that digest. `http/api.ts` says it in as many words: *"one
- * configuration — dispatcher included — across seeds … choosing a different one moves a player to a
- * different board rather than up the one they are on."* So #93's *"allow players to mark their
- * posted dispatcher as public or hidden"* is asking for a per-row secret that is already a
- * per-board fact, and the honest reveal names it **once**, above the table, rather than repeating it
- * on every row as though it varied. {@link boardConfigurationOf} refuses to name one at all if the
- * page's own rows disagree — see its docstring; that is the mechanical check that keeps this
- * paragraph true rather than remembered.
+ * **1. The dispatcher was a property of the board and is now a property of the row — and the check
+ * below is what caught it rather than a reader.** This paragraph used to read *"the dispatcher is a
+ * property of the board, not of the row"*, because `packages/server`'s `configHashOf` digested
+ * `buildingId`, `dispatcherProfileId`, `demandTemplateId`, `arrivalRatePctPop5min`, `durationS` and
+ * `windowStartS`, and a board *was* that digest. `ENGINE_CONTRACT.md` § 12.1 forbids that key —
+ * every axis in it is a parameter a player sets — so the digest kept its job of naming *what a row
+ * was measured against* and stopped deciding which board a row is on. A board is now the **date**,
+ * or a player's own log.
+ *
+ * The consequence for this module is exact: **on the daily board every row shares everything except
+ * the dispatcher, which is the axis being compared, and in a personal log the rows may share
+ * nothing.** So #93's *"a per-row secret that is already a per-board fact"* has stopped being true,
+ * and the honest reveal is no longer one sentence above the table.
+ *
+ * {@link boardConfigurationOf} already refuses to name a configuration when the page's rows
+ * disagree, so the surface goes **quiet** rather than printing a dispatcher that ran some of the
+ * rows — which is the correct behaviour and was already the mechanical check keeping this paragraph
+ * honest. What it is not is a *finished* answer: a daily board's reveal should name the axes the
+ * rows agree on and put the dispatcher on each row, and that is a screen change this module cannot
+ * make on its own. Until it lands the panel is silent on a mixed board, which is a gap stated here
+ * rather than discovered by a reader wondering why the box is empty.
  *
  * **2. A row cannot be beaten by running it.** The configuration is fixed by the board and the seed
  * is on the row, so loading both and pressing go reproduces the row's figures **exactly** —
@@ -119,10 +129,10 @@ export interface ResolvedAxis {
  * Because the claim it produces is about the **board**, and a claim about a board taken from one row
  * is a claim that could be wrong without anything noticing. Every row on a board shares the
  * configuration by construction (see the module docstring), so this checks it: if any two rows
- * disagree on any of the six hashed fields, {@link BoardConfiguration.agreed} is `false` and the
- * caller must not print a configuration sentence. That would mean either a server change that moved
- * a field out of `configHashOf` or a client reading the wrong page, and both are cases where the
- * honest surface says nothing rather than naming a dispatcher that ran some of the rows.
+ * disagree on any of the six digested fields, {@link BoardConfiguration.agreed} is `false` and the
+ * caller must not print a configuration sentence. On a daily board that is the ordinary case rather
+ * than an anomaly — the dispatcher is what the board compares — and the silence is correct either
+ * way: the alternative is naming a dispatcher that ran some of the rows.
  *
  * ## What is deliberately not in here
  *
@@ -145,7 +155,13 @@ export interface BoardConfiguration {
   readonly unresolved: readonly ResolvedAxis[];
 }
 
-/** The six fields `configHashOf` digests, as one comparable string. Never shown to a reader. */
+/**
+ * The six fields `boardKey.ts#runDataHashOf` digests, as one comparable string. Never shown.
+ *
+ * The same six it has always been. What moved is what a difference between two of them *means*: it
+ * used to mean the two rows could not be on one board, and now it means they were measured against
+ * different things while sitting on the same one.
+ */
 function configKeyOf(run: RunSubmission): string {
   return [
     run.buildingId,

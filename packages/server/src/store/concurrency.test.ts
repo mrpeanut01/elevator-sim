@@ -263,8 +263,9 @@ const REMEDIES: Readonly<Record<string, readonly Remedy[]>> = Object.freeze({
       risks: ['unique'],
       remedy: 'arbitrated-by-the-write',
       because:
-        'The second defect at this site, and it has nothing to do with deletion. `UNIQUE (config_hash, ' +
-        'user_id, seed)` is the natural key, and the upsert conflicted on `id` — the *primary* key — so ' +
+        'The second defect at this site, and it has nothing to do with deletion. `UNIQUE (board_key, ' +
+        'data_hash, user_id, seed)` is the natural key, and the upsert conflicted on `id` — the ' +
+        '*primary* key — so ' +
         'the “re-submitting the same seed replaces rather than appends” guarantee held only when the ' +
         'pre-read found the row. Two concurrent submissions of one seed both read nothing, both mint a ' +
         'fresh `randomUUID`, and the second violates the natural key. The conflict target is now the ' +
@@ -529,8 +530,8 @@ describe('the derivation notices a schema change as well as a code change', () =
 
   it('sees a new unique constraint on a table an existing member writes', () => {
     const mutated = SOURCE.replace(
-      '  submitted_at_ms     BIGINT NOT NULL,\n  UNIQUE (config_hash, user_id, seed)',
-      '  submitted_at_ms     BIGINT NOT NULL,\n  UNIQUE (config_hash, user_id, seed),\n  UNIQUE (run_json)',
+      '  submitted_at_ms     BIGINT NOT NULL,\n  UNIQUE (board_key, data_hash, user_id, seed)',
+      '  submitted_at_ms     BIGINT NOT NULL,\n  UNIQUE (board_key, data_hash, user_id, seed),\n  UNIQUE (run_json)',
     );
     expect(mutated).not.toBe(SOURCE);
     const site = writingSites(mutated).find((s) => s.member === 'recordEntry');

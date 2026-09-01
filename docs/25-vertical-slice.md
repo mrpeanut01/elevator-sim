@@ -583,8 +583,21 @@ asked for it, which is worth more than any tooltip.
   verdict is *too close to call at this many runs* — never the better-looking arm named as the
   winner. One day each is a comparison, not proof; the bench settles it properly, and the sheet says
   which of the two it is.
-- **The player leaves mid-day.** Progress does not survive the tab (#164, M3). The slice must not
-  imply otherwise: no *saved* language, no resume affordance that resumes nothing.
+- **The player leaves mid-day.** This bullet read *"Progress does not survive the tab (#164, M3)"*
+  and **half of it stopped being true on 2026-09-01**, which is [§ D227](../DECISIONS.md#d227)'s
+  class arriving in a document rather than in a control: a refusal that outlives its cause tells a
+  reviewer not to expect something the product now does.
+
+  What survives the tab: the **week** (`persist/`'s session, and it always did —
+  [§ D402](../DECISIONS.md#d402) found the rail claiming otherwise and fixed the claim), and, since
+  GitHub issue #224, the **solved fix cases** and the **gauntlet ratings**
+  ([§ D433](../DECISIONS.md#d433)).
+
+  What still does not, and is what this bullet is now about: **a day in progress**. The per-case
+  repair selections, the cached as-built runs and a stage run that has not been filed all end with
+  the tab, deliberately — a working draft is not progress. So the slice must still not imply
+  otherwise **for the mid-day case**: no resume affordance that resumes nothing. *Saved* language
+  about a closed day, a fixed building or a standing rating is now accurate and is not forbidden.
 
 ---
 

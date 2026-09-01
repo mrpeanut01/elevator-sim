@@ -103,6 +103,60 @@ export interface RunSubmission {
    */
   readonly windowStartS: number | null;
   readonly seed: string;
+  /**
+   * The Everyday rules the run's dispatcher was driven by — § 11.5, in first-match order.
+   *
+   * Absent for every run that wrote none, which is not a default standing in for a missing value:
+   * `authoring/ruleSpec.ts#profileWithRules` returns the driving profile by object identity for an
+   * empty list, so a run with no rules **is** the run the submitted dispatcher id already implies.
+   * The server drops the key from its digest for the same reason, so every score posted before this
+   * field re-verifies unchanged.
+   *
+   * `scope/runIdentity.ts` refused a written rule list until this field existed — *"no selection or
+   * submission carries a rule list"* — and the whole of § 11's workshop therefore produced
+   * dispatchers nobody could post. The refusal was correct; the fact it rested on is gone.
+   *
+   * The rows are structurally `core`'s own `RuleRowConfig`, restated rather than imported for
+   * `menu/challenge.ts`'s reason applied to the other package: this is the wire, and two ends of a
+   * wire are allowed to declare one shape twice. `runIdentity.test.ts` reads the server's source
+   * text so the two cannot drift.
+   */
+  readonly ruleRows?: readonly SubmittedRuleRow[] | undefined;
+  /**
+   * The run record's intervention log — `ENGINE_CONTRACT.md` § 1.4's `{ seed, config,
+   * interventions[] }`, in press order.
+   *
+   * § 1.4 clause 2 is *replay verification*: the server re-simulates the record, **log included**,
+   * and refuses a submission whose metrics do not reproduce. Without this field it re-simulated the
+   * seed without the log, got different legs, and refused an honest run as a forgery.
+   *
+   * Only `park-cars-lobby` travels. A `switch-dispatcher` carries a whole weight vector inline,
+   * which is the cheat `RunSubmission`'s ids exist to prevent; an `answer-incident` answers a
+   * campaign incident that is on no wire, so a replay would have the answer and not the thing
+   * answered. `scope/runIdentity.ts` still refuses both, naming which.
+   */
+  readonly interventions?: readonly SubmittedIntervention[] | undefined;
+}
+
+/**
+ * One when/then rule row on the wire — `core`'s `RuleRowConfig` without its `$comment`.
+ *
+ * Ids and values from `RULE_CONDITIONS` / `RULE_ACTIONS` and their declared `values` lists, which
+ * both ends resolve out of `core`. The server refuses anything outside them before it will simulate,
+ * so the space a submission can express is a finite product of shipped vocabulary — which is what
+ * makes a rule list unlike a building, and why it may travel where a fabric may not.
+ */
+export interface SubmittedRuleRow {
+  readonly when: string;
+  readonly whenValue?: number | string | undefined;
+  readonly then: string;
+  readonly thenValue?: number | string | undefined;
+}
+
+/** One entry of the run record's log — `{ atS, change }`, contract § 1.4. */
+export interface SubmittedIntervention {
+  readonly atS: number;
+  readonly change: { readonly kind: string };
 }
 
 export interface ClaimedMetrics {
@@ -172,12 +226,24 @@ export interface BoardEntry {
   readonly id: string;
   readonly displayName: string;
   readonly run: RunSubmission;
+  /**
+   * What data this row was measured against — the server's digest of the resolved building,
+   * dispatcher and template plus the run's own axes.
+   *
+   * **Not a board key**, and the distinction is `ENGINE_CONTRACT.md` § 12.1's: a board is keyed by
+   * the date or, for anything else, by the player, and this says which *measurement* a row is. Rows
+   * on one board carry different ones — the daily board's differ by dispatcher, a personal log's by
+   * configuration — so it is the only thing a reader can compare to know whether another row is the
+   * same question as theirs.
+   */
+  readonly dataHash: string;
   readonly measured: ClaimedMetrics;
   readonly submittedAtMs: number;
 }
 
 export interface BoardPage {
-  readonly configHash: string;
+  /** `daily:YYYY-MM-DD` or `personal:<user id>` — the key the page was asked for. */
+  readonly boardKey: string;
   readonly metric: string;
   /** The server's own sentence about what the ranking means. Shown, never paraphrased. */
   readonly note: string;
@@ -185,7 +251,7 @@ export interface BoardPage {
 }
 
 export interface BoardSummary {
-  readonly configHash: string;
+  readonly boardKey: string;
   readonly entries: number;
   readonly latestMs: number;
 }
@@ -384,9 +450,9 @@ export interface LeaderboardClient {
   submit(
     token: string,
     submission: { run: RunSubmission; claimed: ClaimedMetrics },
-  ): Promise<Result<{ configHash: string; entry: BoardEntry }>>;
+  ): Promise<Result<{ boardKey: string; placement: string; entry: BoardEntry }>>;
   boards(): Promise<Result<readonly BoardSummary[]>>;
-  board(configHash: string, metric: string): Promise<Result<BoardPage>>;
+  board(boardKey: string, metric: string): Promise<Result<BoardPage>>;
   /**
    * The challenge index — **the only answer** to *"which challenge is it today"*.
    *
@@ -524,8 +590,15 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
     submit: (token, submission) =>
       call({ method: 'POST', url: `${base}/api/scores`, token, body: submission }, (body) => {
         const record = body as Record<string, unknown> | null;
-        return typeof record?.['configHash'] === 'string'
-          ? { configHash: record['configHash'], entry: record['entry'] as BoardEntry }
+        return typeof record?.['boardKey'] === 'string'
+          ? {
+              boardKey: record['boardKey'],
+              // Which *kind* of place, said by the server rather than parsed off the key's prefix —
+              // a client that read `personal:` out of a string would be a second place deciding what
+              // a board key looks like.
+              placement: String(record['placement'] ?? ''),
+              entry: record['entry'] as BoardEntry,
+            }
           : undefined;
       }),
     boards: () =>
@@ -533,11 +606,11 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
         const boards = (body as Record<string, unknown> | null)?.['boards'];
         return Array.isArray(boards) ? (boards as BoardSummary[]) : undefined;
       }),
-    board: (configHash, metric) =>
+    board: (boardKey, metric) =>
       call(
         {
           method: 'GET',
-          url: `${base}/api/board?configHash=${encodeURIComponent(configHash)}&metric=${encodeURIComponent(metric)}`,
+          url: `${base}/api/board?board=${encodeURIComponent(boardKey)}&metric=${encodeURIComponent(metric)}`,
           token: undefined,
           body: undefined,
         },

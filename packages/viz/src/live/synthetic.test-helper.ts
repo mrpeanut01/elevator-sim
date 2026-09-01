@@ -11,6 +11,8 @@
  * decision naming a car the recording does not draw.
  */
 
+import type { SimTime } from '@elevator-sim/core/browser';
+
 import type {
   VizDecision,
   VizFloor,
@@ -62,6 +64,16 @@ export interface SyntheticOptions {
   readonly endedAt?: number;
   readonly floors?: readonly VizFloor[];
   readonly shafts?: readonly VizShaft[];
+  /**
+   * § 5's `trips`, as the instants the loaded moves ended — schema 10.
+   *
+   * Defaults to `[]` rather than to absent, on this helper's own rule that every field the contract
+   * declares is present: a recording built here stands for one this build produced, and *the fleet
+   * made no loaded trip* is the honest reading of a synthetic run with no motions. Pass `undefined`
+   * explicitly to build the other case — a recording carrying no travel record at all, which is what
+   * `shift/goals.ts` refuses to grade.
+   */
+  readonly loadedDepartures?: readonly SimTime[] | undefined;
 }
 
 /**
@@ -99,6 +111,11 @@ export function syntheticRecording(options: SyntheticOptions = {}): VizRecording
     decisions: options.decisions ?? [],
     outOfServiceCarIds: [],
     warnings: [],
+    // Spread rather than assigned, so `loadedDepartures: undefined` builds the *absent* case under
+    // `exactOptionalPropertyTypes` instead of a present `undefined`.
+    ...('loadedDepartures' in options && options.loadedDepartures === undefined
+      ? {}
+      : { loadedDepartures: options.loadedDepartures ?? [] }),
   };
 }
 
