@@ -50,8 +50,8 @@ legs, and a run in which it would silently skip is red rather than green
 
 | Platform | Browser | Evidence |
 |---|---|---|
-| Linux, x86-64 (`ubuntu-latest`) | **Chromium** headless shell, from `playwright-core` | 32 `*.browser.test.ts` files, driven through a real Vite dev server against the built `core` |
-| macOS (`macos-latest`, ARM64 today) | **Chromium** headless shell, from `playwright-core` | The same 32 `*.browser.test.ts` files, same gate |
+| Linux, x86-64 (`ubuntu-latest`) | **Chromium** headless shell, from `playwright-core` | 33 `*.browser.test.ts` files, driven through a real Vite dev server against the built `core` |
+| macOS (`macos-latest`, ARM64 today) | **Chromium** headless shell, from `playwright-core` | The same 33 `*.browser.test.ts` files, same gate |
 
 Three things about this tier that a reader will otherwise assume wrongly:
 
