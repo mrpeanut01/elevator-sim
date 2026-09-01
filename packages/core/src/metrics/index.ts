@@ -194,6 +194,7 @@ export {
   fullRunWindow,
   handlingCapacityOf,
   legDurations,
+  loadedDepartureTimes,
   loadFactorStatistics,
   peakArrivalWindow,
   queueLengthSeries,

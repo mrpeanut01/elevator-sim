@@ -260,6 +260,49 @@ describe('a goal may only read an observation', () => {
   });
 });
 
+describe('an observation nobody took is not graded, in either direction', () => {
+  /** A trip budget — the shape `everyday/campaignModel.ts#campaignTestGoals` builds. */
+  const trips: ShiftGoal = {
+    id: 'trips',
+    label: 'No more than 520 trips on the machines',
+    unit: '',
+    bar: 520,
+    compare: 'at-most',
+    reads: 'loadedDepartures',
+  };
+
+  it('grades the count when the run carried one', () => {
+    expect(readGoal(trips, observations({ loadedDepartures: 300 })).state).toBe('met');
+    expect(readGoal(trips, observations({ loadedDepartures: 521 })).state).toBe('missed');
+    expect(readGoal(trips, observations({ loadedDepartures: 300 })).display).toBe('300');
+  });
+
+  it('refuses when the field is absent, rather than reading it as a zero', () => {
+    /*
+     * The direction that matters, and the reason the gate is over the *value* rather than over the
+     * goal's id: this bar is `at-most`, so a `?? 0` anywhere upstream would grade **met** on every
+     * run nobody measured — a pass awarded for a measurement that was never taken. The censoring
+     * gate one property up refuses for the opposite reason; both come out `pending`.
+     */
+    const unmeasured = readGoal(trips, observations());
+    expect(unmeasured.state).toBe('pending');
+    expect(unmeasured.observed).toBeNull();
+    expect(unmeasured.display).toBe(PENDING_DISPLAY);
+    expect(unmeasured.progressPct).toBe(0);
+  });
+
+  it('leaves the four daily goals alone — none of them reads it', () => {
+    // The daily loop still asks four things and this is not one of them; the trip budget is the
+    // campaign's bar. So a day with no trip count still grades every goal `goalsForDay` returns.
+    for (let day = 1; day <= 20; day += 1) {
+      for (const goal of goalsForDay(day)) {
+        expect(goal.reads).not.toBe('loadedDepartures');
+        expect(readGoal(goal, observations()).state).not.toBe('pending');
+      }
+    }
+  });
+});
+
 describe('nothing is graded before the building wakes up', () => {
   it('reads pending at every arrival count below the threshold', () => {
     for (const arrived of [0, 1, 7, WAKE_UP_ARRIVALS - 1]) {

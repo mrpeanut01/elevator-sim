@@ -345,6 +345,26 @@ export interface LiveObservations {
   readonly worstWaitIsCensored: boolean;
   /** The abandonment horizon applied — `summary.serviceLevel.horizonS`. Copied, never assumed. */
   readonly horizonS: number;
+  /**
+   * **Loaded car departures completed by `t`** — `ENGINE_CONTRACT.md` § 5's `trips`, and the
+   * campaign's fourth daily test (GitHub issues #169, #313).
+   *
+   * Cut from {@link VizRecording.loadedDepartures}, which `core` derives from the travel samples it
+   * already takes; the definition of *loaded*, and why the stamp on a move is its arrival rather
+   * than its departure, are `metrics/summarize.ts#loadedDepartureTimes`'. This module counts and
+   * decides nothing about either, for the reason `turnedAway` is copied rather than re-derived: two
+   * answers to *how many trips did the machines make* is the failure this package has a rule about.
+   *
+   * **`undefined` when the recording carries no travel record**, which is a hand-built fixture
+   * rather than anything a player can produce — `record/document.ts` refuses a file below schema 10
+   * outright, and `recordRun` writes the field on every run whose fleet moved at all. Kept
+   * `undefined` rather than folded to `0` because *the machines made no trips* and *nobody wrote
+   * down whether they did* are different facts, and only the first of them may grade a trip budget.
+   * `shift/goals.ts` reads the difference as a gate.
+   *
+   * Non-decreasing in `t`, like every other count here.
+   */
+  readonly loadedDepartures: number | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

@@ -222,7 +222,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday campaign screens', () => {
     await page.close();
   });
 
-  it('reads the four daily tests with a “was” column, and refuses the one nothing measures', async () => {
+  it('reads the four daily tests with a “was” column, and none of them refuses any more', async () => {
     const page = await coldLoad();
     await enterCampaign(page);
     await page.click('.everyday-towers-open');
@@ -240,12 +240,47 @@ describe.skipIf(!HAS_BROWSER)('the Everyday campaign screens', () => {
     )) {
       expect(row).toBe('was —');
     }
-    // And the trip budget says why it grades nothing, rather than showing a stand-in.
-    const refusals = await page.$$eval('.everyday-campaign-test-refusal', (nodes) =>
+    /*
+     * **The trip budget's refusal is gone from the screen** — GitHub issue #169. It read *not
+     * measured — this run records how many people were carried and how long they stood, and not how
+     * many loaded departures the machines made*, and that stopped being true when
+     * `shift/types.ts#GoalObservations` acquired the count. The row grades like the other three now,
+     * so there is no refusal element at all rather than a reworded one, and the assertion is that
+     * the class is absent from the document — the shape that would catch a sentence left behind.
+     */
+    expect(await page.$$('.everyday-campaign-test-refusal')).toHaveLength(0);
+    // Scoped to the four rows, not the whole document: the Engineer surface is still built behind
+    // the cover and has refusals of its own, so a page-wide search would assert somebody else's copy.
+    for (const row of tests) expect(row).not.toContain('not measured');
+    /*
+     * All four are ungraded here and that is the state rather than a refusal: this is a cold load
+     * with no run behind it, so every row carries the `·` glyph, including the three that have
+     * always graded. That is exactly the point — the fourth row is now indistinguishable from the
+     * other three, where before it was the only one carrying prose.
+     */
+    await page.close();
+  });
+
+  it('says on the build select that it changes no day, and on the dispatcher select nothing of the kind', async () => {
+    /*
+     * GitHub issue #313. The two halves of § 8.1's standing order are not the same kind of control —
+     * one reaches the day and one does not — and this is the sentence that says so where a player
+     * meets it. Asserted on the desk, which draws both selects in one group, and against the note
+     * count, because a note under the *pair* would read as *neither of these does anything*.
+     */
+    const page = await coldLoad();
+    await enterCampaign(page);
+    await page.click('.everyday-towers-open');
+    await page.waitForSelector('.everyday-building');
+
+    const notes = await page.$$eval('.everyday-campaign-build-note', (nodes) =>
       nodes.map((node) => node.textContent ?? ''),
     );
-    expect(refusals).toHaveLength(1);
-    expect(refusals[0]).toContain('not measured');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toContain('changes nothing about how the lifts run');
+    // Visible, beside a control that still works — refused, never hidden or disabled.
+    expect(await page.locator('.everyday-campaign-build').isVisible()).toBe(true);
+    expect(await page.locator('.everyday-campaign-build').isDisabled()).toBe(false);
     await page.close();
   });
 });

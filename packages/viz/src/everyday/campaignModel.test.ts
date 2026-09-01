@@ -19,7 +19,6 @@ import {
   CALENDAR_GLYPHS,
   CONTRACT_COPY,
   MONTH_LEGEND,
-  TRIPS_REFUSAL,
   UNFINISHED,
   buildingView,
   calendarView,
@@ -93,8 +92,20 @@ function twoTowers(): CampaignCareer {
   return { ...base, today: 24, towers: [...base.towers, second] };
 }
 
-/** Observations good enough to grade all three measurable tests. */
+/** Observations good enough to grade all four tests, and to hold every one of them. */
 const GOOD: GoalObservations = Object.freeze({
+  arrived: 400,
+  carryPct: 98,
+  minutePct: 91,
+  peakQueue: 12,
+  abandoned: 0,
+  worstWaitS: 96,
+  worstWaitIsCensored: false,
+  loadedDepartures: 300,
+});
+
+/** The same day, on a recording that carries no trip count at all — the fourth test's own gate. */
+const GOOD_UNMEASURED_TRIPS: GoalObservations = Object.freeze({
   arrived: 400,
   carryPct: 98,
   minutePct: 91,
@@ -306,11 +317,11 @@ describe('the building desk (§ 8.2)', () => {
 describe('the four daily tests (§ 7, § 8.6)', () => {
   const tower = (): CampaignTower => openingCareer('eta').towers[0]!;
 
-  it('sets three bars from the difficulty and grades them from the run', () => {
+  it('sets four bars from the difficulty and grades them from the run', () => {
     const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []);
     expect(rows).toHaveLength(4);
     expect(rows.map((row) => row.target)).toEqual(['75%', '180 s', '25', '520']);
-    expect(rows.slice(0, 3).map((row) => row.reading?.state)).toEqual(['met', 'met', 'met']);
+    expect(rows.map((row) => row.reading?.state)).toEqual(['met', 'met', 'met', 'met']);
     /*
      * Move the difficulty and the **bars** move with it rather than the copy — and the same run
      * changes verdict, which is the half worth asserting: 80% away holds a standard month's 75 and
@@ -325,14 +336,29 @@ describe('the four daily tests (§ 7, § 8.6)', () => {
     expect(hard[0]?.reading?.state).toBe('missed');
   });
 
-  it('refuses the trip budget rather than inventing a figure for it', () => {
+  /*
+   * **The row that used to refuse** — GitHub issue #169. It carried `TRIPS_REFUSAL` and no reading
+   * at all; both are gone, and what stands in their place is a bar read off the run like the other
+   * three. The two directions are asserted together because either alone would pass a defect: a
+   * measured day must *grade*, and an unmeasured one must still refuse rather than be handed a zero
+   * — a trip budget is an `at-most` bar, so a fabricated zero would read `met`.
+   */
+  it('grades the trip budget from the run, and refuses it when the run carried no count', () => {
     const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []);
     const trips = rows.at(-1)!;
-    expect(trips.reading).toBeUndefined();
-    expect(trips.was).toBe(UNFINISHED);
-    expect(trips.refusal).toBe(TRIPS_REFUSAL);
-    // And the three that do grade carry no refusal.
-    for (const row of rows.slice(0, 3)) expect(row.refusal).toBeUndefined();
+    expect(trips.id).toBe('trips');
+    expect(trips.reading?.state).toBe('met');
+    expect(trips.reading?.display).toBe('300');
+
+    const over = campaignTestRows(DIFFICULTIES.standard, tower(), { ...GOOD, loadedDepartures: 521 }, []);
+    expect(over.at(-1)?.reading?.state).toBe('missed');
+
+    const unmeasured = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD_UNMEASURED_TRIPS, []);
+    expect(unmeasured.at(-1)?.reading?.state).toBe('pending');
+    expect(unmeasured.at(-1)?.reading?.display).toBe(UNFINISHED);
+    expect(unmeasured.at(-1)?.reading?.observed).toBeNull();
+    // The other three still grade on that day — the gate is the fourth row's alone.
+    expect(unmeasured.slice(0, 3).map((row) => row.reading?.state)).toEqual(['met', 'met', 'met']);
   });
 
   it('reads the “was” column off the previous day, or `—` when there is none', () => {
@@ -360,8 +386,25 @@ describe('the four daily tests (§ 7, § 8.6)', () => {
 
   it('counts what is holding out of what it can grade, both halves derived', () => {
     expect(testsHeldLine(campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []))).toBe(
-      '3 of 3 holding',
+      '4 of 4 holding',
     );
+    /*
+     * A day whose trip count could not be read reads `3 of 4`, which is this line's **existing**
+     * treatment of a `pending` row rather than anything this lane chose: a censored worst wait has
+     * always produced the same shape, because the denominator is *rows carrying a reading* and a
+     * pending reading is one. What changed is only that the fourth row now has a reading to be
+     * pending — before this lane it had none at all, so it sat outside the denominator on every
+     * day, measured or not.
+     */
+    expect(
+      testsHeldLine(campaignTestRows(DIFFICULTIES.standard, tower(), GOOD_UNMEASURED_TRIPS, [])),
+    ).toBe('3 of 4 holding');
+    // The same shape, from the gate that predates this lane.
+    expect(
+      testsHeldLine(
+        campaignTestRows(DIFFICULTIES.standard, tower(), { ...GOOD, worstWaitIsCensored: true }, []),
+      ),
+    ).toBe('3 of 4 holding');
     expect(testsHeldLine(campaignTestRows(DIFFICULTIES.standard, tower(), undefined, []))).toBe(
       'nothing run yet today',
     );
@@ -739,16 +782,27 @@ describe('what marks a campaign day', () => {
     expect(verdictAt(DIFFICULTIES.hard, marginal)).toBe('missed');
   });
 
-  it('does not count the trip budget against a day, in either direction', () => {
+  it('counts the trip budget against a day now that it is measured', () => {
     /*
-     * The fourth test grades nothing ({@link TRIPS_REFUSAL}), so it is absent from the fold rather
-     * than failed by it — a row counted as missed would refuse every day the campaign ever runs,
-     * and a row counted as held would be a bar nobody measured being reported as met.
+     * The fourth test used to be absent from the fold because nothing measured it. It decides the
+     * day like the other three now: the same run, over the budget, is a missed day rather than a
+     * cleared one — which is the whole of what *ungraded* was costing the mode.
      */
     const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []);
-    expect(rows.at(-1)?.reading).toBeUndefined();
     expect(campaignDayVerdict(rows)).toBe('cleared');
-    expect(campaignDayVerdict(rows.slice(0, 3))).toBe('cleared');
+    const over = campaignTestRows(
+      DIFFICULTIES.standard,
+      tower(),
+      { ...GOOD, loadedDepartures: 900 },
+      [],
+    );
+    expect(campaignDayVerdict(over)).toBe('missed');
+    /*
+     * And a day whose trip count could not be read is `ungraded` rather than cleared by three tests
+     * out of four — § D234's *unjudged is not passed*, reaching the one row that can still refuse.
+     */
+    const unmeasured = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD_UNMEASURED_TRIPS, []);
+    expect(campaignDayVerdict(unmeasured)).toBe('ungraded');
   });
 
   it('refuses a morning the tests never read, rather than marking it against the player', () => {
@@ -765,17 +819,21 @@ describe('what marks a campaign day', () => {
     );
   });
 
-  it('says on the desk what decides a day, without promising the bar nothing measures', () => {
+  it('says on the desk what decides a day, without promising a bar the day may not have', () => {
     /*
-     * § D227 on the line a player reads before pressing: this note said *all four* over a fourth
-     * test that grades nothing. Asserted against the fold rather than against a literal, so the
-     * two cannot drift apart again.
+     * § D227 on the line a player reads before pressing. The note said *all four* over a fourth test
+     * that graded nothing; it says *every one this run can read* instead, and that stays the right
+     * sentence now the fourth grades — a reading can still be `pending`, and on such a day fewer
+     * than four bars decide it. Asserted against the fold rather than against a literal, so the two
+     * cannot drift apart again in either direction.
      */
     expect(BUILDING_COPY.testsNote).not.toContain('four');
-    const graded = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []).filter(
-      (row) => row.reading !== undefined,
-    );
-    expect(graded).toHaveLength(3);
+    const gradedOf = (observations: GoalObservations): number =>
+      campaignTestRows(DIFFICULTIES.standard, tower(), observations, []).filter(
+        (row) => row.reading?.state !== 'pending' && row.reading !== undefined,
+      ).length;
+    expect(gradedOf(GOOD)).toBe(4);
+    expect(gradedOf(GOOD_UNMEASURED_TRIPS)).toBe(3);
     expect(buildingView(inputOf(openingCareer('eta'), { observations: GOOD }))?.tests.note).toBe(
       BUILDING_COPY.testsNote,
     );

@@ -28856,6 +28856,130 @@ explanation, exactly as D387 was met.
 
 ---
 
+## D431 — `trips` is one measurement with two lifetimes, and `core` takes it
+
+**Date: 2026-09-01 · Owner: wave J lane A · Closes GitHub issue #169 item 2 and issue #313's first
+half. Corrects a refusal under [§ D227](#d227).**
+
+**Decision.** `ENGINE_CONTRACT.md` § 5's `trips` — *count of car departures under load* — is measured
+in `core`, as **the instants the loaded moves ended** rather than as a count:
+`metrics/summarize.ts#loadedDepartureTimes`. `VizRecording.loadedDepartures` carries them at schema
+**10**, `live/observations.ts` cuts them at the playhead, and
+`shift/types.ts#GoalObservations.loadedDepartures` is what a goal reads. Two consumers, both landing
+in the same change because a field with no consumer is this repository's signature defect:
+
+- **§ 8.6's fourth daily test grades.** `everyday/campaignModel.ts#campaignTestGoals` returns four
+  goals instead of three, and `campaignTestRows` is one map over them.
+- **§ 8.3's wear clock advances.** `campaign/career.ts#fileDay` adds the filed day's count to
+  `CampaignTower.trips`, carried on the `file-day` action by `everyday/host.ts#closeDay`.
+
+**The two are deliberately not folded together, and that is the load-bearing half.** They share
+arithmetic and are different fields with different lifetimes: the test grades **one day** against
+`tests.trips`, and the clock accumulates **a contract's** days against `serviceAt`. Nothing reads one
+through the other. A single field would have had to be reset by the service window (§ 8.3) and by the
+close of every day (§ 7), and those are different events.
+
+**Why a list of instants and not a count.** The campaign's test row is drawn on the building desk
+*while the day is still playing*, so the figure has to answer at a playhead. A window figure published
+at an instant short of `endedAt` is the violation class the honesty sweep's temporal axis exists to
+find ([§ D307](#d307)), and `GoalObservations.worstWaitS` already carries that warning in as many
+words. The consumer cuts; `core` does not.
+
+**Why the arrival instant stamps a departure.** A `TravelSample` is stamped when the car **levelled**,
+and the record carries no departure time to reproduce — `Car.completeArrival` returns four fields and
+none is a clock. `energyStatistics` already charges a move whole to the window it finished in, so a
+second convention four lines away would make *"of the moves, this many were loaded"* a sentence about
+two populations. The cost is stated rather than hidden: a car in flight at the playhead has not yet
+contributed its trip, which is at most one move per car.
+
+**It is whole-run where `VizEnergy.starts` is windowed**, and that is forced by the same requirement:
+a figure cut to the reporting window could not answer at a playhead outside it. The two are two stated
+cohorts and no ordering holds between them — measured on `chancery-house`'s breadth recording, **265**
+loaded departures against **97** windowed starts, and on `vertical-city`'s, **899** against **385**.
+`live/observations.test.ts` checks the count against the fleet's motions instead, and says why.
+
+**Absence is a gate, and this is the direction that matters.** `GoalObservations.loadedDepartures` is
+the type's **one optional member**. A trip budget is an `at-most` bar, so folding *nobody wrote it
+down* to a zero would grade **met** on every run nobody measured — a pass awarded for a measurement
+never taken. `shift/observations.ts` therefore refuses to default it, `readGoal` returns `pending`
+over the absent value, and `fileDay` holds the wear clock where it is rather than filing a day of no
+wear. `shift/observations.test.ts` exists for that one property, because the defect is one character
+of ergonomics away at all times.
+
+**A refusal was deleted rather than reworded.** `everyday/campaignModel.ts#TRIPS_REFUSAL` said *"not
+measured — this run records how many people were carried and how long they stood, and not how many
+loaded departures the machines made"*. It became false, and § D227 binds both ways: a control that
+writes something may not claim it writes nothing. The `CampaignTestRow.refusal` field went with it —
+it existed for that one row — and a row that cannot be graded on some particular day now says so the
+way the other three do, with a `pending` reading and an em dash. `campaign/career.ts`'s absence
+register carried the same claim in a comment and is corrected there.
+
+**What is measured and is content for somebody else.** § 8.3 sizes `daysLeft` at *1 400 trips a
+working day*. A campaign day at the campaign's own cell — `garden-apartments`, one hour, seed
+424 242 — produces **16** loaded departures over **29** arrivals, so the printed figure goes 32 → 32
+while the clock moves underneath it, and a service window is on the order of **2 800** contract days
+away. Two of § 8's own numbers fall out of that and neither is this lane's to move: *1 400 a working
+day* is off by roughly ninetyfold at the cell § 8 actually runs, and the tier bars (`tests.trips`,
+620 / 520 / 470 / 430) are unmissable there by a factor of thirty. `campaign/wearClock.test.ts`
+asserts the direction that is true (`≤`) and records the disagreement rather than scaling the count on
+its way in, which would have been inventing a number and hiding the disagreement inside it.
+
+**A first draft of this entry attributed the 265/97 pair to `garden-apartments` and then reused 265 as
+the campaign day's own count.** Both were wrong — 265/97 is `chancery-house`'s breadth recording, and
+the campaign cell produces 16 — and it is recorded rather than quietly fixed, because it is exactly
+the defect [`RISKS.md`](RISKS.md) R38 tracks: a measured figure carried across to a second claim it
+was never measured for. Catching it took a probe; re-reading the sentence would not have.
+
+**Not claimed.** Nothing here says what a good trip budget is, and `DIFFICULTIES`' four `tests.trips`
+figures are the design handoff's own and are unmoved. What *is* now measured is that they cannot be
+missed at the campaign's own cell — 16 against 430 at the tightest tier — and moving them is a
+difficulty decision this lane may not take.
+
+---
+
+## D432 — the campaign's build select is a record, and it says so
+
+**Date: 2026-09-01 · Owner: wave J lane A · Closes GitHub issue #313's second half by refusing it,
+under [§ D227](#d227) and [§ D177](#d177).**
+
+**Decision.** `CampaignTower.buildId` does not reach a run, will not be wired to one here, and now
+**says so on the control itself** — `everyday/campaignModel.ts#BUILD_REFUSAL`, drawn under the select
+on both surfaces that offer it. The refusal is pinned by a run rather than by another sentence:
+`campaign/buildStandingOrder.test.ts` drives `everyday/host.ts#runCampaignDay` over all five shapes at
+the campaign's own cell and requires `legsOf` to be **identical**.
+
+**Why refused rather than wired.** The design file authors `build` as a descriptive line per building
+— `docs/design/elevator-sim-casual.dc.html` gives Garden Apartments `build: 'As built'` beside its
+quirk — and its own prototype writes the select into `st.builds[t.id]` and reads it back only to mark
+an option selected. `ENGINE_CONTRACT.md` § 8 gives it no expression at all. So there is no mechanism
+in the handoff that this build dropped. Inventing one would be game design taken in a lane, and the
+obvious invention is worse than none: pointing the five shapes at the group levers would hand a player
+for free what § 8.2's `control` tier charges six units and a night for. What changes a building's
+fabric in § 8 is the shop, which is bought and which does reach the run ([§ D427](#d427)).
+
+**The proof is § D177's comparison run in the refusing direction**, and two things make it evidence
+rather than a tautology. It goes through the **shipped press** — `runCampaignDay`, not a hand-rolled
+patch reproducing what that function currently writes — so the day somebody wires `buildId` into it,
+the file reddens and the sentence on the select has to be rewritten rather than quietly becoming
+false. And the cell is **proved able to show a change**: the positive control is the other select in
+the same group, at the same cell, through the same press, on the same seed. That is `fitOut.test.ts`'s
+own rule — three of sixteen shop tiers move nothing at this cell for physical reasons, so an identical
+pair with no positive control beside it means nothing.
+
+**A mutation that survives, recorded rather than left to be rediscovered.** Wiring `buildId` into
+`shiftLengthS` (`+ 60` on any build but `as-built`) leaves the file green, because `legsOf` at 3 600 s
+and 3 660 s on this building returns the same string — the demand is spent well before the hour is,
+and the tail is drain. That is § D427's own trap arriving as a *mutation* that cannot bite rather than
+a measurement that cannot; the test's docstring names it and names the mutation that does bite.
+
+**The distinction this keeps.** An action the reducer **refuses** and an action that lands on a field
+nothing reads are two different defects with the same symptom ([§ D219](#d219)). `set-build` still
+writes the record, and the test asserts that first, so what is being reported is the second.
+
+**Not claimed.** No judgement that the select should exist. Removing it would fight
+`docs/12-design-handoff.md`'s rule that the handoff wins every disagreement about what the screen
+looks like; § 8.1 draws two inline selects and this build draws two.
+
 ## D433 — earned progress goes in the Everyday slot, not the Engineer session, and a refusal to restore it is a sentence
 
 **Date: 2026-09-01 · Owner: wave J lane B, GitHub issue #224 · Extends [§ D402](#d402)'s reading of

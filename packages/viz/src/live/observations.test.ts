@@ -390,3 +390,96 @@ describe('the edges a real run will not show on demand', () => {
     expect(observationsAt(recording, 10).deepestQueueFloorId).toBe('L0');
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * § 5's `trips`, at the playhead
+ * -------------------------------------------------------------------------- */
+
+describe('loaded departures are cut at the playhead like everything else here', () => {
+  it('counts the loaded moves that had ended by `t`, and is non-decreasing in it', () => {
+    const recording = syntheticRecording({ loadedDepartures: [30, 90, 90, 240] });
+    expect(observationsAt(recording, 0).loadedDepartures).toBe(0);
+    expect(observationsAt(recording, 29).loadedDepartures).toBe(0);
+    // At the instant a move lands it counts — the same `<= t` rule the leg counts use.
+    expect(observationsAt(recording, 30).loadedDepartures).toBe(1);
+    // Two cars landing at the same second are two trips, not one.
+    expect(observationsAt(recording, 90).loadedDepartures).toBe(3);
+    expect(observationsAt(recording, 600).loadedDepartures).toBe(4);
+  });
+
+  it('answers the same at an instant whether the playhead arrived forwards or backwards', () => {
+    // The module's own no-cursor rule: a reader drags left, and a fold carrying state answers that
+    // wrongly in a way that only appears when somebody drags.
+    const recording = syntheticRecording({ loadedDepartures: [30, 90, 240] });
+    const forwards = [0, 60, 120, 300].map((t) => observationsAt(recording, t).loadedDepartures);
+    const backwards = [300, 120, 60, 0]
+      .map((t) => observationsAt(recording, t).loadedDepartures)
+      .reverse();
+    expect(forwards).toEqual(backwards);
+  });
+
+  it('is `undefined`, never `0`, on a recording carrying no travel record', () => {
+    /*
+     * The distinction the campaign's trip budget rests on: its bar is `at-most`, so *nobody wrote
+     * it down* folded to a zero would grade **met**. `shift/goals.ts` refuses instead, and this is
+     * the field it refuses on.
+     */
+    const recording = syntheticRecording({ loadedDepartures: undefined });
+    expect(recording.loadedDepartures).toBeUndefined();
+    expect(observationsAt(recording, 600).loadedDepartures).toBeUndefined();
+    // And a fleet that genuinely made none reports a number.
+    expect(observationsAt(syntheticRecording({ loadedDepartures: [] }), 600).loadedDepartures).toBe(
+      0,
+    );
+  });
+
+  it('is on every shipped building’s own run, and is a strict subset of the fleet’s moves', () => {
+    for (const id of BUILDING_IDS) {
+      const recording = recordingOf(id);
+      const times = recording.loadedDepartures;
+      expect(times, `${id} recorded no trip count at all`).toBeDefined();
+      if (times === undefined) continue;
+      // Non-vacuity: a building whose cars never carried anybody would make every claim here empty.
+      expect(times.length, `${id} made no loaded departure`).toBeGreaterThan(0);
+      // Ascending, which is what lets the fold break early.
+      expect([...times].sort((a, b) => a - b)).toEqual([...times]);
+      // Inside the run, and no more numerous than the moves the fleet actually made.
+      for (const at of times) expect(at).toBeLessThanOrEqual(recording.endedAt);
+      const moves = recording.shafts.reduce((total, shaft) => total + shaft.motions.length, 0);
+      expect(times.length).toBeLessThanOrEqual(moves);
+      /*
+       * **Checked against the motions and deliberately not against `summary.energy.starts`.** The
+       * two count the same events over **different stretches**: `starts` is the *reporting window's*
+       * moves and this is the *whole run's*, and every shipped template narrows its window — the
+       * suite above measured 0 of 8 spanning. Measured on this loop's own recordings, `chancery-house`
+       * reports **265** loaded departures against **97** windowed starts and `vertical-city` reports
+       * **899** against **385**, so an ordering between them is not a property at all.
+       * `GoalObservations.worstWaitS` is the same pair of cohorts and says so; the trip count has to
+       * be whole-run because the fold serves a playhead, and a bar drawn against it grades the shift.
+       */
+      expect(recording.summary.energy.starts).not.toBeNull();
+    }
+  }, 300_000);
+
+  it('exceeds the windowed start count on the two buildings the paragraph above names', () => {
+    /*
+     * **The published pair, run rather than transcribed.** The comment one case up cites two
+     * measurements; a citation nobody re-derives is how a number in this repository goes stale, and
+     * a first draft of it named the wrong building. So the direction is asserted — whole-run count
+     * *above* windowed starts — on the two recordings the prose quotes.
+     *
+     * The direction rather than the digits: an ordering is the claim being made, and pinning 265 and
+     * 97 exactly would redden this file the next time a demand template moved without telling anyone
+     * anything about the cohorts.
+     */
+    for (const id of ['chancery-house', 'vertical-city'] as const) {
+      const recording = recordingOf(id);
+      const times = recording.loadedDepartures ?? [];
+      const starts = recording.summary.energy.starts;
+      expect(starts, id).not.toBeNull();
+      expect(times.length, `${id}: whole-run trips no longer exceed the windowed starts`).toBeGreaterThan(
+        starts ?? 0,
+      );
+    }
+  }, 300_000);
+});

@@ -929,6 +929,7 @@ export {
   legSecondsOf,
   linearTrend,
   energyStatistics,
+  loadedDepartureTimes,
   loadFactorStatistics,
   loadSampleSchema,
   mean,

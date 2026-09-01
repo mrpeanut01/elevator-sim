@@ -82,5 +82,12 @@ export function shiftObservationsOf(live: LiveObservations): Observations {
     // and the report cell cannot round one wait two ways.
     worstWaitS: live.worstWaitSoFarS === undefined ? 0 : Math.round(live.worstWaitSoFarS),
     worstWaitIsCensored: live.worstWaitIsCensored,
+    // § 5's `trips`, copied like `abandoned` and `turnedAway` beside it and derived nowhere else.
+    // **The one field here that is not defaulted**, and deliberately: the three cases above spell
+    // an empty run as a number because a goal is a comparison, and each is unreadable under a gate.
+    // This one has no such gate to hide behind — a trip budget is an `at-most` bar, so a `?? 0`
+    // would grade *met* on every run nobody measured. `undefined` travels through instead, and
+    // `goals.ts#readGoal` refuses it.
+    ...(live.loadedDepartures === undefined ? {} : { loadedDepartures: live.loadedDepartures }),
   };
 }

@@ -166,12 +166,26 @@ export function units(value: number): string {
  * -------------------------------------------------------------------------- */
 
 /**
- * The three of § 8.6's tests that read a measurement this simulator records, as `ShiftGoal`s.
+ * **All four** of § 8.6's tests, as `ShiftGoal`s.
  *
  * Expressed as `ShiftGoal`s rather than as a private shape so that `shift/goals.ts#readGoal` grades
  * them and `#wasDisplayOf` supplies § 7's *was* — one grading rule for the daily loop and the
  * campaign, rather than a second opinion here about what *met* means. The bars are the picked
  * difficulty's, so changing the difficulty moves the row rather than the copy.
+ *
+ * ## It used to be three, and the fourth is the whole of GitHub issue #169's item 2
+ *
+ * The trip budget shipped as a hand-built row carrying a refusal — *"not measured — this run records
+ * how many people were carried and how long they stood, and not how many loaded departures the
+ * machines made"* — because `GoalObservations` had no field it could read. It has one now
+ * (`ENGINE_CONTRACT.md` § 5's `trips`, folded by `core` and cut at the playhead by
+ * `live/observations.ts`), so the refusal is **false** and is deleted rather than reworded: § D227
+ * binds both ways, and a control that writes something may not claim it writes nothing.
+ *
+ * The row is no longer special in any way. It is the fourth entry of this list, it grades through
+ * the same `readGoal`, and on a recording that carries no travel record it prints the same em dash
+ * the other three print below the wake-up gate — which is the only shape in which the row can still
+ * decline to answer, and it is a state rather than a sentence.
  */
 export function campaignTestGoals(difficulty: Difficulty): readonly ShiftGoal[] {
   return Object.freeze([
@@ -199,8 +213,33 @@ export function campaignTestGoals(difficulty: Difficulty): readonly ShiftGoal[] 
       compare: 'at-most' as const,
       reads: 'peakQueue' as const,
     }),
+    Object.freeze({
+      id: 'trips',
+      label: `No more than ${String(difficulty.tests.trips)} trips on the machines`,
+      unit: '' as const,
+      bar: difficulty.tests.trips,
+      compare: 'at-most' as const,
+      reads: 'loadedDepartures' as const,
+    }),
   ]);
 }
+
+/**
+ * **Why the build select changes no day** — GitHub issue #313, drawn under the control itself.
+ *
+ * The two halves of the standing order are not the same kind of thing, and until this sentence the
+ * screen presented them as though they were: the dispatcher select decides who drives and reaches
+ * the run, and the build select records a shape and reaches nothing.
+ * `campaign/career.ts#CampaignTower.buildId` holds the argument and the measurement; this is what a
+ * player reads. It names where the fabric *is* decided rather than only saying what this control
+ * does not do, because a refusal that leaves a reader with nowhere to go reads as a broken screen.
+ *
+ * Per-control and not in `CAMPAIGN_ABSENCES`, which is #207's placement rule: a register at the top
+ * of a screen is where a reader learns what the mode cannot do, and a control's own limits belong on
+ * the control.
+ */
+export const BUILD_REFUSAL =
+  'kept for your own records — the day is built from what this building has actually had fitted, so picking a shape here changes nothing about how the lifts run. Buying the shape on the contract sheet is what changes that.';
 
 /** § 8.6's tension sentence for each test — the prototype's own, in its order. */
 export const TEST_TENSIONS: Readonly<Record<string, string>> = Object.freeze({
@@ -212,7 +251,7 @@ export const TEST_TENSIONS: Readonly<Record<string, string>> = Object.freeze({
   trips: 'A wear budget, not a score. It punishes running half-empty cars up and down to look responsive.',
 });
 
-/** One test row. `reading` is `undefined` on the one test nothing measures. */
+/** One test row. `reading` is `undefined` before any run today. */
 export interface CampaignTestRow {
   readonly id: string;
   readonly label: string;
@@ -222,21 +261,22 @@ export interface CampaignTestRow {
   readonly was: string;
   readonly tension: string;
   readonly reading: GoalReading | undefined;
-  /** Why this row grades nothing, on the one row that does not. */
-  readonly refusal: string | undefined;
 }
 
-/** Why the trip budget is ungraded, said once and drawn wherever the row is. */
-export const TRIPS_REFUSAL =
-  'not measured — this run records how many people were carried and how long they stood, and not how many loaded departures the machines made';
-
 /**
- * The four rows: three graded from the run, and the fourth refusing.
+ * The four rows, all four graded from the run.
  *
  * The `was` column is `shift/goals.ts#wasDisplayOf` over the week's history, which matches the
  * previous day by what a goal *reads* rather than by its id — so a campaign test and a daily goal
  * reading the same observation share one previous figure, which is what § 7 means by *"this
  * building's previous day"*.
+ *
+ * **There is no longer a `refusal` on this shape**, and the deletion is the point rather than a
+ * tidy-up. The fourth row used to be built by hand here, outside the loop, carrying a sentence
+ * saying nothing measured it; the field existed for that one row and for nothing else. A row that
+ * cannot be graded now says so the way the other three do — a `pending` reading and an em dash —
+ * which is a *state* the surrounding machinery already understands rather than prose only this
+ * module could write. See {@link campaignTestGoals} for what made the sentence false.
  */
 export function campaignTestRows(
   difficulty: Difficulty,
@@ -244,7 +284,7 @@ export function campaignTestRows(
   observations: GoalObservations | undefined,
   history: readonly DayOutcome[],
 ): readonly CampaignTestRow[] {
-  const graded = campaignTestGoals(difficulty).map((goal): CampaignTestRow => {
+  return campaignTestGoals(difficulty).map((goal): CampaignTestRow => {
     const suffix = goal.unit === '%' ? '%' : goal.unit;
     return {
       id: goal.id,
@@ -253,21 +293,8 @@ export function campaignTestRows(
       was: wasDisplayOf(history, tower.day, goal),
       tension: TEST_TENSIONS[goal.id] ?? '',
       reading: observations === undefined ? undefined : readGoal(goal, observations),
-      refusal: undefined,
     };
   });
-  return [
-    ...graded,
-    {
-      id: 'trips',
-      label: `No more than ${String(difficulty.tests.trips)} trips on the machines`,
-      target: String(difficulty.tests.trips),
-      was: UNFINISHED,
-      tension: TEST_TENSIONS['trips'] ?? '',
-      reading: undefined,
-      refusal: TRIPS_REFUSAL,
-    },
-  ];
 }
 
 /**
@@ -282,13 +309,19 @@ export function campaignTestRows(
  * of on the record — and it would silently stop following the difficulty the moment either copy
  * moved.
  *
- * ## Three tests decide it, and the fourth is a refusal rather than a pass
+ * ## All four decide it now, and the fold did not have to change to say so
  *
- * § 8.6 says a day is cleared only if **all four** hold; the trip budget is the fourth and nothing
- * in this simulator measures it ({@link TRIPS_REFUSAL}). Its row carries no `reading`, so it is not
- * in this fold at all — a row nothing measured cannot be counted as held, and counting it as failed
- * would refuse every day the campaign ever runs. `campaign/career.ts#CAMPAIGN_ABSENCES` says so
- * where a player reads it.
+ * § 8.6 says a day is cleared only if **all four** hold. The trip budget is the fourth and used to
+ * be the one nothing measured, so its row carried no `reading` and fell out of this fold — a row
+ * nothing measured cannot be counted as held, and counting it as failed would have refused every
+ * day the campaign ever ran. It is measured now (GitHub issue #169, `shift/types.ts`'s
+ * `GoalObservations.loadedDepartures`), so it arrives with a reading like the other three and this
+ * function folds four.
+ *
+ * **Not one line here moved for that**, which is what the shape was chosen for: the fold is over
+ * whatever rows carry readings, so a fourth reading joins by existing. The same arm still covers the
+ * case where a run's trip count is genuinely unavailable — the reading is then `pending`, `wasGraded`
+ * refuses, and the day is `ungraded` rather than quietly decided by three tests out of four.
  *
  * ## Why `ungraded` is a third answer here and only two marks reach the record
  *
@@ -434,6 +467,8 @@ export interface StandingOrderView {
   readonly builds: readonly { readonly id: BuildId; readonly label: string }[];
   /** The picked style's one-line trade, or the honest fallback. */
   readonly note: string;
+  /** {@link BUILD_REFUSAL} — why the build select changes no run. Always present. */
+  readonly buildNote: string;
 }
 
 export interface TowerRowView {
@@ -532,6 +567,7 @@ function standingOrderView(input: CampaignInput, tower: CampaignTower): Standing
     dispatchers: input.dispatchers,
     buildId: tower.buildId,
     builds: BUILD_IDS.map((id) => ({ id, label: BUILD_LABELS[id] })),
+    buildNote: BUILD_REFUSAL,
     /*
      * § 8.2's *"the style's one-line trade printed beneath the picker"*, and the honest arm when
      * there is none. No shipped dispatcher carries a player-facing trade line — the profiles hold
@@ -767,14 +803,16 @@ export const BUILDING_COPY = Object.freeze({
   monthHeading: 'THIS MONTH',
   testsEyebrow: 'WHAT TODAY ASKS',
   /*
-   * **This read *"all four, or the day is missed"* and the fourth grades nothing** — § D227's
-   * first direction, on the line that tells a player what closing the day will do to them.
+   * **This read *"all four, or the day is missed"* when the fourth graded nothing**, and it is left
+   * exactly as the correction wrote it now that all four do — § D227's first direction, on the line
+   * that tells a player what closing the day will do to them.
    *
-   * The trip budget's row ships a refusal ({@link TRIPS_REFUSAL}) because this run records how many
-   * people were carried and not how many loaded departures the machines made, and
-   * {@link campaignDayVerdict} therefore folds three readings rather than four. A note promising a
-   * bar nothing measures is worse than a missing one: it tells a reader their day turned on a
-   * figure that was never taken.
+   * *Every one this run can read* is still the true sentence rather than a leftover. The trip budget
+   * grades from this wave (GitHub issue #169), so on a shipped run the four are four; but a reading
+   * can still be `pending` — below the wake-up gate, on a censored worst wait, or on a recording that
+   * carries no travel record — and on those days {@link campaignDayVerdict} returns `ungraded` and
+   * nothing is filed. A note promising *all four* would be back to promising a bar the day may not
+   * have, which is the defect this line was rewritten for.
    */
   testsNote:
     'every one this run can read, or the day is missed — and a day it could not read is not filed at all',

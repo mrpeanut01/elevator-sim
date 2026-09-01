@@ -155,7 +155,30 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
     horizonS,
     worstWaitSoFarS,
     worstWaitIsCensored,
+    loadedDepartures: loadedDeparturesBy(recording, t),
   };
+}
+
+/**
+ * How many of the run's loaded moves had ended by `t` — § 5's `trips` at the playhead.
+ *
+ * A linear count rather than a binary search, deliberately: the array is at most one entry per car
+ * move, this module already walks every leg in the same call, and a search would need the sortedness
+ * to be checked here as well as promised in `core`. It breaks on the first instant past the playhead,
+ * which the ascending order makes correct.
+ *
+ * `undefined` in, `undefined` out — see {@link LiveObservations.loadedDepartures}. The absent case is
+ * not folded to zero here or anywhere downstream.
+ */
+function loadedDeparturesBy(recording: VizRecording, t: SimTime): number | undefined {
+  const times = recording.loadedDepartures;
+  if (times === undefined) return undefined;
+  let count = 0;
+  for (const at of times) {
+    if (at > t) break;
+    count += 1;
+  }
+  return count;
 }
 
 /**
