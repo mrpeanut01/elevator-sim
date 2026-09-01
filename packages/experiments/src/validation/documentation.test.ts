@@ -1421,7 +1421,17 @@ type DecisionReservation = {
  * the whole point: the next integrator opens a block by replacing `null` with an object literal
  * and nothing else has to compile for the first time.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = {
+  wave: 'J',
+  /*
+   * D431–D442. Lanes A–E hold D431–D440, two apiece; **D441–D442 are the integrator's**, sized that
+   * way from wave I onward because § D418 was written past a block fitted to its lanes alone. § D430
+   * adds the other half of the rule this block must satisfy: a hole may sit anywhere inside it
+   * except at its top, or the charter row ends up naming a number the register says nobody may take.
+   */
+  from: 431,
+  to: 442,
+} as DecisionReservation | null;
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
  *
