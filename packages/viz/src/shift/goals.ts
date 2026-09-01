@@ -34,7 +34,7 @@
  *
  * ## The rule that is structural rather than stated
  *
- * {@link readGoal} takes a {@link GoalObservations}, which carries six numbers, one censoring
+ * {@link readGoal} takes a {@link GoalObservations}, which carries seven numbers, one censoring
  * flag and **not one suppressible field** — no `meanWaitS`, no `wait95S`, no
  * `meanTimeToDestinationS`. A goal that wanted to grade a mean could not be written against this
  * type. CLAUDE.md: *"If a configuration saturates, flag it and suppress the AWT interval"*;

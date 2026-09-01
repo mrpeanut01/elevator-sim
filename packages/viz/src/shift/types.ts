@@ -16,10 +16,12 @@
  * **A goal reads an observation. Never a mean, and never anything `awtIsValid` could suppress.**
  *
  * {@link GoalObservations} is the structural form of that rule. It is the *only* type
- * `readGoal` accepts, and it carries six numbers and a censoring flag. Four of the numbers are
+ * `readGoal` accepts, and it carries seven numbers and a censoring flag. Four of the numbers are
  * the design's own (`design.html` :1428–1439): a carried share, an away-inside-a-minute share, a
  * peak queue depth and an abandonment count; the fifth gradeable one is the worst wait the
- * casual handoff's fourth test grades (§ 8.6). There is no `meanWaitS` on it, no `wait95S`, no
+ * casual handoff's fourth test grades (§ 8.6), and the sixth is the loaded-departure count its
+ * *fourth campaign* test grades (§ 7, GitHub issue #169) — the one that is optional, because its
+ * absence is a gate. There is no `meanWaitS` on it, no `wait95S`, no
  * `meanTimeToDestinationS` — so a goal that wanted to grade a suppressible estimate could not be
  * written against this type without changing the type, which is a visible diff and a decision
  * somebody has to make out loud. CLAUDE.md: *"If a configuration saturates, flag it and suppress
