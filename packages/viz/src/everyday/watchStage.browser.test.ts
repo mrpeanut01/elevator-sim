@@ -56,7 +56,15 @@ let origin: string;
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
   // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
-  site = await startShippedSite({ preview: { port: 5217, strictPort: false } });
+  /*
+   * 5218, not 5217. Wave J's lanes B and C each added a browser-tier file and each picked the
+   * lowest free port **on its own branch**, so both picked 5217 and neither was wrong where it
+   * stood. `browserTier.test.ts` caught it at integration; without that guard the collision would
+   * not have failed loudly, because `strictPort: false` lets the loser move — two servers on one
+   * origin, each serving the other's pages. Which of the two files moved is arbitrary (this one
+   * merged second); the port is not, 5218 being the gap the tier already had between 5217 and 5219.
+   */
+  site = await startShippedSite({ preview: { port: 5218, strictPort: false } });
   origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
 }, 120_000);
