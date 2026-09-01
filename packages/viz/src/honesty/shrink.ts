@@ -82,6 +82,15 @@ function differs(a: HonestyCase, b: HonestyCase): boolean {
 const REDUCERS: readonly Reducer[] = Object.freeze([
   /* Drop the campaign half. */
   (honestyCase) => (honestyCase.stageId === null ? [] : [{ ...honestyCase, stageId: null }]),
+  /*
+   * Put the tower back **as built** — § D437's axis, reduced away.
+   *
+   * Second, and what it buys is a *diagnosis* rather than wall clock: a violation that survives
+   * this was never about the fit-out, and one that does not survive it is a violation only a
+   * fitted tower produces. That is the single most useful thing a reader can learn about a
+   * counterexample on this axis, and the shrinker records it by what it accepted.
+   */
+  (honestyCase) => (honestyCase.fitOutId === null ? [] : [{ ...honestyCase, fitOutId: null }]),
   /* Halve the batch, then walk it to the floor of two — one replication forms no interval. */
   (honestyCase) => {
     const candidates: HonestyCase[] = [];

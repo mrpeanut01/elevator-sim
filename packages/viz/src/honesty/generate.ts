@@ -26,6 +26,7 @@
  * | replications | R2 and R13 are both rules about `n`, and `batch/report.ts`'s own `budgetNote` exists because the panel accepts any integer ≥ 1. |
  * | stage | The campaign surfaces take a stage, not a building; a case that names one drives them. |
  * | mode | § D163's fourth dimension. One value today — see {@link HONESTY_MODES}. |
+ * | fit-out | § 8's shop reaching the run (§ D427). Without it every case is a tower **as built**, which is what the corpus was and what a null result found — see {@link HonestyCase.fitOutId}. |
  *
  * ## Determinism
  *
@@ -37,6 +38,7 @@
 
 import { StreamSet, type Rng } from '@elevator-sim/core/browser';
 
+import { HONESTY_KIT_IDS } from './fitOut.js';
 import { HONESTY_MODES, type HonestyCase, type HonestyMode } from './types.js';
 
 /**
@@ -70,6 +72,15 @@ export interface HonestySpace {
   /** Probability the two arms name the same profile — the identical-arm control. */
   readonly identicalArmProbability: number;
   readonly modes: readonly HonestyMode[];
+  /**
+   * Fit-out kits a case may run under — `honesty/fitOut.ts#HONESTY_KIT_IDS`.
+   *
+   * Empty means every case in this space is a tower **as built**, which is what the corpus was
+   * until this axis landed and is the state `HonestyCase.fitOutId` documents.
+   */
+  readonly fitOutIds: readonly string[];
+  /** Probability a case is fitted, when the space names any kit. */
+  readonly fitOutProbability: number;
 }
 
 /**
@@ -125,6 +136,18 @@ export const STANDARD_SPACE: HonestySpace = Object.freeze({
   demandOverrideProbability: 0.5,
   identicalArmProbability: 0.15,
   modes: HONESTY_MODES,
+  fitOutIds: HONESTY_KIT_IDS,
+  /**
+   * A third of cases carry a kit, and the number is a **coverage** choice rather than a cost one.
+   *
+   * A fitted case costs one extra `parseBuilding`/`resolveBuilding` and no extra simulation, so the
+   * budget is indifferent. What the fraction buys is both halves of the axis in one corpus: the
+   * as-built majority is the regression history these pinned seeds have always been, and the fitted
+   * minority is the half § D427 left unswept. `honesty.test.ts` asserts that both halves are
+   * non-empty, for the reason it asserts the same of the suppressed/quotable split — a corpus that
+   * drew one value of an axis is a corpus that never checked it.
+   */
+  fitOutProbability: 1 / 3,
 });
 
 /**
@@ -378,6 +401,19 @@ export function caseFromSeed(honestySeed: number, options: GenerateOptions): Hon
 
   const mode = pick(rng, space.modes);
 
+  /*
+   * **Drawn last, and that is what keeps the pinned corpus a regression suite.**
+   *
+   * `mode` was drawn last for this reason and this draw sits after it for the same one: every seed
+   * in `STANDARD_CORPUS` keeps the building, dispatcher pair, horizon, demand, batch shape and mode
+   * it had before this axis existed, and gains a field. A corpus whose cases moved under a new axis
+   * would have had its regression history silently rewritten — the failures those seeds are pinned
+   * for would be about configurations nobody had ever run.
+   */
+  const fitted = space.fitOutIds.length > 0 && rng.nextFloat() < space.fitOutProbability;
+  const fitOutId = fitted ? pick(rng, space.fitOutIds) : null;
+  if (fitOutId !== null) tags.push(`fit-${fitOutId}`);
+
   return Object.freeze({
     caseId: `honesty-${String(honestySeed)}`,
     honestySeed: String(honestySeed),
@@ -390,6 +426,7 @@ export function caseFromSeed(honestySeed: number, options: GenerateOptions): Hon
     replications,
     stageId,
     mode,
+    fitOutId,
     tags: Object.freeze(tags),
   });
 }

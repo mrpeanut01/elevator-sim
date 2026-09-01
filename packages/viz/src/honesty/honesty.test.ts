@@ -40,6 +40,7 @@ import {
   HONESTY_MODES,
   HONESTY_PROPERTIES,
   PLAYER_FACING_SURFACES,
+  recordingConfigFor,
   runHonestyCampaign,
   STANDARD_CORPUS,
   STANDARD_SPACE,
@@ -55,6 +56,33 @@ import {
 } from './index.js';
 import { loadHonestyResources } from './resources.test-helper.js';
 import { FAULTS } from './faults.js';
+import { freshTower } from '../campaign/career.js';
+import { fitOutOf } from '../campaign/fitOut.js';
+import { recordRun } from '../record/recordRun.js';
+import { HONESTY_KITS, fittedBuildingFor, fittedProfileFor } from './fitOut.js';
+import type { HonestyCase } from './types.js';
+
+/**
+ * The legs of a run, as a comparable string — `scope/probes.test-helper.ts#legsOf`'s own shape.
+ *
+ * Passenger, car and boarding instant in the recording's own order, and never a window statistic:
+ * § D177's rule is that *a mean can be unchanged for a run that is entirely different, and a mean
+ * can move because the window moved.* Built through `recordingConfigFor` so what is compared is the
+ * run a case actually produces rather than a second construction of one.
+ */
+function legsFrom(config: Parameters<typeof recordRun>[0]): string {
+  return JSON.stringify(
+    recordRun(config, { recordDecisions: false }).recording.legs.map((leg) => [
+      leg.passengerId,
+      leg.carId ?? '',
+      leg.boardedAt ?? -1,
+    ]),
+  );
+}
+
+function legsOf(honestyCase: HonestyCase, from: HonestyResources): string {
+  return legsFrom(recordingConfigFor(honestyCase, from));
+}
 
 let resources: HonestyResources;
 let standard: HonestyCampaignResult;
@@ -154,6 +182,112 @@ describe('the search is alive — the five false-negative shapes, hunted in the 
     expect(standard.stats.suppressedCases).toBeGreaterThan(0);
     expect(standard.stats.suppressedCases).toBeLessThan(standard.stats.evaluated);
   });
+
+  it('the corpus reaches both halves of the fit-out axis, so § 8 has something to check', () => {
+    /*
+     * **The shape a null result found, asserted so it cannot come back** — § D437.
+     *
+     * § D427 made a campaign purchase reach the run and said in advance what that would do to this
+     * corpus: *"any corpus case that ever carries a non-`AS_BUILT` fit-out would move."* Re-measured
+     * against a re-measured base, every figure was identical — so **none did**, and the ten
+     * properties had never read a string produced by a fitted run. A corpus in which
+     * `fitOuts['as-built']` is the whole of this record is that corpus again, and it is
+     * byte-identical to one where the axis works and nothing drew it.
+     *
+     * Both halves, for `suppressedCases`' reason one line above: the as-built majority is the
+     * regression history these pinned seeds have always been, and the fitted minority is the half
+     * § 8 was unswept in.
+     */
+    const { fitOuts } = standard.stats;
+    expect(fitOuts['as-built'] ?? 0).toBeGreaterThan(0);
+    const fitted = Object.entries(fitOuts).filter(([id]) => id !== 'as-built');
+    expect(fitted.length, 'the corpus drew no fit-out kit at all').toBeGreaterThan(0);
+    // Every shipped kit is drawn, in both directions: a kit nobody draws is a kit nobody checks.
+    expect(fitted.map(([id]) => id).sort()).toEqual([...HONESTY_KITS.map((kit) => kit.id)].sort());
+    for (const [id, count] of fitted) expect(count, id).toBeGreaterThan(0);
+    expect(
+      fitted.reduce((total, [, count]) => total + count, 0),
+    ).toBeLessThan(standard.stats.evaluated);
+  });
+
+  it('the fit-out axis moves the run — § D177, on the legs, on every fitted case', () => {
+    /*
+     * **The check that makes the seed real rather than decorative**, and the rule is CLAUDE.md's
+     * standing requirement verbatim: *move the control and require the run to change, compared on
+     * the legs.* Never a window statistic — *a mean can be unchanged for a run that is entirely
+     * different, and a mean can move because the window moved.*
+     *
+     * Every fitted case rather than a sample, because the kits were chosen by a survey that says
+     * every one of them moves every always-on cell (`fitOut.ts#HONESTY_KITS`, measured by
+     * `measure.fitOut.test.ts`), and an assertion weaker than the measurement would not notice the
+     * measurement going stale. A case is put back **as built by the one field**, so nothing else
+     * moves and a difference is attributable to the kit and to nothing else.
+     *
+     * ## The deep tier is not asserted here, and four of its cases are the reason
+     *
+     * Measured: 24 of 60 deep cases are fitted and **20** move. The four that do not are named
+     * cells rather than a failure, on § D427's own precedent that an empty cell is a finding about a
+     * building. Two are `crown-hotel` and `st-jude-hospital`, whose only bank is mixed-fleet, so
+     * `campaign/fitOut.ts#choicesFor` refuses to flatten it and the `machines` tier buys nothing
+     * there; the third and fourth are `chancery-house`, whose six cars are **already**
+     * `gearless-traction` at 5 m/s — a tower that has what the tier sells. All three buildings are
+     * stage buildings and reachable in no other tier.
+     */
+    const fitted = STANDARD_CORPUS.map((seed) => caseFromSeed(seed, { space: STANDARD_SPACE })).filter(
+      (honestyCase) => honestyCase.fitOutId !== null,
+    );
+    expect(fitted.length).toBeGreaterThan(0);
+    const inert = fitted
+      .filter(
+        (honestyCase) =>
+          legsOf(honestyCase, resources) === legsOf({ ...honestyCase, fitOutId: null }, resources),
+      )
+      .map((honestyCase) => `${honestyCase.caseId}/${honestyCase.fitOutId ?? ''}/${honestyCase.buildingId}`);
+    expect(
+      inert,
+      'a fitted case whose legs are the as-built ones is a purchase that reaches no passenger — ' +
+        'either the seam came unwired, or the kit is inert at this cell and fitOut.ts’s survey is stale',
+    ).toEqual([]);
+  }, 300_000);
+
+  it('each bought category moves the run on its own — the seam probe the combined kit cannot give', () => {
+    /*
+     * `probes.test-helper.ts` states the risk the second kit runs: *"an arm that turned the whole
+     * shop on would still be green if five of the six categories had come unwired."*
+     * `machines-2+control-3` buys two categories, and `machines` L2 moves every always-on cell — so
+     * on its own the case above would stay green with `profileWithKit` unwired entirely.
+     *
+     * So each category is driven alone, at **one cell measured to move under both**: seed 9005,
+     * `secure-tower`/`nearest-car` at 600 s, which `measure.fitOut.test.ts` reports moving under
+     * `machines` L2 (49 of 49) and under `control` L3 (33 of 49, and 9005 is not one of its
+     * sixteen empty cells).
+     */
+    const base = caseFromSeed(9005, { space: STANDARD_SPACE });
+    const asBuilt = legsOf({ ...base, fitOutId: null }, resources);
+    for (const kit of HONESTY_KITS) {
+      expect(legsOf({ ...base, fitOutId: kit.id }, resources), kit.id).not.toBe(asBuilt);
+    }
+    // And each of the two categories the kits buy, on its own, through the shipped fold.
+    for (const category of ['machines', 'control'] as const) {
+      const level = category === 'machines' ? 2 : 3;
+      const fit = fitOutOf({
+        ...freshTower({
+          contractId: 'c1',
+          buildingId: 'garden-apartments',
+          dispatcherId: 'collective',
+          rate: 3,
+        }),
+        fitted: { [category]: level },
+      });
+      const config = recordingConfigFor({ ...base, fitOutId: null }, resources);
+      const alone = legsFrom({
+        ...config,
+        building: fittedBuildingFor(config.building, fit, resources.elevatorSpecs),
+        dispatcherProfile: fittedProfileFor(config.dispatcherProfile, fit),
+      });
+      expect(alone, `${category} L${String(level)} moved no leg at seed 9005`).not.toBe(asBuilt);
+    }
+  }, 300_000);
 
   it('the corpus reaches both ends of the playhead, so R6 has something to check', () => {
     /*

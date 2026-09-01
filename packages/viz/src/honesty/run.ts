@@ -43,6 +43,8 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { recordRun } from '../record/recordRun.js';
 import type { PublishedScenario } from '../scenario/published.js';
+import type { CampaignFitOut } from '../campaign/fitOut.js';
+import { fitOutForCase, fittedBuildingFor, fittedProfileFor } from './fitOut.js';
 import { checkAll } from './properties.js';
 import {
   memoisedBundles,
@@ -101,6 +103,54 @@ function requireProfile(resources: HonestyResources, id: string): DispatcherProf
   const profile = resources.dispatcherProfilesById.get(id);
   if (profile === undefined) throw new UnrunnableCase(`unknown dispatcher profile "${id}"`);
   return profile;
+}
+
+/**
+ * The kit this case's tower is running — `undefined` for a case that names none.
+ *
+ * Read once here rather than in each of the four places below, so a case cannot be built with the
+ * building fitted and the dispatcher as built. `fitOutForCase` throws on an id no kit table holds,
+ * which travels out as an `UnrunnableCase` for `stageOf`'s reason: a case naming a kit that does
+ * not exist must not silently run as built, which is the shape that makes an axis look swept while
+ * it is inert.
+ */
+function kitOf(honestyCase: HonestyCase): CampaignFitOut | undefined {
+  try {
+    return fitOutForCase(honestyCase.fitOutId);
+  } catch (error) {
+    throw new UnrunnableCase(error instanceof Error ? error.message : String(error));
+  }
+}
+
+/** The building this case runs in, with § 8's kit in it. Identity at *nothing bought*. */
+function buildingFor(honestyCase: HonestyCase, resources: HonestyResources): ResolvedBuilding {
+  return fittedBuildingFor(
+    requireBuilding(resources, honestyCase.buildingId),
+    kitOf(honestyCase),
+    resources.elevatorSpecs,
+  );
+}
+
+/**
+ * The dispatcher library the **run** resolves against, with the landing hardware on every profile.
+ *
+ * Every profile rather than only the driving one, and that is `campaign/fitOut.ts#profileWithKit`'s
+ * own sentence read at batch scale: *the panel in the lobby is a fact about the building*. A batch
+ * runs two arms in one tower, so a kit applied to the baseline and not to the candidate would be a
+ * comparison of two different buildings wearing one building's name.
+ *
+ * `HonestyContext.dispatcherProfiles` is deliberately **not** this value — see `contextFor`.
+ */
+function profilesForRun(
+  honestyCase: HonestyCase,
+  resources: HonestyResources,
+): DispatcherProfiles {
+  const fit = kitOf(honestyCase);
+  if (fit === undefined) return resources.dispatcherProfiles;
+  const profiles = resources.dispatcherProfiles.profiles.map((profile) =>
+    fittedProfileFor(profile, fit),
+  );
+  return { ...resources.dispatcherProfiles, profiles };
 }
 
 /** A case the shipped data cannot express. A generator defect, never a finding. */
@@ -192,18 +242,24 @@ export function recordingConfigFor(
      */
     return demonstrationConfigFor({
       stage: staged.stage,
-      building: requireBuilding(resources, honestyCase.buildingId),
-      dispatcherProfile: requireProfile(resources, staged.stage.dispatcher.startingProfileId),
+      building: buildingFor(honestyCase, resources),
+      dispatcherProfile: fittedProfileFor(
+        requireProfile(resources, staged.stage.dispatcher.startingProfileId),
+        kitOf(honestyCase),
+      ),
       trafficProfiles: resources.trafficProfiles,
       elevatorSpecs: resources.elevatorSpecs,
-      dispatcherProfiles: resources.dispatcherProfiles,
+      dispatcherProfiles: profilesForRun(honestyCase, resources),
       replication: 0,
     });
   }
   return {
-    building: requireBuilding(resources, honestyCase.buildingId),
-    dispatcherProfile: requireProfile(resources, honestyCase.baselineProfileId),
-    dispatcherProfiles: resources.dispatcherProfiles,
+    building: buildingFor(honestyCase, resources),
+    dispatcherProfile: fittedProfileFor(
+      requireProfile(resources, honestyCase.baselineProfileId),
+      kitOf(honestyCase),
+    ),
+    dispatcherProfiles: profilesForRun(honestyCase, resources),
     trafficProfiles: resources.trafficProfiles,
     elevatorSpecs: resources.elevatorSpecs,
     seed: BigInt(honestyCase.simSeed),
@@ -256,7 +312,10 @@ export function comparisonConfigFor(
 ): SimulationConfig {
   return {
     ...recordingConfigFor(honestyCase, resources),
-    dispatcherProfile: requireProfile(resources, honestyCase.candidateProfileId),
+    dispatcherProfile: fittedProfileFor(
+      requireProfile(resources, honestyCase.candidateProfileId),
+      kitOf(honestyCase),
+    ),
     runId: `${honestyCase.caseId}-candidate`,
   };
 }
@@ -285,8 +344,8 @@ export function batchRequestFor(
 
 function batchResourcesFor(honestyCase: HonestyCase, resources: HonestyResources): BatchResources {
   return {
-    building: requireBuilding(resources, honestyCase.buildingId),
-    dispatcherProfiles: resources.dispatcherProfiles,
+    building: buildingFor(honestyCase, resources),
+    dispatcherProfiles: profilesForRun(honestyCase, resources),
     trafficProfiles: resources.trafficProfiles,
     elevatorSpecs: resources.elevatorSpecs,
   };
@@ -315,10 +374,31 @@ function stageBundleFor(
   };
 }
 
-/** Assemble everything an adapter reads, running the two simulations a case needs. */
+/**
+ * Assemble everything an adapter reads, running the two simulations a case needs.
+ *
+ * ## What the kit reaches, and what it deliberately does not
+ *
+ * A fitted case's **run** is fitted end to end — the recording, the pairing run and both batch arms
+ * are built from {@link buildingFor} and {@link profilesForRun} — and so is everything below that
+ * describes *this run's tower*: the building, its name, its floors, its access zones and whether the
+ * driving dispatcher reads a credential.
+ *
+ * `buildings`, `buildingDocument`, `dispatcherProfiles` and `elevatorSpecs` stay **as shipped**, and
+ * that is a decision rather than an oversight. They are the library, not today's tower: the
+ * scenarios grid draws five cards out of `data/buildings/`, the editor validates the document a
+ * reader would paste, and the dispatcher editor draws one row per cost term out of
+ * `data/dispatcher-profiles.json`. A kit is bought against one building for one contract, so a
+ * fit-out that rewrote the library would put a purchase on four buildings nobody bought it for —
+ * which is `dev/state.ts`'s own split between `ShiftRunConfig.building` and the building the chrome
+ * describes, one directory over.
+ */
 export function contextFor(honestyCase: HonestyCase, resources: HonestyResources): HonestyContext {
-  const building = requireBuilding(resources, honestyCase.buildingId);
-  const profile = requireProfile(resources, honestyCase.baselineProfileId);
+  const building = buildingFor(honestyCase, resources);
+  const profile = fittedProfileFor(
+    requireProfile(resources, honestyCase.baselineProfileId),
+    kitOf(honestyCase),
+  );
   requireProfile(resources, honestyCase.candidateProfileId);
 
   const { recording } = recordRun(recordingConfigFor(honestyCase, resources));

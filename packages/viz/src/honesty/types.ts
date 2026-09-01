@@ -427,6 +427,28 @@ export interface HonestyCase {
   /** A `data/campaign.json` stage id, or `null` when this case drives no campaign surface. */
   readonly stageId: string | null;
   readonly mode: HonestyMode;
+  /**
+   * A `honesty/fitOut.ts#HONESTY_KITS` id, or `null` for a tower **as built**.
+   *
+   * ## Why this axis exists, and why it is a field rather than a corpus of its own
+   *
+   * [§ D427](../../../../DECISIONS.md) made a campaign purchase reach the run and predicted its own
+   * effect on this corpus: *"any corpus case that ever carries a non-`AS_BUILT` fit-out would
+   * move."* The corpus was measured against a re-measured base and **every figure was identical** —
+   * so none did, and the ten properties had never read a string produced by a run whose doors,
+   * machines, cars, shafts, control or tenancy had been fitted out. A surface can be honest about a
+   * tower as built and dishonest about a fitted one.
+   *
+   * `mode` is the precedent for the shape and is cited **with** its own measured null: it produced
+   * zero new strings on the day it landed and stopped being a null later, when two adapters became
+   * mode-aware. An axis is driven from the day a fitted surface lands rather than from the day
+   * somebody remembers to check it, which one extra case would not be.
+   *
+   * Drawn **last** by `caseFromSeed`, after {@link mode}, so every pinned case keeps the building,
+   * dispatcher, seed, horizon, demand, batch shape and mode it already had. See
+   * `honesty/fitOut.ts` for which kits and the measurement that chose them.
+   */
+  readonly fitOutId: string | null;
   /** Short labels for what makes this case interesting. Reported, never branched on. */
   readonly tags: readonly string[];
 }
@@ -528,6 +550,16 @@ export interface HonestyCampaignStats {
   readonly surfaces: Readonly<Record<string, number>>;
   readonly buildings: Readonly<Record<string, number>>;
   readonly modes: Readonly<Record<string, number>>;
+  /**
+   * Cases per fit-out kit, with `as-built` for the towers that bought nothing.
+   *
+   * Reported beside {@link buildings} and {@link modes} because it is the same kind of fact and
+   * carries the same risk: an axis whose corpus drew one value is an axis nobody checked, and the
+   * value it would silently collapse to here is the one the corpus already had — every case a tower
+   * **as built**, which is the state § D427's null result found. `honesty.test.ts` asserts both
+   * halves are non-empty for that reason.
+   */
+  readonly fitOuts: Readonly<Record<string, number>>;
   /** The temporal axis's own size, summed over the campaign. See {@link TemporalReach}. */
   readonly temporal: TemporalReach;
   /** The withheld matrix's own size, summed over the campaign. See {@link WithheldReach}. */
