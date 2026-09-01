@@ -358,6 +358,18 @@ export const GOAL_GLYPHS: Readonly<Record<GoalState, string>> = Object.freeze({
  * (`live/types.ts#LiveObservations.worstWaitIsCensored` owns that argument). A bound that might
  * overstate proves nothing, so both directions read `pending` — which `week.ts` already treats
  * correctly: unjudged is not passed, and not failed either.
+ *
+ * ## The third gate: a figure nobody took is not graded either
+ *
+ * {@link GoalObservations.loadedDepartures} is the type's one optional member, and an `undefined`
+ * reads `pending` in both directions. Here the asymmetry runs the other way from the censoring
+ * gate's: the trip budget is an `at-most` bar, so a recording with no travel record folded to a
+ * zero would grade **met** — a pass awarded for a measurement nobody took. That is the shape
+ * `campaign/career.ts`'s own rule refuses (*unjudged is not passed*), and it is why the absent case
+ * is a gate rather than a default.
+ *
+ * The check is written over the *value* rather than over the goal's id, so a second optional
+ * observation added later inherits it instead of needing a fourth branch here.
  */
 export function readGoal(goal: ShiftGoal, observations: GoalObservations): GoalReading {
   if (observations.arrived < WAKE_UP_ARRIVALS) {
@@ -382,6 +394,16 @@ export function readGoal(goal: ShiftGoal, observations: GoalObservations): GoalR
   }
 
   const observed = observations[goal.reads];
+  if (observed === undefined) {
+    return {
+      goal,
+      state: 'pending',
+      observed: null,
+      display: PENDING_DISPLAY,
+      progressPct: 0,
+      glyph: GOAL_GLYPHS.pending,
+    };
+  }
   const met = goal.compare === 'at-most' ? observed <= goal.bar : observed >= goal.bar;
   const state: GoalState = met ? 'met' : 'missed';
   return {

@@ -76,6 +76,7 @@ import type {
  * | 7 | {@link VizLeg.alightedAt}, {@link VizRecording.decisions} and {@link VizRecording.demandPhases} added, for `docs/12-design-handoff.md` § 3.1 BE1, BE2 and BE4. Each lands with the surface that reads it: *carried today* and the report's carried figure read `alightedAt`, the left rail's **WHY IT DID THAT** log reads `decisions`, and the transport timeline reads `demandPhases`. None of the three is derivable from version 6 — `boardedAt` is not delivery, a decision's losing bids are discarded by the time the run returns, and the phase schedule lives on the resolved template rather than on the result. |
  * | 8 | {@link VizSummary.awtInvalidGround} added — the machine-readable half of a refused mean, beside the sentence {@link VizSummary.awtInvalidReason} has carried since version 1. `core` publishes it on `RunSummary` from `metrics/awtValidity.ts`'s ground table (`the root DECISIONS.md` § D183), and **the consumer landed one commit before the transport**: `src/mode/disclosure.ts` already words a Basic suppression lead per ground and, without this field, fell back to the ground-free sentence on every recording this build produced. So this is the reverse of the usual order and the reason is stated rather than implied — a field arriving before its reader is this repository's dead seam, a reader arriving before its field is a fallback that fires. Not derivable from version 7: which of the four grounds fired is a decision `diagnoseAwtValidity` makes in its own precedence order, and re-deriving it here from `saturated`, `waitCount`, `unservedCount` and `serviceLevel` would be a second answer to a question `core` has already answered — wrong in exactly the case the fourth ground exists for. |
  * | 9 | {@link VizRecording.patternSwitches} added — the weight-set selector's pattern-in-force over time, sampled from the policy's own `activePattern` accessor during the run (Everyday Mode slice 4b, `docs/18` § Slice 4). Until this version the detector classified, switched weight vectors, and told nobody: `dispatch/policy.ts` has exposed `activePattern` since the selector landed and its only readers were in `packages/experiments`, so the one thing a player could not see about a selecting run was the selection. Its consumers land in the same change — the stage header's pattern pill (`dev/main.ts`, deriving through `live/patternReadout.ts#patternReadoutAt`) — because a field with no consumer is this repository's signature defect. Not derivable from version 8: the arm in force is the policy's own deterministic state, discarded when `run()` returns, and re-deriving it here would mean re-implementing the detector over the recording — a second answer that drifts the day a ramp is recalibrated. |
+ * | 10 | {@link VizRecording.loadedDepartures} added — the instants the fleet's **loaded** moves ended, so `ENGINE_CONTRACT.md` § 5's `trips` (*count of car departures under load*) can be folded at a playhead. `core`'s `metrics/summarize.ts#loadedDepartureTimes` derives them from the travel samples it already takes; `live/observations.ts` cuts them at the playhead and `shift/goals.ts` grades the campaign's fourth daily test off the result (GitHub issues #169, #313). Its consumers land in the same change, because a field with no consumer is this repository's signature defect. **Not derivable from version 9**: a loaded move is a `(load, distance)` pair the run holds and the recording drops — `VizShaft.motions` carries no load and `VizShaft.occupants` is a fold of the load samples, so joining the two here would be a second answer to a question `core` has already answered, and it would disagree the first time a car levelled between two load samples. **Optional, and absent is not empty**: absent means a recording that carries no travel record at all — a hand-built fixture, since `record/document.ts` refuses a file below this version outright — and present-and-empty is the honest record of a fleet that never once moved with somebody aboard. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -108,7 +109,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 9;
+export const VIZ_SCHEMA_VERSION = 10;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -857,6 +858,29 @@ export interface VizRecording {
    * {@link VizLeg}'s optional fields keep.
    */
   readonly patternSwitches?: readonly VizPatternSwitch[] | undefined;
+  /**
+   * **The instants the fleet's loaded moves ended** — `ENGINE_CONTRACT.md` § 5's `trips`, version 10.
+   *
+   * One entry per car move that carried at least one passenger, ascending. `core`'s
+   * `metrics/summarize.ts#loadedDepartureTimes` owns both halves of that sentence — which moves count
+   * as loaded, and which instant stamps one — and its docstring carries why the stamp is the arrival
+   * rather than the departure.
+   *
+   * **A list rather than a count, because the surface that reads it reads it mid-run.** The campaign's
+   * fourth daily test is drawn on the building desk while the day is still playing, and a whole-run
+   * figure published at a playhead short of `endedAt` is the violation class the honesty sweep's
+   * temporal axis exists to find (`the root DECISIONS.md` § D307). `live/observations.ts` cuts this at
+   * the playhead exactly as it cuts {@link legs}.
+   *
+   * **Absent is not empty.** Absent means a recording carrying no travel record — a fixture built by
+   * hand, since `record/document.ts` refuses a file below version 10 outright — and the goal reading
+   * is then `pending` rather than a fabricated zero. Empty is the honest record of a fleet that never
+   * moved with anybody aboard, which is a real state of a quiet thirty-minute period, and it grades.
+   *
+   * Written as absent (never an explicit `undefined`) by the same JSON-round-trip rule
+   * {@link VizLeg}'s optional fields keep.
+   */
+  readonly loadedDepartures?: readonly SimTime[] | undefined;
   /** Non-fatal diagnostics from the run, for the viewer's warning strip. */
   readonly warnings: readonly string[];
 }

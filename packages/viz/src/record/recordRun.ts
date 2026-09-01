@@ -44,6 +44,7 @@
 
 import {
   Simulation,
+  loadedDepartureTimes,
   resolveDemandTemplate,
   type Car,
   type CarMotion,
@@ -402,6 +403,16 @@ function describeRun(
   };
   // Absent, never an explicit `undefined` — the JSON-round-trip rule `describeLegs` states.
   if (extras.patternSwitches !== undefined) recording.patternSwitches = extras.patternSwitches;
+  /*
+   * § 5's `trips`, from `core` and derived nowhere else — version 10.
+   *
+   * `loadedDepartureTimes` returns `undefined` for a record with no travel samples, and the field is
+   * then left off for the same reason `patternSwitches` is: absent and empty are different claims
+   * (`contract/types.ts#VizRecording.loadedDepartures`), and a viewer that wrote `[]` for a run
+   * nobody instrumented would let the campaign's trip budget grade a day it never measured.
+   */
+  const loadedDepartures = loadedDepartureTimes(result.record.travelSamples);
+  if (loadedDepartures !== undefined) recording.loadedDepartures = loadedDepartures;
   return recording;
 }
 
