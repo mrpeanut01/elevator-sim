@@ -163,11 +163,11 @@ import {
   STAGE_ABSENCES,
   STAGE_AWAITING_RUN,
   STAGE_INTERVENTIONS,
-  type StageSwitchTarget,
   STAGE_NO_GHOST,
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
 import {
