@@ -565,15 +565,18 @@ describe('posting a whole authored day', () => {
     expect(posted.status, JSON.stringify(posted.body)).toBe(201);
   }, 120_000);
 
-  it('puts it on its own board, never against a slice of the same day', async () => {
+  it('records it as its own measurement, never confused with a slice of the same day', async () => {
     /*
      * The property that makes widening safe rather than a ranking bug, driven through the API so it
      * is the *server's* digest being compared rather than a recomputation.
      *
-     * `verify.test.ts` proves `configHashOf` separates the two lengths; this proves the route uses
-     * that digest to file the entry. A ten-hour run and a two-hour window over the same day, same
-     * building, same dispatcher and same seed are different measurements, and a board that mixed
-     * them would rank a rush hour against a whole working day and call one dispatcher better.
+     * **What changed is which half of the claim the API answers.** A ten-hour run and a two-hour
+     * window over the same day, same building, same dispatcher and same seed are different
+     * measurements, and this proves the route files them as such — the entries carry different
+     * `dataHash`es. What it no longer proves, because it is no longer true and § 12.1 says it may
+     * not be, is that they are on different *boards*: neither is the day's fixture, so both land in
+     * the same personal-record log and the log holds them apart by their data hashes rather than by
+     * minting a leaderboard for each.
      */
     const account = await signIn();
     const day = await call('POST', '/api/scores', { token: account.token, body: honest(WHOLE_DAY) });
@@ -585,7 +588,13 @@ describe('posting a whole authored day', () => {
     const posted = await call('POST', '/api/scores', { token: account.token, body: honest(slice) });
     expect(posted.status, JSON.stringify(posted.body)).toBe(201);
 
-    expect(bodyOf(day)['configHash']).not.toBe(bodyOf(posted)['configHash']);
+    const dataHashOf = (response: ApiResponse): unknown =>
+      (bodyOf(response)['entry'] as Record<string, unknown>)['dataHash'];
+    expect(dataHashOf(day)).not.toBe(dataHashOf(posted));
+    // Same log, and that is the fix rather than a regression: a length nobody else picked used to
+    // mint a board of one with its player permanently first.
+    expect(bodyOf(day)['boardKey']).toBe(bodyOf(posted)['boardKey']);
+    expect(bodyOf(day)['placement']).toBe('personal');
   }, 180_000);
 
   it('charges what it costs — five reference replays, not one', async () => {
@@ -736,9 +745,9 @@ describe('a board', () => {
   it('ranks on the metric it was asked for, and says so on the wire', async () => {
     const account = await signIn();
     const posted = await call('POST', '/api/scores', { token: account.token, body: honest() });
-    const configHash = String(bodyOf(posted)['configHash']);
+    const board_ = String(bodyOf(posted)['boardKey']);
 
-    const board = await call('GET', '/api/board', { query: { configHash, metric: 'wt95S' } });
+    const board = await call('GET', '/api/board', { query: { board: board_, metric: 'wt95S' } });
     expect(board.status).toBe(200);
     expect(bodyOf(board)['metric']).toBe('wt95S');
     // § D106's rule, said where a client can read it rather than only in a docstring: the ranking
@@ -748,12 +757,22 @@ describe('a board', () => {
   }, 60_000);
 
   it('refuses a metric that is not one of the four', async () => {
-    const response = await call('GET', '/api/board', { query: { configHash: 'x', metric: 'energyKJ' } });
+    const response = await call('GET', '/api/board', { query: { board: 'x', metric: 'energyKJ' } });
     expect(response.status).toBe(400);
     expect(bodyOf(response)['error']).toBe('no-such-metric');
   });
 
-  it('puts a different arrival rate on a different board', async () => {
+  it('keeps a different arrival rate in the same log, told apart by what it measured', async () => {
+    /*
+     * **This case used to assert the defect.** It read *"puts a different arrival rate on a
+     * different board"*, and that is § 12.1's forbidden key by name: the rate is a parameter a
+     * player sets, so every rate minted its own leaderboard and everybody was first on theirs.
+     *
+     * The true half of § D214 § 4 survives and is what is asserted now — a run under heavier traffic
+     * is not a better run at the same thing, so the two must not be *confused*. They are told apart
+     * by `dataHash`, which is what that digest was always for. Where they are is the player's own
+     * log, because neither is the day's fixture.
+     */
     const account = await signIn();
     const first = await call('POST', '/api/scores', { token: account.token, body: honest() });
     const second = await call('POST', '/api/scores', {
@@ -761,9 +780,10 @@ describe('a board', () => {
       body: honest({ ...RUN, arrivalRatePctPop5min: 8 }),
     });
     expect(second.status, JSON.stringify(second.body)).toBe(201);
-    // § D214 § 4. A run under heavier traffic is not a better run at the same thing; comparing the
-    // two would rank the easier configuration.
-    expect(bodyOf(first)['configHash']).not.toBe(bodyOf(second)['configHash']);
+    const dataHashOf = (response: ApiResponse): unknown =>
+      (bodyOf(response)['entry'] as Record<string, unknown>)['dataHash'];
+    expect(dataHashOf(first)).not.toBe(dataHashOf(second));
+    expect(bodyOf(first)['boardKey']).toBe(bodyOf(second)['boardKey']);
   }, 120_000);
 
   it('lists its boards', async () => {
@@ -848,8 +868,8 @@ describe('deleting an account', () => {
       body: honest({ ...RUN, arrivalRatePctPop5min: 7 }),
     });
     expect(posted.status, JSON.stringify(posted.body)).toBe(201);
-    const configHash = String(bodyOf(posted)['configHash']);
-    const before = await call('GET', '/api/board', { query: { configHash, metric: 'awtS' } });
+    const boardKey = String(bodyOf(posted)['boardKey']);
+    const before = await call('GET', '/api/board', { query: { board: boardKey, metric: 'awtS' } });
     expect(JSON.stringify(bodyOf(before)['entries'])).toContain(displayName);
 
     const deleted = await call('DELETE', '/api/me', { token: account.token });
@@ -860,7 +880,7 @@ describe('deleting an account', () => {
     expect((await call('GET', '/api/me', { token: account.token })).status).toBe(401);
     // The board entry went with it. `store.test.ts` proves this against every child table the
     // schema declares; this is the same fact observed where a player would notice it.
-    const after = await call('GET', '/api/board', { query: { configHash, metric: 'awtS' } });
+    const after = await call('GET', '/api/board', { query: { board: boardKey, metric: 'awtS' } });
     expect(JSON.stringify(bodyOf(after)['entries'])).not.toContain(displayName);
 
     // And the row is gone rather than flagged: asking for a link at the same address again creates

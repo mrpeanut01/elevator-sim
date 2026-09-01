@@ -8,8 +8,8 @@
 
 export {
   ACCEPTED_DURATIONS_S,
+  SUBMITTABLE_INTERVENTION_KINDS,
   canonicalJson,
-  configHashOf,
   digestOf,
   submissionIssues,
   type ClaimedMetrics,
@@ -17,6 +17,21 @@ export {
   type Submission,
   type SubmittedRun,
 } from './leaderboard/submission.js';
+
+export {
+  BOARD_KEYS,
+  DAILY_FIXTURE_CONFIG,
+  dailyDateOf,
+  dailyFixtureAt,
+  dailySeedFor,
+  isDailyFixtureRun,
+  placeSubmission,
+  runDataHashOf,
+  type BoardKeyRow,
+  type BoardPlacement,
+  type DailyFixture,
+  type DailyFixtureConfig,
+} from './leaderboard/boardKey.js';
 
 export {
   SIGN_IN_FRAGMENT_KEY,

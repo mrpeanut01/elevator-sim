@@ -2,8 +2,17 @@
  * The database. PostgreSQL, one schema, no ORM, no migration framework.
  *
  * `DECISIONS.md` § D214 § 5 gives sessions a table rather than a JWT — *revocation is a `DELETE`* —
- * and § 4 gives every leaderboard entry a `configHash` so a `data/` change starts a new board
- * instead of corrupting an old one. Both of those are schema decisions, so they live here.
+ * and § 4 gives every leaderboard entry a digest of the `data/` it was measured against, so a
+ * `data/` change is visible rather than silent. Both of those are schema decisions, so they live
+ * here.
+ *
+ * **`entries` carries two identities now and used to carry one**, and the split is
+ * `ENGINE_CONTRACT.md` § 12.1's: `board_key` says *which leaderboard this row is on* and `data_hash`
+ * says *what data it was measured against*. The single `config_hash` column answered both, and its
+ * value was a digest of the building, the dispatcher, the template, the rate and the run length —
+ * which is the key the contract forbids in as many words, because every axis in it is one a player
+ * picks. `leaderboard/boardKey.ts` holds the argument; what it costs here is a column rename and a
+ * column added.
  *
  * ## Three rules this module keeps that are easy to lose
  *
@@ -49,6 +58,24 @@
  * everybody would be the migration lying about them. It does **not** belong hidden in
  * {@link Store.open}; this module's own rule is that when there is something to migrate, the honest
  * thing is a versioned migration table.
+ *
+ * ## What `entries`' second identity would have had to do, on the same terms
+ *
+ * `config_hash` became `board_key` **and** `data_hash`, and the two hold different things rather
+ * than one being a rename of the other. An existing table would need:
+ *
+ * ```sql
+ * ALTER TABLE entries RENAME COLUMN config_hash TO data_hash;
+ * ALTER TABLE entries ADD COLUMN board_key TEXT;
+ * ```
+ *
+ * — and then a **backfill only the application can write**, because a board key is decided from the
+ * run and the day's fixture (`leaderboard/boardKey.ts#placeSubmission`) and neither is a column
+ * here: every old row would be replayed through `placeSubmission` from its `run_json` and the
+ * fixture for its `submitted_at_ms`, and only then could `board_key` be made `NOT NULL` and the
+ * unique constraint moved. There is nothing to migrate today — the deployed database has never held
+ * an entry, for the reason § D243 gives about a viewer that could not find its own API — and writing
+ * the steps down is the alternative to assuming that stays true.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -104,7 +131,10 @@ export interface LoginTokenRow {
 /** One accepted score. The **server's** metrics; a claim is never persisted (§ D214 § 3). */
 export interface EntryRow {
   readonly id: string;
-  readonly configHash: string;
+  /** Which board — `daily:YYYY-MM-DD` or `personal:<user id>`. `boardKey.ts#placeSubmission`. */
+  readonly boardKey: string;
+  /** What data it was measured against — `boardKey.ts#runDataHashOf`. Never a board key. */
+  readonly dataHash: string;
   readonly userId: string;
   readonly displayName: string;
   readonly run: SubmittedRun;
@@ -519,12 +549,19 @@ export class Store {
   /**
    * Record an accepted score.
    *
-   * One row per (board, player, seed): re-submitting the same seed **replaces** rather than
-   * appends, because a deterministic replay of the same seed is the same run and a board that
-   * listed it twice would be counting a refresh as an achievement.
+   * One row per (board, configuration, player, seed): re-submitting the same seed **replaces**
+   * rather than appends, because a deterministic replay of the same seed is the same run and a board
+   * that listed it twice would be counting a refresh as an achievement.
+   *
+   * **`data_hash` joined that key when the board key stopped being a digest of the configuration.**
+   * It had to: `personal:<user id>` is one key for every run a player posts, so `(board_key, user,
+   * seed)` alone would have collapsed two different configurations at one seed into one row — a
+   * personal *record* log that could hold at most one record per seed. On the daily board the
+   * fixture pins the seed, so the pair `(board_key, data_hash)` there separates a player's rows by
+   * the dispatcher they ran, which is the axis that board compares.
    *
    * **The database keeps that promise now, and until #266 a `SELECT` did.** The upsert conflicted on
-   * `id` — the *primary* key — while the guarantee is over `UNIQUE (config_hash, user_id, seed)`, so
+   * `id` — the *primary* key — while the guarantee is over the natural key, so
    * the replacement only happened when the pre-read found the row. Two submissions of one seed in
    * flight together both read nothing, both mint a fresh `randomUUID`, and the second violates the
    * natural key: a double-tapped submit answered `500` and posted nothing for the losing half.
@@ -541,7 +578,8 @@ export class Store {
    * key, and that is mapped rather than closed — see {@link NoSuchUserError}.
    */
   async recordEntry(input: {
-    readonly configHash: string;
+    readonly boardKey: string;
+    readonly dataHash: string;
     readonly userId: string;
     readonly run: SubmittedRun;
     readonly measured: ClaimedMetrics;
@@ -550,7 +588,8 @@ export class Store {
     if (user === undefined) throw new NoSuchUserError('recordEntry');
 
     const draft = {
-      configHash: input.configHash,
+      boardKey: input.boardKey,
+      dataHash: input.dataHash,
       userId: input.userId,
       displayName: user.displayName,
       run: input.run,
@@ -562,15 +601,17 @@ export class Store {
     let written;
     try {
       written = await this.#sql.query(
-        'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, ' +
-          'pct_over_long_wait, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ' +
-          'ON CONFLICT (config_hash, user_id, seed) DO UPDATE SET run_json = excluded.run_json, ' +
+        'INSERT INTO entries (id, board_key, data_hash, user_id, seed, run_json, awt_s, wt95_s, ' +
+          'ttd_mean_s, pct_over_long_wait, submitted_at_ms) ' +
+          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ' +
+          'ON CONFLICT (board_key, data_hash, user_id, seed) DO UPDATE SET run_json = excluded.run_json, ' +
           'awt_s = excluded.awt_s, wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
           'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms ' +
           'RETURNING id',
         [
           randomUUID(),
-          draft.configHash,
+          draft.boardKey,
+          draft.dataHash,
           draft.userId,
           draft.run.seed,
           JSON.stringify(draft.run),
@@ -605,28 +646,28 @@ export class Store {
    * directly, and it also retires the correlated `MIN` subquery the old query needed to find each
    * player's best row. The inner ordering picks the row; the outer ordering ranks the board.
    */
-  async board(configHash: string, metric: BoardMetric, limit: number): Promise<readonly EntryRow[]> {
+  async board(boardKey: string, metric: BoardMetric, limit: number): Promise<readonly EntryRow[]> {
     const column = COLUMN_OF[metric];
     const result = await this.#sql.query(
       `SELECT * FROM (` +
         `SELECT DISTINCT ON (e.user_id) e.*, u.display_name AS display_name ` +
-        `FROM entries e JOIN users u ON u.id = e.user_id WHERE e.config_hash = $1 ` +
+        `FROM entries e JOIN users u ON u.id = e.user_id WHERE e.board_key = $1 ` +
         `ORDER BY e.user_id, e.${column} ASC, e.submitted_at_ms ASC` +
         `) best ORDER BY best.${column} ASC, best.submitted_at_ms ASC LIMIT $2`,
-      [configHash, limit],
+      [boardKey, limit],
     );
     return Object.freeze(result.rows.map((row) => entryOf(row)));
   }
 
   /** Every board that has an entry, most recently posted to first. For the leaderboard index. */
-  async boards(): Promise<readonly { readonly configHash: string; readonly entries: number; readonly latestMs: number }[]> {
+  async boards(): Promise<readonly { readonly boardKey: string; readonly entries: number; readonly latestMs: number }[]> {
     const result = await this.#sql.query(
-      'SELECT config_hash, COUNT(*) AS entries, MAX(submitted_at_ms) AS latest FROM entries ' +
-        'GROUP BY config_hash ORDER BY latest DESC',
+      'SELECT board_key, COUNT(*) AS entries, MAX(submitted_at_ms) AS latest FROM entries ' +
+        'GROUP BY board_key ORDER BY latest DESC',
     );
     return Object.freeze(
       result.rows.map((row) => ({
-        configHash: String(row['config_hash']),
+        boardKey: String(row['board_key']),
         // `COUNT(*)` and a `BIGINT` `MAX` both come back from `pg` as strings, because a 64-bit
         // integer does not always fit a JS number. These two always do, and `Number` takes either
         // form, so the coercion is the same one the row mappers already used.
@@ -896,7 +937,8 @@ function challengeEntryOf(row: Record<string, unknown>): ChallengeEntryRow {
 function entryOf(row: Record<string, unknown>): EntryRow {
   return Object.freeze({
     id: String(row['id']),
-    configHash: String(row['config_hash']),
+    boardKey: String(row['board_key']),
+    dataHash: String(row['data_hash']),
     userId: String(row['user_id']),
     displayName: String(row['display_name']),
     run: JSON.parse(String(row['run_json'])) as SubmittedRun,
@@ -957,7 +999,12 @@ CREATE INDEX IF NOT EXISTS login_tokens_expiry ON login_tokens (expires_at_ms);
 
 CREATE TABLE IF NOT EXISTS entries (
   id                  TEXT PRIMARY KEY,
-  config_hash         TEXT NOT NULL,
+  -- Which leaderboard: 'daily:YYYY-MM-DD' or 'personal:<user id>' (ENGINE_CONTRACT section 12.1).
+  -- Never a digest of the configuration: that is the key the contract forbids.
+  board_key           TEXT NOT NULL,
+  -- What the row was measured against -- leaderboard/boardKey.ts#runDataHashOf. This is the value
+  -- the old config_hash column held; what changed is that it no longer decides who ranks beside whom.
+  data_hash           TEXT NOT NULL,
   user_id             TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   seed                TEXT NOT NULL,
   run_json            TEXT NOT NULL,
@@ -966,9 +1013,9 @@ CREATE TABLE IF NOT EXISTS entries (
   ttd_mean_s          DOUBLE PRECISION NOT NULL,
   pct_over_long_wait  DOUBLE PRECISION NOT NULL,
   submitted_at_ms     BIGINT NOT NULL,
-  UNIQUE (config_hash, user_id, seed)
+  UNIQUE (board_key, data_hash, user_id, seed)
 );
-CREATE INDEX IF NOT EXISTS entries_board ON entries (config_hash, awt_s);
+CREATE INDEX IF NOT EXISTS entries_board ON entries (board_key, awt_s);
 
 CREATE TABLE IF NOT EXISTS challenges (
   id            TEXT PRIMARY KEY,

@@ -11,7 +11,8 @@ import { describe, expect, it, beforeAll } from 'vitest';
 
 import { loadConfig, runSimulation, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 
-import { configHashOf, digestOf, submissionIssues, type Submission } from './submission.js';
+import { runDataHashOf } from './boardKey.js';
+import { digestOf, submissionIssues, type Submission } from './submission.js';
 import {
   METRIC_EPSILON,
   configFor,
@@ -305,10 +306,20 @@ describe('a windowed run can be posted, and is replayed over the part it names',
 });
 
 /* -------------------------------------------------------------------------- *
- * The board's identity
+ * What a row was measured against
  * -------------------------------------------------------------------------- */
 
-describe('a board is keyed by what it measures', () => {
+/*
+ * These cases used to be titled *a board is keyed by what it measures*, and the digest they exercise
+ * used to be the board key. `ENGINE_CONTRACT.md` § 12.1 forbids that key in as many words, so the
+ * value kept its bytes and lost its second job: it now says **what data a stored row was measured
+ * against**, and `boardKey.test.ts` decides which board the row is on.
+ *
+ * The cases survive the rename because every claim they made was a true claim about the digest and a
+ * false one only about the word *board*. The last of them is the load-bearing one: the digest is
+ * asserted against a literal hex string, so the split is proved to have moved no byte.
+ */
+describe('an entry names the data it was measured against', () => {
   const facts = {
     buildingDigest: 'aaa',
     dispatcherDigest: 'bbb',
@@ -316,39 +327,40 @@ describe('a board is keyed by what it measures', () => {
     trafficModel: 'v1',
   };
 
-  it('puts two runs of the same configuration on the same board, whatever the seed', () => {
-    // A board is a leaderboard ACROSS seeds. Hashing the seed would give every player a private
-    // board of one.
-    expect(configHashOf({ ...RUN, seed: '1' }, facts)).toBe(configHashOf({ ...RUN, seed: '999' }, facts));
+  it('measures two runs of one configuration against the same data, whatever the seed', () => {
+    // The seed is the run, not the data. Hashing it here would make the digest an identity for the
+    // replication rather than for what the replication was measured against.
+    // (`boardKey.ts#isDailyFixtureRun` is where the seed does matter, and says why.)
+    expect(runDataHashOf({ ...RUN, seed: '1' }, facts)).toBe(runDataHashOf({ ...RUN, seed: '999' }, facts));
   });
 
-  it('starts a new board when the data it measured changes', () => {
+  it('changes when the data it measured changes', () => {
     // The § D205 / § D213 lesson with money on it: a building edited under a live board would leave
     // every stored score describing a run that no longer exists — and failing to re-verify, so
-    // honest old entries would start looking like forgeries.
-    const moved = configHashOf(RUN, { ...facts, buildingDigest: 'aaa2' });
-    expect(moved).not.toBe(configHashOf(RUN, facts));
+    // honest old entries would start looking like forgeries. The digest is what makes that visible.
+    const moved = runDataHashOf(RUN, { ...facts, buildingDigest: 'aaa2' });
+    expect(moved).not.toBe(runDataHashOf(RUN, facts));
   });
 
   it('separates runs that differ in any input that could move the result', () => {
-    const base = configHashOf(RUN, facts);
-    expect(configHashOf({ ...RUN, durationS: 1800 }, facts)).not.toBe(base);
-    expect(configHashOf({ ...RUN, arrivalRatePctPop5min: 8 }, facts)).not.toBe(base);
-    expect(configHashOf({ ...RUN, dispatcherProfileId: 'eta' }, facts)).not.toBe(base);
+    const base = runDataHashOf(RUN, facts);
+    expect(runDataHashOf({ ...RUN, durationS: 1800 }, facts)).not.toBe(base);
+    expect(runDataHashOf({ ...RUN, arrivalRatePctPop5min: 8 }, facts)).not.toBe(base);
+    expect(runDataHashOf({ ...RUN, dispatcherProfileId: 'eta' }, facts)).not.toBe(base);
     // `null` — the building's own profile — is a distinct selection, not the absence of one.
-    expect(configHashOf({ ...RUN, arrivalRatePctPop5min: null }, facts)).not.toBe(base);
+    expect(runDataHashOf({ ...RUN, arrivalRatePctPop5min: null }, facts)).not.toBe(base);
     // ...and the engine's own model version, because a v1 score and a v2 score are not comparable
     // however identical the rest is.
-    expect(configHashOf(RUN, { ...facts, trafficModel: 'v2' })).not.toBe(base);
+    expect(runDataHashOf(RUN, { ...facts, trafficModel: 'v2' })).not.toBe(base);
   });
 
-  it('ranks two parts of one day apart, because they are different runs', () => {
-    // § D285. A morning window and a lunch window over the same seed measure different traffic;
-    // ranking them together would be comparing a rush hour with a lull and calling one dispatcher
-    // better. The whole-period run is a third thing again.
-    const base = configHashOf(RUN, facts);
-    const morning = configHashOf({ ...RUN, windowStartS: 30 * 60 }, facts);
-    const lunch = configHashOf({ ...RUN, windowStartS: 255 * 60 }, facts);
+  it('tells two parts of one day apart, because they are different runs', () => {
+    // § D285. A morning window and a lunch window over the same seed measure different traffic, so
+    // a row that recorded one under the other's digest would name data it was never measured
+    // against. The whole-period run is a third thing again.
+    const base = runDataHashOf(RUN, facts);
+    const morning = runDataHashOf({ ...RUN, windowStartS: 30 * 60 }, facts);
+    const lunch = runDataHashOf({ ...RUN, windowStartS: 255 * 60 }, facts);
     expect(new Set([base, morning, lunch]).size).toBe(3);
   });
 
@@ -356,43 +368,68 @@ describe('a board is keyed by what it measures', () => {
    * GitHub issue #267's safety property, and the reason widening `ACCEPTED_DURATIONS_S` is not a
    * ranking bug: **a ten-hour run never competes against a thirty-minute one.**
    *
-   * Verified by construction rather than assumed — `configHashOf` puts `durationS` in the canonical
-   * string it digests, so every accepted length is its own board. The case above already proves the
-   * general rule at 1 800 s; this one names the whole day, because that is the length the issue is
-   * about and a general rule nobody instantiated is how a specific regression hides.
+   * Verified by construction rather than assumed — `runDataHashOf` puts `durationS` in the canonical
+   * string it digests, so every accepted length has its own digest. The case above already proves
+   * the general rule at 1 800 s; this one names the whole day, because that is the length the issue
+   * is about and a general rule nobody instantiated is how a specific regression hides.
    *
-   * The cost of the property is the empty board it creates, which is `RISKS.md` R32 and GitHub
-   * issue #222 rather than something this test can fix.
+   * **The empty board this used to create is gone**, and it is worth saying which half of #267
+   * survived. The property that a ten-hour run is not confused with a thirty-minute one is this
+   * digest's and stands. The *cost* — `RISKS.md` R32's board of one, minted by a length nobody else
+   * picked — was the board key being this digest, and a run that is not the day's fixture now lands
+   * in its player's own log instead.
    */
-  it('gives a whole authored day its own board, so it never ranks against a slice', () => {
-    const wholeDay = configHashOf({ ...RUN, durationS: 36_000, windowStartS: 0 }, facts);
-    const twoHours = configHashOf({ ...RUN, durationS: 7_200, windowStartS: 0 }, facts);
-    const halfHour = configHashOf({ ...RUN, durationS: 1_800, windowStartS: 0 }, facts);
+  it('gives a whole authored day its own digest, so it is never confused with a slice', () => {
+    const wholeDay = runDataHashOf({ ...RUN, durationS: 36_000, windowStartS: 0 }, facts);
+    const twoHours = runDataHashOf({ ...RUN, durationS: 7_200, windowStartS: 0 }, facts);
+    const halfHour = runDataHashOf({ ...RUN, durationS: 1_800, windowStartS: 0 }, facts);
     expect(new Set([wholeDay, twoHours, halfHour]).size).toBe(3);
   });
 
   it('treats a window starting at zero as a selection, not as its absence', () => {
     // `0` is *the run starts at the top of the day*, `null` is *there is no window*. They are two
     // different statements and `?? undefined` is what keeps them apart — `|| undefined` would fold
-    // the first into the second and silently rank a windowed run on the whole-period board.
-    expect(configHashOf({ ...RUN, windowStartS: 0 }, facts)).not.toBe(configHashOf(RUN, facts));
+    // the first into the second and record a windowed run under the whole-period run's digest.
+    expect(runDataHashOf({ ...RUN, windowStartS: 0 }, facts)).not.toBe(runDataHashOf(RUN, facts));
   });
 
-  it('leaves every board that already exists exactly where it was', () => {
+  it('leaves every entry that already exists naming exactly the data it always named', () => {
     /*
-     * The regression this field could most easily have caused, and the reason `configHashOf` writes
-     * the window as `undefined` rather than `null` when there is none.
+     * **This is the assertion that says the split moved no byte**, and it is the same assertion it
+     * was before the split — which is the point of leaving the literal alone.
      *
-     * Every score posted before the window existed was a whole-period run. Adding a key to the
-     * canonical string would have moved all of them to a new board — honest entries relocated for a
-     * selection their players never made, on a leaderboard whose entire premise is that a board
-     * survives everything except a change to what it measured.
+     * Three fields have now been added to `SubmittedRun` without moving this hex: `windowStartS`,
+     * and this wave's `ruleRows` and `interventions`. Each is written into the canonical string as
+     * `undefined` when the run did not use it, and `canonicalJson` drops `undefined` entries, so a
+     * whole-period run with no rules and no log digests to **exactly** the string it digested when
+     * none of the three existed. Adding a key unconditionally would have re-digested every honest
+     * entry ever stored, for selections their players never made.
      *
      * Asserted against the literal digest rather than against a recomputation, because a
-     * recomputation would change with the code and prove nothing. This hex is what a
-     * whole-period `RUN` on these facts hashed to before `windowStartS` existed.
+     * recomputation would change with the code and prove nothing.
      */
-    expect(configHashOf(RUN, facts)).toBe('d77c9681da72ea7aea293a204a1b55ff');
+    expect(runDataHashOf(RUN, facts)).toBe('d77c9681da72ea7aea293a204a1b55ff');
+    // Explicitly, rather than only by RUN's shape: the two new fields at their empty values are the
+    // same string as their absence.
+    expect(runDataHashOf({ ...RUN, ruleRows: [], interventions: [] }, facts)).toBe(
+      'd77c9681da72ea7aea293a204a1b55ff',
+    );
+  });
+
+  it('does move when a run actually carries rules or a log, because those moved the result', () => {
+    // The other half of the field's contract. An empty list must not fork the digest and a written
+    // one must: a row that recorded a ruled run under the plain run's digest would name data the
+    // run was not measured against.
+    const base = runDataHashOf(RUN, facts);
+    const ruled = runDataHashOf(
+      { ...RUN, ruleRows: [{ when: 'call-waited', whenValue: 60, then: 'jump-queue' }] },
+      facts,
+    );
+    const logged = runDataHashOf(
+      { ...RUN, interventions: [{ atS: 300, change: { kind: 'park-cars-lobby' } }] },
+      facts,
+    );
+    expect(new Set([base, ruled, logged]).size).toBe(3);
   });
 
   it('does not fork a board over key order in a record', () => {

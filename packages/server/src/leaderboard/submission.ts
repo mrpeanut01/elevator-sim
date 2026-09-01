@@ -1,11 +1,11 @@
 /**
- * What a player submits, and the digest that decides **which board it belongs to**.
+ * What a player submits, and the cheap gate in front of the simulation.
  *
  * `DECISIONS.md` § D214 § 3–4. A client-reported score measures willingness to cheat, so nothing
  * here trusts one: a submission carries the **seed and the resolved configuration**, and
  * `verify.ts` re-runs the simulation and accepts the score only if it reproduces.
  *
- * ## Why a board is keyed by a content hash
+ * ## Why an entry carries a content hash of its inputs
  *
  * A score is *"this seed, on this building, under this dispatcher, scored X"* — and every one of
  * those nouns lives in `data/`. Change `midtown-office`'s population and every stored score silently
@@ -17,11 +17,29 @@
  * over, where adding a traffic profile moved `fuzz-1001074`'s arrival count from 177 to 188 while
  * the case still ran and still reported cleanly. A leaderboard is that shape with money on it.
  *
- * So {@link configHashOf} digests the **fully resolved inputs a run depended on**, and a board is
- * that digest. A `data/` change does not corrupt an old board — it starts a new one, and the old
- * board stays readable and stays verifiable against the data it was set on.
+ * So `boardKey.ts#runDataHashOf` digests the **fully resolved inputs a run depended on**, and every
+ * entry carries it. A `data/` change does not corrupt an old row — the row still names the data it
+ * was measured against, and stays verifiable against it.
+ *
+ * ## What that digest is no longer allowed to be
+ *
+ * It used to be the **board key**, under the name `configHashOf`, and `ENGINE_CONTRACT.md` § 12.1
+ * forbids that shape in as many words: *"No player-settable parameter may enter a board key. A key
+ * of building × dispatcher × traffic template × arrival rate × run length fragments into thousands
+ * of one-entry boards where everyone is permanently first."* That was the digest exactly, plus a
+ * window. `boardKey.ts` is where the two jobs were separated and where the argument lives; this
+ * module keeps the wire's shape and the gate in front of it.
  */
 
+import {
+  RULE_ACTION_WORDS,
+  RULE_CONDITION_WORDS,
+  isInterventionKind,
+  type RuleActionId,
+  type RuleConditionId,
+  type RuleRowConfig,
+  type RunInterventionConfig,
+} from '@elevator-sim/core';
 import { createHash } from 'node:crypto';
 
 /* -------------------------------------------------------------------------- *
@@ -63,6 +81,65 @@ export interface SubmittedRun {
   readonly windowStartS: number | null;
   /** Decimal digits, 1–20. Validated before it reaches the kernel. */
   readonly seed: string;
+  /**
+   * The Everyday rules the run's dispatcher was driven by, in first-match order — § 11.5.
+   *
+   * ## Why this is *not* the inline-object cheat the module's own rule forbids
+   *
+   * The rule above is *ids rather than inline objects*, and the reason it gives is that a submission
+   * carrying its own building would let a player invent a two-floor tower with sixteen cars. A rule
+   * row is the opposite shape: it is **two ids and two values from closed lists declared in `core`**
+   * (`RULE_CONDITIONS`, `RULE_ACTIONS`, and the `values` arrays on `RULE_CONDITION_WORDS` /
+   * `RULE_ACTION_WORDS`), so the whole space a player can express is a finite product of vocabulary
+   * this server ships. {@link submissionIssues} refuses anything outside it before a simulation
+   * starts, and `core`'s own `resolveDispatchConfig` refuses it again at resolve.
+   *
+   * The rows are applied to **the profile this server resolved from `dispatcherProfileId`**, never
+   * to a profile the submission carried — `verify.ts#profileWithRules`. So the weights are still the
+   * server's own and the rules are the player's, which is exactly the division `submission.ts`'s
+   * founding sentence asks for.
+   *
+   * Absent and `[]` are the same run: `profileWithRules` returns its input by object identity for an
+   * empty list, and `boardKey.ts#runDataHashOf` drops the key from the canonical string.
+   *
+   * Before this field existed, `scope/runIdentity.ts` refused every state with a rule in it — *"no
+   * selection or submission carries a rule list"* — so the whole of § 11's workshop produced
+   * dispatchers that were unpostable by construction. That refusal was correct and is gone because
+   * the fact it rested on is.
+   */
+  readonly ruleRows?: readonly RuleRowConfig[] | undefined;
+  /**
+   * The run record's intervention log — `ENGINE_CONTRACT.md` § 1.4's `{ seed, config,
+   * interventions[] }`, in press order.
+   *
+   * § 1.4 clause 2 is *replay verification*: *"The server re-simulates the record, log included, and
+   * refuses a submission whose metrics do not reproduce."* This field is what the log travels in;
+   * without it the server replayed the seed **without** the log, got different legs, and refused an
+   * honest run as `metrics-do-not-reproduce` — spending this product's one accusation on a player
+   * who did nothing wrong.
+   *
+   * **Two of the three kinds are refused here and the reason is not the same for both**, which is
+   * why {@link SUBMITTABLE_INTERVENTION_KINDS} names the one that travels rather than a list of
+   * exclusions:
+   *
+   * - `switch-dispatcher` carries a whole `DispatcherProfile` **inline**, which is this module's
+   *   founding rule violated exactly: a vector a player supplies, run on a board keyed by a
+   *   dispatcher they only started under. It could only ever travel as a *shipped profile id*
+   *   resolved against this server's `data/`, and that is a different field from the one the viewer
+   *   needs locally (its driving profile is routinely a derived object no id resolves).
+   * - `answer-incident` answers a **campaign incident**, and the incident is not on the wire.
+   *   `viz`'s `shift/incidents.ts` writes it onto the building as `serviceEvents` from the week's
+   *   day and the calendar; a replay built from ids alone has no incident to answer, so the answer's
+   *   `serviceEvents` would be the only mode changes in the run and the legs would differ. It is a
+   *   missing *cause*, not a missing field, and carrying the answer without it would be worse than
+   *   refusing it.
+   *
+   * `park-cars-lobby` carries nothing but its instant, and travels.
+   *
+   * Absent and `[]` are the same run, byte for byte — `core` pins that with a fingerprint
+   * (`sim/interventions.test.ts`), and `runDataHashOf` drops the key.
+   */
+  readonly interventions?: readonly RunInterventionConfig[] | undefined;
 }
 
 /** The metrics a player claims. Every one is re-derived by the server and compared. */
@@ -89,7 +166,7 @@ export interface Submission {
 }
 
 /* -------------------------------------------------------------------------- *
- * The board identity
+ * What a row was measured against
  * -------------------------------------------------------------------------- */
 
 /**
@@ -110,55 +187,25 @@ export interface ResolvedDataFacts {
    *
    * `TRAFFIC_DEFAULTS.trafficModel` names *which simulator* produced a number, the way a file
    * format version names which writer produced a file. A `v1` score and a `v2` score are not
-   * comparable however identical the rest of the configuration is, so the version is part of the
-   * board's identity rather than a footnote on it.
+   * comparable however identical the rest of the configuration is, so the version is part of what a
+   * row was measured against rather than a footnote on it.
    */
   readonly trafficModel: string;
 }
 
-/**
- * The board a submission belongs to: a digest over what it measured, **not** over who ran it or
- * what they scored.
+/*
+ * `configHashOf` used to be here, and its absence is the record of a decision rather than a
+ * deletion.
  *
- * Two runs share a board exactly when every input that could move the result is the same. The seed
- * is deliberately **not** in it — a board is a leaderboard across seeds, and hashing the seed would
- * give every player a private board of one.
+ * It answered two questions with one value — *what data was this measured against* and *which board
+ * is this row on* — and `ENGINE_CONTRACT.md` § 12.1 forbids the second answer in as many words,
+ * because a digest of the building, the dispatcher, the template, the rate and the run length is a
+ * board key made entirely of player-settable parameters. The first answer is right and is kept, bit
+ * for bit, as `boardKey.ts#runDataHashOf`; the second is `boardKey.ts#placeSubmission`'s.
  *
- * The digest is over a canonical JSON string with sorted keys, so a field reordered in a record does
- * not silently fork a board.
- *
- * ## Why the window is `undefined` when absent rather than `null`
- *
- * Two runs of one seed over two parts of a day are **different runs** and belong on different
- * boards, so `windowStartS` has to be in here. But writing it as `null` for a whole-period run
- * would put a key in the canonical string that was never there before and **fork every board that
- * already exists** — every honest score posted before the window field, moved to a new board for a
- * selection its player did not make.
- *
- * `canonicalJson` drops `undefined` entries, so a whole-period run digests to **exactly** the string
- * it digested before this field existed, and a windowed run gets its own board. That is the same
- * argument the module makes at the top, applied to itself: a change that does not alter what a run
- * measured must not move the board it is on.
- *
- * `0` is a window and is not dropped — `windowStartS: 0` means *starts at the top of the day*,
- * which is a selection, and `?? undefined` distinguishes it from `null` correctly where `|| undefined`
- * would not.
+ * Left as a comment rather than deleted because a reader looking for *why is there no config board
+ * any more* should find the answer where the function used to be, not in a commit.
  */
-export function configHashOf(run: SubmittedRun, facts: ResolvedDataFacts): string {
-  const canonical = canonicalJson({
-    buildingId: run.buildingId,
-    dispatcherProfileId: run.dispatcherProfileId,
-    demandTemplateId: run.demandTemplateId,
-    arrivalRatePctPop5min: run.arrivalRatePctPop5min,
-    durationS: run.durationS,
-    windowStartS: run.windowStartS ?? undefined,
-    buildingDigest: facts.buildingDigest,
-    dispatcherDigest: facts.dispatcherDigest,
-    templateDigest: facts.templateDigest,
-    trafficModel: facts.trafficModel,
-  });
-  return createHash('sha256').update(canonical).digest('hex').slice(0, 32);
-}
 
 /**
  * JSON with object keys in sorted order, recursively.
@@ -301,5 +348,133 @@ export function submissionIssues(submission: Submission): readonly string[] {
   }
   if (typeof claimed.awtIsValid !== 'boolean') issues.push('awtIsValid must be a boolean');
 
+  issues.push(...ruleRowIssues(run.ruleRows));
+  issues.push(...interventionIssues(run.interventions));
+
   return Object.freeze(issues);
+}
+
+/* -------------------------------------------------------------------------- *
+ * The two Everyday fields, bounded before anything simulates
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The most rule rows a submission may carry.
+ *
+ * The editor offers a list a player builds a row at a time and § 11.5 puts no ceiling on it, so the
+ * ceiling is here for {@link submissionIssues}' own stated reason rather than as a game rule: an
+ * unauthenticated shape error must not be able to command server CPU, and every row is a clause
+ * `resolveRuleArms` evaluates on **every dispatch decision**. Sixteen is comfortably above anything
+ * the § 11.5 vocabulary can express without repeating itself — nine conditions, eight actions — and
+ * far below a list that would cost a measurable fraction of a replay.
+ *
+ * Recorded here rather than in `DECISIONS.md`, under § D405: the constant is local to this module
+ * and refuses by name, so the docstring is the record.
+ */
+const MAX_RULE_ROWS = 16;
+
+/**
+ * The most interventions a submission may carry.
+ *
+ * A run is re-simulated whole from t = 0 on every one (§ 1.4), so on the *client* the log's length
+ * costs a player their own time; on the server it costs nothing per entry, because the replay is one
+ * simulation whatever the log holds. The bound is therefore about the wire rather than about the
+ * CPU: a log longer than this is not a day somebody played, and refusing it by name is cheaper than
+ * storing it.
+ */
+const MAX_INTERVENTIONS = 64;
+
+/**
+ * The intervention kinds a submission may carry — the **allow-list**, not a list of exclusions.
+ *
+ * Written this way round on `core`'s own precedent for `INTERVENTION_KINDS`: a kind added tomorrow
+ * is refused here until somebody decides it can travel, where a deny-list would let it through
+ * silently and the first symptom would be an honest player accused of a forgery.
+ * {@link SubmittedRun.interventions} carries the reason each of the other two is out.
+ */
+export const SUBMITTABLE_INTERVENTION_KINDS: readonly string[] = Object.freeze(['park-cars-lobby']);
+
+/** Everything structurally wrong with a submitted rule list, or nothing. */
+function ruleRowIssues(rows: readonly RuleRowConfig[] | undefined): readonly string[] {
+  if (rows === undefined) return [];
+  if (!Array.isArray(rows)) return ['ruleRows must be an array'];
+  if (rows.length > MAX_RULE_ROWS) return [`ruleRows must hold at most ${MAX_RULE_ROWS} rows`];
+  const issues: string[] = [];
+  for (const [index, row] of rows.entries()) {
+    if (typeof row !== 'object' || row === null) {
+      issues.push(`ruleRows[${index}] must be an object`);
+      continue;
+    }
+    /*
+     * Both halves of a row are checked against `core`'s **own** vocabulary tables rather than
+     * against a copy — `RULE_CONDITION_WORDS` and `RULE_ACTION_WORDS` are keyed by the declared id
+     * and carry the admissible `values`, so this refuses exactly what `resolveDispatchConfig` would
+     * refuse and cannot drift from it. The check is here as well as there for `submissionIssues`'
+     * one job: an out-of-vocabulary row would otherwise reach the kernel and be refused by a thrown
+     * `TrafficError` *after* the run was set up, which is a simulation an unauthenticated caller
+     * commanded.
+     */
+    const condition = RULE_CONDITION_WORDS[row.when as RuleConditionId] as
+      | { readonly values?: readonly { readonly value: number | string }[] | undefined }
+      | undefined;
+    if (condition === undefined) {
+      issues.push(`ruleRows[${index}].when "${String(row.when)}" is not a declared rule condition`);
+    } else if (!valueIsDeclared(condition.values, row.whenValue)) {
+      issues.push(`ruleRows[${index}].whenValue is not one of the values "${String(row.when)}" declares`);
+    }
+    const action = RULE_ACTION_WORDS[row.then as RuleActionId] as
+      | { readonly values?: readonly { readonly value: number | string }[] | undefined }
+      | undefined;
+    if (action === undefined) {
+      issues.push(`ruleRows[${index}].then "${String(row.then)}" is not a declared rule action`);
+    } else if (!valueIsDeclared(action.values, row.thenValue)) {
+      issues.push(`ruleRows[${index}].thenValue is not one of the values "${String(row.then)}" declares`);
+    }
+  }
+  return issues;
+}
+
+/**
+ * Whether a row's value is one the vocabulary declares.
+ *
+ * A valueless id declares no `values`, and for one the only admissible value is **absent** — a
+ * number beside `a shaft is out of service` is a row that means nothing, and accepting it would let
+ * two different submissions digest differently while describing the same run.
+ */
+function valueIsDeclared(
+  values: readonly { readonly value: number | string }[] | undefined,
+  value: unknown,
+): boolean {
+  if (values === undefined) return value === undefined;
+  return values.some((option) => option.value === value);
+}
+
+/** Everything structurally wrong with a submitted intervention log, or nothing. */
+function interventionIssues(log: readonly RunInterventionConfig[] | undefined): readonly string[] {
+  if (log === undefined) return [];
+  if (!Array.isArray(log)) return ['interventions must be an array'];
+  if (log.length > MAX_INTERVENTIONS) {
+    return [`interventions must hold at most ${MAX_INTERVENTIONS} entries`];
+  }
+  const issues: string[] = [];
+  for (const [index, entry] of log.entries()) {
+    if (typeof entry !== 'object' || entry === null) {
+      issues.push(`interventions[${index}] must be an object`);
+      continue;
+    }
+    if (!Number.isFinite(entry.atS) || entry.atS < 0) {
+      issues.push(`interventions[${index}].atS must be a non-negative number of simulated seconds`);
+    }
+    const kind = (entry.change as { readonly kind?: unknown } | undefined)?.kind;
+    if (typeof kind !== 'string' || !isInterventionKind(kind)) {
+      issues.push(`interventions[${index}].change.kind "${String(kind)}" is not a declared intervention kind`);
+    } else if (!SUBMITTABLE_INTERVENTION_KINDS.includes(kind)) {
+      issues.push(
+        `interventions[${index}] is a "${kind}", which a submission may not carry — ` +
+          `only ${SUBMITTABLE_INTERVENTION_KINDS.join(', ')} travels, because the others carry a ` +
+          'dispatcher inline or answer an incident this server has no record of',
+      );
+    }
+  }
+  return issues;
 }

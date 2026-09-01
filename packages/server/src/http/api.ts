@@ -46,10 +46,12 @@
  *
  * ## Two boards, and they answer different questions
  *
- * `/api/board` is the **configuration** board of § D214 § 4: one configuration — dispatcher
- * included — across seeds. It is a real thing and it is not the product's answer to *"who is best
- * at this"*, because the dispatcher is in its key, so choosing a different one moves a player to a
- * different board rather than up the one they are on.
+ * `/api/board` is `ENGINE_CONTRACT.md` § 12.1's pair: the **daily board**, keyed by the date and
+ * carrying everybody who ran the day's fixture, and a **personal-record log** per player for
+ * everything else. It used to be the configuration board of § D214 § 4 — one configuration,
+ * dispatcher included, across seeds — and that key is the one § 12.1 forbids by name, because every
+ * axis in it is a parameter a player sets. `leaderboard/boardKey.ts` is where the digest was split
+ * from the key and where the argument lives.
  *
  * `/api/challenge-board` is § D218's answer instead: a **fixed seed set**, the dispatcher left
  * free, and a row that is a mean over the whole set with the count it was computed over. Everything
@@ -88,7 +90,8 @@ import {
 } from '../challenge/submission.js';
 import { verifyChallengeSubmission } from '../challenge/verify.js';
 import { signInMessage, type Mailer } from '../mail/mailer.js';
-import { configHashOf, submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
+import { BOARD_KEYS, dailyFixtureAt, placeSubmission, runDataHashOf } from '../leaderboard/boardKey.js';
+import { submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
 import {
   BOARD_METRICS,
@@ -324,7 +327,21 @@ export function createApi(deps: ApiDeps): Api {
       case 'POST /api/scores':
         return submit(deps, request, nextSubmitMs);
       case 'GET /api/boards':
-        return { status: 200, body: { boards: await deps.store.boards() } };
+        /*
+         * The boards that have entries, and **the kinds of board this build has at all**.
+         *
+         * The second half is § 12.2's requirement rather than a courtesy. A client drawing a board
+         * list has to distinguish *"no scores have been posted yet"* from *"this product has no
+         * route that could produce one"*, and only the server knows which — `BOARD_KEYS` is the
+         * contract's own table with the route naming column, so the ladder arrives labelled as a
+         * key with no route instead of arriving as an absence a client has to explain for itself.
+         * `menu/client.ts#AccountSummary` makes the same argument about a generated display name:
+         * a fact the server holds is put on the wire rather than inferred from a shape.
+         */
+        return {
+          status: 200,
+          body: { boards: await deps.store.boards(), kinds: BOARD_KEYS, today: dailyFixtureAt(deps.now()) },
+        };
       case 'GET /api/board':
         return board(deps, request);
       case 'GET /api/challenges':
@@ -765,11 +782,19 @@ async function submit(
     return { status: 422, body: { error: verification.code, detail: verification.detail } };
   }
 
-  const configHash = configHashOf(submission.run, facts);
+  /*
+   * Two values, two jobs — `ENGINE_CONTRACT.md` § 12.1 and `leaderboard/boardKey.ts`. The placement
+   * says which board; the data hash says what the row was measured against. The board is decided
+   * against **this server's** fixture on **this server's** clock, so a client cannot choose which
+   * leaderboard it lands on any more than it can choose which challenge is open (§ D218 § 3).
+   */
+  const placement = placeSubmission(submission.run, user.id, dailyFixtureAt(deps.now()));
+  const dataHash = runDataHashOf(submission.run, facts);
   let entry: EntryRow;
   try {
     entry = await deps.store.recordEntry({
-      configHash,
+      boardKey: placement.key,
+      dataHash,
       userId: user.id,
       run: submission.run,
       // The **server's** figures. The claim is compared and then discarded; it is never what ranks.
@@ -779,13 +804,23 @@ async function submit(
     if (error instanceof NoSuchUserError) return accountVanished();
     throw error;
   }
-  return { status: 201, body: { configHash, entry: publicEntry(entry) } };
+  /*
+   * The key names where it landed and `placement` says what kind of place that is, because *"your
+   * run is in your own log"* and *"your run is on today's board"* are different outcomes and a
+   * client that had to infer which from a key's prefix would be a second place deciding what a board
+   * key looks like — `menu/client.ts#AccountSummary` makes the same argument about a generated
+   * display name.
+   */
+  return {
+    status: 201,
+    body: { boardKey: placement.key, placement: placement.kind, entry: publicEntry(entry) },
+  };
 }
 
 async function board(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
-  const configHash = request.query.get('configHash') ?? '';
-  if (configHash.length === 0) {
-    return { status: 400, body: { error: 'no-board', detail: 'Name a board with ?configHash=…' } };
+  const boardKey = request.query.get('board') ?? '';
+  if (boardKey.length === 0) {
+    return { status: 400, body: { error: 'no-board', detail: 'Name a board with ?board=…' } };
   }
   const asked = request.query.get('metric') ?? 'awtS';
   if (!BOARD_METRICS.includes(asked as BoardMetric)) {
@@ -795,11 +830,11 @@ async function board(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
     };
   }
   const limit = Math.min(Math.max(Number(request.query.get('limit') ?? '25') || 25, 1), 100);
-  const entries = await deps.store.board(configHash, asked as BoardMetric, limit);
+  const entries = await deps.store.board(boardKey, asked as BoardMetric, limit);
   return {
     status: 200,
     body: {
-      configHash,
+      boardKey,
       metric: asked,
       // Said on the wire, not only in a docstring. A client that ranked on one column and drew the
       // others would otherwise have no way to say which one the order came from.
@@ -1170,11 +1205,22 @@ function publicUser(user: UserRow): Record<string, unknown> {
   };
 }
 
+/**
+ * One row, as a reader may see it.
+ *
+ * `dataHash` is on the projection and `boardKey` is not, and the asymmetry is the § 12.1 split
+ * restated: the board is a property of the *request* — a client asked for `?board=…` and got rows —
+ * so repeating it on every row would be the answer telling the question back. What data a row was
+ * measured against is a property of the **row**, differs between rows on one board (the daily
+ * board's rows differ by dispatcher, the personal log's by configuration), and is the only thing a
+ * reader can use to tell *"this is the same measurement as mine"* from *"this is a different one"*.
+ */
 function publicEntry(entry: EntryRow): Record<string, unknown> {
   return {
     id: entry.id,
     displayName: entry.displayName,
     run: entry.run,
+    dataHash: entry.dataHash,
     measured: entry.measured,
     submittedAtMs: entry.submittedAtMs,
   };
