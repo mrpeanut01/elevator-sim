@@ -673,6 +673,14 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     const handTo = other.find((value) => value !== standing) ?? '';
     expect(handTo).not.toBe('');
 
+    /*
+     * Dead first, and this half is the one that would go quietly missing. On a cold load the picker
+     * names the dispatcher the day is already running, so the model refuses the press — and a button
+     * that arrived enabled would mean that refusal never reached the DOM.
+     */
+    expect(await page.getAttribute(SWITCH, 'disabled')).not.toBe(null);
+    expect(await page.getAttribute(SWITCH, 'title')).toContain('already running');
+
     await page.selectOption('.everyday-stage-switch-pick', handTo);
     await page.waitForFunction(
       (selector) => document.querySelector(selector)?.hasAttribute('disabled') === false,
