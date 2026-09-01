@@ -1964,16 +1964,24 @@ re-drive is owed in the drive phase.)*
 
 **Named limits on clause 1, in the same breath as the verdict.** The sweep's `mode` axis has **one
 value** — it plugs in at a tuple in `packages/viz/src/honesty/types.ts`, and the corpus assertion
-tightens automatically when it does. The three DOM panels are **statically swept rather than
-driven**, so a sentence assembled at runtime there is invisible to the search. The access block's
+tightens automatically when it does. The **33 statically swept DOM entry points** are **not
+driven**, so a sentence assembled at runtime there is invisible to the search — **17** mounts and
+**16** screen-registry rows, whose pure halves *are* driven, so what goes unswept in both groups is
+only what the entry point authors inline. **That figure is derived by
+`packages/viz/src/honesty/derive.test.ts` rather than transcribed here**, and this verdict published
+*three* from wave 12 until [§ D421](../DECISIONS.md) measured it: a named gap is part of the
+verdict, so a count inside one that nothing re-derives is a verdict going stale by itself. The
+access block's
 labels, tooltips and legend, and the elevation express toggle's two strings, are **not seeded** into
 `packages/viz/src/honesty/surfaces.ts` and are therefore outside R1–R13. Two rows with one cause:
 `surfaces.ts` is a chokepoint every editor lane hits and no editor lane owns. All four are in
 [`GAPS.md`](../GAPS.md). *(Wave 12, [§ D194](../DECISIONS.md): the `mode` axis now has two values —
 and the second produced **zero new strings**, a measured null, because no shipped adapter branches
 on case mode — and the express-toggle strings and the access block are seeded, as seeds rather than
-`covers` entries because their producers are deliberately prose-free. The three DOM panels remain
-statically swept — that limit stands.)*
+`covers` entries because their producers are deliberately prose-free. The statically swept DOM
+entry points remain undriven — that limit stands, and only the count moved: this sentence said
+~~three DOM panels~~ until [§ D421](../DECISIONS.md), which is the paragraph above rather than a
+second claim.)*
 
 **Named limits on clause 2.** Two of [§ D168](../DECISIONS.md)'s four are **closed** — Basic can now
 shorten a suppression reason, because `core` carries the ground beside the prose
