@@ -22,7 +22,8 @@ import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { towerById, type CampaignTower } from '../campaign/career.js';
-import { clearedDays, purseOf } from '../campaign/economy.js';
+import { clearedDays, purseOf, type ShopCategoryId } from '../campaign/economy.js';
+import { AS_BUILT } from '../campaign/fitOut.js';
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
 import { shiftGoalsOf } from '../dev/leftRail.js';
@@ -30,6 +31,7 @@ import {
   initialState,
   profileById,
   shiftLengthForContract,
+  shiftRunConfigOf,
   type ViewerState,
 } from '../dev/state.js';
 import { DATA_DIR, fixtureConfig } from '../fixtures.test-helper.js';
@@ -736,6 +738,77 @@ describe('filing the campaign day — issue #223', () => {
     standard.closeDay();
     expect(towerOf(standard).difficultyId).toBe('standard');
     expect(towerOf(standard).missed).toBe(1);
+  });
+
+  /* ------------------------------------------------------------------------ *
+   * GitHub issue #181 — the press, and the legs it produces
+   * ------------------------------------------------------------------------ */
+
+  /**
+   * **The end-to-end half of § D177's rule, driven through the product's own press.**
+   *
+   * `campaign/fitOut.test.ts` proves each tier on the legs from a hand-built state. That is the
+   * seam; this is the **path** — buy a tier through `campaignAct`, press *Lock it in and run day N*
+   * through `runCampaignDay`, and require the run built from the state that press left behind to
+   * have different legs. A seam that is proved and a path that never reaches it is precisely the
+   * defect issue #181 is about, and the two halves cannot substitute for each other.
+   */
+  describe('what the tower has bought reaches the run — issue #181', () => {
+    /** The legs a state produces, built by `shiftRunConfigOf` exactly as `runShift` builds one. */
+    const legsOf = (state: ViewerState): string => {
+      const plan = shiftRunConfigOf(resources, state);
+      return JSON.stringify(
+        recordRun(plan.config, {
+          recordDecisions: false,
+          outOfServiceCarIds: plan.outOfServiceCarIds,
+        }).recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1]),
+      );
+    };
+
+    /** Press *buy this tier*, then *Lock it in and run day N*, and hand back what the press left. */
+    function pressed(buy: { readonly categoryId: ShopCategoryId; readonly level: number } | undefined): ViewerState {
+      const h = campaignHarness(undefined);
+      const host = createEverydayHost(h.bindings);
+      if (buy !== undefined) {
+        // § 8.4's two-step buy, through the reducer the screens press — never by writing `fitted`
+        // onto the record, which would prove the fold and nothing about the shop. A zero-night tier
+        // is fitted on the first press, which is why the second is only sent when there is one.
+        host.campaignAct({ kind: 'press-tier', towerId: 'c1', ...buy });
+        if (host.campaign().pendingBooking !== undefined) {
+          host.campaignAct({ kind: 'pick-start', startIdx: 0 });
+        }
+      }
+      host.runCampaignDay('c1');
+      return h.state;
+    }
+
+    it('writes the kit the tower is running, and nothing when nothing is bought', () => {
+      expect(pressed(undefined).campaignFitOut).toEqual(AS_BUILT);
+      expect(pressed({ categoryId: 'doors', level: 1 }).campaignFitOut?.doorSecondsSaved).toBe(1);
+    });
+
+    it('changes the legs of the day — a bought tier and an unbought one are two runs', () => {
+      // `doors` L1 books zero nights, so it is live on the day it is bought and the press that runs
+      // day 1 runs it. A tier with nights would need the days walking forward first, which is
+      // `fitOut.test.ts`'s booking case.
+      expect(legsOf(pressed({ categoryId: 'doors', level: 1 }))).not.toBe(legsOf(pressed(undefined)));
+    });
+
+    it('does not follow the player out to Today’s tower', () => {
+      /*
+       * The cross-flow case, on the latch's own ground one field over: run a campaign day, leave for
+       * § 6's day, and the week's building must not be running another contract's doors. Worse than
+       * a stale latch, which decides what a day is *filed* against — this decides what the day *is*.
+       */
+      const h = campaignHarness(undefined);
+      const host = createEverydayHost(h.bindings);
+      host.campaignAct({ kind: 'press-tier', towerId: 'c1', categoryId: 'doors', level: 1 });
+      host.runCampaignDay('c1');
+      expect(h.state.campaignFitOut).not.toEqual(AS_BUILT);
+
+      host.startRun();
+      expect(h.state.campaignFitOut).toBeUndefined();
+    });
   });
 
   it('files nothing for a day Today’s tower started', () => {

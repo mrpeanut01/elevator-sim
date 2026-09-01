@@ -93,6 +93,13 @@ import {
   type CalendarAskInput,
   type CalendarPeriod,
 } from '../shift/calendar.js';
+import {
+  fittedArrivalRate,
+  fittedBuilding,
+  leversWithKit,
+  profileWithKit,
+  type CampaignFitOut,
+} from '../campaign/fitOut.js';
 import { commissionedBuilding } from '../commissioning/building.js';
 import {
   RETROFIT_CONSTRAINT_ID,
@@ -369,6 +376,28 @@ export interface ViewerState {
    * the shift week with a different title. The fabric is chosen, and then you live with it.
    */
   readonly commissioning: CommissioningChoices;
+  /**
+   * The kit § 8's campaign tower has bought and had fitted, or `undefined` outside a campaign day.
+   *
+   * ## Why this is a field rather than something `runCampaignDay` could write into the fields above
+   *
+   * Because it is not expressible in them. A shop tier moves shafts *and* door timings *and* a
+   * rated load *and* an arrival rate *and* a floor's population *and* the landing call type, and
+   * `viewer.commissioning` is deliberately three dimensions (`commissioning/types.ts` argues why a
+   * fourth would be a control with nothing behind it). Splitting one purchase across five writes
+   * would also lose the property that makes this checkable: **one field, one probe, one
+   * assertion** — `scope/scope.test.ts` moves it and requires the legs to differ, which is the
+   * standing requirement GitHub issue #181 exists for.
+   *
+   * `undefined` and `campaign/fitOut.ts#AS_BUILT` mean the same thing and every applier returns its
+   * input by object identity at both, so a tower with nothing bought runs the day it ran before this
+   * field existed. That is asserted on the legs rather than promised here.
+   *
+   * Written by `everyday/host.ts#runCampaignDay` and by nothing else — a setter would be a control
+   * that changed the fabric without running the day the fabric belongs to, which is the same
+   * argument that method's own docstring makes about the building and the dispatcher.
+   */
+  readonly campaignFitOut: CampaignFitOut | undefined;
   /**
    * Which capital constraint the fabric is judged against — *retrofit*, *refurbishment*, *new build*.
    *
@@ -1035,6 +1064,10 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     playMode: 'shift-week',
     calendar: null,
     commissioning: [],
+    // No campaign day has been pressed, so there is no tower whose kit this would be. `undefined`
+    // rather than `AS_BUILT` because the two are the same run and only one of them is a statement
+    // that a campaign is in progress.
+    campaignFitOut: undefined,
     // Retrofit: the fabric is what the building already has. The opening position is the one that
     // takes nothing away and adds nothing — a player has not asked to rebuild anything yet.
     commissioningConstraintId: RETROFIT_CONSTRAINT_ID,
@@ -1172,16 +1205,28 @@ export function drivingProfileOf(
   state: ViewerState,
 ): DispatcherProfile {
   const base = profileById(resources, state.savedDispatchers, state.dispatcherId);
-  return profileWithRules(
-    profileWithSelector(
-      profileFromSpec(specFromProfile(base, base.name), {
-        id: base.id,
-        base,
-        levers: state.levers,
-      }),
-      state.selectorSpec,
+  /*
+   * § 8's kit joins the chain at both ends and neither placement is free.
+   *
+   * `leversWithKit` goes **in** at the bottom, because *zone the tower* is the express lever and
+   * `profileFromSpec` already owns what that lever means; a second expression of it here would be
+   * the answer that drifts. `profileWithKit` goes **on** at the top, because a destination panel is
+   * hardware in the lobby and a rule list is a preference — a preference may not un-install
+   * hardware. Both are the identity when nothing is bought.
+   */
+  return profileWithKit(
+    profileWithRules(
+      profileWithSelector(
+        profileFromSpec(specFromProfile(base, base.name), {
+          id: base.id,
+          base,
+          levers: leversWithKit(state.levers, state.campaignFitOut),
+        }),
+        state.selectorSpec,
+      ),
+      state.ruleRows,
     ),
-    state.ruleRows,
+    state.campaignFitOut,
   );
 }
 
@@ -1386,7 +1431,22 @@ export function shiftRunConfigOf(
    * the screen gates with `reviewCommissioning`, and a run is never unloadable.
    */
   const classes = commissionableClasses(specs);
-  const fabric = commissionedBuilding(authored, state.commissioning, classes);
+  const commissioned = commissionedBuilding(authored, state.commissioning, classes);
+
+  /*
+   * 2c — § 8's kit, **after commissioning and before growth**, on 2b's own two arguments.
+   *
+   * After commissioning because it is the same kind of edit and the two must compose in one
+   * direction only: `fittedBuilding` grows shafts through `commissionedBuilding` itself, so a
+   * fit-out applied first would be re-derived from a bank the player's own choices had already
+   * moved. Before growth for 2b's reason exactly — the fabric is decided before the week opens, and
+   * growth is a thing that happens to the fabric.
+   *
+   * Identity at *nothing bought*, so a state with no campaign day on it is byte-identical to the
+   * state before this line existed. `campaign/fitOut.ts` holds that contract and the leg-level test
+   * for it.
+   */
+  const fabric = fittedBuilding(commissioned, state.campaignFitOut, specs);
 
   // 1 — grown to the day, then the dwell lever written onto the cars, then re-parsed so a grown
   // building is validated like any other.
@@ -1436,10 +1496,33 @@ export function shiftRunConfigOf(
   const askInput = calendarAskInputOf(resources, state, authored);
   const demandTemplate = askInput.demandTemplateId as typeof pattern.demandTemplate;
   const rate = state.freePlay?.arrivalRatePctPop5min;
-  const demand =
+  const asked =
     rate === undefined || rate === null
       ? pattern.demand
       : { ...pattern.demand, arrivalRatePctPop5min: rate };
+  /*
+   * § 8's `tenants` tier, applied to the rate the day would otherwise have run at.
+   *
+   * Two writes rather than one, because a rate can arrive here from two places and only one of them
+   * is on `demand`: `baseOf` falls back to the **building's own traffic profile** when the pattern
+   * asked for nothing, which is the campaign's own case, so a factor written onto `demand` alone
+   * would flatten a number that is not there. `fitBase` is what the day's event multiplies (a fire
+   * drill is five times a staggered morning, not the other way round) and `demand` is what runs when
+   * there is no event.
+   *
+   * Both are the identity at *nothing bought*: `fittedArrivalRate` returns its input at factor 1 and
+   * the spread is skipped, so `demand` is `asked` by object identity.
+   */
+  const askedBase = baseOf(resources, authored, asked);
+  const fitBase =
+    state.campaignFitOut === undefined || state.campaignFitOut.arrivalRateFactor === 1
+      ? askedBase
+      : {
+          ...askedBase,
+          ratePctPop5min: fittedArrivalRate(askedBase.ratePctPop5min, state.campaignFitOut),
+        };
+  const demand =
+    fitBase === askedBase ? asked : { ...asked, arrivalRatePctPop5min: fitBase.ratePctPop5min };
   /*
    * Mean group size is not a `demand` option — it lives on the traffic profile, so a pattern that
    * moved it widens the file the run resolves against. See `patternSpec.ts`'s
@@ -1452,7 +1535,7 @@ export function shiftRunConfigOf(
   const patch = shiftRunPatch({
     event,
     building,
-    base: baseOf(resources, authored, demand),
+    base: fitBase,
     templateVariesMix: demandTemplate === 'lunch-two-way',
   });
 
@@ -1486,7 +1569,9 @@ export function shiftRunConfigOf(
   const calendar = calendarPatch({
     day: calendarDay,
     building: grown,
-    split: patch.demand.directionalSplit ?? baseOf(resources, authored, demand).split,
+    // `fitBase.split` is `baseOf`'s own answer — the kit moves the rate and never the mix — and it
+    // is read from the same object the patch above was built from rather than derived a second time.
+    split: patch.demand.directionalSplit ?? fitBase.split,
     ...askInput,
     event,
     playerHeldCarIds: state.outOfServiceCarIds,

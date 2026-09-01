@@ -124,6 +124,7 @@ import {
   specFromProfile as selectorSpecFromProfile,
   selectorContextFrom,
 } from '../authoring/selectorSpec.js';
+import { fitOutIsAsBuilt } from '../campaign/fitOut.js';
 import { commissionedBuilding } from '../commissioning/building.js';
 import { commissionableClasses } from '../commissioning/types.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -300,6 +301,33 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
     state.savedClasses.length === 0
       ? undefined
       : 'a saved machine class widens the specs this building resolves against, and only this browser has it',
+
+  /**
+   * § 8's fitted kit — `viewer.commissioning`'s exact footing, one product over.
+   *
+   * **Asked as *is this the identity?* rather than *is the field set?***, and that is the fabric
+   * arm's distinction rather than a copy of its words: `campaign/fitOut.ts#AS_BUILT` is what a tower
+   * with nothing bought folds to, every applier returns its input by object identity at it, and a
+   * state carrying it runs the day it would have run before the field existed. Refusing on
+   * `!== undefined` would refuse a campaign day on which nothing has been bought — a run the
+   * artefacts reproduce perfectly.
+   *
+   * `fitOutIsAsBuilt` is the shipped decision and is compared field by field rather than by object
+   * identity, because a fit-out reaches the run over a structured clone; asking `=== AS_BUILT` here
+   * would be a restatement that is false on the worker's side of the seam.
+   *
+   * The refusal itself is `commissioning`'s, for the same reason: a submission of ids carries no
+   * fabric, so a replay would run the building `data/buildings/` ships — and here it would also run
+   * the dispatcher `data/dispatcher-profiles.json` ships, since the kit writes a call type and a
+   * ride-time floor over whichever profile is driving.
+   */
+  campaignFitOut: (state) =>
+    fitOutIsAsBuilt(state.campaignFitOut)
+      ? undefined
+      : 'this is a § 8 campaign day and the tower has kit fitted — shafts, machines, car size, ' +
+        'doors, a landing panel or a tenant negotiation — and neither a selection nor a submission ' +
+        'carries any of it, so this run would be replayed against the building and the dispatcher ' +
+        'the data ships',
 
   /**
    * The patience curve — the field the UI readiness audit's B4 made reachable.
