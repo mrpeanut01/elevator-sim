@@ -307,6 +307,12 @@ describe('the search is alive — the five false-negative shapes, hunted in the 
      * so the sentence is asserted rather than trusted.
      */
     for (const kit of HONESTY_KITS) {
+      /*
+       * Each kit says why it and not another, the way `WITHHELD_REASONS` names a seam in this tree:
+       * the choice is a survey over `measure.fitOut.test.ts`'s table, and a kit swapped for one
+       * nobody measured would arrive with the previous kit's sentence still attached.
+       */
+      expect(kit.why.length, kit.id).toBeGreaterThan(40);
       const fit = fitOutForCase(kit.id);
       expect(fit, kit.id).toBeDefined();
       expect(fit?.arrivalRateFactor, `${kit.id} buys a demand factor this corpus cannot apply`).toBe(1);

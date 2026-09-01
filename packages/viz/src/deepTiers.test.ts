@@ -214,6 +214,24 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'describes a scheduled run on main and nothing a pull request can do',
     scheduled: true,
   },
+  'packages/viz/src/honesty/measure.fitOut.test.ts': {
+    gates: ['FITOUT_OUT'],
+    reason:
+      '§ D437’s survey — which of the sixteen § 8.2 shop tiers move this ' +
+      'corpus’s runs, and therefore which kit the fit-out axis may seed. A prose table over a ' +
+      'tree goes stale the way the corpus figures above do, and RISKS.md R38’s remedy is a ' +
+      'derivation rather than a pin, so it rides in the same job for the same reason',
+    scheduled: true,
+  },
+  'packages/viz/src/honesty/measure.fitOut.test.ts': {
+    gates: ['FITOUT_OUT'],
+    reason:
+      '\u00a7 D437\u2019s survey \u2014 which of the sixteen \u00a7 8.2 shop tiers move this corpus\u2019s runs, ' +
+      'and therefore which kit the fit-out axis may seed. A prose table over a tree goes stale the ' +
+      'way the corpus figures above do, and RISKS.md R38\u2019s remedy is a derivation rather than a ' +
+      'pin, so it rides in the same job for the same reason',
+    scheduled: true,
+  },
   /*
    * The one that must stay off, and the reason it is in this table rather than absent from it.
    *

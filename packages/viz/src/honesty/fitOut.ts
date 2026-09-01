@@ -23,9 +23,15 @@
  * surface lands — it is driven from that day rather than from the day somebody remembers to check
  * it. A single new case would be a screen the search reads once, on one building, at one horizon.
  *
- * This axis is **not** that null. It changes the run at every case it is drawn on, which is asserted
- * on the legs rather than argued — see {@link HONESTY_KITS} for which kit and why, and
- * `honesty.test.ts`'s *the fit-out axis moves the legs* case for the assertion.
+ * This axis is **not** that null. It changes the run at every **always-on** case it is drawn on,
+ * which is asserted on the legs rather than argued — see {@link HONESTY_KITS} for which kit and why,
+ * and `honesty.test.ts`'s *the fit-out axis moves the run* case for the assertion. Four deep-tier
+ * cases are fitted and inert, and each is a named cell rather than a failure: `crown-hotel` and
+ * `st-jude-hospital` have one mixed-fleet bank apiece, so `campaign/fitOut.ts#choicesFor` refuses to
+ * flatten it and the `machines` tier buys nothing there, and `chancery-house`'s six cars are
+ * **already** `gearless-traction` at 5 m/s — a tower that has what the tier sells. All three are
+ * stage buildings, reachable in no other tier, which is why the corpus-wide assertion is scoped to
+ * the tier the survey was taken on.
  *
  * ## Drawn last, so the pinned corpus keeps its meaning
  *
