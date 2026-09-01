@@ -51,7 +51,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { RunInterventionConfig } from '@elevator-sim/core/browser';
 
-import { profileById, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import { drivingProfileOf, profileById, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
 import { baseState, RESOURCES } from '../scope/probes.test-helper.js';
 import { stageInterventionsOf, STAGE_SWITCH_NO_CHANGE } from './stageScreenModel.js';
@@ -116,7 +116,12 @@ function handoverFrom(state: ViewerState, targetId: string, atS: number): RunInt
     hasRun: true,
     dayClosed: false,
     recomputing: false,
-    switchTo: { target, driving: () => profileById(RESOURCES, [], state.dispatcherId) },
+    /*
+     * `drivingProfileOf`, which is what `EverydayHost.drivingProfile` answers with and what
+     * `shiftRunConfigOf` builds the run through — not the base profile the id names. Using the base
+     * here would make this helper agree with the screen only while the player has moved nothing.
+     */
+    switchTo: { target, driving: () => drivingProfileOf(RESOURCES, state) },
   });
   const row = view.rows.find((entry) => entry.change.kind === 'switch-dispatcher');
   if (row === undefined) throw new Error('the stage model offered no handover row');
