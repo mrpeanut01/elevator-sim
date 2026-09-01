@@ -42,9 +42,10 @@
  *
  * ## What the preference reaches, and what it does not
  *
- * It reaches **machine specifications** — the rated speed of a car and the travel it makes — on the
- * three Everyday surfaces that print them: § 13.2's rating plate and the machine panel beside it on
- * the drawing board, the tuner's machine card (whose readout's own docstring says it is *"in the
+ * It reaches **machine specifications** — a car's rated speed, the travel it makes, and the band and
+ * maximum rise its machine class declares — on the three Everyday surfaces that print them: § 13.2's
+ * rating plate and the machine panel beside it on the drawing board (the class band, and the speed
+ * ladder's chip faces), the tuner's machine card (whose readout's own docstring says it is *"in the
  * units the plate uses"*, so the two could not be allowed to disagree), and the daily loop's
  * *Rated speed* fact.
  *
