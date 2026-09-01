@@ -195,6 +195,25 @@ export default defineConfig({
           testTimeout: 120_000,
           hookTimeout: 120_000,
           passWithNoTests: true,
+          /*
+           * **The tier serves the artifact players load, and this line is what makes that
+           * affordable** — GitHub issue #281, § D425.
+           *
+           * Until wave I, 32 of the tier's 33 files started a `vite dev` server while `dist-web/` is
+           * what ships. This global setup runs `vite build` **once**, before any file is collected;
+           * each file then serves that one output with `preview()` and keeps its own port. A build
+           * per file was measured and rejected — 4.5 s × 32 against 4.5 s × 1 for the same artifact.
+           *
+           * It is a `*.test-helper.ts` under `src/dev/` rather than a loose script beside
+           * `vite.config.ts` on purpose: that path is inside `packages/viz/tsconfig.json`'s
+           * `include`, so `npm run build` typechecks it, and `deadCode.test-helper.ts#isTest`
+           * classifies it honestly instead of reporting its exports as a dead seam.
+           *
+           * The build is skipped when there is no Chromium, because the tier is skipped then too.
+           * That is the one place the gate is read outside a test, and it is read from the module
+           * that owns it rather than from a second copy of `existsSync`.
+           */
+          globalSetup: ['./src/dev/browserTierSite.test-helper.ts'],
         },
       },
     ],

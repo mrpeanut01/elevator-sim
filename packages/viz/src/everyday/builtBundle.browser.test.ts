@@ -1,78 +1,90 @@
 /**
- * **The tier's one case that drives the artifact players actually load** — GitHub issue #281.
+ * **The tier drives the artifact players load, and this file is what says so** — GitHub issue #281,
+ * [`DECISIONS.md`](../../../../DECISIONS.md) § D425.
  *
  * ## Why this file exists
  *
- * Every other file in this tier starts `createServer` — Vite's **dev** server, serving modules from
- * source. The thing a player loads is `dist-web/`, produced by `npm run build:web` and served as
- * static files. They are different artifacts, and a real defect has already lived in the gap.
+ * Until wave I, 32 of the tier's 33 files started `createServer` — Vite's **dev** server, serving
+ * modules from source. The thing a player loads is `dist-web/`, produced by `npm run build:web` and
+ * served as static files. They are different artifacts, and a real defect had already lived in the
+ * gap: the Everyday shell did not reset scroll on navigation, **two cases were written to pin the
+ * fix and both were deleted for asserting nothing**, and the tier stayed green either way.
  *
- * The Everyday shell did not reset scroll on navigation. At `375×667` — the shortest viewport
- * `docs/31-support-matrix.md` § 1 tier 2 drives — the menu's third and fourth tiles are below the
- * fold, so a player scrolls to reach one, taps it, and arrives on the new screen still scrolled.
- * Measured on the deployed preview: offset **300** carried through, with the incoming heading
- * **272 px above the top of the viewport**.
+ * 29 files serve the built bundle now. This one is the file that keeps that true — it asserts what
+ * the served artifact **is**, so that every other file's green result means what it appears to mean.
+ * `browserTier.test.ts` asserts the same thing statically, from the tier's sources; this file
+ * asserts it from the wire, which is the half a static check cannot do.
  *
- * **Two cases were written to pin the fix and both were deleted for asserting nothing.** Removing
- * either half of `shell.ts#go`'s reset leaves the whole browser tier green against `vite dev`, on
- * the `rush` tile and the `fixit` tile alike. The tier could not express the claim, because the
- * claim is not true of the artifact it drives.
- *
- * The cause is `dev/dom.ts#reconcile`: it drops every child before inserting, so `scrollHeight`
- * collapses while the container is empty and the browser clamps `scrollTop` to `0` on the way
- * through. **That clamp is real and it is not reliable** — it depends on the incoming screen being
- * shorter than the offset, which `fixit` is not — so it saves the dev server and does not save the
- * bundle.
- *
- * That is [`RISKS.md`](../../../../RISKS.md) **R26** one level up from where R26 has been recorded
- * before: not a fixture standing in for a run, but a whole **build** standing in for the shipped
+ * That is [`RISKS.md`](../../../../RISKS.md) **R26** one level up from where R26 is usually
+ * recorded: not a fixture standing in for a run, but a whole **build** standing in for the shipped
  * one.
  *
- * ## What this file is not
+ * ## The scroll defect: what reproduced, and what did not
  *
- * It is **not** a second copy of the tier. `vite dev` is the right thing to drive for almost
- * everything — it is fast, it maps to source, and a bundle-only tier would be slow enough that
- * nobody ran it. This file exists so that the four claim families in
- * {@link BUILT_ARTIFACT_CLAIMS} have **somewhere** to be asserted against the shipped artifact.
+ * The reported defect — measured on the **deployed** preview at `375×667`, scripted — was an offset
+ * of **300** carried through a navigation, with the incoming heading **272 px above** the top of the
+ * viewport. Issue #281's third acceptance criterion asks for a case that fails when either half of
+ * `shell.ts#go`'s reset is removed.
  *
- * ## What this file does NOT do, and it is the half a reader must not assume
+ * **It does not reproduce here, and wave I measured *why* rather than only *that*.** Both artifacts
+ * were driven side by side, in one script, at `375×667`, with and without the region reset:
  *
- * **It does not make the scroll defect bite.** GitHub issue #281's third criterion asks for a case
- * that fails when either half of `shell.ts#go`'s reset is removed. Mutation-tested here: deleting
- * the `.everyday-screen` reset and re-running this file leaves it **3 of 3 green**. So this file
- * closes #281's first two criteria and **not** that one, and #281 stays open on it.
+ * | | `vite dev` | `dist-web` |
+ * |---|---|---|
+ * | document overflow on the menu | 0 | 0 |
+ * | `.everyday-screen` overflow on the menu | 335 px | 335 px |
+ * | `.everyday-screen` overflow on the **incoming** fixit screen | 8 772 px | 8 772 px |
+ * | offset after tapping the fourth tile | 0 | 0 |
+ * | the same, with `screenEl.scrollTop = 0` deleted | **0** | **0** |
  *
- * The reason is measured rather than guessed. At `375×667`, driving the locally-served bundle:
+ * Every tile box, the rail, the bar and the inline stylesheet's SHA-256 are identical between the
+ * two as well. **So the local dev server and the local bundle are not laid out differently at all**,
+ * and the mechanism recorded for this defect — that `reconcile`'s clamp *"depends on the incoming
+ * screen being shorter than the offset"* — is refuted on this Chromium: instrumented, `scrollTop`
+ * reads **0 the moment the container is emptied**, before any layout is forced and regardless of
+ * what is about to be inserted. `fixit` is 8 772 px of overflow and is clamped exactly like the
+ * short screens are.
  *
- * | measurement | value |
- * |---|---|
- * | document overflow on the menu | **0** — the document does not scroll at all |
- * | `.everyday-screen` overflow on the menu | **335 px** |
- * | offset after tapping a tile, reset removed | **0** |
+ * What follows from that is worth stating plainly, because it is a correction rather than a
+ * repetition: **whatever makes the defect appear on the deployed build and not here is not the
+ * dev-server-versus-bundle difference.** It is unmeasured, and this file may not name a replacement
+ * cause — that would be `CLAUDE.md`'s stated-mechanism defect with new wording. The deployed build
+ * is unreachable from this container (`curl` → status `000`, GitHub issue **#123**), so the one
+ * measurement that could settle it cannot be taken here.
  *
- * `dev/dom.ts#reconcile`'s incidental clamp covers the removal here: the container empties, the
- * browser clamps `scrollTop`, and the offset is gone before the reset would have run. The clamp is
- * exactly what `shell.ts#go`'s own docstring says is *real and not reliable* — and locally it
- * happens to hold for all four destinations.
+ * The case below is therefore a **regression guard on the shipped artifact for the effect a player
+ * experiences**, and it is labelled as that. It is not a pin on the mechanism, and #281's third
+ * criterion is still open.
  *
- * **The defect was measured on the deployed build, not on a local one**, and that build is
- * unreachable from this container: the PR's own preview answers `curl` with status `000`, which is
- * the gap GitHub issue #123 is about. So the artifact this file serves is the right *kind* of
- * artifact and is still not the one the defect was found on — a narrower version of the very gap
- * #281 names, and it should be recorded rather than closed over.
+ * ## What the gap turned out actually to be
  *
- * What the second case below therefore is: a **regression guard on the built bundle** for the
- * effect a player experiences, honestly labelled. It is not a pin on the mechanism.
+ * Not layout. The measured difference between the two artifacts is the **asset surface**, and it is
+ * large. `vite.config.ts` points `publicDir` at the repository's `data/`, so the dev server answers
+ * for every file in it; on build, `copyPublicDir` is `false` and only `WEB_DATA_FILES` plus
+ * `__buildings.json` are emitted. Measured on both servers:
+ *
+ * | request | `vite dev` | `dist-web` |
+ * |---|---|---|
+ * | `/elevator-specs.json` | 200 `application/json` | 200 `application/json` |
+ * | `/buildings/midtown-office.json` | **200 `application/json`** | the SPA fallback, `text/html` |
+ * | `/buildings/README.md` | **200 `text/markdown`** | the SPA fallback |
+ *
+ * A viewer that started fetching a seventh document would therefore work on every machine in this
+ * repository and fail in production — and `dev/data.ts#fetchJson` would report it as *"did not parse
+ * as JSON"* rather than as a missing file, because the fallback answers **200** with an HTML body.
+ * The third case below pins that difference from the wire, and it is the assertion that fails first
+ * if any part of this tier ever goes back to a dev server.
  *
  * ## The cost, measured rather than assumed
  *
- * One build and one server, in `beforeAll`, for the whole file — a build per case is not viable.
- * Measured on a quiet machine: a cold `dist-web/` build is **4 152 ms**, and this whole file —
- * build, preview server, three cases, a browser — is **6.34 s**. That is cheap enough that the
- * per-file shape needs no defending.
+ * One build for the **whole tier**, in `vitest.config.ts`'s `globalSetup`, and one `preview` server
+ * per file. A build per file was measured and rejected: 4.5 s × 32 is about 150 s onto a 269 s
+ * tier. The gate below reads the global setup's own figure through `inject`, so the day a build
+ * becomes minutes the thing that notices is a failing test rather than a reader.
  *
- * It also does not land in the always-on path at all: `viz-browser` is opted into by name and
- * gated on {@link HAS_BROWSER}, so `npm test` on a machine without a browser never pays it.
+ * It also does not land in the always-on path at all: `viz-browser` is opted into by name and gated
+ * on {@link HAS_BROWSER}, and the global setup skips the build when there is no browser — so
+ * `npm test` on a machine without one never pays it.
  *
  * ## Both scrollers, and why neither alone is the answer
  *
@@ -84,7 +96,7 @@
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import {
   BUILT_ARTIFACT_CLAIMS,
@@ -92,8 +104,8 @@ import {
   HAS_BROWSER,
   SKIP_REASON,
   openPage,
-  startBuiltSite,
-  type BuiltSite,
+  startShippedSite,
+  type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
 
 /** The shortest viewport `docs/31-support-matrix.md` § 1 tier 2 supports. */
@@ -104,21 +116,34 @@ const SHORTEST_SUPPORTED = { width: 375, height: 667 } as const;
  *
  * `300` is the figure the deployed preview was measured at, kept rather than rounded so the case
  * and the finding quote the same number. It is comfortably inside the menu's own overflow at this
- * viewport — measured at 366 px — and the case asserts that it actually took effect rather than
+ * viewport — measured at 335 px — and the case asserts that it actually took effect rather than
  * trusting it, because a scroll that silently did nothing would make this whole file vacuous.
  */
 const SCROLLED_TO = 300;
 
+/**
+ * A document the **dev server** serves out of `publicDir` and the **bundle** does not emit.
+ *
+ * `data/buildings/` is deliberately not in the bundle: the viewer never fetches a building by name
+ * — HTTP has no directory listing — so `vite.config.ts` assembles `/__buildings.json` instead and
+ * leaves the directory out. That decision is what makes this path a usable probe: it is a real file
+ * on disk under `publicDir`, so a dev server answers it with JSON, and the shipped artifact cannot.
+ */
+const DEV_ONLY_DOCUMENT = '/buildings/midtown-office.json';
+
+/** A document the bundle **does** emit, so the probe above cannot pass by the server being broken. */
+const SHIPPED_DOCUMENT = '/elevator-specs.json';
+
 let browser: Browser;
-let site: BuiltSite;
-let buildAndServeMs = 0;
+let site: ShippedSite;
+let serveMs = 0;
 
 describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)', () => {
   beforeAll(async () => {
     browser = await chromium.launch({ executablePath: CHROMIUM });
     const startedAt = process.hrtime.bigint();
-    site = await startBuiltSite({ preview: { port: 5299, strictPort: false } });
-    buildAndServeMs = Number((process.hrtime.bigint() - startedAt) / 1_000_000n);
+    site = await startShippedSite({ preview: { port: 5299, strictPort: false } });
+    serveMs = Number((process.hrtime.bigint() - startedAt) / 1_000_000n);
   }, 300_000);
 
   afterAll(async () => {
@@ -133,17 +158,17 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
         window.scrollY + (document.querySelector<HTMLElement>('.everyday-screen')?.scrollTop ?? 0),
     );
 
-  it('serves the built bundle rather than source modules, or this file proves nothing', async () => {
+  it('serves the built bundle rather than source modules, or this tier proves nothing', async () => {
     const page = await openPage(browser, { viewport: SHORTEST_SUPPORTED });
     await page.goto(site.origin, { waitUntil: 'load' });
     await page.waitForSelector('.everyday-screen', { timeout: 30_000 });
     await page.waitForSelector('[data-screen="fixit"]', { timeout: 30_000 });
 
     /*
-     * The liveness guard this file cannot do without. If `preview` fell back to serving source —
-     * or if the build silently emitted nothing and the server answered an index that loads
-     * modules — every assertion below would be a claim about `vite dev` wearing this file's name,
-     * which is the exact defect the file exists to close.
+     * The liveness guard neither this file nor the other 28 can do without. If `preview` fell back
+     * to serving source — or if the build silently emitted nothing and the server answered an index
+     * that loads modules — every assertion in the tier would be a claim about `vite dev` wearing a
+     * different name, which is the exact defect #281 is about.
      *
      * A dev server serves the entry as `/src/…` module scripts and injects its own client; a built
      * bundle serves hashed assets and no client. Both halves are asserted, because either alone
@@ -161,6 +186,40 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
     ).toEqual(expect.arrayContaining([expect.stringMatching(/assets\/.*-[A-Za-z0-9_-]{6,}\.js/u)]));
   });
 
+  it('has the bundle’s asset surface and not the dev server’s publicDir', async () => {
+    /*
+     * **The difference between the two artifacts that actually bites, asserted from the wire.**
+     *
+     * The dev server serves the whole of `data/` out of `publicDir`; the bundle emits
+     * `WEB_DATA_FILES` and `__buildings.json` and nothing else. So a document that exists on disk
+     * under `data/` and is not on that list is served by one artifact and not the other, and that
+     * is a class of defect a dev-server tier cannot see: it works on every machine here and 404s in
+     * production.
+     *
+     * Both directions, because either alone is satisfiable by the wrong thing. A shipped document
+     * must arrive as JSON — otherwise this case would pass against a server that answers nothing —
+     * and the dev-only one must **not**, which is what says the tree being served is the built one.
+     *
+     * `fetchJson`'s own docstring is why the second half checks the content type rather than the
+     * status: Vite's SPA fallback answers a missing document with `index.html` and a **200**, so a
+     * status assertion would pass on the artifact this case exists to rule out.
+     */
+    const shipped = await fetch(`${site.origin}${SHIPPED_DOCUMENT}`);
+    expect(
+      shipped.headers.get('content-type') ?? '',
+      `${SHIPPED_DOCUMENT} is one of vite.config.ts's WEB_DATA_FILES and the served tree does not ` +
+        'have it as JSON. Either the build emitted nothing or this server is not serving dist-web.',
+    ).toContain('application/json');
+
+    const devOnly = await fetch(`${site.origin}${DEV_ONLY_DOCUMENT}`);
+    expect(
+      devOnly.headers.get('content-type') ?? '',
+      `${DEV_ONLY_DOCUMENT} came back as JSON. That file is in the repository's data/ directory ` +
+        'and NOT in the bundle — it is reachable only through `publicDir`, which is a dev-server ' +
+        'facility — so this is a `vite dev` server wearing this tier\'s name. GitHub issue #281.',
+    ).not.toContain('application/json');
+  });
+
   it('keeps the incoming screen at the top when a tile is tapped from a scrolled menu', async () => {
     const page = await openPage(browser, { viewport: SHORTEST_SUPPORTED });
     await page.goto(site.origin, { waitUntil: 'load' });
@@ -168,11 +227,14 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
     await page.waitForSelector('[data-screen="fixit"]', { timeout: 30_000 });
 
     /*
-     * **The fourth tile, and it has to be the fourth.** `fixit` is the one screen tall enough that
-     * `reconcile`'s incidental clamp does not save it — the third tile was measured clamping on
-     * some layouts, which is why the deleted cases passed. Its key is `fixit` from
-     * `everyday/modes.ts`, read off the tile's own `data-screen` rather than its label, so a copy
-     * change cannot silently point this case at a different screen.
+     * **The fourth tile, and it is the fourth for a measured reason that turned out not to be the
+     * reason it was chosen for.** `fixit` was picked as the one screen tall enough that
+     * `reconcile`'s incidental clamp would not save it. Measured, its incoming overflow **is** the
+     * largest — 8 772 px against the menu's 335 — and the clamp saves it anyway, because on this
+     * Chromium the clamp fires when the container is emptied rather than when the new content
+     * proves shorter. The tile is kept because it is the one the deployed measurement used and the
+     * two should quote the same navigation. Its key is read off `data-screen` rather than the
+     * label, so a copy change cannot silently point this case at another screen.
      */
     await page.evaluate((to) => {
       const region = document.querySelector<HTMLElement>('.everyday-screen');
@@ -193,8 +255,9 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
     expect(
       await offsetOf(page),
       'the new screen opened at the offset the menu was left at — `shell.ts#go` did not reset ' +
-        'both scrollers. This is the defect GitHub issue #281 exists for, and it reproduces on ' +
-        'the built bundle while the dev server clamps it away.',
+        'both scrollers. This is the effect GitHub issue #281 reported from the deployed build. ' +
+        'Read the header before concluding this case pins the mechanism: it does not, because ' +
+        'deleting either half of the reset leaves it green here.',
     ).toBe(0);
 
     /*
@@ -231,19 +294,39 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
 
     /*
      * **The cost gate, and it is a gate rather than a note.** #281 asks for the cost to be measured
-     * before this lands in the always-on path. One build plus one server is seconds; the ceiling
-     * below is generous against the measurement on this host and exists to catch the day a build
-     * becomes minutes — at which point this file stops being viable per-file and the answer has to
-     * change. A number in a comment would not notice.
+     * before this lands in the always-on path, and wave I moved what there is to measure: the build
+     * happens **once for the whole tier**, in `vitest.config.ts`'s `globalSetup`, so the figure that
+     * matters is that one and not this file's share of it. It arrives through `inject`, which is
+     * how a global setup hands a measurement to a case.
+     *
+     * The ceiling is generous against 4 152 ms cold on a quiet machine and exists to catch the day
+     * a build becomes minutes — at which point the shape has to change again, because a once-per-run
+     * build is only affordable while it is seconds. A number in a comment would not notice.
+     */
+    const buildMs = inject('shippedBuildMs');
+    expect(
+      buildMs,
+      'the viz-browser global setup did not report a build time, so either it did not run or it ' +
+        'skipped the build — and this file is then serving whatever `dist-web/` happened to be on ' +
+        'disk. See vitest.config.ts and browserTierSite.test-helper.ts#setup.',
+    ).toBeGreaterThan(0);
+    expect(
+      buildMs,
+      `building dist-web took ${String(buildMs)} ms for the whole tier. Measured at 4 152 ms cold ` +
+        'on a quiet developer machine; the ceiling is generous against a slower CI runner.',
+    ).toBeLessThan(120_000);
+
+    /*
+     * And the per-file half, which is the number that decides whether *every* file can afford this.
+     * Serving is a socket, not a build — if this ever approaches the build figure, `preview()` has
+     * started doing work it is not supposed to do and 29 files are each paying for it.
      */
     expect(
-      buildAndServeMs,
-      `building and serving dist-web took ${String(buildAndServeMs)} ms. Measured at 4 152 ms cold ` +
-        'on a quiet developer machine; the ceiling is generous against a slower CI runner and ' +
-        'exists to catch the day a build becomes minutes — at which point the per-file shape stops ' +
-        'being viable and the tier needs one build shared across files, which startBuiltSite ' +
-        'deliberately does not do. A number in a comment would not notice.',
-    ).toBeLessThan(120_000);
+      serveMs,
+      `starting the preview server took ${String(serveMs)} ms. It serves an already-built ` +
+        'directory and should cost a socket; 29 files each pay this, so a build hiding in here ' +
+        'would multiply.',
+    ).toBeLessThan(30_000);
   });
 });
 

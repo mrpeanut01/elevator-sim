@@ -48,40 +48,40 @@
  * re-baselining, which is a control that trains its owner to override it.
  */
 
-import { fileURLToPath } from 'node:url';
-
 import { chromium, type Browser, type Page } from 'playwright-core';
-import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  enterEngineerStage,
+  openPage,
+  pressMenuRow,
+  reopenEngineerMenu,
+  startShippedSite,
+  type ShippedSite,
+} from './browserTier.test-helper.js';
 
-let server: ViteDevServer;
+let site: ShippedSite;
 let browser: Browser;
 let page: Page;
 
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
-  server = await createServer({
-    configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
-    root: fileURLToPath(new URL('../..', import.meta.url)),
-    /*
-     * A port of this file's own, and `strictPort: false` so a busy one becomes the next free one.
-     *
-     * Not `port: 0`. `boot.browser.test.ts` asks for that and lands on Vite's default 5173 anyway,
-     * so two browser files running in parallel — which is vitest's default — collide, and the
-     * second one to start fails with *"Port 5173 is already in use"* for a reason that has nothing
-     * to do with the product. Naming a port outside the range anything else in this repository
-     * uses, and letting it slide when it is taken, is the half of that this file can fix without
-     * reaching into a test it does not own.
-     */
-    server: { port: 5273, strictPort: false },
-    logLevel: 'error',
-  });
-  await server.listen();
-  const origin = server.resolvedUrls?.local[0]?.replace(/\/$/, '');
-  if (origin === undefined) throw new Error('the dev server did not report a URL');
+  // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
+  /*
+   * A port of this file's own, and `strictPort: false` so a busy one becomes the next free one.
+   *
+   * Not `port: 0`. `boot.browser.test.ts` asks for that and lands on Vite's default 5173 anyway,
+   * so two browser files running in parallel — which is vitest's default — collide, and the
+   * second one to start fails with *"Port 5173 is already in use"* for a reason that has nothing
+   * to do with the product. Naming a port outside the range anything else in this repository
+   * uses, and letting it slide when it is taken, is the half of that this file can fix without
+   * reaching into a test it does not own.
+   */
+  site = await startShippedSite({ preview: { port: 5273, strictPort: false } });
+  const origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
   page = await openPage(browser, { viewport: { width: 1600, height: 1000 } });
   await page.goto(origin, { waitUntil: 'load' });
@@ -124,7 +124,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser?.close();
-  await server?.close();
+  await site?.close();
 });
 
 /** Every option's visible text on a picker, in the page's own order. */

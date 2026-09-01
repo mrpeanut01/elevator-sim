@@ -58,13 +58,17 @@
  * could see that the node tier could not — which is this file's whole reason for existing.
  */
 
-import { fileURLToPath } from 'node:url';
-
 import { chromium, type Browser } from 'playwright-core';
-import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage } from './browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  enterEngineerStage,
+  openPage,
+  startShippedSite,
+  type ShippedSite,
+} from './browserTier.test-helper.js';
 
 /*
  * **The gate comes from the shared module, and this file is the reason that module now exists in
@@ -122,39 +126,32 @@ interface Measured {
   readonly ratio: number;
 }
 
-let server: ViteDevServer;
+let site: ShippedSite;
 let browser: Browser;
 let origin: string;
 let measured: readonly Measured[] = [];
 
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
-  server = await createServer({
-    configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
-    root: fileURLToPath(new URL('../..', import.meta.url)),
-    /*
-     * A port of this file's own, and `strictPort: false` so a busy one becomes the next free one —
-     * `compareLab.browser.test.ts`'s rule, and this file is the case that proves it.
-     *
-     * It was written as `port: 0` and was green, because on its own branch it was the only new file
-     * in the tier. Integrated beside issue #142's repairs it became the **seventh** file here, and
-     * `port: 0` does not mean *an ephemeral port*: Vite resolves it to its configured default of
-     * 5173, which `boot.browser.test.ts` also asks for. Seven files start concurrently by default,
-     * so the loser got no URL at all and this suite failed in `beforeAll` with *"the dev server did
-     * not report a local URL"* — six skipped cases and a red file, for a reason with nothing to do
-     * with contrast.
-     *
-     * Found only by running the tier **after** integrating, never on either branch: each was green
-     * alone. That is the merge-finds-what-neither-branch-could shape, and it is the second time in
-     * this wave that the tier's own concurrency produced it.
-     */
-    server: { port: 5293, strictPort: false },
-    logLevel: 'error',
-  });
-  await server.listen();
-  const local = server.resolvedUrls?.local[0];
-  if (local === undefined) throw new Error('the dev server did not report a local URL');
-  origin = local.replace(/\/$/, '');
+  // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
+  /*
+   * A port of this file's own, and `strictPort: false` so a busy one becomes the next free one —
+   * `compareLab.browser.test.ts`'s rule, and this file is the case that proves it.
+   *
+   * It was written as `port: 0` and was green, because on its own branch it was the only new file
+   * in the tier. Integrated beside issue #142's repairs it became the **seventh** file here, and
+   * `port: 0` does not mean *an ephemeral port*: Vite resolves it to its configured default of
+   * 5173, which `boot.browser.test.ts` also asks for. Seven files start concurrently by default,
+   * so the loser got no URL at all and this suite failed in `beforeAll` with *"the dev server did
+   * not report a local URL"* — six skipped cases and a red file, for a reason with nothing to do
+   * with contrast.
+   *
+   * Found only by running the tier **after** integrating, never on either branch: each was green
+   * alone. That is the merge-finds-what-neither-branch-could shape, and it is the second time in
+   * this wave that the tier's own concurrency produced it.
+   */
+  site = await startShippedSite({ preview: { port: 5293, strictPort: false } });
+  origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
 
   measured = [
@@ -252,7 +249,7 @@ async function measureAt(scheme: 'dark' | 'light'): Promise<readonly Measured[]>
 
 afterAll(async () => {
   await browser?.close();
-  await server?.close();
+  await site?.close();
 });
 
 describe.skipIf(!HAS_BROWSER)('the change-scope notes are legible on the page a player loads', () => {

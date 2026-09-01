@@ -20,12 +20,15 @@
  * `shell.ts#keepScrollAcrossRerender` for the traced sequence.
  *
  * **2. It must drive the built bundle.** [`RISKS.md`](../../../../RISKS.md) R26 and GitHub issue
- * **#281** are the standing reason, and `builtBundle.browser.test.ts` is the precedent: `vite dev`
- * and `dist-web/` lay out differently enough that a scroll claim about one is not a claim about the
- * other. The reporter measured this defect on both and they agreed, so the *finding* does not
- * depend on #281 — but a case that asserts a **layout** and an **overflow**, two of
- * `browserTier.test-helper.ts`'s four `BUILT_ARTIFACT_CLAIMS` families, has to be driven here to
- * mean anything.
+ * **#281** are the standing reason. This clause used to add that *"`vite dev` and `dist-web/` lay
+ * out differently enough that a scroll claim about one is not a claim about the other"*, which was
+ * #281's own stated mechanism and is **refuted on this host** (§ D426): driven side by side at
+ * `375×667`, the two artifacts agree on every box, both scrollers and the inline stylesheet's
+ * digest. What survives is the weaker and sufficient reason — a case that asserts a **layout** and
+ * an **overflow**, two of `browserTier.test-helper.ts`'s four `BUILT_ARTIFACT_CLAIMS` families,
+ * should be made about the artifact players receive rather than about one that agrees with it
+ * today on one browser at one viewport. The reporter measured this defect on both and they agreed,
+ * so the *finding* never depended on #281 either way.
  *
  * **3. The desktop viewport is not a control, and the issue thought it was.** #298 reports
  * `1280×800` as a **0 px** row and explains the defect's seven-wave survival by *"at 1280×800 both
@@ -38,10 +41,11 @@
  *
  * ## The cost, and why the file is shaped per-file
  *
- * One build and one preview server in `beforeAll`, `builtBundle.browser.test.ts`'s shape and for
- * its stated reason: a build is seconds, so a build per case is not viable. The tier is opted into
- * by name and gated on {@link HAS_BROWSER}, so `npm test` on a machine without a browser never
- * pays it.
+ * One preview server in `beforeAll`, over the `dist-web/` that `vitest.config.ts`'s `globalSetup`
+ * built **once for the whole tier** — § D425 moved the build there, so this file no longer pays for
+ * one and neither do the other 28. The tier is opted into by name and gated on {@link HAS_BROWSER},
+ * and the global setup skips the build when there is no browser, so `npm test` on a machine without
+ * one never pays it.
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
@@ -52,8 +56,8 @@ import {
   HAS_BROWSER,
   SKIP_REASON,
   openPage,
-  startBuiltSite,
-  type BuiltSite,
+  startShippedSite,
+  type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
 
 /** The shortest viewport `docs/31-support-matrix.md` § 1 tier 2 supports. */
@@ -75,12 +79,12 @@ const DESKTOP = { width: 1280, height: 800 } as const;
 const STATIONARY_PX = 200;
 
 let browser: Browser;
-let site: BuiltSite;
+let site: ShippedSite;
 
 describe.skipIf(!HAS_BROWSER)('an in-screen toggle keeps the scroll offset (issue #298)', () => {
   beforeAll(async () => {
     browser = await chromium.launch({ executablePath: CHROMIUM });
-    site = await startBuiltSite({ preview: { port: 5298, strictPort: false } });
+    site = await startShippedSite({ preview: { port: 5298, strictPort: false } });
   }, 300_000);
 
   afterAll(async () => {

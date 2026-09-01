@@ -99,6 +99,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CHROMIUM,
   CHROMIUM_ENV,
+  DEV_SERVER_FILES,
   HAS_BROWSER,
   SKIP_REASON,
 } from './browserTier.test-helper.js';
@@ -453,7 +454,7 @@ describe('a project whose tests do not fit the 5 s default declares a timeout th
 });
 
 /**
- * Every file in the browser tier starts its own Vite dev server, and each one has to say where.
+ * Every file in the browser tier starts its own Vite server, and each one has to say where.
  *
  * ## The trap this guard exists for, stated as it measures rather than as it was reasoned
  *
@@ -463,6 +464,14 @@ describe('a project whose tests do not fit the 5 s default declares a timeout th
  * to `0` and `strictPort` resolves to `true`: **the inline port wins and `strictPort` is
  * inherited.** Vite then maps `port: 0` onto its own built-in default, `5173`, and `strictPort`
  * turns a busy `5173` into `Port 5173 is already in use` rather than a step to the next free one.
+ *
+ * **Since GitHub issue #281 most of the tier serves `dist-web/` through `preview()` instead, and
+ * the trap is the same shape with different numbers.** Resolving the same config and reading it
+ * back reports `preview.port 4173 / preview.strictPort true`: `preview` inherits `strictPort` from
+ * `server` and does **not** inherit the port, so a file that named none would put every server in
+ * the tier on `4173` and the second to start would throw. Both defaults are named in the failure
+ * message below, because a reader who meets one and looks up the other finds a number that is not
+ * theirs.
  *
  * So the failure is *refused to serve at all*, not *served somewhere we did not read*. Three files
  * in this directory carry notes describing it the other way round; those notes are wrong on the
@@ -493,12 +502,12 @@ describe('every browser-tier file names a port of its own — the trap this tier
    * `server: { port: <n>, ... }` as the tier actually writes it, across line breaks — **and
    * `preview: { … }` beside it**, which is the tier's second server kind.
    *
-   * The `preview` arm landed with GitHub issue #281's `builtBundle.browser.test.ts`, the one file
-   * that serves the **built** `dist-web/` rather than source modules. It needs a port for exactly
-   * the same reason and collides in exactly the same way, so it is read by the same guard rather
-   * than excused from it. `startBuiltSite` takes Vite's own `preview` options as an object for this
-   * reason: a port passed as a bare number would be invisible here, and a guard that cannot see a
-   * file's port is a guard that file is exempt from.
+   * The `preview` arm landed with GitHub issue #281 and is now **the tier's common case**: 29 of
+   * its 33 files serve the built `dist-web/` rather than source modules. It needs a port for
+   * exactly the same reason and collides in exactly the same way, so it is read by the same guard
+   * rather than excused from it. `startShippedSite` takes Vite's own `preview` options as an object
+   * for this reason: a port passed as a bare number would be invisible here, and a guard that
+   * cannot see a file's port is a guard that file is exempt from.
    *
    * **This widens what the guard reads and weakens none of what it asserts** — every file still
    * names a literal port, still may not say `0`, and still may not share one.
@@ -515,15 +524,16 @@ describe('every browser-tier file names a port of its own — the trap this tier
         expect(
           found,
           `${shortly(path)} starts a Vite server without naming a port. It will land on Vite's ` +
-            'default 5173 and, under the config\'s inherited `strictPort: true`, throw rather than ' +
-            'move the moment anything else holds that port.',
+            "own default — 5173 for a dev server, 4173 for a preview one — and, under the config's " +
+            'inherited `strictPort: true`, throw rather than move the moment anything else holds ' +
+            'that port.',
         ).not.toBeNull();
         expect(
           Number((found as RegExpExecArray)[1]),
           `${shortly(path)} asks for \`port: 0\`. That does not mean *an ephemeral port*: Vite ` +
-            'resolves it to its own default 5173, `strictPort: true` is inherited from ' +
-            'vite.config.ts, and the file then fails with `Port 5173 is already in use` for a ' +
-            'reason that has nothing to do with what it tests.',
+            'resolves it to its own default — 5173 for a dev server, 4173 for a preview one — ' +
+            '`strictPort: true` is inherited from vite.config.ts, and the file then fails with ' +
+            '`Port … is already in use` for a reason that has nothing to do with what it tests.',
         ).not.toBe(0);
       }
     }
@@ -656,5 +666,119 @@ describe('the tier collects page errors in one place — GitHub issue #268', () 
         'page. The shared gate covers every page of every file; a private one is a second answer ' +
         'to the same question, and this repository has paid for that shape before.',
     ).toEqual([]);
+  });
+});
+
+/**
+ * **The tier drives the artifact players load, and the exceptions are named** — GitHub issue #281,
+ * [`DECISIONS.md`](../../../../DECISIONS.md) § D425.
+ *
+ * ## What was wrong
+ *
+ * 32 of the tier's 33 files started a `vite dev` server. Players load `dist-web/`, produced by
+ * `npm run build:web` and served as static files. Everything the tier certified was therefore true
+ * of an artifact nobody receives, and a defect had already lived in the difference — the Everyday
+ * shell's missing scroll reset, whose two pinning cases were both deleted for asserting nothing.
+ *
+ * 29 files now serve the shipped bundle through `startShippedSite`. Four cannot, and this suite is
+ * what stops that four from becoming five by accident.
+ *
+ * ## Why both directions
+ *
+ * A one-directional check is the shape this repository keeps finding stale. *Every dev-server file
+ * is registered* alone lets an entry stay in the list after the file it names has been converted,
+ * and the list then reads as a limitation that no longer exists — `RISKS.md` R38 and § D227's stale
+ * refusal in one. *Every registered file drives a dev server* alone lets a converted file quietly
+ * regain `createServer` with nothing said. So the two sets must be **equal**.
+ *
+ * The registry lives in `browserTier.test-helper.ts` beside `BUILT_ARTIFACT_CLAIMS` rather than
+ * here, because a reader meets it there: the claims a dev-server case may not make, and the files
+ * that are still dev-server cases, are one fact told in two halves.
+ */
+describe('the browser tier serves the shipped bundle, and names what does not — issue #281', () => {
+  /** How a file says it is starting Vite's development server. */
+  const DEV_SERVER = /\bcreateServer\s*\(/u;
+
+  /** How a file says it is serving the built bundle. */
+  const SHIPPED_SITE = /\bstartShippedSite\s*\(/u;
+
+  /** `packages/viz/src`, which is what `DEV_SERVER_FILES` spells its entries relative to. */
+  const VIZ_SRC = fileURLToPath(new URL('..', import.meta.url));
+
+  it('drives a dev server in exactly the files that say so, and in no others', async () => {
+    const tiers = browserTiers(await registeredProjects());
+    expect(
+      tiers.length,
+      'no browser tier was found, so this guard is watching nothing',
+    ).toBeGreaterThan(0);
+
+    const driving: string[] = [];
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        if (DEV_SERVER.test(code(readSource(path)))) driving.push(relative(VIZ_SRC, path));
+      }
+    }
+
+    expect(
+      driving.sort(),
+      'the set of tier files that start a `vite dev` server has drifted from ' +
+        '`browserTier.test-helper.ts#DEV_SERVER_FILES`. A file that appears here and not there has ' +
+        'gone back to driving an artifact players never receive, with nothing said — which is ' +
+        'GitHub issue #281 reopening. A file that appears there and not here has been converted, ' +
+        'and the entry is now a limitation that does not exist, which is the stale refusal § D227 ' +
+        'is about. Fix whichever half is wrong; do not delete the check.',
+    ).toEqual([...DEV_SERVER_FILES].sort());
+  });
+
+  it('serves the shipped bundle everywhere else, so the registry is a floor and not a ceiling', async () => {
+    /*
+     * The half that stops the case above being satisfied by a tier that drives *nothing*. Emptying
+     * every `beforeAll` would make `DEV_SERVER_FILES` and the derived set agree at zero, and this
+     * case is what notices: every file that is not an exception must actively serve `dist-web/`.
+     */
+    const tiers = browserTiers(await registeredProjects());
+    const exempt = new Set<string>(DEV_SERVER_FILES);
+    const missing: string[] = [];
+    let serving = 0;
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        const rel = relative(VIZ_SRC, path);
+        if (exempt.has(rel)) continue;
+        if (SHIPPED_SITE.test(code(readSource(path)))) serving += 1;
+        else missing.push(rel);
+      }
+    }
+    expect(
+      missing,
+      'these files are in the browser tier, are not registered as dev-server exceptions, and never ' +
+        'call `startShippedSite`. Whatever they drive, it is not the artifact players load and it ' +
+        'is not declared either — GitHub issue #281.',
+    ).toEqual([]);
+    expect(
+      serving,
+      'no file in the tier serves the built bundle, so the case above passed vacuously',
+    ).toBeGreaterThan(0);
+  });
+
+  it('names exceptions that are files the tier actually collects', async () => {
+    /*
+     * A renamed file would otherwise sit in the registry looking like a satisfied exemption.
+     * Checked against the tier's own collected files rather than against disk, because a file that
+     * exists and is no longer in the tier is equally wrong.
+     */
+    const tiers = browserTiers(await registeredProjects());
+    const collected = new Set(
+      tiers.flatMap((tier) => tier.files.map((path) => relative(VIZ_SRC, path))),
+    );
+    for (const rel of DEV_SERVER_FILES) {
+      expect(
+        collected.has(rel),
+        `${rel} is registered as a dev-server exception and is not a file the browser tier collects`,
+      ).toBe(true);
+    }
+    expect(
+      DEV_SERVER_FILES.length,
+      'the exception registry is empty, so the cases above are vacuous',
+    ).toBeGreaterThan(0);
   });
 });
