@@ -1204,6 +1204,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'measured rather than argued.',
       ids: ['shift/calendar.ts#calendarAsks'],
     },
+    {
+      reason:
+        'A **transcription that is never drawn** — GitHub issue #182, § D435. ' +
+        '`GUIDE_WATCHING_NOTE` is `GAMEPLAY_AND_NAVIGATION.md` § 3.3’s own `stage · watching` ' +
+        'cell, kept in the source so the deviation beside it can be read against the sentence it ' +
+        'departs from rather than asserted. Nothing draws it: `ACTION_BAR_ROWS` carries ' +
+        '`WATCHING_NOTE`, which `EVERYDAY_MENU` covers and this search sweeps through that ' +
+        'adapter’s row loop. Excluded rather than driven, because seeding it would put the word ' +
+        '§ 14.1 calls a defect into the corpus as though a surface had said it — and the deviation ' +
+        'exists precisely so no surface does. What holds the pair honest is not this search: ' +
+        '`everyday/actionBar.test.ts` asserts in both directions that the guide’s cell is still ' +
+        'first-person and the shipped one is not, so a guide revision that drops the pronoun makes ' +
+        'the deviation red rather than merely unnecessary.',
+      ids: ['everyday/actionBar.ts#GUIDE_WATCHING_NOTE'],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));

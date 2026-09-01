@@ -243,6 +243,17 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
     'fault injectors; a non-test caller would be the defect (fuzz precedent, § D118)',
   'honesty/coveredDeclarations':
     'the coverage ledger derive.test.ts’s guard iterates; the guard is its consumer by design',
+  /*
+   * -- The guide's own § 3.3 `stage · watching` cell, transcribed so the deviation beside it can be
+   * read against the sentence it departs from (GitHub issue #182, § D435). A shipped caller here
+   * would be the defect, not the fix: it would put `your` on the screen § 14.1 calls that word a
+   * defect on, which is exactly what `WATCHING_NOTE` exists instead of. Its consumer is
+   * `everyday/actionBar.test.ts`'s both-directions assertion — the guard is the consumer, on
+   * `coveredDeclarations`' ground one line up — and that assertion is what turns the deviation red
+   * the day a guide revision drops the pronoun, rather than leaving it standing unread.
+   */
+  'everyday/GUIDE_WATCHING_NOTE':
+    'the guide’s own cell, transcribed and never drawn; the deviation guard is its consumer',
 
   /*
    * -- Guards given a value so a claim cannot rot. The first is a conditional type — a runtime

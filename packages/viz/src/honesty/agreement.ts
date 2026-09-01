@@ -337,6 +337,17 @@ function hostBindingsFor(view: AgreementView): EverydayHostBindings {
     closeDay: refuse('close the day'),
     openRunTab: refuse('open a tab'),
     applyPatch: refuse('patch the state'),
+    /*
+     * § 14.1's five presses refuse on the same ground as the four above — GitHub issue #182. The
+     * sixth is a **read** and answers `undefined`: this harness renders one state, and no state it
+     * is given is a spectator's, so *nobody is being watched* is the true answer rather than a stub.
+     */
+    loadReferenceRuns: () => Promise.resolve([]),
+    simulateRecord: refuse('simulate a record'),
+    enterWatch: refuse('enter a watch'),
+    stopWatching: refuse('stop a watch'),
+    playThisCrowd: refuse('play a watched crowd'),
+    watching: () => undefined,
     onChange: () => () => undefined,
   };
 }

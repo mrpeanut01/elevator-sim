@@ -29005,3 +29005,150 @@ wearing a friendlier face. The one thing deliberately **not** refused is a solve
 this build no longer ships: `fixitCaseRailModel` derives every row and its `{fixed}/{total}` count
 from the loaded case file, so such an id matches nothing and inflates nothing, and refusing the set
 over a catalogue edit would lose a player's afternoon to a data change they did not make.
+
+## D435 — where § 3.3 and § 14.1 disagree on one screen, the defect condition wins
+
+**Date: 2026-09-01 · Owner: wave J lane C · GitHub issue #182 · Deviates from
+`GAMEPLAY_AND_NAVIGATION.md` § 3.3, line 188.**
+
+**The disagreement.** § 3.3's `stage · watching` row prints its note verbatim:
+
+> Their record, replayed. Nothing here is scored, and **your** own day is untouched.
+
+§ 14.1, about the screen that row is pinned under, says in terms:
+
+> **No first-person copy anywhere in the mode.** Not `you`, not `your run`, not `your best`. The
+> word `you` on a watched run is a defect.
+
+The two are the same document contradicting itself, and until this wave nothing had to choose:
+`everyday/actionBar.ts` transcribed the row and no shell could reach `ctx: 'watch'` to draw it. The
+route built for issue #182 draws it in the pinned bar under the § 14.1 stage.
+
+**Decision.** § 14.1 wins. `WATCHING_NOTE` ships as *"Their record, replayed. Nothing here is
+scored, and the day on this device is untouched."*, and `GUIDE_WATCHING_NOTE` keeps § 3.3's sentence
+beside it, transcribed and never drawn.
+
+**Why that way round.** § 14.1 states a **defect condition** — a thing a test can fail, and one this
+repository already fails on `watchingStrings`, on `shellWatchingStrings` and on the Engineer tier's
+rendered page. § 3.3 states **copy**. A rule that can be checked outranks a sentence that cannot, and
+`docs/12`'s documented-deviation pattern is what a build does when the handoff disagrees with itself.
+The precedent is one directory over and identical in shape: [§ D407](#d407) substituted
+`VERIFIED BY RE-SIMULATION` for § 14.1's own `VERIFIED BY THE SERVER`, because the guide's cell
+asserted a check that does not happen here.
+
+**What is preserved.** All three of the cell's claims: the run is *their record*, it is *replayed*,
+and *nothing here is scored*. The fourth clause is kept as a claim about the **device** rather than
+about the reader — `watch/shell.ts#RAIL_EYEBROW_WATCHING`'s own move (*The week on this device*) —
+and it is true for that module's stated reason: `watch/session.ts#watchingStateOf` carries `week`,
+`report`, `tomorrow` and `interventions` by reference and moves none of them.
+
+**How the deviation is stopped from outliving its reason.** `everyday/actionBar.test.ts` holds the
+guide's cell in the second transcription that exists to catch drift, and asserts **both** directions:
+that the guide's sentence is still first-person, and that the shipped one is not. A future revision
+of the handoff that drops the pronoun turns this case red on the day it lands, and the fix is then to
+delete the deviation rather than to keep it because nobody re-read it. That is [§ D227](#d227)'s rule
+— a refusal is pinned by a run, never by another sentence — pointed at a test instead of at a
+control.
+
+**Not claimed.** No other § 3.3 cell is deviated from, and the guide's table is otherwise
+transcription. The one row the table does not contain at all (`report`/`watch`) is unchanged and
+still carries `guide: false`.
+
+---
+
+## D436 — a route away from a dead seam is the same defect, and its absence is deleted with it
+
+**Date: 2026-09-01 · Owner: wave J lane C · GitHub issue #182.**
+
+**What was true.** `packages/viz/src/watch/` was complete and good: a record is the *question*
+(`{seed, config, interventions[]}`) rather than a recording, it is replayed rather than re-run with
+the viewer's own dispatcher, a row that does not reproduce its four posted figures loses its button
+rather than replaying something approximate ([§ D407](#d407), ENGINE_CONTRACT § 1.5), and § 14.1's
+no-first-person rule is grepped over the value the shell draws from.
+
+It was reachable from the **Engineer** shell alone. `everyday/types.ts` declared `'watch'` as § 18's
+fourth run context, `everyday/actionBar.ts` carried the whole § 3.3 `stage · watching` row,
+`everyday/rail.ts` carried its subline, and `everyday/host.ts` named the gap in its own register of
+absences — *"no watch entry — § 14's spectator flow has no Everyday surface yet"*. What was missing
+was one thing: `everyday/shell.ts` set `ctx` from the tile a player commits to and could produce only
+`daily`, `campaign` or `rush`.
+
+**The decision, and why it is recorded rather than left to a docstring.** This is
+`docs/05-roadmap.md`'s standing requirement in its second form — not *a behaviour with no caller*,
+but **a caller with no route to it** — which is the shape `accessZones` had and which this repository
+keeps a register of. The register is why the instance is named. The route:
+
+- **`everyday/host.ts`** gains five methods — `watchableRuns`, `watchRun`, `watching`,
+  `stopWatching`, `playThisCrowd` — and the stated absence is **deleted on the same commit**. A
+  stated absence that has stopped being true is [§ D227](#d227)'s defect with its polarity reversed.
+- **`dev/main.ts`** implements six bindings, every one of them onto a seam `dev/watchPanel.ts`
+  already presses. Two shells, one `enterWatch`, one `stopWatching`, one `playThisCrowd` — a second
+  implementation would be a second answer to *whose day is on screen*.
+- **`everyday/weekScreen.ts`** draws the rows, directly under the block that says why the board has
+  none. § 14.1 opens *"A board row is a run, and a run can be watched"*, and the rows this build has
+  are the days this device filed and the reference runs it ships.
+- **`everyday/stageScreen.ts`** draws § 14.1's table from `watch/view.ts` — the ink band, the
+  initial, their name, `THEIR DISPATCHER`, the source line, the posted figures, the pill — and
+  disables § 7.6's intervention rows.
+- **`everyday/shell.ts`** owns the context: `enterWatch()` sets it, and `go()` clears it and calls
+  `stopWatching` on **any** move off the stage.
+
+**Two findings from building it, both of which a reader should have before touching this code.**
+
+*The entry rule would have undone the whole route.* `stageEntryStartsARun` reads `open`, which is
+false for *"a watched or file-loaded run — somebody else's"*, and `dayClosed`, which a watch leaves
+false. So it answers **true** on the way into a watch, and the mount's first act would have been
+`host.startRun()` — the player's own day simulated over the record they had just pressed `Watch it`
+on, with the spectator band naming somebody else over it. The rule is right and the call site had to
+ask § 18's second question. Measured rather than argued: with the guard removed, the stage header
+goes from the record's `06:00 · FILLING` to the player's own `08:00 · STEADY` inside four seconds
+while the band still names the record.
+
+*One exit was not enough.* `requestLeave` handles `⤺ Stop watching`; every rail row calls `go`
+directly. A row pressed while a record was on the stage left `ctx: 'watch'` standing over a screen
+that is not a stage, with the watched run on `state.recording` and the player's own day still
+snapshotted inside `dev/main.ts` — the state § 3.4 exempts a watch from *warning* about, and
+therefore the one nothing else was going to catch. The clear is centralised in `go` and the button
+now only chooses the destination.
+
+**§ 20.15's instruction this build cannot carry out, withdrawn rather than reworded.** The guide:
+*"`Play this crowd yourself` must open the brief for **that day's** fixture, not today's, when the
+row belongs to an archived day."* The conversion this build has carries the record's selection and
+deliberately **not** its week day — `dev/main.ts#playThisCrowd`'s own stated omission, because the
+day number belongs to the watched week and would grow the spectator's building by somebody else's
+schedule. `shift/growth.ts` grows a tower 11 % per day and `shift/events.ts#eventFor(day, dayIdx)`
+derives the day's event from the pair, so on a row from another day the crowd set up is **not** the
+one on the stage.
+
+So the primary is resolved **inert with a sentence naming the mechanism** on any row whose record is
+not the day standing here — `everyday/watchStage.ts#playThisCrowdRefusalFor` — and live on one that
+is. That is [§ D392](#d392)'s rule (an instruction a control cannot carry out is withdrawn rather
+than reworded) rather than [§ D227](#d227)'s, because the control is not inert everywhere: it works,
+on the rows where it can keep its promise. Both directions are driven, because a control withdrawn in
+every state is a control the player never gets and § 14.1 calls this one *"the whole reason watching
+exists"*. § 6.1's replay of an archived day (GitHub issue #177) is what would make it live
+everywhere, and it is not built.
+
+**Two limits, stated rather than discovered.** *Another player's* posted run is not a source — that
+needs the wire, and there is no server; the picker's own lede says so on its face. And the reference
+runs are labelled `reference run · not a player` from `WatchableRun.source` rather than from the file
+they were read out of, which is § 20.11 kept by construction.
+
+**The grep, and the trap it was written for.** § 14.1's rule is enforced over
+`watch/view.ts#watchingStrings` and `watch/shell.ts#shellWatchingStrings`, and the Engineer browser
+tier sweeps five named selectors. **A second screen drawing the same run through a different path
+passes all of it.** Measured: with a first-person clause added to the Everyday watching stage,
+`watch/view.test.ts` reports 13 passed and `dev/watch.browser.test.ts` 1 passed, both green, while a
+player reads the word § 14.1 calls a defect.
+
+The Everyday sweep is therefore a **region rather than a list**:
+`everyday/watchStage.browser.test.ts` reads the rendered text of `.everyday-screen` and
+`.everyday-bar` — the two boxes § 3.1 gives the shell sole ownership of, which every screen it mounts
+draws inside — plus the one rail cell that names the run. A string added anywhere on the watching
+screen is inside that sweep with nobody having to remember a selector, which is the property
+`docs/20` defect 7 records the absence of.
+
+**Not claimed.** The rest of the rail is outside the sweep and says so: its rows name screens (*Your
+week*) and its card names the player, and neither describes the day on the stage. That is
+`watch/shell.ts`'s own line — *does this surface describe, identify or attribute the day on the
+stage?* — and it is drawn in writing rather than left to whoever adds the next surface.

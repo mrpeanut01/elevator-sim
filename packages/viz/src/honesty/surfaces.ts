@@ -57,6 +57,11 @@ import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type Batc
 import { briefingFor } from '../campaign/brief.js';
 import { ACTION_BAR_ROWS, actionBarFor, confirmStripFor, TIMELINE_STEPS } from '../everyday/actionBar.js';
 import {
+  everydayWatchingCopyOf,
+  everydayWatchingStrings,
+  playThisCrowdRefusalFor,
+} from '../everyday/watchStage.js';
+import {
   buildingLineOf,
   FIXIT_SCREEN_COPY,
   fixitBarModel,
@@ -7311,6 +7316,15 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/actionBar.ts#confirmStripFor',
     'everyday/actionBar.ts#TIMELINE_STEPS',
     /*
+     * § 3.3's `stage · watching` note, which both `watch` rows carry — GitHub issue #182,
+     * [§ D435](../../../../DECISIONS.md). Its text already reaches this corpus through the
+     * `ACTION_BAR_ROWS` loop below, because the loop seeds every row's `note`; the entry is here so
+     * the **declaration** is claimed by the adapter that drives it, which is what `derive.test.ts`
+     * asks. Its transcribed twin `#GUIDE_WATCHING_NOTE` is excluded there instead: it is the
+     * guide's own sentence, kept so the deviation can be read against it, and it is never drawn.
+     */
+    'everyday/actionBar.ts#WATCHING_NOTE',
+    /*
      * **`screens.ts#UNBUILT_REASONS` and `#unbuiltReasonFor` left this list on the merge that
      * registered the last three screens, and they left because they stopped being text producers.**
      *
@@ -10036,6 +10050,91 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
   },
 };
 
+/**
+ * **The Everyday shell's own spectator words** — GitHub issue **#182**,
+ * [§ D436](../../../../DECISIONS.md).
+ *
+ * ## Why this is a second watching surface rather than more rows in {@link WATCH}
+ *
+ * `WATCH` drives `watch/view.ts` and `watch/shell.ts` — everything the **Engineer** shell says
+ * while a record is on the stage, plus the model both shells draw the § 14.1 table from. The
+ * Everyday shell draws that same model and adds words of its own: a picker on § 14's *Your week*, a
+ * § 3.3 row for a watched stage, and § 20.15's withdrawal of the conversion on a row that is not
+ * the day standing here. Those are a different screen's sentences and they belong under a different
+ * surface id, because a violation has to be able to say **which** screen said it.
+ *
+ * ## Both branches of the withdrawal, deliberately
+ *
+ * The refusal is seeded and so is the state that does not refuse. § 14.1 calls the primary *"the
+ * whole reason watching exists"*, so a control withdrawn in every state would be as wrong as one
+ * that never withdraws — and a corpus that only ever saw the refusal could not tell the two apart.
+ *
+ * ## No playhead on any of it
+ *
+ * Nothing here is a reading of the run. The picker's rows, the bar's row and both refusals are
+ * claims about **what a control does**, not about what a replay has done, so the temporal axis has
+ * nothing to ask of them — `WATCH`'s posted figures carry the same argument from the other side.
+ */
+const EVERYDAY_WATCHING: SurfaceAdapter = {
+  id: 'everyday/watchStage.ts#everydayWatchingCopyOf',
+  covers: [
+    'everyday/watchStage.ts#everydayWatchingCopyOf',
+    /*
+     * `#everydayWatchingStrings` is **deliberately absent** while being the function this adapter
+     * renders through — `#stageCarReadoutOf`'s case one surface up. It composes no prose of its
+     * own: it walks a value somebody else wrote, so the derivation finds no text producer there and
+     * a `covers` entry would be a coverage claim the guard cannot resolve. What it walks is claimed
+     * above, and that is where the coverage actually is.
+     */
+    'everyday/watchStage.ts#watchStageBarOf',
+    'everyday/watchStage.ts#playThisCrowdRefusalFor',
+    'everyday/watchStage.ts#WATCH_ROWS_HEADING',
+    'everyday/watchStage.ts#WATCH_ROWS_LEDE',
+    'everyday/watchStage.ts#WATCH_IT_LABEL',
+    'everyday/watchStage.ts#NOTHING_TO_WATCH',
+    'everyday/watchStage.ts#WATCH_ROWS_LOADING',
+    'everyday/watchStage.ts#REPLAY_NOT_ON_STAGE',
+    'everyday/watchStage.ts#SPECTATOR_MAKES_NO_CHANGES',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const state = { screen: 'stage', ctx: 'watch' } as const;
+    /*
+     * Through the module's own enumeration, for `WATCH`'s stated reason: a sentence added to
+     * `EverydayWatchingCopy` with no line in `everydayWatchingStrings` is outside this corpus and
+     * outside § 14.1's grep at once, and one list of *what a watched run says* is what keeps the
+     * two from disagreeing about which strings exist.
+     */
+    const states = [
+      ['live', { hasReplay: true, playRefusal: undefined }],
+      ['no-replay', { hasReplay: false, playRefusal: undefined }],
+    ] as const;
+    for (const [label, input] of states) {
+      for (const [index, text] of everydayWatchingStrings(
+        everydayWatchingCopyOf(state, input),
+      ).entries()) {
+        if (text === '') continue;
+        seeds.push({
+          field: `everydayWatch(${label}).string[${String(index)}]`,
+          text,
+          role: 'label',
+        });
+      }
+    }
+    /* § 20.15's two refusals, which are a function of a row rather than of a state. */
+    const day = { day: 3, dayIdx: 2 };
+    const archived = playThisCrowdRefusalFor({ day: 1, dayIdx: 0 }, day);
+    if (archived !== undefined) {
+      seeds.push({ field: 'everydayWatch.play.archived', text: archived, role: 'reason' });
+    }
+    const noRecord = playThisCrowdRefusalFor(null, day);
+    if (noRecord !== undefined) {
+      seeds.push({ field: 'everydayWatch.play.noRecord', text: noRecord, role: 'reason' });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -10193,6 +10292,14 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * and no band. There is no wording it could take a fault off another surface for.
    */
   EVERYDAY_BUILD_NOTES,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 14.1's Everyday side
+   * (GitHub issue #182). The collision it would cause is real and is named rather than waved past
+   * — its § 3.3 row draws `⤺ Stop watching` and `Play this crowd yourself`, which are `WATCH`'s
+   * own labels through the same table, so a slot ahead of `WATCH` would take every
+   * spectator-shaped fault off the surface that exists to carry them.
+   */
+  EVERYDAY_WATCHING,
 ]);
 
 /* -------------------------------------------------------------------------- *

@@ -86,7 +86,7 @@ export function refusalForDay(reason: string): string {
 }
 
 /**
- * The days this device filed, newest first, as rows a picker can draw.
+ * The days this device filed, in the order the weeks hold them, as rows a picker can draw.
  *
  * ## Why every week and not only the live one
  *
@@ -116,11 +116,23 @@ export function filedDayRuns(
     }
   }
   /*
-   * Newest first, by day within a week and by nothing across weeks — a filed day carries no
-   * wall-clock stamp (invariant 3 forbids one in `core`, and nothing in `shift/` writes one
-   * either), so *which week was played more recently* is a fact this build does not have. Sorting
-   * by day alone would claim an ordering across weeks that is not there, so the weeks stay in the
-   * order the caller supplied and only the days inside each are reversed.
+   * **Unsorted, and the sentence that used to stand here described a sort this function has never
+   * performed** — GitHub issue #182, [§ D436](../../../../DECISIONS.md). It read *"Newest first, by
+   * day within a week … the weeks stay in the order the caller supplied and only the days inside
+   * each are reversed"*, and nothing is reversed: `shift/week.ts#closeDay` appends
+   * (`[...week.history, outcome]`), so the days come out oldest first. A stated mechanism goes
+   * stale the same way a published number does, and this one was written beside the loop it
+   * misdescribes.
+   *
+   * The half that was **right** is kept, because it is the reason not to fix this by adding a sort:
+   * a filed day carries no wall-clock stamp — invariant 3 forbids one in `core` and nothing in
+   * `shift/` writes one — so *which week was played more recently* is a fact this build does not
+   * have, and sorting by day number alone would claim an ordering across weeks that is not there.
+   * So the weeks stay in the order the caller supplied and the days stay in the order the week
+   * holds them, which is what the code does and is now what the comment says.
+   *
+   * Changing the order is a change to what two shipped pickers show and belongs to whoever wants
+   * it, with a reason; correcting the sentence does not.
    */
   return Object.freeze(rows);
 }
