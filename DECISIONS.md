@@ -28880,6 +28880,16 @@ slots is two states that can disagree, and the profile and the progress are read
 by the same rail. So it is **one slot, two payloads, refused under two rules** — `persist/`'s own
 `session`-beside-`library` shape, one product over.
 
+**This departs from the route the issue's own scope named, and says so rather than quietly taking
+another.** `ISSUE_WORKER_LEDGER.md` records issue #164 folding into #224 having transferred *"the
+`persist/validate.ts` migration blocker … and the pre-written fix site"*, which points at the
+Engineer envelope. That route is refused on the paragraph above, and refusing it costs the
+transferred scope nothing that matters: the migration blocker was *a versioned envelope needs a
+migration before it can grow a key*, which is true of this slot too and is discharged here by
+`withProgress` and its version-1 case; and the size-budget argument is discharged by
+`PROGRESS_BUDGET_CHARACTERS`. What does not survive the departure is the file the fix was expected
+to land in, and only that.
+
 **The migration, and the test an older envelope has to pass.** Version 1 has no `progress` key, and
 `withProgress` completes it with an empty one. That is `persist/session.ts`'s
 `withWindowStart`/`withParkedWeeks` family and it has to survive their objection: is empty a value

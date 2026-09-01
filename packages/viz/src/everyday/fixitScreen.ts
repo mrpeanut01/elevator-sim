@@ -144,7 +144,8 @@ interface LoadedFixit {
 }
 
 /* ------------------------------------------------------------------------- *
- * The module-scope store — see the docstring's FIXED-is-session-local note.
+ * The module-scope store — seeded from the slot, see the docstring's
+ * FIXED-survives-the-tab note for which of these outlive it and which do not.
  * ------------------------------------------------------------------------- */
 
 let loaded: LoadedFixit | undefined;
