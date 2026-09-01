@@ -140,6 +140,11 @@ function buildingFor(honestyCase: HonestyCase, resources: HonestyResources): Res
  * comparison of two different buildings wearing one building's name.
  *
  * `HonestyContext.dispatcherProfiles` is deliberately **not** this value — see `contextFor`.
+ *
+ * Returns the shipped library **by object identity** when no profile moved, which is `fitOut.ts`'s
+ * own contract one layer up and matters for its reason: `profileWithKit` is the identity for a kit
+ * that names no `dispatch` field, so a `machines` kit would otherwise hand every batch a fresh
+ * library object that is element-wise the one it already had.
  */
 function profilesForRun(
   honestyCase: HonestyCase,
@@ -147,9 +152,11 @@ function profilesForRun(
 ): DispatcherProfiles {
   const fit = kitOf(honestyCase);
   if (fit === undefined) return resources.dispatcherProfiles;
-  const profiles = resources.dispatcherProfiles.profiles.map((profile) =>
-    fittedProfileFor(profile, fit),
-  );
+  const shipped = resources.dispatcherProfiles.profiles;
+  const profiles = shipped.map((profile) => fittedProfileFor(profile, fit));
+  if (profiles.every((profile, index) => profile === shipped[index])) {
+    return resources.dispatcherProfiles;
+  }
   return { ...resources.dispatcherProfiles, profiles };
 }
 

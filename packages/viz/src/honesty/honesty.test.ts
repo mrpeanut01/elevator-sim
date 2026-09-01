@@ -57,9 +57,9 @@ import {
 import { loadHonestyResources } from './resources.test-helper.js';
 import { FAULTS } from './faults.js';
 import { freshTower } from '../campaign/career.js';
-import { fitOutOf } from '../campaign/fitOut.js';
+import { fitOutIsAsBuilt, fitOutOf } from '../campaign/fitOut.js';
 import { recordRun } from '../record/recordRun.js';
-import { HONESTY_KITS, fittedBuildingFor, fittedProfileFor } from './fitOut.js';
+import { HONESTY_KITS, fitOutForCase, fittedBuildingFor, fittedProfileFor } from './fitOut.js';
 import type { HonestyCase } from './types.js';
 
 /**
@@ -288,6 +288,33 @@ describe('the search is alive — the five false-negative shapes, hunted in the 
       expect(alone, `${category} L${String(level)} moved no leg at seed 9005`).not.toBe(asBuilt);
     }
   }, 300_000);
+
+  it('no kit buys a delta this corpus has no seam for — § D227, pinned by a run', () => {
+    /*
+     * **A refusal is pinned by a run, never by another sentence.**
+     *
+     * `campaign/fitOut.ts` has four appliers and a case has two seams for them: the building and the
+     * shipped dispatcher profile. The other two have no writer here, and `measure.fitOut.test.ts`'s
+     * table says so in prose — `control` L1's `zonesTheTower` writes a `GroupLevers` that
+     * `authoring/dispatcherSpec.ts#profileFromSpec` turns into a profile, and a case names a shipped
+     * profile and builds no spec; `tenants` L2's `arrivalRateFactor` would have to multiply a demand
+     * that is `null` on half the corpus, which means resolving a schedule into a constant — a second
+     * change to the run beside the one being measured.
+     *
+     * A kit that carried either would be **silently dropped**: the case would report itself fitted,
+     * pay for the resolve, and run the tower it always ran. That is precisely CLAUDE.md's stale
+     * refusal with the polarity that matters — a control claiming to write something it does not —
+     * so the sentence is asserted rather than trusted.
+     */
+    for (const kit of HONESTY_KITS) {
+      const fit = fitOutForCase(kit.id);
+      expect(fit, kit.id).toBeDefined();
+      expect(fit?.arrivalRateFactor, `${kit.id} buys a demand factor this corpus cannot apply`).toBe(1);
+      expect(fit?.zonesTheTower, `${kit.id} buys a group lever this corpus cannot apply`).toBe(false);
+      // And it buys *something*: a kit that folded to the identity would be an axis with one value.
+      expect(fitOutIsAsBuilt(fit), `${kit.id} folds to AS_BUILT — it buys nothing at all`).toBe(false);
+    }
+  });
 
   it('the corpus reaches both ends of the playhead, so R6 has something to check', () => {
     /*

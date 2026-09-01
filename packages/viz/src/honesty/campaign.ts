@@ -214,6 +214,12 @@ export function formatFailure(failure: HonestyShrinkResult): string {
  *
  * `mode` is no longer on this list: `HONESTY_MODES` names both values, so the pinned cases
  * distribute across Basic and Advanced and the corpus assertion requires both to appear.
+ *
+ * **Nor is the fit-out** ([§ D437](../../../../DECISIONS.md)). A third of these seeds now run a
+ * tower that has bought something, drawn from `fitOut.ts#HONESTY_KITS`, and each kit was chosen by
+ * measuring the shipped tiers **at these cells** rather than at the campaign's — so every fitted
+ * case in this tier moves the legs, which `honesty.test.ts` asserts rather than assumes. Before that
+ * every case here was a tower **as built**, which is the hole § D427's null result found.
  */
 export const STANDARD_CORPUS: readonly number[] = Object.freeze([
   9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008, 9009, 9010, 9011, 9012, 9013, 9014, 9015, 9016,

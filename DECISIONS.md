@@ -28853,3 +28853,134 @@ number outside it, **D431**, which no register claims.
 hole, which happened for the first time in this wave. Wave H's block closed with every number spent,
 so the interaction could not appear; the next integrator would have met it as a red gate with no
 explanation, exactly as D387 was met.
+
+---
+
+## D437 — the honesty corpus runs fitted towers, and which kit is a survey rather than a preference
+
+**Date: 2026-09-01 · Owner: lane D, wave J · Closes GitHub issue #312. Answers the null result
+[§ D427](#d427) predicted and did not get, and re-measures that decision's tier table at cells it was
+never taken at.**
+
+**Decision.** `HonestyCase` gains `fitOutId`, a `honesty/fitOut.ts#HONESTY_KITS` id or `null` for a
+tower **as built**. `honesty/run.ts` resolves it once per case and applies it to everything that is
+the run — the recording, the pairing run § D310's delta block needs, both batch arms, and the
+building the context describes — through the shipped `campaign/fitOut.ts` appliers rather than a
+second copy of them. The library the editors draw (`buildings`, `buildingDocument`,
+`dispatcherProfiles`, `elevatorSpecs`) stays as shipped: a kit is bought against one building for one
+contract, and a fit-out that rewrote the library would put a purchase on four buildings nobody bought
+it for.
+
+**What was wrong.** § D427 made a campaign purchase reach the run and said in advance what that would
+do here: *"any corpus case that ever carries a non-`AS_BUILT` fit-out would move."* The corpus was
+then measured on the integrated tree against a re-measured base and **every figure was identical**.
+None did. So the corpus held **no case in which anything had been bought** — every campaign case the
+ten honesty properties saw was a tower as built, and none of them had ever read a string produced by
+a run whose doors, machines, cars, shafts, control or tenancy were fitted out. A surface can be
+honest about a tower as built and dishonest about a fitted one, and nothing would have noticed. That
+is a hole in the corpus's coverage of GAMEPLAY § 8 found **by a null result rather than by a
+violation**, which is the thing the Phase 9 status row exists to make visible.
+
+**An axis, not a case, and the precedent is cited with its own measured null.** `HONESTY_MODES`
+(§ D194) is the shape: its second value produced **zero** new strings the day it landed, and that
+stopped being true later, when the Day report and the live-metrics panel became mode-aware. The value
+of generating an axis is that it is driven from the day a fitted surface lands rather than from the
+day somebody remembers to check it; one new case would be a screen the search reads once, on one
+building, at one horizon. This axis is **not** that null — it moves the run at every always-on case it
+is drawn on, which is asserted on the legs rather than argued.
+
+**Drawn last.** After `mode`, which was itself drawn last for this reason: the 49 pinned seeds keep
+the building, dispatcher pair, horizon, demand, batch shape and mode they already had and gain a
+field. A corpus whose cases moved under a new axis would have had its regression history silently
+rewritten, and the failures those seeds are pinned for would be about configurations nobody had ever
+run.
+
+**Which kit is a measurement, and it had to be re-taken.** § D427's table is measured at
+`garden-apartments`/3 600 s — the campaign's own cell, which is what `everyday/host.ts#runCampaignDay`
+writes. This corpus runs five buildings at **600–900 s** in the always-on tier, and
+`scope/probes.test-helper.ts` already records that `doors` L1 is **inert** at
+`garden-apartments`/900 s. A kit inherited from § D427's table would have been a kit measured where
+this corpus never runs. So `honesty/measure.fitOut.test.ts` sweeps **all sixteen shipped tiers over
+all 49 always-on cases**, as built and fitted, comparing the legs — passenger, car and boarding
+instant, `scope/probes.test-helper.ts#legsOf`'s string and § D177's rule, never a window statistic:
+
+| tier | legs move | tier | legs move |
+|---|---|---|---|
+| `doors` L1 | 38 | `machines` L1 | 41 |
+| `doors` L2 | 38 | `machines` L2 | **49** |
+| `doors` L3 | 40 | `machines` L3 | **49** |
+| `control` L1 | not drivable at this corpus's seams | `cars` L1 | **0** |
+| `control` L2 | 31 | `cars` L2 | 26 |
+| `control` L3 | 33 | `shafts` L1 / L2 | 44 |
+| `tenants` L1 | 24 | `tenants` L2 | not drivable at this corpus's seams |
+| `tenants` L3 | 27 | | |
+
+**`cars` L1 moves 0 of 49, which extends § D427's finding rather than repeating it.** That decision
+found the tier inert at the campaign's cell and live at the same cell at 15 % of population per
+5 min. Here it is inert at **every** cell: no always-on horizon fills a car, so *16-person cars* is an
+empty control across a whole tier. `machines` L1 is inert on exactly the eight `secure-tower` cases
+and nowhere else, which is a fact about one building's fleet.
+
+**Two tiers are not drivable at this corpus's seams, and that is a refusal pinned by a run.**
+`control` L1 is `zonesTheTower`, which `leversWithKit` writes onto a `GroupLevers` that
+`authoring/dispatcherSpec.ts#profileFromSpec` turns into a profile — a case names a **shipped**
+profile and builds no spec. `tenants` L2 is `arrivalRateFactor`, and a case's demand is either an
+explicit rate or `null` for the building's own profile, so multiplying `null` would mean resolving a
+schedule into a constant: a second change to the run beside the one being measured. `honesty.test.ts`
+asserts no shipped kit carries either field, so the exclusion is § D227's rule obeyed rather than a
+sentence a reader has to trust.
+
+**Two kits, over two seams, and the second is bought *on top of* the first.** `machines` L2 is the
+seed because with L3 it is the only rung that moves 49 of 49 — a kit inert on a case is a case that
+adds strings without adding coverage. But § 8 has two appliers and they are separate seams:
+`fittedBuilding` edits the tower, `profileWithKit` edits the dispatcher, and `machines` L2 names no
+`dispatch` field, so a corpus driving only it would leave `profileWithKit` at its identity branch
+forever. `control` L3 alone moves only 33 of 49, so it is bought beside a tier that always moves
+rather than instead of one.
+
+**That is the *turn the whole shop on* mistake unless something checks each category alone, and
+something does — measured, not argued.** `probes.test-helper.ts` states the risk: *"an arm that
+turned the whole shop on would still be green if five of the six categories had come unwired."*
+Unwiring the dispatcher seam alone was run: the corpus-wide *"the fit-out axis moves the run"* case
+**stayed green**, because `machines` L2 carries the move, and only the per-category probe went red.
+That is the argument for the probe existing, taken as a measurement rather than offered as one.
+
+**What it cost, and what it did not.** Branch-local, always-on tier: strings **571 205 → 571 295**
+(+90), and **simulations, surfaces and failing cases all unmoved** — 606, 53 and 0, with the surface
+sets diffed rather than the counts compared and found identical. A fitted case runs the same number
+of simulations as an as-built one; it resolves one extra building. These figures are **branch-local
+and are not published to `CLAUDE.md`**: § D343 puts that measurement on the integrator, once, after
+integration, both tiers in one sitting.
+
+**One column moved that nobody predicted, and it is the most interesting thing here.** Suppressed
+runs went **9 of 49 → 12 of 49**. Three cases — 9022, 9024 and 9034, all `mixed-use-high-rise` under
+`machines-2+control-3` — publish a quotable mean as built and have it **refused** once the tower is
+fitted. So a purchase changes whether R3 has anything to say about the run at all, which is exactly
+the class of thing a corpus of as-built towers could not see. No mechanism is offered for it: this
+repository's own rule is that a sentence about *why* something performs a certain way is either
+measured or declared unmeasured, and this one is unmeasured.
+
+**Seeded is not checked, and the difference is a fault.** `faults.ts#fittedTowerMeanLeak` is
+`suppressedMeanLeak` with one guard in front of it — *a tower as built has bought nothing to lie
+about* — so it is a no-op on every as-built case by construction. `faults.test.ts` asserts both
+directions on one case: fitted, it produces a fresh R3 violation; the same case with `fitOutId: null`,
+it produces none. A fault that fired either way would prove the property works and say nothing about
+whether the fitted half of the corpus reaches it. Its fixture is a **fitted and suppressed** case, and
+whether the corpus still produces one is itself a measurement, so the fixture loop throws with that
+sentence rather than skipping.
+
+**The shrinker can put a tower back as built**, second in the reducer order, and what that buys is a
+diagnosis rather than wall clock: a violation that survives the reduction was never about the
+fit-out, and one that does not survive it is a violation only a fitted tower produces.
+
+**Four deep-tier cases are fitted and inert, and each is a named cell rather than a failure** —
+§ D427's own precedent, which asserts an empty cell beside a cell where the same tier moves. Two are
+`crown-hotel` and `st-jude-hospital`, whose only bank is mixed-fleet, so `campaign/fitOut.ts#choicesFor`
+refuses to flatten it and the `machines` tier buys nothing there; the other two are `chancery-house`,
+whose six cars are **already** `gearless-traction` at 5 m/s — a tower that has what the tier sells.
+All three are stage buildings, reachable in no other tier, which is why the corpus-wide legs assertion
+is scoped to the always-on tier where the survey was taken.
+
+**Not claimed.** That the properties would *catch* a real fitted-surface defect — only that they read
+a fitted run's strings, and that one of them can be made to fire there. Nothing here changes a
+property, and `honesty/properties.ts` is untouched.
