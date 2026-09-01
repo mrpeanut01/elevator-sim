@@ -44,6 +44,7 @@ import {
   purseOf,
   rateOnDay,
   renewalOffer,
+  serviceDaysLeft,
   standingOf,
   wearHeadOf,
   wearOf,
@@ -517,9 +518,14 @@ describe('§ 8.12’s snapshots, as the regression fixtures the design asks for'
  *
  * The verdict itself is not decided here — `everyday/campaignModel.ts#campaignDayVerdict` folds
  * § 8.6's tests and its own suite holds it. What these cases hold is the half § 8.1 makes
- * expensive to get wrong: two fields move and **every** other figure is derived from them, so a
+ * expensive to get wrong: three fields move and **every** other figure is derived from them, so a
  * day filed here has to be visible in the purse, the grid, the allowance and the renewal without
  * anything else being written.
+ *
+ * Every case below files `trips: 0` except the wear-clock block at the end, so the arithmetic each
+ * one is about is the arithmetic it asserts. Zero is a legal day's count — a thirty-minute period
+ * on a quiet building can genuinely produce no loaded departure — rather than a stand-in for the
+ * absent case, which is `undefined` and has its own case.
  */
 describe('filing a campaign day', () => {
   const first = (career: CampaignCareer): CampaignTower => towerById(career, 'c1')!;
@@ -530,6 +536,7 @@ describe('filing a campaign day', () => {
       kind: 'file-day',
       towerId: 'c1',
       verdict: 'cleared',
+      trips: 0,
     });
 
     expect(first(after).day).toBe(first(before).day + 1);
@@ -551,6 +558,7 @@ describe('filing a campaign day', () => {
       kind: 'file-day',
       towerId: 'c1',
       verdict: 'missed',
+      trips: 0,
     });
 
     expect(first(after).missed).toBe(1);
@@ -569,11 +577,13 @@ describe('filing a campaign day', () => {
       kind: 'file-day',
       towerId: 'c1',
       verdict: 'cleared',
+      trips: 0,
     });
     const missed = applyCampaignAction(before, {
       kind: 'file-day',
       towerId: 'c1',
       verdict: 'missed',
+      trips: 0,
     });
 
     expect(purseOf(first(cleared))).toBe(purseOf(first(before)) + rate);
@@ -584,7 +594,12 @@ describe('filing a campaign day', () => {
     const allowance = DIFFICULTIES[first(openingCareer('eta')).difficultyId].miss;
     let career = openingCareer('eta');
     for (let day = 0; day <= allowance; day += 1) {
-      career = applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict: 'missed' });
+      career = applyCampaignAction(career, {
+        kind: 'file-day',
+        towerId: 'c1',
+        verdict: 'missed',
+        trips: 0,
+      });
     }
     expect(first(career).missed).toBe(allowance + 1);
     expect(contractIsLost(first(career))).toBe(true);
@@ -593,21 +608,36 @@ describe('filing a campaign day', () => {
   it('files the month’s last day and then refuses, because day twenty-one has no fee and no cell', () => {
     let career = openingCareer('eta');
     for (let day = 0; day < CONTRACT_DAYS; day += 1) {
-      career = applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict: 'cleared' });
+      career = applyCampaignAction(career, {
+        kind: 'file-day',
+        towerId: 'c1',
+        verdict: 'cleared',
+        trips: 0,
+      });
     }
     expect(first(career).day).toBe(CONTRACT_DAYS + 1);
     expect(clearedDays(first(career))).toBe(CONTRACT_DAYS);
     // The month is over; § 8.9's renewal is the next press, not a twenty-first day.
     expect(needOf(first(career))?.kind).toBe('renewal');
-    expect(applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict: 'cleared' })).toBe(
-      career,
-    );
+    expect(
+      applyCampaignAction(career, {
+        kind: 'file-day',
+        towerId: 'c1',
+        verdict: 'cleared',
+        trips: 0,
+      }),
+    ).toBe(career);
   });
 
   it('refuses a tower the career does not hold, and moves nothing', () => {
     const before = openingCareer('eta');
     expect(
-      applyCampaignAction(before, { kind: 'file-day', towerId: 'c6', verdict: 'cleared' }),
+      applyCampaignAction(before, {
+        kind: 'file-day',
+        towerId: 'c6',
+        verdict: 'cleared',
+        trips: 0,
+      }),
     ).toBe(before);
   });
 
@@ -617,6 +647,7 @@ describe('filing a campaign day', () => {
       kind: 'file-day',
       towerId: 'c6',
       verdict: 'cleared',
+      trips: 0,
     });
     expect(towerById(after, 'c6')!.day).toBe(towerById(before, 'c6')!.day + 1);
     expect(towerById(after, 'c1')).toEqual(towerById(before, 'c1'));
@@ -626,11 +657,139 @@ describe('filing a campaign day', () => {
   it('carries a filed record into § 8.9’s renewal offer and into the standing it banks', () => {
     let career = openingCareer('eta');
     for (const verdict of ['cleared', 'cleared', 'missed'] as const) {
-      career = applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict });
+      career = applyCampaignAction(career, {
+        kind: 'file-day',
+        towerId: 'c1',
+        verdict,
+        trips: 0,
+      });
     }
     const tower = first(career);
     // Two of the three days held, which is what the agent prices the renewal from.
     expect(renewalOffer(tower).clearRate).toBeCloseTo(2 / 3, 10);
     expect(standingOf(career.carry, career.towers)).toBe(2 * 2 - 3);
+  });
+
+  /*
+   * **The wear clock — GitHub issue #313.** `trips` had four consumers and no writer, so `wearOf`,
+   * `failureOddsPct`, `serviceDaysLeft` and `wearHeadOf` were all reading a constant and every check
+   * they passed was vacuous. These cases are the writer, asserted through those consumers rather
+   * than on the field alone: a test that only read `tower.trips` back would pass on a change that
+   * moved the number and reached none of § 8.3.
+   */
+  it('puts the day’s loaded departures on the wear clock, and the clock reaches § 8.3', () => {
+    const before = openingCareer('eta');
+    expect(first(before).trips).toBe(0);
+    expect(wearOf(first(before))).toBe(0);
+    expect(wearHeadOf(first(before))).toBe('fresh');
+
+    // A day at roughly § 8.3's own 1 400 trips a working day.
+    const after = applyCampaignAction(before, {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'cleared',
+      trips: 1_400,
+    });
+    expect(first(after).trips).toBe(1_400);
+    expect(wearOf(first(after))).toBeCloseTo(1_400 / SERVICE_AT_TRIPS, 12);
+    // `daysLeft` is the figure the desk prints, and it has moved by exactly one working day.
+    expect(serviceDaysLeft(first(after))).toBe(serviceDaysLeft(first(before)) - 1);
+
+    // It accumulates across days rather than being replaced by the latest one.
+    const second = applyCampaignAction(after, {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'missed',
+      trips: 600,
+    });
+    expect(first(second).trips).toBe(2_000);
+  });
+
+  it('drives the wear head across § 8.3’s thresholds as days are filed', () => {
+    let career = openingCareer('eta');
+    // Just past 0.6 of the interval — § 8.3's *Wearing in*.
+    career = applyCampaignAction(career, {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'cleared',
+      trips: Math.round(SERVICE_AT_TRIPS * 0.61),
+    });
+    expect(wearHeadOf(first(career))).toBe('wearing');
+    // And past 0.85 — *Service window due*, which is the incident `needOf` derives.
+    career = applyCampaignAction(career, {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'cleared',
+      trips: Math.round(SERVICE_AT_TRIPS * 0.3),
+    });
+    expect(wearHeadOf(first(career))).toBe('due');
+    expect(needOf(first(career))?.kind).toBe('service');
+  });
+
+  it('holds the clock where it is on a day whose trips were never counted', () => {
+    /*
+     * `undefined` is *nobody counted*, and it may not be filed as *no wear*: `daysLeft` would go on
+     * publishing a figure derived from a day that never entered it. The day itself still files —
+     * the wear clock is not a gate on the record.
+     */
+    const before = applyCampaignAction(openingCareer('eta'), {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'cleared',
+      trips: 1_400,
+    });
+    const after = applyCampaignAction(before, {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'cleared',
+      trips: undefined,
+    });
+    expect(first(after).trips).toBe(first(before).trips);
+    expect(first(after).day).toBe(first(before).day + 1);
+  });
+
+  it('refuses a trip count that is negative or not a number, rather than poisoning § 8.3', () => {
+    const before = openingCareer('eta');
+    for (const trips of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const after = applyCampaignAction(before, {
+        kind: 'file-day',
+        towerId: 'c1',
+        verdict: 'cleared',
+        trips,
+      });
+      expect(first(after).trips).toBe(0);
+      expect(Number.isFinite(wearOf(first(after)))).toBe(true);
+    }
+  });
+
+  it('resets to zero on a service window, and keeps accumulating after it', () => {
+    /*
+     * The two halves that only mean something together: § 8.3's window resets the clock, and the
+     * next filed day starts it again from there. Before this lane the second half was untestable
+     * because nothing ever moved the clock off zero in the first place.
+     */
+    let career = applyCampaignAction(openingCareer('eta'), {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'cleared',
+      trips: Math.round(SERVICE_AT_TRIPS * 0.9),
+    });
+    const need = needOf(first(career));
+    expect(need?.kind).toBe('service');
+    const window = need!.options.find((option) => option.id !== 'leave')!;
+    career = applyCampaignAction(career, {
+      kind: 'answer-need',
+      towerId: 'c1',
+      optionId: window.id,
+    });
+    expect(first(career).trips).toBe(0);
+
+    career = applyCampaignAction(career, {
+      kind: 'file-day',
+      towerId: 'c1',
+      verdict: 'cleared',
+      trips: 700,
+    });
+    expect(first(career).trips).toBe(700);
   });
 });

@@ -1064,16 +1064,31 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       const tower = towerById(career, towerId);
       const recording = state.recording;
       if (tower === undefined || recording === undefined) return;
+      const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
       const verdict = campaignDayVerdict(
         campaignTestRows(
           DIFFICULTIES[tower.difficultyId],
           tower,
-          shiftObservationsOf(observationsAt(recording, recording.endedAt)),
+          observations,
           state.week.history,
         ),
       );
       if (verdict === 'ungraded') return;
-      const next = applyCampaignAction(career, { kind: 'file-day', towerId, verdict });
+      /*
+       * **And the trips the day put on the machines** — GitHub issue #313, § 8.3's wear clock.
+       *
+       * The same observation object the four tests were graded from, so the figure the player was
+       * shown on the row is the figure the clock takes; a second fold here would be a second answer
+       * to *how many trips did today make*. `undefined` travels rather than a zero when the run
+       * carried no trip count, and `campaign/career.ts#fileDay` holds the clock where it is —
+       * a day nobody counted may not be recorded as a day of no wear.
+       */
+      const next = applyCampaignAction(career, {
+        kind: 'file-day',
+        towerId,
+        verdict,
+        trips: observations.loadedDepartures,
+      });
       if (next === career) return;
       career = next;
       notifyCampaign();

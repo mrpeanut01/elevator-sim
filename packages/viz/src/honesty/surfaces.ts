@@ -7965,7 +7965,6 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     'everyday/campaignModel.ts#CONTRACT_COPY',
     'everyday/campaignModel.ts#WEAR_HEADS',
     'everyday/campaignModel.ts#TEST_TENSIONS',
-    'everyday/campaignModel.ts#TRIPS_REFUSAL',
     'everyday/campaignModel.ts#CALENDAR_LEGEND',
     'everyday/campaignModel.ts#MONTH_LEGEND',
     /* Reached through the three views above: every figure they print is one of these. */
@@ -8108,6 +8107,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
         seeds.push({ field: `${at}.record`, text: row.record, role: 'observation' });
         seeds.push({ field: `${at}.wear`, text: row.wear, role: 'observation' });
         seeds.push({ field: `${at}.order.note`, text: row.order.note, role: 'prose' });
+        /* The build select's own refusal — a control that writes nothing saying so (issue #313). */
+        seeds.push({ field: `${at}.order.buildNote`, text: row.order.buildNote, role: 'reason' });
         for (const build of row.order.builds) {
           seeds.push({ field: `${at}.build.${build.id}`, text: build.label, role: 'label' });
         }
@@ -8160,6 +8161,11 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
         }
         seeds.push({ field: `${label}.desk.order.sub`, text: desk.order.sub, role: 'prose' });
         seeds.push({ field: `${label}.desk.order.note`, text: desk.order.view.note, role: 'prose' });
+        seeds.push({
+          field: `${label}.desk.order.buildNote`,
+          text: desk.order.view.buildNote,
+          role: 'reason',
+        });
         for (const row of desk.fitted.rows) {
           seeds.push({ field: `${label}.desk.fitted.${row.categoryId}`, text: row.label, role: 'label' });
           seeds.push({ field: `${label}.desk.fitted.${row.categoryId}.level`, text: row.level, role: 'observation' });
@@ -8189,9 +8195,6 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
           seeds.push({ field: `${at}.tension`, text: row.tension, role: 'prose' });
           if (row.reading !== undefined) {
             seeds.push({ field: `${at}.reading`, text: row.reading.display, role: 'observation' });
-          }
-          if (row.refusal !== undefined) {
-            seeds.push({ field: `${at}.refusal`, text: row.refusal, role: 'reason' });
           }
         }
       }
