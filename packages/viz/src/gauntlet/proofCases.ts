@@ -13,12 +13,34 @@
  * tower name or a crowd label as a literal.** A second copy of the names is the defect; a test that
  * only checked the first copy would not see it.
  *
- * The one thing `data/` deliberately does *not* carry is the seed. § 1's rule is
- * `hash(towerId, crowdIndex)`, *"fixed forever; a rating is only comparable if the cases never
- * move"* — so it is computed by {@link proofSeedOf} where a hand editing a rate cannot reach it.
- * Invariant 5 is unaffected: every case carries the seed it ran under into the rating record.
+ * **All three readers exist as of [§ D445](../../../../DECISIONS.md)**: the gauntlet (`run.ts`),
+ * the ladder's disclosure (`ladder.ts#whatAreTheFortyOf`) and the Everyday bench
+ * (`everyday/benchModel.ts`), which ran `MATRIX_CELLS` until that ruling. The Engineer's suite
+ * panel (`dev/suitePanel.ts`) still runs the matrix and is **not** a fourth reader: § 12.3 names
+ * the *bench's* suite, § 12 is the Everyday bench, and the Engineer surface asks the matrix's own
+ * question at the matrix's own points.
  *
- * ## Why the eight are not `MATRIX_CELLS`
+ * ## The seed is not part of the list, and § 1 gives one rule per reader
+ *
+ * The one thing `data/` deliberately does *not* carry is the seed, and § 1's table carries **two**
+ * rules over this one fixture set:
+ *
+ * | Gauntlet, 40 cases | `hash(towerId, crowdIndex)` | *fixed forever; a rating is only comparable if the cases never move* |
+ * | Bench, per test per rep | `hash(testId, repIndex)` | *the same for every entrant — that is what "matched crowds" means* |
+ *
+ * So *one list, three readers* is a claim about **fixtures**, never about traces. {@link proofSeedOf}
+ * is the gauntlet's rule and {@link benchSeedOf} is the bench's, and neither has a default: a caller
+ * of {@link proofCaseRequestOf} must hand it a seed and therefore must say which reader it is.
+ *
+ * That split is also CLAUDE.md's hold-out discipline, which is why it is not merely obedience to a
+ * table. A bench sharing the gauntlet's seeds would let a player tune a dispatcher against the exact
+ * forty traces it is about to be **rated** on — *"tune on one seed set, validate on a disjoint one,
+ * or you overfit the weight vector to specific passenger traces and the gain vanishes on new
+ * traffic"*. Same operating points, disjoint traces, is the textbook arrangement and it is what this
+ * pair produces. `proofCases.test.ts` asserts the two seed **sets** are disjoint over the shipped
+ * forty rather than trusting that two hashes of different strings differ.
+ *
+ * ## Why the eight are not `MATRIX_CELLS`, and what the bench gave up by moving
  *
  * `benchmark/matrixCells.ts` holds eight **measured operating points** — building × traffic-pattern
  * cells over five buildings, each carrying a derived replication budget and the census that argued
@@ -27,6 +49,16 @@
  * shipped building appears exactly once, every crowd shape appears on every building, and no cell
  * is dropped for being hard to resolve — a tower a dispatcher does badly on is the point of it.
  * The two lists are therefore two lists, and neither may be derived from the other.
+ *
+ * The bench moving to the forty therefore looks like it costs the derived budgets, and **it costs
+ * nothing**, which was measured rather than assumed: no module in `packages/viz` reads
+ * `MatrixCell.replications`, `budgetBasis`, `armCeilings` or `admissibleReplications`. The bench
+ * consumed a cell's building, horizon, demand block, window, id and label and nothing else, and a
+ * proof case carries every one of those. `SuiteRequest.replications` says why in its own docstring:
+ * the budget is *"one number for the whole suite rather than each cell's own derived budget, because
+ * this is the player's control"*. What the bench keeps is `report.ts`'s `under-budget` refusal below
+ * `MIN_REPLICATION_BUDGET`, which is a gate rather than an estimate and is unaffected by which
+ * fixtures it gates. See [§ D445](../../../../DECISIONS.md).
  *
  * ## What the derivation guarantees
  *
@@ -119,6 +151,41 @@ export function proofSeedOf(towerId: string, crowdIndex: number): string {
 }
 
 /**
+ * § 1's **bench** seed rule: `hash(testId, repIndex)` — the test half of it.
+ *
+ * `runBatch` supplies the `repIndex` half (`replicationSeed(request.seed, replication)`, one seed
+ * per index shared by every arm — *"this line is the whole of CRN"*), so what a caller owes is one
+ * stable number per test. The test **is** a proof case, so the key is the case's own id under a
+ * bench prefix.
+ *
+ * ## Why this is not {@link proofSeedOf}
+ *
+ * Two reasons, and the second is the one that would survive § 1 being rewritten.
+ *
+ * 1. § 1's table gives the bench and the gauntlet **different rules** over the same fixture set.
+ *    *One list, three readers* (§ 12.3) is a claim about fixtures; a rating is comparable because
+ *    the **cases** never move, not because everything that ever runs them shares their traces.
+ * 2. CLAUDE.md § Tuning discipline: *"Tune on one seed set, validate on a disjoint one, or you
+ *    overfit the weight vector to specific passenger traces and the gain vanishes on new traffic."*
+ *    The bench is where a player iterates on a dispatcher and the gauntlet is what rates it. Shared
+ *    seeds would make the rating a measurement on the training set.
+ *
+ * The prefix is a different key space rather than a different hash, so the two rules stay one
+ * function's worth of arithmetic and a reader can check either by hand. Disjointness over the
+ * shipped forty is **asserted** in `proofCases.test.ts`, not assumed: two hashes of two different
+ * strings are only *probably* different, and the probability is not the argument.
+ */
+export function benchSeedOf(proofCase: ProofCase): string {
+  let hash = 2166136261;
+  const key = `bench#${proofCase.id}`;
+  for (let index = 0; index < key.length; index += 1) {
+    hash = (hash ^ key.charCodeAt(index)) >>> 0;
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return String(hash >>> 0);
+}
+
+/**
  * The forty, tower-major, derived — never authored.
  *
  * Total over a parsed document, so `length === towers.length × crowds.length` holds by
@@ -154,15 +221,22 @@ export function proofCasesOf(set: ProofCaseSet): readonly ProofCase[] {
  * `replications` is the caller's, and the gauntlet passes **1**. That is not a budget and is not
  * claimed to be one: see `rating.ts`, which states what a mean over forty single runs may and may
  * not be used to say, and refuses to name a winner from it.
+ *
+ * **`seed` is the caller's too, and it is required rather than defaulted.** § 1 gives one seed rule
+ * per reader over this one list — {@link proofSeedOf} for the gauntlet, {@link benchSeedOf} for the
+ * bench — and a default here would be one of the two rules worn silently by the other reader. That
+ * is the shape [§ D227](../../../../DECISIONS.md) is about: the caller says which rule it is using,
+ * in the call, where a reader of the call can see it.
  */
 export function proofCaseRequestOf(
   proofCase: ProofCase,
   arms: readonly BatchArmRequest[],
   replications: number,
+  seed: string,
 ): BatchRequest {
   return {
     buildingId: proofCase.tower.id,
-    seed: proofCase.seed,
+    seed,
     durationS: proofCase.crowd.durationS,
     replications,
     arms,

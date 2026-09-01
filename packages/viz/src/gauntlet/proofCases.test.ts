@@ -104,7 +104,7 @@ describe('a case as a batch request', () => {
 
   it('carries the tower’s building and level and the crowd’s horizon and shape', () => {
     if (first === undefined) throw new Error('no proof cases');
-    const request = proofCaseRequestOf(first, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1);
+    const request = proofCaseRequestOf(first, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1, first.seed);
     expect(request.buildingId).toBe(first.tower.id);
     expect(request.durationS).toBe(first.crowd.durationS);
     expect(request.seed).toBe(first.seed);
@@ -114,7 +114,7 @@ describe('a case as a batch request', () => {
 
   it('never sets the level twice — `runBatch` refuses the combination by name', () => {
     if (first === undefined) throw new Error('no proof cases');
-    const request = proofCaseRequestOf(first, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1);
+    const request = proofCaseRequestOf(first, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1, first.seed);
     expect(request.arrivalRatePctPop5min).toBeNull();
     expect(request.demandLevel).toBeUndefined();
   });
@@ -122,7 +122,8 @@ describe('a case as a batch request', () => {
   it('reports every case over the whole run, so forty figures share one label', () => {
     for (const entry of proofCasesOf(SET)) {
       expect(
-        proofCaseRequestOf(entry, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1).reportWindow,
+        proofCaseRequestOf(entry, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1, entry.seed)
+          .reportWindow,
       ).toBe('full-run');
     }
   });

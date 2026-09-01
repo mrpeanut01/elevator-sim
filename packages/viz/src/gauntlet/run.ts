@@ -163,6 +163,13 @@ export function runGauntlet(options: GauntletOptions): GauntletHandle {
         proofCase,
         [{ armId: 'candidate', dispatcherProfileId: options.dispatcherProfileId }],
         options.replications,
+        /*
+         * § 1's gauntlet rule — `hash(towerId, crowdIndex)`, fixed forever, which is the whole
+         * reason two ratings a month apart are comparable. The bench runs the same forty cases
+         * under `benchSeedOf` instead (§ D445); passing the case's own seed is a choice this call
+         * makes and not a default it inherits.
+         */
+        proofCase.seed,
       ),
     });
   };
