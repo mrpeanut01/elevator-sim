@@ -51,7 +51,6 @@
  */
 
 import type { VizRecording } from '../contract/types.js';
-import type { SimulationConfig } from '@elevator-sim/core/browser';
 import { filedDayRuns, watchGateAfter, watchGateBefore } from '../watch/library.js';
 import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';

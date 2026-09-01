@@ -35,6 +35,14 @@ import {
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
+import {
+  BLOCKED_FRAME_GAP_MS,
+  frameDisabled,
+  frameLabels,
+  frameReading,
+  paintedBusyFrame,
+  recordFrames,
+} from '../dev/mainThreadFrames.test-helper.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -79,6 +87,20 @@ async function openFixit(page: Page): Promise<void> {
     () => document.querySelectorAll('.everyday-fixit-case').length > 0,
     undefined,
     { timeout: 60_000 },
+  );
+  /*
+   * And wait for the first case's four figures.
+   *
+   * Since GitHub issue #165 the as-built run those figures are measurements of happens on a
+   * worker, so a case-rail row existing no longer means the screen has its numbers — it means the
+   * case file loaded. This walk is *open the screen and let it settle*, so the honest latch is the
+   * last thing the open produces. The screen's own busy state is asserted by the cases that watch
+   * a **second** case being opened, where the transient is the subject rather than the wait.
+   */
+  await page.waitForFunction(
+    () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
+    undefined,
+    { timeout: 120_000 },
   );
 }
 
@@ -379,6 +401,141 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       expect(outcome.count).toBe(
         `${String(solved ? 1 : 0)}/${String(outcome.tags.length)} fixed`,
       );
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('keeps painting through the pair, and through opening a case — GitHub issue #165', async () => {
+    const page = await coldLoad();
+    try {
+      await openFixit(page);
+
+      /*
+       * Issue #165's acceptance on the surface it called the most exposed, and it is asserted
+       * about the **page**: while the runs happen, the browser goes on rendering frames.
+       *
+       * Both halves are driven, because they failed differently. The press had a busy state and a
+       * frozen page behind it — measured on the base commit in the shipped artifact, the longest
+       * stretch with no rendered frame was **947 ms over 13 frames**. Opening a case had no busy
+       * state at all: it ran inside `mainColumn`, so a player clicking a rail row got a screen that
+       * simply stopped — **128 ms** there, on the case the rail happens to offer second.
+       *
+       * § D220 § 4 still holds. Nothing here reads a figure of a run; a frame gap is a fact about
+       * the browser's frame delivery.
+       */
+      await recordFrames(page, '.everyday-bar-primary');
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-fixit-outcome', { timeout: 120_000 });
+
+      /*
+       * A **painted** frame carrying the busy primary — the assertion that needs no threshold, and
+       * the one the sibling case above could not make. That case reads a `MutationObserver`
+       * recording and says so in its own docstring: an observer reports DOM *writes*, so it passes
+       * against a screen whose runs are on the main thread. This is the other instrument.
+       */
+      const busyAt = await paintedBusyFrame(page, /Running the day/);
+      expect(
+        busyAt,
+        `no rendered frame carried the busy label: ${JSON.stringify(await frameLabels(page))}`,
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        await frameDisabled(page, busyAt),
+        'the § 3.3 primary was relabelled but stayed pressable',
+      ).toBe(true);
+
+      const press = await frameReading(page);
+      // Both halves: a sampler that never started reports a longest gap of zero, which reads
+      // exactly like a page that never stuttered.
+      expect(press.frames, 'the frame sampler recorded nothing').toBeGreaterThan(10);
+      expect(
+        press.longestGapMs,
+        `the page stopped painting for ${press.longestGapMs.toFixed(0)} ms over ${String(press.frames)} frames — a run is back on the main thread`,
+      ).toBeLessThan(BLOCKED_FRAME_GAP_MS);
+
+      // And opening a second case, which takes an as-built run of its own.
+      await recordFrames(page, '.everyday-fixit-measuring');
+      await page.locator('.everyday-fixit-case').nth(1).click();
+      await page.waitForFunction(
+        () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
+        undefined,
+        { timeout: 120_000 },
+      );
+      /*
+       * The busy state the open run never had, on a painted frame. Before the move this ran inside
+       * `mainColumn`, so a player clicking a rail row got a screen that simply stopped and there
+       * was no state to draw — nothing could have painted one.
+       */
+      const measuringAt = await paintedBusyFrame(page, /Measuring the building/);
+      expect(
+        measuringAt,
+        `no rendered frame said the case was being measured: ${JSON.stringify(await frameLabels(page))}`,
+      ).toBeGreaterThanOrEqual(0);
+
+      const open = await frameReading(page);
+      /*
+       * A lower floor than the press's, because the window is shorter: one small run rather than a
+       * pair, so the sampler gets a handful of frames rather than a hundred and fifty. The floor
+       * exists only to make the gap below meaningful — a reading of nought or one frame has no gap
+       * in it — and the weight on this half is carried by the painted measuring frame above, which
+       * needs no threshold at all.
+       */
+      expect(open.frames, 'the frame sampler recorded nothing on the open').toBeGreaterThan(2);
+      expect(
+        open.longestGapMs,
+        `opening a case stopped the page for ${open.longestGapMs.toFixed(0)} ms over ${String(open.frames)} frames`,
+      ).toBeLessThan(BLOCKED_FRAME_GAP_MS);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('never draws a blank figure while a case’s as-built run is out', async () => {
+    const page = await coldLoad();
+    try {
+      await openFixit(page);
+      /*
+       * The complement of the painted-frame assertion above: the grid goes from *nothing, with a
+       * sentence in place of the figures* to *four figures*, and never through a partial state. A
+       * card with no reading in it is worse than a named absence — this repository's rule about a
+       * figure a surface does not have, applied to a transient.
+       *
+       * A `MutationObserver` rather than a frame sampler, deliberately: this is a claim about what
+       * the screen ever *wrote*, and a frame loop would miss an intermediate state that existed
+       * between two frames. The two instruments answer different questions and the case above
+       * holds the one about paint.
+       */
+      await page.evaluate(() => {
+        const seen: string[] = [];
+        const sample = (): void => {
+          const grid = document.querySelector('.everyday-fixit-figures');
+          if (grid === null) return;
+          const measuring = grid.querySelector('.everyday-fixit-measuring');
+          const shape = `${String(grid.querySelectorAll('.everyday-fixit-figure').length)}:${measuring === null ? '-' : 'measuring'}`;
+          if (seen.at(-1) !== shape) seen.push(shape);
+        };
+        sample();
+        (window as unknown as { __figureShapes?: string[] }).__figureShapes = seen;
+        new MutationObserver(sample).observe(document.documentElement, {
+          subtree: true,
+          childList: true,
+          characterData: true,
+        });
+      });
+      await page.locator('.everyday-fixit-case').nth(1).click();
+      await page.waitForFunction(
+        () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
+        undefined,
+        { timeout: 120_000 },
+      );
+      const shapes = await page.evaluate(
+        () => (window as unknown as { __figureShapes?: string[] }).__figureShapes ?? [],
+      );
+      expect(shapes, 'the grid never announced it was measuring').toContain('0:measuring');
+      // It ended: a measuring state that is the last one seen is a grid left saying so.
+      expect(shapes.at(-1) ?? '').toBe('4:-');
+      // And no partial grid was ever written.
+      expect(shapes.filter((shape) => /^[1-3]:/.test(shape))).toEqual([]);
     } finally {
       await page.close();
     }
