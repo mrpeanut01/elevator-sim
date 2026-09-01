@@ -108,8 +108,9 @@ function requireProfile(resources: HonestyResources, id: string): DispatcherProf
 /**
  * The kit this case's tower is running — `undefined` for a case that names none.
  *
- * Read once here rather than in each of the four places below, so a case cannot be built with the
- * building fitted and the dispatcher as built. `fitOutForCase` throws on an id no kit table holds,
+ * The one place in this module that turns a case's `fitOutId` into a kit, so a config cannot be
+ * assembled with the building fitted and the dispatcher as built — every seam below asks this
+ * function rather than the case. `fitOutForCase` throws on an id no kit table holds,
  * which travels out as an `UnrunnableCase` for `stageOf`'s reason: a case naming a kit that does
  * not exist must not silently run as built, which is the shape that makes an axis look swept while
  * it is inert.
