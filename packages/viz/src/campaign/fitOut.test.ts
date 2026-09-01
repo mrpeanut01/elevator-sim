@@ -35,7 +35,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { parseBuilding, type BuildingConfig } from '@elevator-sim/core/browser';
+import { parseBuilding, resolveBuilding, type BuildingConfig } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -52,7 +52,6 @@ import {
   fitOutOf,
   fittedArrivalRate,
   fittedBuilding,
-  fittedBuildingLoads,
   leversWithKit,
   profileWithKit,
   type CampaignFitOut,
@@ -102,6 +101,22 @@ const shipped = (id: string) => {
   if (entry === undefined) throw new Error(`${id} is not loaded`);
   return entry.config;
 };
+
+/**
+ * Whether the loader takes a fitted building — `fitOut.ts`'s stated contract, run rather than read.
+ *
+ * **Here rather than exported from the module it checks**, and `deadCode.test.ts` is what settled
+ * that: a first draft put it beside the appliers, where it had no non-test caller and the audit said
+ * so on its first run. That is this repository's own instrument catching the defect this lane is
+ * about, one directory over from the code it was about — so the function moved rather than being
+ * registered, because a shipped export whose only caller is a test is the thing the register is for
+ * recording, not for excusing. The run path re-parses and re-resolves the edited document anyway
+ * (`dev/state.ts#shiftRunConfigOf`), so a second gate on the shipped path would be a second opinion
+ * about legality.
+ */
+function loads(config: BuildingConfig): void {
+  resolveBuilding(parseBuilding(config as unknown), RESOURCES.elevatorSpecs);
+}
 
 /**
  * **Every building `data/buildings/` ships**, read off disk rather than off `RESOURCES`.
@@ -203,10 +218,7 @@ describe('§ 8.2’s shop', () => {
     for (const base of SHIPPED) {
       for (const { where, categoryId, tier } of TIERS) {
         const fitted = fittedBuilding(base, kit(categoryId, tier.level), RESOURCES.elevatorSpecs);
-        expect(
-          () => fittedBuildingLoads(fitted, RESOURCES.elevatorSpecs),
-          `${base.id} · ${where}`,
-        ).not.toThrow();
+        expect(() => { loads(fitted); }, `${base.id} · ${where}`).not.toThrow();
       }
     }
   });
@@ -217,7 +229,7 @@ describe('§ 8.2’s shop', () => {
     );
     for (const base of SHIPPED) {
       const fitted = fittedBuilding(base, everything, RESOURCES.elevatorSpecs);
-      expect(() => fittedBuildingLoads(fitted, RESOURCES.elevatorSpecs), base.id).not.toThrow();
+      expect(() => { loads(fitted); }, base.id).not.toThrow();
     }
   });
 });

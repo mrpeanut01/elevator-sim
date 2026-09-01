@@ -43,10 +43,7 @@
  */
 
 import {
-  parseBuilding,
   parseLoadDivisor,
-  personsAtRatedLoad,
-  resolveBuilding,
   type BuildingConfig,
   type DispatchStageConfig,
   type DispatcherProfile,
@@ -512,19 +509,4 @@ export function profileWithKit(
 
 function clamp(value: number, low: number, high: number): number {
   return Math.min(high, Math.max(low, value));
-}
-
-/**
- * Whether a fitted building the caller is about to run is one the loader takes.
- *
- * Exported for `fitOut.test.ts` and for no shipped caller, which is why it is the last thing in the
- * file and says so: the run path re-parses and re-resolves the edited document anyway
- * (`dev/state.ts#shiftRunConfigOf`), so a second gate on the shipped path would be a second opinion
- * about legality. What this is for is asserting the contract this module's docstring states — *the
- * result is accepted by `parseBuilding`/`resolveBuilding`* — over every tier of every shipped
- * building, which is the check that would have caught a speed outside its class's band.
- */
-export function fittedBuildingLoads(config: BuildingConfig, specs: ElevatorSpecs): boolean {
-  resolveBuilding(parseBuilding(config as unknown), specs);
-  return true;
 }
