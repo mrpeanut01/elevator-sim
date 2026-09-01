@@ -274,6 +274,38 @@ describe('the resource lookups are honest — undefined, never a substitution', 
   });
 });
 
+/**
+ * **The vector actually driving, not the id the player picked** — GitHub issue #171.
+ *
+ * The façade grew this method for § 7.6's handover, and the case that matters is the one an id
+ * comparison gets wrong: a player who has moved a plain lever is running a vector their standing
+ * dispatcher's name no longer describes, so handing the day to that name is a real change. If this
+ * method ever answered the base profile, the stage's control would be disabled at exactly that
+ * moment — § D177's inert-control class with its polarity reversed.
+ */
+describe('drivingProfile — what the building is obeying', () => {
+  it('is the standing profile while nothing has been moved', () => {
+    const host = createEverydayHost(harnessOf(base()).bindings);
+    const standing = host.dispatcherById(host.selection().dispatcherId);
+    expect(standing).toBeDefined();
+    expect(host.drivingProfile().weights).toEqual(standing?.weights);
+  });
+
+  it('follows a lever the run reads, under the same standing id', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    /*
+     * *Keep a car downstairs* is the one plain lever `drivingProfileOf` reads (issue #296), so it
+     * is the one that can make this method disagree with the base profile without the id moving.
+     */
+    host.setPlainLever('lobby', true);
+    const moved = createEverydayHost(harnessOf({ ...base(), ...h.patches[0] }).bindings);
+    expect(moved.selection().dispatcherId).toBe(host.selection().dispatcherId);
+    expect(moved.drivingProfile().idle?.parkingStrategy).toBe('lobby');
+    expect(host.drivingProfile().idle?.parkingStrategy).not.toBe('lobby');
+  });
+});
+
 describe('editedDispatcher — the § 20.10 gauntlet gate’s one question', () => {
   it('is clean on a freshly opened profile, so a saved dispatcher may be sent', () => {
     const edited = createEverydayHost(harnessOf(base()).bindings).editedDispatcher();
