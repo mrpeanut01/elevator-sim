@@ -115,7 +115,23 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * A register that kept naming any of them would be [§ D227](../../../../DECISIONS.md)'s stale
    * refusal — the defect this register exists to prevent — reproduced by the register itself.
    */
-  'Replaying a past day — the front door’s week strip says what each day did, and no control opens one again to watch it. A week here only moves forward.',
+  /*
+   * **Narrowed on the commit that made half of it false** — GitHub issue #182,
+   * [§ D436](../../../../DECISIONS.md), and this is the third time this register has had to do
+   * that. It read: *"Replaying a past day — the front door's week strip says what each day did, and
+   * no control opens one again to watch it. A week here only moves forward."*
+   *
+   * The second clause was the half that stopped being true. Your week now carries a `Watch it`
+   * button on every closed day whose record re-simulates to the figures it was filed with, so a
+   * player can open one again and watch it — and an entry telling them no control does is § D227's
+   * stale refusal, the defect this register exists to make findable, reproduced by the register.
+   *
+   * What is still absent is the **other** thing that sentence was reaching for, and it is now said
+   * exactly: a past day cannot be handed back to be *played* as the day it was. That is § 6.1's
+   * replay (GitHub issue #177), and `everyday/watchStage.ts#playThisCrowdRefusalFor` is the
+   * player-facing statement of the same absence on the control that would otherwise promise it.
+   */
+  'Replaying a past day as the day it was — Your week opens a closed day and watches its record play, but nothing hands one back to be played again. A tower grows through a week, so the same building and the same seed on a later day meet a different crowd, and Play this crowd yourself says so on any row that is not the day standing now.',
   'Racing a second dispatcher — no run in this build sends two dispatchers at the same crowd, so the brief’s *Race against* card says what that would show you instead of offering it.',
   /*
    * **A fifth row left on the very next merge, and it is the one this register existed to make
