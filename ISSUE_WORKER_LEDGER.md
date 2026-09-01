@@ -859,9 +859,14 @@ the same precision here would be manufacturing it.
 - **#176 is measured and unfixed.** *"The three DOM panels are statically swept"* is published in six
   places and none names which three; derived, it is **17 `#mount*` ids and 16 `*_SCREEN` rows** of
   216 exclusions, and even the narrowest reading is four rather than three. The derivation is on the
-  issue so nobody has to re-take it.
+  issue so nobody has to re-take it. *(Closed in wave I by lane B, [§ D421](DECISIONS.md) — as **33**
+  rather than 17: the classifier's own reasons put mounts and screen rows in one class, and stopping
+  at the mounts is how `docs/14` came to put a fifth panel in a class of three. All six sites now
+  derive it from `NOT_PLAYER_FACING` rather than carry a typed number.)*
 - **The `§ Dnnn` citation gate still reads markdown only.** Lane E was handed it; whether it landed
-  widened is for the next reader to check rather than assume.
+  widened is for the next reader to check rather than assume. *(Checked at wave I's dispatch rather
+  than assumed: **it did land** — the resolver iterates `[...DOCUMENTS, ...SOURCES]` with its own
+  non-vacuity guard on the `.ts` walk.)*
 - **D387 remains a registered hole**, and the mechanism that would have prevented it now exists.
 - **The ratchet sits on its ceiling again at 5 with zero headroom**, which is the ratchet working and
   the next lane's operational constraint.

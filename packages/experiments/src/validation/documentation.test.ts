@@ -1421,18 +1421,7 @@ type DecisionReservation = {
  * the whole point: the next integrator opens a block by replacing `null` with an object literal
  * and nothing else has to compile for the first time.
  */
-const OPEN_RESERVATION = {
-  wave: 'I',
-  /*
-   * D419–D430. Lanes A–E hold D419–D428, two apiece; **D429–D430 are the integrator's**, and
-   * reserving them is § D418's lesson applied rather than restated. Wave H's block was fitted to
-   * its lanes alone, the integrator then wrote a decision mid-wave, and this file's ceiling check
-   * caught it one number past the block — on the one participant the process had not thought to
-   * allocate for.
-   */
-  from: 419,
-  to: 430,
-} as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
  *
@@ -1473,6 +1462,13 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
     'allocated to wave F in the block D386–D392 and never written. Left unused permanently under ' +
       '§ D404: ids are names here, so backfilling it would make it denote two things across time ' +
       'and would falsify the charter’s record of what wave F took.',
+  ],
+  [
+    428,
+    'wave I allocated it to lane E, which folded its second subject into § D427 as paragraphs rather than ' +
+      'splitting it, and reported the number unspent. Registered rather than backfilled because ids here are ' +
+      'names (§ D430). It sits inside wave I’s block and not at its top: § D429 and § D430 close the block, ' +
+      'so the charter row names D431 and points at no hole.',
   ],
 ]);
 

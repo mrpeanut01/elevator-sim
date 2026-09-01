@@ -28780,3 +28780,76 @@ opened**, and was verified rather than assumed: [§ D400](#d400)/[§ D401](#d401
 file, mark the grid cleared or missed, move the purse and the career record, and drive progression,
 and `everyday/campaignJourney.browser.test.ts` drives the page to it. The issue text is stale on that
 clause and is corrected in the lane's report rather than worked around.
+
+---
+
+## D429 — a figure nobody can derive twice the same way is withheld, not refreshed
+
+**Date: 2026-09-01 · Owner: integrator, wave I · Corrects [§ D192](#d192)'s figures where they are
+live, dates them where they are not.**
+
+**Decision.** `CLAUDE.md`'s Phase 9 clause-4 paragraph publishes three figures from the `packages/viz`
+dead-code audit. They are now treated as three different kinds of claim:
+
+- *"all **19** `packages/viz/src` directories sit outside every `AUDITED_MODULES`"* is **present
+  tense and was wrong**. The tree holds **27**
+  (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`). Corrected.
+- *"19 directories derived from disk … 1 017 exports classified"* describes **what that audit found
+  on the tree it landed on**. It is a dated record, and now says so instead of reading as current.
+- **The export count is not re-published at all**, and that is the decision rather than an omission.
+
+**Why the third one is withheld.** Two derivations disagreed — **2 357** from wave I lane C's scan
+and **~2 893** from a cruder one taken here — and the audit's own figure cannot be read off a run,
+because vitest intercepts `console.log`. That is the identical trap that made
+`honesty/measure.corpus.test.ts` necessary: an instrument that computes the number a publisher needs
+and prints it where no publisher can see it. Picking either figure would republish a count no reader
+can reproduce, which is [`RISKS.md`](RISKS.md) R38 with fresh digits.
+
+**The rule this states.** A prose count is publishable when a reader can re-derive it by a stated
+command. Where the derivation exists, publish the command beside the number ([§ D421](#d421) does
+this for the 33 DOM entry points). Where it does not, **name the gap and publish nothing** — a
+withheld figure is a smaller defect than one two methods disagree about, because the first invites a
+measurement and the second ends the question falsely.
+
+**Not claimed.** No judgement is offered on which of 2 357 and ~2 893 is right. Making the audit's
+own count readable — the `measure.corpus.test.ts` treatment, writing to a file rather than a stream —
+is the fix, and it is not taken here.
+
+---
+
+## D430 — an unspent number in a block is a hole, and the block's last number must be spent
+
+**Date: 2026-09-01 · Owner: integrator, wave I · Completes [§ D404](#d404)'s mechanism with the case
+it did not cover.**
+
+**Decision.** When a wave's block closes, an allocated number no lane wrote is registered in
+`documentation.test.ts#KNOWN_DECISION_HOLES` and stays unused permanently — `CLAUDE.md`'s existing
+rule, because ids here are names and backfilling one makes it mean two things. **D428 is that number for
+wave I**: lane E reported it unspent, having folded its second subject into § D427 as paragraphs
+rather than splitting it.
+
+It is written **D428**, never as a `§` reference, and this entry earned that rule twice over rather
+than stating it. The first draft cited it as a section and `citations.test.ts` refused, because such
+a reference promises a heading a reader can follow and a hole is exactly the absence of one. The
+second draft explained the refusal **using the forbidden form as an example**, and the gate refused
+again — correctly, since it cannot tell an illustration from a claim.
+
+That is [§ D405](#d405)'s convention arriving at a second gate: **name it, do not utter it.** There
+it was the owed-decision marker, whose ratchet counts a discussion of the phrase as a use of it; here
+it is the section sigil. Both gates read prose as data, and neither can be taught the difference
+without being taught to miss a real site written the same way. **A hole is named, never cited.**
+
+**The case § D404 did not cover, found by closing its first block.** The closed-reservation arm
+asserts the charter's *Next free decision number* row equals `highest + 1`. If the block's **last**
+number is a hole, that arithmetic points the next lane straight at it — the row would have read D428
+while D428 was registered as permanently unused, and the next lane would have taken a number the
+register says nobody may have.
+
+So the rule is two-sided: **holes may sit anywhere inside a block except at its top.** The
+integrator's own numbers close the block — here § D429 and § D430 — and the row then names the first
+number outside it, **D431**, which no register claims.
+
+**Why this is a decision and not a note.** It is only reachable by closing a block that contains a
+hole, which happened for the first time in this wave. Wave H's block closed with every number spent,
+so the interaction could not appear; the next integrator would have met it as a red gate with no
+explanation, exactly as D387 was met.

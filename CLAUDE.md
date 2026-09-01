@@ -400,12 +400,23 @@ verdict:
   because a corpus that grew an axis and stayed green is a different claim from one that had to be
   repaired first. **Say the gaps in the same breath.** Clause 4 —
   *every unit names its non-test caller* — is **satisfied in prose and mechanised by nothing**: all
-  **19** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
+  **27** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
   audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
   the clause to distrust first, and a fifth audit under `packages/viz` is the fix — **done in
-  wave 12** (`packages/viz/src/deadCode.test.ts`, [§ D192](DECISIONS.md)): 19 directories derived
-  from disk and asserted both ways, 1 017 exports classified, and it immediately found two
-  docstrings naming callers that do not call; the verdict itself is unchanged. Also named in the
+  wave 12** (`packages/viz/src/deadCode.test.ts`, [§ D192](DECISIONS.md)), which **on the tree it
+  landed on** derived 19 directories from disk, asserted them both ways, classified 1 017 exports,
+  and immediately found two docstrings naming callers that do not call; the verdict itself is
+  unchanged.
+
+  **Two of those figures are dated and one was live and wrong, which is the distinction this row
+  keeps failing.** The directory count is a present-tense claim about the tree — it read **19** and
+  the tree holds **27** (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`), so it is
+  corrected. The wave-12 pair is a record of what that audit found when it landed, and is now marked
+  as such rather than silently refreshed. **The export count is deliberately not re-published**: two
+  derivations disagreed (2 357 against ~2 893 by a cruder scan), and the audit's own figure cannot be
+  read off a run because vitest intercepts `console.log` — the same trap that made
+  `honesty/measure.corpus.test.ts` necessary. A count nobody can derive twice the same way does not
+  belong in prose ([§ D429](DECISIONS.md)). Also named in the
   verdict: `Escape` does not dismiss the drawer *(closed in wave 12, [§ D188](DECISIONS.md))*, the
   honesty sweep's `mode` axis has one value *(closed in wave 12, [§ D194](DECISIONS.md) — the
   second value produced zero new strings, **and that measured null has since stopped being true**:
