@@ -28853,3 +28853,134 @@ number outside it, **D431**, which no register claims.
 hole, which happened for the first time in this wave. Wave H's block closed with every number spent,
 so the interaction could not appear; the next integrator would have met it as a red gate with no
 explanation, exactly as D387 was met.
+
+---
+
+## D433 — earned progress goes in the Everyday slot, not the Engineer session, and a refusal to restore it is a sentence
+
+**Date: 2026-09-01 · Owner: wave J lane B, GitHub issue #224 · Extends [§ D402](#d402)'s reading of
+what the Everyday store is for.**
+
+**Decision.** The set of solved fix cases and the gauntlet ratings are kept in
+`everyday/profile.ts`'s slot, as a **second payload key beside the profile**, at schema version 2.
+They are not a fourth key in `persist/`'s session envelope, and they are not a third
+`localStorage` key of their own.
+
+`everyday/profile.ts` already argued the first half — *the slot is deliberately not a fourth key
+inside `persist/`'s session envelope* — and issue #224 is the first change that could have made
+that argument stale rather than merely repeated it, because it is the first thing an Everyday
+screen earns that is worth keeping. The argument holds, and the test it holds under is this: a
+`persist/` session is **written whole at one instant** and is the Engineer shell's week, its menu
+settings and its free-play selection. A fix-it press is not part of that instant. Splicing it in
+would make one version number the property of two products, which is the failure the original
+paragraph names.
+
+A third key was refused for the reason `persist/types.ts#SESSION_KEY` gives about the mode key: two
+slots is two states that can disagree, and the profile and the progress are read on the same frame
+by the same rail. So it is **one slot, two payloads, refused under two rules** — `persist/`'s own
+`session`-beside-`library` shape, one product over.
+
+**The migration, and the test an older envelope has to pass.** Version 1 has no `progress` key, and
+`withProgress` completes it with an empty one. That is `persist/session.ts`'s
+`withWindowStart`/`withParkedWeeks` family and it has to survive their objection: is empty a value
+the absence **determines**, or a guess about something nobody wrote down? It is determined, and by
+the defect this key closes. Before version 2 the solved set lived in `everyday/fixitScreen.ts`'s
+module scope and the ratings in `everyday/boardScreen.ts`'s, and **both ended with the tab** — each
+file said so in a named absence. At the instant a version-1 envelope was written there was no
+stored progress to record, and every reload under that build opened with none. An empty progress is
+what the player had.
+
+Two consequences are asserted rather than assumed. A version-1 envelope **keeps its name and
+picture**: the whole cost of the migration to a player who had one is nothing. And the migrated
+profile is carried into the version-2 envelope the *next* write produces — which is the half a
+migration usually gets wrong, because reading the old shape is not the same as keeping what it
+held, and the write that stores the first solved building is the one that could lose the name.
+
+**One writer, and it takes both payloads.** `saveProfile(store, profile)` is **deleted** rather
+than kept beside the new writer. One slot means one `write`, so a writer handed half the envelope
+has to invent the other half, and there are only two ways to do it: re-read the slot, which writes
+back a value a keystroke may already have replaced, or write an empty one, which deletes a player's
+afternoon on a name change. Both are asserted against, in both directions.
+
+**A refusal to restore progress is a sentence, and that is not decoration.** A profile that will
+not restore falls back to a name the player can see is wrong and retype. Progress cannot do that:
+**an empty solved set and an empty ladder are exactly what a player who has done nothing sees**, so
+a silent refusal reads as *your afternoon did not happen*. So every refusing path — a store that
+throws, bytes that do not parse, a version this build does not read, a shape it cannot vouch for,
+a page with no storage at all, and a payload past the budget — produces words, and the fix screen
+and the ladder draw them. `absent` is the one path that answers empty **and** stays silent, because
+there a player really has earned nothing.
+
+The budget is `PROGRESS_BUDGET_CHARACTERS`, checked **before** the store is touched, which is
+`persist/session.ts`'s `library-too-large` ordering and its reason sharpened: there is one slot and
+`write` replaces it whole, so a save that quietly dropped oversized progress would be *deleting*
+what is already stored rather than declining to add to it. It is a twentieth of the conservative
+quota where the library takes a fifth, and the asymmetry is deliberate — the library holds work a
+player authored and cannot recover, this holds work a player can re-earn by running the forty
+again, so where the two compete for one origin's quota this is the one that yields.
+
+**What is not kept, and it is most of the session.** The per-case `FixitState` selections and the
+cached as-built `RecordedRun`s stay session-local. A working draft a player is in the middle of is
+not progress, and a recording is megabytes of legs. Only the badge survives — and it still follows
+the **latest** run in both directions (`fixit/engine.ts#fixedBadgeAfter`, `docs/20` defect 16): a
+restored case arrives badged and is re-badged, including out of FIXED, by the next run it has.
+Restoring a badge does not make it a high-water mark, which is the defect that rule was written
+for.
+
+**Measured rather than argued, and the tier is named.** A node case that writes a value and reads
+it back proves serialisation, and serialisation is not survival — it passes identically against a
+store held in a module-scope `Map`, which is the defect this issue was opened about. So the claim
+is made where it can be false: `everyday/progress.browser.test.ts` drives the **shipped bundle**
+(§ D425), solves a building, **reloads the page** and looks again. Removing the write reddens it;
+removing the restore reddens it; breaking the migration reddens it in both tiers; and silencing the
+refusal reddens the corrupt-store case on the page.
+
+**Not claimed.** Nothing here says the two stores should ever merge, and nothing says the Engineer
+session should learn about Everyday progress. And one seam is driven by node tests only, stated
+rather than implied: `everyday/boardScreen.ts#onFinished`'s call to `savedRatingOf` cannot be
+reached in the browser tier without running the forty, which is minutes.
+
+---
+
+## D434 — a stored rating is its forty cases, and the mean is rebuilt rather than written down
+
+**Date: 2026-09-01 · Owner: wave J lane B, GitHub issue #224 · Applies [§ D433](#d433)'s slot to the
+ladder.**
+
+**Decision.** `gauntlet/ladder.ts#SavedRating` keeps a rating's **cases and its denominator**, and
+stores none of the five figures `ratingOf` computes from them — not `rating`, not `casesRated`, not
+`casesRun`, not `complete`, not `weakest`. A restored row is rebuilt by `ladderEntryOf` through the
+same `ratingOf` a live gauntlet folds with.
+
+**Why.** Writing the aggregate down creates five figures a store can hold in disagreement with the
+evidence beside them: a rating of `91.2%` over cases whose scores mean `88.4`, a `weakest` naming a
+case that is not the worst one, a `complete: true` over thirty-nine. **Nothing would notice**,
+because the ladder draws the stored aggregate and never re-derives it — which is this repository's
+published-number defect with a `localStorage` key in place of a document. Keeping the evidence and
+recomputing means there is one arithmetic, and a row restored from last week and one computed a
+second ago cannot disagree about a mean.
+
+It also keeps invariant 5 where it belongs. Every `RatedCase` carries the seed it ran under, so a
+kept rating is a claim that **replays exactly**; `ratedCaseIssue` refuses a case with no seed at the
+storage boundary rather than restoring an unrepeatable figure onto a standing table.
+
+**The one figure that is stored, and why it is not an exception.** `casesTotal` cannot be derived
+from what is kept. `ratingOf`'s own docstring says why it is a parameter rather than `cases.length`:
+the interesting incomplete rating is the one where a case **never ran** — a cancelled gauntlet, a
+failed worker — and that case has no row at all, so a restore reading `cases.length` would report
+`40 of 40` on a gauntlet that ran twelve. That was not a hypothetical here: every existing case in
+`gauntlet/ladder.test.ts` had the two numbers equal, so the substitution was **silent** until a
+twelve-of-forty case was written for it.
+
+**`fingerprint` is stored for the same class of reason.** § 11.7's *edited since* is a comparison
+against the dispatcher as it stands **now**, so without the digest a restored rating would be a
+figure with no way of telling the player it is stale — present rather than usable.
+
+**What the restore does not do.** It does not repair. A rating with one unreadable case is refused
+whole, because `rating.ts` says in terms that a mean over a different set is a different quantity;
+and a progress payload whose ratings are unreadable takes the solved set down with it, because
+showing a player part of a career with nothing saying a part is missing is the quiet-repair defect
+wearing a friendlier face. The one thing deliberately **not** refused is a solved id naming a case
+this build no longer ships: `fixitCaseRailModel` derives every row and its `{fixed}/{total}` count
+from the loaded case file, so such an id matches nothing and inflates nothing, and refusing the set
+over a catalogue edit would lose a player's afternoon to a data change they did not make.
