@@ -40,6 +40,19 @@
  * for `fitOut.test.ts`'s reason: `openingCareer` holds `c1` and nothing else, and `runCampaignDay`
  * writes that contract's length itself, so a proof taken anywhere else is a proof about a day the
  * campaign never runs.
+ *
+ * ## One mutation this file does **not** catch, recorded so it is not mistaken for a hole
+ *
+ * Wiring `buildId` into `shiftLengthS` — `+ 60` on any build but `as-built` — leaves every case here
+ * green, and that is a fact about the cell rather than about the assertions. Measured directly:
+ * `legsOf` at 3 600 s and at 3 660 s on this building returns the **same string**, so an extra minute
+ * of shift adds no leg. The demand this building declares is spent well before the hour is, and the
+ * tail is drain.
+ *
+ * It is the trap § D427's own lane recorded one level up — a leg comparison at a cell where the
+ * effect cannot bite reports nothing — arriving here as a *mutation* that cannot bite. The mutation
+ * that does is `dispatcherId`, which the positive control below independently proves reaches the run
+ * at this cell; a future reader checking this file's teeth should use that one.
  */
 
 import { describe, expect, it } from 'vitest';
