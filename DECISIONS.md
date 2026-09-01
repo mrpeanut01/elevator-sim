@@ -29796,3 +29796,100 @@ correction (struck text kept, dated, attributed) rather than silently rewritten,
 own verification comment both predicted: Sound is #258's and is not this lane's to build, and Units
 is #170's alone. The Units half is this lane's and is built beside this entry; it cites this one,
 rather than this one citing forward into work that had not landed when it was written.
+
+---
+
+## D448 — the Units preference converts, and the module's shape is what keeps it out of a run
+
+**Date: 2026-09-01 · Wave K lane C · GitHub issue [#170](https://github.com/mrpeanut01/elevator-sim/issues/170), Units half**
+
+**Decision.** § 15.1's `Units` row ships. `everyday/units.ts` is the consumer whose absence was the
+refusal, the preference lives as a **sibling of `profile`** in the Everyday slot at envelope version
+3, and the `SETTINGS_ABSENCES` entry plus its `ABSENCE_TRIAGE` row are deleted on the commit that
+makes them false. [§ D447](#d447) is the Sound half, which stays refused and is #258's.
+
+### What was refused, and what makes the refusal false now
+
+The entry read *"Units — nothing in the viewer reads a metres-or-feet preference, so there is nothing
+for the switch to switch"*, and its evidence was a grep: `grep -rin "imperial" packages/viz/src
+--include='*.ts'` found no non-test occurrence. That was true of every build until this one. The work
+was never the control — the control is designed, and § 18's prototype state has carried an `imperial`
+field the whole time — it was **a consumer**, which is the shape `CLAUDE.md`'s standing requirement
+names from the other side: a seam with no caller, filed as a control with no seam.
+
+`ENGINE_CONTRACT.md` § 13 is what the consumer had to satisfy: *metres by default; the `Units`
+setting switches machine specs to feet and **must convert, not relabel***.
+
+### The correctness bite, and why it is answered with a module shape rather than a rule
+
+`CLAUDE.md`'s conventions keep units **SI internally** and allow imperial values only in reference
+data and display formatting, always with the unit in the identifier (`ratedLoadLb`, `speedFpm`). A
+display-layer conversion that leaked into a stored figure would be a defect of a different order from
+a mislabelled one: it would reach a run record, a persisted profile, a submitted run or a published
+interval, every one of which is compared against numbers taken under the other preference. Two runs
+that cannot be compared while both look valid is the failure mode this repository's statistical
+discipline exists to prevent, arriving through a settings row.
+
+**So the guarantee is structural rather than remembered.** `feetOf` and `METRES_PER_FOOT` are
+module-private and **every export that touches them returns a `string`**. There is no signature in
+`units.ts` through which a converted quantity can be assigned to anything, so the invariant is a fact
+about the types. `units.test.ts` holds it from three directions:
+
+1. **The export surface**, walked rather than listed, so an export added later is covered on the
+   commit that adds it — every entry point must answer a string. Mutated to return a `number`, this
+   is caught **twice**: `tsc -b` refuses the call site, and the case names the export.
+2. **The legs.** Flipping the *shipped singleton* leaves `legsOf(baseState())` byte-identical. Legs
+   rather than a window statistic, for [§ D177](#d177)'s reason. This is
+   `docs/05`'s standing requirement in its contrapositive, and it is the shape #258 states for a
+   presentation control: it must reach a sink and **must not** reach the legs. Verified by mutation —
+   a `shiftRunConfigOf` that read the preference and moved one car's `ratedSpeedMps` reddens this case
+   **and nothing else in the suite**, `boundaries.test.ts` and the whole of `scope/` included.
+3. **The storage.** What is persisted is one of two words, so there is no number in the envelope the
+   preference can move.
+
+### Where the preference lives, and why not on the profile
+
+A **sibling** of `profile` and `progress` in the Everyday slot, at schema version 3, on
+[§ D433](#d433)'s precedent one version down. `EverydayProfile` is *identity* — the name and colour
+§ 15.1's lede says travel with every run you post — and a display preference folded into it would
+ride along with a submission. It is not in `menu/types.ts#Settings` either, for `profile.ts`'s own
+stated reason: that envelope is the Engineer session, with a different owner and a different version
+number, and nothing on the Engineer surface reads this preference.
+
+The `withUnits` migration **determines** `metric` rather than guessing it, which is the only ground on
+which a migration may invent a value: before version 3 nothing in the viewer read a metres-or-feet
+preference at all — that is the whole of what #170 reported — so metres is what any earlier build's
+player was looking at, not a preference chosen on their behalf.
+
+### The scope is a list, and the list is checked
+
+The preference reaches **machine specifications**: § 13.2's rating plate (`RATED SPEED`, `TRAVEL`),
+the drawing board's machine-class band and its speed chips, the tuner's machine card (whose readout's
+own docstring says it is *"in the units the plate uses"*, so the two could not be allowed to
+disagree), and the daily loop's *Rated speed* fact. Three neighbours are deliberately left alone:
+`CAPACITY … lb` on the plate, because `ratedLoadLb` is reference data with the unit in the identifier
+and § 13's clause is about metres and feet; the fix screen's `+0.5 m/s` repair step, because that is a
+**price** quoted in the unit § 9 prices it in; and `shift/contracts.ts`'s stat line, which is shared
+with the Engineer surface and governed by its own contract.
+
+That list is a claim about this tree, so it is **asserted rather than described**: a bare `m/s`
+literal anywhere in `everyday/` must go through this module or arrive in `units.test.ts`'s allowance
+with its reason, and an allowance whose file stopped printing one must go with it.
+
+**The chip labels convert and the values they write do not**, which is *convert, not relabel* pointed
+at a control rather than at a readout: a player picking `8.20 ft/s` on the drawing board writes `2.5`
+to `ratedSpeedMps`, exactly as they did before this preference existed.
+
+### One metric string moved, and it is named rather than left to be discovered
+
+`today.ts`'s *Rated speed* fact printed `String(max) + ' m/s'` — `2.5 m/s`, and `8 m/s` for a shuttle
+— while the plate two screens over printed `2.50 m/s` for the same car. The fact takes the plate's
+precision now. It is the only metric arm this lane changed, it changes no figure's value, and it is
+recorded here because a change nobody declares is how a string count stops being attributable.
+
+### What the corpus gains
+
+Both faces are seeded: the plate under both preferences, the tuner's readout under both, and the
+daily facts **diffed** so only what actually differs is pushed — `todayOf` is total in `units`, so
+seeding an identical record again would be the same string twice under two names. Under
+[§ D343](#d343) this lane does not measure the corpus; the forecast is in its report.
