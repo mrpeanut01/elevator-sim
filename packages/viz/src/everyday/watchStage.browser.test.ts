@@ -153,8 +153,19 @@ describe.skipIf(!HAS_BROWSER)('watching, in the Everyday shell — GAMEPLAY § 1
     expect(bar).toContain('Stop watching');
     expect(bar).toContain('Play this crowd');
     expect(await page.locator('.everyday-bar-timeline').count()).toBe(0);
-    /* § 14.1: the intervention machinery is disabled while watching. */
-    expect(await page.locator('.everyday-stage-intervene').first().isDisabled()).toBe(true);
+    /*
+     * § 14.1: the intervention machinery is disabled while watching — **every arm of it**, and the
+     * picker that chooses one. `.first()` was enough while the row held one button; GitHub issue
+     * #171 put § 7.6's handover beside it, and a spectator who could hand somebody else's day to
+     * another dispatcher would be playing rather than watching.
+     */
+    const arms = page.locator('.everyday-stage-intervene');
+    const armCount = await arms.count();
+    expect(armCount).toBeGreaterThan(1);
+    for (let index = 0; index < armCount; index += 1) {
+      expect(await arms.nth(index).isDisabled()).toBe(true);
+    }
+    expect(await page.locator('.everyday-stage-switch-pick').first().isDisabled()).toBe(true);
     expect(await page.textContent('.everyday-stage-intervene-refusal')).toContain('spectator');
     /* And the transport is deliberately not — contract § 1.5, *pause and the speeds stay*. */
     expect(await page.locator('.everyday-stage-play').first().isDisabled()).toBe(false);
