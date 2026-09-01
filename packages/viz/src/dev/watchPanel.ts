@@ -201,6 +201,20 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
 
   const close = (): void => {
     root.style.display = 'none';
+    /*
+     * **A check the player walked away from is abandoned**, and this is a bug an asynchronous gate
+     * creates rather than a tidiness. `settle()` on the passing path calls `host.onWatch`, which
+     * puts the shell into the spectator state — so a run still in flight when the picker is
+     * dismissed would, seconds later, drop the player into somebody else's day they had just
+     * declined to watch. `dev/offThreadRuns.ts#cancel` is silent by construction, which is exactly
+     * what is wanted here.
+     *
+     * It is a no-op on the passing path even though `settle` calls this: the runner clears its
+     * current ask **before** handing the recordings on, so by the time `close` runs there is
+     * nothing in flight to cancel. The busy row is redrawn by `open`, which draws on every show.
+     */
+    runner.cancel();
+    checking = undefined;
   };
 
   doc.addEventListener('keydown', (event) => {
