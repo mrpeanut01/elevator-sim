@@ -7965,6 +7965,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     'everyday/campaignModel.ts#CONTRACT_COPY',
     'everyday/campaignModel.ts#WEAR_HEADS',
     'everyday/campaignModel.ts#TEST_TENSIONS',
+    /* § 8.1's build select saying it changes no day — drawn under the control on both surfaces. */
+    'everyday/campaignModel.ts#BUILD_REFUSAL',
     'everyday/campaignModel.ts#CALENDAR_LEGEND',
     'everyday/campaignModel.ts#MONTH_LEGEND',
     /* Reached through the three views above: every figure they print is one of these. */
