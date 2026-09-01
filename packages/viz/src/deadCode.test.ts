@@ -83,7 +83,7 @@
  *    only about the export whose caller was **removed**, and that is what moved here.
  */
 
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
@@ -385,6 +385,56 @@ describe('every export of packages/viz has a caller or a stated reason', () => {
     expect(both, 'a symbol cannot be both a recorded defect and deliberately caller-free').toEqual(
       [],
     );
+  });
+
+  /**
+   * **`GAPS.md` § 5 reports this register, and it went on reporting a residue that had been
+   * disposed of for six weeks** — GitHub issue #166, [§ D424](../../../DECISIONS.md)'s class.
+   *
+   * The document said *"the **8 dead candidates await disposition** — wire or delete, each with
+   * its own verification burden, a recorded follow-up task"* while `DEAD_CANDIDATES` was already
+   * `{}` and the comments inside it were the register of how each had been closed. Nothing linked
+   * the two, so the only thing standing between a gaps register and a stale entry was somebody
+   * remembering to re-read it.
+   *
+   * The link is asserted **in both directions**, because each direction is a different defect. A
+   * document claiming a residue that is gone sends a reader to do finished work; a document
+   * claiming the register is empty when it is not hides an open finding, which is the worse of the
+   * two and the one no reader would think to check.
+   *
+   * Deliberately a claim about the *register's state* rather than its size. `GAPS.md` used to
+   * publish 19 directories, 1 017 exports and an 8 + 17 split, all of which were true on
+   * 2026-07-30 and none of which is now — so those figures were taken **out** of that document
+   * rather than corrected, and live here in the dated block at the top of this file. A count in a
+   * gaps register that nothing re-derives is a hostage to the next commit, and the fix for one is
+   * to stop publishing it rather than to publish it again.
+   */
+  it('agrees with GAPS.md § 5 about whether any candidate is still awaiting disposition', () => {
+    const gaps = readFileSync(join(PACKAGES_DIR, '../GAPS.md'), 'utf8');
+    // Non-vacuity: the section this reads must exist, or a rename would silently disable the case.
+    expect(
+      gaps,
+      'GAPS.md no longer names DEAD_CANDIDATES, so this case is watching nothing. Either the ' +
+        'section moved — retarget it — or the claim was deleted, in which case delete this case.',
+    ).toContain('DEAD_CANDIDATES');
+
+    const open = Object.keys(DEAD_CANDIDATES).length;
+    /* `~~…~~` is how this repository marks a superseded sentence, so the *struck* form of the
+       claim is not the claim. The shape below therefore requires the phrase to be reachable
+       without crossing a strike-through marker on its own line. */
+    const claimsAResidue = gaps
+      .split('\n')
+      .some((line) => /await(s|ing)? disposition/u.test(line) && !line.includes('~~'));
+    expect(
+      claimsAResidue,
+      open > 0
+        ? `DEAD_CANDIDATES holds ${String(open)} candidate(s) and GAPS.md § 5 does not say so. ` +
+          'A register that is open and a document that says it is closed is the direction of this ' +
+          'defect nobody would think to check.'
+        : 'DEAD_CANDIDATES is empty and GAPS.md § 5 still says candidates await disposition. ' +
+          'Strike the sentence rather than deleting it — the residue was recorded there, and a ' +
+          'residue that quietly disappears reads as one that was never there.',
+    ).toBe(open > 0);
   });
 
   /*
