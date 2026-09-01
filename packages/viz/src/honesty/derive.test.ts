@@ -296,6 +296,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A predicate over two weight vectors, derived only because its docstring is prose — it ' +
+        'returns a boolean and puts nothing on a screen. It decides *whether* § 7.6’s handover ' +
+        'control can act; the sentence a player reads when it says no is ' +
+        '`everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE`, which the `EVERYDAY_STAGE` adapter ' +
+        'drives in the state that produces it rather than excusing it here. Its other caller, the ' +
+        'Engineer strip, draws no sentence at all and disables the button. The day this function ' +
+        'returns a reason instead of a boolean it stops being excludable.',
+      ids: ['live/interventions.ts#switchChangesNothing'],
+    },
+    {
+      reason:
         'Diagnostics for a failed **save**, and for the shape check beneath a failed restore — ' +
         'developer strings on the same footing as `SCOPE_OF`’s `why`. Nothing puts one on a screen: ' +
         '`saveSession` refuses in a value the shell drops, `jsonRoundTripIssue` and `snapshotIssue` ' +
