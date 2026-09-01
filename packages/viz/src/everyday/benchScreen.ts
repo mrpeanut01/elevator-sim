@@ -33,6 +33,7 @@
 import { intervalPlotFor } from '../batch/intervalPlot.js';
 import { actionBarFor } from './actionBar.js';
 import { suiteCellViewOf, SuiteError, type SuiteCellView } from '../batch/suite.js';
+import { batchLibraryOf, savedProfilesOf } from '../batch/library.js';
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { loadBrowserResources, loadProofCases, type BrowserResources } from '../dev/data.js';
 import { proofCasesOf, type ProofCaseSet } from '../gauntlet/proofCases.js';
@@ -183,6 +184,23 @@ function mountBench(
     const request = requestOf();
     const data = state.data;
     if (request === undefined || data === undefined) return;
+    /*
+     * The field's own dispatchers, admitted before a worker starts — issues #167 and #228,
+     * § D443, and the pre-flight matters more on this screen than on the Engineer bench. A suite
+     * runs one worker per ticked test in sequence, so a shelf the worker refuses is refused once
+     * per test with the reader watching a progress line between each; and this is the screen that
+     * *offered* a saved dispatcher in its field before it could run one, so a refusal arriving
+     * from the engine rather than from the field is the exact register to avoid here.
+     */
+    const library = batchLibraryOf(
+      api.dispatcherProfilesFile(),
+      savedProfilesOf(api.savedDispatchers()),
+    );
+    if (!library.ok) {
+      state.error = library.reason;
+      render();
+      return;
+    }
     let plans: readonly BenchCasePlan[];
     try {
       plans = benchPlanOf(data.set, request, towerNameOf);
@@ -247,7 +265,19 @@ function mountBench(
         stopWorker();
         render();
       });
-      next.postMessage({ kind: 'run', request: plan.request } satisfies BatchWorkerRequest);
+      /*
+       * The player's own dispatchers ride with the request — issues #167 and #228,
+       * [§ D443](../../../../DECISIONS.md). This screen's field has listed them since it was
+       * written (`api.dispatchers()` **is** `allDispatchers(...)`), and until this line the run
+       * failed at the worker with an engine sentence about `data/`: a control that was offered and
+       * could not be honoured. Read at post time rather than captured at mount, so a dispatcher
+       * saved while the bench is open is one the bench can run.
+       */
+      next.postMessage({
+        kind: 'run',
+        request: plan.request,
+        savedProfiles: savedProfilesOf(api.savedDispatchers()),
+      } satisfies BatchWorkerRequest);
     };
 
     render();

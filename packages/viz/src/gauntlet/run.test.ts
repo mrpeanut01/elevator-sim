@@ -8,6 +8,7 @@
  * holding one cannot be driven without a browser.
  */
 
+import type { DispatcherProfile } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
 import { fakeArm, fakeReplication } from '../batch/fixtures.test-helper.js';
@@ -48,16 +49,25 @@ function resultWith(pct: number): BatchResult {
   };
 }
 
-/** A worker that answers synchronously, recording the request it was posted. */
+/**
+ * A worker that answers synchronously, recording the request it was posted.
+ *
+ * `messages` records the **whole** message and `posted` only its request half, because most cases
+ * here are about the forty and one is about what rides beside them: the shelf a saved dispatcher's
+ * id has to be resolved against (issues #167, #228, § D443). Two arrays rather than rewriting
+ * twelve existing assertions to reach one level deeper.
+ */
 function doubleFor(
   answer: (posted: number) => BatchWorkerMessage | 'silent',
   posted: BatchRequest[],
+  messages: PostedMessage[] = [],
 ): () => GauntletWorker {
   return () => {
     let handler: ((event: { data: unknown }) => void) | undefined;
     let terminated = false;
     return {
-      postMessage: (message: { readonly request: BatchRequest }) => {
+      postMessage: (message: PostedMessage) => {
+        messages.push(message);
         posted.push(message.request);
         const reply = answer(posted.length - 1);
         if (reply !== 'silent' && !terminated) handler?.({ data: reply });
@@ -72,7 +82,72 @@ function doubleFor(
   };
 }
 
+/** What {@link doubleFor} sees on the wire: the batch, and the reader's own dispatchers. */
+interface PostedMessage {
+  readonly request: BatchRequest;
+  readonly savedProfiles?: readonly DispatcherProfile[] | undefined;
+}
+
 describe('the forty run', () => {
+  it('sends the shelf the candidate id has to resolve against — issues #167, #228', () => {
+    /*
+     * **The gauntlet's whole subject is a saved dispatcher**, and until § D443 the id it posted was
+     * one `dev/batchWorker.ts` could not resolve: `gauntlet/ladder.ts#sendGateOf` exists to admit
+     * *a saved dispatcher that is not dirty*, so the ordinary case was a send that failed at the
+     * first case with an engine sentence about `data/` — which `onStopped` then reported as
+     * *"nothing is rated"*, honest about the outcome and silent about the cause.
+     *
+     * Asserted on **every** case rather than on the first: the forty are posted one at a time, each
+     * on its own worker, so a shelf attached to the opening message and not to the rest would rate
+     * a dispatcher on one case and refuse the other thirty-nine.
+     */
+    const posted: BatchRequest[] = [];
+    const messages: PostedMessage[] = [];
+    const mine = { id: 'yours-1', name: 'Kestrel', weights: { waitTime: 1 } } as DispatcherProfile;
+    runGauntlet({
+      set: SET,
+      dispatcherProfileId: 'yours-1',
+      savedProfiles: [mine],
+      replications: 1,
+      towerNameOf: nameOf,
+      createWorker: doubleFor(() => ({ kind: 'done', result: resultWith(20) }), posted, messages),
+      onProgress: () => {},
+      onFinished: () => {},
+      onStopped: (reason) => {
+        throw new Error(`a finished gauntlet must not stop: ${reason}`);
+      },
+    });
+    expect(messages).toHaveLength(proofCasesOf(SET).length);
+    for (const message of messages) {
+      expect(message.savedProfiles).toEqual([mine]);
+      expect(message.request.arms.map((arm) => arm.dispatcherProfileId)).toEqual(['yours-1']);
+    }
+  });
+
+  it('sends no shelf for a shipped dispatcher, so a reference run is byte-identical', () => {
+    /*
+     * The negative half. § 20.11's *reference run* rates a profile out of `data/`, which needs no
+     * shelf — and `batchLibraryOf` returns the loaded file **by identity** on an empty one, so an
+     * absent key here is what keeps a reference rating the same computation it was before this
+     * lane. An unconditional `savedProfiles: []` would be equivalent in effect and would make the
+     * two cases indistinguishable on the wire, which is worth less than it costs.
+     */
+    const posted: BatchRequest[] = [];
+    const messages: PostedMessage[] = [];
+    runGauntlet({
+      set: SET,
+      dispatcherProfileId: 'eta',
+      replications: 1,
+      towerNameOf: nameOf,
+      createWorker: doubleFor(() => ({ kind: 'done', result: resultWith(20) }), posted, messages),
+      onProgress: () => {},
+      onFinished: () => {},
+      onStopped: () => {},
+    });
+    expect(messages.length).toBeGreaterThan(0);
+    for (const message of messages) expect('savedProfiles' in message).toBe(false);
+  });
+
   it('runs every case once, in the list’s own order, each on its own seed', () => {
     const posted: BatchRequest[] = [];
     let finished: RatingSummary | undefined;

@@ -194,6 +194,7 @@ import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js'
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 
+import { savedProfilesOf } from '../batch/library.js';
 import { mountBatchPanel } from './batchPanel.js';
 import { mountSuitePanel } from './suitePanel.js';
 import { mountCampaignPanel, type CampaignPanelHandle } from './campaignPanel.js';
@@ -3575,6 +3576,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       seed: state.seed.toString(),
       durationS: String(state.shiftLengthS),
     }),
+    /*
+     * The reader's own dispatchers, so Compare can compare one — issues #167 and #228,
+     * [§ D443](../../../../DECISIONS.md).
+     *
+     * A closure over `state` rather than a value, and that is the whole reason it works: these
+     * three panels are mounted **once**, at boot, before the workshop has ever been opened. A
+     * snapshot taken here would be the empty shelf a fresh session starts with, for the life of
+     * the page, which is a picker that can never show anything a player made.
+     */
+    savedProfiles: () => savedProfilesOf(state.savedDispatchers),
   });
 
   /*
@@ -3583,7 +3594,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * or in `index.html` retypes the fixture list. It inherits nothing from the viewer on purpose:
    * a suite's cells fix the building and the traffic, which is the point of a fixed fixture list.
    */
-  mountSuitePanel({ elements: ui.suite, resources });
+  mountSuitePanel({
+    elements: ui.suite,
+    resources,
+    savedProfiles: () => savedProfilesOf(state.savedDispatchers),
+  });
 
   /*
    * The campaign needs its own data file, which is fetched separately. A page that could not load
@@ -3598,6 +3613,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         resources,
         loaded,
         mode: () => state.mode,
+        savedProfiles: () => savedProfilesOf(state.savedDispatchers),
       });
     })
     .catch((error: unknown) => {
