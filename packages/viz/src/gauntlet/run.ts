@@ -34,6 +34,8 @@
  * decisions are drivable without a document.
  */
 
+import type { DispatcherProfile } from '@elevator-sim/core/browser';
+
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 
 import { caseNameOf } from './ladder.js';
@@ -64,6 +66,21 @@ export interface GauntletOptions {
   readonly set: ProofCaseSet;
   /** The saved dispatcher being proved. The gate in `ladder.ts` decides whether it may be here. */
   readonly dispatcherProfileId: string;
+  /**
+   * The player's own dispatchers, so {@link dispatcherProfileId} can name one of them.
+   *
+   * **This parameter is the gauntlet's whole point arriving**, issues #167 and #228,
+   * [§ D443](../../../../DECISIONS.md). § 20.10 sends *a saved dispatcher* through the forty and
+   * `ladder.ts#sendGateOf` refuses a dirty one *because a rating is a standing claim about one
+   * exact dispatcher* — so the id reaching this module was, until now, always one
+   * `dev/batchWorker.ts` could not resolve. Every send failed at the first case with an engine
+   * sentence about `data/`, which `onStopped` then dressed as *"nothing is rated"*: the refusal
+   * was honest about the outcome and silent about the cause.
+   *
+   * Defaulted to empty rather than required, because a gauntlet run on a **shipped** profile is a
+   * real thing — § 20.11's reference run — and it needs no shelf.
+   */
+  readonly savedProfiles?: readonly DispatcherProfile[] | undefined;
   /** How a tower is named for a reader. No engine identifier reaches a progress line. */
   towerNameOf(towerId: string): string;
   createWorker(): GauntletWorker;
@@ -164,6 +181,7 @@ export function runGauntlet(options: GauntletOptions): GauntletHandle {
         [{ armId: 'candidate', dispatcherProfileId: options.dispatcherProfileId }],
         options.replications,
       ),
+      ...(options.savedProfiles === undefined ? {} : { savedProfiles: options.savedProfiles }),
     });
   };
 

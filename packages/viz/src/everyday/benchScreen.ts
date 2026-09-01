@@ -40,6 +40,7 @@ import {
   type SuiteCellView,
   type SuiteRequest,
 } from '../batch/suite.js';
+import { savedProfilesOf } from '../batch/library.js';
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 
 import {
@@ -214,7 +215,19 @@ function mountBench(
         stopWorker();
         render();
       });
-      next.postMessage({ kind: 'run', request: plan.request } satisfies BatchWorkerRequest);
+      /*
+       * The player's own dispatchers ride with the request — issues #167 and #228,
+       * [§ D443](../../../../DECISIONS.md). This screen's field has listed them since it was
+       * written (`api.dispatchers()` **is** `allDispatchers(...)`), and until this line the run
+       * failed at the worker with an engine sentence about `data/`: a control that was offered and
+       * could not be honoured. Read at post time rather than captured at mount, so a dispatcher
+       * saved while the bench is open is one the bench can run.
+       */
+      next.postMessage({
+        kind: 'run',
+        request: plan.request,
+        savedProfiles: savedProfilesOf(api.savedDispatchers()),
+      } satisfies BatchWorkerRequest);
     };
 
     render();

@@ -170,3 +170,47 @@ export function batchLibraryOf(
     library: { ...shipped, profiles: [...shipped.profiles, ...validated] },
   };
 }
+
+/**
+ * A shelf of saved dispatchers as the profile documents {@link BatchWorkerRequest.savedProfiles}
+ * carries — one expression of it, for the five surfaces that post a batch.
+ *
+ * Structurally typed rather than importing `dev/state.ts#SavedDispatcher`, for the reason
+ * `dispatch/policy.ts#WeightSetLibrarySource` is: `batch/` may not depend on `dev/`, and stating
+ * the one field this needs is a more honest declaration than a type import would be. It takes the
+ * viewer's `state.savedDispatchers` and `everyday/host.ts`'s `savedDispatchers()` unchanged.
+ *
+ * A function rather than five inline `.map`s so that *"what does a surface send"* has one answer
+ * and one name to grep for. Adding a sixth batch surface should be a call to this, and a sixth
+ * inline map is the thing that eventually forgets.
+ */
+export function savedProfilesOf(
+  saved: readonly { readonly profile: DispatcherProfile }[],
+): readonly DispatcherProfile[] {
+  return saved.map((entry) => entry.profile);
+}
+
+/* -------------------------------------------------------------------------- *
+ * What a picker calls the two halves
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The `<optgroup>` label for `data/dispatcher-profiles.json`'s own profiles.
+ *
+ * Here rather than in each panel because three pickers draw the same two groups, and a label
+ * retyped three times is three labels. It is the batch surfaces' vocabulary for the split this
+ * module *is* — a library with a shipped half and a player's half — so the words live beside the
+ * function that makes it.
+ */
+export const SHIPPED_GROUP_LABEL = 'THIS BUILD SHIPS';
+
+/**
+ * The `<optgroup>` label for the reader's own saved dispatchers.
+ *
+ * **`YOURS`, because that is the word the product already uses for them.**
+ * `dev/dispatcherEditor.ts` tags a saved profile `YOURS` in its controller list and
+ * `everyday/workshopModel.ts` heads its shelf `YOURS`; a picker that said *"custom"* or *"mine"*
+ * would be a third name for one thing, and a reader who saved a dispatcher under one heading has
+ * to find it under the same heading somewhere else.
+ */
+export const YOURS_GROUP_LABEL = 'YOURS';

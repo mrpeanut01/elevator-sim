@@ -29,6 +29,7 @@
  * refusal rather than re-deriving or relaxing it.
  */
 
+import type { DispatcherProfile } from '@elevator-sim/core/browser';
 import { MATRIX_CELLS } from '@elevator-sim/experiments/browser';
 
 import { intervalPlotFor } from '../batch/intervalPlot.js';
@@ -42,6 +43,11 @@ import {
   type SuiteRequest,
   type SuiteRowMark,
 } from '../batch/suite.js';
+import {
+  batchLibraryOf,
+  SHIPPED_GROUP_LABEL,
+  YOURS_GROUP_LABEL,
+} from '../batch/library.js';
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import type { GlossaryTerm } from '../mode/glossary.js';
 import type { BrowserResources } from './data.js';
@@ -69,6 +75,12 @@ export interface SuitePanelElements {
 export interface SuitePanelOptions {
   readonly resources: BrowserResources;
   readonly elements: SuitePanelElements;
+  /**
+   * The dispatchers the reader has saved — issues #167 and #228,
+   * [§ D443](../../../../DECISIONS.md). A function, read at fill, pre-flight and post; see
+   * `dev/batchPanel.ts`'s own field for the argument, which is the same one and is not repeated.
+   */
+  readonly savedProfiles: () => readonly DispatcherProfile[];
 }
 
 export function mountSuitePanel(options: SuitePanelOptions): void {
@@ -79,21 +91,50 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
   let runToken = 0;
   let showingEmptyState = false;
 
-  /*
-   * `Name (slug)`, the form the bench above already uses, from the same source —
-   * `data/dispatcher-profiles.json`'s own `name` field.
-   */
-  for (const select of [ui.baseline, ui.candidate]) {
-    for (const profile of resources.dispatcherProfiles.profiles) {
-      select.append(new Option(`${profile.name} (${profile.id})`, profile.id));
-    }
-  }
+  fillDispatcherOptions();
   applyPreference(ui.baseline, PREFERRED_BATCH_BASELINE);
   applyPreference(ui.candidate, PREFERRED_BATCH_CANDIDATE);
 
   function applyPreference(select: HTMLSelectElement, preferred: readonly string[]): void {
     const found = preferredId(preferred, resources.dispatcherProfiles.profiles);
     if (found !== undefined) select.value = found;
+  }
+
+  /**
+   * Refill both arm pickers — `Name (slug)`, the form the bench above uses, from the same source,
+   * plus the reader's own shelf under its own heading (issues #167, #228, § D443).
+   *
+   * The selection is read back for `dev/batchPanel.ts#fillDispatcherOptions`'s reason: refilling a
+   * `<select>` resets `value`, and a picker that silently changed arms while the reader was in the
+   * workshop is the defect this fixes arriving from the fix. With an empty shelf the list is the
+   * flat one this panel always drew.
+   */
+  function fillDispatcherOptions(): void {
+    const saved = options.savedProfiles();
+    for (const select of [ui.baseline, ui.candidate]) {
+      const chosen = select.value;
+      select.replaceChildren();
+      if (saved.length === 0) {
+        for (const profile of resources.dispatcherProfiles.profiles) {
+          select.append(optionFor(profile));
+        }
+      } else {
+        select.append(groupOf(SHIPPED_GROUP_LABEL, resources.dispatcherProfiles.profiles));
+        select.append(groupOf(YOURS_GROUP_LABEL, saved));
+      }
+      if ([...select.options].some((option) => option.value === chosen)) select.value = chosen;
+    }
+  }
+
+  function optionFor(profile: DispatcherProfile): HTMLOptionElement {
+    return new Option(`${profile.name} (${profile.id})`, profile.id);
+  }
+
+  function groupOf(label: string, profiles: readonly DispatcherProfile[]): HTMLOptGroupElement {
+    const group = doc.createElement('optgroup');
+    group.label = label;
+    for (const profile of profiles) group.append(optionFor(profile));
+    return group;
   }
 
   /*
@@ -181,6 +222,17 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
       fail(error instanceof Error ? error.message : String(error));
       return;
     }
+    /*
+     * The shelf, admitted at the control before any worker starts — `dev/batchPanel.ts#start`'s
+     * argument, and it matters more here: a suite runs one worker per ticked cell, so a shelf the
+     * worker would refuse would refuse eight times over, once per cell, with the reader watching
+     * a progress bar between each.
+     */
+    const library = batchLibraryOf(resources.dispatcherProfiles, options.savedProfiles());
+    if (!library.ok) {
+      fail(library.reason);
+      return;
+    }
 
     ui.error.textContent = '';
     stopWorker();
@@ -243,7 +295,11 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
         fail(`the suite worker failed to start: ${event.message}`);
         stopWorker();
       });
-      next.postMessage({ kind: 'run', request: plan.request } satisfies BatchWorkerRequest);
+      next.postMessage({
+        kind: 'run',
+        request: plan.request,
+        savedProfiles: options.savedProfiles(),
+      } satisfies BatchWorkerRequest);
     };
     runCell(0);
   }
@@ -481,4 +537,22 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
   ui.progress.hidden = true;
   showingEmptyState = true;
   drawEmptyState();
+
+  /*
+   * **The arm pickers are refilled every time this tab is shown**, which is the only signal this
+   * module has and is the one `dev/batchPanel.ts` already uses (issue #119 item 7's observer, and
+   * its finding: a handle `dev/main.ts` discards is not a caller). The suite sits inside
+   * `panel-compare` beside the bench, so this observes the same element the bench's does; two
+   * observers on one attribute is cheaper than a shared one owned by neither panel.
+   *
+   * Unlatched, unlike that panel's `prefill`: a missing option is not something a reader can
+   * overrule, so the list is rebuilt on every visit rather than on the first.
+   */
+  const panel = ui.output.closest('[role="tabpanel"]');
+  if (panel !== null && typeof MutationObserver === 'function') {
+    const observer = new MutationObserver(() => {
+      if (!panel.hasAttribute('hidden')) fillDispatcherOptions();
+    });
+    observer.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+  }
 }
