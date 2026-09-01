@@ -174,9 +174,18 @@ construction**.
 > the two documents did not even agree with each other — and § 7 item 7 of that document had already
 > named this exact number as one that *"will drift silently … Re-derive them, do not copy them
 > forward."* Naming a risk is not a check. It is derived now, from disk, in both of the shapes above
-> and in both documents, by `packages/viz/src/everyday/viewportGates.browser.test.ts`; **that file is
-> itself the twenty-ninth**, which is the whole lesson in one line — a hand-written `28` would have
-> been stale before it was pushed. GitHub issue #292.
+> and in both documents, by `packages/viz/src/everyday/viewportGateClaims.test.ts`;
+> `viewportGates.browser.test.ts` beside it — the browser gate that issue closed — is **itself the
+> twenty-ninth**, which is the whole lesson in one line: a hand-written `28` would have been stale
+> before it was pushed. GitHub issue #292.
+>
+> **Both halves of that sentence were wrong for a wave, and each in its own way.** It named
+> `viewportGates.browser.test.ts` as the file that reads the count, which it is not and its own
+> docstring says it is not — a citation is a claim about a mechanism, and this one sent a reader to
+> a browser test to look for a `globSync`. And *"derived now … in both documents"* was true of the
+> shapes the guard could reach and not of three live claims that wrapped across a line or spelled
+> the count in no shape at all, two of them in § 4 of this document. Both are corrected, and the
+> guard's shapes are whitespace-tolerant with a third phrasing added. GitHub issue #230.
 
 A criterion measured on one engine is not a matrix, so the instrument had to be built outside the
 tier — and it had to be built outside because a measurement lane may not edit the tier. **That second
@@ -381,9 +390,10 @@ The two bold rows are the ones this lane's matrix work turns on: **T1's test is 
 stands.** Two independent reasons, and only the second is about hardware:
 
 1. **The product's own tier is single-engine** (§ 3). Even a machine with all three browsers
-   installed could not make `npx vitest run --project viz-browser` cover a matrix, because **29 of
-   30** browser-tier files name `chromium`. Until a browser-tier file takes its engine as a parameter, *"the slice runs
-   on the target browser matrix"* is a claim no tier command can produce evidence for.
+   installed could not make `npx vitest run --project viz-browser` cover a matrix, because
+   **33 of 33** browser-tier files name `chromium`. Until a browser-tier file takes its engine as a
+   parameter, *"the slice runs on the target browser matrix"* is a claim no tier command can
+   produce evidence for.
 2. **Tier 1 is two rows and both are Chromium.** #203 § 4's rule is explicit: *"Every tier-1 row must
    be a row a red run defends, and adding a tier-1 row means adding its gate in the same change."*
    There is no gate for a second engine, so there is no second engine in tier 1.
@@ -400,6 +410,18 @@ prevent.
 
 Not a wish list — each is small, and each converts a *claim* into something a red run defends.
 
+> **The counts in § 4 are live claims, not dated records, and that was settled rather than
+> inherited** ([§ D423](DECISIONS.md)). § 4 is a recommendation in the present tense: the `while`
+> clause in item 2 is the *reason* a reader is being told not to install Gecko yet, so it is a
+> statement about the tree today and is re-derived. § 5 below is this document's dated section, and
+> its figures are left exactly as they were taken. The test is not *"is the document dated?"* —
+> every document is — but *"does the sentence say when?"*
+>
+> They read **29 of 30** here and **29 of 29** in item 2 until 2026-09-01: two answers to one
+> question in one section, for a set of **33**, while `viewportGateClaims.test.ts` reported green
+> over both. Its shapes wanted a literal space and Markdown had wrapped these two sentences between
+> the tokens. The shapes are whitespace-tolerant now. GitHub issue #230.
+
 1. **Fix `boot.browser.test.ts`'s port** (§ 7.1). Four lines. Until it is fixed, the tier is red on
    any machine with a Vite server running, which means the criterion's own instrument is not
    dependable on the machines it will be run on.
@@ -407,7 +429,7 @@ Not a wish list — each is small, and each converts a *claim* into something a 
    module and `browserTier.test.ts` already enforces that every tier file goes through it — so the
    engine belongs in the same place. That single change is what turns *"the slice runs on the target
    browser matrix"* from an unanswerable sentence into a command, and it is a **precondition for the
-   Firefox row #203 § 4 already recommends**: installing Gecko buys nothing while **29 of 29**
+   Firefox row #203 § 4 already recommends**: installing Gecko buys nothing while **33 of 33**
    browser-tier files name `chromium`.
 3. **One touch cell.** § 2's `best effort` becomes measurable with `hasTouch`/`isMobile` on the
    Chromium already installed, at one phone viewport, through one real journey. §&nbsp;4 of the matrix

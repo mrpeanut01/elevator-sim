@@ -39,6 +39,33 @@
  * markers instead would put the distinction in a regex, where the next person cannot see it; kept
  * this way, a figure that is still in a shape is still being asserted.
  *
+ * **The same rule covers a *dated* figure, which is not the same thing as a superseded one.**
+ * `docs/31-support-matrix.md` § 5 says the tier's ~157 s was measured over the 25 files it held
+ * then. That 25 is neither wrong nor superseded — it is a correct record of what was counted, and
+ * striking it through would say it had been corrected when it has not. It is written **outside**
+ * the shapes instead, without the backticked filename that shape 2 keys on, so a reader still gets
+ * the number and the guard still sees only live claims. If a figure is a claim about the tree now,
+ * it goes in a shape; if it is a claim about a measurement then, it says *then* and stays out of
+ * one.
+ *
+ * ## Three of the shapes were tightened after a wave went red for the opposite reason — none
+ *
+ * The four original shapes matched a **literal space** between their tokens, and Markdown wraps
+ * prose at 100 columns. So *"installing Gecko buys nothing while `**29 of\n   29**` browser-tier
+ * files name `chromium`"* — a live claim, off by four — sat in `M2_MEASUREMENT.md` § 4.2 through a
+ * wave that corrected four of its siblings, and this guard reported **green** over it, because the
+ * newline between `of` and `29` was not the space the regex wanted. Two more in
+ * `docs/31-support-matrix.md` § 5 escaped the same way. The tokens are joined with `\s+` now, and
+ * the lesson is the ordinary one about a check whose *shape* is transcribed rather than derived:
+ * a guard that can be defeated by a line wrap is a guard whose coverage depends on where the
+ * paragraph happens to break. GitHub issue #230.
+ *
+ * The third shape, `the tier holds N`, is new and exists because three of those escaped claims did
+ * not spell the count in any shape at all — *"it holds 29 now"*. Rather than teach the regex three
+ * more bespoke phrasings, the documents were reworded onto one, which is the direction that keeps
+ * the check readable: the sentence a person writes and the sentence a machine reads are the same
+ * sentence.
+ *
  * **No `DECISIONS.md` entry is claimed for this, and that is deliberate rather than an oversight.**
  * The wave that produced it forbade taking a number, and `documentation.test.ts`'s ratchet on
  * owed-decision sites stands at its ceiling — a lane may not raise a ratchet, and settling one
@@ -82,8 +109,9 @@ describe('the browser-tier file count both documents publish is derived, not tra
      * and neither command can drift alone — which is what happened, in both directions at once.
      */
     const SHAPES: readonly RegExp[] = Object.freeze([
-      /\*\*(\d+) of (\d+)\*\* browser-tier files/gu,
-      /(\d+)[*_]*\s+`\*\.browser\.test\.ts` files/gu,
+      /\*\*(\d+)\s+of\s+(\d+)\*\*\s+browser-tier\s+files/gu,
+      /(\d+)[*_]*\s+`\*\.browser\.test\.ts`\s+files/gu,
+      /the\s+tier\s+holds\s+\*{0,2}(\d+)\*{0,2}/gu,
       /grep -rl "chromium\.launch"[^\n]*?→\s*(\d+)/gu,
       /find packages -name "\*\.browser\.test\.ts" \| wc -l[^\n]*?→\s*(\d+)/gu,
     ]);

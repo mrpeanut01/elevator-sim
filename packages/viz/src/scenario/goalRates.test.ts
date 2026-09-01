@@ -218,8 +218,16 @@ describe('the table printed in docs/10 § M30 is the table in data/scenario-goal
     /*
      * **The early-return guard**, which is the third false-negative shape in this repository's
      * list: every clause above sits behind a `return` that a missing record or a null rate would
-     * take, so a table whose cells all fell through would report no failure at all. Seven stages
-     * times five columns, and no cell in this table is unmeasured.
+     * take, so a table whose cells all fell through would report no failure at all. Every scenario
+     * the candidate set declares, times every column § M30 has, and no cell in this table is
+     * unmeasured.
+     *
+     * **The sentence used to say *"Seven stages times five columns"* and the code has never
+     * counted seven** — `data/scenario-goals.json` ships ten scenarios, so the assertion below
+     * computes 10 × 5 (GitHub issue #166). It is reworded rather than re-numbered because the
+     * assertion already derives both factors: a `ten` written here is the next `seven`, and this
+     * repository's rule is that a published count with no derivation is stale as of the commit
+     * that moves it. The one number left in the sentence is none.
      */
     expect(compared).toBe(table.scenarios.length * M30_COLUMNS.length);
   });

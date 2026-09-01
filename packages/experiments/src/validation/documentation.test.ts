@@ -792,6 +792,85 @@ describe('README.md § Documentation', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * README's suite figure — GitHub issue #230's fourth acceptance criterion
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **One suite figure is authoritative and the README is not where it lives.**
+ *
+ * The README's § Status published *"253 test files, 4,700 tests (4,690 passing, 10 skipped), 550 s
+ * serially"*, and eight lines below it a command block published *"226 files, 4,148 tests"* — two
+ * answers to one question inside one section, both stale, and both disagreeing with `GAPS.md`'s
+ * header and with every measured run in `AGENT_STATUS.md`. GitHub issue #230's fourth acceptance
+ * criterion is *one suite figure is authoritative and the others reference it*, and this is the
+ * mechanical half of it.
+ *
+ * **Why the fix is deletion rather than a corrected number, which is the part worth arguing.** A
+ * suite count is a claim about a **machine, a commit and a tier**, not about a project:
+ * `GAPS.md`'s own header records the same suite measured on two operating systems with the pin sets
+ * *exactly inverted*, and `AGENT_STATUS.md` records a browser tier whose test count **fell** while
+ * its coverage rose. A number with none of that attached cannot be read, only repeated. So the
+ * README — which is the one document written for a reader who has none of the context — carries no
+ * count and points at the two that do.
+ *
+ * **Not derived from disk either, and that is deliberate.** `find packages -name "*.test.ts"`
+ * answers **472** on this tree, against the 418 + 26 files the last measured run reports, because
+ * files on disk and files a project runs are different sets. Publishing the derivable number as
+ * though it were the measured one would be this defect again with a `globSync` behind it.
+ *
+ * The shapes below are the two the README actually used. A guard over prose can only read the
+ * phrasings it knows, so a **non-vacuity** check is not possible here in the usual form — there is
+ * nothing left to match — and what stands in for it is that both shapes are known to have matched
+ * on the commit before this one, which the assertion message records.
+ *
+ * **The § Status paragraph that explains the removal quotes the old figures on purpose**, and this
+ * is the same consequence `everyday/viewportGateClaims.test.ts` met and resolved the same way: the
+ * superseded numbers are written struck through — `~~*253*~~ test files` — which puts them outside
+ * the shapes rather than teaching the shapes to recognise a supersession marker. A distinction kept
+ * in a regex is a distinction the next author cannot see; kept this way, a figure that is still in
+ * a shape is still being asserted.
+ */
+describe('README.md § Status publishes no suite figure of its own (GitHub issue #230)', () => {
+  const SUITE_FIGURE_SHAPES: readonly RegExp[] = Object.freeze([
+    /(\d[\d,   ]*)\s+test\s+files/giu,
+    /(\d[\d,   ]*)\s+files,\s*(\d[\d,   ]*)\s+tests/giu,
+  ]);
+
+  it('carries neither of the two shapes it used to carry', () => {
+    const readme = read('README.md');
+    const found: string[] = [];
+    for (const shape of SUITE_FIGURE_SHAPES) {
+      for (const hit of readme.matchAll(shape)) found.push(hit[0].trim());
+    }
+    expect(
+      found,
+      'README.md publishes a suite count again. It is the one document whose reader has no ' +
+        'context to judge one by, and it carried two contradictory counts in a single section ' +
+        'for six waves. A suite figure is a claim about a machine, a commit and a tier: put it ' +
+        'in AGENT_STATUS.md beside the run that produced it, or in GAPS.md’s header beside its ' +
+        'caveat, and point at it from here.',
+    ).toEqual([]);
+  });
+
+  it('points at the documents that do carry one', () => {
+    const readme = read('README.md');
+    const status = readme.slice(readme.indexOf('## Status'), readme.indexOf('\n## ', readme.indexOf('## Status') + 1));
+    expect(status.length, 'README.md has no ## Status section to check').toBeGreaterThan(0);
+    // Both, because they answer different questions — AGENT_STATUS.md has the tier split and the
+    // host, GAPS.md's header has the caveat that makes a whole-suite number readable at all. A
+    // pointer to one of them would send half the readers to the wrong place.
+    for (const document of ['AGENT_STATUS.md', 'GAPS.md']) {
+      expect(
+        status,
+        `README.md § Status no longer points at ${document}. Removing the count without leaving ` +
+          'the pointer turns a wrong answer into no answer, which is not the improvement this ' +
+          'criterion asked for.',
+      ).toContain(document);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * The roadmap's reproduction instructions
  * -------------------------------------------------------------------------- */
 

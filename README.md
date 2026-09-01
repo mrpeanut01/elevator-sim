@@ -337,8 +337,20 @@ exchanged ([§ D308](DECISIONS.md)).
 **Phases 0–5 and 7–9 are landed and accepted. Phase 6 is partially complete** — see the table for
 what that means, and read Phase 9's row rather than its tick: it is **accepted with named gaps**,
 and the gaps are part of the verdict. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI, and a
-viewer built to a [design handoff](docs/12-design-handoff.md). **253 test files, 4,700 tests**
-(4,690 passing, 10 skipped), `tsc -b` clean, 550 s serially on an idle machine.
+viewer built to a [design handoff](docs/12-design-handoff.md), and `tsc -b` clean.
+
+**This section used to publish a suite figure and it no longer does, which is the correction rather
+than an omission** (GitHub issue #230). It said ~~*253*~~ test files and ~~*4,700*~~ tests at
+~~*550 s*~~ serially, eight lines above a command block saying ~~*226*~~ and ~~*4,148*~~ — two
+answers to one question inside one section, both stale, and both disagreeing with every other
+document that has ever measured the suite. The superseded figures are written struck through and
+outside the shape the guard reads, which is the convention `docs/31-support-matrix.md` already uses
+and the reason a corrected document may contain the old number at all. A suite count is a claim about **a machine, a commit and
+a tier** rather than about a project, so it belongs where those are recorded and nowhere else:
+[`AGENT_STATUS.md`](AGENT_STATUS.md) carries the measured runs with their host, their tier split and
+their date, and [`GAPS.md`](GAPS.md)'s header carries the wave-12 figure with the two-OS caveat that
+makes it readable. `packages/experiments/src/validation/documentation.test.ts` keeps this section
+free of a third answer.
 
 Wave 10 rebuilt the viewer against that handoff and **moved no phase verdict**: no published number
 was recomputed and no acceptance criterion was touched — the report sheet reads `VizSummary`, which
@@ -357,7 +369,7 @@ reads `RunSummary`, which is the object the CLI and the experiment matrix alread
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `fuzz`, `watch` |
 | 6 — Destination dispatch & learned control | ⚠️ 6a (disclosure) and 6b (dispatch) accepted against a **raised** criterion, now measured on the Mixed-Use High-Rise the criterion names: **met by the Level-0 arm — and since [§ D333](DECISIONS.md) by the Level-1 panel too, at the heavy point.** The panel had been measured with a defect only it could suffer: `#tellThePanel` promised every waiter at a landing to one car with no capacity bound. Bounded, ΔTTD at up-peak 4 % (n = 200) is `−1.598 [−2.575, −0.621]` against `eta` and `−1.642 [−2.620, −0.663]` against `collective`, both **BETTER** and resolvable at that cell, with AWT and WT95 still **WORSE** beside them. The two lighter points remain INDISTINGUISHABLE, which is the shape an over-subscription defect predicts. 6c (learned control) is **implemented, measured, and NOT ACCEPTED** — and the refusal is no longer one operating point: it was swept over **eight pre-registered cells** and held, refused at **all five primary cells** under a multiple-comparison correction, with the smallest detectable effect re-measured at each cell rather than inherited from another. Two of those cells clear the correction and were **refused anyway**, because the effect is a third to a half of what the apparatus can resolve there. **The refusal has since held a third time, on the one condition the sweep named as missing**: measured under [§ D162](DECISIONS.md)'s pre-registered conditions at the mix-varying `lunch-two-way` point — where the detector's `two-way` pattern really is the incumbent — the learned arm's ΔTTD contains zero and sits below the cell's own TTD-measured limit, and the flat-mix negative control exposed the remaining advantage as a static weight-vector hybrid, not mix exploitation (`benchmark/lunchTwoWaySelection.ts`). Double-deck operation **is simulated**; its verdict became BETTER-EVERYWHERE once a real escalator replaced a lift leg the hardware would never pay for — on **two cells at one operating point where the previous answer had four at two**, and a better word on a narrower base is not a stronger result. Every sub-phase now has a measurement rather than a deferral, and the phase is still partial because one of them was refused |
 | 8 — Testing campaign | ✅ All eight tracks landed — fuzzing, oracle across all five buildings, physics, statistics, determinism, scale, adversarial, and the full experiment matrix (8 cells × 12 profiles, Pareto front over AWT / energy / WT95) — and found four real defects, **all four now fixed**; the deep tier is green at 2 000 cases and **no property violation is outstanding**, so both halves of the criterion are met |
-| 9 — Experience layer | ✅ **ACCEPTED WITH NAMED GAPS** — all nine units built, and the two clauses that decide the phase are met **by a run rather than by an argument**: the honesty property held under **search** over 60 cases, **271 985 generated strings** and 23 surfaces with **0 violations** — *after* finding two, one real and one a check accepting the wrong branch — and mode parity is **derived from the code**, not listed by hand. **The gaps are named because they are part of the verdict, not beside it**: clause 4, *every unit names its non-test caller*, is **satisfied in prose and mechanised by nothing** — no dead-code audit reaches `packages/viz`, so it is the clause to distrust first *(closed in wave 12: `packages/viz/src/deadCode.test.ts` mechanises it, [§ D192](DECISIONS.md) — verdict unchanged)*; `Escape` does not dismiss the drawer *(closed in wave 12, [§ D188](DECISIONS.md))*; and **U6**, **U7's rider models** and **Basic's curated three-dimension subset** are unbuilt |
+| 9 — Experience layer | ✅ **ACCEPTED WITH NAMED GAPS** — all nine units built, and the two clauses that decide the phase are met **by a run rather than by an argument**: the honesty property held under **search** over a corpus of generated strings across every registered surface, with **0 violations** and an empty register in both tiers — *after* finding two, one real and one a check accepting the wrong branch — and the cases, strings, simulations and surfaces are counted in one place only, [`CLAUDE.md`](CLAUDE.md)'s Phase 9 table, because that figure has been re-measured every wave and a second copy here would be stale within one (this row said *271 985 strings and 23 surfaces* for six waves; both had roughly doubled) — and mode parity is **derived from the code**, not listed by hand. **The gaps are named because they are part of the verdict, not beside it**: clause 4, *every unit names its non-test caller*, is **satisfied in prose and mechanised by nothing** — no dead-code audit reaches `packages/viz`, so it is the clause to distrust first *(closed in wave 12: `packages/viz/src/deadCode.test.ts` mechanises it, [§ D192](DECISIONS.md) — verdict unchanged)*; `Escape` does not dismiss the drawer *(closed in wave 12, [§ D188](DECISIONS.md))*; and **U6**, **U7's rider models** and **Basic's curated three-dimension subset** are unbuilt |
 
 Try it — six commands, all against the real `data/` directory:
 
@@ -369,7 +381,7 @@ npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher eta --speed 10
-npm test        # 226 files, 4,148 tests — the benchmarks execute real replications, so this is minutes, not seconds
+npm test        # the benchmarks execute real replications, so this is minutes, not seconds
 ```
 
 `compare` prints a paired-t interval on the difference and refuses to rank two arms whose interval
@@ -403,10 +415,24 @@ guard cannot tell a raised criterion from a weakened one. See [`docs/07` § 8](d
 The browser viewer and building editor live in `packages/viz` and are dev-served with Vite;
 `packages/core` exposes a `./browser` subpath so nothing pulls `node:fs` into a bundle.
 
-**The menu, accounts and the leaderboard** ([`DECISIONS.md` § D214](DECISIONS.md), § D215). The shell
-opens on a main menu — Campaign, Free Play, Leaderboard, Account, Settings — whose state is a pure
-reducer with no `document` in it, and whose Free Play axes are **derived from `data/`** rather than
-listed. `packages/server` is the first server this repository has had: accounts with `scrypt`
+**The page opens on Everyday Mode, and has since 2026-08-12** ([§ D335](DECISIONS.md),
+[§ D338](DECISIONS.md)). `packages/viz/index.html` loads `everyday/boot.ts`, which mounts a rail, a
+pinned action bar and a four-tile menu over the Engineer surface; the Engineer surface still builds
+and starts exactly as before, because `boot.ts` imports `dev/main.ts` for its side effect. The two
+worlds co-exist and the rail's footer row is the door between them, with the way back on the
+Engineer header. The swap is not remembered: a reload lands on the Everyday main menu whichever
+world the player was in.
+
+> **This paragraph described the Engineer menu as what a player meets first for six weeks after
+> that stopped being true** (GitHub issue #230). It is the class this file's own front matter
+> names — a sentence that outlived the thing that made it true — arriving on the one surface where
+> it decides what a reader thinks the product *is*. Everything below is unchanged and still
+> accurate; only the claim about what opens moved.
+
+**The Engineer menu, accounts and the leaderboard** ([`DECISIONS.md` § D214](DECISIONS.md), § D215).
+Behind the Everyday shell, the Engineer surface opens on a main menu — Campaign, Free Play,
+Leaderboard, Account, Settings — whose state is a pure reducer with no `document` in it, and whose
+Free Play axes are **derived from `data/`** rather than listed. `packages/server` is the first server this repository has had: accounts with `scrypt`
 hashing, email confirmation behind a signed expiring token, opaque session tokens in a table, and a
 leaderboard whose **entries are verified by replaying their seed**. That last part is the whole
 anti-cheat design and there is no other part to it — a client-reported score measures willingness to

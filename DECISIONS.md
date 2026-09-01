@@ -28305,3 +28305,142 @@ these literals extracted every quoted string and returned **279** "ids", because
 `reason` is full of apostrophes. Reading the array directly cannot have that failure mode. When the
 thing being reported is a count produced by an instrument nobody checked, the instrument is the part
 to keep short.
+
+## D423 — the browser-tier count in a *recommendation* is a live claim, and the guard over it could be defeated by a line wrap
+
+**Date: 2026-09-01 · Owner: lane C, wave I · Closes the GitHub issue #230 half of a question wave H
+left open, and re-opens the corrected row of [§ D227](#d227)'s class in the file that carries the
+guard.**
+
+**Decision, in two halves.**
+
+1. `M2_MEASUREMENT.md` § 4.2's *"installing Gecko buys nothing while **N of N** browser-tier files
+   name `chromium`"* is a **live claim** and is re-derived, not a dated record left as it was. So are
+   § 4.1's twin and the three sentences in `docs/31-support-matrix.md` §§ 5 and 7 that spell the same
+   count. All five now read **33**, which is what both of § 3's commands answer on this tree.
+2. `viewportGateClaims.test.ts`'s shapes join their tokens with `\s+` rather than a literal space,
+   and a third shape — `the tier holds N` — is added.
+
+**Why the first half is a claim and not a record, since wave H decided the other way and said so.**
+Three grounds, and the third is the one that settles it.
+
+- **The sentence is in the present tense inside a live recommendation.** § 4.2 is headed *"The
+  cheapest three things that would move this box"* and its own preamble says *"each converts a
+  claim into something a red run defends"*. The `while` clause is the **precondition** for the
+  Firefox row: it is the reason a reader is being told not to install Gecko yet. A reader acts on it
+  today.
+- **The same document already treats the same figure as live.** § 3 was re-derived to *33 of 33* and
+  carries a block quote recording what it used to say. A document cannot hold one figure to two
+  standards in two sections without becoming the thing it is warning about — and § 4.1 and § 4.2
+  disagreed with **each other**, publishing *29 of 30* and *29 of 29* for one set in one tree, which
+  is exactly the two-documents-disagreeing defect § 3's block quote exists to record.
+- **This document already has a section for dated findings and this is not in it.** § 5 is *"Published
+  numbers that have gone stale, found while measuring"*, and its figures — 25, 26 — are correct
+  records of what was found on 2026-08-24 and stay untouched. § 4 is not that section. The test for
+  a dated record is not *"is the document dated?"*; every document is. It is *"does the sentence say
+  when?"*
+
+**What a dated figure does instead, because deleting one would be worse than leaving it.**
+`docs/31-support-matrix.md` § 5's *"the ~157 s was measured over the 25 files the tier held then"* is
+a true record and is kept. It is written **outside** the machine-read shape — the backticked
+`` `*.browser.test.ts` `` that shape 2 keys on is dropped from that clause — rather than struck
+through, because striking it would announce a correction that has not happened. That extends the rule
+this guard already had for *superseded* figures to *dated* ones: **a figure that is a claim about the
+tree now goes in a shape; a figure that is a claim about a measurement then says *then* and stays out
+of one.**
+
+**The second half is the finding, and it is not really about line wraps.** The guard was green over
+all five stale sites. Its four shapes matched a literal space between tokens, Markdown wraps prose at
+100 columns, and two of the five had a newline where the regex wanted a space:
+
+```
+because **29 of
+30** browser-tier files name `chromium`
+```
+
+The other three spelled the count in no shape at all — *"it holds 29 now"*, *"It is **29** now"*. So a
+check written to end a class of staleness had been reporting **green** over five members of it, on
+the two documents it was built for, for the whole of the wave that corrected four of their siblings.
+
+**The lesson is the ordinary one about derivation, aimed one level up.** This repository's rule is
+that a published *number* with no derivation is stale as of the next commit that moves it. The same
+is true of a *shape*: a guard whose coverage depends on where a paragraph happens to break is a
+transcribed guard, and it fails silently, which is the worse of the two failure modes. `RISKS.md`
+R38's remedy is a ratchet or a derivation and never a pin — and a regex that only matches one
+rendering of a sentence is a pin wearing a derivation's clothes.
+
+Rather than teach the regex three more bespoke phrasings for the three that spelled no shape, the
+three sentences were reworded onto one shape. That direction is deliberate: the sentence a person
+writes and the sentence the machine reads should be the same sentence, or the next author will write
+a fourth phrasing without knowing there was a set to join.
+
+**Mutation-validated in both directions.** Wrapping a *correct* `**33 of 33**` across a line keeps
+the guard green (the wrap alone is not the defect); wrapping a *stale* `**29 of 29**` the same way is
+now caught, where before this change it was not. Setting `the tier holds 33` to `29` is caught by the
+new shape. And the strengthened guard's first run found all three surviving stale sites on its own,
+which is a better validation than an injected fault: it went red on real staleness.
+
+**One citation was wrong for the same wave and is corrected with it.** Both documents said the count
+was derived by `viewportGates.browser.test.ts`. It is not, and that file's own docstring says it is
+not — the derivation is `viewportGateClaims.test.ts` beside it, deliberately not a browser test. A
+citation is a claim about a mechanism and goes stale the same way a number does, with the difference
+that a stale number is merely wrong while a stale citation sends the next reader to a file that
+cannot explain itself.
+
+## D424 — a fixed finding left reading as live is [§ D227](#d227) with its polarity reversed, and a register is what closes it
+
+**Date: 2026-09-01 · Owner: lane C, wave I · Closes item 1 of GitHub issue #172 and the `docs/20`
+bullet of #230.**
+
+**Decision.** `docs/20-everyday-playtest-audit-2.md`'s eleven unstruck ranked defects are struck
+through **in place**, each with the commit and the module that closed it beside it, and
+`packages/viz/src/docs20Register.test.ts` holds the register from now on.
+
+**What was true.** All seventeen ranked defects from the 2026-08-11 player-walk were fixed across
+three merges — `d43cc8a` (1, 2, 7, 10, 12), `cac03d1` (3, 4, 5, 6, 8, 9), `4005c86` (11, 13–17) —
+and **only the last six were struck through**. So 1–10 and 12 read as live findings for three waves,
+on a page whose six struck siblings told a reader that this document marks its closures.
+
+**Why that is worse than a stale figure and belongs in § D227's family.** § D227's finding is that a
+stale *refusal* tells a reader not to touch a control that works. This is the same sentence pointing
+the other way: a stale *finding* tells a reader to go and fix something already fixed. Both are a
+sentence that stopped describing the tree; both survive every check the repository runs, because
+nothing in the suite reads a document's verdicts against the code. The cost here is concrete rather
+than theoretical — this document's *What I would do next* list was six-sevenths done, and a lane
+planning work from it would have picked up six finished jobs.
+
+**Each of the three classes was treated differently, and saying which is which is most of the work.**
+
+- A **number** that has moved is derived. The register's open count is one, and it is a ratchet at
+  **zero** rather than a pin at eleven-minus-eleven.
+- A **claim about a mechanism** that has stopped being true is corrected with its evidence beside
+  it — the merge, the module, and the test that pins it, one per defect, so a reader can check the
+  claim rather than believe it.
+- A **dated record** is left standing and its datedness is made explicit. Three of those here:
+  Part A's table of `PARTIALLY` verdicts, which is what a player saw on one day and is **not**
+  re-scored (re-marking it `VERIFIED` would claim a second walk that has not happened, so the rows
+  say where each partial went in the ranked list instead); the `result:` line at the foot, which is
+  the lane's verbatim sign-off and whose *17 new ranked defects* is a correct count of what the walk
+  found; and the walk's method and base-commit block.
+
+  The *What I would do next* list is deliberately **not** in that class. A recommendation is a claim
+  about work that should happen, so an unmarked one recommends six things that already exist. Each
+  item carries its own outcome, and item 7 is marked **Open** on a measurement rather than an
+  assumption: nothing in `packages/viz/src` renders *Write a rule* and no coach line names the race
+  strip. GitHub issue #172 asserted that list was *"entirely done"*; six of seven is, and checking
+  the seventh is the difference between this entry and a transcription of the issue.
+
+**What the guard can assert, said plainly because the failure mode of a check like this one is a
+reader taking it for more than it is.** It cannot check that a defect is fixed; no mechanical reading
+of *"Better now requires a measured improvement"* evaluates against a tree. It checks the **link**
+between document and tree, both ways: every struck-through defect is named by number somewhere in
+`packages/viz/src` — this repository's own convention, that a fix cites the finding it closes — and
+the count of findings still reading as live is a ratchet at zero. A citation is weaker evidence than
+a passing test and stronger than a reader's diligence, and what it buys is that the document and the
+tree can no longer drift apart quietly: they disagree in a suite, on the commit that separates them.
+
+**Mutation-validated, four ways.** Un-striking one defect fails the ratchet naming it; renumbering a
+heading fails the contiguity case; a struck-through defect no file cites fails the citation case; and
+breaking the heading shape fails the non-vacuity case rather than passing over an empty list — which
+is the trap `deadCode.test.ts` and `viewportGateClaims.test.ts` both guard, and the one a guard over
+a document is most likely to fall into.
