@@ -99,6 +99,7 @@ import {
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  STAGE_SWITCH_PICKER_LABEL,
   type StageFigure,
   type StageGeometry,
   type StageInterventionRow,
@@ -768,7 +769,7 @@ function mountStage(
     'font-size:12.5px',
     'max-width:100%',
   ].join(';');
-  switchPicker.setAttribute('aria-label', 'Who drives the rest of the day');
+  switchPicker.setAttribute('aria-label', STAGE_SWITCH_PICKER_LABEL);
   for (const profile of switchable) {
     const option = el(doc, 'option', undefined, profile.name);
     option.value = profile.id;

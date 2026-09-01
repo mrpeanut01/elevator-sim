@@ -167,6 +167,7 @@ import {
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  STAGE_SWITCH_PICKER_LABEL,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
@@ -8515,6 +8516,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_NO_GHOST',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
@@ -8620,6 +8622,11 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         }
       }
     }
+    seeds.push({
+      field: 'stage.intervene.switch.pickerLabel',
+      text: STAGE_SWITCH_PICKER_LABEL,
+      role: 'label',
+    });
     seeds.push({ field: 'stage.race.noGhost', text: STAGE_NO_GHOST, role: 'reason' });
 
     /* § 14's overflow chip — the one string `stageCrowdCapOf` produces. */

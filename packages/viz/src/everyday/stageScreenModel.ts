@@ -616,6 +616,16 @@ export const STAGE_SWITCH_EXPLAINS =
   SWITCH_PINS_NOTE;
 
 /**
+ * What the handover's picker is *for*, for a reader who cannot see it beside the button.
+ *
+ * Here rather than inline in the mount, on this module's founding split: the words are the model's
+ * and the mount decides which attribute they go in. A label read only by a screen reader is still a
+ * player-facing string, and one authored in the mount would reach the static sweep and none of the
+ * ten properties — which is exactly what § D347 moved three of the cutaway's captions here for.
+ */
+export const STAGE_SWITCH_PICKER_LABEL = 'Who drives the rest of the day';
+
+/**
  * Why the handover arm cannot act — it would hand the day to the vector already driving.
  *
  * A sentence rather than a bare disabled button (§ 7.6's fourth rule), and it names the *reason*
