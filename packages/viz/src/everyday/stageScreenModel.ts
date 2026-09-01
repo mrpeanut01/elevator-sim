@@ -70,11 +70,17 @@
  * register's own precedent applied one screen down: a register nothing renders is read by nobody.
  */
 
-import type { RunInterventionConfig } from '@elevator-sim/core/browser';
+import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import type { VizFloor, VizRecording, VizShaft } from '../contract/types.js';
 import { WAIT_BANDS } from '../live/bands.js';
-import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import {
+  interventionStampOf,
+  PARK_CARS_LOBBY_LABEL,
+  switchChangesNothing,
+  switchDispatcherLabelOf,
+  SWITCH_PINS_NOTE,
+} from '../live/interventions.js';
 import { clockAt, phaseAt, timelineOf } from '../live/timeline.js';
 import type { LiveObservations, WaitBandId } from '../live/types.js';
 // AD-S17's length rule, shared with the Engineer stage. The *derivation* — what counts as standing
@@ -544,22 +550,21 @@ export function stageAlarmOf(o: LiveObservations, floorLabelOf: (id: string) => 
 /**
  * One arm of § 7.6's control.
  *
- * **Which arms exist, stated because the guide lists three and this build ships one.** § 7.6's
- * build order is (1) park the cars in the lobby, (2) switch who is driving, (3) answer a campaign
- * incident. All three are `RunInterventionConfig['change']` kinds in `core` now, and the table is
- * still one row — because the constraint is not the kind union, it is **what this screen can
- * construct**. A row carries the whole `change`, so an arm is buildable here exactly when the
- * screen holds everything that change needs:
+ * **A row is one *change the screen can construct*, not one kind**, and the distinction is the whole
+ * reason this carries a whole `change` rather than a kind. § 7.6's build order is (1) park the cars
+ * in the lobby, (2) switch who is driving, (3) answer a campaign incident; all three are
+ * `RunInterventionConfig['change']` arms in `core`, and an arm is buildable here exactly when this
+ * screen holds everything that change needs.
  *
- * - (1) needs nothing beyond the kind, so it is the row.
- * - (2) needs the profile being handed to, and choosing one is § 11's workshop surface, not this
- *   screen's — the Engineer strip carries the arm today against its own resolved target.
- * - (3) needs an answered incident's option and its service events, which come from § 7.5's dock;
- *   no route in this build produces the `ctx === 'campaign'` that dock lives on.
+ * - (1) needs nothing beyond the kind, so it is a constant — {@link STAGE_INTERVENTIONS}.
+ * - (2) needs the profile being handed to, which is why it is **not** in that constant and is built
+ *   per call by {@link stageInterventionsOf} from {@link StageInterventionInput.switchTo}. GitHub
+ *   issue **#171**; it was unbuildable while the screen held no dispatcher to name.
+ * - (3) needs an answered incident's option and its service events, which come from § 7.5's dock.
+ *   Still absent, and {@link STAGE_ABSENCES} says so where a player reads it.
  *
- * That is why the row type is a `change` and not a kind. A kind-keyed table would compile for (1)
- * and be a lie the moment a kind carried data — which it now does, twice. See
- * {@link STAGE_ABSENCES}, which names both absences for a player rather than leaving them here.
+ * A kind-keyed table would have compiled for (1) and been a lie the moment a kind carried data —
+ * which it now does, twice, and one of those two is drawn.
  */
 export interface StageInterventionRow {
   /** The whole entry this arm appends — not a kind, per the docstring above. */
@@ -568,9 +573,26 @@ export interface StageInterventionRow {
   readonly label: string;
   /** What pressing it will do, for the control's title. § 7.6's mechanism in one sentence. */
   readonly explains: string;
+  /**
+   * Why **this arm** cannot act, or `undefined` when it can — § 7.6's fourth rule at row scope.
+   *
+   * Beside {@link StageInterventionView.refusal} rather than instead of it, because the two answer
+   * different questions. That one is about the *run* — no day is running, the day is filed, a
+   * re-simulation is in flight — and is true of every arm at once. This one is about the *arm*: a
+   * handover to the vector already driving is a control that moves nothing, which § D177 ranks below
+   * no control at all, and it says so while the arm beside it is still pressable.
+   */
+  readonly refusal?: string | undefined;
 }
 
-/** The arms this build ships — see the interface docstring for why it is one and not three. */
+/**
+ * The arms that need nothing from the run to construct.
+ *
+ * One entry, and that is now a statement about **arity of data** rather than about what this build
+ * ships: parking is the only change whose whole content is its kind. The handover arm is real and is
+ * assembled per call, because its content is a profile this constant cannot know. Read
+ * {@link stageInterventionsOf} for the rows a player actually meets.
+ */
 export const STAGE_INTERVENTIONS: readonly StageInterventionRow[] = Object.freeze([
   Object.freeze({
     change: Object.freeze({ kind: 'park-cars-lobby' as const }),
@@ -580,6 +602,31 @@ export const STAGE_INTERVENTIONS: readonly StageInterventionRow[] = Object.freez
       'everything before this moment is unchanged, and playback resumes here',
   }),
 ]);
+
+/**
+ * The handover arm's title — the park arm's own sentence, with what a switch does to the player's
+ * choosers instead of what it does to the picture.
+ *
+ * `SWITCH_PINS_NOTE` rather than a second phrasing of it: the Engineer strip's control has carried
+ * that exact sentence since review finding 3, and two wordings of one mechanism is how a refusal
+ * goes stale (§ D227).
+ */
+export const STAGE_SWITCH_EXPLAINS =
+  'appends to today’s record at the playhead and re-simulates the day from the start — ' +
+  SWITCH_PINS_NOTE;
+
+/**
+ * Why the handover arm cannot act — it would hand the day to the vector already driving.
+ *
+ * A sentence rather than a bare disabled button (§ 7.6's fourth rule), and it names the *reason*
+ * rather than the comparison: what the player has selected is what the building is already obeying,
+ * so the record would grow an entry that changed no decision. `live/interventions.ts` decides when
+ * this is true, and it is emphatically not an id comparison — a player who has moved the plain
+ * levers is driving a different vector under the same name, and handing the day to that name is a
+ * real change.
+ */
+export const STAGE_SWITCH_NO_CHANGE =
+  'that is what the building is already running — handing the day over would change nothing';
 
 /** The intervention control, resolved for a run and a playhead. */
 export interface StageInterventionView {
@@ -606,6 +653,25 @@ export interface StageInterventionInput {
   readonly dayClosed: boolean;
   /** Whether a re-simulation is in flight — § 7.6's `recomputing` beat. */
   readonly recomputing: boolean;
+  /**
+   * The dispatcher § 7.6's second arm would hand the day to, or `undefined` when the screen is
+   * offering none — which is every caller that draws no picker.
+   */
+  readonly switchTo?: StageSwitchTarget | undefined;
+}
+
+/**
+ * What the handover arm needs: who the day would go to, and what it is on now.
+ *
+ * `driving` is a **thunk**, and the reason is `live/interventions.ts#switchChangesNothing`'s: a run
+ * that already carries a handover is answered without consulting a vector at all, and deriving the
+ * driving profile walks the whole spec chain on a function the stage calls once per frame.
+ */
+export interface StageSwitchTarget {
+  /** The profile the control hands the day to, whole — the shape the record carries. */
+  readonly target: DispatcherProfile;
+  /** The vector **actually driving**, derived. See the interface docstring for the thunk. */
+  readonly driving: () => DispatcherProfile;
 }
 
 /** § 7.6's `recomputing` beat, so a re-simulation is a state rather than a freeze. */
@@ -621,10 +687,37 @@ export function stageInterventionsOf(input: StageInterventionInput): StageInterv
         ? STAGE_RECOMPUTING
         : undefined;
   return {
-    rows: STAGE_INTERVENTIONS,
+    rows: rowsOf(input),
     stamp,
     ...(refusal === undefined ? {} : { refusal }),
   };
+}
+
+/**
+ * The arms this call can offer: the constant ones, plus the handover when a target was supplied.
+ *
+ * The handover row is built here rather than held in a constant because its `change` carries the
+ * whole profile — see {@link StageInterventionRow}. Its own refusal is decided here too, so a
+ * screen never has to know what makes a handover a no-op; that rule lives in one place and both
+ * shells read it.
+ */
+function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] {
+  const { switchTo } = input;
+  if (switchTo === undefined) return STAGE_INTERVENTIONS;
+  const changesNothing = switchChangesNothing({
+    interventions: input.interventions,
+    target: switchTo.target,
+    driving: switchTo.driving,
+  });
+  return Object.freeze([
+    ...STAGE_INTERVENTIONS,
+    Object.freeze({
+      change: Object.freeze({ kind: 'switch-dispatcher' as const, profile: switchTo.target }),
+      label: switchDispatcherLabelOf(switchTo.target.name),
+      explains: STAGE_SWITCH_EXPLAINS,
+      ...(changesNothing ? { refusal: STAGE_SWITCH_NO_CHANGE } : {}),
+    }),
+  ]);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -665,12 +758,25 @@ export const STAGE_NO_GHOST =
  * `STAGE_NO_GHOST` is the exception and the reason the exception is a rule: it is a **control's**
  * refusal, drawn on the ghost lane's own card as well as being in this register, because a control
  * that cannot act says so where the control is.
+ *
+ * ## One entry was **deleted** here rather than reworded, and the distinction is § D227's
+ *
+ * It read *"no decisions during a run — a day can carry a handover to another dispatcher and an
+ * answered incident, and this screen offers neither"*, and half of it stopped being true on the
+ * commit that put § 7.6's handover on this stage (GitHub issue **#171**). A refusal that has stopped
+ * being true is worse than a missing one: it tells a reader not to look for a control that is there.
+ * So the sentence went with the arm it described, and what stands in its place is a **narrower**
+ * claim about the arm that is still absent — not the same sentence with a clause trimmed off it.
+ *
+ * That remaining entry is pinned by a run and not by another sentence: `stageScreenModel.test.ts`
+ * asserts that no row this model can build carries an answer, so the day an answer arm lands the
+ * check goes red and the sentence comes out with it.
  */
 export const STAGE_ABSENCES: readonly string[] = Object.freeze([
   STAGE_NO_GHOST,
   'no campaign dock — a campaign day reaches this stage, and the money-and-incident panel that belongs beside it is not drawn',
   'no camera — the cutaway draws the whole building at once, so there is nothing to pan and nothing to follow',
-  'no decisions during a run — a day can carry a handover to another dispatcher and an answered incident, and this screen offers neither: a handover needs a dispatcher picked somewhere, and an incident needs the dock above',
+  'no answer to a live incident — a day can carry one, stamped with the moment it was given, and this screen offers none: answering needs the money-and-incident panel above, and that panel is what is missing',
 ]);
 
 /* -------------------------------------------------------------------------- *
