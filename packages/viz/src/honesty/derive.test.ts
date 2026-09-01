@@ -895,6 +895,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * parsed list, through the `GAUNTLET` adapter's `whatAreTheFortyOf` and the ladder rows.
          */
         'gauntlet/proofCases.ts#parseProofCases',
+        /*
+         * § 1's bench seed rule (§ D446). Not prose, and derived only by the identifier clause the
+         * `watch/` group above names first: the scanner reads the key template `bench#${caseId}` as
+         * words. What it returns is a decimal seed string that no surface prints — `proofSeedOf`,
+         * its gauntlet twin, is not derived at all, and the only difference between them is that
+         * this one's key carries a literal word. `proofCases.test.ts` pins the value and asserts
+         * the two seed sets are disjoint, which is the check that matters about it.
+         */
+        'gauntlet/proofCases.ts#benchSeedOf',
         'scenario/published.ts#classOfCounts',
         'scenario/published.ts#validatePublishedGoalRates',
         'editor/editorValidate.ts#validateBuildingText',

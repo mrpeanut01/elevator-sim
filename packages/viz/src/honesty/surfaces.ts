@@ -9879,6 +9879,15 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
     // § D389's heading, driven through `benchResultViewOf`, which is the only caller: the seed
     // below carries the composed string a player reads rather than the bare stem.
     'everyday/benchModel.ts#benchTooCloseHeadingOf',
+    /*
+     * § D445's planner. Covered rather than excluded, and the distinction was **measured rather
+     * than inherited**: this entry first said the derivation could not find it, copied by analogy
+     * from `SUITE_BENCH`'s note about `suitePlanOf`, and `derive.test.ts` reported it as an
+     * unclassified producer of its own prose on the next run. The two are not alike — `benchPlanOf`
+     * composes a case's label through `caseNameOf` as well as throwing — so the analogy was the
+     * defect. Its refusals are driven below, by manufacturing the state that produces each.
+     */
+    'everyday/benchModel.ts#benchPlanOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -9934,10 +9943,10 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
 
     /*
      * `benchPlanOf`'s refusals, driven by manufacturing the state that produces each — `SUITE_BENCH`
-     * does the same for `suitePlanOf` and for the same reason, and `benchPlanOf` is likewise not in
-     * `covers`: its prose lives in `throw` messages, which the producer derivation does not
-     * attribute to an export, and a `covers` entry the derivation cannot find is a coverage claim
-     * for nothing. The screen draws these in its error slot, so they are a player's strings.
+     * does the same for `suitePlanOf`. Unlike `suitePlanOf` it **is** in `covers`, because the
+     * derivation finds it and the coverage claim is therefore real; the note beside that entry
+     * records how the opposite was briefly written here by analogy. The screen draws these in its
+     * error slot, so they are a player's strings.
      *
      * The field-of-under-two guard is not driven here: the type forbids it, only a deserialised
      * state reaches it, and manufacturing one would need a cast. `SUITE_BENCH` leaves its twin
