@@ -17,13 +17,21 @@
  * other mounts, and the strings it prints come from the engine, the case file, or the figure
  * producers, all of which are driven.
  *
- * ## The runs happen on the main thread, and that is a stated cost
+ * ## The runs are on a worker — GitHub issue #165
  *
- * `recordRun` here takes ~0.5 s per run on the largest shipped case. The shift surface moved its
- * runs to a worker (B3); this panel keeps the two-run pair synchronous with the button disabled
- * and relabelled while it computes, because a worker round-trip for a surface whose whole output
- * is one before/after sheet is complexity the first slice does not need. Named in the delivery
- * report as a limitation.
+ * Both of a press's runs, and the as-built run a case opens by taking, go through
+ * `dev/offThreadRuns.ts` to `dev/shiftWorker.ts`. This panel used to state a cost here instead —
+ * *"~0.5 s per run on the largest shipped case … a worker round-trip for a surface whose whole
+ * output is one before/after sheet is complexity the first slice does not need"* — and that
+ * sentence is deleted rather than reworded, because a stated cost that has been paid is § D227's
+ * stale refusal: it tells the next reader not to touch the thing.
+ *
+ * The busy states stay, because they are still honest: the run button relabels to
+ * `Running the day…` and goes inert, and the figures card says it is measuring while the case's
+ * as-built run is in flight. What went with the block is the `requestAnimationFrame` +
+ * `setTimeout` defer, whose whole subject was getting the relabel painted **before** a task that
+ * would seize the thread for a second. There is no such task now; the click handler returns
+ * immediately and the browser paints on its own schedule.
  */
 
 import { el, fill } from './dom.js';
@@ -45,15 +53,26 @@ import {
   toggleRepair,
   type FixitOutcome,
 } from '../fixit/engine.js';
-import { figureValuesOf, fixitRunPlanOf, measuredOf, runFixitPair } from '../fixit/run.js';
+import { FIXIT_RUN_SWITCHES, figureValuesOf, fixitRunPlanOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
-import type { RecordedRun } from '../record/recordRun.js';
+import type { VizRecording } from '../contract/types.js';
+
+import { createOffThreadRunner } from './offThreadRuns.js';
+import type { ShiftWorkerLike } from './shiftRunner.js';
 
 export interface FixitPanelHost {
   readonly document: Document;
   readonly resources: BrowserResources;
   /** Fetch-and-parse, once, on first open — `dev/data.ts#loadFixitCases`. */
   readonly loadCases: () => Promise<FixitCases>;
+  /**
+   * Start the worker a run crosses to — `dev/offThreadRuns.ts`, GitHub issue #165.
+   *
+   * Injected rather than built here for `dev/shiftRunner.ts`'s reason: `new Worker(new URL(…))` is
+   * a bundler seam and a DOM global, so a panel that constructed one could not be driven without a
+   * document *or* a bundler. The shell passes the real one.
+   */
+  readonly spawnRunWorker: () => ShiftWorkerLike;
 }
 
 export interface FixitPanel {
@@ -67,7 +86,8 @@ interface CaseSession {
   state: FixitState;
   fixed: boolean;
   outcome: FixitOutcome | undefined;
-  asBuilt: RecordedRun | undefined;
+  /** The as-built run the figures are measurements of. `undefined` until the worker answers. */
+  asBuilt: VizRecording | undefined;
 }
 
 /*
@@ -105,6 +125,21 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
   let loadFailure: string | undefined;
   let selectedId: string | undefined;
   const sessions = new Map<string, CaseSession>();
+
+  const runner = createOffThreadRunner({ spawn: host.spawnRunWorker });
+
+  /**
+   * What the runner is currently doing, as `caseId:open` or `caseId:press` — or `undefined`.
+   *
+   * One field rather than a per-session busy flag, and that is what makes the screen self-heal
+   * across a supersede. `dev/offThreadRuns.ts` answers exactly one ask; a second `start` abandons
+   * the first **silently**, so a flag left on the abandoned case would leave it measuring forever.
+   * Keying on the ask means the next draw of that case sees an ask that is not its own and starts
+   * a fresh one.
+   */
+  let ask: string | undefined;
+  /** A failed run, said where the reader is rather than swallowed. Cleared by the next ask. */
+  let runFailure: string | undefined;
 
   const sessionOf = (entry: FixitCase): CaseSession => {
     let session = sessions.get(entry.id);
@@ -233,14 +268,46 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
     );
   }
 
+  /**
+   * The as-built run the four figures are measurements of, asked for on the case's first draw.
+   *
+   * Started from `main` because that is where the absence is noticed, and guarded by {@link ask}
+   * so a re-render mid-flight does not queue a second one. The case redraws when it lands.
+   */
+  function measureAsBuilt(entry: FixitCase): void {
+    const key = `${entry.id}:open`;
+    /*
+     * Guarded twice. An ask already running for this case is left alone; an ask running for a
+     * **press** is never superseded, because `render()` runs immediately after a press to draw the
+     * busy button and would otherwise steal the runner from the pair it just started — leaving the
+     * button inert with nothing coming. An open ask *may* supersede another open ask, which is
+     * what makes switching cases mid-measure work.
+     */
+    if (ask === key || ask?.endsWith(':press') === true) return;
+    ask = key;
+    runFailure = undefined;
+    const plan = fixitRunPlanOf(entry, emptyFixitState(), host.resources);
+    runner.start({
+      runs: [{ config: plan.asBuilt, ...FIXIT_RUN_SWITCHES }],
+      onDone: ([asBuilt]) => {
+        ask = undefined;
+        if (asBuilt !== undefined) sessionOf(entry).asBuilt = asBuilt;
+        render();
+      },
+      onFailed: (message) => {
+        ask = undefined;
+        runFailure = message;
+        render();
+      },
+    });
+  }
+
   function main(entry: FixitCase): HTMLElement {
     const session = sessionOf(entry);
-    if (session.asBuilt === undefined) {
-      // The four figures are measurements of the as-built run, so the case opens by taking one.
-      session.asBuilt = runFixitPair(fixitRunPlanOf(entry, emptyFixitState(), host.resources)).before;
-    }
+    if (session.asBuilt === undefined) measureAsBuilt(entry);
     const spend = spendOf(entry, session.state);
-    const figures = figureValuesOf(entry, session.asBuilt.recording);
+    const figures =
+      session.asBuilt === undefined ? undefined : figureValuesOf(entry, session.asBuilt);
     return el(doc, 'div', {
       style: { flex: '1', padding: '1.5rem', 'max-width': '52rem' },
       children: [
@@ -258,18 +325,32 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
           }),
         ]),
         card(
-          figures.map((figure) =>
-            el(doc, 'div', {
-              style: { display: 'flex', 'justify-content': 'space-between', gap: '1rem' },
-              children: [
-                el(doc, 'span', { text: figure.label, style: { color: MUTED } }),
-                el(doc, 'span', {
-                  text: figure.text,
-                  style: figure.reading === 'bad' ? { color: BAD } : {},
+          figures === undefined
+            ? [
+                /*
+                 * The figures are measurements of a run that is happening on a worker, so the card
+                 * says so rather than drawing four blanks. Mount-status text, on the same footing
+                 * as the load-failure line above — this panel's own literal, and this panel is
+                 * DOM-bound and outside the honesty search's driven corpus for that reason.
+                 */
+                el(doc, 'p', {
+                  className: 'fixit-measuring',
+                  text: 'Measuring the building as it stands…',
+                  style: { color: MUTED, margin: '0' },
                 }),
-              ],
-            }),
-          ),
+              ]
+            : figures.map((figure) =>
+                el(doc, 'div', {
+                  style: { display: 'flex', 'justify-content': 'space-between', gap: '1rem' },
+                  children: [
+                    el(doc, 'span', { text: figure.label, style: { color: MUTED } }),
+                    el(doc, 'span', {
+                      text: figure.text,
+                      style: figure.reading === 'bad' ? { color: BAD } : {},
+                    }),
+                  ],
+                }),
+              ),
         ),
         card([
           el(doc, 'p', { text: entry.diagnosis.text, style: { margin: '0 0 0.5rem', 'font-weight': '600' } }),
@@ -453,56 +534,69 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
   }
 
   function runButton(entry: FixitCase, session: CaseSession): HTMLElement {
+    const busy = ask === `${entry.id}:press`;
     const button = el(doc, 'button', {
       // Named for the same reason `.fixit-repair` is: the tier selects a control by its class and
       // never by the prose a player reads, which is a lesson this file's sibling paid for once.
       className: 'fixit-run',
-      text: session.outcome === undefined ? 'Run the day' : 'Run it again',
+      text: busy ? 'Running the day…' : session.outcome === undefined ? 'Run the day' : 'Run it again',
       style: { ...buttonStyle(true), 'font-weight': '600', margin: '0.75rem 0' },
     });
+    /*
+     * **The busy state survives the re-render, which the disabled flag alone did not.**
+     * `render()` rebuilds this button, so a press that wrote `disabled`/`textContent` onto the old
+     * node lost both the moment anything redrew. That was invisible while the runs blocked the
+     * thread — nothing *could* redraw — and is exactly the bug an asynchronous run introduces. So
+     * the label and the flag are drawn from {@link ask}, which outlives any one node.
+     */
+    button.disabled = busy;
     button.addEventListener('click', () => {
-      button.disabled = true;
-      button.textContent = 'Running the day…';
-      /*
-       * Deferred **past a paint** so the relabel is on screen before the synchronous pair of runs
-       * blocks the thread.
-       *
-       * ## The comment that used to sit here described a mechanism this code did not have
-       *
-       * It read *"deferred one frame so the relabel paints before the synchronous pair of runs"*,
-       * over a bare `setTimeout(…, 0)`. A zero timeout schedules a **task**, not a frame: the
-       * browser may run it before the next paint, and the task then blocks the main thread for the
-       * length of two `recordRun` calls — 0.5–1.5 s on the shipped buildings. So the two writes
-       * above reached the DOM and were overwritten by `render()` below without ever being painted,
-       * and the disabled, relabelled button — the only thing stopping a second press mid-run —
-       * existed for nobody.
-       *
-       * It was measured rather than reasoned about, and not here: `everyday/fixitScreen.ts` carried
-       * this approach over verbatim, and its browser case waited fifteen seconds for a button
-       * reading `Running the day…` on a run that takes seconds and never saw one.
-       *
-       * `requestAnimationFrame` runs its callback **before** the paint that follows it, and a
-       * `setTimeout` inside that callback runs after — which is the first moment the relabel is
-       * guaranteed to be on screen. Nesting the two is the whole fix. `everyday/fixitScreen.ts`'s
-       * `afterPaint` holds the same argument at more length; this panel is where the mistake was.
-       */
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          const plan = fixitRunPlanOf(entry, session.state, host.resources);
-          const pair = runFixitPair(plan);
-          session.asBuilt = pair.before;
-          const measurement = measuredOf(entry, pair.before.recording, pair.after.recording);
-          const outcome = classifyOutcome(entry, measurement, spendOf(entry, session.state));
+      if (busy) return;
+      ask = `${entry.id}:press`;
+      runFailure = undefined;
+      const plan = fixitRunPlanOf(entry, session.state, host.resources);
+      // The spend is bound here rather than read in the callback: the outcome is classified
+      // against the state the press was made in, not against one the player edited meanwhile.
+      const spend = spendOf(entry, session.state);
+      runner.start({
+        runs: [
+          { config: plan.asBuilt, ...FIXIT_RUN_SWITCHES },
+          { config: plan.asRepaired, ...FIXIT_RUN_SWITCHES },
+        ],
+        onDone: ([before, after]) => {
+          ask = undefined;
+          if (before === undefined || after === undefined) return;
+          session.asBuilt = before;
+          const outcome = classifyOutcome(entry, measuredOf(entry, before, after), spend);
           session.outcome = outcome;
           // The badge follows the latest run, in both directions — `fixit/engine.ts#fixedBadgeAfter`
           // holds the argument (docs/20 defect 16: FIXED beside a 0 % outcome card is two verdicts
           // about one case on one screen).
           session.fixed = fixedBadgeAfter(outcome);
           render();
-        }, 0);
+        },
+        onFailed: (message) => {
+          ask = undefined;
+          runFailure = message;
+          render();
+        },
       });
+      render();
     });
-    return el(doc, 'div', { children: [button] });
+    return el(doc, 'div', {
+      children: [
+        button,
+        ...(runFailure === undefined
+          ? []
+          : [
+              el(doc, 'p', {
+                className: 'fixit-run-failed',
+                text: `The day could not be run: ${runFailure}`,
+                style: { color: BAD, margin: '0 0 0.5rem' },
+              }),
+            ]),
+      ],
+    });
   }
 
   function outcomeCard(outcome: FixitOutcome): HTMLElement {

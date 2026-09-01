@@ -1045,6 +1045,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * optional, so `index.html` is unchanged and `elementMap.test.ts`'s contract is untouched.
    */
   /**
+   * A worker that runs one simulation and hands the recording back — `dev/shiftWorker.ts`.
+   *
+   * One factory for all three of its near sides: `createShiftRunner` below, and
+   * `dev/offThreadRuns.ts` inside the Fix-a-building and Watch panels (GitHub issue #165). Hoisted
+   * here rather than written out per caller because `new Worker(new URL(…))` is a **bundler seam** —
+   * Vite rewrites that exact expression — and three copies of it are three chances for one to be
+   * spelled differently and silently fall back to a runtime fetch.
+   */
+  const spawnRunWorker = (): Worker =>
+    new Worker(new URL('./shiftWorker.ts', import.meta.url), { type: 'module' });
+
+  /**
    * Fix-a-building — GAMEPLAY § 10, mounted like the menu: a TypeScript-built overlay, so
    * `index.html` and `elementMap.test.ts`'s contract are untouched. The case file is fetched on
    * first open (`loadFixitCases`'s own note on why it is not part of boot).
@@ -1053,6 +1065,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     document,
     resources,
     loadCases: () => loadFixitCases(resources),
+    spawnRunWorker,
   });
 
   /**
@@ -2908,7 +2921,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   };
 
   const shiftRunner = createShiftRunner({
-    spawn: () => new Worker(new URL('./shiftWorker.ts', import.meta.url), { type: 'module' }),
+    spawn: spawnRunWorker,
     clock,
     onStatus: (text) => {
       setText(ui.transport.status, text);
