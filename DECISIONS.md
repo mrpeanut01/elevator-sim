@@ -30408,3 +30408,42 @@ still an absence of its own — but the handover has been an Engineer-only contr
 is the commit that lets a player reach that state from the Everyday stage. Watching is unaffected:
 `watch/record.ts#WATCH_RECORD_CARRIES` carries `viewer.interventions`, so a handed-over day travels
 to a spectator whole.
+
+
+## D453 — a merge conflict can be loud and still be resolved wrongly, and the fix is to read both intents
+
+**Date: 2026-09-01 · Owner: integrator, wave K · The case [§ D441](#d441) does not cover.**
+
+**Decision.** When two lanes edit the same function for different reasons and git raises a conflict,
+the resolution is not a choice between the two sides and is not a concatenation of them. It is a
+third text that carries **both intents**, written after reading what each lane was trying to do — and
+it is verified by asserting that both behaviours survive, not by the build passing.
+
+**Why this needed its own entry beside § D441.** That entry is about collisions git **cannot see**:
+two lanes writing the same value, producing no marker and a wrong result. This is the opposite
+failure and it is the more tempting one, because a conflict marker *looks* like the tool has told you
+what to do. It has told you only where the two texts differ, which is not the same as telling you
+what either was for.
+
+**The instance.** `everyday/benchScreen.ts`, wave K. Lane B had rewritten that screen's run path to
+plan § 12.3's forty proof cases — `benchPlanOf`, `BenchCasePlan`, a `state.data` guard — and had
+narrowed its `batch/suite.js` import accordingly, dropping `suitePlanOf`, `SuiteCellPlan` and
+`SuiteRequest`. Lane A had added a saved-dispatcher pre-flight to the same function, written against
+the `SuiteCellPlan` shape that lane B had just removed.
+
+Both sides were correct on their own branch. Taking either whole would have shipped a screen that
+was coherent and wrong: lane B's alone offers the player's dispatchers in its field and refuses them
+at Run, which is the exact defect #167 exists to close; lane A's alone plans matrix cells on a screen
+whose own copy now names the forty, which is the defect #157 exists to close. **A three-way merge
+tool cannot pick between those, because the information that decides it is in neither text.**
+
+The resolution keeps lane B's plan types and data guard, and inserts lane A's pre-flight between the
+guard and the plan — before any worker starts, which is where lane A's own argument put it. It was
+then checked in the only way that means anything: the merged screen was read for **both** halves, and
+both are present — it plans the forty (`benchPlanOf` at the plan site) and it carries
+`savedProfiles` on its `postMessage`. `tsc -b` would have passed on either side alone.
+
+**The rule.** A conflict in a function two lanes both rewrote is a signal to read both lanes'
+*reports*, not just both diffs. Resolve to the union of intents, then assert each intent separately
+against the merged file. If the two intents genuinely cannot coexist, that is a design question for
+the lanes' owner and not a merge to be finished quietly.

@@ -1435,22 +1435,18 @@ type DecisionReservation = {
  * a citation promises a heading a reader can follow, and § D430 settled that a hole is named and
  * never cited. That gate caught this very line.)
  */
-const OPEN_RESERVATION = {
-  wave: 'K',
-  /*
-   * D443–D454. Lanes A–E hold D443–D452, two apiece; **D453–D454 are the integrator's**, sized that
-   * way since wave I because § D418 was written past a block fitted to its lanes alone — and wave J
-   * spent both of its own on findings that only exist at integration (§ D441, § D442), which is the
-   * argument for keeping them rather than a coincidence.
-   *
-   * § D430's other half applies: a hole may sit anywhere inside this block except at its top, or the
-   * charter row ends up naming a number the register says nobody may take. Two waves running, a
-   * lane has returned its second number unspent because a survey is one decision however many cells
-   * it measures (D428, D438), so expect a hole and leave room for it below D453.
-   */
-  from: 443,
-  to: 454,
-} as DecisionReservation | null;
+/*
+ * No wave is open. The annotation is load-bearing and must stay: a bare `= null` narrows the const
+ * to `null`, the open-wave arm below becomes `never`, and `tsc -b` fails with eleven
+ * `Property 'wave' does not exist on type 'never'`. Vitest transpiles rather than type-checks, so
+ * that break passes the tests it belongs to and is caught by CI instead. Do not simplify it away.
+ *
+ * Wave K's block was D443–D454: lanes A–E held D443–D452 and the integrator held D453–D454. Three
+ * of its numbers are holes — D444, D450 and D452, registered above — which is the most any block
+ * has returned, and the reason is the same in each case: an issue closed end to end is one decision
+ * however many modules it touches. The charter row is reconciled to D455 on this same commit.
+ */
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
  *
@@ -1518,6 +1514,20 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
       'third consecutive wave a lane has returned its second number, and the reason is the same each time: ' +
       'one issue closed end to end is one decision however many modules it touches. It sits inside wave ' +
       'K’s block and not at its top, which § D430’s other half requires.',
+  ],
+  [
+    444,
+    'wave K allocated it to lane A, which spent § D443 on GitHub issues #167 and #228 together — the ' +
+      'batch library seam, the five surfaces it reaches, and the cell the leg-level proof is measured ' +
+      'at — and reported the number unspent. Two issues closed through one seam is still one decision.',
+  ],
+  [
+    452,
+    'wave K allocated it to lane E, which spent § D451 on the absence it deleted and re-took, and ' +
+      'recorded the shared-predicate extraction and the `drivingProfile` façade method in their own ' +
+      'docstrings under § D405 rather than taking a second number for them. A decision that reaches no ' +
+      'further than the module taking it does not need an entry here, which is what makes this a hole ' +
+      'rather than an omission.',
   ],
 ]);
 
