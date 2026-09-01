@@ -155,10 +155,11 @@ derived from it:
 
 **The pointer's type already exists and a second one may not be invented.** It is `SubmittedRun` in
 `packages/server/src/leaderboard/submission.ts` — `buildingId`, `dispatcherProfileId`,
-`demandTemplateId`, `arrivalRatePctPop5min`, `durationS`, `windowStartS`, `seed` — together with the
-`ResolvedDataFacts` digests that `configHashOf` folds in, so a `data/` change starts a new
-population rather than corrupting an old one ([§ D214](../DECISIONS.md) § 4). Telemetry reuses that
-type unchanged. Two pointer shapes would be two answers to *what is a run*, and the first time they
+`demandTemplateId`, `arrivalRatePctPop5min`, `durationS`, `windowStartS`, `seed`, and since
+[§ D440](../DECISIONS.md) the Everyday pair `ruleRows` and `interventions` — together with the
+`ResolvedDataFacts` digests that `leaderboard/boardKey.ts#runDataHashOf` folds in, so a `data/`
+change starts a new population rather than corrupting an old one ([§ D214](../DECISIONS.md) § 4).
+Telemetry reuses that type unchanged. Two pointer shapes would be two answers to *what is a run*, and the first time they
 disagreed the disagreement would be invisible.
 
 **The cost of the pointer, stated.** Re-deriving a figure costs a simulation, and
@@ -950,7 +951,7 @@ prevent.
   exists to retire, and the source of the rule that until then every claim is recorded as
   unevaluated. **R32**, the competitive layer judged by a round trip rather than by either end.
 - `packages/server/src/` — the existing account model. `leaderboard/submission.ts` supplies
-  `SubmittedRun` and `configHashOf` (§ 2.1); `store/store.ts` supplies `SESSION_TTL_MS`,
+  `SubmittedRun` (§ 2.1) and `leaderboard/boardKey.ts` supplies `runDataHashOf`; `store/store.ts` supplies `SESSION_TTL_MS`,
   `LOGIN_TTL_MS`, the cascade, and the sweep-on-write mechanism § 5.2 reuses;
   `accounts/credentials.ts` supplies the cold-start measurement; `http/api.ts` and `http/serve.ts`
   supply the in-memory rate-limit key and `MAX_BODY_BYTES`.

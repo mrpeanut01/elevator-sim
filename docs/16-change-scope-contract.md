@@ -146,7 +146,7 @@ oversight, which is § D106's argument about `measured: false` versus `0`, appli
 the **shipped** decision, not a restatement of it: a probe that recomputes the arithmetic asserts its
 own correctness and passes whether or not the control is connected to anything. Both halves, and the
 second is the inverse of § D177's rule. One clause catches a setting that secretly moves a run — which
-would silently break `configHashOf`'s replay guarantee while both players' scores looked valid — and
+would silently break the leaderboard's replay guarantee while both players' scores looked valid — and
 the other catches a setting that reaches nothing at all.
 
 **S3 — A non-`presentation` control must change the legs.** Compared on the legs, never on a window
