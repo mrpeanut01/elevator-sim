@@ -28170,3 +28170,61 @@ not — the derivation is `viewportGateClaims.test.ts` beside it, deliberately n
 citation is a claim about a mechanism and goes stale the same way a number does, with the difference
 that a stale number is merely wrong while a stale citation sends the next reader to a file that
 cannot explain itself.
+
+## D424 — a fixed finding left reading as live is [§ D227](#d227) with its polarity reversed, and a register is what closes it
+
+**Date: 2026-09-01 · Owner: lane C, wave I · Closes item 1 of GitHub issue #172 and the `docs/20`
+bullet of #230.**
+
+**Decision.** `docs/20-everyday-playtest-audit-2.md`'s eleven unstruck ranked defects are struck
+through **in place**, each with the commit and the module that closed it beside it, and
+`packages/viz/src/docs20Register.test.ts` holds the register from now on.
+
+**What was true.** All seventeen ranked defects from the 2026-08-11 player-walk were fixed across
+three merges — `d43cc8a` (1, 2, 7, 10, 12), `cac03d1` (3, 4, 5, 6, 8, 9), `4005c86` (11, 13–17) —
+and **only the last six were struck through**. So 1–10 and 12 read as live findings for three waves,
+on a page whose six struck siblings told a reader that this document marks its closures.
+
+**Why that is worse than a stale figure and belongs in § D227's family.** § D227's finding is that a
+stale *refusal* tells a reader not to touch a control that works. This is the same sentence pointing
+the other way: a stale *finding* tells a reader to go and fix something already fixed. Both are a
+sentence that stopped describing the tree; both survive every check the repository runs, because
+nothing in the suite reads a document's verdicts against the code. The cost here is concrete rather
+than theoretical — this document's *What I would do next* list was six-sevenths done, and a lane
+planning work from it would have picked up six finished jobs.
+
+**Each of the three classes was treated differently, and saying which is which is most of the work.**
+
+- A **number** that has moved is derived. The register's open count is one, and it is a ratchet at
+  **zero** rather than a pin at eleven-minus-eleven.
+- A **claim about a mechanism** that has stopped being true is corrected with its evidence beside
+  it — the merge, the module, and the test that pins it, one per defect, so a reader can check the
+  claim rather than believe it.
+- A **dated record** is left standing and its datedness is made explicit. Three of those here:
+  Part A's table of `PARTIALLY` verdicts, which is what a player saw on one day and is **not**
+  re-scored (re-marking it `VERIFIED` would claim a second walk that has not happened, so the rows
+  say where each partial went in the ranked list instead); the `result:` line at the foot, which is
+  the lane's verbatim sign-off and whose *17 new ranked defects* is a correct count of what the walk
+  found; and the walk's method and base-commit block.
+
+  The *What I would do next* list is deliberately **not** in that class. A recommendation is a claim
+  about work that should happen, so an unmarked one recommends six things that already exist. Each
+  item carries its own outcome, and item 7 is marked **Open** on a measurement rather than an
+  assumption: nothing in `packages/viz/src` renders *Write a rule* and no coach line names the race
+  strip. GitHub issue #172 asserted that list was *"entirely done"*; six of seven is, and checking
+  the seventh is the difference between this entry and a transcription of the issue.
+
+**What the guard can assert, said plainly because the failure mode of a check like this one is a
+reader taking it for more than it is.** It cannot check that a defect is fixed; no mechanical reading
+of *"Better now requires a measured improvement"* evaluates against a tree. It checks the **link**
+between document and tree, both ways: every struck-through defect is named by number somewhere in
+`packages/viz/src` — this repository's own convention, that a fix cites the finding it closes — and
+the count of findings still reading as live is a ratchet at zero. A citation is weaker evidence than
+a passing test and stronger than a reader's diligence, and what it buys is that the document and the
+tree can no longer drift apart quietly: they disagree in a suite, on the commit that separates them.
+
+**Mutation-validated, four ways.** Un-striking one defect fails the ratchet naming it; renumbering a
+heading fails the contiguity case; a struck-through defect no file cites fails the citation case; and
+breaking the heading shape fails the non-vacuity case rather than passing over an empty list — which
+is the trap `deadCode.test.ts` and `viewportGateClaims.test.ts` both guard, and the one a guard over
+a document is most likely to fall into.
