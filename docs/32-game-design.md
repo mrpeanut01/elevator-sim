@@ -397,9 +397,12 @@ So the shape of a campaign decision is not *can I afford this* but *can I still 
 > number going up. The ordering that makes it a decision is **take capacity away first, give it back
 > later**, and a future currency sink that costs nothing in the present is refused under this rule.
 
-**GD11's ordering is the design intent and it is UNBUILT.** This paragraph read *"every works tier
-above tier 1 in the shipped shop takes capacity away first and gives it back later, and that ordering
-is the mechanic"*, stated as a fact about the shipped build, and it was false three ways:
+**GD11's ordering is the design intent and its *first* half is still UNBUILT.** This paragraph read
+*"every works tier above tier 1 in the shipped shop takes capacity away first and gives it back
+later, and that ordering is the mechanic"*, stated as a fact about the shipped build, and it was
+false three ways. **The second of the three has since been closed** ([§ D427](../DECISIONS.md)) and
+is left standing below with its correction, because a break that was recorded and then fixed must
+stop reading as open without the record of it disappearing:
 
 1. **No campaign day takes a car out of passenger service.**
    `RecordRunOptions.outOfServiceCarIds` has no writer under `packages/viz/src/campaign/`, none in
@@ -409,21 +412,33 @@ is the mechanic"*, stated as a fact about the shipped build, and it was false th
    calendar tip and from `campaign/economy.ts`'s `shafts` tier ([§ D364](../DECISIONS.md)); the
    `shafts` L1 line that this document quoted as *"eight nights with two cars out"* now reads only
    `'The tower stops being one car short.'`
-2. **The other half is unbuilt too**, so *gives it back later* is not a survivor of the correction.
-   Nothing bought reaches a run: `fittedLevel` is read only by `everyday/campaignModel.ts`'s
-   contract and shop screens, and the day a player then watches is built from `buildingId` and
-   `dispatcherId` alone. That is GitHub issue **#181**'s third break, still open.
+2. ~~**The other half is unbuilt too**, so *gives it back later* is not a survivor of the
+   correction. Nothing bought reaches a run: `fittedLevel` is read only by
+   `everyday/campaignModel.ts`'s contract and shop screens, and the day a player then watches is
+   built from `buildingId` and `dispatcherId` alone.~~ **CLOSED** — GitHub issue **#181**'s third
+   break, [§ D427](../DECISIONS.md). `everyday/host.ts#runCampaignDay` writes
+   `ViewerState.campaignFitOut` from `campaign/fitOut.ts#fitOutOf`, which reads the same
+   `fittedLevel` — so the nights a booking costs are what gate the kit rather than a second reading
+   of them — and `dev/state.ts#shiftRunConfigOf` builds the day's building, crowd and driving
+   profile from it. *Gives it back later* is built and pinned in the shape this section names:
+   thirteen of the sixteen tiers move the **legs** at the campaign's own cell, and the other three
+   are named with the cell where each does move rather than left to be discovered
+   (`packages/viz/src/campaign/fitOut.test.ts`). **It is only the second half.** GD11's ordering
+   still needs break 1, which is unchanged.
 3. **"Every works tier above tier 1" is false on its own terms**, before any question of capacity:
    `tenants` L2 (*Staggered start times*, 10 u) books **zero** nights, as do `doors` L1 and
    `tenants` L1. Nights are not a function of tier depth.
 
-What *is* built is the ledger: the purse moves, the month grid fills, the tier's nights gate when it
-reads as fitted, and a late purchase is refused. That is a real cost and it is the one stated above.
-It is **not** GD11's ordering, and the difference is the whole of the rule — a delay is not a
-subtraction. Building the ordering means giving a live booking a writer for
-`RecordRunOptions.outOfServiceCarIds` on the path `runCampaignDay` takes, and it is pinned in the
-repository's standing shape when it lands: *move the control and require the run to change, compared
-on the legs*. A works day whose legs match an ordinary one has not taken a car out.
+What is built is the ledger — the purse moves, the month grid fills, the tier's nights gate when it
+reads as fitted, and a late purchase is refused — **and now the giving back**: once the nights are
+past, the kit is in the building the run is built on. That is a real cost and a real reward, and it
+is still **not** GD11's ordering, because the ordering is *take away first*. The difference is the
+whole of the rule — a delay is not a subtraction. Building the missing half means giving a live
+booking a writer for `RecordRunOptions.outOfServiceCarIds` on the path `runCampaignDay` takes, and it
+is pinned in the repository's standing shape when it lands: *move the control and require the run to
+change, compared on the legs*. A works day whose legs match an ordinary one has not taken a car out.
+[§ D427](../DECISIONS.md) deliberately did not reinstate the withdrawn sentence while building the
+reward half, which is why break 1's two mechanised guards below are unchanged.
 
 **What holds the three sentences above true, stated because the answer is uncomfortable.** No test
 reads this file — `docs/32-game-design.md` is cited by `docs/33`, `docs/34` and
@@ -699,8 +714,11 @@ references `shift/growth.ts` at all, and `shift/growth.ts`'s callers are `shift/
 `authoring/` and `menu/` — the daily loop's side of the tree. `campaign/career.ts`'s own
 `CAMPAIGN_ABSENCES` says it outright: *"there is no seeded stream for a campaign day and no event
 calendar behind a contract."* So *Shipped? Yes* was true of the mechanism and false of the mode it
-was filed under — issue #181's class (nothing the campaign does reaches a run) pointed at events
-rather than at works.
+was filed under — issue #181's class (a thing the campaign does that reaches no run) pointed at
+events rather than at works. **The works half of that class is closed**
+([§ D427](../DECISIONS.md)); these two rows are not, and the reason they are different is worth
+keeping: the shop had a fold to reach for and these have none. `runCampaignDay` still never touches
+`state.calendar`, and nothing under `packages/viz/src/campaign/` still references `shift/growth.ts`.
 
 **The ambition is kept rather than deleted**, as a fourth row marked UNBUILT. A campaign whose
 contracts carry their own events is a better game than one whose difficulty is fabric and wear
@@ -1031,17 +1049,22 @@ records:
 - **`docs/32 GD12`'s reading of a unit as a cleared day is arithmetic, not an authored intent.** It
   follows from the rate being per cleared day and the shop being priced in the same unit. If the
   handoff intended a different meaning, the handoff wins.
-- **Nothing files a campaign day** (§ 3.6), so the economy specified in § 3 currently operates over a
-  record that play cannot write to. Every rule in § 3 is stated to be true of the economy once that
-  is closed.
-- **`docs/32 GD11`'s ordering — *take capacity away first, give it back later* — is unbuilt**, and
-  § 3.1 states it as intent rather than as a description. Neither half ships: no campaign day takes a
-  car out of passenger service (`RecordRunOptions.outOfServiceCarIds` has no writer on the path
-  `everyday/host.ts#runCampaignDay` takes — GitHub issues **#264**, **#272**,
-  [§ D364](../DECISIONS.md)), and nothing bought reaches a run at all (**#181** break 3). § 3.1 said
-  otherwise, as a fact about the shipped shop, for a wave after the product's own copy was corrected
-  — which is this repository's *stale claim* class arriving in a document rather than in a string,
-  and the reason § 3.1 now names what holds it true.
+- ~~**Nothing files a campaign day** (§ 3.6), so the economy specified in § 3 currently operates over
+  a record that play cannot write to.~~ **CLOSED** — [§ D400](../DECISIONS.md)/[§ D401](../DECISIONS.md):
+  a completed day is filed, the month grid is marked, the purse and the career record move, and
+  progression is driven. Every rule in § 3 is now stated of an economy play can write to.
+- **`docs/32 GD11`'s ordering — *take capacity away first, give it back later* — is half built**, and
+  § 3.1 states the ordering as intent rather than as a description. **The giving back ships**
+  ([§ D427](../DECISIONS.md)): the kit a tower has had fitted reaches the run through
+  `ViewerState.campaignFitOut`, and thirteen of the sixteen tiers are proved on the legs at the
+  campaign's own cell, with the other three named beside the cell where each does move. **The taking
+  away does not**: no campaign day takes a car out of passenger service
+  (`RecordRunOptions.outOfServiceCarIds` has no writer on the path `everyday/host.ts#runCampaignDay`
+  takes — GitHub issues **#264**, **#272**, [§ D364](../DECISIONS.md)), and § D427 deliberately did
+  not reinstate that sentence while building the other half. § 3.1 once said the whole thing shipped,
+  as a fact about the shipped shop, for a wave after the product's own copy was corrected — which is
+  this repository's *stale claim* class arriving in a document rather than in a string, and the
+  reason § 3.1 now names what holds it true.
 
 ---
 

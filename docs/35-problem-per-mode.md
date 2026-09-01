@@ -444,16 +444,30 @@ by `1 + 0.11 × (day − 1)` as **a real edit to a real `BuildingConfig` put bac
 `parseBuilding` and `resolveBuilding`**, because *"a growth factor that only reached the tenant count
 in the header would be … a lying one."*
 
-**And today the mode poses none of it**, for the reason GitHub issue #181 records in four verified
-breaks: closing a day records nothing, the wear clock is frozen at zero, the `build` select writes a
-field no run reads, and — the one that matters here — **nothing bought reaches a run.** `fittedLevel`
-and `bookedLevel` are display-only; `host.runCampaignDay` writes `buildingId` and `dispatcherId` and
-nothing else. A player books faster doors, watches the purse fall, and runs a day identical to the
-one before it.
+**Two of issue #181's four verified breaks are closed and two are not, and the two halves have to be
+read apart.** The paragraph here used to say the mode posed none of its problem, listing all four:
+closing a day records nothing, the wear clock is frozen at zero, the `build` select writes a field no
+run reads, and — the one that mattered here — *nothing bought reaches a run*, with `fittedLevel` and
+`bookedLevel` display-only and `host.runCampaignDay` writing `buildingId` and `dispatcherId` and
+nothing else.
 
-> **The design verdict is that Campaign's problem is the right problem and its wiring is absent.**
-> Nothing below asks for a new mechanic. It asks for the shop to reach the run (#181), and then for
-> three things the mode does not have even once it does.
+**The first and the last of those have stopped being true.** § D400/§ D401 made a completed day file,
+mark the month grid, move the purse and drive progression. And § D427 makes what is bought reach the
+run: `everyday/host.ts#runCampaignDay` writes `ViewerState.campaignFitOut` from
+`campaign/fitOut.ts#fitOutOf`, which folds § 8.2's *fitted* levels — so the nights a booking costs
+gate the kit, not a second reading of them — and `shiftRunConfigOf` builds the day's building, crowd
+and driving profile from it. Thirteen of the sixteen tiers move the **legs** at the campaign's own
+cell; the other three are measured and named rather than assumed
+(`packages/viz/src/campaign/fitOut.test.ts`).
+
+**The wear clock and the `build` select are still exactly as described**, and neither is closed by
+the above: nothing increments `trips`, and `CampaignTower.buildId` is still read by
+`everyday/campaignModel.ts` and by no run.
+
+> **The design verdict is that Campaign's problem is the right problem and half its wiring is still
+> absent.** Nothing below asks for a new mechanic. The shop now reaches the run (#181's first clause,
+> § D427); what the mode still does not have is the three things below, and a works night a player
+> can watch rather than only pay for.
 
 ### 5.2 The symptom, before any figure
 
@@ -478,31 +492,39 @@ Campaign has the **best-drawn symptom in the product and does not use it as one.
 > windows, so it has no equivalent — and that is the gap `PM-CA2` names. **Unverified**: whether the
 > band is legible at Casual row pitches; `docs/28` § 5.1's geometry is the place to settle it.
 
-> **`PM-CA3` — A works night is watched, not just paid for.** The purchase that reaches the run
-> (#181) reaches the *picture* too: a shaft bought is a well that appears, a car derated is a car
-> that moves differently, a service window is a shaft that goes dashed for a day. Every one of those
-> is in § 3.1's palette. **A purchase whose only visible consequence is the purse falling is the
-> economy this mode already has.**
+> **`PM-CA3` — A works night is watched, not just paid for.** The purchase reaches the run now
+> (#181's first clause, § D427) and the *picture* follows for free where the fabric moves: a shaft
+> bought **is** a well that appears, because `fittedBuilding` grows the bank through
+> `commissionedBuilding` and the renderers draw the building the run was built on. What is still
+> unbuilt is the works **night** — no campaign day takes a car out of passenger service, which is
+> `docs/32` `GD11`'s ordering and issue #272's withdrawn sentence — so a booking under works is
+> still a purse falling and a calendar cell filling, and nothing on the stage. **A purchase whose
+> only visible consequence is the purse falling is the economy this mode already had.**
 
 ### 5.3 What the player changes
 
 | | control | writes | shipped? |
 |---|---|---|---|
-| Works night | the shop — fittings, shafts, doors, destination panels | **Nothing today.** #181 break 3 | **No** |
+| Works night | the shop — fittings, shafts, doors, destination panels | `ViewerState.campaignFitOut`, folded from § 8.2's fitted levels, and through it the run's `BuildingConfig` (shafts, machine class, rated speed, rated load, door timings, transfer time, floor populations), its `demand.arrivalRatePctPop5min` and its driving profile's `dispatch` block — [§ D427](../DECISIONS.md) | Yes, and proved on the legs |
 | Career | difficulty tier | the purse `16 / 8 / 5 / 3`, the rate ladder, the miss allowance `6 / 3 / 1 / 0` — **stakes, never a bar**, per [§ D345](../DECISIONS.md) | Yes |
 | Day | dispatcher, the three group levers, the pattern rows | `SimulationConfig.dispatcherProfile`, `GroupLevers`, `authoring/patternSpec.ts#PATTERN_ROWS` | Yes |
 | Stage | the shipped interventions | `interventions[]` | Yes |
 
-> **`PM-CA4` — The shop needs `PM-b`, and the moment #181 lands is the moment it becomes possible to
-> get wrong.** Fix a building's five standing extras carry **no patch at all** and exist *so the
-> budget can be spent badly*; `docs/33` `DC-9` requires that a repair be inert only where the case
-> **declares** it inert, asserted on the legs in both directions. Campaign's shop has the opposite
-> problem today — every item is inert and none of them says so, which is
+> **`PM-CA4` — The shop needs `PM-b`, and #181's first clause landing is the moment it became
+> possible to get wrong.** Fix a building's five standing extras carry **no patch at all** and exist
+> *so the budget can be spent badly*; `docs/33` `DC-9` requires that a repair be inert only where the
+> case **declares** it inert, asserted on the legs in both directions. Campaign's shop used to have
+> the opposite problem — every item inert and none of them saying so, which is
 > [§ D219](../DECISIONS.md)'s defect at the scale of a mode's whole economy, as #181 itself puts it.
-> **So the rule arrives with the wiring:** once the shop reaches a run, every item is swept against a
-> no-purchase control on the same seed, and an item that moves no leg is either removed or given the
-> sentence that says so. An item that is *defensible and useless* is good design; an item that is
-> silently useless is the thing this repository has recorded eleven times.
+> **The rule arrived with the wiring** ([§ D427](../DECISIONS.md)): every one of the sixteen tiers is
+> swept against a no-purchase control on the same seed at the campaign's own cell, and the three that
+> move no leg there are named in the file with the cell where each does move —
+> `cars` L1 and L2 (the fitted document really does put 16- and 21-person cars in, and two cars over
+> an hour of a residential trickle never fill) and `control` L2 (Level-0 disclosure, which
+> [§ D112](../DECISIONS.md) already measured as changing no decision, against `control` L3's
+> Level-1 panel which does move it). An item that is *defensible and useless at a cell* is a
+> measurement; an item that is silently useless is the thing this repository has recorded eleven
+> times.
 
 ### 5.4 How the player finds out whether they were right
 

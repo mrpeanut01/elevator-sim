@@ -28089,3 +28089,102 @@ confirms it. This decision rests on the survey and the probe, not on a red anybo
 test in `experiments` now takes five minutes to fail instead of five seconds. A hang is a bug found
 once and fixed; a 5 s ceiling under load is a false red on a required check that recurs forever and
 trains people to re-run the suite instead of reading it.
+
+---
+
+## D427 — what a campaign tower buys reaches the run, and the three tiers that move no leg are measured rather than assumed
+
+**Date: 2026-09-01 · Owner: lane E, wave I · Closes GitHub issue #181's first clause. Its second
+clause was already false — see below. Applies CLAUDE.md's standing requirement (*move the control and
+require the run to change, compared on the legs*) to a whole economy, and is
+[§ D219](#d219)'s shape at that scale.**
+
+**Decision.** GAMEPLAY § 8.2's shop table gains a column. Each `ShopTier` carries a `FitOutDelta` —
+plain numbers and ids, **absolute at that tier's level** — and `campaign/fitOut.ts#fitOutOf` folds
+the *fitted* level of each category (`economy.ts#fittedLevel`, which is already gated on a booking's
+nights) into one `CampaignFitOut`. That record is `ViewerState.campaignFitOut`, written by
+`everyday/host.ts#runCampaignDay` and by nothing else, and read by `dev/state.ts#shiftRunConfigOf`
+and `#drivingProfileOf` — the two non-test callers, named because a barrel re-export and a `{@link}`
+tag look exactly like a caller and are not one.
+
+**What was wrong.** § 8's shop was a display of an economy. A tier could be bought, it cost units, it
+booked nights, the month grid filled in, `fittedLevel` reported it live — and `runCampaignDay` wrote
+a `buildingId` and a `dispatcherId`, pressed run, and read no booking at all. A player bought faster
+doors, watched the purse fall, and ran a day **byte-identical on the legs** to the one before it.
+That is `patternSwitching`'s defect with a shop in front of it.
+
+**The column is on the tier rather than in a table beside it**, and that is the load-bearing half of
+the shape. A second map keyed by `(categoryId, level)` is the thing that goes stale: a tier added to
+`SHOP` with no row in it would be a purchase that costs units, books nights, fills the grid and
+changes nothing about the day — this defect arriving one tier at a time. `fits` is required rather
+than optional, so a tier that buys nothing is a compile error, and `fitOut.test.ts` asserts every one
+of the sixteen carries a non-empty one. The fold is generic over the table: there is no
+`if (categoryId === 'doors')` anywhere in `fitOut.ts`, which is CLAUDE.md invariant 7 read forwards.
+
+**Every figure is the tier's own sentence or a value `data/` already ships, and the second half is
+asserted against the file rather than against a copy of it.** `doors` L1's second and L3's two
+seconds are the tiers' own words; the three machine speeds and the two person counts are the tiers'
+own names; `tenants` L2's third is its own sentence. `doors` L2's dwell second is
+`data/elevator-specs.json`'s `doors.dwellHallCallS` typical against its minimum; `tenants` L1's
+ceiling is that file's `timing.passengerTransferS.office`; persons become a rated load through its
+`conventions.personsPerRatedLoadUS` divisor, so `core`'s own `personsAtRatedLoad` is the inverse and
+a *16-person car* is sixteen people to the loader. The two ride-time floors are
+`data/dispatcher-profiles.json`'s `destination-eta` 0.5 and `destination-panel` 1.0.
+
+**One number is not modelled and is said so rather than invented.** `cars` L2's *slower doors* gets
+no penalty: a stop's length is `passengerTransferS` **per passenger per direction**, so a car taking
+five more people at a landing already stands there longer, and a second figure beside that would be
+this repository's stale-mechanism defect written forwards. What is genuinely unmodelled — a wider
+leaf on the same operator — has no shipped figure, and the tier's comment says which is which.
+
+**`control` L2 forced a decision that § D112 had already measured.** A tier that only set
+`dispatch.callType` is § D112's defect bought with units: `destination-eta` authored
+`weights.rideTime: 0`, disclosed a destination that changed no decision, and was bit-identical to
+`eta` at 8 of 8 matrix cells. Measured here on the legs at `garden-apartments`/3 600 s under
+`collective` — which weights `waitTime` alone — disclosure on its own moves nothing at all. So the
+tier discloses **and** prices, through a `rideTimeWeightFloor` rather than an assignment: a
+dispatcher already pricing ride time higher keeps its own vector, so this raises a floor rather than
+overruling § 8.5's standing order about who drives.
+
+**The result, at the campaign's own cell** — `garden-apartments` at 3 600 s, which is what
+`runCampaignDay` writes for `c1`. **Thirteen of the sixteen tiers move the legs.** The other three
+are empty cells rather than dead controls, and each is asserted **with** a cell where the same tier
+does move, which is `commissioning.test.ts`'s precedent and `docs/10` § 0's M1:
+
+| tier | why the cell is empty | where it moves |
+|---|---|---|
+| `cars` L1 | the fitted document really is 10 → 16 persons; two cars over an hour of a residential trickle never fill | the same cell at 15 % of population per 5 min |
+| `cars` L2 | the same sparseness one rung up | `midtown-office` at 1 800 s, as built |
+| `control` L2 | Level-0 disclosure on two cars — `garden-apartments`' own documented collapse of the dispatcher menu | `midtown-office` at 1 800 s, and `control` L3's Level-1 panel moves at the campaign's own cell |
+
+**A second finding, from sweeping the shipped set rather than the two buildings the probe helper
+loads.** `cars` clamps a rated load into the class's `capacityLbRange`, as `commissionedBuilding`
+does and for its reason. The clamp **alone** shrinks a car above the tier's rung: on `crown-hotel`'s
+4 000 lb service car, buying *16-person cars* would have taken it to 2 500. So the load is
+`max(wanted, the car's own)` and then clamped, and the assertion that holds it reads
+`data/buildings/` from disk — on both loaded buildings it is vacuous, which is why it is not written
+against them.
+
+**Registered where the repository already checks this class.** `scope/surface.ts` declares the field
+`between-days` — a works booking is priced in nights and `bookingIsLive` will not report a tier
+fitted until they are past, so the kit moves on a day boundary and never inside one, and a contract
+is twenty days rather than one game. `scope/probes.test-helper.ts` gives it the two-arm probe
+`scope.test.ts` requires, at 3 600 s: at `baseState()`'s 900 s the same arm is inert, so a probe left
+on the default cell would have reported a live seam dead. `scope/runIdentity.ts` gains the eleventh
+answer — a fitted tower's day may not be posted, on `viewer.commissioning`'s exact ground and asked
+the same way, *is this the identity?* through `fitOutIsAsBuilt`, never *is the field set?*, which
+would refuse a campaign day on which nothing has been bought. `persist.test.ts`'s ledger carries the
+reason it is not persisted: it is derived from a career that is itself not written to this device.
+
+**What this does not do, stated because half a design reading as whole is how § 3.1 of `docs/32` went
+stale.** It does not take a car out of passenger service for the nights a booking occupies. That is
+`docs/32` GD11's *take capacity away first*, it is the half issues #264 and #272 withdrew the
+sentence for ([§ D364](#d364)), and nothing here reinstates it —`economy.test.ts`'s prose sweep is
+what would catch an attempt to. `docs/32` § 3.1 and its § 8 register, and `docs/35` § 5.1–5.3, are
+corrected to say which half shipped.
+
+**Issue #181's second clause — *closing a day records nothing* — was already false when this lane
+opened**, and was verified rather than assumed: [§ D400](#d400)/[§ D401](#d401) made a completed day
+file, mark the grid cleared or missed, move the purse and the career record, and drive progression,
+and `everyday/campaignJourney.browser.test.ts` drives the page to it. The issue text is stale on that
+clause and is corrected in the lane's report rather than worked around.
