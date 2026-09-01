@@ -1971,9 +1971,9 @@ only what the entry point authors inline. **That figure is derived by
 `packages/viz/src/honesty/derive.test.ts` rather than transcribed here**, and this verdict published
 *three* from wave 12 until [§ D421](../DECISIONS.md) measured it: a named gap is part of the
 verdict, so a count inside one that nothing re-derives is a verdict going stale by itself. The
-access block's
-labels, tooltips and legend, and the elevation express toggle's two strings, are **not seeded** into
-`packages/viz/src/honesty/surfaces.ts` and are therefore outside R1–R13. Two rows with one cause:
+access block's labels, tooltips and legend, and the elevation express toggle's two strings, are
+**not seeded** into `packages/viz/src/honesty/surfaces.ts` and are therefore outside R1–R13. Two
+rows with one cause:
 `surfaces.ts` is a chokepoint every editor lane hits and no editor lane owns. All four are in
 [`GAPS.md`](../GAPS.md). *(Wave 12, [§ D194](../DECISIONS.md): the `mode` axis now has two values —
 and the second produced **zero new strings**, a measured null, because no shipped adapter branches
