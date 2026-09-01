@@ -1081,7 +1081,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * instead (*"~0.2–1.5 s on the shipped buildings"*, carried from `dev/fixitPanel.ts`) and it is
    * deleted rather than reworded: a stated cost that has been paid is § D227's stale refusal. The
    * measurement that replaced it is in `dev/watchPanel.ts`'s own header, and it found that
-   * sentence understated by more than threefold on the worst row this picker can offer.
+   * sentence understated by more than threefold on a filed day this picker will offer.
    */
   const watchPanel = mountWatchPanel({
     document,

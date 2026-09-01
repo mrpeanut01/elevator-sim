@@ -46,8 +46,8 @@ import type { Page } from 'playwright-core';
  * **Measured on both sides rather than chosen.** The population it has to separate:
  *
  * - *Blocking*, before this issue — `dev/measure.surfaceRuns.test.ts` over the shipped cases:
- *   Fix-a-building's open run 11–474 ms and its press 24–846 ms, Watch's worst offered row
- *   4 351 ms. The **smallest** of those is what the bound must sit under, because a bound above it
+ *   Fix-a-building's open run 11–474 ms and its press 24–846 ms, and a filed Vertical City day
+ *   Watch would offer at 4 351 ms. The **smallest** of those is what the bound must sit under, because a bound above it
  *   would let a regression on the cheapest case through.
  * - *Free* — a frame at 60 Hz is 16.7 ms, and this tier runs headless Chromium in a container that
  *   is hosting several worktrees by design, so single frames are dropped routinely.

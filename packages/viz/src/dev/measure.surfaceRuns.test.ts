@@ -245,13 +245,17 @@ describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting th
       }
 
       /*
-       * **The worst row the picker can offer, which is not a reference run.** The shipped
-       * references are two small days; a *filed* day is whatever the player ran, and the menu's
-       * ceiling is `menu/types.ts#LONGEST_OFFERED_RUN_S` on any tower they have played. So the
-       * population a stated cost has to cover includes Vertical City at 7 200 s — the cell
-       * `dev/shiftRunner.ts` measured at 21–31 s under `collective` and moved to a worker for.
-       * Measured here rather than inherited from that docstring, because it is a different
-       * machine and a different year.
+       * **A filed day, which is not a reference run — and a floor rather than a worst case.** The
+       * shipped references are two small days; a *filed* day is whatever the player ran, and the
+       * menu's ceiling is `menu/types.ts#LONGEST_OFFERED_RUN_S` on any tower they have played. So
+       * the population a stated cost has to cover includes Vertical City at 7 200 s.
+       *
+       * This runs that tower on **its own** demand rather than on `constant-iso`, which is what
+       * `dev/shiftRunner.ts` measured at 21–31 s under `collective` and moved the shift to a worker
+       * for. A day run that way can be filed too, so what this row establishes is that the stated
+       * ceiling was already exceeded well before the heaviest thing the menu allows — not what the
+       * heaviest thing costs. Measured here rather than inherited from that docstring, because it
+       * is a different machine and a different year.
        */
       const worstRecord = watchRecordOf(
         { ...baseState(), buildingId: 'vertical-city', shiftLengthS: 7200 },

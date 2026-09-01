@@ -29767,6 +29767,13 @@ times the stated ceiling, and 387 ms of the remaining transport is the recording
 cost quoted from the population that is easy to reach is the same defect as a refusal that has gone
 stale: both tell a reader the thing is smaller than it is.
 
+**4 351 ms is a floor on that, not a worst case, and the table says a filed day rather than *the
+worst* row for that reason.** It runs Vertical City on the building's own demand;
+[`dev/shiftRunner.ts`](packages/viz/src/dev/shiftRunner.ts) measured the same tower at the same
+7 200 s under `constant-iso` at **21–31 s** on `collective`, and a day run that way can be filed
+like any other. What this row establishes is that the stated ceiling was already exceeded well
+before the heaviest thing the menu allows.
+
 **The Everyday open run is the one nobody could see.** It ran inside `mainColumn`, so it had no busy
 state and could not have had one — nothing can paint while it runs. Measured through the browser
 tier on the shipped artifact, clicking a rail row stopped the page for **128 ms**; pressing the

@@ -15,7 +15,7 @@
  * | Fix-a-building, opening a case (one run) | 11–474 ms, median 87 | 1.9–40.9 ms |
  * | Fix-a-building, `Run the day` (the pair) | 24–846 ms, median 146 | 3.2–72.0 ms |
  * | Watch, the two shipped reference rows | 6 ms and 150 ms | 1.2 and 10.7 ms |
- * | Watch, the worst row the picker can offer — a filed `vertical-city` day at 7 200 s | **4 351 ms** | 387.6 ms |
+ * | Watch, a filed `vertical-city` day at 7 200 s | **4 351 ms** | 387.6 ms |
  *
  * The last row is the finding rather than the total. Watch's stated cost was *"~0.2–1.5 s"*, and
  * the rows it was measured against are the two references — 6 ms and 150 ms, *below* the range it
@@ -23,6 +23,12 @@
  * `menu/types.ts#LONGEST_OFFERED_RUN_S` on any tower they have played; and that row blocks for
  * three times the stated ceiling. A stated cost measured on the cheap half of its own population
  * is § D227's stale refusal wearing a number.
+ *
+ * **That row is not the worst one, and it is deliberately not called the worst.** It runs Vertical
+ * City on the building's own demand; `dev/shiftRunner.ts` measured the same tower at the same
+ * 7 200 s under `constant-iso` — 13 269 arrivals — at **21–31 s** on `collective`. A player who
+ * ran that and filed it can press `Watch it` on it. So 4 351 ms is a *floor* on what the stated
+ * ceiling was hiding, not a ceiling of its own.
  *
  * ## Why this is not `dev/shiftRunner.ts`
  *

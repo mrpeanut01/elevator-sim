@@ -43,7 +43,9 @@
  * day**, which is whatever the player ran up to `menu/types.ts#LONGEST_OFFERED_RUN_S` on any tower
  * they have played, and `dev/measure.surfaceRuns.test.ts` measures a filed `vertical-city` day at
  * 7 200 s blocking this thread for **4 351 ms** — three times the stated ceiling, with 386 ms of
- * that being the recording's own clone.
+ * that being the recording's own clone. And that is a **floor** rather than a worst case: the same
+ * tower at the same horizon under `constant-iso` is `dev/shiftRunner.ts`'s own 21–31 s, and a day
+ * run that way is a day that can be filed.
  *
  * The busy state stays, because it is still honest: the pressed row's button reads
  * `Checking this day…` and goes inert while its run is out. It is new — the blocking version had
