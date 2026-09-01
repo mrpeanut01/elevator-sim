@@ -289,6 +289,29 @@ function demandOptionsFor(request: BatchRequest): { demand?: SimulationDemandOpt
 }
 
 /**
+ * The whole `SimulationConfig` one arm runs, minus the seed — the shipped assembly, exported.
+ *
+ * Exported for **evidence**, and the evidence is the standing requirement's own: *move the control
+ * and require the run to change, compared on the legs*. `runBatch` discards every recording it
+ * makes, so the only things it hands back are window statistics — and § D177 is explicit that a
+ * mean can be unchanged for a run that is entirely different. A test that wants the legs therefore
+ * needs the config, and the one thing it must not do is build a second one: `scope/probes.test-helper.ts`
+ * states the trap outright — *"an instrument that does not reproduce the shipped call path measures
+ * the instrument."* This is that call path, by name, so a leg-level comparison of two arms is a
+ * comparison of what a batch actually ran.
+ *
+ * A caller still supplies `seed` and `replication`, exactly as the loop below does, because that
+ * is the one line of CRN and it belongs to the loop.
+ */
+export function armConfigOf(
+  request: BatchRequest,
+  resources: BatchResources,
+  arm: BatchArmRequest,
+): Omit<SimulationConfig, 'seed'> {
+  return baseConfigFor(request, resources, armProfile(resources, arm));
+}
+
+/**
  * The dispatcher one arm runs: the shipped profile, or that profile with the player's edit applied.
  *
  * The edit is resolved through `controls/editedProfile.ts` — the **same** module
@@ -299,6 +322,20 @@ function demandOptionsFor(request: BatchRequest): { demand?: SimulationDemandOpt
  * `collectSearchSpace()` is called here rather than carried on the request because a search space
  * is derived from `core`'s own declarations and is the same object on both sides of the worker
  * boundary; sending it would be sending a projection of something the receiver already has.
+ *
+ * ## The library, not a shipped list — issues #167 and #228, [§ D443](../../../../DECISIONS.md)
+ *
+ * `resources.dispatcherProfiles` is *"the whole of `data/dispatcher-profiles.json`"* and this line
+ * has always read it rather than a shipped array. What changed is who fills it:
+ * `dev/batchWorker.ts` now folds the player's own saved dispatchers in through
+ * `batch/library.ts#batchLibraryOf` before handing the resources over, so an arm naming a
+ * dispatcher somebody built in the workshop resolves here like any other. **Nothing in this
+ * function knows that**, which is CLAUDE.md invariant 7 kept rather than bent: a saved dispatcher
+ * is one more entry in the file's own shape, not a second kind of arm.
+ *
+ * The refusal below therefore still means what it says. It fires for an id in **neither** half —
+ * a stale deep link, a request restored from a session whose dispatcher was deleted — and the
+ * sentence is right for both.
  */
 function armProfile(resources: BatchResources, arm: BatchArmRequest): DispatcherProfile {
   const profile = resources.dispatcherProfiles.profiles.find(

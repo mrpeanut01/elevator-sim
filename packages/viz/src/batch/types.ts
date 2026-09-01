@@ -39,6 +39,7 @@
 
 import type {
   DemandLevel,
+  DispatcherProfile,
   DispatcherProfiles,
   ElevatorSpecs,
   ResolvedBuilding,
@@ -438,6 +439,31 @@ export interface BatchProgress {
 export interface BatchWorkerRequest {
   readonly kind: 'run';
   readonly request: BatchRequest;
+  /**
+   * The player's own saved dispatchers, so an arm may name one — issues #167 and #228,
+   * [§ D443](../../../../DECISIONS.md).
+   *
+   * **On the message and not on {@link BatchRequest}, because it is a resolution rather than an
+   * instruction.** The request names things by id, the way it names a building by id; the worker
+   * loads `data/` on its own side and had no way to know about a dispatcher the player authored
+   * in this session. `batch/library.ts#batchLibraryOf` folds these into
+   * `BatchResources.dispatcherProfiles` — which is what `runBatch` already resolved arms against,
+   * so nothing in the runner changes. Embedding a copy on the request instead would give a stored
+   * request two sources for one dispatcher, and the embedded copy is the one that goes stale.
+   *
+   * Whole profile documents rather than ids, because the worker cannot look them up: they live in
+   * `ViewerState.savedDispatchers` on the main thread. They are validated on arrival by `core`'s
+   * own parser and are refused, by name, if they cannot be authored — see `batch/library.ts`.
+   *
+   * Absent or empty is byte-identical to every batch run before this field existed, and that is
+   * asserted rather than asserted-in-prose: `batchLibraryOf` returns the loaded file **by
+   * identity** when nothing is carried.
+   *
+   * It is not part of the CRN equivalence class, for the reason {@link BatchRequest} gives about
+   * the dispatcher generally: `traceKeyOf` reads the fields core's trace generator reads, and the
+   * dispatcher is not one of them.
+   */
+  readonly savedProfiles?: readonly DispatcherProfile[] | undefined;
 }
 
 /** Sent back, zero or more times, then exactly one of `done` or `failed`. */
