@@ -1378,8 +1378,10 @@ exactly what goes and that boards keep what you already posted), and **Switch to
 
 Two notes for the build:
 
-- `Sound` has nothing behind it in the prototype. Either give it doors, chimes and lobby murmur,
-  or remove the row (§20.12) — a toggle that toggles nothing is a lie in a settings panel.
+- `Sound` has nothing behind it in the prototype. ~~Either give it doors, chimes and lobby murmur,
+  or remove the row (§20.12)~~ — **decided: give it the sound.** A toggle that toggles nothing is
+  still a lie in a settings panel, so until the audio plays the row is **not drawn** and its
+  absence is stated. See §20.12.
 - Settings never appears as a modal or a tray. It is a screen, it is in the rail, and it is
   reachable from anywhere without abandoning a run.
 
@@ -1659,8 +1661,30 @@ this revision:
   into tomorrow opens the brief paused. *Check:* nothing statistical sits above that button.
 - The report's third lever (*a fourth shaft*) must actually apply the shaft in the sandbox and
   offer the re-run. A lever that navigates and changes nothing is the defect #116 §3 names.
-- The `Sound` setting has nothing behind it. Either give it doors, chimes and lobby murmur, or
-  remove the row. A toggle that toggles nothing is a lie in a settings panel.
+- The `Sound` setting has nothing behind it. ~~Either give it doors, chimes and lobby murmur, or
+  remove the row.~~ A toggle that toggles nothing is a lie in a settings panel.
+
+  **Decided on 2026-08-24 and corrected here on 2026-09-01: the first branch was taken.**
+  `DECISIONS.md` §D344 is a product-owner ruling that **audio ships**, speed-tiered — lobby chimes
+  and doors at 1:1, a crowd bed where the clock is too compressed to carry a transient — which
+  overrules the written cut `docs/29-audio-direction.md` recommended. So this bullet no longer
+  offers a choice: the sound gets built, and **#258** is the lane that builds it. It was blocked on
+  the speed ladder having no 1:1 rung (**#257**, closed by §D354, which made the ladder seven rungs
+  with every label equal to its ratio), and it is unblocked now.
+
+  **What the build does in the meantime is the third thing this bullet did not name, and it is
+  neither of the two.** The row is not drawn and its absence is stated in the build-information
+  panel, which satisfies the rule this bullet ends with — the lie is a *drawn* toggle that toggles
+  nothing, and there is no drawn toggle. That stated absence is deleted on the commit that makes
+  the audio play, and not before; it carries #258 as its owner in the build's own triage table
+  (`packages/viz/src/everyday/buildNotes.test.ts#ABSENCE_TRIAGE`, `DECISIONS.md` §D370), so it is a
+  queue item rather than a permanent refusal. §15.1's note carries the same correction.
+
+  Two things this correction deliberately does **not** do. It does not describe the audio design —
+  §D344 and #258 are that account, and `docs/29` says in its own header that two accounts of one
+  design drift apart. And it does not touch §15.1's lede, *"how the game looks and sounds to you"*:
+  under the cut that sentence was a false promise to be corrected, and under this ruling it becomes
+  true by the sound arriving.
 
 ### 20.13 Content and honesty gates
 

@@ -18,9 +18,18 @@
  *   `set-setting` intent, so the two surfaces cannot disagree. While the Engineer surface is
  *   still booting the bridge is absent and the row is **absent too**, with a sentence in its
  *   place: a toggle whose write would land nowhere is § 20.12's lie with a race for an excuse.
- * - **Sound — not drawn.** `grep -rn "mute\|Audio\|chime" packages/viz/src --include='*.ts'`
- *   finds no audio machinery anywhere in the tree; the prototype's own build note (§ 15.1) says
- *   this row had nothing behind it *there* either. Named in {@link SETTINGS_ABSENCES} instead.
+ * - **Sound — not drawn, and now not drawn *yet*.** `grep -rn "mute\|Audio\|chime"
+ *   packages/viz/src --include='*.ts'` finds no audio machinery anywhere in the tree; the
+ *   prototype's own build note (§ 15.1) says this row had nothing behind it *there* either. Named
+ *   in {@link SETTINGS_ABSENCES} instead. **§ 20.12 offered two ways out and the choice has been
+ *   made**: [§ D344](../../../../DECISIONS.md) is a product-owner ruling that audio **ships**,
+ *   speed-tiered, overruling the written cut `docs/29-audio-direction.md` recommended — so this
+ *   row gains a consumer rather than losing its label. What was blocking it was the speed ladder
+ *   having no 1:1 rung for a discrete cue to play at, and § D354 closed that. The entry below is
+ *   therefore a **queue item with an owner** (`buildNotes.test.ts#ABSENCE_TRIAGE`, § D370) rather
+ *   than a holding position, and it is deleted on the commit that makes a sound play and not
+ *   before. [§ D447](../../../../DECISIONS.md) records that reading and the correction it owed the
+ *   design guide, whose § 20.12 and § 15.1 both still put the choice as open.
  * - **Default speed — not drawn.** The prototype's row writes `st.speed`, § 18's Everyday
  *   `run.speed(1..5)` — state this build does not have: the day a player runs is the Engineer
  *   stage (§ D335's hand-off), whose ×-chips and `settings.playbackSpeed` multiplier belong to

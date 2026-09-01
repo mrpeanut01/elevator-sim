@@ -29726,3 +29726,73 @@ mean.** It is unmeasured, and a second plausible sentence in place of a measurem
 
 **Both registers are empty and both tiers are green**, so the verdict column means today what it was
 written to mean: 0 failing cases *and* nothing held in `honesty.test.ts`'s `OUTSTANDING`.
+
+---
+
+## D447 — the Sound row is a queue item, not a holding position, and the guide's binary is closed
+
+**Date: 2026-09-01 · Wave K lane C · GitHub issue [#170](https://github.com/mrpeanut01/elevator-sim/issues/170), Sound half**
+
+**Decision.** The Everyday Settings `Sound` row **stays refused**, and the refusal is now recorded
+as *unbuilt with an owner* rather than as *undecided*. The design guide's § 20.12 —
+*"Either give it doors, chimes and lobby murmur, or remove the row"* — is **corrected in place** to
+say that the first branch was taken, by whom, and which lane carries it.
+
+**Why this is not the third option wearing a new hat.** § 20.12 offers two ways out and the issue
+that raised this says the stated absence is *"a reasonable holding position, but not an ending"*.
+It is an ending now, because the decision has been made elsewhere and this lane's job was to find
+it rather than to make it again: [§ D344](#d344) is a product-owner ruling of 2026-08-24 that
+**audio ships**, speed-tiered, overruling the written cut `docs/29-audio-direction.md`
+recommended. The lane that builds it is
+[#258](https://github.com/mrpeanut01/elevator-sim/issues/258), which was blocked on
+`STAGE_SPEEDS` having no 1:1 rung for a discrete cue to fit inside a 9.8 s door cycle
+([#257](https://github.com/mrpeanut01/elevator-sim/issues/257), closed by [§ D354](#d354) — seven
+rungs, every label equal to its ratio). **The block is gone and the work is live.**
+
+So the three options are not equally open: *build it* is chosen, *remove the row* is refused, and
+what is drawn today is what the chosen option looks like before it lands.
+
+**Why the refusal may stand while the work is owed.** § 20.12's rule is that *a toggle that toggles
+nothing is a lie in a settings panel* — and there is no drawn toggle. `settingsView.ts`'s
+`SETTINGS_ABSENCES` states the absence in words, and `buildNotes.test.ts#ABSENCE_TRIAGE`
+([§ D370](#d370)) already names #258 as its owner, in both directions: an entry with no triage row
+fails, and a triage row whose entry has gone fails too. That is the mechanism that makes this a
+queue rather than a permanent refusal, and it was already in place — this decision adds no
+apparatus, it reads the one that exists.
+
+**What was actually wrong, and it was a document rather than a build.** The guide said the choice
+was open. It had been closed for eight days, on a ruling in this repository's own decision log, and
+nothing pointed the reader of § 20.12 at it. That is [§ D227](#d227)'s class — a stated position
+that has stopped being true — in its documentary form: not a stale *refusal* (the refusal is
+accurate) but a stale *open question*, which sends the next lane to re-decide something already
+decided. Both sites are corrected: § 20.12's bullet and § 15.1's build note, which carried the same
+sentence.
+
+**The guide is edited rather than annotated from outside, and that is the precedent this entry
+sets.** `docs/design/design_handoff_casual_mode/` has been vendored twice and never edited, so this
+is the first change to it. Two things make it the right place. Its own § 21 says the guide *"is
+maintained alongside the prototype, not written once"* and names § 20's work order as the section
+that *"rots fastest"*, and its README says § 20 is **work, not design** — so correcting a work
+order is not overruling the canonical interface, which is what `CLAUDE.md` protects when it makes
+the handoff win every disagreement about what the screen looks like. The correction is marked as a
+correction (struck text kept, dated, attributed) rather than silently rewritten, on
+`docs/29`'s own pattern one document over.
+
+**What this decision deliberately does not do.**
+
+- **It does not describe the audio design.** § D344 and #258 are that account, and `docs/29`'s
+  header states the reason in its own case: two accounts of one design drift apart.
+- **It does not touch § 15.1's lede** (*"how the game looks **and sounds** to you"*). Under the cut
+  that sentence was a false promise needing correction; under this ruling it is a promise that
+  becomes true when the sound arrives, which is #258's to deliver.
+- **It does not amend `docs/29`.** That document is a superseded recommendation, already headed
+  *OVERRULED*, and it says outright that it is not amended to describe what replaced it. Its § 8
+  reasoning for the Sound half — *"Sound closes because the work is cancelled: there is no consumer
+  to build"* — is therefore **stale on its face and correctly so**, because the document above it
+  says the conclusion was overruled and the evidence was not. Rewriting § 8 would be the second
+  account this repository has twice refused to keep.
+
+**The consequence for #170.** Its two halves separate for good, which `docs/29` § 8 and this issue's
+own verification comment both predicted: Sound is #258's and is not this lane's to build, and Units
+is #170's alone. The Units half is this lane's and is built beside this entry; it cites this one,
+rather than this one citing forward into work that had not landed when it was written.
