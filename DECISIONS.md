@@ -28224,3 +28224,84 @@ the thing it was written about is decoration.
 its prose. § D393's own header records the sibling of this trap: an apostrophe inside a template
 literal opened a bogus string in a comment-stripper and silently lost a tier. The extraction check
 asserts the absence rather than trusting it.
+
+---
+
+## D421 — Phase 9's *"three DOM panels"* is 33 DOM entry points, and it was never a measurement
+
+**Date: 2026-09-01 · Owner: Lane B, wave I · Closes: GitHub issue #176's counting half.**
+
+**Decision.** The gap Phase 9's verdict names is **33 DOM entry points the honesty sweep cannot
+drive**, published as its two components — **17 mounts and 16 screen-registry rows** — with the
+clause that the screen rows' *pure halves are driven*. All six sites carry that figure, and none of
+them carries it as a typed number: it is derived from `NOT_PLAYER_FACING` by
+`packages/viz/src/honesty/derive.test.ts` and checked against the documents that publish it.
+
+**Numbered under [§ D405](#d405) criteria 1 and 2**: it binds five documents `packages/viz/src/honesty/`
+does not own — `CLAUDE.md`, `GAPS.md`, `docs/05-roadmap.md`, `docs/14-building-behaviour-contract.md`,
+`docs/18-everyday-mode-tree-audit.md` — and it moves a figure already recorded inside an accepted
+phase verdict, where a named gap is part of the verdict rather than commentary on it.
+
+**Both readings of *three* were wrong, and the narrowest failed inside the classifier.** The wide
+readings are 17 and 33. The narrow one is the docstring above `mountLeftRail`, the only place that
+ever enumerated the panels by name: it named three, and the id list beneath it has held **four**
+since `mountRightRail` joined — `RIGHT_RAIL` drives that mount's pure half and no sentence said so.
+That is a docstring naming its own members going stale, the class `packages/viz/src/deadCode.test.ts`
+caught twice in wave 12, arriving in the instrument built to catch it.
+
+**Why 33 rather than 17.** The classifier's own reasons put all 33 in one class. Thirty-two are in
+the `DOM-bound` group; `dev/watchPanel.ts#mountWatchPanel` is excluded a few groups later as *"DOM-
+or fetch-bound … on `dev/fixitPanel.ts`'s own established ground"*. Stopping at the mounts would
+leave sixteen exclusions taken on that same ground uncounted — which is exactly how
+`docs/14-building-behaviour-contract.md` came to cite the phrase as the *name* of a category and
+then put a fifth panel, `mountBuildingEditor`, into it. Nothing there was wrong about the gap. What
+had happened is that the number stopped being a measurement and became a label, and a label cannot
+go stale visibly.
+
+**Why not a bare 33.** Calling the sixteen screen rows *not driven* full stop would be a **new**
+false statement rather than a corrected count — [§ D227](#d227)'s stale-refusal trap one layer in.
+Each of those exclusions names the adapter that renders that screen's words. What is unswept, in
+both groups alike, is only what the entry point authors **inline**, and that reaches the static R10
+sweep and no other property of the ten. So the decomposition and that clause travel with the number
+wherever it is published; the number alone is not the claim.
+
+**What is not claimed.** This closes the *counting* half of issue #176 and nothing else. The mount-
+private prose is not exported, the 33 are not driven, and the gap is the same size it was — only
+the sentence describing it is now true. Issue #176's other two families (R2's replication-budget
+clause reachable only in the deep tier, and `UX.md` § 26's owed drive coverage) are untouched.
+
+---
+
+## D422 — a published count carries a machine-read shape, and a superseded one is struck through
+
+**Date: 2026-09-01 · Owner: Lane B, wave I · Generalises
+`packages/viz/src/everyday/viewportGateClaims.test.ts`'s rule to a second subject.**
+
+**Decision.** Where a figure this repository derives is published in prose, **the live claim is
+written in a shape a gate reads, and a superseded figure is struck through** (`~~three~~`). The gate
+strips `~~…~~` spans before reading anything, so history may stand beside the correction without
+satisfying the check, and a corrected sentence cannot pass by quoting the number it replaced.
+[§ D421](#d421)'s figure is the second subject to adopt it; the browser tier's file count was the
+first.
+
+**Numbered under [§ D405](#d405) criterion 1**: it is a rule for anyone editing the five documents
+§ D421 binds, and a lane that rewords one of those sentences has to know the shape exists before it
+goes red.
+
+**Two guards, because a count gate has two ways to pass while lying.** *Per site*: a document in the
+list that states no figure the gate reads is red, so a site cannot quietly drop the claim and become
+free to acquire a bare count again — that is how the figure reached six sites unchecked in the first
+place. *On the instrument*: the id shapes must find something, and every id they find must sit in an
+exclusion group whose reason names the DOM. Both were mutation-checked red before landing. The
+second is what makes a syntactic count a class rather than a spelling: a future `mountXxx` excluded
+for some non-DOM reason goes red and asks the question instead of joining a figure five documents
+publish.
+
+**Where the derivation lives, and why it is not a file of its own.**
+`viewportGateClaims.test.ts` is a separate file because its artefact is on disk and any test can
+glob it. This artefact is a module-private literal inside `derive.test.ts`, so a gate elsewhere
+would have to re-parse it — and issue #176 records what that costs: the first parser written over
+these literals extracted every quoted string and returned **279** "ids", because the prose in each
+`reason` is full of apostrophes. Reading the array directly cannot have that failure mode. When the
+thing being reported is a count produced by an instrument nobody checked, the instrument is the part
+to keep short.

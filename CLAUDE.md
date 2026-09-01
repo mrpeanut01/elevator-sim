@@ -412,7 +412,11 @@ verdict:
   the Day report and the live-metrics panel became mode-aware for GitHub issues #110 and #100, and
   both adapters now render **both** registers on every case, which is where the always-on tier's
   string count moved to 278 756. A null is a measurement of a tree, not a property of the axis)*,
-  three DOM panels are statically swept rather than driven, and **U6**, **U7's rider models** and
+  **33 statically swept DOM entry points** are not driven *(**17** mounts and **16**
+  screen-registry rows, derived by `packages/viz/src/honesty/derive.test.ts` rather than
+  transcribed, and published in this verdict as three until [§ D421](DECISIONS.md) measured it —
+  the screen rows' pure halves **are** driven, so what goes unswept in both groups is only what the
+  entry point authors inline)*, and **U6**, **U7's rider models** and
   **Basic's curated three-dimension subset** are unbuilt.
 
 **Phase 9's row is the first status to move since Phase 8's on 2026-07-28, and wave 6 is the reason
