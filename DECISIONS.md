@@ -28089,3 +28089,84 @@ confirms it. This decision rests on the survey and the probe, not on a red anybo
 test in `experiments` now takes five minutes to fail instead of five seconds. A hang is a bug found
 once and fixed; a 5 s ceiling under load is a false red on a required check that recurs forever and
 trains people to re-run the suite instead of reading it.
+
+## D423 — the browser-tier count in a *recommendation* is a live claim, and the guard over it could be defeated by a line wrap
+
+**Date: 2026-09-01 · Owner: lane C, wave I · Closes the GitHub issue #230 half of a question wave H
+left open, and re-opens the corrected row of [§ D227](#d227)'s class in the file that carries the
+guard.**
+
+**Decision, in two halves.**
+
+1. `M2_MEASUREMENT.md` § 4.2's *"installing Gecko buys nothing while **N of N** browser-tier files
+   name `chromium`"* is a **live claim** and is re-derived, not a dated record left as it was. So are
+   § 4.1's twin and the three sentences in `docs/31-support-matrix.md` §§ 5 and 7 that spell the same
+   count. All five now read **33**, which is what both of § 3's commands answer on this tree.
+2. `viewportGateClaims.test.ts`'s shapes join their tokens with `\s+` rather than a literal space,
+   and a third shape — `the tier holds N` — is added.
+
+**Why the first half is a claim and not a record, since wave H decided the other way and said so.**
+Three grounds, and the third is the one that settles it.
+
+- **The sentence is in the present tense inside a live recommendation.** § 4.2 is headed *"The
+  cheapest three things that would move this box"* and its own preamble says *"each converts a
+  claim into something a red run defends"*. The `while` clause is the **precondition** for the
+  Firefox row: it is the reason a reader is being told not to install Gecko yet. A reader acts on it
+  today.
+- **The same document already treats the same figure as live.** § 3 was re-derived to *33 of 33* and
+  carries a block quote recording what it used to say. A document cannot hold one figure to two
+  standards in two sections without becoming the thing it is warning about — and § 4.1 and § 4.2
+  disagreed with **each other**, publishing *29 of 30* and *29 of 29* for one set in one tree, which
+  is exactly the two-documents-disagreeing defect § 3's block quote exists to record.
+- **This document already has a section for dated findings and this is not in it.** § 5 is *"Published
+  numbers that have gone stale, found while measuring"*, and its figures — 25, 26 — are correct
+  records of what was found on 2026-08-24 and stay untouched. § 4 is not that section. The test for
+  a dated record is not *"is the document dated?"*; every document is. It is *"does the sentence say
+  when?"*
+
+**What a dated figure does instead, because deleting one would be worse than leaving it.**
+`docs/31-support-matrix.md` § 5's *"the ~157 s was measured over the 25 files the tier held then"* is
+a true record and is kept. It is written **outside** the machine-read shape — the backticked
+`` `*.browser.test.ts` `` that shape 2 keys on is dropped from that clause — rather than struck
+through, because striking it would announce a correction that has not happened. That extends the rule
+this guard already had for *superseded* figures to *dated* ones: **a figure that is a claim about the
+tree now goes in a shape; a figure that is a claim about a measurement then says *then* and stays out
+of one.**
+
+**The second half is the finding, and it is not really about line wraps.** The guard was green over
+all five stale sites. Its four shapes matched a literal space between tokens, Markdown wraps prose at
+100 columns, and two of the five had a newline where the regex wanted a space:
+
+```
+because **29 of
+30** browser-tier files name `chromium`
+```
+
+The other three spelled the count in no shape at all — *"it holds 29 now"*, *"It is **29** now"*. So a
+check written to end a class of staleness had been reporting **green** over five members of it, on
+the two documents it was built for, for the whole of the wave that corrected four of their siblings.
+
+**The lesson is the ordinary one about derivation, aimed one level up.** This repository's rule is
+that a published *number* with no derivation is stale as of the next commit that moves it. The same
+is true of a *shape*: a guard whose coverage depends on where a paragraph happens to break is a
+transcribed guard, and it fails silently, which is the worse of the two failure modes. `RISKS.md`
+R38's remedy is a ratchet or a derivation and never a pin — and a regex that only matches one
+rendering of a sentence is a pin wearing a derivation's clothes.
+
+Rather than teach the regex three more bespoke phrasings for the three that spelled no shape, the
+three sentences were reworded onto one shape. That direction is deliberate: the sentence a person
+writes and the sentence the machine reads should be the same sentence, or the next author will write
+a fourth phrasing without knowing there was a set to join.
+
+**Mutation-validated in both directions.** Wrapping a *correct* `**33 of 33**` across a line keeps
+the guard green (the wrap alone is not the defect); wrapping a *stale* `**29 of 29**` the same way is
+now caught, where before this change it was not. Setting `the tier holds 33` to `29` is caught by the
+new shape. And the strengthened guard's first run found all three surviving stale sites on its own,
+which is a better validation than an injected fault: it went red on real staleness.
+
+**One citation was wrong for the same wave and is corrected with it.** Both documents said the count
+was derived by `viewportGates.browser.test.ts`. It is not, and that file's own docstring says it is
+not — the derivation is `viewportGateClaims.test.ts` beside it, deliberately not a browser test. A
+citation is a claim about a mechanism and goes stale the same way a number does, with the difference
+that a stale number is merely wrong while a stale citation sends the next reader to a file that
+cannot explain itself.
