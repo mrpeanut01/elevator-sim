@@ -59,6 +59,29 @@
  * A build per **file** was measured and rejected: 4.5 s × 32 files is about 150 s onto a 269 s tier,
  * where one build is 4.5 s onto the same tier and buys the same artifact.
  *
+ * ## And a build per file is not merely slower — it was already broken, which is why this is a
+ * structural guarantee rather than an optimisation
+ *
+ * The helper this replaces *built* on every call, and two tier files called it. Vitest runs files in
+ * parallel, `dist-web/` is one directory, and `vite.config.ts` sets `emptyOutDir: true` — so the
+ * second file's write phase deleted the site the first file's `preview` server was still serving.
+ * Measured on this host by running the old helper twice over: the already-serving preview answered
+ * **404 on 63 of 87** requests for `/`, **62 of 87** for its own entry chunk, and a live page saw
+ * **404 on 18 of 140** requests for `/fixit-cases.json` — a window of roughly 900 ms in which the
+ * site did not exist.
+ *
+ * That is both of the CI reds of 2026-09-01, on a commit whose whole diff was one unrelated file:
+ * macOS reported `net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:5299/`, which is the first
+ * row; linux reported *"the fixit screen drew no heading to measure"*, which is what
+ * `everyday/fixitScreen.ts#render` draws when its data fetch fails, because the `loadFailure` branch
+ * has no `h1` in it. The 404 window is measured; that the failure branch draws no heading is read
+ * off the code rather than observed on a runner, and the distinction is kept because the two are
+ * different kinds of evidence.
+ *
+ * **This tier ran rarely enough for that to go unnoticed since 2026-08-26**, which is GitHub issue
+ * #163's shape one level in. One build, before any file is collected, makes the race impossible
+ * rather than unlikely — and `browserTier.test.ts` fails any tier file that calls `build(` again.
+ *
  * **The build is skipped when there is no browser**, because the tier is skipped then too and a
  * bundle nobody serves is 4.5 s spent on nothing. That is the one place {@link HAS_BROWSER} is read
  * outside a test.

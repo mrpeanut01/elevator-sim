@@ -134,6 +134,9 @@ let measured: readonly Measured[] = [];
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
   // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
+  // The note below predates that and still holds, with one number changed: a **preview**
+  // server's own default is 4173, not 5173, and it inherits `strictPort` from `server` just
+  // as the note describes. Measured by resolving vite.config.ts and reading it back.
   /*
    * A port of this file's own, and `strictPort: false` so a busy one becomes the next free one —
    * `compareLab.browser.test.ts`'s rule, and this file is the case that proves it.

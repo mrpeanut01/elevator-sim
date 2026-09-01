@@ -9,7 +9,7 @@
  *
  * ## Why this file exists at all
  *
- * Six `*.browser.test.ts` files each carried their own copy of the two constants below, and each
+ * Six `*.browser.test.ts` files each carried their own copy of the two constants, and each
  * copy's docstring said the same thing: *"`boot.browser.test.ts`'s constant and its reasoning, kept
  * identical so a machine that can run one tier can run both."* Six copies kept identical by a
  * sentence is the shape this repository keeps finding stale — the copies were in fact identical, and

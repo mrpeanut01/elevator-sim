@@ -75,6 +75,21 @@
  * The third case below pins that difference from the wire, and it is the assertion that fails first
  * if any part of this tier ever goes back to a dev server.
  *
+ * ## One red this file produced, and it was this file's rather than the product's
+ *
+ * On 2026-09-01 `suite (linux)` failed here — *"the fixit screen drew no heading to measure:
+ * expected null not to be null"* — on a commit whose whole diff was one unrelated file, while the
+ * same file passed twice on this container. **The case was already unreliable when it was written**
+ * (`97ac411`, 2026-08-26) and wave I did not make it so: it waited for `.everyday-fixit`, which
+ * `go` draws immediately, and then measured. `fixitScreen.ts#render` puts
+ * `.everyday-fixit-loading` in that container until `/fixit-cases.json` resolves, and in that state
+ * there is **no `h1` at all**. The window is a network fetch, which a loaded runner widens.
+ *
+ * That state was reproduced here rather than inferred: an unsettled probe against the **dev**
+ * server read heading `null` and incoming overflow `0`, which is the loading screen exactly. The
+ * fix is to wait for the loaded screen, not to sleep — and the offset is now asserted at both
+ * moments, because they are different claims.
+ *
  * ## The cost, measured rather than assumed
  *
  * One build for the **whole tier**, in `vitest.config.ts`'s `globalSetup`, and one `preview` server
@@ -258,6 +273,39 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
         'both scrollers. This is the effect GitHub issue #281 reported from the deployed build. ' +
         'Read the header before concluding this case pins the mechanism: it does not, because ' +
         'deleting either half of the reset leaves it green here.',
+    ).toBe(0);
+
+    /*
+     * **Wait for the case file, and do not measure the loading state** — the fix for a red this
+     * case produced on a GitHub Linux runner while passing twice on this container.
+     *
+     * `.everyday-fixit` exists the instant `go` draws, and `fixitScreen.ts#render` puts
+     * `.everyday-fixit-loading` in it until `/fixit-cases.json` resolves. In that state there is no
+     * `h1` at all, so `headingTop` is `null` and the assertion below reads *"the fixit screen drew
+     * no heading to measure"* — which is true of a screen that is still loading and says nothing
+     * about the product. The same state was reproduced here, on the **dev** server, by an
+     * unsettled probe: heading `null`, incoming overflow `0`.
+     *
+     * **The case was unreliable when it was written**, not made so by wave I: the runner red was on
+     * `97ac411`'s original file, and the window is a network fetch, which a loaded runner widens.
+     * Waiting for the loaded screen is the fix rather than a timeout — a sleep would trade this red
+     * for a slower one.
+     *
+     * The offset is asserted **twice on purpose**: above, at the instant of the navigation, which is
+     * what `go` resets; and again below, after the screen has grown to its full 8 772 px of
+     * overflow, which is what the player is left looking at. A future keeper that restored an
+     * offset on the data-driven re-render would satisfy the first and fail the second.
+     */
+    await page.waitForFunction(
+      () => document.querySelector('.everyday-fixit h1, .everyday-fixit h2') !== null,
+      undefined,
+      { timeout: 60_000 },
+    );
+
+    expect(
+      await offsetOf(page),
+      'the fixit screen scrolled away from the top when its case file arrived — the navigation ' +
+        'reset held and something after it did not',
     ).toBe(0);
 
     /*

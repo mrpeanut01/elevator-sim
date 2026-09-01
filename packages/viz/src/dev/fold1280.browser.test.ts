@@ -53,6 +53,9 @@ let origin: string;
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
   // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
+  // The note below predates that and still holds, with one number changed: a **preview**
+  // server's own default is 4173, not 5173, and it inherits `strictPort` from `server` just
+  // as the note describes. Measured by resolving vite.config.ts and reading it back.
   // A port of this file's own, `strictPort: false` so it moves rather than fights the sibling
   // files — the tier's convention since noteContrast met boot on 5173 (see that file's note).
   site = await startShippedSite({ preview: { port: 5195, strictPort: false } });

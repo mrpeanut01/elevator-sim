@@ -760,6 +760,43 @@ describe('the browser tier serves the shipped bundle, and names what does not �
     ).toBeGreaterThan(0);
   });
 
+  it('lets no file build the bundle itself, which is the defect the CI reds were', async () => {
+    /*
+     * **The reason the build is in `globalSetup` and not in a `beforeAll`, stated as a check.**
+     *
+     * Two files used to call the old `startBuiltSite`, and it *built* — so two of them built into
+     * one `dist-web/` with `emptyOutDir: true`, concurrently, because vitest runs files in
+     * parallel. Whichever was serving answered 404 for the whole of the other's write phase.
+     * Measured on this host by running the old helper twice over: the already-serving preview
+     * returned **404 on 63 of 87** requests for `/`, **62 of 87** for its own entry chunk, and a
+     * live page saw **404 on 18 of 140** requests for `/fixit-cases.json` — a window of roughly
+     * 900 ms in which the site it was serving did not exist.
+     *
+     * That is both CI reds of 2026-09-01: macOS's `net::ERR_HTTP_RESPONSE_CODE_FAILURE at
+     * http://localhost:5299/` is the first row, and linux's *"the fixit screen drew no heading to
+     * measure"* is what `fixitScreen.ts#render` draws when its data fetch fails — the
+     * `loadFailure` branch has no `h1` in it.
+     *
+     * One build, before any file is collected, makes the race structurally impossible rather than
+     * unlikely. This case is what stops a future file reintroducing it by building its own.
+     */
+    const tiers = browserTiers(await registeredProjects());
+    const building: string[] = [];
+    for (const tier of tiers) {
+      for (const path of tier.files) {
+        if (/\bbuild\s*\(/u.test(code(readSource(path)))) building.push(relative(VIZ_SRC, path));
+      }
+    }
+    expect(
+      building,
+      'these tier files call `build(` themselves. `dist-web/` is one directory with ' +
+        '`emptyOutDir: true`, vitest runs files in parallel, and a second build empties the site ' +
+        "the first one's preview server is still serving — measured at 404 on 63 of 87 requests " +
+        "for `/`. The build belongs in `vitest.config.ts`'s globalSetup, once, before any file is " +
+        'collected. GitHub issue #281, § D425.',
+    ).toEqual([]);
+  });
+
   it('names exceptions that are files the tier actually collects', async () => {
     /*
      * A renamed file would otherwise sit in the registry looking like a satisfied exemption.
