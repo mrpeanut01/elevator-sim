@@ -101,6 +101,17 @@ export const BENCH_COPY = Object.freeze({
     'checked, and one the ladder could not rate.',
   noTests: 'No tests ticked. Pick at least one.',
   /**
+   * The labelled state between the screen painting and the forty arriving.
+   *
+   * § 12.2's rule about the withheld matrix is the local one and it is general: *"every combination
+   * renders `—` or a labelled unavailable state; none renders a zero, a spinner or a stale figure"*.
+   * The tick list is fetched (§ D445), so there is a beat where it is empty — and an empty list
+   * under *"No tests ticked. Pick at least one."* is a small lie, because it says there is something
+   * to tick. This is drawn instead, and `benchTestsRefusal` is not: a reader is told what is
+   * happening rather than blamed for it.
+   */
+  testsLoading: 'Fetching the forty proof cases…',
+  /**
    * Why the § 3.3 primary cannot be pressed while the suite is in flight — `BarPrimary.inert`'s
    * sentence, not a status line. The matrix's own cells report progress; this answers the other
    * question a dead button raises (GitHub issue #262).
@@ -303,8 +314,20 @@ export function benchTestsOf(
   );
 }
 
-/** Why the suite cannot run for want of a test, or `undefined`. §12.1's own sentence. */
-export function benchTestsRefusal(tickedIds: readonly string[]): string | undefined {
+/**
+ * Why the suite cannot run for want of a test, or `undefined`.
+ *
+ * §12.1's own sentence when there are tests and none is ticked, and
+ * {@link BENCH_COPY.testsLoading} while the forty are still arriving — two different facts, and
+ * telling a reader to pick from an empty list is the one this split exists to stop. `offered` is
+ * the number of tests the screen is drawing, so the refusal is a function of what is in front of
+ * the reader rather than of a flag a renderer sets.
+ */
+export function benchTestsRefusal(
+  tickedIds: readonly string[],
+  offered = 1,
+): string | undefined {
+  if (offered === 0) return BENCH_COPY.testsLoading;
   return tickedIds.length === 0 ? BENCH_COPY.noTests : undefined;
 }
 

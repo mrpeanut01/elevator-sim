@@ -148,8 +148,18 @@ describe('§12.3 — the tests are the forty, and this reader derives every one 
   });
 
   it('refuses an empty tick list in §12.1’s own words', () => {
-    expect(benchTestsRefusal([])).toBe('No tests ticked. Pick at least one.');
-    expect(benchTestsRefusal([first.id])).toBeUndefined();
+    expect(benchTestsRefusal([], 40)).toBe('No tests ticked. Pick at least one.');
+    expect(benchTestsRefusal([first.id], 40)).toBeUndefined();
+  });
+
+  it('says the forty are still arriving rather than blaming the reader for an empty list', () => {
+    /*
+     * The list is fetched, so there is a beat where it is empty. Telling a reader to *"pick at
+     * least one"* from nothing is a small lie about what is on the screen — § 12.2's rule that
+     * every unavailable state is labelled, applied to the one this screen has.
+     */
+    expect(benchTestsRefusal([], 0)).toBe(BENCH_COPY.testsLoading);
+    expect(benchTestsRefusal([], 0)).not.toBe(BENCH_COPY.noTests);
   });
 });
 

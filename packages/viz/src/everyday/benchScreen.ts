@@ -35,7 +35,7 @@ import { actionBarFor } from './actionBar.js';
 import { suiteCellViewOf, SuiteError, type SuiteCellView } from '../batch/suite.js';
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { loadBrowserResources, loadProofCases, type BrowserResources } from '../dev/data.js';
-import type { ProofCaseSet } from '../gauntlet/proofCases.js';
+import { proofCasesOf, type ProofCaseSet } from '../gauntlet/proofCases.js';
 
 import {
   benchBudgetNoteOf,
@@ -171,7 +171,7 @@ function mountBench(
   function requestOf(): BenchSuiteRequest | undefined {
     const field = benchFieldOf(state.pickedIds);
     if (field === undefined) return undefined;
-    if (benchTestsRefusal(state.tickedIds) !== undefined) return undefined;
+    if (benchTestsRefusal(state.tickedIds, state.tickedIds.length) !== undefined) return undefined;
     return {
       caseIds: state.tickedIds,
       replications: state.replications,
@@ -341,7 +341,8 @@ function mountBench(
      * eight groups of five. The heading is `towerNameOf`'s, never a literal.
      */
     let group: string | undefined;
-    for (const test of benchTestsOf(state.data?.set ?? EMPTY_SET, state.tickedIds, towerNameOf)) {
+    const tests = benchTestsOf(state.data?.set ?? EMPTY_SET, state.tickedIds, towerNameOf);
+    for (const test of tests) {
       if (test.towerName !== group) {
         group = test.towerName;
         const heading = el(doc, 'div', 'everyday-bench-test-group', test.towerName);
@@ -369,10 +370,12 @@ function mountBench(
     absent.style.cssText = `${NOTE};margin:9px 0 0`;
     wrap.append(absent);
 
-    const refusal = benchTestsRefusal(state.tickedIds);
+    const refusal = benchTestsRefusal(state.tickedIds, tests.length);
     if (refusal !== undefined) {
       const line = el(doc, 'p', 'everyday-bench-tests-refusal', refusal);
-      line.style.cssText = `${NOTE};color:${C.alarm};margin:9px 0 0`;
+      /* The loading state is not an alarm — it is a fact about the fetch, not about the reader. */
+      const colour = tests.length === 0 ? C.warmGrey : C.alarm;
+      line.style.cssText = `${NOTE};color:${colour};margin:9px 0 0`;
       wrap.append(line);
     }
     return wrap;
@@ -572,7 +575,11 @@ function mountBench(
        */
       refusal: state.running
         ? COPY.runningSuite
-        : (benchFieldRefusal(state.pickedIds) ?? benchTestsRefusal(state.tickedIds)),
+        : (benchFieldRefusal(state.pickedIds) ??
+            benchTestsRefusal(
+              state.tickedIds,
+              state.data === undefined ? 0 : proofCasesOf(state.data.set).length,
+            )),
     };
     root.replaceChildren();
     const eyebrow = el(doc, 'div', undefined, COPY.eyebrow);
