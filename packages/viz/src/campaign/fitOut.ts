@@ -328,13 +328,14 @@ function carsFitted(
            */
           ...(wantedLb === undefined || spec === undefined
             ? {}
-            : {
-                ratedLoadLb: clamp(
+            : loadOf(
+                clamp(
                   Math.max(wantedLb, car.ratedLoadLb ?? 0),
                   spec.capacityLbRange[0],
                   spec.capacityLbRange[1],
                 ),
-              }),
+                car.ratedLoadLbPerDeck,
+              )),
           ...(fit.transferCeilingS === undefined || transfer === undefined
             ? {}
             : { passengerTransferS: Math.min(transfer, fit.transferCeilingS) }),
@@ -342,6 +343,30 @@ function carsFitted(
       }),
     })),
   };
+}
+
+/**
+ * A car's new rating, **with the per-deck half moved with it** where the car declares one.
+ *
+ * `core` states the coupling as an invariant of the document — `parse.ts` warns
+ * `deck-load-mismatch` when the whole-car rating is not twice the per-deck one, and
+ * `model/car/car.ts` derives a deck's design load from the *ratio* rather than by halving — so a
+ * bigger car whose per-deck figure stayed behind would be a building describing hardware that does
+ * not exist, and would carry a warning nobody asked a question about.
+ *
+ * **No shipped building reaches this today** and it is still written: `vertical-city`'s shuttles are
+ * the only double-deck cars in `data/buildings/`, they are rated 4 000 lb, and both `cars` tiers ask
+ * for less than that, so the `Math.max` above leaves them alone. That is a fact about the shipped
+ * set rather than about this function — a ninth building with a smaller double-deck car makes the
+ * branch live, and a latent defect waiting on a data file is the shape this repository has a rule
+ * about. `fitOut.test.ts` drives it directly for the same reason.
+ */
+function loadOf(
+  ratedLoadLb: number,
+  perDeckLb: number | undefined,
+): { readonly ratedLoadLb: number; readonly ratedLoadLbPerDeck?: number } {
+  if (perDeckLb === undefined) return { ratedLoadLb };
+  return { ratedLoadLb, ratedLoadLbPerDeck: ratedLoadLb / 2 };
 }
 
 /**

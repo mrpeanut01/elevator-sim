@@ -356,6 +356,50 @@ describe('car size is live and the campaign’s building is what is insensitive 
     expect(bought.map((car) => car.ratedLoadLb)).toEqual(asBuilt.map((car) => car.ratedLoadLb));
   });
 
+  it('moves a double-deck car’s per-deck half with its whole-car rating', () => {
+    /*
+     * **Driven by a fit-out rather than by a tier, because no shipped tier reaches it.**
+     * `vertical-city`'s shuttles are the only double-deck cars in `data/buildings/`; they are rated
+     * 4 000 lb, and both double-deck classes in `data/elevator-specs.json` declare a 3 500 lb floor,
+     * so **no legal double-deck car in this repository is below either `cars` tier's rung** and the
+     * *never smaller* rule leaves them all alone. The branch is live and unreachable from the shipped
+     * data — a reader-saved machine class with a lower band is what would reach it — so it is driven
+     * at the seam instead of being left to a data file. `core` warns `deck-load-mismatch` when the
+     * whole-car rating is not twice the per-deck one, and `model/car/car.ts` derives a deck's design
+     * load from that ratio, so a car raised with its half left behind is a building describing
+     * hardware that does not exist.
+     */
+    const shuttles = SHIPPED.find((base) => base.id === 'vertical-city');
+    expect(shuttles).toBeDefined();
+    if (shuttles === undefined) return;
+    const before = shuttles.banks.flatMap((bank) =>
+      bank.cars.filter((car) => car.ratedLoadLbPerDeck !== undefined),
+    );
+    expect(before.length, 'vertical-city declares no double-deck car').toBeGreaterThan(0);
+
+    const thirtyPerson: CampaignFitOut = { ...AS_BUILT, carPersons: 30 };
+    const after = fittedBuilding(shuttles, thirtyPerson, RESOURCES.elevatorSpecs);
+    const decked = after.banks.flatMap((bank) =>
+      bank.cars.filter((car) => car.ratedLoadLbPerDeck !== undefined),
+    );
+    expect(decked.length).toBe(before.length);
+    for (const car of decked) {
+      // 30 × the specs file's own divisor, inside `ultra-high-speed`'s 3 500–5 000 lb band.
+      expect(car.ratedLoadLb, car.id).toBe(4500);
+      expect(car.ratedLoadLbPerDeck, car.id).toBe(2250);
+    }
+    expect(() => { loads(after); }).not.toThrow();
+
+    // And the shipped tiers really do leave them alone, which is why the case above is synthetic.
+    for (const level of [1, 2]) {
+      const untouched = fittedBuilding(shuttles, kit('cars', level), RESOURCES.elevatorSpecs);
+      const cars = untouched.banks.flatMap((bank) =>
+        bank.cars.filter((car) => car.ratedLoadLbPerDeck !== undefined),
+      );
+      expect(cars.map((car) => car.ratedLoadLb)).toEqual(before.map((car) => car.ratedLoadLb));
+    }
+  });
+
   it('never makes a car smaller than it already is, on any tier of any shipped building', () => {
     /*
      * Swept over the **shipped** set rather than the two loaded ones, and that is what makes the

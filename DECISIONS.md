@@ -28157,6 +28157,28 @@ does move, which is `commissioning.test.ts`'s precedent and `docs/10` § 0's M1:
 | `cars` L2 | the same sparseness one rung up | `midtown-office` at 1 800 s, as built |
 | `control` L2 | Level-0 disclosure on two cars — `garden-apartments`' own documented collapse of the dispatcher menu | `midtown-office` at 1 800 s, and `control` L3's Level-1 panel moves at the campaign's own cell |
 
+**A mixed-fleet bank keeps its fleet, which is `commissioning/refusals.ts`'s third gate taken where
+there is no screen to draw it on.** A `BankChoice` collapses a bank to one class, one speed and one
+load, and two shipped banks are not one machine — `crown-hotel`'s `main` has a geared 1.75 m/s car
+beside gearless 3.0 m/s ones, `st-jude-hospital`'s has a bed car. `commissionedBuilding` is total by
+design, so a shaft bought on either would rewrite every car to the first one's machine: the campaign
+flattening the thing those buildings were written to teach. `refusals.ts` refuses every dimension on
+such a bank; this module has no control to put a refusal beside, so it takes the same decision the
+only way it can — the `shafts` and `machines` tiers buy nothing on that bank, and every other bank
+and every other category is unaffected. `cars`, `doors` and `tenants` raise a floor or shave a
+constant per car, so a mixed fleet stays mixed and still gets what was bought.
+
+**A double-deck car's per-deck half moves with its whole-car rating, and that branch is unreachable
+from the shipped data.** `core` warns `deck-load-mismatch` when the two disagree and
+`model/car/car.ts` derives a deck's design load from the *ratio*, so a car raised with its half left
+behind is a building describing hardware that does not exist. No shipped tier reaches it:
+`vertical-city`'s shuttles are the only double-deck cars in `data/buildings/`, both double-deck
+classes declare a 3 500 lb floor, and both `cars` tiers ask for less — so the *never smaller* rule
+leaves every legal double-deck car in the repository alone. It is written and driven at the seam
+anyway, because a latent defect waiting on a ninth building or a reader-saved machine class is the
+shape this repository has a rule about, and `fitOut.test.ts` asserts both halves: the branch under a
+30-person fit-out, and the shipped tiers leaving the shuttles untouched.
+
 **A second finding, from sweeping the shipped set rather than the two buildings the probe helper
 loads.** `cars` clamps a rated load into the class's `capacityLbRange`, as `commissionedBuilding`
 does and for its reason. The clamp **alone** shrinks a car above the tier's rung: on `crown-hotel`'s
