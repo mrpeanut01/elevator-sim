@@ -19,7 +19,12 @@
  *   function of the run and can therefore carry a threshold.
  *
  * **`ELEVATOR_SIM_DEEP=1`**: the full 20 000 replications, executed, with the projection checked
- * against what actually happened.
+ * against what actually happened. **It needs a built tree**, which the always-on half does not: it
+ * is the only case here that runs on worker threads, and a worker resolves `@elevator-sim/core`
+ * through `node_modules` to core's built output rather than through vitest's alias to its source.
+ * Run `npx tsc -b` first, or the arm refuses with a message saying so — see the case itself, and
+ * `.github/workflows/deep-tiers.yml`, whose `perf-sweep` job went red in four seconds for exactly
+ * this reason before the build step existed (GitHub issue #309).
  *
  * ## Why the projection is worth having even when the real sweep has not run
  *
@@ -34,6 +39,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { canonicalJson, createStoredRun, serializeStoredRun } from '../reports/persistence.js';
+import { assertCoreBuilt } from '../runner/fixtures.test-helper.js';
 import { runExperiment } from '../runner/replicationRunner.js';
 import type { ExperimentResources, ExperimentResult } from '../runner/types.js';
 import { loadResources, withProfiles } from './harness.js';
@@ -156,6 +162,26 @@ describe('a large replication sweep', () => {
   it.skipIf(!DEEP)(
     `runs the full ${String(DEEP_REPLICATIONS)}-replication sweep`,
     async () => {
+      /*
+       * The one case in this file that leaves the vitest process, and the reason it says so before
+       * it starts — GitHub issue #309, § D419.
+       *
+       * This arm runs `parallel: { mode: 'workers' }`. A worker thread is loaded by Node rather
+       * than by vitest, so it resolves `@elevator-sim/core` through `node_modules` to core's
+       * **built** output, while every other case in this file resolves the same specifier through
+       * `vitest.config.ts`'s alias to core's *source*. On a tree that has never been built there is
+       * no `dist`, and the pool dies at spawn with `Cannot find module …/core/dist/index.js` —
+       * which is what happened on the first scheduled firing of the `perf-sweep` job, in four
+       * seconds, with the four serial cases above it passing.
+       *
+       * That error names a path and not a cause. {@link assertCoreBuilt} names the cause and the
+       * fix, and it also catches the case the module-resolution error cannot see at all: a `dist`
+       * that exists but is *older* than `src`, where the pool and the parent silently run different
+       * code. `parallel.test.ts` guards its executor-parity cases the same way and for the same
+       * reason; this file needed it too and did not have it.
+       */
+      assertCoreBuilt();
+
       const started = process.hrtime.bigint();
       const result = await runExperiment(
         sweepSpec('perf/sweep-deep', DEEP_REPLICATIONS),

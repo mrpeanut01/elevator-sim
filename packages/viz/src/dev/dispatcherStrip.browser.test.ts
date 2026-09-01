@@ -45,32 +45,32 @@
  * The selection is derived from the panel's own answer now. See {@link selectRunnableDispatcher}.
  */
 
-import { fileURLToPath } from 'node:url';
-
 import { chromium, type Browser, type Page } from 'playwright-core';
-import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  enterEngineerStage,
+  openPage,
+  pressMenuRow,
+  reopenEngineerMenu,
+  startShippedSite,
+  type ShippedSite,
+} from './browserTier.test-helper.js';
 
-let server: ViteDevServer;
+let site: ShippedSite;
 let browser: Browser;
 let origin: string;
 let page: Page;
 
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
-  server = await createServer({
-    configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
-    root: fileURLToPath(new URL('../..', import.meta.url)),
-    // A port of its own, `strictPort: false` — `keyboard.browser.test.ts`'s reasoning, four files on.
-    server: { port: 5192, strictPort: false },
-    logLevel: 'error',
-  });
-  await server.listen();
-  origin = (server.resolvedUrls?.local[0] ?? '').replace(/\/$/, '');
-  if (origin === '') throw new Error('the dev server did not report a URL');
+  // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
+  // A port of its own, `strictPort: false` — `keyboard.browser.test.ts`'s reasoning, four files on.
+  site = await startShippedSite({ preview: { port: 5192, strictPort: false } });
+  origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
   page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
 }, 120_000);
@@ -78,7 +78,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await page?.close();
   await browser?.close();
-  await server?.close();
+  await site?.close();
 });
 
 /** What the strip is saying, read off the DOM by the relation the mount builds rather than by id. */

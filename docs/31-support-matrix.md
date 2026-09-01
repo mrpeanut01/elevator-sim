@@ -384,13 +384,21 @@ leg**, of which the browser tier is **~157 s** (`ci.yml`).
 
 The browser tier is **~157 s out of ~2 000–3 400 s**. That is roughly **5–8 %** of a leg. So the
 cost of a second browser engine is *not* a second CI leg — it is a second pass over the tier, on the
-same leg, at roughly the tier's own cost. **The ~157 s was measured over the 25 `*.browser.test.ts`
-files the tier held then; it holds 29 now** and the timing has not been re-measured, so read the
-percentage as the shape of the answer rather than as a current figure.
+same leg, at roughly the tier's own cost. **The ~157 s was measured over the 25 files the tier held
+then; the tier holds 33** and the timing has not been re-measured, so read the percentage as the
+shape of the answer rather than as a current figure.
+
+> **Two numbers in that sentence and only one of them is a claim about now.** The 25 is a *dated*
+> figure — a correct record of what the ~157 s was measured over — so it is written without the
+> backticked filename that `viewportGateClaims.test.ts`'s shape keys on, and no guard re-derives it,
+> because re-deriving it would replace a true record with today's count. The 33 is a claim about the
+> tree and sits in a shape that guard reads. It said **29** through the wave that corrected four of
+> its siblings, because the sentence wrapped between `29` and the shape's next token and the regex
+> matched a literal space. GitHub issue #230, [§ D423](../DECISIONS.md).
 
 | What to add | What it buys | What it costs | Verdict |
 |---|---|---|---|
-| **Firefox** on the existing Linux leg | Tier 3's largest claim becomes a fact. Gecko is where the canvas and `@container` assertions are most likely to differ | ~157 s per leg when the tier held 25 files and it holds 29 now, so somewhat more, plus one more Playwright browser download (size unmeasured — `playwright-core install firefox` reports it), and a real risk of an initial burst of engine-specific failures that are the product's, not the tier's | **Recommended, and the highest-value single addition.** Run it on the **Linux leg only** — the engine is the variable, not the host OS |
+| **Firefox** on the existing Linux leg | Tier 3's largest claim becomes a fact. Gecko is where the canvas and `@container` assertions are most likely to differ | ~157 s per leg when the tier held 25 files and the tier holds 33 now, so somewhat more, plus one more Playwright browser download (size unmeasured — `playwright-core install firefox` reports it), and a real risk of an initial burst of engine-specific failures that are the product's, not the tier's | **Recommended, and the highest-value single addition.** Run it on the **Linux leg only** — the engine is the variable, not the host OS |
 | **WebKit** on the existing macOS leg | Safari — and, more to the point, **every browser on iOS**, all of which are WebKit whatever their name | ~157 s on the leg that already takes 56 min; a Playwright WebKit download | **Recommended second.** On macOS, because Playwright's Linux WebKit is a build that is not Safari, and testing a not-Safari to claim Safari support is the shape of defect this repository records |
 | **A Windows leg** (`windows-latest`) | The largest desktop user base by share, on an engine tier 1 already covers | A **whole third leg** — ~33–56 min of runner time per PR, plus the pin-portability question `ci.yml`'s header opens: a third platform is *a third pin environment whose pin set nobody has measured*, and § D201 found 26 pins **exactly inverted** between two platforms | **Refused for now, and the reason is not the minutes.** It would fork the pinned-digest question three ways. If Windows support ever needs to be a tier-1 claim, it should be a **browser-tier-only** leg that runs no statistical pins |
 | **A touch/mobile emulation pass** | § 2's `best effort` becomes measurable | Small: Playwright's `hasTouch`/`isMobile` on the **already-installed** Chromium. A handful of files at a phone viewport | **Recommended, and cheapest of all.** It is #240's gate |
@@ -514,10 +522,20 @@ Recorded because a specification that hides its own open items is the defect it 
 7. **One of the two counts in this document that were read off the tree drifted, exactly as this
    item said it would.** It read ~~*25*~~ where the tree held **28** when GitHub issue #292 re-ran
    the command, and `M2_MEASUREMENT.md` § 3 published **26** for the same set at the same moment, so
-   the two documents disagreed with each other as well as with the tree. It is
-   **29** now and it is **derived** — `packages/viz/src/everyday/viewportGates.browser.test.ts` reads
-   the count off disk and requires every published shape of it in both documents to match, which is
-   why the number moved again on the commit that closed it: that file is the twenty-ninth. The
+   the two documents disagreed with each other as well as with the tree. The tier holds **33** now
+   and the figure is **derived** — `packages/viz/src/everyday/viewportGateClaims.test.ts` reads the
+   count off disk and requires every published shape of it in both documents to match, which is why
+   the number moved again on the commit that closed it: `viewportGates.browser.test.ts` is the
+   twenty-ninth. **Two corrections in that sentence, and the second is the interesting one.** The
+   count had drifted to 29 while the guard reported green: three live claims — this one and two in
+   § 5 — spelled the figure in a phrasing the guard read no shape for, or wrapped it across a line
+   the shape's literal space could not cross. The shapes are whitespace-tolerant now and there is a
+   third of them; a guard defeated by where a paragraph breaks is not the derivation this item asked
+   for. And this sentence named the **wrong file** for the whole of that time —
+   `viewportGates.browser.test.ts` is the browser gate, and the file that reads the count off disk
+   is `viewportGateClaims.test.ts` beside it, which its own docstring says. A citation is a claim
+   about a mechanism and goes stale the same way a number does, with the difference that it sends
+   the next reader to a file that will not explain itself. GitHub issue #230, [§ D423](../DECISIONS.md). The
    *eight* reference-data documents `vite.config.ts` emits is still transcribed and still exactly the
    kind of figure § 6's standing rule exists for. Re-derive it, do not copy it forward — and note
    that this item naming the risk did not stop the risk, which is the argument for a check over a

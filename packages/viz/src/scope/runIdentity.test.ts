@@ -306,8 +306,13 @@ describe('every field the module is asked about has an answer, and no answer is 
     // `patience` in — the probe was compulsory before this list knew the name.
     // `ruleRows` is the tenth and is slice 4c: the Everyday rules, on `interventions`' exact
     // footing — the empty list carries by object identity, and a written list has no wire field.
+    // `campaignFitOut` is the eleventh and is GitHub issue #181: § 8's shop reaching the run. It is
+    // `commissioning`'s answer one product over — the identity carries, a fitted tower does not,
+    // and the walk over `SCOPE_OF` forced it in here on the day the field landed rather than on the
+    // day somebody remembered, which is the third time this list has recorded that.
     expect(sorted(fieldsAnsweredFor('ranked').map(({ field }) => field))).toEqual([
       'calendar',
+      'campaignFitOut',
       'commissioning',
       'interventions',
       'levers',

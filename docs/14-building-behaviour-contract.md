@@ -27,9 +27,13 @@ bit-identical to the control, so a mode the router ignored genuinely fails the t
 **The four gaps, named rather than left to be discovered:**
 
 1. **`drawTransport` has a shipped caller and no DOM driver.** `dev/main.ts` is the only caller of
-   `mountBuildingEditor`, and no test drives the mounted panel. This is the known Phase 9 gap —
-   *"three DOM panels are statically swept rather than driven"* — matched exactly by the
+   `mountBuildingEditor`, and no test drives the mounted panel. This is the known Phase 9 gap — the
+   **33 statically swept DOM entry points**, of which this mount is one — matched exactly by the
    access-zone editor beside it. It is **not widened** by this step, and it is not closed either.
+   *(This sentence named that gap ~~"three DOM panels are statically swept rather than driven"~~
+   and then put a fifth panel in it, which is how a count stops being a measurement and becomes a
+   label: nothing was wrong about the gap, and the figure could no longer go stale visibly. It is
+   derived by `packages/viz/src/honesty/derive.test.ts` now — [§ D421](../DECISIONS.md).)*
 2. **The round trip carries three fields, not five.** `id`, `connects` and `traversalTimeS`
    survive; `name` and `$comment` do not, both deliberately (`buildingSpec.ts`'s
    `specFromBuilding` states the reason for each). `authoring.test.ts` asserts the surviving key

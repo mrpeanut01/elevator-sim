@@ -533,7 +533,9 @@ scale of a mode's economy, and neither #223 nor #169 carries them.
 - **B · The stale-statement class (R38) — #230 (canonical), #286, #256, #176's figure half, #172, #173,
   #166, #170.** Shared *root cause*, not shared file. The durable fix is identical in each: derive the
   number from the structure. #286 from `STAGE_SPEEDS.length`; #176 corrects *"three DOM panels"* to
-  **17**; #175's *"seven"* from `Object.keys(DEAD_CANDIDATES).length`.
+  **33** — 17 mounts plus 16 screen-registry rows, not the **17** this line predicted, because the
+  exclusions are one class and the narrow reading is exactly what let a fifth panel into a class of
+  three ([§ D421](DECISIONS.md)); #175's *"seven"* from `Object.keys(DEAD_CANDIDATES).length`.
 - **C · The campaign loop — #223, #181, #169, #171, #234, #270, #224.** Shared files: `campaign/career.ts`
   and `everyday/host.ts`.
 - **D · Run-context reachability — #182, #171, #220, #223.** *A cluster verification created rather than

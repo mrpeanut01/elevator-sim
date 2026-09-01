@@ -112,6 +112,7 @@ import {
   type CampaignCareer,
 } from '../campaign/career.js';
 import { DIFFICULTIES } from '../campaign/economy.js';
+import { fitOutOf } from '../campaign/fitOut.js';
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -1005,7 +1006,22 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
        * write no field would be doing work a player could see for a change nobody made.
        */
       const day = dayFor(b);
-      if (day !== undefined) b.applyPatch(wholeDayRun(day));
+      /*
+       * **And the kit comes off with the latch** — GitHub issue #181.
+       *
+       * `campaignFitOut` is a fact about *one tower's* day, so a § 6 day that inherited it would run
+       * the week's building with another contract's shafts and doors on it while the rail described
+       * the shipped tower. That is the same stale-latch failure the line below is about, one field
+       * over, and it is worse: the latch decides what a day is *filed* against and this decides what
+       * the day *is*.
+       *
+       * Spread in rather than patched separately, and only when there is something to clear, on the
+       * comment above's own ground — a press that repainted every surface to write no field would be
+       * doing work a player could see for a change nobody made.
+       */
+      const kitToClear = b.state().campaignFitOut === undefined ? {} : { campaignFitOut: undefined };
+      const patch = { ...(day === undefined ? {} : wholeDayRun(day)), ...kitToClear };
+      if (Object.keys(patch).length > 0) b.applyPatch(patch);
       // § 6's day is not a campaign day — see {@link campaignDayTowerId} for what a stale latch
       // here would file, and against which building.
       campaignDayTowerId = undefined;
@@ -1076,7 +1092,13 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       // Tomorrow is a day of the same kind today was — the whole-day patch rides in the same merge
       // rather than in a second one, so no render sees a week advanced onto a horizon it is not
       // running yet.
-      b.applyPatch({ ...openTomorrowPatch(state.week), ...dayPatchFor(b) });
+      // `campaignFitOut: undefined` unconditionally here, unlike in `startRun`: this patch is never
+      // empty, so clearing a field that is already clear costs no render that was not happening.
+      b.applyPatch({
+        ...openTomorrowPatch(state.week),
+        ...dayPatchFor(b),
+        campaignFitOut: undefined,
+      });
       b.openRunTab();
       // § 6's tomorrow, for the same reason `startRun` clears it — {@link campaignDayTowerId}.
       campaignDayTowerId = undefined;
@@ -1124,6 +1146,21 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       b.applyPatch({
         buildingId: tower.buildingId,
         dispatcherId: tower.dispatcherId,
+        /*
+         * **And the kit the tower has actually had fitted** — GitHub issue #181's first clause.
+         *
+         * `fitOutOf` reads § 8.2's fitted level per category, which is `economy.ts#fittedLevel`'s
+         * answer and therefore already gated on the nights: a tier bought this morning with two
+         * nights of works is not in here until the day its works are behind it. So this is the
+         * booking rules reaching the simulation rather than a second reading of them, and the day a
+         * player watches on the night a tier goes live is a different day on the legs.
+         *
+         * Written on **this** press and no other, for `runCampaignDay`'s own reason: a setter for it
+         * would be a control that changed the fabric of a tower without running the day that fabric
+         * belongs to. Every other path through the shell leaves the field where `startRun` and
+         * `openTomorrow` put it, which is `undefined`.
+         */
+        campaignFitOut: fitOutOf(tower),
         /*
          * **And the length this contract is graded over** — GitHub issue #223.
          *

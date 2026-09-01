@@ -12,6 +12,35 @@
 >
 > The findings below are the lane's report, verbatim; the evidence is the deliverable.
 > Screenshots were taken in the session workspace and are not committed.
+>
+> **All seventeen ranked defects are closed, and this line is the register that says so**
+> (GitHub issues #172 and #230, [§ D424](../DECISIONS.md)). Six were struck through as they were
+> fixed and eleven were not, so **defects 1–10 and 12 read as live findings for three waves after
+> they had been fixed** — the mirror image of [§ D227](../DECISIONS.md)'s stale refusal, and worse
+> than a stale number: a reader planning work off this document would have picked up eleven jobs
+> that were done. Each is now struck through **in place** with the commit and the module that
+> closed it beside it, rather than deleted, because a superseded finding is evidence about how the
+> product got here.
+>
+> | closed by | ranked defects |
+> |---|---|
+> | `d43cc8a` — PT2-A, watch integrity | 1, 2, 7, 10, 12 |
+> | `cac03d1` — PT2-B, temporal, window and accounting | 3, 4, 5, 6, 8, 9 |
+> | `4005c86` — the polish six | 11, 13, 14, 15, 16, 17 |
+>
+> `packages/viz/src/docs20Register.test.ts` re-derives that: every ranked defect this document strikes
+> through must be named by number somewhere in `packages/viz/src`, and the count of ones that are
+> **not** struck through is a ratchet standing at zero. It is deliberately not proof of a fix — a
+> citation is evidence that the tree knows the defect's number, which is what this document's own
+> convention produces and is checkable, while *fixed* is not. What it does stop is the state this
+> paragraph is about: a finding struck through with nothing in the tree that names it, and a
+> finding fixed in the tree that nothing here strikes through.
+>
+> **Everything above the ranked list is the walk's own report and is left as it was taken**,
+> including Part A's three `PARTIALLY` verdicts and the `result:` line at the foot of this file.
+> Those are dated records of what a player saw on 2026-08-11, not claims about the tree now; the
+> *What I would do next* list carries its own outcome per item, because that list is a
+> recommendation rather than an observation.
 
 Walk complete. Repo untouched (`git status` clean); 70 screenshots in the scratchpad. Writing up.
 
@@ -47,6 +76,13 @@ Walk complete. Repo untouched (`git status` clean); 70 screenshots in the scratc
 
 **Net: 9 of 12 fully verified, 3 partial, 0 regressions to a previous state. The blocks-play trap is gone.**
 
+> **This table is the walk's own record and is not re-scored.** For where the three `PARTIALLY`
+> rows went, read the ranked list: **3** became ranked defect 4 (the two *stairs* cohorts),
+> **4** became ranked defect 3 (whole-run figures on the canvas), and **5** became ranked defect 11
+> (the lever echo below the fold). All three are closed there, with the module and the test beside
+> each. Re-marking these rows `VERIFIED` would claim a second player-walk that has not happened —
+> the rows say what was seen on 2026-08-11 and the ranked list says what the tree does now.
+
 ---
 
 ## PART B — the new flows, as a first-timer
@@ -67,38 +103,38 @@ Walk complete. Repo untouched (`git status` clean); 70 screenshots in the scratc
 
 **No blocks-play defect found.** Severities below are *confusing* / *polish*.
 
-**1. CONFUSING — Write one rule and every day you file afterwards becomes unwatchable, with a reason that blames the file format.**
+**1. CONFUSING — ~~Write one rule and every day you file afterwards becomes unwatchable, with a reason that blames the file format.~~** **Closed** in `d43cc8a`, both halves. The gate reads the *record's* rule rows rather than the profile's (`watch/record.ts#watchRecordIssues`, and `watch/types.ts` carries the rules in first-match order so a record can testify to them at all), and the refusal names the issue that fired instead of one sentence for every cause (`watch/library.ts#refusalForDay`). The false clause — *"days closed from here on carry one"* — was deleted rather than reworded, which `watch/library.ts:51` records. Driven, not argued: `watch/record.test.ts`.
 Repro: dispatcher editor → *Add a rule* → save & run → file the day → menu → Scenarios → **Watch a run**. The current week's day is listed as `Monday · day 1 / — · day 1 of this week` with *"this day was filed without the record of what it ran, so there is nothing to re-simulate — days closed from here on carry one"*. It was closed by this build, seconds ago; and "days closed from here on carry one" is false — every subsequent day carries the same rule and is refused identically. I re-ran and re-filed the same day with the shipped `conventional collective` and it stayed unwatchable, because the rule row is still session state. Screenshots `60-watch-picker.png`, `71-watch-list-after-clean-day.png`. Owner: `watch/record.ts#watchRecordIssues` (the whole-issue refusal) + `watch/library.ts:51` (the one-size message).
 
-**2. CONFUSING — A written rule governs the run but is named nowhere the run is judged.**
+**2. CONFUSING — ~~A written rule governs the run but is named nowhere the run is judged.~~** **Closed** in `d43cc8a`. The sheet's provenance carries the rules in the editor's own readback wording, one line per rule with its ordinal (`shift/report.ts:640`), so the sheet and the header pill say the same thing about the same run. Pinned by `shift/report.test.ts` — *names the rules the run was driven by, in the editor's own readback*.
 After picking *Conventional collective* from the drawer, the rule was still in force (header pill: `rule 1 …`), yet the footer said `conventional collective`, and the filed sheet's identity line said **"Midtown Office · Conventional collective"** — the sheet contains the word "rule" zero times. The exact shape of old defect 10, fixed for interventions and open for rules. Screenshot `48-rule-run-start.png` + sheet dump. Owner: `shift/report.ts` identity line, `dev/state.ts#shiftRunConfigOf` provenance.
 
-**3. CONFUSING — The canvas publishes the whole-run refusal from the first frames, under a "so far" label.**
+**3. CONFUSING — ~~The canvas publishes the whole-run refusal from the first frames, under a "so far" label.~~** **Closed** in `cac03d1`, and by the method item 4 of *What I would do next* proposed: § D300's temporal property was extended to both surfaces rather than each being patched. `render/canvas.ts:1113` dates the refusal and `render/describeFrame.ts:154` gates the mood drivers the way § D293 gated the rail; `honesty/properties.ts` is what stops either drifting back, because a surface publishing a whole-run figure at a playhead short of `endedAt` is now a property violation rather than a reading.
 Repro: run Midtown, scrub to 14 %: 60 carried, 93 % away inside a minute, longest wait 102 s — and the RIGHT NOW box reads *"average wait so far / **NO AVERAGE — A RESULT**"*. `#frame-description` carries the full whole-run saturation paragraph identically at 14 %, 64 % and 97 %. `68-canvas-early.png`, `67-midrun-canvas.png`. Owner: `render/canvas.ts` (the RIGHT NOW cell and the header strip) and the frame-description producer — both are candidates for § D300's E-4 temporal property, which the transport line already passes.
 
-**4. CONFUSING — "taking the stairs" means two different things, six centimetres apart.**
+**4. CONFUSING — ~~"taking the stairs" means two different things, six centimetres apart.~~** **Closed** in `cac03d1`. The rail's fourth mood band and the sheet's cell no longer share a phrase, and the assertion that keeps them apart derives **both** labels — the cell's off a real report, the band's off `WAIT_BANDS` — so it fails if either surface drifts onto the other's words, which no assertion inside a single module could catch (`shift/report.test.ts:409`).
 Midtown day 1: left rail *taking the stairs **534***, sheet *TOOK THE STAIRS **288***, both on screen at once, and the sheet's own note says every one of the 288 *was carried* — so the cell labelled "took the stairs" counts people who did not. `38-midtown-report.png`. Owner: `dev/leftRail.ts` mood-cohort labels vs `shift/report.ts` stairs figure.
 
-**5. CONFUSING — The tutorial scenario's first-ever sheet refuses both of its headline numbers, and the small print's explanation of why is wrong.**
+**5. CONFUSING — ~~The tutorial scenario's first-ever sheet refuses both of its headline numbers, and the small print's explanation of why is wrong.~~** **Closed** in `cac03d1`, and this is *What I would do next* item 1 done. `shift/reportWindow.ts#shiftReportWindowFor` gives a building the `full-run` window when **every** matrix cell for it declares one, and `undefined` — the template's own band — otherwise, rather than `'peak-5min'`, because passing a selection would silently re-measure every building in the product to fix one. The small print stopped calling the window *the busiest five minutes* on the same commit (`shift/report.ts:2018`). Pinned by `shift/reportWindow.test.ts`, which reproduces the defect and then closes it — and which caught it coming back on a second path.
 Garden Apartments day 1 (the very first sheet a new player sees): **AVERAGE WAIT withheld**, **WORST WAIT not recorded** — *"the reporting window held no arrivals"* — while the goal row beside them reads a perfectly good `38 s` and the rail says *"0.0 people arrived every 5 minutes and the lifts carried 0.0. The lifts kept up with the door."* on a day of 40 arrivals. The window is fixed at the template's PEAK band (08:57–09:02 on both Garden days), but the small print calls it *"the busiest five minutes of the day"* — which a window with zero arrivals in a 40-arrival day is not. The project already measured this: `experiments/src/benchmark/arms.ts:40` — *"Garden Apartments needs the full-run window, not peak-5min … at 1 % the peak-5min cell is invalid on 54 replications in 100"*. The shift path sets no `reportWindow`. `09-day1-end.png`. Owner: the shift run config's window choice + `shift/report.ts` small print.
 
-**6. CONFUSING — The sheet's "worst of it" is a different window from the one its means are taken over.**
+**6. CONFUSING — ~~The sheet's "worst of it" is a different window from the one its means are taken over.~~** **Closed** in `cac03d1`. Where the worst moment sits relative to the window the means are read over is now stated on the sheet rather than left for the reader to reconcile (`shift/report.ts:1614`, `:2056`), and the whole-shift rows say they are whole-shift rows (`shift/report.test.ts:739`).
 Free-play Chancery: means over `08:42–08:47`, *"THE TIGHTEST MOMENT 08:50"*, *"08:47–09:00 The worst of it landed in EASING"* — while the small print says *"a wait quoted on this sheet is a wait during the worst of it"*. On Garden day 1 the same line reads *"The worst of it landed in EASING, at **0.0 %pop/5min**"*. Owner: `shift/report.ts` tightest-moment vs window derivation.
 
-**7. CONFUSING — Watch mode calls the watched run "you" and labels it with the spectator's own identity.**
+**7. CONFUSING — ~~Watch mode calls the watched run "you" and labels it with the spectator's own identity.~~** **Closed** in `d43cc8a`, and this is *What I would do next* item 2 done — the fix is the **grep's scope** rather than a set of string edits. `watch/view.test.ts:94` runs the same *the word `you` does not appear* check over the half of the screen the original case could not see: the shell's rails, footer and race strip. That is why the audit's own diagnosis — *"every one of the four defect conditions § 14.1 set out to prevent is present in the room; they are just outside the module the tests grep"* — is the sentence that closed it. `watch/shell.ts` is the one run read on one screen.
 While watching *The lobby-parking reference*: race-strip key **"you"**; footer `paused · 363 arrived, 363 carried · **lobby holder** seed **20260804** · day 1` (my dispatcher, my seed) beside *THEIR DISPATCHER Conventional collective*; rail headed **YOUR RUN**; the Day report tab silently shows **my** last filed sheet with no note that it is not the run on screen. `62-watching-stage.png`, `63-watch-report.png`. `watch/view.test.ts` greps the *watch view*'s strings — the shell's rails, footer and race strip are outside it. Owner: `dev/main.ts` watch adoption + `live/raceStrip.ts` key + `dev/leftRail.ts`.
 
-**8. CONFUSING — Fix-a-building's verdict says "Better" when nothing got better, and its money copy contradicts itself.**
+**8. CONFUSING — ~~Fix-a-building's verdict says "Better" when nothing got better, and its money copy contradicts itself.~~** **Closed** in `cac03d1`, and the docstring is the record: `fixit/engine.ts:278` writes out that the code had done the **opposite of what its own docstring claimed** — the *Better* head was the unconditional fall-through where the prose said the not-enough arm was. *Better* now requires a measured improvement, and the *settings are free* sentence keys on spend rather than on machinery spend. `fixit/engine.test.ts`.
 Bought *New car interiors* (5 u) + *Call-out cover* (6 u) — both described by the product as doing nothing — and ran: **"Better, and the complaint still stands."** above a row reading *"9 waits → 9 waits · **0 %** of it went away"*. `classifyOutcome` (`fixit/engine.ts:272`) uses that head as the fall-through, and its own docstring claims the opposite intent. Two more on the same screen: the budget line reads *"11 of 12 u committed, 0 u of it machinery — **Everything you changed is a setting, and settings are free**"*, and after the real fix the body says *"**Nothing was bought**: the cars were always enough"* while the Spent row reads *"budget 12 u → 11 u"*. `54-fixit-budget.png`, `55-fixit-outcome-wrong.png`, `56-fixit-fixed.png`.
 
-**9. CONFUSING — Engine ids and raw JSON on player-facing surfaces.**
+**9. CONFUSING — ~~Engine ids and raw JSON on player-facing surfaces.~~** **Closed** in `cac03d1`. The canvas takes the dispatcher's **display name** as an input rather than looking up an id (`render/canvas.ts#SceneInput.dispatcherName`), spelled as `shift/report.ts#dayReportOf`'s own idiom so the stage and the sheet fall back to the same string when a caller has no name to give. The suite's population line is prose (`batch/report.ts:1134`), and `dev/suitePanel.ts:429` records the rule the fix was held to: *the identifier is gone and the fact it was carrying is not*.
 Canvas subtitle and `#frame-description` both name the dispatcher **`yours-1`** where every other surface says *Lobby holder* (`68-canvas-early.png`); the suite prints `{"arrivalRatePctPop5min":2,"building":"garden-apartments","durationS":3600,"peakWindowS":300}` as its population line, and names `packages/experiments' MATRIX_CELLS` in body copy (`59-suite-result.png`). Owner: `render/canvas.ts`, `batch/suite.ts` / `dev/suitePanel.ts`.
 
-**10. CONFUSING — Speed carries into Watch; a stranger's day is over before you look at it.** ×900 latched → 1.5 s after *Watch it* the run is at 06:22 of a ~06:26 record. Free play resets to ×60; watch does not. Owner: `dev/main.ts#enterWatch` transport state.
+**10. CONFUSING — ~~Speed carries into Watch; a stranger's day is over before you look at it.~~** ×900 latched → 1.5 s after *Watch it* the run is at 06:22 of a ~06:26 record. Free play resets to ×60; watch does not. Owner: `dev/main.ts#enterWatch` transport state. **Closed** in `d43cc8a`, and with the second half § 14.1 requires and the other mode doors have no equivalent of: entering a watch is a mode entry, so `enterWatch` calls `resetTransportSpeed` like every other door — *and* saves the chip on `WatchedBefore.baseSpeed`, because a reset with no restore would put the player back on their own run at a speed they never chose, which is the same surprise aimed the other way. `dev/watch.browser.test.ts:131` latches the top chip and drives it.
 
 **11. POLISH — ~~The lever's new echo sentence lands below the fold at 1280×800~~** (y 748–835, footer at 745), ~~and the cost-terms header is still a 58 px vertical sliver~~. `27-editor-after-lever.png`. **Closed.** Two causes, one insertion: the lever block was mounted *inside* the terms header's own flex row — which is what squeezed `THE 13 COST TERMS` to its longest word — and the echo sat below the four slider rows, which pushed it under the fold at exactly the width the block was built for. The block now goes above the header row (`dispatcherEditor.ts`), the acknowledgement pair sits above the rows it acknowledges, and the header's row wraps its chip instead of shrinking its words (`index.html`). `fold1280.browser.test.ts` moves a real lever at 1280×800 and measures the echo inside the sheet's scrollport and the header on one horizontal line.
 
-**12. POLISH — The spectator bar overlaps the app header**, clipping "Elevator Sim", the Menu button and the clock. `61-watching.png`.
+**12. POLISH — ~~The spectator bar overlaps the app header~~**, clipping "Elevator Sim", the Menu button and the clock. `61-watching.png`. **Closed** in `d43cc8a`, as a layout bug rather than a styling preference: `.shell` is `grid-template-rows: auto 1fr auto` over exactly three children, so inserting the strip as a fourth child before the header shifted all three down a track. It goes in a band of its own (`dev/main.ts:1093`).
 
 **13. POLISH — ~~The dispatcher editor's left column is a large empty white void~~** once you scroll to the rules section — half the panel width, nothing in it. `46-rule-added.png`. **Closed** with the panel's own content rather than a re-layout: the catalogue column is sticky against `.sheet`'s scroll, so the pick list rides beside the rules instead of being left ~4 000 px above them — and it scrolls itself, because it was measured at ~800 px against a ~650 px scrollport, and a plain sticky column would have traded the void for a pick list whose tail nothing could reach. Scoped to this editor and to the two-column layout. `fold1280.browser.test.ts` scrolls to the rules and requires the list on screen.
 
@@ -126,12 +162,22 @@ Canvas subtitle and `#frame-description` both name the dispatcher **`yours-1`** 
 
 ## What I would do next
 
-1. **Give Garden Apartments the `full-run` window in the shift path.** The measurement that justifies it is already in the repo (`arms.ts:40`); the tutorial building currently refuses its own headline numbers roughly half the time.
-2. **Put the shell's own rails, footer and race strip inside the watch view's string corpus.** The rule *"the word `you` does not appear"* is enforced over the panel and not over the screen, and the screen is what the player reads.
-3. **Make the record refusal name its cause.** `watchRecordIssues` already knows which issue fired; printing it turns "your days are mysteriously unwatchable forever" into "this day ran rules you wrote, and a record cannot name them yet".
-4. **Extend § D300's temporal property to `render/canvas.ts`'s RIGHT NOW cell and the frame description.** The transport line was fixed by exactly this method; the canvas is the surface a player actually watches.
-5. **Fix the fixit fall-through head** so "Better" requires a measured improvement, and key the *"settings are free"* sentence on spend rather than on machinery spend.
-6. **Pick one word for the give-up cohort** and use it on both the rail and the sheet, or rename one of them. Two numbers under one label, side by side, is the accounting complaint from the last audit wearing a new hat.
-7. **Surface the two new toys.** A *Write a rule* row beside *Open dispatcher editor →*, and one coach line pointing at the race strip, would double their discovery rate for free.
+**Six of these seven are done and the seventh is not, which is why each carries its outcome rather
+than the list carrying one verdict.** A recommendation list is not a dated record — it is a claim
+about work that should happen — so leaving it unmarked would have it recommending six things that
+already exist. Checked against the tree on 2026-09-01, each against the module that would carry it.
+
+1. ~~**Give Garden Apartments the `full-run` window in the shift path.**~~ The measurement that justifies it is already in the repo (`arms.ts:40`); the tutorial building currently refuses its own headline numbers roughly half the time. — **Done** in `cac03d1`, and more narrowly than proposed: `shift/reportWindow.ts#shiftReportWindowFor` gives a building `full-run` only when **every** matrix cell for it declares one, so the fix does not re-measure the rest of the product.
+2. ~~**Put the shell's own rails, footer and race strip inside the watch view's string corpus.**~~ The rule *"the word `you` does not appear"* is enforced over the panel and not over the screen, and the screen is what the player reads. — **Done** in `d43cc8a` (`watch/view.test.ts:94`), and it is what closed ranked defect 7.
+3. ~~**Make the record refusal name its cause.**~~ `watchRecordIssues` already knows which issue fired; printing it turns "your days are mysteriously unwatchable forever" into "this day ran rules you wrote, and a record cannot name them yet". — **Done** in `d43cc8a` (`watch/library.ts#refusalForDay`), and the reason is *quoted* rather than paraphrased, on `live/honesty.ts`'s rule that a refusal has one author.
+4. ~~**Extend § D300's temporal property to `render/canvas.ts`'s RIGHT NOW cell and the frame description.**~~ The transport line was fixed by exactly this method; the canvas is the surface a player actually watches. — **Done** in `cac03d1` (`honesty/properties.ts`, with the two surfaces at `render/canvas.ts:1113` and `render/describeFrame.ts:154`).
+5. ~~**Fix the fixit fall-through head**~~ so "Better" requires a measured improvement, and key the *"settings are free"* sentence on spend rather than on machinery spend. — **Done** in `cac03d1` (`fixit/engine.ts:278`).
+6. ~~**Pick one word for the give-up cohort**~~ and use it on both the rail and the sheet, or rename one of them. Two numbers under one label, side by side, is the accounting complaint from the last audit wearing a new hat. — **Done** in `cac03d1`, and by deriving both labels rather than by agreeing on one (`shift/report.test.ts:409`), so neither surface can drift onto the other's words.
+7. **Surface the two new toys.** A *Write a rule* row beside *Open dispatcher editor →*, and one coach line pointing at the race strip, would double their discovery rate for free. — **Open.** Measured, not assumed: nothing in `packages/viz/src` renders the string *Write a rule*, and no coach line names the race strip. This is the one item on the list that is still a recommendation, and it is the only one that was never a defect — the other six each closed a ranked finding.
+
+**The line below is the walking lane's own sign-off, dated 2026-08-11, and is left verbatim.** Its
+*17 new ranked defects* is a correct count of what the walk found and not a statement about the tree
+now — all seventeen are closed; see the register at the top of this file. It is kept rather than
+annotated inline because a verbatim report that has been edited is no longer one.
 
 result: PT2 audit complete — of the first audit's 14 defects 9 are verified fixed (including the blocks-play Resume trap) and 3 are only partial (saturated people-accounting, mid-playback whole-run figures on the canvas, lever feedback at 1280); the new rules editor, ghost race, Fix-a-building, bench suite and watch flows all work, with 17 new ranked defects — the worst being that writing one rule silently makes every later filed day unwatchable under a wrong reason, and that watch mode labels somebody else's run "you" with the spectator's own dispatcher and seed; screenshots in `/tmp/claude-0/-home-user-elevator-sim/bac14123-a480-501d-a689-b40a5481e334/scratchpad/playtest2/`.

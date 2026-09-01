@@ -28089,3 +28089,767 @@ confirms it. This decision rests on the survey and the probe, not on a red anybo
 test in `experiments` now takes five minutes to fail instead of five seconds. A hang is a bug found
 once and fixed; a 5 s ceiling under load is a false red on a required check that recurs forever and
 trains people to re-run the suite instead of reading it.
+
+## D419 — a scheduled tier that runs replications runs on a built tree, and the sweep had never run at all
+
+**Date: 2026-09-01 · Owner: lane A, wave I · Closes: the outstanding third of GitHub issue #309.
+[§ D393](#d393) built the workflow this corrects.**
+
+**Decision.** Every `--project experiments` job in `.github/workflows/deep-tiers.yml` runs
+`npm run build` before its tier — six jobs gained the step, `golden-runs` already had it.
+`validation/perfSweep.test.ts`'s deep arm calls `assertCoreBuilt()` before it spawns a pool, and
+`validation/deepTierBuild.test.ts` asserts the workflow property per job. The two jobs in the other
+project are deliberately left without a build step.
+
+**What was reported, and what it was not.** The weekly run on `6260dcb`
+([run 33303221167](https://github.com/mrpeanut01/elevator-sim/actions/runs/33303221167)) failed
+three of eleven jobs. Wave H closed two — `fuzz-deep` (#305) and `matrix-census` (#306). The third,
+`perf — the 20 000-replication sweep`, **failed in four seconds**: 09:06:41 → 09:06:45.
+
+Four seconds is the signature of vitest's 5 000 ms default, and [§ D418](#d418) had just given
+`experiments` `SIMULATING_TIMEOUT_MS`, so the hypothesis on the table was *already fixed on `main`*.
+**It is not, and the log says so in one line:**
+
+```text
+RunnerError: Worker failed to initialize: Cannot find module
+  '…/node_modules/@elevator-sim/core/dist/index.js'
+  imported from …/packages/experiments/src/runner/replication.ts
+ ❯ Worker.onMessage src/runner/parallel.ts:230:22
+```
+
+That is a module-resolution failure at worker spawn, not `Test timed out in 5000ms`. **Reproduced on
+the current tree** — `255aff2` + `d5b53f5`, § D418 present — the same error with this tree's paths,
+exit 1, 4.94 s. So the sweep had failed for a reason no timeout change could touch.
+
+**And the four seconds are not even mysterious once the log is read to the end.** The job step ran
+09:06:41 → 09:06:45; vitest reports `Duration 3.35s`, of which the four *always-on* cases account for
+2.25 s and the deep arm for **188 ms** — the time it takes to construct a `Worker` and receive its
+`fatal`. A timeout does not fail fast; this failed fast because nothing ran.
+
+**The mechanism.** `vitest.config.ts` aliases `@elevator-sim/*` to package **source**, which is why
+the always-on suite needs no build and why four of that file's five cases passed. A worker thread is
+loaded by Node, not by vitest: it resolves the same specifier through `node_modules` to
+`packages/core/dist`, and `npm ci` does not run `tsc -b`. `runner/parallel.ts`'s own docstring had
+said this for as long as the pool has existed. The job that needed to read it was written a year
+later, in another directory, by somebody measuring on a tree that had already been built.
+
+**So #163's acceptance clause was still undischarged.** *"The seed-collision check has run at least
+once on `main`"* is this job and no other — 20 000 distinct trace digests, the only place in the
+repository a seed derivation is looked at that scale. It had been wired, scheduled, named in
+`deepTiers.test.ts`, counted in every audit, and had never executed a single replication. That is
+#163's own defect surviving the workflow written to close it: not a tier nothing opts into, but a
+tier that opts in and cannot start.
+
+**Why the build is on every `experiments` job rather than on the one that needed it.** Whether a
+tier reaches a worker pool is **not readable from the tier's own source**:
+`RUNNER_DEFAULTS.parallelMode` is `'auto'` and `minReplicationsForWorkers` is 64, so a spec that
+says nothing about parallelism spawns workers as soon as the guaranteed work clears the threshold;
+`validation/harness.ts` pins `'serial'` inside `runGateExperiment`, which is the only reason the
+census and the oracle survive an unbuilt tree today, and it is three modules away from the tiers it
+protects; and `goldenRuns.test.ts` needs a built tree for an entirely different reason — a child
+`node` against `experiments/dist`. A per-file derivation would be wrong in the unsafe direction:
+green over exactly the tier it failed to classify. The job-level property has no such gap and is
+decidable from the workflow alone.
+
+**The cost is measured, not waved at**: `npm run build` from a fully cleaned tree is **11.2 s** on
+this 4-core container (`tsc -b`, five packages). Against tiers measured at 4.6 min to four hours
+that is under a percent, and it buys a typecheck on the commit each tier judges — `ci.yml` makes the
+same trade for the always-on suite in the same words.
+
+**Two instruments, because they catch different things.** `assertCoreBuilt()` turns
+*"Cannot find module"* — which names a path, not a cause — into a sentence naming the fix, and it
+also catches the case that error **cannot see at all**: a `dist` that exists but is older than
+`src`, where the pool and the parent run different code and agree about nothing for reasons that
+look like a concurrency bug. Both directions were driven: with `dist` moved aside the arm fails in
+6 ms with *"packages/core/dist is missing…"*, and with `src` newer it fails with
+*"…is older than packages/core/src"*. `deepTierBuild.test.ts` catches the other half — a **new** job
+that forgets the step, which no assertion inside a test file can see.
+
+**What is not claimed.** The other eight jobs of that run were not re-executed here; three of the
+eleven are the issue's subject and all three were run. And this decision does not touch
+`ci.yml`, which has built before testing since § D201.
+
+**The measurement, with the ceiling it was taken under.** Reproduced red at 4.94 s (exit 1) with no
+`dist`; green at 67.1 s and again at 72.9 s (exit 0, 5 of 5) with one. The workflow's header quotes
+4.6 min for this tier under contention, and the ceiling stays at 180 minutes: a hosted runner is
+slower, and a ceiling raised after a red has already cost the week it was meant to save.
+
+## D420 — a failure report points at the job that failed, and the flake caveat is scoped to the flake
+
+**Date: 2026-09-01 · Owner: lane A, wave I · Closes: the misdirection half of GitHub issue #309.
+Amends [§ D393](#d393)'s `report` job.**
+
+**Decision.** The `report` job's guidance paragraph is computed from the jobs that actually failed
+rather than written as one fixed sentence. `perf-scaling`'s wall-clock-flake caveat appears only
+when `perf-scaling` is among the failures; when it is not, the paragraph says so outright. A second
+sentence names the signature this issue turned on — a job that went red in seconds failed *before*
+its tier started.
+
+**Context.** The sentence being replaced read: *"These tiers run nowhere else, so a red here is the
+only place the finding exists. Read `perf-scaling` against its own note about wall-clock flake under
+load before treating it as a defect; the other eight are deterministic."* On 2026-08-30
+`perf-scaling` **passed** and `perf-sweep` failed, and the issue this job filed still sent its
+reader to the passing job.
+
+**Why that is worse than saying nothing.** The note it points at exists to explain a red *away* —
+*"expected 0.887 to be greater than 0.9"*, a gate about a machine rather than about the simulator. A
+reader who follows an unscoped pointer onto the wrong job comes back with *known flake* about a
+defect. § D393's own header is careful about exactly this distinction between kinds of red —
+*"reporting those as one number would say the same thing about a defect and a stale baseline"* — and
+then the issue body it generates undoes it for every future run. A caveat that does not name its own
+scope will be applied where it does not hold.
+
+**The count went too.** *"The other eight"* was a hand-written arithmetic over a `needs:` list that
+a tenth tier would falsify silently. It is derived now, and it is the count of *failing* jobs other
+than the flaky one, which is the number the sentence is actually about.
+
+**Verified by driving it rather than by reading it, and the check ships.**
+`validation/deepTierReport.test.ts` extracts the generator from the workflow file — never a copy, or
+it would be asserting things about itself — and executes it over three job-result sets:
+`perf-sweep` alone (the 2026-08-30 shape) produces *"`perf-scaling` … is NOT among the failures
+above, so its note does not apply here"*; `perf-scaling` alone produces the caveat scoped with
+*"read THAT job, and only that one"*; both plus `matrix-census` produces the caveat **and** *"The
+other 2 failing job(s) are deterministic"*. A test that merely asserted the workflow *contains* a
+phrase would pass over a generator emitting it unconditionally, which is the defect itself.
+
+**The mutation run changed the test.** Regressed to the superseded sentence, the case that exists
+for this did **not** trip its refusal of `read THAT job` — those are different words for the same
+mistake — and was saved by a positive assertion beside it. So the imperative is now refused *by
+name* (`Read \`perf-scaling\``) as well as generically, and a second mutation that keeps reading
+`RESULTS` while emitting the old sentence was driven to confirm it. A refusal that cannot recognise
+the thing it was written about is decoration.
+
+**A constraint worth recording for the next person editing that step.** The generator runs as
+`node -e '…'` inside a single-quoted shell word, so **it may contain no apostrophe** — including in
+its prose. § D393's own header records the sibling of this trap: an apostrophe inside a template
+literal opened a bogus string in a comment-stripper and silently lost a tier. The extraction check
+asserts the absence rather than trusting it.
+
+---
+
+## D421 — Phase 9's *"three DOM panels"* is 33 DOM entry points, and it was never a measurement
+
+**Date: 2026-09-01 · Owner: Lane B, wave I · Closes: GitHub issue #176's counting half.**
+
+**Decision.** The gap Phase 9's verdict names is **33 DOM entry points the honesty sweep cannot
+drive**, published as its two components — **17 mounts and 16 screen-registry rows** — with the
+clause that the screen rows' *pure halves are driven*. All six sites carry that figure, and none of
+them carries it as a typed number: it is derived from `NOT_PLAYER_FACING` by
+`packages/viz/src/honesty/derive.test.ts` and checked against the documents that publish it.
+
+**Numbered under [§ D405](#d405) criteria 1 and 2**: it binds five documents `packages/viz/src/honesty/`
+does not own — `CLAUDE.md`, `GAPS.md`, `docs/05-roadmap.md`, `docs/14-building-behaviour-contract.md`,
+`docs/18-everyday-mode-tree-audit.md` — and it moves a figure already recorded inside an accepted
+phase verdict, where a named gap is part of the verdict rather than commentary on it.
+
+**Both readings of *three* were wrong, and the narrowest failed inside the classifier.** The wide
+readings are 17 and 33. The narrow one is the docstring above `mountLeftRail`, the only place that
+ever enumerated the panels by name: it named three, and the id list beneath it has held **four**
+since `mountRightRail` joined — `RIGHT_RAIL` drives that mount's pure half and no sentence said so.
+That is a docstring naming its own members going stale, the class `packages/viz/src/deadCode.test.ts`
+caught twice in wave 12, arriving in the instrument built to catch it.
+
+**Why 33 rather than 17.** The classifier's own reasons put all 33 in one class. Thirty-two are in
+the `DOM-bound` group; `dev/watchPanel.ts#mountWatchPanel` is excluded a few groups later as *"DOM-
+or fetch-bound … on `dev/fixitPanel.ts`'s own established ground"*. Stopping at the mounts would
+leave sixteen exclusions taken on that same ground uncounted — which is exactly how
+`docs/14-building-behaviour-contract.md` came to cite the phrase as the *name* of a category and
+then put a fifth panel, `mountBuildingEditor`, into it. Nothing there was wrong about the gap. What
+had happened is that the number stopped being a measurement and became a label, and a label cannot
+go stale visibly.
+
+**Why not a bare 33.** Calling the sixteen screen rows *not driven* full stop would be a **new**
+false statement rather than a corrected count — [§ D227](#d227)'s stale-refusal trap one layer in.
+Each of those exclusions names the adapter that renders that screen's words. What is unswept, in
+both groups alike, is only what the entry point authors **inline**, and that reaches the static R10
+sweep and no other property of the ten. So the decomposition and that clause travel with the number
+wherever it is published; the number alone is not the claim.
+
+**What is not claimed.** This closes the *counting* half of issue #176 and nothing else. The mount-
+private prose is not exported, the 33 are not driven, and the gap is the same size it was — only
+the sentence describing it is now true. Issue #176's other two families (R2's replication-budget
+clause reachable only in the deep tier, and `UX.md` § 26's owed drive coverage) are untouched.
+
+---
+
+## D422 — a published count carries a machine-read shape, and a superseded one is struck through
+
+**Date: 2026-09-01 · Owner: Lane B, wave I · Generalises
+`packages/viz/src/everyday/viewportGateClaims.test.ts`'s rule to a second subject.**
+
+**Decision.** Where a figure this repository derives is published in prose, **the live claim is
+written in a shape a gate reads, and a superseded figure is struck through** (`~~three~~`). The gate
+strips `~~…~~` spans before reading anything, so history may stand beside the correction without
+satisfying the check, and a corrected sentence cannot pass by quoting the number it replaced.
+[§ D421](#d421)'s figure is the second subject to adopt it; the browser tier's file count was the
+first.
+
+**Numbered under [§ D405](#d405) criterion 1**: it is a rule for anyone editing the five documents
+§ D421 binds, and a lane that rewords one of those sentences has to know the shape exists before it
+goes red.
+
+**Two guards, because a count gate has two ways to pass while lying.** *Per site*: a document in the
+list that states no figure the gate reads is red, so a site cannot quietly drop the claim and become
+free to acquire a bare count again — that is how the figure reached six sites unchecked in the first
+place. *On the instrument*: the id shapes must find something, and every id they find must sit in an
+exclusion group whose reason names the DOM. Both were mutation-checked red before landing. The
+second is what makes a syntactic count a class rather than a spelling: a future `mountXxx` excluded
+for some non-DOM reason goes red and asks the question instead of joining a figure five documents
+publish.
+
+**Where the derivation lives, and why it is not a file of its own.**
+`viewportGateClaims.test.ts` is a separate file because its artefact is on disk and any test can
+glob it. This artefact is a module-private literal inside `derive.test.ts`, so a gate elsewhere
+would have to re-parse it — and issue #176 records what that costs: the first parser written over
+these literals extracted every quoted string and returned **279** "ids", because the prose in each
+`reason` is full of apostrophes. Reading the array directly cannot have that failure mode. When the
+thing being reported is a count produced by an instrument nobody checked, the instrument is the part
+to keep short.
+
+## D423 — the browser-tier count in a *recommendation* is a live claim, and the guard over it could be defeated by a line wrap
+
+**Date: 2026-09-01 · Owner: lane C, wave I · Closes the GitHub issue #230 half of a question wave H
+left open, and re-opens the corrected row of [§ D227](#d227)'s class in the file that carries the
+guard.**
+
+**Decision, in two halves.**
+
+1. `M2_MEASUREMENT.md` § 4.2's *"installing Gecko buys nothing while **N of N** browser-tier files
+   name `chromium`"* is a **live claim** and is re-derived, not a dated record left as it was. So are
+   § 4.1's twin and the three sentences in `docs/31-support-matrix.md` §§ 5 and 7 that spell the same
+   count. All five now read **33**, which is what both of § 3's commands answer on this tree.
+2. `viewportGateClaims.test.ts`'s shapes join their tokens with `\s+` rather than a literal space,
+   and a third shape — `the tier holds N` — is added.
+
+**Why the first half is a claim and not a record, since wave H decided the other way and said so.**
+Three grounds, and the third is the one that settles it.
+
+- **The sentence is in the present tense inside a live recommendation.** § 4.2 is headed *"The
+  cheapest three things that would move this box"* and its own preamble says *"each converts a
+  claim into something a red run defends"*. The `while` clause is the **precondition** for the
+  Firefox row: it is the reason a reader is being told not to install Gecko yet. A reader acts on it
+  today.
+- **The same document already treats the same figure as live.** § 3 was re-derived to *33 of 33* and
+  carries a block quote recording what it used to say. A document cannot hold one figure to two
+  standards in two sections without becoming the thing it is warning about — and § 4.1 and § 4.2
+  disagreed with **each other**, publishing *29 of 30* and *29 of 29* for one set in one tree, which
+  is exactly the two-documents-disagreeing defect § 3's block quote exists to record.
+- **This document already has a section for dated findings and this is not in it.** § 5 is *"Published
+  numbers that have gone stale, found while measuring"*, and its figures — 25, 26 — are correct
+  records of what was found on 2026-08-24 and stay untouched. § 4 is not that section. The test for
+  a dated record is not *"is the document dated?"*; every document is. It is *"does the sentence say
+  when?"*
+
+**What a dated figure does instead, because deleting one would be worse than leaving it.**
+`docs/31-support-matrix.md` § 5's *"the ~157 s was measured over the 25 files the tier held then"* is
+a true record and is kept. It is written **outside** the machine-read shape — the backticked
+`` `*.browser.test.ts` `` that shape 2 keys on is dropped from that clause — rather than struck
+through, because striking it would announce a correction that has not happened. That extends the rule
+this guard already had for *superseded* figures to *dated* ones: **a figure that is a claim about the
+tree now goes in a shape; a figure that is a claim about a measurement then says *then* and stays out
+of one.**
+
+**The second half is the finding, and it is not really about line wraps.** The guard was green over
+all five stale sites. Its four shapes matched a literal space between tokens, Markdown wraps prose at
+100 columns, and two of the five had a newline where the regex wanted a space:
+
+```
+because **29 of
+30** browser-tier files name `chromium`
+```
+
+The other three spelled the count in no shape at all — *"it holds 29 now"*, *"It is **29** now"*. So a
+check written to end a class of staleness had been reporting **green** over five members of it, on
+the two documents it was built for, for the whole of the wave that corrected four of their siblings.
+
+**The lesson is the ordinary one about derivation, aimed one level up.** This repository's rule is
+that a published *number* with no derivation is stale as of the next commit that moves it. The same
+is true of a *shape*: a guard whose coverage depends on where a paragraph happens to break is a
+transcribed guard, and it fails silently, which is the worse of the two failure modes. `RISKS.md`
+R38's remedy is a ratchet or a derivation and never a pin — and a regex that only matches one
+rendering of a sentence is a pin wearing a derivation's clothes.
+
+Rather than teach the regex three more bespoke phrasings for the three that spelled no shape, the
+three sentences were reworded onto one shape. That direction is deliberate: the sentence a person
+writes and the sentence the machine reads should be the same sentence, or the next author will write
+a fourth phrasing without knowing there was a set to join.
+
+**Mutation-validated in both directions.** Wrapping a *correct* `**33 of 33**` across a line keeps
+the guard green (the wrap alone is not the defect); wrapping a *stale* `**29 of 29**` the same way is
+now caught, where before this change it was not. Setting `the tier holds 33` to `29` is caught by the
+new shape. And the strengthened guard's first run found all three surviving stale sites on its own,
+which is a better validation than an injected fault: it went red on real staleness.
+
+**One citation was wrong for the same wave and is corrected with it.** Both documents said the count
+was derived by `viewportGates.browser.test.ts`. It is not, and that file's own docstring says it is
+not — the derivation is `viewportGateClaims.test.ts` beside it, deliberately not a browser test. A
+citation is a claim about a mechanism and goes stale the same way a number does, with the difference
+that a stale number is merely wrong while a stale citation sends the next reader to a file that
+cannot explain itself.
+
+## D424 — a fixed finding left reading as live is [§ D227](#d227) with its polarity reversed, and a register is what closes it
+
+**Date: 2026-09-01 · Owner: lane C, wave I · Closes item 1 of GitHub issue #172 and the `docs/20`
+bullet of #230.**
+
+**Decision.** `docs/20-everyday-playtest-audit-2.md`'s eleven unstruck ranked defects are struck
+through **in place**, each with the commit and the module that closed it beside it, and
+`packages/viz/src/docs20Register.test.ts` holds the register from now on.
+
+**What was true.** All seventeen ranked defects from the 2026-08-11 player-walk were fixed across
+three merges — `d43cc8a` (1, 2, 7, 10, 12), `cac03d1` (3, 4, 5, 6, 8, 9), `4005c86` (11, 13–17) —
+and **only the last six were struck through**. So 1–10 and 12 read as live findings for three waves,
+on a page whose six struck siblings told a reader that this document marks its closures.
+
+**Why that is worse than a stale figure and belongs in § D227's family.** § D227's finding is that a
+stale *refusal* tells a reader not to touch a control that works. This is the same sentence pointing
+the other way: a stale *finding* tells a reader to go and fix something already fixed. Both are a
+sentence that stopped describing the tree; both survive every check the repository runs, because
+nothing in the suite reads a document's verdicts against the code. The cost here is concrete rather
+than theoretical — this document's *What I would do next* list was six-sevenths done, and a lane
+planning work from it would have picked up six finished jobs.
+
+**Each of the three classes was treated differently, and saying which is which is most of the work.**
+
+- A **number** that has moved is derived. The register's open count is one, and it is a ratchet at
+  **zero** rather than a pin at eleven-minus-eleven.
+- A **claim about a mechanism** that has stopped being true is corrected with its evidence beside
+  it — the merge, the module, and the test that pins it, one per defect, so a reader can check the
+  claim rather than believe it.
+- A **dated record** is left standing and its datedness is made explicit. Three of those here:
+  Part A's table of `PARTIALLY` verdicts, which is what a player saw on one day and is **not**
+  re-scored (re-marking it `VERIFIED` would claim a second walk that has not happened, so the rows
+  say where each partial went in the ranked list instead); the `result:` line at the foot, which is
+  the lane's verbatim sign-off and whose *17 new ranked defects* is a correct count of what the walk
+  found; and the walk's method and base-commit block.
+
+  The *What I would do next* list is deliberately **not** in that class. A recommendation is a claim
+  about work that should happen, so an unmarked one recommends six things that already exist. Each
+  item carries its own outcome, and item 7 is marked **Open** on a measurement rather than an
+  assumption: nothing in `packages/viz/src` renders *Write a rule* and no coach line names the race
+  strip. GitHub issue #172 asserted that list was *"entirely done"*; six of seven is, and checking
+  the seventh is the difference between this entry and a transcription of the issue.
+
+**What the guard can assert, said plainly because the failure mode of a check like this one is a
+reader taking it for more than it is.** It cannot check that a defect is fixed; no mechanical reading
+of *"Better now requires a measured improvement"* evaluates against a tree. It checks the **link**
+between document and tree, both ways: every struck-through defect is named by number somewhere in
+`packages/viz/src` — this repository's own convention, that a fix cites the finding it closes — and
+the count of findings still reading as live is a ratchet at zero. A citation is weaker evidence than
+a passing test and stronger than a reader's diligence, and what it buys is that the document and the
+tree can no longer drift apart quietly: they disagree in a suite, on the commit that separates them.
+
+**Mutation-validated, four ways.** Un-striking one defect fails the ratchet naming it; renumbering a
+heading fails the contiguity case; a struck-through defect no file cites fails the citation case; and
+breaking the heading shape fails the non-vacuity case rather than passing over an empty list — which
+is the trap `deadCode.test.ts` and `viewportGateClaims.test.ts` both guard, and the one a guard over
+a document is most likely to fall into.
+
+## D425 — the browser tier serves `dist-web/`, and the four files that cannot are named
+
+**Date: 2026-09-01 · Owner: wave I lane D · Closes GitHub issue [#281](https://github.com/mrpeanut01/elevator-sim/issues/281) criteria 1, 2, 4 and 5. Criterion 3 is refused rather than met — see [§ D426](#d426). `RISKS.md` R26's third realised instance.**
+
+**Decision.** `vitest.config.ts`'s `viz-browser` project gains a `globalSetup` that runs `vite build`
+**once** before any file is collected. `browserTier.test-helper.ts#startShippedSite` serves that one
+output with Vite's own `preview()`, and **29 of the tier's 33 files** now drive it instead of a
+`vite dev` server. The four that cannot are declared in
+`browserTier.test-helper.ts#DEV_SERVER_FILES`, and `browserTier.test.ts` derives the same set from
+the tier's own sources and requires the two to be **equal in both directions**.
+
+**What was wrong.** 32 of 33 files started `createServer`. Players load `dist-web/`, produced by
+`npm run build:web` and served as static files. Every claim the tier made — and it is the evidence
+behind a large number of this repository's assertions — was true of an artifact nobody receives.
+
+**The gap was measured on this host rather than listed from Vite's documentation, and most of the
+textbook differences do not bite.** Both servers were driven side by side, in one script, at
+`375×667`:
+
+| difference | bites? |
+|---|---|
+| CSS delivery | **no** — `index.html` carries the whole stylesheet inline; one `<style>` of 103 542 characters, same SHA-256 on both |
+| layout and geometry | **no** — every tile box, the rail, the bar, both scrollers, identical to 0.01 px |
+| env replacement | **no** — nothing under `packages/viz/src` reads `import.meta.env` |
+| module resolution, transform, minification | **in kind** — dev serves `/@vite/client` + `/src/everyday/boot.ts`; the bundle serves one hashed `/assets/index-*.js` |
+| **asset surface** | **yes, and it is the large one** |
+
+**The asset surface is the real gap.** `vite.config.ts` points `publicDir` at the repository's
+`data/`, so the dev server answers for **every file in it**; on build `copyPublicDir` is `false` and
+only `WEB_DATA_FILES` plus `__buildings.json` are emitted:
+
+| request | `vite dev` | `dist-web` |
+|---|---|---|
+| `/elevator-specs.json` | 200 `application/json` | 200 `application/json` |
+| `/buildings/midtown-office.json` | **200 `application/json`** | the SPA fallback, `text/html` |
+| the buildings README — `data/buildings/README.md` on disk, requested at /buildings/README.md because `publicDir` is `data/` | **200 `text/markdown`** | the SPA fallback |
+| `/src/everyday/host.ts` | 200 `text/javascript` | the SPA fallback |
+
+So a viewer that started fetching a seventh document would work on every machine in this repository
+and fail in production — and `dev/data.ts#fetchJson` would report it as *"did not parse as JSON"*
+rather than as a missing file, because the fallback answers **200** with an HTML body. That is the
+class this decision puts under test, and it is mutation-proved: deleting `fixit-cases.json` from
+`WEB_DATA_FILES` leaves the dev server serving it and turns the tier **red in 5 files and 12 cases**,
+where before this change the same deletion left it entirely green.
+
+**The shape: one build per run, one server per file.** A build per file was measured and rejected —
+4.5 s × 32 is about 150 s onto a 269 s tier, against 4.5 s × 1 for the same artifact. Per-file
+`preview()` keeps each file's own port and the file isolation the tier already had, so
+`browserTier.test.ts`'s port guard applies unchanged.
+
+**The cost, measured on this host, and the stability measured across runs rather than in one.** The
+tier was **268.98 s** for 33 files and 191 tests before. After — 33 files, 192 tests, exit 0 every
+time:
+
+| run | wall | 1-minute load average |
+|---|---|---|
+| quiet 1 | 186.6 s | 9.16 |
+| quiet 2 | 199.3 s | 9.00 |
+| quiet 3 | 183.1 s | 10.57 |
+| under eight extra spinners, 1 | 253.2 s | 16.12 |
+| under eight extra spinners, 2 | 249.8 s | 14.60 |
+
+**Cheaper, not dearer**, which is not obvious and is the reason for measuring it: one `vite build` is
+added and **29 dev-server startups are removed**, and a preview server over a prebuilt tree answers a
+page in one request where a dev server answers it in hundreds. Five runs rather than one because a
+harness that serves a real artifact has to be shown stable across runs — the third finding below was
+found that way and would have survived any single green.
+
+The build is skipped when there is no Chromium, because the tier is skipped then too.
+
+**The gate moved one module down, and that is a move rather than a copy.** A `globalSetup` runs in
+vitest's main process before any suite exists, and importing `browserTier.test-helper.ts` from there
+fails with vitest's own *"Vitest failed to find the current suite"* — measured with a throwaway
+setup, because that module registers `afterEach`/`afterAll` at module scope. So `CHROMIUM`,
+`HAS_BROWSER`, `SKIP_REASON` and `startShippedSite` live in `browserTierSite.test-helper.ts` and
+`browserTier.test-helper.ts` re-exports them. There is still exactly one `HAS_BROWSER` in the
+repository — GitHub issue #142's point — and no file in the tier changed the specifier it imports.
+
+**The four exceptions, stated rather than implied.** `dailyLoop`, `reportScreen`, `shell` and
+`stageScreen` each drive `EVERYDAY_HOST` through `page.evaluate("import('/src/everyday/host.ts')…")`.
+That path exists only on a dev server. The alternative — publishing the host on a global so all four
+could drive the bundle — is refused for the reason `shell.browser.test.ts` already states in terms:
+*"driving the host must not require the product to publish itself on a global."* So those four
+assert nothing from `BUILT_ARTIFACT_CLAIMS`, and the registry is checked **both ways**: an entry that
+has stopped being true is as much a failure as a file that has quietly reacquired `createServer`.
+One direction alone is § D227's stale refusal with a new subject.
+
+**Two reds were reported against this tier while the lane was open, they have one cause, and the
+cause is the harness that closed the gap rather than the bundle.** On 2026-09-01 both CI legs failed
+in `everyday/builtBundle.browser.test.ts` on a commit whose whole diff was one unrelated file:
+
+```
+suite (linux):  AssertionError: the fixit screen drew no heading to measure
+suite (macos):  page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:5299/
+```
+
+An HTTP error status from a static server is not a rendering flake, and the cause is one the
+superseded helper's own docstring reasoned past. `startBuiltSite` **built** on every call, and **two**
+tier files called it — `builtBundle` and `rerenderScroll`. Vitest runs files in parallel, `dist-web/`
+is one directory, and `vite.config.ts` sets `emptyOutDir: true`, so the second file's write phase
+deleted the site the first file's `preview` server was still serving. The docstring had considered
+memoisation and rejected it — *"a cache keyed on disk would make one file's pass depend on another
+file having run"* — and never considered two builds sharing one output directory.
+
+**Measured on this host by running the superseded helper twice over**, rather than inferred:
+
+| what the already-serving preview answered, during the other file's build | |
+|---|---|
+| `GET /` | **404 on 63 of 87** requests |
+| `GET /assets/index-*.js` (its own entry chunk) | **404 on 62 of 87** |
+| `GET /fixit-cases.json`, from a live page | **404 on 18 of 140** — a window of roughly 900 ms |
+
+The first row **is** the macOS symptom. The linux symptom follows from the third: a failed data fetch
+puts `everyday/fixitScreen.ts#render` into its `loadFailure` branch, which draws no `h1` at all. The
+404 window is measured; that the branch draws no heading is read off the code rather than observed on
+a runner, and the two are different kinds of evidence, so they are labelled differently here.
+
+**This is a defect in the harness that closes the gap, not in the bundle** — issue #281 does not
+distinguish the two and the distinction matters. **One build in `globalSetup` makes the race
+impossible rather than unlikely**, and `browserTier.test.ts` now fails any tier file that calls
+`build(` again. It went unnoticed from 2026-08-26 because the only two files that could trigger it
+ran rarely, which is GitHub issue #163's shape one level in.
+
+**A third, found by running the tier repeatedly rather than once — which is why it was run
+repeatedly.** On the second of two consecutive runs, `builtBundle.browser.test.ts` reported
+`Hook timed out in 120000ms` at its `afterAll` with **all 192 tests passing**: a two-minute red about
+nothing the product does. `httpServer.close()` stops accepting and then waits for every open
+connection to end, a Playwright page holds a keep-alive socket for as long as it is open, and that
+file closed its **site before its browser**. The dev server hid this — `ViteDevServer.close()` tears
+its own sockets down, while `preview()` hands back the raw `httpServer`, which does not. Fixed twice
+over: the two files that had the ordering wrong now close the browser first, as the other
+twenty-seven already did, and `startShippedSite`'s `close` calls `closeAllConnections()` first so the
+ordering is discipline rather than the only defence. **One green run would not have found it**, which
+is the general point: a harness that serves a real artifact has to be shown stable across runs, not
+across one.
+
+**A second, independent unreliability in the same case, and it is filed as a defect in the case
+rather than in the product.** `suite (linux)` failed on
+`everyday/builtBundle.browser.test.ts` — *"the fixit screen drew no heading to measure"* — on a
+commit whose whole diff was one unrelated file, while the same file passed twice on this container.
+**The case was unreliable when it was written** (`97ac411`, 2026-08-26) and wave I did not make it
+so: it waited for `.everyday-fixit`, which `shell.ts#go` draws immediately, and then measured, while
+`fixitScreen.ts#render` puts `.everyday-fixit-loading` in that container until `/fixit-cases.json`
+resolves — and that state has **no `h1` at all**. The window is a network fetch, which a loaded
+runner widens. The state was reproduced here rather than inferred: an unsettled probe against the
+dev server read heading `null` and incoming overflow `0`, which is the loading screen exactly. Fixed
+by waiting for the loaded screen rather than by sleeping, and the offset is now asserted at **both**
+moments — at the navigation, which is what `go` resets, and after the case file lands, which is what
+the player is left looking at.
+
+**Two measured corrections travel with it.** Resolving `vite.config.ts` and reading it back reports
+`server.port 5174 / server.strictPort true` and `preview.port 4173 / preview.strictPort true`: a
+preview server **inherits `strictPort`** and does **not** inherit the port, so its default is 4173
+rather than 5173 and the port guard's message now names both. And every converted file's port note
+is **carried over rather than replaced**, because `boot.browser.test.ts`'s records a measured
+mechanism that three sibling files cite by name.
+
+## D426 — the #281 clamp does not depend on the incoming screen's height, and what makes the defect deploy is unmeasured
+
+**Date: 2026-09-01 · Owner: wave I lane D · Corrects a stated mechanism recorded in `everyday/shell.ts#go`, `everyday/builtBundle.browser.test.ts`, `everyday/rerenderScroll.browser.test.ts`, `RISKS.md` R26 and GitHub issue [#281](https://github.com/mrpeanut01/elevator-sim/issues/281) itself. [§ D425](#d425) is the fix this was found while building.**
+
+**What was recorded.** That `dev/dom.ts#reconcile` empties its host before inserting, that the
+browser therefore clamps `scrollTop` to `0` on the way through, and that this clamp *"is real and it
+is not reliable — it depends on the incoming screen being shorter than the offset, which `fixit` is
+not"*. From that: the clamp saves a `vite dev` server and does not save the built bundle, which is
+why removing either half of `shell.ts#go`'s reset left the tier green while the deployed build showed
+an offset of **300** carried through a navigation.
+
+**Decision. The conditional half is refuted, and no replacement mechanism is offered.**
+
+**Measurement 1 — the clamp is not conditional on the incoming content at all.** Instrumented on the
+shipped bundle at `375×667`, with `.everyday-screen` scrolled to 300 and its four children removed
+by hand:
+
+| moment | `scrollTop` | `scrollHeight` | children |
+|---|---|---|---|
+| after setting `scrollTop = 300` | 300 | 894 | 4 |
+| emptied, **no layout forced** | **0** | 559 | 0 |
+| emptied, layout forced | 0 | 559 | 0 |
+| refilled | 0 | 894 | 4 |
+
+`scrollTop` reads `0` the moment the container is emptied — before any layout is forced, and before
+anything is inserted. Nothing about the incoming screen can enter that decision, because it has not
+been decided yet.
+
+**Measurement 2 — `fixit` is the tallest destination, not a short one.** Its incoming
+`.everyday-screen` overflow is **8 772 px** against the menu's 335. It was chosen as the tile the
+clamp would *not* save; it is clamped exactly like the rest. (A first probe of this file read that
+overflow as `0`, measured before layout settled; the published figure is the second one.)
+
+**Measurement 3 — the two local artifacts are not laid out differently.** Driven side by side in one
+script at `375×667`, `vite dev` and `dist-web` agree on the document overflow (0 and 0), the menu's
+region overflow (335 and 335), the incoming screen's overflow (8 772 and 8 772), every tile box, the
+rail, the bar, and the inline stylesheet's SHA-256. **With `screenEl.scrollTop = 0` deleted, both
+report an offset of 0.** So the defect does not reproduce on either, and the artifact was not the
+difference between them.
+
+**What follows.** GitHub issue #281's third acceptance criterion — *a case that fails when either
+half of the reset is removed* — is **not met, and is not going to be met by driving the bundle**,
+which was the plan § D425 was expected to carry out. The criterion is not weakened and the reset is
+not deleted: it is pinned by the driven deployment, and that evidence stands.
+
+**Where the offset survives on the deployed build is unmeasured, and this decision may not name a
+cause.** `CLAUDE.md`'s rule about stated mechanisms is the whole of the reasoning — a second
+plausible sentence is exactly how the first one came to be written, and the six sites that carried
+*"and the saving is entirely in the credential"* are what that costs. The measurement that would
+settle it needs the deployed origin, which answers `curl` with status `000` from an agent container
+(GitHub issue **#123**).
+
+**What was corrected, and where.** Four sites carried the conditional clause or the
+artifact-difference claim: `everyday/shell.ts#go`, `everyday/builtBundle.browser.test.ts`,
+`everyday/rerenderScroll.browser.test.ts` and `RISKS.md` R26. Each now states the negative and cites
+this entry. `shell.ts#go` additionally keeps the warning it earned the first time: **do not delete
+that line on the strength of a green local run**, because that is precisely the inference that
+deleted it once already.
+---
+
+## D427 — what a campaign tower buys reaches the run, and the three tiers that move no leg are measured rather than assumed
+
+**Date: 2026-09-01 · Owner: lane E, wave I · Closes GitHub issue #181's first clause. Its second
+clause was already false — see below. Applies CLAUDE.md's standing requirement (*move the control and
+require the run to change, compared on the legs*) to a whole economy, and is
+[§ D219](#d219)'s shape at that scale.**
+
+**Decision.** GAMEPLAY § 8.2's shop table gains a column. Each `ShopTier` carries a `FitOutDelta` —
+plain numbers and ids, **absolute at that tier's level** — and `campaign/fitOut.ts#fitOutOf` folds
+the *fitted* level of each category (`economy.ts#fittedLevel`, which is already gated on a booking's
+nights) into one `CampaignFitOut`. That record is `ViewerState.campaignFitOut`, written by
+`everyday/host.ts#runCampaignDay` and by nothing else, and read by `dev/state.ts#shiftRunConfigOf`
+and `#drivingProfileOf` — the two non-test callers, named because a barrel re-export and a `{@link}`
+tag look exactly like a caller and are not one.
+
+**What was wrong.** § 8's shop was a display of an economy. A tier could be bought, it cost units, it
+booked nights, the month grid filled in, `fittedLevel` reported it live — and `runCampaignDay` wrote
+a `buildingId` and a `dispatcherId`, pressed run, and read no booking at all. A player bought faster
+doors, watched the purse fall, and ran a day **byte-identical on the legs** to the one before it.
+That is `patternSwitching`'s defect with a shop in front of it.
+
+**The column is on the tier rather than in a table beside it**, and that is the load-bearing half of
+the shape. A second map keyed by `(categoryId, level)` is the thing that goes stale: a tier added to
+`SHOP` with no row in it would be a purchase that costs units, books nights, fills the grid and
+changes nothing about the day — this defect arriving one tier at a time. `fits` is required rather
+than optional, so a tier that buys nothing is a compile error, and `fitOut.test.ts` asserts every one
+of the sixteen carries a non-empty one. The fold is generic over the table: there is no
+`if (categoryId === 'doors')` anywhere in `fitOut.ts`, which is CLAUDE.md invariant 7 read forwards.
+
+**Every figure is the tier's own sentence or a value `data/` already ships, and the second half is
+asserted against the file rather than against a copy of it.** `doors` L1's second and L3's two
+seconds are the tiers' own words; the three machine speeds and the two person counts are the tiers'
+own names; `tenants` L2's third is its own sentence. `doors` L2's dwell second is
+`data/elevator-specs.json`'s `doors.dwellHallCallS` typical against its minimum; `tenants` L1's
+ceiling is that file's `timing.passengerTransferS.office`; persons become a rated load through its
+`conventions.personsPerRatedLoadUS` divisor, so `core`'s own `personsAtRatedLoad` is the inverse and
+a *16-person car* is sixteen people to the loader. The two ride-time floors are
+`data/dispatcher-profiles.json`'s `destination-eta` 0.5 and `destination-panel` 1.0.
+
+**One number is not modelled and is said so rather than invented.** `cars` L2's *slower doors* gets
+no penalty: a stop's length is `passengerTransferS` **per passenger per direction**, so a car taking
+five more people at a landing already stands there longer, and a second figure beside that would be
+this repository's stale-mechanism defect written forwards. What is genuinely unmodelled — a wider
+leaf on the same operator — has no shipped figure, and the tier's comment says which is which.
+
+**`control` L2 forced a decision that § D112 had already measured.** A tier that only set
+`dispatch.callType` is § D112's defect bought with units: `destination-eta` authored
+`weights.rideTime: 0`, disclosed a destination that changed no decision, and was bit-identical to
+`eta` at 8 of 8 matrix cells. Measured here on the legs at `garden-apartments`/3 600 s under
+`collective` — which weights `waitTime` alone — disclosure on its own moves nothing at all. So the
+tier discloses **and** prices, through a `rideTimeWeightFloor` rather than an assignment: a
+dispatcher already pricing ride time higher keeps its own vector, so this raises a floor rather than
+overruling § 8.5's standing order about who drives.
+
+**The result, at the campaign's own cell** — `garden-apartments` at 3 600 s, which is what
+`runCampaignDay` writes for `c1`. **Thirteen of the sixteen tiers move the legs.** The other three
+are empty cells rather than dead controls, and each is asserted **with** a cell where the same tier
+does move, which is `commissioning.test.ts`'s precedent and `docs/10` § 0's M1:
+
+| tier | why the cell is empty | where it moves |
+|---|---|---|
+| `cars` L1 | the fitted document really is 10 → 16 persons; two cars over an hour of a residential trickle never fill | the same cell at 15 % of population per 5 min |
+| `cars` L2 | the same sparseness one rung up | `midtown-office` at 1 800 s, as built |
+| `control` L2 | Level-0 disclosure on two cars — `garden-apartments`' own documented collapse of the dispatcher menu | `midtown-office` at 1 800 s, and `control` L3's Level-1 panel moves at the campaign's own cell |
+
+**A mixed-fleet bank keeps its fleet, which is `commissioning/refusals.ts`'s third gate taken where
+there is no screen to draw it on.** A `BankChoice` collapses a bank to one class, one speed and one
+load, and two shipped banks are not one machine — `crown-hotel`'s `main` has a geared 1.75 m/s car
+beside gearless 3.0 m/s ones, `st-jude-hospital`'s has a bed car. `commissionedBuilding` is total by
+design, so a shaft bought on either would rewrite every car to the first one's machine: the campaign
+flattening the thing those buildings were written to teach. `refusals.ts` refuses every dimension on
+such a bank; this module has no control to put a refusal beside, so it takes the same decision the
+only way it can — the `shafts` and `machines` tiers buy nothing on that bank, and every other bank
+and every other category is unaffected. `cars`, `doors` and `tenants` raise a floor or shave a
+constant per car, so a mixed fleet stays mixed and still gets what was bought.
+
+**A double-deck car's per-deck half moves with its whole-car rating, and that branch is unreachable
+from the shipped data.** `core` warns `deck-load-mismatch` when the two disagree and
+`model/car/car.ts` derives a deck's design load from the *ratio*, so a car raised with its half left
+behind is a building describing hardware that does not exist. No shipped tier reaches it:
+`vertical-city`'s shuttles are the only double-deck cars in `data/buildings/`, both double-deck
+classes declare a 3 500 lb floor, and both `cars` tiers ask for less — so the *never smaller* rule
+leaves every legal double-deck car in the repository alone. It is written and driven at the seam
+anyway, because a latent defect waiting on a ninth building or a reader-saved machine class is the
+shape this repository has a rule about, and `fitOut.test.ts` asserts both halves: the branch under a
+30-person fit-out, and the shipped tiers leaving the shuttles untouched.
+
+**A second finding, from sweeping the shipped set rather than the two buildings the probe helper
+loads.** `cars` clamps a rated load into the class's `capacityLbRange`, as `commissionedBuilding`
+does and for its reason. The clamp **alone** shrinks a car above the tier's rung: on `crown-hotel`'s
+4 000 lb service car, buying *16-person cars* would have taken it to 2 500. So the load is
+`max(wanted, the car's own)` and then clamped, and the assertion that holds it reads
+`data/buildings/` from disk — on both loaded buildings it is vacuous, which is why it is not written
+against them.
+
+**Registered where the repository already checks this class.** `scope/surface.ts` declares the field
+`between-days` — a works booking is priced in nights and `bookingIsLive` will not report a tier
+fitted until they are past, so the kit moves on a day boundary and never inside one, and a contract
+is twenty days rather than one game. `scope/probes.test-helper.ts` gives it the two-arm probe
+`scope.test.ts` requires, at 3 600 s: at `baseState()`'s 900 s the same arm is inert, so a probe left
+on the default cell would have reported a live seam dead. `scope/runIdentity.ts` gains the eleventh
+answer — a fitted tower's day may not be posted, on `viewer.commissioning`'s exact ground and asked
+the same way, *is this the identity?* through `fitOutIsAsBuilt`, never *is the field set?*, which
+would refuse a campaign day on which nothing has been bought. `persist.test.ts`'s ledger carries the
+reason it is not persisted: it is derived from a career that is itself not written to this device.
+
+**What this does not do, stated because half a design reading as whole is how § 3.1 of `docs/32` went
+stale.** It does not take a car out of passenger service for the nights a booking occupies. That is
+`docs/32` GD11's *take capacity away first*, it is the half issues #264 and #272 withdrew the
+sentence for ([§ D364](#d364)), and nothing here reinstates it —`economy.test.ts`'s prose sweep is
+what would catch an attempt to. `docs/32` § 3.1 and its § 8 register, and `docs/35` § 5.1–5.3, are
+corrected to say which half shipped.
+
+**Issue #181's second clause — *closing a day records nothing* — was already false when this lane
+opened**, and was verified rather than assumed: [§ D400](#d400)/[§ D401](#d401) made a completed day
+file, mark the grid cleared or missed, move the purse and the career record, and drive progression,
+and `everyday/campaignJourney.browser.test.ts` drives the page to it. The issue text is stale on that
+clause and is corrected in the lane's report rather than worked around.
+
+---
+
+## D429 — a figure nobody can derive twice the same way is withheld, not refreshed
+
+**Date: 2026-09-01 · Owner: integrator, wave I · Corrects [§ D192](#d192)'s figures where they are
+live, dates them where they are not.**
+
+**Decision.** `CLAUDE.md`'s Phase 9 clause-4 paragraph publishes three figures from the `packages/viz`
+dead-code audit. They are now treated as three different kinds of claim:
+
+- *"all **19** `packages/viz/src` directories sit outside every `AUDITED_MODULES`"* is **present
+  tense and was wrong**. The tree holds **27**
+  (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`). Corrected.
+- *"19 directories derived from disk … 1 017 exports classified"* describes **what that audit found
+  on the tree it landed on**. It is a dated record, and now says so instead of reading as current.
+- **The export count is not re-published at all**, and that is the decision rather than an omission.
+
+**Why the third one is withheld.** Two derivations disagreed — **2 357** from wave I lane C's scan
+and **~2 893** from a cruder one taken here — and the audit's own figure cannot be read off a run,
+because vitest intercepts `console.log`. That is the identical trap that made
+`honesty/measure.corpus.test.ts` necessary: an instrument that computes the number a publisher needs
+and prints it where no publisher can see it. Picking either figure would republish a count no reader
+can reproduce, which is [`RISKS.md`](RISKS.md) R38 with fresh digits.
+
+**The rule this states.** A prose count is publishable when a reader can re-derive it by a stated
+command. Where the derivation exists, publish the command beside the number ([§ D421](#d421) does
+this for the 33 DOM entry points). Where it does not, **name the gap and publish nothing** — a
+withheld figure is a smaller defect than one two methods disagree about, because the first invites a
+measurement and the second ends the question falsely.
+
+**Not claimed.** No judgement is offered on which of 2 357 and ~2 893 is right. Making the audit's
+own count readable — the `measure.corpus.test.ts` treatment, writing to a file rather than a stream —
+is the fix, and it is not taken here.
+
+---
+
+## D430 — an unspent number in a block is a hole, and the block's last number must be spent
+
+**Date: 2026-09-01 · Owner: integrator, wave I · Completes [§ D404](#d404)'s mechanism with the case
+it did not cover.**
+
+**Decision.** When a wave's block closes, an allocated number no lane wrote is registered in
+`documentation.test.ts#KNOWN_DECISION_HOLES` and stays unused permanently — `CLAUDE.md`'s existing
+rule, because ids here are names and backfilling one makes it mean two things. **D428 is that number for
+wave I**: lane E reported it unspent, having folded its second subject into § D427 as paragraphs
+rather than splitting it.
+
+It is written **D428**, never as a `§` reference, and this entry earned that rule twice over rather
+than stating it. The first draft cited it as a section and `citations.test.ts` refused, because such
+a reference promises a heading a reader can follow and a hole is exactly the absence of one. The
+second draft explained the refusal **using the forbidden form as an example**, and the gate refused
+again — correctly, since it cannot tell an illustration from a claim.
+
+That is [§ D405](#d405)'s convention arriving at a second gate: **name it, do not utter it.** There
+it was the owed-decision marker, whose ratchet counts a discussion of the phrase as a use of it; here
+it is the section sigil. Both gates read prose as data, and neither can be taught the difference
+without being taught to miss a real site written the same way. **A hole is named, never cited.**
+
+**The case § D404 did not cover, found by closing its first block.** The closed-reservation arm
+asserts the charter's *Next free decision number* row equals `highest + 1`. If the block's **last**
+number is a hole, that arithmetic points the next lane straight at it — the row would have read D428
+while D428 was registered as permanently unused, and the next lane would have taken a number the
+register says nobody may have.
+
+So the rule is two-sided: **holes may sit anywhere inside a block except at its top.** The
+integrator's own numbers close the block — here § D429 and § D430 — and the row then names the first
+number outside it, **D431**, which no register claims.
+
+**Why this is a decision and not a note.** It is only reachable by closing a block that contains a
+hole, which happened for the first time in this wave. Wave H's block closed with every number spent,
+so the interaction could not appear; the next integrator would have met it as a red gate with no
+explanation, exactly as D387 was met.

@@ -28,41 +28,42 @@
  * is whether an overlay is up.
  */
 
-import { fileURLToPath } from 'node:url';
-
 import { chromium, type Browser, type Page } from 'playwright-core';
-import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, MENU_CONTROL_ATTR, enterEngineerStage, openPage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  MENU_CONTROL_ATTR,
+  enterEngineerStage,
+  openPage,
+  pressMenuRow,
+  reopenEngineerMenu,
+  startShippedSite,
+  type ShippedSite,
+} from './browserTier.test-helper.js';
 
-let server: ViteDevServer;
+let site: ShippedSite;
 let browser: Browser;
 let origin: string;
 
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
-  server = await createServer({
-    configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
-    root: fileURLToPath(new URL('../..', import.meta.url)),
-    // A port of its own, and `strictPort: false` so it moves rather than throws — the files in this
-    // project run concurrently and would otherwise fight over one port. It said *three* for as long
-    // as three was true; the tier is **26** files now, and the rule is no longer kept by anybody
-    // counting: `browserTier.test.ts` derives it — every file names a port, none says `port: 0`, and
-    // no two name the same one. That third clause found eleven files across five collisions.
-    server: { port: 5191, strictPort: false },
-    logLevel: 'error',
-  });
-  await server.listen();
-  origin = (server.resolvedUrls?.local[0] ?? '').replace(/\/$/, '');
-  if (origin === '') throw new Error('the dev server did not report a URL');
+  // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
+  // A port of its own, and `strictPort: false` so it moves rather than throws — the files in this
+  // project run concurrently and would otherwise fight over one port. It said *three* for as long
+  // as three was true; the tier is **26** files now, and the rule is no longer kept by anybody
+  // counting: `browserTier.test.ts` derives it — every file names a port, none says `port: 0`, and
+  // no two name the same one. That third clause found eleven files across five collisions.
+  site = await startShippedSite({ preview: { port: 5191, strictPort: false } });
+  origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
 }, 120_000);
 
 afterAll(async () => {
   await browser?.close();
-  await server?.close();
+  await site?.close();
 });
 
 /**

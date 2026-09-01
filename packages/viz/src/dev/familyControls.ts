@@ -58,6 +58,22 @@
  *    both ways: a control that writes nothing must say so, and the sentence is pinned by a run —
  *    `familyControls.test.ts` requires each tabled id to actually be overridden and every untabled
  *    family id to actually survive, over every flag and lever combination.
+ *
+ * ## Where this module's decisions are recorded — [§ D405](../../../../DECISIONS.md)
+ *
+ * **This docstring is the record, and that is the answer rather than an omission.** GitHub issue
+ * #172 item 8 reported that B4 landed with nothing in `DECISIONS.md` while its two sibling lanes
+ * each got a heading (§ D336, § D337), and read that as debt. § D405 — written after that issue —
+ * settles the rule it was applying: an entry in that file is called for when a decision **reaches
+ * past the module that took it**, and otherwise the module's own docstring is the record the
+ * working agreement asks for.
+ *
+ * Measured against that rule, the four decisions this file made are all its own. The partition
+ * (§ 3.6 completeness) is asserted here in both directions rather than argued anywhere else; the
+ * `selection` refusal names `dev/state.ts#drivingProfileOf` as the ground but changes nothing
+ * there; the override table is § D227 applied, not moved; and none of the four reverses anything
+ * already recorded. What would have reached past this module — changing who owns
+ * `profile.selection` — is exactly what {@link SELECTION_REFUSAL} declines to do.
  */
 
 import type { DispatcherProfile } from '@elevator-sim/core/browser';

@@ -30,10 +30,7 @@
  * exactly the shape of thing this repository keeps finding in its own tree.
  */
 
-import { fileURLToPath } from 'node:url';
-
 import { chromium, type Browser, type ConsoleMessage } from 'playwright-core';
-import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
@@ -47,68 +44,63 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * registered project is wholly gated by asking which project's every file imports that module, and
  * turns an unexpectedly gated tier in CI into a red run.
  */
-import { CHROMIUM, HAS_BROWSER, enterEngineerStage, openPage, reopenEngineerMenu } from './browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  enterEngineerStage,
+  openPage,
+  reopenEngineerMenu,
+  startShippedSite,
+  type ShippedSite,
+} from './browserTier.test-helper.js';
 
-let server: ViteDevServer;
+let site: ShippedSite;
 let browser: Browser;
 let origin: string;
 
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
-  server = await createServer({
-    configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
-    root: fileURLToPath(new URL('../..', import.meta.url)),
-    /*
-     * A port of this file's own, and `strictPort: false` so it moves rather than throws.
-     *
-     * **This is the file the other three notes about this trap cite by name, and it is the one
-     * that was never fixed.** `compareLab`, `noteContrast` and `stageHeight` each took a numbered
-     * port after being bitten, and each explains the trap by pointing here — so the tier converged
-     * on the right pattern everywhere except at the site the pattern was learned from. It stayed
-     * green in CI because CI's runner has nothing else on 5173; it goes red on any developer
-     * machine where something does, which is how it was finally caught.
-     *
-     * **The mechanism, measured rather than reasoned — and all three sibling notes state it
-     * wrongly.** They say the inline port loses to `vite.config.ts`'s pinned `5174`. It does not.
-     * Resolving this exact config and reading it back reports `server.port = 0` and
-     * `strictPort = true`: the **inline port wins** and what is inherited from the config file is
-     * `strictPort`. Vite then maps `port: 0` to its own built-in default — **5173**, not the
-     * config's 5174 — and `strictPort: true` turns a busy 5173 into a throw instead of a step to
-     * the next free port. So the failure was never *"served somewhere else than we read"*; it is
-     * *"refused to serve at all"*, and `Port 5173 is already in use` is the whole of it.
-     *
-     * That correction matters beyond tidiness: a reader who believes the config's port wins will
-     * conclude that pinning a different port here changes nothing, and leave `port: 0` in place.
-     * `port: 0` does not mean *an ephemeral port* to Vite, and no amount of inline config makes it
-     * mean that while `strictPort` is inherited.
-     *
-     * 5189 sits immediately below the 5190-block the rest of the tier occupies, because this file
-     * is the tier's first and belongs at the head of it. **Recorded here rather than in
-     * `DECISIONS.md`, under § D405**: stating the measured mechanism here and leaving the three
-     * sibling notes to be corrected where they sit is a choice about four files in one tier.
-     */
-    server: { port: 5189, strictPort: false },
-    logLevel: 'error',
-  });
-  await server.listen();
+  // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
+  // The note below predates that and still holds, with one number changed: a **preview**
+  // server's own default is 4173, not 5173, and it inherits `strictPort` from `server` just
+  // as the note describes. Measured by resolving vite.config.ts and reading it back.
   /*
-   * `resolvedUrls`, not `httpServer.address()`.
+   * A port of this file's own, and `strictPort: false` so it moves rather than throws.
    *
-   * `resolvedUrls` is Vite's own answer to *where am I actually serving*, which is the question,
-   * and it stays right if the port above has to move — which, with `strictPort: false`, is now a
-   * thing that can happen rather than a thing that throws.
+   * **This is the file the other three notes about this trap cite by name, and it is the one
+   * that was never fixed.** `compareLab`, `noteContrast` and `stageHeight` each took a numbered
+   * port after being bitten, and each explains the trap by pointing here — so the tier converged
+   * on the right pattern everywhere except at the site the pattern was learned from. It stayed
+   * green in CI because CI's runner has nothing else on 5173; it goes red on any developer
+   * machine where something does, which is how it was finally caught.
+   *
+   * **The mechanism, measured rather than reasoned — and all three sibling notes state it
+   * wrongly.** They say the inline port loses to `vite.config.ts`'s pinned `5174`. It does not.
+   * Resolving this exact config and reading it back reports `server.port = 0` and
+   * `strictPort = true`: the **inline port wins** and what is inherited from the config file is
+   * `strictPort`. Vite then maps `port: 0` to its own built-in default — **5173**, not the
+   * config's 5174 — and `strictPort: true` turns a busy 5173 into a throw instead of a step to
+   * the next free port. So the failure was never *"served somewhere else than we read"*; it is
+   * *"refused to serve at all"*, and `Port 5173 is already in use` is the whole of it.
+   *
+   * That correction matters beyond tidiness: a reader who believes the config's port wins will
+   * conclude that pinning a different port here changes nothing, and leave `port: 0` in place.
+   * `port: 0` does not mean *an ephemeral port* to Vite, and no amount of inline config makes it
+   * mean that while `strictPort` is inherited.
+   *
+   * 5189 sits immediately below the 5190-block the rest of the tier occupies, because this file
+   * is the tier's first and belongs at the head of it. **Recorded here rather than in
+   * `DECISIONS.md`, under § D405**: stating the measured mechanism here and leaving the three
+   * sibling notes to be corrected where they sit is a choice about four files in one tier.
    */
-  const local = server.resolvedUrls?.local[0];
-  if (local === undefined) {
-    throw new Error('the dev server did not report a local URL');
-  }
-  origin = local.replace(/\/$/, '');
+  site = await startShippedSite({ preview: { port: 5189, strictPort: false } });
+  origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
 }, 120_000);
 
 afterAll(async () => {
   await browser?.close();
-  await server?.close();
+  await site?.close();
 });
 
 /**

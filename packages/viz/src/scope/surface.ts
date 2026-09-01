@@ -176,6 +176,17 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       'between-games and the mode says so: you choose the building and then live with it for the ' +
       'week, which is the whole difference between commissioning and the shift week.',
   ),
+  'viewer.campaignFitOut': control(
+    'between-days',
+    'The kit § 8’s campaign tower has bought and had fitted — shafts, machines, car size, doors, ' +
+      'the landing panel and the tenants — folded from the bookings whose nights are behind today. ' +
+      'between-days rather than between-games because that is what a works booking is: § 8.2 prices ' +
+      'a tier in nights and `bookingIsLive` will not report it fitted until they are past, so the ' +
+      'kit changes on a day boundary and never inside one. It is not between-games either — a ' +
+      'contract is twenty days and the fabric moves several times inside one, which is the whole ' +
+      'shape of the mode. Written only by everyday/host.ts#runCampaignDay, which presses the run in ' +
+      'the same call, so no screen can move it without running the day it belongs to.',
+  ),
   'viewer.commissioningConstraintId': control(
     'presentation',
     'Which capital constraint the fabric is judged against. Presentation, and the distinction is the ' +

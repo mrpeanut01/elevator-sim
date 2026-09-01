@@ -1,9 +1,15 @@
 /**
  * The browser tier's gate, in **one** place — GitHub issue #142.
  *
+ * **The two constants and the artifact moved one module down in wave I and this file re-exports
+ * them** — see the export block below, and `browserTierSite.test-helper.ts` for why a `globalSetup`
+ * cannot import this file. Everything this header says about there being *one* definition is still
+ * true of the repository; only the file holding it changed, and no file in the tier changed the
+ * specifier it imports.
+ *
  * ## Why this file exists at all
  *
- * Six `*.browser.test.ts` files each carried their own copy of the two constants below, and each
+ * Six `*.browser.test.ts` files each carried their own copy of the two constants, and each
  * copy's docstring said the same thing: *"`boot.browser.test.ts`'s constant and its reasoning, kept
  * identical so a machine that can run one tier can run both."* Six copies kept identical by a
  * sentence is the shape this repository keeps finding stale — the copies were in fact identical, and
@@ -45,64 +51,39 @@
  *
  * ## And the same argument again, one channel over — GitHub issue #268
  *
- * The gate above answers *did this tier run?* The gate at the foot of this file answers *did the
+ * The gate above answers *did this tier run?* The gate in the next section answers *did the
  * page it ran throw?*, and it is here for the reason the constants are: three of the tier's
  * twenty-six files had each hand-rolled a page-error collector, the other twenty-three had none,
  * and the run was green either way. {@link openPage} and the two hooks below it are the one place
  * that reads the channel. See that section's own docstring for what it is and is not evidence of.
  */
 
-import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import type { Browser, BrowserContextOptions, Page } from 'playwright-core';
 import { afterAll, afterEach, expect } from 'vitest';
 
 /**
- * The variable that points the tier at a browser.
+ * The gate and the artifact, from the one module that can be read outside a test — § D425.
  *
- * Exported as a **string** rather than only read, because `browserTier.test.ts` greps the tier's own
- * sources for it: a file that names the variable without going through this module has rolled its
- * own gate, and that is the thing the guard has to be able to see.
+ * They **moved** here in wave I and were not copied: `vitest.config.ts` runs
+ * `browserTierSite.test-helper.ts` as the `viz-browser` project's `globalSetup`, that runs before
+ * any suite exists, and importing *this* module from there fails with vitest's own *"failed to find
+ * the current suite"* — measured, because of the two hooks below. So the definitions sit one module
+ * lower and this one re-exports them, which keeps every file in the tier importing the gate from
+ * here and keeps there being exactly one {@link HAS_BROWSER} in the repository.
+ *
+ * `startShippedSite` travels the same way for the same reason: the global setup builds `dist-web/`
+ * once and the tier's files serve it, so both halves have to be reachable from both places.
  */
-export const CHROMIUM_ENV = 'ELEVATOR_SIM_CHROMIUM';
+export {
+  CHROMIUM,
+  CHROMIUM_ENV,
+  HAS_BROWSER,
+  SKIP_REASON,
+  startShippedSite,
+  type ShippedSite,
+} from './browserTierSite.test-helper.js';
 
-/**
- * Where the tier looks when nothing says otherwise.
- *
- * A path from the environment that originally provisioned this tier, kept because it costs nothing
- * and documents what *provisioned* meant there. It is not a default anybody should rely on — but
- * **it is not dead either, and this sentence used to say it was.**
- *
- * It read *"on every machine this repository has been measured on since, it does not exist, and the
- * tier skips"* until 2026-08-26, when a host arrived where it **does** exist: the tier ran from this
- * constant with {@link CHROMIUM_ENV} unset, `dailyLoop.browser.test.ts` 6 passed in 18.81 s.
- * `ISSUE_WORKER_LEDGER.md` W18-5 carried the same claim and is corrected with it. Both were true
- * where they were written, which is the point — a sentence about *the environment* goes stale the
- * same way a sentence about the product does (`RISKS.md` R38), and nothing re-derives this one.
- *
- * So read it as: **a fallback that works on some hosts and not others**, which is exactly why
- * {@link HAS_BROWSER} tests the file rather than trusting the constant.
- */
-const PROVISIONED_FALLBACK =
-  '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
-
-/** The executable the tier will launch. */
-export const CHROMIUM = process.env[CHROMIUM_ENV] ?? PROVISIONED_FALLBACK;
-
-/** Whether this machine has one. Every suite in the tier hangs off this. */
-export const HAS_BROWSER = existsSync(CHROMIUM);
-
-/**
- * What a reader is told when it does not.
- *
- * One sentence, and it names the path it looked at rather than only the variable — the two failures
- * *unset* and *set to something that has been deleted* look identical without it, and the second one
- * is what a stale shell revision produces.
- */
-export const SKIP_REASON =
-  `[viz-browser] skipped: no Chromium at ${CHROMIUM}. ` +
-  `Set ${CHROMIUM_ENV} to run the browser tier (DECISIONS.md § D220, GitHub issue #142).`;
+import { HAS_BROWSER, SKIP_REASON } from './browserTierSite.test-helper.js';
 
 if (!HAS_BROWSER) console.warn(SKIP_REASON);
 
@@ -547,38 +528,42 @@ export async function enterEverydayStage(page: Page): Promise<void> {
 }
 
 /* -------------------------------------------------------------------------- *
- * The built bundle — GitHub issue #281
+ * The artifact the tier drives — GitHub issue #281
  * -------------------------------------------------------------------------- */
 
 /**
- * What this tier may **not** conclude from a `vite dev` server, and why it is a list.
+ * What a claim driven against a `vite dev` server may **not** conclude, and why it is still a list.
  *
- * Every other file in this tier drives `createServer` — Vite's dev server, serving modules from
- * source. **The artifact players load is `dist-web/`**, produced by `npm run build:web` and served
- * as static files. They are not the same thing, and a defect has already lived in the difference:
- * the Everyday shell did not reset scroll on navigation, and at `375×667` the built bundle keeps
- * the offset while the dev server clamps it to `0`. Two cases were written to pin the fix and
- * **both had to be deleted for asserting nothing** — removing either half of `shell.ts#go`'s reset
- * left the whole tier green.
+ * **The tier drives the shipped bundle now, and this list is what is left over.** Until wave I, 32
+ * of the tier's 33 files started `createServer` — Vite's dev server, serving modules from source —
+ * while the artifact players load is `dist-web/`, produced by `npm run build:web` and served as
+ * static files. They are not the same thing, and a defect had already lived in the difference: the
+ * Everyday shell did not reset scroll on navigation, and **two cases were written to pin the fix and
+ * both had to be deleted for asserting nothing.**
  *
- * The cause is `dev/dom.ts#reconcile`: it drops every child before inserting, so `scrollHeight`
- * collapses while the container is empty and the browser clamps `scrollTop` on the way through.
- * That clamp depends on the incoming screen being **shorter than the offset**, and the two
- * artifacts lay out differently enough for it to flip.
+ * That is `RISKS.md` **R26** one level up from where R26 is usually recorded — not a fixture
+ * standing in for a run, but a whole **build** standing in for the shipped one.
  *
- * So a claim in any of these four families is a claim about the *dev server* unless it is driven
- * through {@link startBuiltSite}:
+ * Every file that can drive `dist-web/` now does, through {@link startShippedSite}. The exceptions
+ * are named in {@link DEV_SERVER_FILES}, and they are named *there* rather than here because
+ * `browserTier.test.ts` derives the same set from the tier's own sources and requires the two to
+ * agree: a file that quietly goes back to a dev server, and an entry that quietly stops being true,
+ * are both a red run. So a claim in one of these four families, made in one of those files, is a
+ * claim about the dev server:
  *
  * 1. **Layout** — where a thing sits, and what is above the fold.
  * 2. **Overflow** — which element scrolls, and by how much.
  * 3. **Geometry** — measured boxes, and anything derived from `getBoundingClientRect`.
  * 4. **Scroll state carried across a navigation**, which is the family the known defect is in.
  *
- * This is exported rather than written in prose because `builtBundle.browser.test.ts` names it in
- * the sentence a reader meets, and a list nothing imports is a list nobody re-reads.
- * `RISKS.md` **R26** is the class: a suite built entirely from fixtures cannot tell *the mechanism
- * is correct* from *the mechanism is reached* — and this is R26 one level up, a whole **build**
- * standing in for the shipped one.
+ * **Measured on this host the two artifacts agree about all four** — see
+ * `browserTierSite.test-helper.ts`'s header for the table, and `builtBundle.browser.test.ts` for
+ * what that does and does not license. The list is kept anyway: agreement measured once, on one
+ * Chromium, at one viewport, is not a property — and these four files are exactly where nothing
+ * would notice if it stopped holding.
+ *
+ * Exported rather than written in prose because `builtBundle.browser.test.ts` names it in the
+ * sentence a reader meets, and a list nothing imports is a list nobody re-reads.
  */
 export const BUILT_ARTIFACT_CLAIMS: readonly string[] = Object.freeze([
   'layout — where a thing sits, and what is above the fold',
@@ -587,66 +572,33 @@ export const BUILT_ARTIFACT_CLAIMS: readonly string[] = Object.freeze([
   'scroll state carried across a navigation',
 ]);
 
-/** A served built bundle, and the way to stop serving it. */
-export interface BuiltSite {
-  readonly origin: string;
-  close(): Promise<void>;
-}
-
 /**
- * Build `dist-web/` and serve it, the way the deploy serves it.
+ * The tier files that still drive a `vite dev` server, and the one reason any of them may.
  *
- * ## The cost, and why it is per file rather than per case
+ * **Each of these four reaches into the shipped module graph by URL** —
+ * `page.evaluate("import('/src/everyday/host.ts')…")` — to drive `EVERYDAY_HOST` directly. That path
+ * exists only on a dev server: `dist-web/` has no `/src/…`, the whole graph is one hashed chunk, and
+ * the request is answered by the SPA fallback with `text/html` and a **200**, so the import fails as
+ * a syntax error rather than as a 404. Measured, both servers side by side — the table in
+ * `browserTierSite.test-helper.ts`'s header.
  *
- * A build is seconds, not milliseconds, so **a build per case is not viable** and this is called
- * once from a file's `beforeAll`. The build is Vite's own `build()` against the same
- * `vite.config.ts` the deploy uses, so `outDir`, `copyPublicDir: false` and the manifest plugin
- * that emits `data/` file by file all apply — which is what makes the served tree the shipped one
- * rather than an approximation of it.
+ * **The alternative was considered and refused.** The product could publish the host on a global and
+ * all four could drive the bundle — but that is a shipped surface existing for a test, which
+ * `shell.browser.test.ts` already refuses in terms: *"driving the host must not require the product
+ * to publish itself on a global."* Reaching a module the dev server already exposes is cheaper than
+ * that, and it is honest about what it costs, which is this list.
  *
- * `preview()` rather than a hand-rolled static server for the same reason: it is the server Vite
- * ships for exactly this, so its SPA fallback and MIME handling are the deploy's rather than this
- * file's guesses.
+ * So the limitation is **stated rather than implied**: these four files assert nothing from
+ * {@link BUILT_ARTIFACT_CLAIMS}, and if one of them ever needs to, the fix is to move that case into
+ * a file that drives {@link startShippedSite} — not to relax this.
  *
- * ## Two things this deliberately does not do
- *
- * It does **not** memoize across files. Vitest isolates each file's module registry, so a
- * module-scope cache would not be shared anyway, and a cache keyed on disk would make one file's
- * pass depend on another file having run — which is the kind of order dependence this tier already
- * refuses elsewhere.
- *
- * And it takes **Vite's own `preview` options** rather than a bare number, because
- * `browserTier.test.ts` derives every tier file's port **from its source text** and requires them
- * to be distinct. A port chosen here, or passed as a bare argument, would be invisible to that
- * guard — so the calling file writes `preview: { port: NNNN }` and the guard reads it there, the
- * same way it reads `server: { port: NNNN }` from every dev-server file in this tier.
+ * Paths are relative to `packages/viz/src`, and `browserTier.test.ts` derives the same set from the
+ * tier's sources and asserts the two are equal **in both directions**: an entry that has stopped
+ * being true is as much a failure as a file that has quietly acquired a dev server.
  */
-export async function startBuiltSite(options: {
-  readonly preview: { readonly port: number; readonly strictPort?: boolean };
-}): Promise<BuiltSite> {
-  const { build, preview } = await import('vite');
-  const configFile = fileURLToPath(new URL('../../vite.config.ts', import.meta.url));
-  const root = fileURLToPath(new URL('../..', import.meta.url));
-
-  await build({ configFile, root, logLevel: 'error' });
-
-  const server = await preview({
-    configFile,
-    root,
-    // `strictPort: false` by default for the reason every dev-server file in this tier carries it:
-    // files in one project run concurrently, and a busy port should move rather than fail the case.
-    preview: { strictPort: false, ...options.preview },
-  });
-
-  const origin = (server.resolvedUrls?.local[0] ?? '').replace(/\/$/u, '');
-  if (origin === '') throw new Error('the preview server did not report a URL');
-
-  return {
-    origin,
-    close: async (): Promise<void> => {
-      await new Promise<void>((resolve, reject) => {
-        server.httpServer.close((error) => (error === undefined ? resolve() : reject(error)));
-      });
-    },
-  };
-}
+export const DEV_SERVER_FILES: readonly string[] = Object.freeze([
+  'everyday/dailyLoop.browser.test.ts',
+  'everyday/reportScreen.browser.test.ts',
+  'everyday/shell.browser.test.ts',
+  'everyday/stageScreen.browser.test.ts',
+]);

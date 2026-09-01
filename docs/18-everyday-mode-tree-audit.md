@@ -609,7 +609,9 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   the percentile line (both need machinery that does not exist); *"no board row survives with no
   server"*, which is the absence of a string and belongs where absences are assertable
   (`menu/screens.ts`'s own tests) rather than in an instrument that judges what a surface said; and
-  the three DOM panels, which are still statically swept. Honesty-corpus string counts are
+  the **33 statically swept DOM entry points**, which are still not driven — a figure this line
+  published as ~~three~~ until [§ D421](../DECISIONS.md) derived it from
+  `packages/viz/src/honesty/derive.test.ts`. Honesty-corpus string counts are
   deliberately **not** re-measured here: a figure measured per branch is stale on merge (CLAUDE.md's
   rule), and this lane moves both tiers' counts and the surface count.
 - **Slice 3, first pass — LANDED.** `SimulationConfig.interventions` carries the log as data

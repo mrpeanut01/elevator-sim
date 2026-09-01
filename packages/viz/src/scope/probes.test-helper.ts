@@ -63,6 +63,8 @@ import { navigate } from '../menu/menu.js';
 import { initialMenuState } from '../menu/menu.js';
 import { catalogueOf } from '../menu/catalogue.js';
 import { CALENDAR_PERIODS, periodOnDays } from '../shift/calendar.js';
+import { freshTower } from '../campaign/career.js';
+import { fitOutOf, type CampaignFitOut } from '../campaign/fitOut.js';
 import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
 import { RETROFIT_CONSTRAINT_ID, commissionableClasses, constraintById } from '../commissioning/types.js';
 import { reviewCommissioning } from '../commissioning/refusals.js';
@@ -309,6 +311,29 @@ function reviewUnder(constraintId: string): unknown {
   return { admissible: review.admissible, refusals: review.refusals.map((entry) => entry.code) };
 }
 
+/**
+ * The kit a § 8 tower with `doors` L1 fitted is running — the `campaignFitOut` probe's second arm.
+ *
+ * **Folded rather than written out**, so the arm exercises the shipped derivation: a hand-built
+ * `CampaignFitOut` would move the field while saying nothing about whether a *purchase* reaches it,
+ * which is the half GitHub issue #181 is actually about.
+ *
+ * `doors` L1 rather than the whole shop, and the choice is a measurement rather than a taste. The
+ * cheapest tier is the weakest arm available and it moves the legs at the cell below, so the case
+ * cannot pass for the wrong reason — an arm that turned the whole shop on would still be green if
+ * five of the six categories had come unwired. `campaign/fitOut.test.ts` is where each category is
+ * proved on its own.
+ */
+const DOORS_FITTED: CampaignFitOut = fitOutOf({
+  ...freshTower({
+    contractId: 'c1',
+    buildingId: 'garden-apartments',
+    dispatcherId: 'collective',
+    rate: 3,
+  }),
+  fitted: { doors: 1 },
+});
+
 /** Midtown's main bank with one more shaft than it ships — the commissioning probe's second arm. */
 function fiveShaftMain(): ReturnType<typeof asBuiltChoices> {
   const building = RESOURCES.buildings.find((entry) => entry.id === 'midtown-office')?.config;
@@ -500,6 +525,23 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
         shiftLengthS: 1800,
         commissioning: fiveShaftMain(),
       }),
+    ],
+  },
+
+  'viewer.campaignFitOut': {
+    /*
+     * `garden-apartments` at **3 600 s**, and both halves of that cell are the campaign's own rather
+     * than convenient. `c1` is the only contract `openingCareer` holds and `shift/contracts.ts`
+     * declares its `shiftLengthS: 3600`, which is exactly what `everyday/host.ts#runCampaignDay`
+     * writes — so this probe runs the day a player actually presses. The length matters as much as
+     * the building: at `baseState()`'s 900 s this same arm is **inert**, because two hydraulic cars
+     * over fifteen minutes of a residential trickle make too few stops for a second off each of them
+     * to change a decision. That is `docs/10` § 0's M1 arriving at a control, and a probe left on
+     * the default cell would have reported a live seam dead.
+     */
+    states: [
+      (s) => ({ ...s, shiftLengthS: 3600, campaignFitOut: undefined }),
+      (s) => ({ ...s, shiftLengthS: 3600, campaignFitOut: DOORS_FITTED }),
     ],
   },
 

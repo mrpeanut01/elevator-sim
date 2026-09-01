@@ -22,6 +22,10 @@
  * 3. **No overlap.** A declaration may not be both driven and excluded.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { coveredDeclarations, SURFACE_ADAPTERS } from './surfaces.js';
@@ -87,12 +91,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/motion.ts#shouldAutoplay',
         'dev/motion.ts#shouldAutoplayWith',
         /*
-         * The design refactor's three mounts. Each is the DOM half of a split whose **pure** half
-         * is driven: `RAIL_VIEW` renders everything `mountLeftRail` writes, `REPORT_PANEL`
-         * everything `mountReport` writes, `SCENARIOS` every card `mountScenarios` instantiates.
+         * The design refactor's **four** mounts. Each is the DOM half of a split whose **pure**
+         * half is driven: `RAIL_VIEW` renders everything `mountLeftRail` writes, `REPORT_PANEL`
+         * everything `mountReport` writes, `SCENARIOS` every card `mountScenarios` instantiates,
+         * and `RIGHT_RAIL` every plate, card and option row `mountRightRail` instantiates.
          * `mountScenarios` is the one that authors a sentence of its own — the dashed sixth card's
          * *"Build your own scenario"* copy, which is inline and therefore reaches only the static
          * sweep below. That is a stated limitation, not coverage.
+         *
+         * **This sentence said *three* and the list beneath it has held four since `mountRightRail`
+         * joined it** — a docstring naming its own members going stale, which is the class
+         * `packages/viz/src/deadCode.test.ts` caught twice in wave 12. It is the narrowest reading
+         * of the *"three DOM panels"* figure Phase 9's verdict published, and it failed here, inside
+         * the classifier, before the wider readings failed anywhere else. Corrected under
+         * [§ D421](../../../../DECISIONS.md); the count that verdict publishes is now derived from
+         * this array rather than transcribed from this comment, below.
          */
         'dev/leftRail.ts#mountLeftRail',
         'dev/reportPanel.ts#mountReport',
@@ -1240,6 +1253,210 @@ describe('the surface set is derived from the source tree', () => {
     const covered = coveredDeclarations();
     const invented = 'render/newBanner.ts#drawTheNewBanner';
     expect(covered.has(invented) || excludedIds.has(invented)).toBe(false);
+  });
+});
+
+/**
+ * **How many DOM entry points the sweep cannot drive, derived here rather than transcribed there**
+ * — GitHub issue #176, [§ D421](../../../../DECISIONS.md).
+ *
+ * Phase 9's verdict is *accepted with named gaps*, and one of the named gaps is a count: *"three
+ * DOM panels are statically swept rather than driven"*. It was published in six places, in five
+ * files, and **not one of them named which three**. Two of those places sit inside the verdict
+ * itself, where a named gap is part of the verdict rather than commentary on it.
+ *
+ * **Every reading of *three* fails, and the narrowest one fails inside this file.** The docstring
+ * above `mountLeftRail` is the only place that ever enumerated the panels by name; it named three
+ * and the id list beneath it has held four since `mountRightRail` joined. On the wide readings the
+ * answer is **{@link MOUNT_SHAPE} 17** and **{@link SCREEN_ROW_SHAPE} 16**. `docs/14` shows how a
+ * count becomes a label: it cites the phrase as the *name* of a category and then puts a fifth
+ * panel, `mountBuildingEditor`, into it. Nothing there is wrong about the gap — what went wrong is
+ * that the number stopped being a measurement, and a label cannot go stale visibly.
+ *
+ * ## The reading this gate publishes, decided rather than assumed
+ *
+ * **33 — every DOM entry point in {@link NOT_PLAYER_FACING} — published as its two components,
+ * 17 mounts and 16 screen-registry rows.** Two halves to the argument:
+ *
+ * - *Why not 17.* The classifier's own reasons put all 33 in one class. Thirty-two are in the
+ *   `DOM-bound` group, and `dev/watchPanel.ts#mountWatchPanel` is excluded a few groups later as
+ *   *"DOM- or fetch-bound … on `dev/fixitPanel.ts`'s own established ground"*. A figure that
+ *   stopped at the mounts would leave sixteen exclusions taken on that same ground uncounted —
+ *   which is exactly how `docs/14` came to put a fifth panel into a class of three: the published
+ *   class was narrower than the thing everybody meant by it.
+ * - *Why not a bare 33.* Calling the screen rows *not driven* full stop would be a **new** false
+ *   statement rather than a corrected count, which is § D227's trap one layer in. Each of the
+ *   sixteen exclusions names the adapter that renders that screen's words — `EVERYDAY_CAMPAIGN`,
+ *   `EVERYDAY_STAGE`, `GAUNTLET`, `EVERYDAY_SETTINGS` — so their **pure halves are driven**. So is
+ *   most of what the mounts sit on. What is unswept, in both groups alike, is only what the entry
+ *   point authors *inline*, and that reaches the static R10 sweep at the bottom of this file and
+ *   **no other property of the ten**. The decomposition and that clause therefore travel with the
+ *   number wherever it is published; the number alone is not the claim.
+ *
+ * ## Why the derivation lives in this file rather than in a gate of its own
+ *
+ * `everyday/viewportGateClaims.test.ts` is the model — re-derive the count from the artefact, fail
+ * naming every stale site — and it is a separate file because its artefact is *on disk* and any
+ * test can glob it. This artefact is a module-private literal in this file. A gate elsewhere would
+ * have to re-parse it, and the measurement recorded on issue #176 says what that costs: the first
+ * parser written over these literals extracted every quoted string and returned **279** "ids",
+ * because the prose in each `reason` is full of apostrophes. Reading the array directly cannot
+ * have that failure mode. The instrument is the thing being reported, so it is the short one.
+ */
+const MOUNT_SHAPE = /#mount[A-Z]/u;
+
+/** A registry row whose `mount` needs a document — `everyday/stageScreen.ts#STAGE_SCREEN`. */
+const SCREEN_ROW_SHAPE = /#[A-Z0-9_]+_SCREEN$/u;
+
+/** Every exclusion matching `shape`, carrying the reason its group gives, so both can be asserted. */
+const excludedEntryPoints = (
+  shape: RegExp,
+): readonly { readonly id: string; readonly reason: string }[] =>
+  NOT_PLAYER_FACING.flatMap((group) =>
+    group.ids.filter((id) => shape.test(id)).map((id) => ({ id, reason: group.reason })),
+  );
+
+describe('the count of statically swept DOM entry points is derived, not transcribed', () => {
+  const REPO = fileURLToPath(new URL('../../../../', import.meta.url));
+
+  /**
+   * The five files carrying the six sites, every one of which must state the figure.
+   *
+   * `docs/05-roadmap.md` holds two of the six; this gate reads whole files, so a document that
+   * carries the claim twice is one entry here and both of its sentences are checked.
+   */
+  const CLAIM_SITES: readonly string[] = Object.freeze([
+    'CLAUDE.md',
+    'GAPS.md',
+    'docs/05-roadmap.md',
+    'docs/14-building-behaviour-contract.md',
+    'docs/18-everyday-mode-tree-audit.md',
+  ]);
+
+  /** The total, in the one noun phrase every site is required to carry. */
+  const TOTAL_SHAPE = /\*{0,2}(\d+)\*{0,2} statically swept DOM entry points/gu;
+
+  /** The decomposition, wherever a site has room for it. Required somewhere, not everywhere. */
+  const SPLIT_SHAPE =
+    /\*{0,2}(\d+)\*{0,2} mounts and \*{0,2}(\d+)\*{0,2} screen-registry rows/gu;
+
+  /**
+   * The superseded figure, which may not stand as a live claim.
+   *
+   * Struck-through spans are removed before this runs, on `viewportGateClaims.test.ts`'s rule: this
+   * repository keeps superseded figures standing with the correction beside them, so **the
+   * machine-read shape belongs to the live claim only** and a figure written `~~three DOM panels~~`
+   * is history rather than an assertion. Teaching the pattern to recognise supersession markers
+   * would put the distinction in a regex where the next reader cannot see it.
+   *
+   * `DECISIONS.md`, `ISSUE_TRIAGE_PLAN.md` and `ISSUE_WORKER_LEDGER.md` also carry the phrase and
+   * are deliberately **not** scanned: the first is the record of what was decided when, and the
+   * other two are this issue's own triage. Quoting a wrong figure in order to correct it is not
+   * publishing it.
+   */
+  const SUPERSEDED_SHAPE = /\b(?:three|3) DOM panels/giu;
+
+  it('finds DOM entry points to count, and every one is excluded on DOM ground', () => {
+    const mounts = excludedEntryPoints(MOUNT_SHAPE);
+    const screenRows = excludedEntryPoints(SCREEN_ROW_SHAPE);
+
+    /*
+     * The non-vacuity guards, and they are on the instrument rather than on the defect. A shape
+     * edited until it matched nothing would take every count to zero and make the case below pass
+     * against any figure at all — wave 8's fifth false-negative shape, arriving in the instrument
+     * built to prevent it.
+     */
+    expect(
+      mounts.length,
+      'no `#mountXxx` exclusion was found, so the mount count is derived from nothing',
+    ).toBeGreaterThan(0);
+    expect(
+      screenRows.length,
+      'no `#*_SCREEN` exclusion was found, so the screen-row count is derived from nothing',
+    ).toBeGreaterThan(0);
+
+    const both = mounts.filter((mount) => screenRows.some((row) => row.id === mount.id));
+    expect(
+      both.map((entry) => entry.id),
+      'the two shapes must partition the DOM entry points; an id counted by both would be counted ' +
+        'twice in the published total',
+    ).toEqual([]);
+
+    /*
+     * What makes the count a class rather than a spelling. Both shapes are syntactic, and a
+     * syntactic count is only worth publishing if every member is there for the reason the
+     * sentence gives. Every one of the 33 is excluded by a group whose reason says *DOM* —
+     * `DOM-bound` for thirty-two of them, `DOM- or fetch-bound` for `mountWatchPanel`. A future
+     * `mountXxx` excluded for some other reason goes red here and asks the question, instead of
+     * quietly joining a figure six documents publish.
+     */
+    const ungrounded = [...mounts, ...screenRows]
+      .filter((entry) => !entry.reason.includes('DOM'))
+      .map((entry) => entry.id)
+      .sort((a, b) => a.localeCompare(b));
+    expect(
+      ungrounded,
+      'an exclusion shaped like a DOM entry point is not excused on DOM ground. Either it belongs ' +
+        'in a group whose reason says so, or it is not one of the surfaces the published figure is ' +
+        'about — and a count that includes it would be a different claim from the sentence.',
+    ).toEqual([]);
+  });
+
+  it('publishes the figure every claim site carries as the one this array derives', () => {
+    const mounts = excludedEntryPoints(MOUNT_SHAPE).length;
+    const screenRows = excludedEntryPoints(SCREEN_ROW_SHAPE).length;
+    const total = mounts + screenRows;
+
+    const wrong = new Set<string>();
+    const silent: string[] = [];
+    let splits = 0;
+    for (const site of CLAIM_SITES) {
+      const raw = readFileSync(join(REPO, site), 'utf8');
+      /* See SUPERSEDED_SHAPE: a struck-through figure is history, so it is removed before any
+         shape is read — including the live ones, so a corrected sentence cannot satisfy this gate
+         by quoting the number it superseded. */
+      const text = raw.replace(/~~[^~]*~~/gu, '');
+      let totals = 0;
+      for (const hit of text.matchAll(TOTAL_SHAPE)) {
+        totals += 1;
+        if (Number(hit[1]) !== total) wrong.add(`${site}: "${hit[0].trim()}" — expected ${String(total)}`);
+      }
+      for (const hit of text.matchAll(SPLIT_SHAPE)) {
+        splits += 1;
+        if (Number(hit[1]) !== mounts || Number(hit[2]) !== screenRows) {
+          wrong.add(
+            `${site}: "${hit[0].trim()}" — expected ${String(mounts)} mounts and ` +
+              `${String(screenRows)} screen-registry rows`,
+          );
+        }
+      }
+      const superseded = [...text.matchAll(SUPERSEDED_SHAPE)];
+      for (const hit of superseded) wrong.add(`${site}: "${hit[0]}" is the superseded figure, live`);
+      if (totals === 0) silent.push(site);
+    }
+
+    expect(
+      silent,
+      'a document that carries the statically-swept-DOM-panels gap states no figure this gate ' +
+        'reads. Either the sentence moved, in which case teach TOTAL_SHAPE, or the claim was ' +
+        'deleted, in which case drop the file from CLAIM_SITES — but a site left out of both is a ' +
+        'site free to acquire a bare count again, which is the whole defect.',
+    ).toEqual([]);
+    expect(
+      splits,
+      'no site states the decomposition. The bare total is not the claim: sixteen of the entry ' +
+        'points are screen-registry rows whose pure halves ARE driven, so a figure published ' +
+        'without its two components invites the reading that all 33 are unchecked.',
+    ).toBeGreaterThan(0);
+    expect(
+      [...wrong].sort((a, b) => a.localeCompare(b)),
+      `NOT_PLAYER_FACING excludes ${String(total)} DOM entry points — ${String(mounts)} mounts and ` +
+        `${String(screenRows)} screen-registry rows. A count typed into a document is stale as of ` +
+        'the next commit that adds a screen; this figure stood at *three* across six sites, in a ' +
+        'phase verdict, while the narrowest reading of it was already four in this file. ' +
+        'Re-derive, do not copy forward, and strike a superseded figure through rather than ' +
+        'leaving it standing as a live one.',
+    ).toEqual([]);
   });
 });
 

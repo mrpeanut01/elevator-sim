@@ -87,6 +87,22 @@ verdict:
   | always-on | 49 | **571 205** | **606** | **53** | **0** | **green**, and the register is empty |
   | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **712 547** | **4 710** | **54** | **0** | **green**, and the register is empty |
 
+  **Wave I moved every one of these figures by zero, and the reason is a gap rather than a
+  non-event.** Measured once on the integrated tree, both tiers in one sitting, after five lanes had
+  merged: **49 / 571 205 / 606 / 53 / 0** and **60 / 712 547 / 4 710 / 54 / 0** — identical to the
+  base at `255aff2`, which was re-measured first and reproduced this row exactly for the second wave
+  running. The surface **sets** were diffed rather than the counts compared: nothing added, nothing
+  removed, and the deep tier's lead is still exactly `campaign/judge.ts#judgeStage`.
+
+  Four of the five lanes could not have moved it — workflows, documents, a classifier's own test and
+  a browser-tier harness render no player-facing string. **The fifth was expected to and did not**,
+  and its lane said so in advance: § D427 makes a purchase reach the run, so *"any corpus case that
+  ever carries a non-`AS_BUILT` fit-out would move"*. None does. **The corpus holds no case in which
+  anything has been bought**, so the ten honesty properties have never read a fitted run's strings —
+  every campaign case they see is a tower as built. That is a hole in the corpus's coverage of § 8,
+  found by a null result rather than by a violation, and it is the kind of thing this column exists to
+  make visible.
+
   **Wave H is the first time this row's *previous* figures were confirmed rather than trusted, and
   that is the finding rather than the move.** Before publishing the new pair, the base commit
   `6260dcb` was re-measured in a detached worktree and reproduced the row it had published
@@ -400,19 +416,34 @@ verdict:
   because a corpus that grew an axis and stayed green is a different claim from one that had to be
   repaired first. **Say the gaps in the same breath.** Clause 4 —
   *every unit names its non-test caller* — is **satisfied in prose and mechanised by nothing**: all
-  **19** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
+  **27** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
   audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
   the clause to distrust first, and a fifth audit under `packages/viz` is the fix — **done in
-  wave 12** (`packages/viz/src/deadCode.test.ts`, [§ D192](DECISIONS.md)): 19 directories derived
-  from disk and asserted both ways, 1 017 exports classified, and it immediately found two
-  docstrings naming callers that do not call; the verdict itself is unchanged. Also named in the
+  wave 12** (`packages/viz/src/deadCode.test.ts`, [§ D192](DECISIONS.md)), which **on the tree it
+  landed on** derived 19 directories from disk, asserted them both ways, classified 1 017 exports,
+  and immediately found two docstrings naming callers that do not call; the verdict itself is
+  unchanged.
+
+  **Two of those figures are dated and one was live and wrong, which is the distinction this row
+  keeps failing.** The directory count is a present-tense claim about the tree — it read **19** and
+  the tree holds **27** (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`), so it is
+  corrected. The wave-12 pair is a record of what that audit found when it landed, and is now marked
+  as such rather than silently refreshed. **The export count is deliberately not re-published**: two
+  derivations disagreed (2 357 against ~2 893 by a cruder scan), and the audit's own figure cannot be
+  read off a run because vitest intercepts `console.log` — the same trap that made
+  `honesty/measure.corpus.test.ts` necessary. A count nobody can derive twice the same way does not
+  belong in prose ([§ D429](DECISIONS.md)). Also named in the
   verdict: `Escape` does not dismiss the drawer *(closed in wave 12, [§ D188](DECISIONS.md))*, the
   honesty sweep's `mode` axis has one value *(closed in wave 12, [§ D194](DECISIONS.md) — the
   second value produced zero new strings, **and that measured null has since stopped being true**:
   the Day report and the live-metrics panel became mode-aware for GitHub issues #110 and #100, and
   both adapters now render **both** registers on every case, which is where the always-on tier's
   string count moved to 278 756. A null is a measurement of a tree, not a property of the axis)*,
-  three DOM panels are statically swept rather than driven, and **U6**, **U7's rider models** and
+  **33 statically swept DOM entry points** are not driven *(**17** mounts and **16**
+  screen-registry rows, derived by `packages/viz/src/honesty/derive.test.ts` rather than
+  transcribed, and published in this verdict as three until [§ D421](DECISIONS.md) measured it —
+  the screen rows' pure halves **are** driven, so what goes unswept in both groups is only what the
+  entry point authors inline)*, and **U6**, **U7's rider models** and
   **Basic's curated three-dimension subset** are unbuilt.
 
 **Phase 9's row is the first status to move since Phase 8's on 2026-07-28, and wave 6 is the reason

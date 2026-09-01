@@ -34,6 +34,30 @@ distributed across commit messages where nobody planning work will find them.
 Nothing in this file is a plan. Items are ordered by whether they can produce a **wrong number**, a
 **wrong screen**, or neither.
 
+> **What the date above covers, and what it does not — because a single date on a register that is
+> revised in place is a claim nobody can check** (GitHub issues #172 and #230).
+>
+> The header's *2026-07-30, wave 12* dates **the suite figure and the wave-12 snapshot**, and those
+> are left exactly as they were taken: they are a measurement of one tree on one machine, and
+> re-typing today's numbers under a heading that says *as of* would be the defect this repository
+> records most often. Everything below the header is a **register**, revised in place, and each
+> entry that has been revised carries its own date and the run or commit behind it — which is the
+> only form of currency a document like this one can actually hold.
+>
+> **Two things follow, and both are stated because a reader would otherwise assume the wrong one.**
+> An entry with no revision date says what was true in wave 12 and has not been re-checked since;
+> read it as a lead, not as a finding. And the register's **coverage** has not moved with the
+> product: it was written before the Everyday screens, the campaign, the gauntlet and the Engineer
+> contract, and **it has no entry for any of them**. That is a gap in the gaps document, which is
+> the one place it is worth saying out loud — an empty section reads as *nothing to report* and here
+> it means *nobody has looked*.
+>
+> § 5's dead-code row is the entry that made this block necessary: it reported a residue of eight
+> candidates for six weeks after all eight were disposed of, and published four counts that were
+> true when written and stale within a wave. Both are corrected below, and `deadCode.test.ts` now
+> fails if this document and that register disagree — see [§ D424](DECISIONS.md) for why a residue
+> is struck through rather than deleted.
+
 ---
 
 ## 1. ~~The largest one: Phase 6c has not been re-measured~~ — CLOSED BY MEASUREMENT (2026-07-30, under [§ D162](DECISIONS.md); [§ D200](DECISIONS.md) is the verdict), and the answer is the third refusal
@@ -101,7 +125,7 @@ selector, not a different measurement.
 | **~~`render/mood.ts`'s docstring does not name `awtInvalidGround`~~ — CLOSED (2026-07-30, wave 12 lane D, `9ce6a6f`)** among the summary fields deliberately omitted from `MoodSummary` | The omission itself was and is real — the `Pick` and the explicit copy list both exclude it, so nothing leaks. Only the docstring was incomplete ([§ D185](DECISIONS.md)); it now names the field. |
 | **~~Several documents state a `VIZ_SCHEMA_VERSION` that is no longer current~~ — CLOSED (2026-07-30, wave 12 lane D)** | `docs/10` § *the recording contract* said the recording *is* at version 4; it is at **8**, and the present-tense claims now say so. Most other occurrences are **historical and correct** — they record the version a unit landed at, and rewriting those would destroy the history they exist for. Distinguishing the two was the work, which is why this was a register row and not a find-and-replace: only the present-tense claims were corrected and the past-tense ones stand as evidence. |
 | **Thirteen warning rows on one building is a wall** | Grouping is deliberately **not** done: parity requires each warning's text in Basic, and a summarising group is the first place one could go missing. |
-| **The three DOM panels are statically swept, not driven** | The generated honesty search reaches them only by scanning source for probability words. A sentence assembled at runtime there is invisible to it. Weaker than driving, and stated as a limitation rather than presented as coverage. |
+| **The 33 statically swept DOM entry points are not driven** | The generated honesty search reaches them only by scanning source for probability words — R10, and no other of the ten properties. A sentence assembled at runtime there is invisible to the rest. Weaker than driving, and stated as a limitation rather than presented as coverage. **The figure is derived rather than transcribed** ([§ D421](DECISIONS.md), `packages/viz/src/honesty/derive.test.ts`): **17** mounts and **16** screen-registry rows, every one excluded on DOM ground. This row published *three* from wave 12 until 2026-09-01, and *three* was never a measurement — the narrowest reading of it, the mounts `derive.test.ts`'s own docstring enumerated, had been four since `mountRightRail` joined that list. **The 16 screen rows' pure halves are driven** — each exclusion names the adapter that renders that screen's words — so what goes unswept, in both groups alike, is only what the entry point authors inline. |
 | **The always-on honesty tier reaches no batch at 50+ replications** | So R2's budget clause is only satisfiable in the deep tier, behind a flag. |
 | **~~The honesty search's `mode` dimension has one value~~ — CLOSED (2026-07-30, wave 12, [§ D194](DECISIONS.md)) — and the result was null** | `'basic'` joined `HONESTY_MODES` and the always-on corpus produced **zero new strings** — no shipped adapter branches on `context.case.mode`, because the disclosure adapter renders both `VIEW_MODES` on every case. The axis is generative headroom that becomes load-bearing the day a renderer branches on case mode, which is what its docstring now records instead of the doubling it wrongly predicted. |
 | **The structural-refusal reason is prose keyed on an id the leg record does not carry** | So it cannot be joined to a leg. **This was in the wave plan and I never briefed it** — an orchestration miss, recorded rather than dropped. |
@@ -154,16 +178,37 @@ ship a subset.
   ~~**Phase 9's clause 4 is the weakest thing under an accepted phase in this repository.**~~
   *(retired in place — that sentence was true when written and the fifth audit it called for is
   built.)* *Every unit names its non-test caller* is re-derived by
-  `packages/viz/src/deadCode.test.ts`: all **19** directories under `packages/viz/src` are derived
-  from disk and asserted in **both directions** — a twentieth directory turns the suite red — over
-  **1 017 exports**, with the 25 zero-caller exports classified as **8 `DEAD_CANDIDATES` + 17
-  `PUBLIC_API_ONLY`**, both lists asserted in both directions plus disjointness. The hand-written
-  table in `packages/viz/src/index.ts` is demoted to commentary. The residue, so this row does not
-  round up: the **8 dead candidates await disposition** — wire or delete, each with its own
-  verification burden, a recorded follow-up task — and the mechanisation immediately found **two
-  docstrings naming callers that do not call** (`dev/viewerRunConfig`,
-  `dev/PREFERRED_VIEWER_DISPATCHERS`; [§ D192](DECISIONS.md)), which is the prose table's failure
-  mode arriving exactly where the standing requirement said it would.
+  `packages/viz/src/deadCode.test.ts`: **every** directory under `packages/viz/src` is derived from
+  disk and asserted in **both directions** — a new directory turns the suite red on the day it
+  appears rather than on the day somebody notices — over every export in them, with the zero-caller
+  set classified into `DEAD_CANDIDATES` and `PUBLIC_API_ONLY`, both lists asserted in both
+  directions plus disjointness. The hand-written table in `packages/viz/src/index.ts` is demoted to
+  commentary.
+
+  **The counts that used to be in that sentence have been taken out of it rather than corrected,
+  and that is the point.** It read *"all **19** directories … over **1 017 exports** … 25
+  zero-caller exports classified as **8 `DEAD_CANDIDATES` + 17 `PUBLIC_API_ONLY`**"*, with *"a
+  twentieth directory turns the suite red"* beside it. Every one of those was a true measurement on
+  2026-07-30 and none is true now — the package has grown by eight directories since — and the
+  twentieth-directory clause had become an assertion about a threshold ten directories in the past.
+  The dated originals are kept where a dated figure belongs, in `deadCode.test.ts`'s own *"What the
+  first run found (2026-07-30)"* block, and what is stated here is the **mechanism**, which is what
+  this row is actually about and what does not go stale between waves. A count in a gaps register
+  that nothing re-derives is a hostage to the next commit. The residue, so this row does not
+  round up: ~~the **8 dead candidates await disposition** — wire or delete, each with its own
+  verification burden, a recorded follow-up task~~ — **all eight were disposed of in that same
+  wave and `DEAD_CANDIDATES` is empty** (four wired, four deleted with their tests and coverage
+  claims; the comments inside the frozen object are the register of what moved and why). The
+  sentence is struck through rather than deleted because *this row is where the residue was
+  recorded*, and a residue that quietly disappears reads as one that was never there. **It stood
+  for six weeks after the work finished** — GitHub issue #166, and the mirror of
+  [§ D227](DECISIONS.md): a stale refusal tells a reader not to touch a control that works, and a
+  stale residue tells them to go and do a job that is done. `deadCode.test.ts` now fails if this
+  document and that register disagree in either direction.
+
+  The mechanisation immediately found **two docstrings naming callers that do not call**
+  (`dev/viewerRunConfig`, `dev/PREFERRED_VIEWER_DISPATCHERS`; [§ D192](DECISIONS.md)), which is the
+  prose table's failure mode arriving exactly where the standing requirement said it would.
 - **Phase 9's own contract has been wrong about the code four times** in this wave — a reachability
   claim, a field list, a hard-coded percentage in an example message, and a goal table disagreeing
   with the shipped data in three of five cells. Being *binding* does not make a document *right*.

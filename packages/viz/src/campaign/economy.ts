@@ -154,6 +154,88 @@ export const SHOP_CATEGORY_IDS = [
 
 export type ShopCategoryId = (typeof SHOP_CATEGORY_IDS)[number];
 
+/**
+ * **What one tier does to the run, as plain numbers — GitHub issue #181's first clause.**
+ *
+ * ## Why this is a column of § 8.2's table rather than a table beside it
+ *
+ * The alternative — a second map keyed by `categoryId` and `level` — is the shape that goes stale:
+ * a tier added to {@link SHOP} with no row in it would be a purchase that costs units, books nights,
+ * fills the month grid and changes **nothing about the day**, which is exactly the defect this field
+ * exists to close. On the row, a tier without one is a compile error rather than a silence.
+ *
+ * ## Every field is absolute at its level, never incremental
+ *
+ * § 8.2's first buying rule is that a tier requires the tier below it, and {@link fittedLevel}
+ * answers with the **highest** live level. So the fold that reads this
+ * (`campaign/fitOut.ts#fitOutOf`) takes one delta per category and never sums two, and a level-3
+ * row states the whole of what level 3 is — not what it adds to level 2.
+ *
+ * ## Where each number comes from, because a number nobody can cite is what this repository keeps
+ * paying for
+ *
+ * Every figure below is either **the tier's own sentence** (`doors` L1's *a second off every stop*,
+ * `doors` L3's *two seconds a stop*, `machines`' three speeds, `cars`' two person counts,
+ * `tenants` L2's *by a third*) or **a value `data/` already ships** (`doors` L2's second is the step
+ * between `snappy` and `normal` in `authoring/dispatcherSpec.ts#DWELL_SETTINGS`, which is itself
+ * `data/elevator-specs.json`'s `doors.dwellHallCallS` typical against its min; `tenants` L1's
+ * ceiling is that file's `timing.passengerTransferS.office`). Nothing here is invented, and
+ * `fitOut.test.ts` asserts the shipped-data half against the file rather than against a copy of it.
+ */
+export interface FitOutDelta {
+  /** Shafts added to **every** bank, over what the building stands as. */
+  readonly extraShafts?: number;
+  /** The class every car is rebuilt to. Set with {@link ratedSpeedMps} or not at all. */
+  readonly machineClassId?: string;
+  /** Rated top speed, m/s. Must sit inside {@link machineClassId}'s declared band. */
+  readonly ratedSpeedMps?: number;
+  /**
+   * Persons at rated load. Converted to `ratedLoadLb` through `data/elevator-specs.json`'s own
+   * `conventions.personsPerRatedLoadUS` divisor, never a literal 150 written here — the divisor is
+   * data and `core` parses it.
+   */
+  readonly carPersons?: number;
+  /** Seconds off each stop's door cycle (`doorOpenS` + `doorCloseS`). */
+  readonly doorSecondsSaved?: number;
+  /** Seconds off the hall-call dwell, which is how long the doors stand open at a landing. */
+  readonly hallDwellSecondsSaved?: number;
+  /** A ceiling on seconds per passenger per direction through the doorway. */
+  readonly transferCeilingS?: number;
+  /** Multiplier on the crowd's arrival rate. */
+  readonly arrivalRateFactor?: number;
+  /** The heaviest tenant floor's population moved down to the lowest floors above the entrance. */
+  readonly movesHeaviestTenantDown?: boolean;
+  /**
+   * The bank is worked as zones.
+   *
+   * Expressed as the group lever `express` rather than as a pair of dispatch fields, because
+   * `authoring/dispatcherSpec.ts#profileFromSpec` already owns what *give each car a slice* means
+   * (`assignmentMode: split-demand`, `parkingStrategy: zone-center`) and a second expression of it
+   * here would be the second answer that drifts.
+   */
+  readonly zonesTheTower?: boolean;
+  /** The landing call carries a destination — `DispatcherProfile.dispatch.callType`. */
+  readonly callType?: string;
+  /** The landing panel names the car — `DispatcherProfile.dispatch.passengerAssignment`. */
+  readonly passengerAssignment?: string;
+  /**
+   * The least the driving profile may weight `rideTime` once a destination is disclosed.
+   *
+   * **A floor rather than an assignment, and it is here because a panel without it is a dead seam
+   * that has already shipped once.** [§ D112](../../../../DECISIONS.md): `destination-eta` authored
+   * `weights.rideTime: 0`, so the destination reached `estimateCost` and *changed no decision* —
+   * bit-identical to `eta` at 8 of 8 matrix cells. A `control` tier that only set `callType` is that
+   * defect bought with units: measured on the legs at `garden-apartments`/3 600 s under
+   * `collective`, which weights `waitTime` alone, disclosure alone moves nothing at all.
+   *
+   * So the tier discloses the destination **and** makes the controller price it, which is what
+   * *so cars can be grouped* claims. The two values are the shipped ones — `destination-eta`'s 0.5
+   * and `destination-panel`'s 1.0 — and a floor, so a dispatcher already pricing ride time higher
+   * keeps its own vector and the § 8.5 standing order still chooses who drives.
+   */
+  readonly rideTimeWeightFloor?: number;
+}
+
 export interface ShopTier {
   /** 1-based. A tier requires the tier below it — § 8.2's first buying rule. */
   readonly level: number;
@@ -162,6 +244,14 @@ export interface ShopTier {
   /** Nights of works. `0` is fitted immediately and works tomorrow. */
   readonly nights: number;
   readonly effect: string;
+  /**
+   * What this tier does to the day once it is live — {@link FitOutDelta}, absolute at this level.
+   *
+   * Required rather than optional, and `economy.test.ts` asserts every tier carries one that is not
+   * empty: a shop row with nothing behind it is GitHub issue #181's whole subject, and an optional
+   * field is how the next tier copied out of the design handoff would arrive without one.
+   */
+  readonly fits: FitOutDelta;
 }
 
 export interface ShopCategory {
@@ -190,6 +280,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 4,
         nights: 0,
         effect: 'A second off every stop, all day, forever.',
+        fits: Object.freeze({ doorSecondsSaved: 1 }),
       }),
       Object.freeze({
         level: 2,
@@ -197,6 +288,15 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 9,
         nights: 1,
         effect: 'Doors stop re-opening for people who were not coming.',
+        /*
+         * The second comes off the **hall-call** dwell and nothing else, because that is the figure
+         * this sentence is about: `data/elevator-specs.json` gives the hall dwell a longer typical
+         * than the car dwell precisely because passengers are still walking to the car, and a sensor
+         * that stops holding for people who were not coming is a shorter hold at a landing rather
+         * than a faster door. The second itself is the shipped step from `normal` to `snappy`
+         * (`DWELL_SETTINGS`, 5 s → 4 s), which is that file's typical against its declared minimum.
+         */
+        fits: Object.freeze({ doorSecondsSaved: 1, hallDwellSecondsSaved: 1 }),
       }),
       Object.freeze({
         level: 3,
@@ -204,6 +304,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 16,
         nights: 2,
         effect: 'Doors start opening as the car lands. Two seconds a stop.',
+        fits: Object.freeze({ doorSecondsSaved: 3, hallDwellSecondsSaved: 1 }),
       }),
     ]),
   }),
@@ -218,6 +319,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 6,
         nights: 1,
         effect: 'Low and high groups. Shorter trips, thinner cover when quiet.',
+        fits: Object.freeze({ zonesTheTower: true }),
       }),
       Object.freeze({
         level: 2,
@@ -225,6 +327,15 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 13,
         nights: 2,
         effect: 'People say their floor in the lobby, so cars can be grouped.',
+        /*
+         * `docs/09` § 1.1's **Level 0** — disclosure. The call carries a destination and
+         * `estimateCost` may price it; any car that opens still takes whoever fits, which is what
+         * *so cars can be grouped* claims and is the whole of what a landing panel without an
+         * assignment does. `mobile-credential` is the shipped call type that carries the
+         * destination as far as `estimateCost` — `data/dispatcher-profiles.json`'s
+         * `destination-eta` is that configuration, and this writes the same field.
+         */
+        fits: Object.freeze({ callType: 'mobile-credential', rideTimeWeightFloor: 0.5 }),
       }),
       Object.freeze({
         level: 3,
@@ -232,6 +343,12 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 24,
         nights: 3,
         effect: 'Every call knows both ends. The largest gain short of building.',
+        /* Level 1: the panel names a car per passenger and boarding honours it — `destination-panel`. */
+        fits: Object.freeze({
+          callType: 'mobile-credential',
+          passengerAssignment: 'panel',
+          rideTimeWeightFloor: 1,
+        }),
       }),
     ]),
   }),
@@ -246,6 +363,14 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 14,
         nights: 2,
         effect: 'Modest on fourteen floors; real above ten.',
+        /*
+         * The class is named as well as the speed, because a speed alone is not a legal building:
+         * `core` raises `speed-outside-class-range` for a car asked to run faster than its class's
+         * declared band, and no shipped class below `gearless-traction` reaches 4 m/s. The three
+         * classes here are the three `data/elevator-specs.json` rows whose bands contain the three
+         * speeds this category's own names publish.
+         */
+        fits: Object.freeze({ machineClassId: 'gearless-traction', ratedSpeedMps: 4 }),
       }),
       Object.freeze({
         level: 2,
@@ -253,6 +378,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 25,
         nights: 3,
         effect: 'Faster and smoother, so people load without hesitating.',
+        fits: Object.freeze({ machineClassId: 'gearless-traction', ratedSpeedMps: 5 }),
       }),
       Object.freeze({
         level: 3,
@@ -260,6 +386,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 40,
         nights: 5,
         effect: 'More than this tower can use. Bought for the renewal, not for now.',
+        fits: Object.freeze({ machineClassId: 'high-speed-gearless', ratedSpeedMps: 8 }),
       }),
     ]),
   }),
@@ -274,6 +401,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 18,
         nights: 3,
         effect: 'Three more per trip. The morning shortens by a fifth.',
+        fits: Object.freeze({ carPersons: 16 }),
       }),
       Object.freeze({
         level: 2,
@@ -281,6 +409,17 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 32,
         nights: 4,
         effect: 'Needs new shells and ropes. Slower doors, far fewer trips.',
+        /*
+         * **Both halves of that trade are the model's, and neither is a second number written here.**
+         * *Far fewer trips* is the capacity. *Slower doors* is not given a figure because it does
+         * not need one and inventing one would be this repository's stale-mechanism defect written
+         * forwards: a stop's length is `passengerTransferS` **per passenger per direction**, so a
+         * car that takes five more people at a landing already stands there longer, and the effect
+         * is produced by the same field the tier is bought for rather than by a penalty beside it.
+         * What is *not* modelled is a wider leaf on the same operator — `data/elevator-specs.json`
+         * prices door time by `doorType`, not by capacity, and there is no shipped figure for it.
+         */
+        fits: Object.freeze({ carPersons: 21 }),
       }),
     ]),
   }),
@@ -319,6 +458,15 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
          * every disagreement about what a number means.
          */
         effect: 'The tower stops being one car short.',
+        /*
+         * One shaft in **every** bank, not a fourth car in a tower that has three. The tier's name
+         * is the design file's own building; the shipped set runs from two cars to eight, and a
+         * rule that read the name as a target would take Garden Apartments from two to four and
+         * Vertical City from eight to four. `commissioning/building.ts#commissionedBuilding` does
+         * the growing, so a new shaft gets its id in the bank's own scheme and the first cars keep
+         * theirs.
+         */
+        fits: Object.freeze({ extraShafts: 1 }),
       }),
       Object.freeze({
         level: 2,
@@ -326,6 +474,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 54,
         nights: 10,
         effect: 'Comfortable at any occupancy this building will ever see.',
+        fits: Object.freeze({ extraShafts: 2 }),
       }),
     ]),
   }),
@@ -340,6 +489,19 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 5,
         nights: 0,
         effect: 'Someone in the lobby directing people. Cheap, and it works.',
+        /*
+         * A marshal changes how long each person takes to get through the doorway, which is exactly
+         * `passengerTransferS`, and the figure is a **ceiling from the shipped table** rather than a
+         * discount: `data/elevator-specs.json`'s `timing.passengerTransferS` prices office 1.2,
+         * hotel 1.5, residential 1.75 and hospital 2.5, and a marshalled lobby is the fastest of
+         * those conditions rather than a faster one nobody has measured.
+         *
+         * **The consequence, said rather than discovered:** on a building already at or below 1.2 s
+         * this tier moves no leg. `midtown-office` is that building. That is a property of the
+         * ceiling and `fitOut.test.ts` asserts it in both directions, so a cell where the tier is
+         * inert is a measured cell rather than a surprise.
+         */
+        fits: Object.freeze({ transferCeilingS: 1.2 }),
       }),
       Object.freeze({
         level: 2,
@@ -347,6 +509,15 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 10,
         nights: 0,
         effect: 'Negotiated with four tenants. Flattens the 08:40 peak by a third.',
+        /*
+         * *By a third* is the tier's own figure, applied to the rate the day would otherwise have
+         * run at — the pattern's if one was chosen, and the building's own traffic profile at its
+         * typical level if not (`dev/state.ts#baseOf`). It is applied **before** the day's event
+         * multiplier rather than after, so a fire drill is five times a staggered morning rather
+         * than a staggered five-times morning: the negotiation is with the tenants, and a drill is
+         * not one of them.
+         */
+        fits: Object.freeze({ arrivalRateFactor: 2 / 3 }),
       }),
       Object.freeze({
         level: 3,
@@ -354,6 +525,14 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
         units: 20,
         nights: 4,
         effect: 'The heaviest tenant comes down to floors 3–4. Fixes the cause.',
+        /*
+         * A real edit to the building's floor populations, on `shift/growth.ts`'s stated ground:
+         * a population that only reached a caption would be a dead seam, and a *lying* one. The
+         * total is preserved, so `resolveBuilding`'s `population-mismatch` warning cannot be raised
+         * by this and the crowd is the same size in a different place — which is what *fixes the
+         * cause* means and what makes it different from `tenants` L2 one row up.
+         */
+        fits: Object.freeze({ movesHeaviestTenantDown: true }),
       }),
     ]),
   }),
