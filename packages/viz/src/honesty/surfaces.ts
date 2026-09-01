@@ -150,6 +150,7 @@ import {
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { everydayReportViewOf } from '../everyday/reportView.js';
 import { SETTINGS_ABSENCES, settingsScreenViewOf } from '../everyday/settingsView.js';
+import { EVERYDAY_UNITS } from '../everyday/units.js';
 import {
   stageAlarmOf,
   stageBarModelOf,
@@ -7765,8 +7766,21 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
           role: 'prose',
         });
       }
-      for (const row of designerPlateRows(drawn, classOfSpec(classes, drawn))) {
-        seeds.push({ field: `designer.${arm}.plate.${row.key}`, text: row.value, role: 'observation' });
+      /*
+       * **Both units preferences, on the one surface that has a plate** — GitHub issue #170's Units
+       * half, § D448. § 15.1's `Units` row switches machine specifications between metres and feet,
+       * so `RATED SPEED` and `TRAVEL` have two faces a player can produce and a corpus that saw one
+       * of them would be blind to half a screen. The other four rows are identical under both by
+       * construction, which is asserted in `designerModel.test.ts` rather than assumed here.
+       */
+      for (const units of EVERYDAY_UNITS) {
+        for (const row of designerPlateRows(drawn, classOfSpec(classes, drawn), units)) {
+          seeds.push({
+            field: `designer.${arm}.plate.${units}.${row.key}`,
+            text: row.value,
+            role: 'observation',
+          });
+        }
       }
       seeds.push({
         field: `designer.${arm}.capacity`,
@@ -7802,7 +7816,14 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         text: patternWithTune(DEFAULT_PATTERN, tune).name,
         role: 'label',
       });
-      seeds.push({ field: `tuner.${arm}.speed`, text: tuneSpeedReadout(tune), role: 'observation' });
+      /* Both faces of the machine card's speed readout — § 15.1's `Units` row, § D448. */
+      for (const units of EVERYDAY_UNITS) {
+        seeds.push({
+          field: `tuner.${arm}.speed.${units}`,
+          text: tuneSpeedReadout(tune, units),
+          role: 'observation',
+        });
+      }
       seeds.push({ field: `tuner.${arm}.cap`, text: tuneCapacityReadout(tune), role: 'observation' });
       for (const card of TUNE_CARDS) {
         for (const row of card.rows) {
@@ -9291,6 +9312,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        /*
+         * The corpus's own arm. Both preferences reach the *Rated speed* fact, and the day record
+         * is seeded once per day rather than once per screen (§ 16 rule 14) — so the second
+         * preference is a second `todayOf` over the same day below rather than a second pass here.
+         */
+        units: 'metric',
       });
       const at = `day${String(entry.day)}`;
       seeds.push({ field: `${at}.today.label`, text: today.dayLabel, role: 'label' });
@@ -9298,6 +9325,33 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       seeds.push({ field: `${at}.today.seed`, text: today.seedLine, role: 'label' });
       for (const fact of today.facts) {
         seeds.push({ field: `${at}.today.fact.${fact.label}`, text: fact.value, role: 'observation' });
+      }
+      /*
+       * **The other units preference, on the one fact that has two faces** — § 15.1's `Units` row,
+       * GitHub issue #170, § D448. Seeded as the facts a preference *changes* rather than as a
+       * second whole record: `todayOf` is pure and total in `units`, so every other field of the
+       * imperial record is identical to the metric one by construction, and seeding them again
+       * would be the same string twice under two names. Diffed rather than assumed — only the
+       * facts that actually differ are pushed, so a preference that stopped reaching this screen
+       * would quietly seed nothing and `derive.test.ts`'s producer guard is what would notice.
+       */
+      const imperialFacts = todayOf({
+        week: entry.week,
+        calendar: null,
+        building: context.building,
+        buildingId: context.building.id,
+        dispatcherName: entry.report.metaLines[0],
+        goals: entry.readings,
+        seed: 424_242n,
+        units: 'imperial',
+      }).facts;
+      for (const [index, fact] of imperialFacts.entries()) {
+        if (fact.value === today.facts[index]?.value) continue;
+        seeds.push({
+          field: `${at}.today.fact.imperial.${fact.label}`,
+          text: fact.value,
+          role: 'observation',
+        });
       }
       if (today.load !== undefined) {
         seeds.push({ field: `${at}.today.load.word`, text: today.load.word, role: 'label' });

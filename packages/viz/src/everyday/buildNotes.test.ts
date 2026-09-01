@@ -206,7 +206,13 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /* Settings. Two of the six are #229's remainder after its premise was refuted (§ D368). */
   { register: 'SETTINGS_ABSENCES', fragment: 'Sound —', issue: 258 },
   { register: 'SETTINGS_ABSENCES', fragment: 'Default speed', issue: 229 },
-  { register: 'SETTINGS_ABSENCES', fragment: 'Units —', issue: 170 },
+  /*
+   * `Units` left this table on the commit that built its consumer — GitHub issue #170, § D448.
+   * The row it owned is drawn on the settings screen now, so a triage row still pointing at the
+   * absence would be the stale half this file's second case exists to catch. #170's other half,
+   * `Sound`, was never this row's: it is #258's above, and the two were separated by § D344's
+   * ruling and § D447's correction rather than by this deletion.
+   */
   { register: 'SETTINGS_ABSENCES', fragment: 'Post runs to the board', issue: 161 },
   { register: 'SETTINGS_ABSENCES', fragment: 'Sign out', issue: 221 },
   { register: 'SETTINGS_ABSENCES', fragment: 'Clear saved progress', issue: 229 },

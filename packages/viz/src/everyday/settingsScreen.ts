@@ -7,7 +7,13 @@
  *   string and refused in that rule's own sentence beside the field when it does not;
  * - the six **avatar swatches**;
  * - the **Motion** pill, which reads and writes the Engineer's own switch through
- *   `engineerBridge.ts` — never a second value.
+ *   `engineerBridge.ts` — never a second value;
+ * - the **Units** pill, which reads and writes this device's own preference through
+ *   `profileStore.ts` — a value the Engineer surface does not hold, so there is nothing to bridge
+ *   to (GitHub issue #170, [§ D448](../../../../DECISIONS.md)). Its write returns the same
+ *   durability answer the name and colour do, and it is fed into the same notice, because a device
+ *   that will not keep a name will not keep a preference either and the player is owed one
+ *   sentence about both rather than two.
  *
  * The name and colour land in `profileStore.ts`'s one store, which is how the rail's `PLAYING AS`
  * card updates without a reload (§ 20.15): the shell subscribes to the same store this screen
@@ -125,6 +131,7 @@ function mount(host: HTMLElement, _context: EverydayScreenContext): EverydayScre
       draftName,
       durable,
       reduceMotion: engineerSettings()?.reduceMotion(),
+      units: store.units(),
     });
 
   let view = viewNow();
@@ -344,7 +351,20 @@ function mount(host: HTMLElement, _context: EverydayScreenContext): EverydayScre
         'padding:7px 15px',
         `font:500 12px ${TYPE.mono}`,
       ].join(';');
+      /*
+       * **One press handler, branching on the row rather than one handler per row.** The two rows
+       * write to different places for a reason the view's docstring gives — Motion has no value of
+       * its own and Units does — and the branch is here rather than in the view because a view that
+       * carried a callback would stop being pure, which is what makes every sentence on this screen
+       * drivable without a document.
+       */
       pill.addEventListener('click', () => {
+        if (rowView.id === 'units') {
+          durable = store.setUnits(store.units() === 'imperial' ? 'metric' : 'imperial');
+          redrawIdentity();
+          redrawPlaying();
+          return;
+        }
         const bridge = engineerSettings();
         /* The row only exists while the bridge does; a vanished one leaves the honest stand-in. */
         if (bridge === undefined) {

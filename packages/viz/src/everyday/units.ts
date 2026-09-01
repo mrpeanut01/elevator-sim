@@ -147,6 +147,19 @@ export function lengthFigure(metres: number, units: EverydayUnits, decimals = 1)
 }
 
 /**
+ * The converted number alone, for a chip in a row whose readout carries the unit once.
+ *
+ * The tuner's speed ladder is drawn as bare figures under a readout that names the unit, and a
+ * ladder that stayed in metres beside a readout in feet is the incoherence § D359 found one screen
+ * over: each half internally honest, the pair contradictory. A **string**, like everything else
+ * exported here, so a bare converted value still cannot be assigned to a numeric field.
+ */
+export function speedValueFigure(mps: number, units: EverydayUnits, decimals = 2): string {
+  const value = units === 'imperial' ? feetOf(mps) : mps;
+  return value.toFixed(decimals);
+}
+
+/**
  * A speed range on one suffix — `0.50–1.00 m/s`, `1.64–3.28 ft/s`.
  *
  * Composed here rather than at the two call sites, so the pair cannot end up converted on one end
