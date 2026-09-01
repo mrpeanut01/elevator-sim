@@ -9936,9 +9936,19 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
     )) {
       seeds.push({ field: `test.${test.caseId}`, text: test.label, role: 'label' });
     }
-    const noTests = benchTestsRefusal([]);
-    if (noTests !== undefined) {
-      seeds.push({ field: 'tests.refusal', text: noTests, role: 'reason', provenance: 'authored' });
+    /*
+     * Both branches of `benchTestsRefusal`, because it has two now (§ D445): *pick at least one*
+     * when there are tests, and *the forty are still arriving* when the fetch has not landed. A
+     * producer with an undriven branch is a string path nothing has read.
+     */
+    for (const [name, offered] of [
+      ['tests.refusal', 40],
+      ['tests.loading', 0],
+    ] as const) {
+      const refusal = benchTestsRefusal([], offered);
+      if (refusal !== undefined) {
+        seeds.push({ field: name, text: refusal, role: 'reason', provenance: 'authored' });
+      }
     }
 
     /*
