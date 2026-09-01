@@ -214,3 +214,56 @@ export function ratingFigureOf(summary: RatingSummary): string {
 export function proofCaseCountOf(summary: RatingSummary): string {
   return `${String(summary.casesRated)} of ${String(summary.casesTotal)}`;
 }
+
+/* -------------------------------------------------------------------------- *
+ * Reading a rated case back off a store — GitHub issue #224
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Why a value read back out of storage is not a {@link RatedCase}, or `undefined` when it is one.
+ *
+ * ## Why the validator is here rather than where the bytes are
+ *
+ * `everyday/profile.ts` owns the slot, the version, the migration and the budget; it does not own
+ * what a rated case *is*, and a persistence layer that grew its own opinion about that would be a
+ * second definition of this module's type kept in step by hand. It is the split `persist/` already
+ * draws between `session.ts` (the envelope) and `validate.ts` (the payloads), one product over.
+ *
+ * ## A sentence rather than a boolean
+ *
+ * `undefined` or a reason — `menu/account.ts#displayNameIssueOf`'s shape, and `persist/validate.ts`'s
+ * — because a refusal a player meets has to be able to say *which* field was wrong, and a predicate
+ * answering `false` would make all six the same failure.
+ *
+ * ## The two `null`s are checked against each other, and that is the point of the last clause
+ *
+ * `score: null` is R13's *this case served nobody*, and `noScoreReason` is the sentence that goes
+ * with it. A stored case carrying **both** a score and a reason, or **neither**, is refused: those
+ * two fields are one fact written twice, and a restored rating whose halves disagree would print a
+ * figure beside an explanation of why there is none. {@link proofCaseScoreOf} cannot emit such a
+ * pair, so a value that carries one did not come from this module.
+ */
+export function ratedCaseIssue(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return 'a rated case is not an object';
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of ['caseId', 'buildingId', 'crowdId', 'seed'] as const) {
+    const text = record[key];
+    // Invariant 5 sits inside this loop: a stored rating with no `seed` is a rating that cannot be
+    // replayed, and restoring one would put an unrepeatable claim on the ladder.
+    if (typeof text !== 'string' || text === '') return `a rated case has no ${key}`;
+  }
+  const score = record['score'];
+  if (score !== null && (typeof score !== 'number' || !Number.isFinite(score))) {
+    return 'a rated case’s score is neither a number nor null';
+  }
+  const reason = record['noScoreReason'];
+  if (reason !== null && typeof reason !== 'string') {
+    return 'a rated case’s noScoreReason is neither a sentence nor null';
+  }
+  if ((score === null) !== (reason !== null)) {
+    return 'a rated case both has a score and says why it has none, or does neither';
+  }
+  return undefined;
+}
