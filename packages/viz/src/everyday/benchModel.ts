@@ -82,7 +82,7 @@ export const BENCH_COPY = Object.freeze({
    * Why the bench's crowds are not the ladder's crowds, said on the screen.
    *
    * The bench runs the ladder's **cases** and not the ladder's **runs**, which is § 1's own pair of
-   * seed rules and CLAUDE.md's hold-out discipline. A player who could tune against the exact forty
+   * seed rules and CLAUDE.md's hold-out discipline — [§ D446](../../../../DECISIONS.md). A player who could tune against the exact forty
    * traces they are about to be rated on would be validating on the training set, and the gain
    * would vanish the moment anything moved. Drawn here rather than left in a docstring because a
    * reader comparing a bench figure with a ladder rating will otherwise assume they are the same
@@ -344,8 +344,8 @@ export interface BenchCasePlan {
  *
  * **The seed is {@link benchSeedOf}, never the case's own**, and that is the whole of the hold-out
  * discipline: same buildings, same crowd shapes, different arrivals from the ones the ladder rates
- * on. `proofCaseRequestOf` requires the seed for exactly this reason — see its docstring and § 1's
- * two-row table.
+ * on. `proofCaseRequestOf` requires the seed for exactly this reason — see its docstring, § 1's
+ * two-row table and [§ D446](../../../../DECISIONS.md).
  *
  * @throws SuiteError with the sentence the screen draws.
  */

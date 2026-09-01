@@ -29802,27 +29802,10 @@ every separating row comes back `under-budget` with the winner deliberately unna
 fifty, a claim about what the report will do). A gate is unaffected by which fixtures it gates. The
 forty have no derived budgets and the bench has not lost one, because it never had one to lose.
 
-### The seed does not move with the list, and that is hold-out discipline
+### The seed does not move with the list
 
-§ 1's table carries **two** rules over this one fixture set — `hash(towerId, crowdIndex)` for the
-gauntlet, *fixed forever*, and `hash(testId, repIndex)` for the bench, *"the same for every entrant
-— that is what matched crowds means"*. So **one list, three readers is a claim about fixtures, never
-about traces**, and the contract is internally consistent on the point.
-
-It is also the right answer independent of the table. CLAUDE.md § Tuning discipline: *"Tune on one
-seed set, validate on a disjoint one, or you overfit the weight vector to specific passenger traces
-and the gain vanishes on new traffic."* The bench is where a player iterates on a dispatcher; the
-gauntlet is what rates it. A bench sharing the gauntlet's seeds would let a player tune against the
-exact forty runs they are about to be rated on, and the rating would be a measurement on the
-training set. **Same operating points, disjoint traces** is the textbook arrangement, and it is
-strictly better than what shipped before, where the fixtures differed too and a bench result said
-nothing about a rating at all.
-
-`proofCaseRequestOf` therefore **requires** its seed rather than defaulting it, so a caller must say
-which of the two rules it is using; `benchSeedOf` is the bench's half. `proofCases.test.ts` asserts
-the two seed **sets** are disjoint over the shipped forty rather than trusting that two hashes of
-different strings differ — a bench seed colliding with *some other* case's gauntlet seed is the same
-defect one row over, and a probability is not an argument.
+That is [§ D446](#d446), split out because it is separately citable and is the clause most at risk
+of being undone by a reader who takes *one list, three readers* to mean *one list, one seed*.
 
 ### No published figure moves, and that was checked before the edit
 
@@ -29865,4 +29848,66 @@ closing it.
 crowds…"*. A reader comparing a bench figure with a ladder rating will otherwise assume they are the
 same measurement, and the whole value of the shared list is that a finding carries from one screen to
 the other. The sentence that makes that safe has to be where the reader is.
+
+---
+
+## D446 — the bench runs the ladder's cases and not the ladder's crowds
+
+**Date: 2026-09-01 · Owner: wave K lane B · GitHub issue #157 · The seed half of
+[§ D445](#d445) · Binds `gauntlet/proofCases.ts`, `gauntlet/run.ts`, `everyday/benchModel.ts` and
+`data/proof-cases.json`.**
+
+**Decision.** The Everyday bench and the gauntlet run the **same forty proof cases** and **must not
+share their seeds**. The gauntlet keeps § 1's `hash(towerId, crowdIndex)`, fixed forever; the bench
+uses its own, `gauntlet/proofCases.ts#benchSeedOf`. `proofCaseRequestOf` **requires** a seed rather
+than defaulting to the case's own, so every caller says in the call which of the two rules it is
+using. The two seed **sets** are asserted disjoint over the shipped forty.
+
+### Why this is not pedantry about a table
+
+§ 1's table already carries two rules over this one fixture set — `hash(towerId, crowdIndex)` for the
+gauntlet, *"fixed forever; a rating is only comparable if the cases never move"*, and
+`hash(testId, repIndex)` for the bench, *"the same for every entrant — that is what matched crowds
+means"*. So § 12.3's *one list, three readers* is a claim about **fixtures** and never about traces,
+and the contract is internally consistent on the point.
+
+But the table is not the reason. **CLAUDE.md § Tuning discipline** is: *"Hold out traffic seeds. Tune
+on one seed set, validate on a disjoint one, or you overfit the weight vector to specific passenger
+traces and the gain vanishes on new traffic."* The bench is where a player iterates on a dispatcher.
+The gauntlet is what rates it and posts the rating to a standing public ladder. A bench sharing the
+gauntlet's seeds would let a player tune a dispatcher against the **exact forty runs it is about to
+be rated on**, and the rating would be a measurement on the training set — a number that would not
+survive contact with any other traffic, published as a standing claim.
+
+**Same operating points, disjoint traces** is the textbook arrangement. It is also strictly better
+than what shipped before § D445, where the fixtures differed as well and a bench result therefore
+said nothing about a rating at all: the hold-out property is *new*, not preserved.
+
+### What makes it hold rather than be intended
+
+Three things, and the first is the one that will still be true in a year.
+
+1. **`proofCaseRequestOf` requires the seed.** It defaulted to `proofCase.seed`. A default is one of
+   two rules worn silently by the other reader — [§ D227](#d227)'s shape — so it is now a required
+   parameter, and making it required is what made `tsc` name all four call sites rather than leaving
+   three of them correct by luck.
+2. **CRN is untouched, and that is why the change is safe.** *"The same for every entrant"* is
+   `runBatch`'s, not the request's: one seed per replication index, drawn once and shared by every
+   arm (*"this line is the whole of CRN"*). Changing which seed a request carries changes the crowd;
+   it cannot change whether the arms meet the same one.
+3. **Disjointness is asserted, not reasoned.** `proofCases.test.ts` checks the two seed **sets** over
+   the shipped forty — set disjointness rather than pairwise inequality, because a bench seed
+   colliding with *some other* case's gauntlet seed is the same defect one row over. Two hashes of
+   two different strings are only *probably* different, and a probability is not an argument. The
+   bench rule is also pinned by value, for `proofSeedOf`'s reason: changing it silently moves every
+   crowd the bench has ever run.
+
+### The sentence a player reads
+
+`BENCH_COPY.testsSeedNote`, drawn above the tick list: *"Same buildings and same crowd shapes as the
+ladder, different crowds. The bench is where you try things out and the ladder is what rates them,
+so they must not share their arrivals…"*. A reader comparing a bench figure with a ladder rating
+will otherwise assume they are the same measurement — and the whole value of the shared list is that
+a finding carries from one screen to the other, so the sentence that makes that safe has to be where
+the reader is rather than in a docstring.
 

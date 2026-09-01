@@ -38,7 +38,8 @@
  * or you overfit the weight vector to specific passenger traces and the gain vanishes on new
  * traffic"*. Same operating points, disjoint traces, is the textbook arrangement and it is what this
  * pair produces. `proofCases.test.ts` asserts the two seed **sets** are disjoint over the shipped
- * forty rather than trusting that two hashes of different strings differ.
+ * forty rather than trusting that two hashes of different strings differ. The ruling is
+ * [§ D446](../../../../DECISIONS.md).
  *
  * ## Why the eight are not `MATRIX_CELLS`, and what the bench gave up by moving
  *
@@ -225,8 +226,9 @@ export function proofCasesOf(set: ProofCaseSet): readonly ProofCase[] {
  * **`seed` is the caller's too, and it is required rather than defaulted.** § 1 gives one seed rule
  * per reader over this one list — {@link proofSeedOf} for the gauntlet, {@link benchSeedOf} for the
  * bench — and a default here would be one of the two rules worn silently by the other reader. That
- * is the shape [§ D227](../../../../DECISIONS.md) is about: the caller says which rule it is using,
- * in the call, where a reader of the call can see it.
+ * is the shape [§ D227](../../../../DECISIONS.md) is about, and
+ * [§ D446](../../../../DECISIONS.md) is the ruling: the caller says which rule it is using, in the
+ * call, where a reader of the call can see it.
  */
 export function proofCaseRequestOf(
   proofCase: ProofCase,

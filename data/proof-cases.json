@@ -52,7 +52,7 @@
     "tune a dispatcher against the exact forty runs it is about to be rated on. proofCases.test.ts",
     "asserts the two seed SETS are disjoint over the shipped forty rather than trusting that two",
     "hashes of different strings differ. Invariant 5 still holds -- every case carries the seed it",
-    "ran under, into the rating record. See DECISIONS.md section D445."
+    "ran under, into the rating record. See DECISIONS.md sections D445 and D446."
   ],
   "version": 1,
   "towers": [
