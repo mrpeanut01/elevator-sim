@@ -160,12 +160,12 @@ asserted at both (`packages/viz/src/everyday/viewportGates.browser.test.ts`).
 than about this machine.** Measured:
 
 ```
-grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 33
-find packages -name "*.browser.test.ts" | wc -l                            # → 33
+grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 34
+find packages -name "*.browser.test.ts" | wc -l                            # → 34
 grep -rn "firefox\|webkit\|Firefox\|WebKit\|Gecko" packages --include="*.ts"  # → no output
 ```
 
-**33 of 33** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
+**34 of 34** browser-tier files call `chromium.launch()` as a literal, and the strings `firefox`,
 `webkit` and `Gecko` do not occur anywhere in `packages/**/*.ts`. The tier is **single-engine by
 construction**.
 
@@ -391,7 +391,7 @@ stands.** Two independent reasons, and only the second is about hardware:
 
 1. **The product's own tier is single-engine** (§ 3). Even a machine with all three browsers
    installed could not make `npx vitest run --project viz-browser` cover a matrix, because
-   **33 of 33** browser-tier files name `chromium`. Until a browser-tier file takes its engine as a
+   **34 of 34** browser-tier files name `chromium`. Until a browser-tier file takes its engine as a
    parameter, *"the slice runs on the target browser matrix"* is a claim no tier command can
    produce evidence for.
 2. **Tier 1 is two rows and both are Chromium.** #203 § 4's rule is explicit: *"Every tier-1 row must
@@ -418,7 +418,7 @@ Not a wish list — each is small, and each converts a *claim* into something a 
 > every document is — but *"does the sentence say when?"*
 >
 > They read **29 of 30** here and **29 of 29** in item 2 until 2026-09-01: two answers to one
-> question in one section, for a set of **33**, while `viewportGateClaims.test.ts` reported green
+> question in one section, for a set of **33** at that date, while `viewportGateClaims.test.ts` reported green
 > over both. Its shapes wanted a literal space and Markdown had wrapped these two sentences between
 > the tokens. The shapes are whitespace-tolerant now. GitHub issue #230.
 
@@ -429,7 +429,7 @@ Not a wish list — each is small, and each converts a *claim* into something a 
    module and `browserTier.test.ts` already enforces that every tier file goes through it — so the
    engine belongs in the same place. That single change is what turns *"the slice runs on the target
    browser matrix"* from an unanswerable sentence into a command, and it is a **precondition for the
-   Firefox row #203 § 4 already recommends**: installing Gecko buys nothing while **33 of 33**
+   Firefox row #203 § 4 already recommends**: installing Gecko buys nothing while **34 of 34**
    browser-tier files name `chromium`.
 3. **One touch cell.** § 2's `best effort` becomes measurable with `hasTouch`/`isMobile` on the
    Chromium already installed, at one phone viewport, through one real journey. §&nbsp;4 of the matrix

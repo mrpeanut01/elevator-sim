@@ -194,19 +194,31 @@ interface ProfileEnvelope {
  * stopped being saved without saying so. So the ceiling is written down here and checked before the
  * store is touched.
  *
+ * ## The number is chosen from what the product can produce, not the other way round
+ *
  * | quantity | value | how it is known |
  * |---|---|---|
  * | the quota, read conservatively | ~2 500 000 characters | ~5 MB, counted pessimistically as UTF-16 bytes |
- * | one stored rating | ~6 000 characters | forty {@link SavedRating.cases}, each a case id, a building id, a crowd id, a seed and a score |
- * | this budget | 128 000 characters | about a **twentieth** of the conservative quota, and about twenty rated dispatchers |
+ * | one stored rating | **7 801 characters** | **measured, not estimated**: `JSON.stringify` of a {@link SavedRating} over the shipped set's shape — forty cases, each carrying a `tower/crowd` case id, a building id, a crowd id, a dated seed and an unrounded score |
+ * | dispatchers `data/dispatcher-profiles.json` ships | 13 | counted from the file |
+ * | this budget | 384 000 characters | **49 ratings** — the thirteen shipped plus thirty-six a player authors |
  *
- * A twentieth rather than the library's fifth, and the asymmetry is deliberate: this key shares an
- * origin with `elevator-sim.session`, whose own budget is already 512 000, and a second slot sized
- * to a fifth of the quota is a slot that makes the *first* one fail. The library holds work a player
- * authored and cannot recover; this holds work a player can re-earn by running the forty again, so
- * where the two compete for one quota, this is the one that yields.
+ * The solved ids are not in that arithmetic because they cannot move it: a case id is tens of
+ * characters and the catalogue is the bound.
+ *
+ * A first draft took a twentieth of the quota, which is 16 ratings — and 16 is **below** what this
+ * build can produce, because the thirteen shipped dispatchers are all rateable and a player's own
+ * are extra. A ceiling a player reaches by doing the ordinary thing is not a safety margin, it is a
+ * defect with a sentence attached, so the budget was moved to the requirement rather than the
+ * requirement to the budget.
+ *
+ * It is still smaller than the library's 512 000 and deliberately so. This key shares an origin
+ * with `elevator-sim.session`, and the two together are about **a third** of the conservative
+ * quota; the four fifths the library leaves over is *for* the next key, and this is that key. The
+ * library holds work a player authored and cannot recover, and this holds work a player can
+ * re-earn by running the forty again — so where the two compete, this is the one that yields.
  */
-export const PROGRESS_BUDGET_CHARACTERS = 128_000;
+export const PROGRESS_BUDGET_CHARACTERS = 384_000;
 
 /**
  * A version 1 envelope, given the one key version 2 added — GitHub issue #224.
@@ -462,11 +474,19 @@ export function saveEveryday(
   if (progressText.length > PROGRESS_BUDGET_CHARACTERS) {
     return { ok: false, notice: oversizeNoticeOf(progress, progressText.length) };
   }
+  /*
+   * Typed as the envelope rather than written as an object literal, so the compiler is what keeps
+   * the written shape and the declared one together: a key added to {@link ProfileEnvelope} and not
+   * written here does not compile, which is `persist/session.ts#ENVELOPE_KEYS`'s device in the form
+   * a three-key envelope can afford.
+   */
+  const envelope: ProfileEnvelope = {
+    schemaVersion: PROFILE_SCHEMA_VERSION,
+    profile,
+    progress,
+  };
   try {
-    store.write(
-      PROFILE_KEY,
-      JSON.stringify({ schemaVersion: PROFILE_SCHEMA_VERSION, profile, progress }),
-    );
+    store.write(PROFILE_KEY, JSON.stringify(envelope));
     return { ok: true, notice: null };
   } catch {
     return { ok: false, notice: STORE_REFUSED };

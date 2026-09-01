@@ -472,6 +472,27 @@ describe('a store past its budget refuses before it writes', () => {
     expect(notice).toMatch(/\d/);
   });
 
+  it('holds more ratings than this build can produce, which is where the number came from', () => {
+    /*
+     * The budget's own arithmetic, pinned. `PROGRESS_BUDGET_CHARACTERS`'s docstring picks the
+     * number from what the product can make — thirteen shipped dispatchers are all rateable and a
+     * player's own are extra — and a first draft at a twentieth of the quota held **16**, which is
+     * below that. A ceiling a player reaches by doing the ordinary thing is a defect with a
+     * sentence attached rather than a safety margin.
+     *
+     * Asserted as *comfortably above thirteen* rather than as `49`, because the exact count moves
+     * with the length of a dispatcher's name and the number of proof cases, and pinning it would be
+     * pinning a figure nobody can reproduce. What must not drift is the inequality.
+     */
+    let progress = EMPTY_EVERYDAY_PROGRESS;
+    let held = 0;
+    while (JSON.stringify(progress).length <= PROGRESS_BUDGET_CHARACTERS) {
+      progress = everydayProgressWith(progress, savedRatingOf(entry(`d-${String(held)}`, 40)));
+      held += 1;
+    }
+    expect(held - 1, 'the budget holds fewer ratings than the game ships dispatchers').toBeGreaterThan(13);
+  });
+
   it('accepts a payload one character under the ceiling — the gate is the size, not the shape', () => {
     /*
      * The positive control. Without it the two cases above would pass against a `saveEveryday`

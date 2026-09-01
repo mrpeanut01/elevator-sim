@@ -28924,10 +28924,21 @@ there a player really has earned nothing.
 The budget is `PROGRESS_BUDGET_CHARACTERS`, checked **before** the store is touched, which is
 `persist/session.ts`'s `library-too-large` ordering and its reason sharpened: there is one slot and
 `write` replaces it whole, so a save that quietly dropped oversized progress would be *deleting*
-what is already stored rather than declining to add to it. It is a twentieth of the conservative
-quota where the library takes a fifth, and the asymmetry is deliberate — the library holds work a
-player authored and cannot recover, this holds work a player can re-earn by running the forty
-again, so where the two compete for one origin's quota this is the one that yields.
+what is already stored rather than declining to add to it.
+
+**The number is chosen from what the product can produce, and the first draft was not.** A stored
+rating measures **7 801 characters** — measured rather than estimated, over the shipped set's shape.
+A budget taken as a twentieth of the conservative quota, by analogy with the library's fifth, holds
+**16** ratings, and `data/dispatcher-profiles.json` ships **13** dispatchers, all of them rateable,
+with a player's own on top. So the analogy produced a ceiling a player reaches by doing the ordinary
+thing, which is a defect with a sentence attached rather than a safety margin. It is **384 000**:
+49 ratings, the thirteen shipped plus thirty-six authored. `everyday/profile.test.ts` asserts the
+inequality — *more ratings than this build ships dispatchers* — rather than the count, because the
+count moves with a dispatcher's name length and pinning it would pin a figure nobody can reproduce.
+
+It is still under the library's 512 000, and that asymmetry is deliberate: the library holds work a
+player authored and cannot recover, this holds work a player can re-earn by running the forty again,
+so where the two compete for one origin's quota this is the one that yields.
 
 **What is not kept, and it is most of the session.** The per-case `FixitState` selections and the
 cached as-built `RecordedRun`s stay session-local. A working draft a player is in the middle of is
