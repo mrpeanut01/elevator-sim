@@ -87,6 +87,22 @@ verdict:
   | always-on | 49 | **571 205** | **606** | **53** | **0** | **green**, and the register is empty |
   | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **712 547** | **4 710** | **54** | **0** | **green**, and the register is empty |
 
+  **Wave I moved every one of these figures by zero, and the reason is a gap rather than a
+  non-event.** Measured once on the integrated tree, both tiers in one sitting, after five lanes had
+  merged: **49 / 571 205 / 606 / 53 / 0** and **60 / 712 547 / 4 710 / 54 / 0** — identical to the
+  base at `255aff2`, which was re-measured first and reproduced this row exactly for the second wave
+  running. The surface **sets** were diffed rather than the counts compared: nothing added, nothing
+  removed, and the deep tier's lead is still exactly `campaign/judge.ts#judgeStage`.
+
+  Four of the five lanes could not have moved it — workflows, documents, a classifier's own test and
+  a browser-tier harness render no player-facing string. **The fifth was expected to and did not**,
+  and its lane said so in advance: § D427 makes a purchase reach the run, so *"any corpus case that
+  ever carries a non-`AS_BUILT` fit-out would move"*. None does. **The corpus holds no case in which
+  anything has been bought**, so the ten honesty properties have never read a fitted run's strings —
+  every campaign case they see is a tower as built. That is a hole in the corpus's coverage of § 8,
+  found by a null result rather than by a violation, and it is the kind of thing this column exists to
+  make visible.
+
   **Wave H is the first time this row's *previous* figures were confirmed rather than trusted, and
   that is the finding rather than the move.** Before publishing the new pair, the base commit
   `6260dcb` was re-measured in a detached worktree and reproduced the row it had published
