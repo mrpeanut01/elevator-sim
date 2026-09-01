@@ -127,6 +127,14 @@ jobs:
       # CI, a gated tier that would skip is a red run. The tier is ~157 s against a suite that runs
       # for ~40 minutes.
       #
+      # Since GitHub issue #281 the tier serves the artifact this repository actually ships —
+      # `dist-web/`, built once by the `viz-browser` project's own globalSetup — rather than a
+      # `vite dev` server. That adds one `vite build` per run and removes 29 dev-server startups,
+      # and it is cheaper rather than dearer — measured on a 4-core container over five runs, three
+      # quiet (186.6 s, 199.3 s, 183.1 s) and two under eight extra CPU spinners (253.2 s, 249.8 s),
+      # against 268.98 s before. So this step needs no change, and nothing has to be built here for
+      # it: the `npm run build` step above is already required, for the reason stated below.
+      #
       # The download is Playwright's own, by `playwright-core` — already a devDependency, so no new
       # package — and the path is read back from `chromium.executablePath()` rather than assembled
       # from a revision number, because pinning `chromium_headless_shell-1228` here would go stale

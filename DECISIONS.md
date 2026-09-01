@@ -28445,6 +28445,221 @@ breaking the heading shape fails the non-vacuity case rather than passing over a
 is the trap `deadCode.test.ts` and `viewportGateClaims.test.ts` both guard, and the one a guard over
 a document is most likely to fall into.
 
+## D425 — the browser tier serves `dist-web/`, and the four files that cannot are named
+
+**Date: 2026-09-01 · Owner: wave I lane D · Closes GitHub issue [#281](https://github.com/mrpeanut01/elevator-sim/issues/281) criteria 1, 2, 4 and 5. Criterion 3 is refused rather than met — see [§ D426](#d426). `RISKS.md` R26's third realised instance.**
+
+**Decision.** `vitest.config.ts`'s `viz-browser` project gains a `globalSetup` that runs `vite build`
+**once** before any file is collected. `browserTier.test-helper.ts#startShippedSite` serves that one
+output with Vite's own `preview()`, and **29 of the tier's 33 files** now drive it instead of a
+`vite dev` server. The four that cannot are declared in
+`browserTier.test-helper.ts#DEV_SERVER_FILES`, and `browserTier.test.ts` derives the same set from
+the tier's own sources and requires the two to be **equal in both directions**.
+
+**What was wrong.** 32 of 33 files started `createServer`. Players load `dist-web/`, produced by
+`npm run build:web` and served as static files. Every claim the tier made — and it is the evidence
+behind a large number of this repository's assertions — was true of an artifact nobody receives.
+
+**The gap was measured on this host rather than listed from Vite's documentation, and most of the
+textbook differences do not bite.** Both servers were driven side by side, in one script, at
+`375×667`:
+
+| difference | bites? |
+|---|---|
+| CSS delivery | **no** — `index.html` carries the whole stylesheet inline; one `<style>` of 103 542 characters, same SHA-256 on both |
+| layout and geometry | **no** — every tile box, the rail, the bar, both scrollers, identical to 0.01 px |
+| env replacement | **no** — nothing under `packages/viz/src` reads `import.meta.env` |
+| module resolution, transform, minification | **in kind** — dev serves `/@vite/client` + `/src/everyday/boot.ts`; the bundle serves one hashed `/assets/index-*.js` |
+| **asset surface** | **yes, and it is the large one** |
+
+**The asset surface is the real gap.** `vite.config.ts` points `publicDir` at the repository's
+`data/`, so the dev server answers for **every file in it**; on build `copyPublicDir` is `false` and
+only `WEB_DATA_FILES` plus `__buildings.json` are emitted:
+
+| request | `vite dev` | `dist-web` |
+|---|---|---|
+| `/elevator-specs.json` | 200 `application/json` | 200 `application/json` |
+| `/buildings/midtown-office.json` | **200 `application/json`** | the SPA fallback, `text/html` |
+| the buildings README — `data/buildings/README.md` on disk, requested at /buildings/README.md because `publicDir` is `data/` | **200 `text/markdown`** | the SPA fallback |
+| `/src/everyday/host.ts` | 200 `text/javascript` | the SPA fallback |
+
+So a viewer that started fetching a seventh document would work on every machine in this repository
+and fail in production — and `dev/data.ts#fetchJson` would report it as *"did not parse as JSON"*
+rather than as a missing file, because the fallback answers **200** with an HTML body. That is the
+class this decision puts under test, and it is mutation-proved: deleting `fixit-cases.json` from
+`WEB_DATA_FILES` leaves the dev server serving it and turns the tier **red in 5 files and 12 cases**,
+where before this change the same deletion left it entirely green.
+
+**The shape: one build per run, one server per file.** A build per file was measured and rejected —
+4.5 s × 32 is about 150 s onto a 269 s tier, against 4.5 s × 1 for the same artifact. Per-file
+`preview()` keeps each file's own port and the file isolation the tier already had, so
+`browserTier.test.ts`'s port guard applies unchanged.
+
+**The cost, measured on this host, and the stability measured across runs rather than in one.** The
+tier was **268.98 s** for 33 files and 191 tests before. After — 33 files, 192 tests, exit 0 every
+time:
+
+| run | wall | 1-minute load average |
+|---|---|---|
+| quiet 1 | 186.6 s | 9.16 |
+| quiet 2 | 199.3 s | 9.00 |
+| quiet 3 | 183.1 s | 10.57 |
+| under eight extra spinners, 1 | 253.2 s | 16.12 |
+| under eight extra spinners, 2 | 249.8 s | 14.60 |
+
+**Cheaper, not dearer**, which is not obvious and is the reason for measuring it: one `vite build` is
+added and **29 dev-server startups are removed**, and a preview server over a prebuilt tree answers a
+page in one request where a dev server answers it in hundreds. Five runs rather than one because a
+harness that serves a real artifact has to be shown stable across runs — the third finding below was
+found that way and would have survived any single green.
+
+The build is skipped when there is no Chromium, because the tier is skipped then too.
+
+**The gate moved one module down, and that is a move rather than a copy.** A `globalSetup` runs in
+vitest's main process before any suite exists, and importing `browserTier.test-helper.ts` from there
+fails with vitest's own *"Vitest failed to find the current suite"* — measured with a throwaway
+setup, because that module registers `afterEach`/`afterAll` at module scope. So `CHROMIUM`,
+`HAS_BROWSER`, `SKIP_REASON` and `startShippedSite` live in `browserTierSite.test-helper.ts` and
+`browserTier.test-helper.ts` re-exports them. There is still exactly one `HAS_BROWSER` in the
+repository — GitHub issue #142's point — and no file in the tier changed the specifier it imports.
+
+**The four exceptions, stated rather than implied.** `dailyLoop`, `reportScreen`, `shell` and
+`stageScreen` each drive `EVERYDAY_HOST` through `page.evaluate("import('/src/everyday/host.ts')…")`.
+That path exists only on a dev server. The alternative — publishing the host on a global so all four
+could drive the bundle — is refused for the reason `shell.browser.test.ts` already states in terms:
+*"driving the host must not require the product to publish itself on a global."* So those four
+assert nothing from `BUILT_ARTIFACT_CLAIMS`, and the registry is checked **both ways**: an entry that
+has stopped being true is as much a failure as a file that has quietly reacquired `createServer`.
+One direction alone is § D227's stale refusal with a new subject.
+
+**Two reds were reported against this tier while the lane was open, they have one cause, and the
+cause is the harness that closed the gap rather than the bundle.** On 2026-09-01 both CI legs failed
+in `everyday/builtBundle.browser.test.ts` on a commit whose whole diff was one unrelated file:
+
+```
+suite (linux):  AssertionError: the fixit screen drew no heading to measure
+suite (macos):  page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:5299/
+```
+
+An HTTP error status from a static server is not a rendering flake, and the cause is one the
+superseded helper's own docstring reasoned past. `startBuiltSite` **built** on every call, and **two**
+tier files called it — `builtBundle` and `rerenderScroll`. Vitest runs files in parallel, `dist-web/`
+is one directory, and `vite.config.ts` sets `emptyOutDir: true`, so the second file's write phase
+deleted the site the first file's `preview` server was still serving. The docstring had considered
+memoisation and rejected it — *"a cache keyed on disk would make one file's pass depend on another
+file having run"* — and never considered two builds sharing one output directory.
+
+**Measured on this host by running the superseded helper twice over**, rather than inferred:
+
+| what the already-serving preview answered, during the other file's build | |
+|---|---|
+| `GET /` | **404 on 63 of 87** requests |
+| `GET /assets/index-*.js` (its own entry chunk) | **404 on 62 of 87** |
+| `GET /fixit-cases.json`, from a live page | **404 on 18 of 140** — a window of roughly 900 ms |
+
+The first row **is** the macOS symptom. The linux symptom follows from the third: a failed data fetch
+puts `everyday/fixitScreen.ts#render` into its `loadFailure` branch, which draws no `h1` at all. The
+404 window is measured; that the branch draws no heading is read off the code rather than observed on
+a runner, and the two are different kinds of evidence, so they are labelled differently here.
+
+**This is a defect in the harness that closes the gap, not in the bundle** — issue #281 does not
+distinguish the two and the distinction matters. **One build in `globalSetup` makes the race
+impossible rather than unlikely**, and `browserTier.test.ts` now fails any tier file that calls
+`build(` again. It went unnoticed from 2026-08-26 because the only two files that could trigger it
+ran rarely, which is GitHub issue #163's shape one level in.
+
+**A third, found by running the tier repeatedly rather than once — which is why it was run
+repeatedly.** On the second of two consecutive runs, `builtBundle.browser.test.ts` reported
+`Hook timed out in 120000ms` at its `afterAll` with **all 192 tests passing**: a two-minute red about
+nothing the product does. `httpServer.close()` stops accepting and then waits for every open
+connection to end, a Playwright page holds a keep-alive socket for as long as it is open, and that
+file closed its **site before its browser**. The dev server hid this — `ViteDevServer.close()` tears
+its own sockets down, while `preview()` hands back the raw `httpServer`, which does not. Fixed twice
+over: the two files that had the ordering wrong now close the browser first, as the other
+twenty-seven already did, and `startShippedSite`'s `close` calls `closeAllConnections()` first so the
+ordering is discipline rather than the only defence. **One green run would not have found it**, which
+is the general point: a harness that serves a real artifact has to be shown stable across runs, not
+across one.
+
+**A second, independent unreliability in the same case, and it is filed as a defect in the case
+rather than in the product.** `suite (linux)` failed on
+`everyday/builtBundle.browser.test.ts` — *"the fixit screen drew no heading to measure"* — on a
+commit whose whole diff was one unrelated file, while the same file passed twice on this container.
+**The case was unreliable when it was written** (`97ac411`, 2026-08-26) and wave I did not make it
+so: it waited for `.everyday-fixit`, which `shell.ts#go` draws immediately, and then measured, while
+`fixitScreen.ts#render` puts `.everyday-fixit-loading` in that container until `/fixit-cases.json`
+resolves — and that state has **no `h1` at all**. The window is a network fetch, which a loaded
+runner widens. The state was reproduced here rather than inferred: an unsettled probe against the
+dev server read heading `null` and incoming overflow `0`, which is the loading screen exactly. Fixed
+by waiting for the loaded screen rather than by sleeping, and the offset is now asserted at **both**
+moments — at the navigation, which is what `go` resets, and after the case file lands, which is what
+the player is left looking at.
+
+**Two measured corrections travel with it.** Resolving `vite.config.ts` and reading it back reports
+`server.port 5174 / server.strictPort true` and `preview.port 4173 / preview.strictPort true`: a
+preview server **inherits `strictPort`** and does **not** inherit the port, so its default is 4173
+rather than 5173 and the port guard's message now names both. And every converted file's port note
+is **carried over rather than replaced**, because `boot.browser.test.ts`'s records a measured
+mechanism that three sibling files cite by name.
+
+## D426 — the #281 clamp does not depend on the incoming screen's height, and what makes the defect deploy is unmeasured
+
+**Date: 2026-09-01 · Owner: wave I lane D · Corrects a stated mechanism recorded in `everyday/shell.ts#go`, `everyday/builtBundle.browser.test.ts`, `everyday/rerenderScroll.browser.test.ts`, `RISKS.md` R26 and GitHub issue [#281](https://github.com/mrpeanut01/elevator-sim/issues/281) itself. [§ D425](#d425) is the fix this was found while building.**
+
+**What was recorded.** That `dev/dom.ts#reconcile` empties its host before inserting, that the
+browser therefore clamps `scrollTop` to `0` on the way through, and that this clamp *"is real and it
+is not reliable — it depends on the incoming screen being shorter than the offset, which `fixit` is
+not"*. From that: the clamp saves a `vite dev` server and does not save the built bundle, which is
+why removing either half of `shell.ts#go`'s reset left the tier green while the deployed build showed
+an offset of **300** carried through a navigation.
+
+**Decision. The conditional half is refuted, and no replacement mechanism is offered.**
+
+**Measurement 1 — the clamp is not conditional on the incoming content at all.** Instrumented on the
+shipped bundle at `375×667`, with `.everyday-screen` scrolled to 300 and its four children removed
+by hand:
+
+| moment | `scrollTop` | `scrollHeight` | children |
+|---|---|---|---|
+| after setting `scrollTop = 300` | 300 | 894 | 4 |
+| emptied, **no layout forced** | **0** | 559 | 0 |
+| emptied, layout forced | 0 | 559 | 0 |
+| refilled | 0 | 894 | 4 |
+
+`scrollTop` reads `0` the moment the container is emptied — before any layout is forced, and before
+anything is inserted. Nothing about the incoming screen can enter that decision, because it has not
+been decided yet.
+
+**Measurement 2 — `fixit` is the tallest destination, not a short one.** Its incoming
+`.everyday-screen` overflow is **8 772 px** against the menu's 335. It was chosen as the tile the
+clamp would *not* save; it is clamped exactly like the rest. (A first probe of this file read that
+overflow as `0`, measured before layout settled; the published figure is the second one.)
+
+**Measurement 3 — the two local artifacts are not laid out differently.** Driven side by side in one
+script at `375×667`, `vite dev` and `dist-web` agree on the document overflow (0 and 0), the menu's
+region overflow (335 and 335), the incoming screen's overflow (8 772 and 8 772), every tile box, the
+rail, the bar, and the inline stylesheet's SHA-256. **With `screenEl.scrollTop = 0` deleted, both
+report an offset of 0.** So the defect does not reproduce on either, and the artifact was not the
+difference between them.
+
+**What follows.** GitHub issue #281's third acceptance criterion — *a case that fails when either
+half of the reset is removed* — is **not met, and is not going to be met by driving the bundle**,
+which was the plan § D425 was expected to carry out. The criterion is not weakened and the reset is
+not deleted: it is pinned by the driven deployment, and that evidence stands.
+
+**Where the offset survives on the deployed build is unmeasured, and this decision may not name a
+cause.** `CLAUDE.md`'s rule about stated mechanisms is the whole of the reasoning — a second
+plausible sentence is exactly how the first one came to be written, and the six sites that carried
+*"and the saving is entirely in the credential"* are what that costs. The measurement that would
+settle it needs the deployed origin, which answers `curl` with status `000` from an agent container
+(GitHub issue **#123**).
+
+**What was corrected, and where.** Four sites carried the conditional clause or the
+artifact-difference claim: `everyday/shell.ts#go`, `everyday/builtBundle.browser.test.ts`,
+`everyday/rerenderScroll.browser.test.ts` and `RISKS.md` R26. Each now states the negative and cites
+this entry. `shell.ts#go` additionally keeps the warning it earned the first time: **do not delete
+that line on the strength of a green local run**, because that is precisely the inference that
+deleted it once already.
 ---
 
 ## D427 — what a campaign tower buys reaches the run, and the three tiers that move no leg are measured rather than assumed

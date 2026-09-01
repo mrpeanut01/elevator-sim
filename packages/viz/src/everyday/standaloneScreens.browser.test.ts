@@ -18,36 +18,33 @@
  * Pattern and gate are `settingsScreen.browser.test.ts`'s; no metric is read (§ D220 § 4).
  */
 
-import { fileURLToPath } from 'node:url';
-
 import { chromium, type Browser, type Page, type ViewportSize } from 'playwright-core';
-import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
-import { CHROMIUM, HAS_BROWSER, openPage } from '../dev/browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  openPage,
+  startShippedSite,
+  type ShippedSite,
+} from '../dev/browserTier.test-helper.js';
 
-let server: ViteDevServer;
+let site: ShippedSite;
 let browser: Browser;
 let origin: string;
 
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
-  server = await createServer({
-    configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
-    root: fileURLToPath(new URL('../..', import.meta.url)),
-    server: { port: 5211, strictPort: false },
-    logLevel: 'error',
-  });
-  await server.listen();
-  origin = (server.resolvedUrls?.local[0] ?? '').replace(/\/$/, '');
-  if (origin === '') throw new Error('the dev server did not report a URL');
+  // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
+  site = await startShippedSite({ preview: { port: 5211, strictPort: false } });
+  origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
 }, 120_000);
 
 afterAll(async () => {
   await browser?.close();
-  await server?.close();
+  await site?.close();
 });
 
 /** What every case here drove before a viewport was ever an argument. */

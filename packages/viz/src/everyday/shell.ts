@@ -717,21 +717,39 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * mutation appeared to confirm it, because removing the line changed no case. **Driving the
    * deployed preview at `375×667` refuted it**: scroll the menu to 300, tap the fourth tile, and the
    * new screen opens at offset **300** with its heading **272 px above the top of the viewport**.
-   * The clamp is real and it is not reliable — it depends on the incoming screen being shorter than
-   * the offset, which `fixit` is not.
+   * So the clamp is real and it is not reliable, and this line is what stands between a player and
+   * that offset.
    *
-   * ## Nothing in this repository's suite can pin it, and that is its own finding
+   * ## Why the clamp is unreliable is *not* what this docstring used to say — § D426
+   *
+   * It said the clamp *"depends on the incoming screen being shorter than the offset, which `fixit`
+   * is not"*. Measured on this host, that is wrong twice over, and both halves are worth having.
+   *
+   * The clamp is **not conditional on the incoming content at all**: instrumented on the shipped
+   * bundle at `375×667`, `scrollTop` reads `0` the *moment* the container is emptied — before any
+   * layout is forced, and before anything is inserted. And `fixit`'s incoming overflow is
+   * **8 772 px** against the menu's 335, so it is the tallest destination rather than a short one,
+   * and it is clamped exactly like the rest.
+   *
+   * **What makes the offset survive on the deployed build is therefore unmeasured**, and no
+   * replacement mechanism is offered here: a second plausible sentence is how the first one got
+   * written. `CLAUDE.md`'s rule applies — either measure it or say it is unmeasured — and the
+   * measurement that would settle it needs the deployed origin, which is unreachable from an agent
+   * container (GitHub issue **#123**).
+   *
+   * ## Nothing in this repository's suite pins it, and that is its own finding
    *
    * Two cases were written to bite locally and both were deleted for asserting nothing: removing
    * either line leaves the whole browser tier green here, on `rush` and on `fixit` alike. The reason
-   * is that the tier drives a **`vite dev` server** while the defect reproduces on the **built
-   * bundle** the preview serves — a different artifact, laid out differently enough that the
-   * reconciler's clamp saves the dev server and does not save production.
+   * used to be given as *the tier drives a `vite dev` server while the defect reproduces on the
+   * built bundle*. **The tier drives the built bundle now** — GitHub issue #281, § D425 — and the
+   * removal is still green, on the artifact players receive: driven side by side in one script, the
+   * dev server and `dist-web/` agree on every box, both scrollers and the inline stylesheet's
+   * digest at this viewport. So the artifact was not the difference.
    *
-   * So this line is pinned by a **driven deployment**, not by a case, and the evidence is quoted
-   * above rather than left as a claim. That gap — the tier asserting things about an artifact
-   * nobody ships — is filed separately; it is `RISKS.md` R26 one level up from the code, and it is
-   * larger than this fix.
+   * This line is therefore still pinned by a **driven deployment** rather than by a case, and the
+   * evidence is quoted above rather than left as a claim. Do not delete it on the strength of a
+   * green local run; that is precisely the inference that deleted it once already.
    *
    * `behavior` is left at its default: a smooth scroll here would animate on a playhead-tied redraw,
    * which `docs/28` § 6's AD-M2 refuses, and it would race the tier's next measurement.
