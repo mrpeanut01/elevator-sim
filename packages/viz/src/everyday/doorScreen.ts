@@ -15,6 +15,7 @@
 import type { ActionBarModel } from './actionBar.js';
 import { actionBarFor } from './actionBar.js';
 import { doorScreenViewOf, type DoorScreenView } from './doorView.js';
+import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import { BODY, CARD, el, EYEBROW, LEDE, MONO, pill, QUIET, section, unavailableBand } from './screenDom.js';
 import { todayOf } from './today.js';
@@ -52,6 +53,8 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
       goals: host.goalsToday(),
       seed: host.seed(),
+      /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
+      units: everydayProfileStore().units(),
     }),
     dayOffset,
     dayClosed: host.runState().dayClosed,

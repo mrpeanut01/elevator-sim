@@ -29911,3 +29911,182 @@ will otherwise assume they are the same measurement — and the whole value of t
 a finding carries from one screen to the other, so the sentence that makes that safe has to be where
 the reader is rather than in a docstring.
 
+## D447 — the Sound row is a queue item, not a holding position, and the guide's binary is closed
+
+**Date: 2026-09-01 · Wave K lane C · GitHub issue [#170](https://github.com/mrpeanut01/elevator-sim/issues/170), Sound half**
+
+**Decision.** The Everyday Settings `Sound` row **stays refused**, and the refusal is now recorded
+as *unbuilt with an owner* rather than as *undecided*. The design guide's § 20.12 —
+*"Either give it doors, chimes and lobby murmur, or remove the row"* — is **corrected in place** to
+say that the first branch was taken, by whom, and which lane carries it.
+
+**Why this is not the third option wearing a new hat.** § 20.12 offers two ways out and the issue
+that raised this says the stated absence is *"a reasonable holding position, but not an ending"*.
+It is an ending now, because the decision has been made elsewhere and this lane's job was to find
+it rather than to make it again: [§ D344](#d344) is a product-owner ruling of 2026-08-24 that
+**audio ships**, speed-tiered, overruling the written cut `docs/29-audio-direction.md`
+recommended. The lane that builds it is
+[#258](https://github.com/mrpeanut01/elevator-sim/issues/258), which was blocked on
+`STAGE_SPEEDS` having no 1:1 rung for a discrete cue to fit inside a 9.8 s door cycle
+([#257](https://github.com/mrpeanut01/elevator-sim/issues/257), closed by [§ D354](#d354) — seven
+rungs, every label equal to its ratio). **The block is gone and the work is live.**
+
+So the three options are not equally open: *build it* is chosen, *remove the row* is refused, and
+what is drawn today is what the chosen option looks like before it lands.
+
+**Why the refusal may stand while the work is owed.** § 20.12's rule is that *a toggle that toggles
+nothing is a lie in a settings panel* — and there is no drawn toggle. `settingsView.ts`'s
+`SETTINGS_ABSENCES` states the absence in words, and `buildNotes.test.ts#ABSENCE_TRIAGE`
+([§ D370](#d370)) already names #258 as its owner, in both directions: an entry with no triage row
+fails, and a triage row whose entry has gone fails too. That is the mechanism that makes this a
+queue rather than a permanent refusal, and it was already in place — this decision adds no
+apparatus, it reads the one that exists.
+
+**What was actually wrong, and it was a document rather than a build.** The guide said the choice
+was open. It had been closed for eight days, on a ruling in this repository's own decision log, and
+nothing pointed the reader of § 20.12 at it. That is [§ D227](#d227)'s class — a stated position
+that has stopped being true — in its documentary form: not a stale *refusal* (the refusal is
+accurate) but a stale *open question*, which sends the next lane to re-decide something already
+decided. Both sites are corrected: § 20.12's bullet and § 15.1's build note, which carried the same
+sentence.
+
+**The guide is edited rather than annotated from outside, and that is the precedent this entry
+sets.** `docs/design/design_handoff_casual_mode/` has been vendored twice and never edited, so this
+is the first change to it. Two things make it the right place. Its own § 21 says the guide *"is
+maintained alongside the prototype, not written once"* and names § 20's work order as the section
+that *"rots fastest"*, and its README says § 20 is **work, not design** — so correcting a work
+order is not overruling the canonical interface, which is what `CLAUDE.md` protects when it makes
+the handoff win every disagreement about what the screen looks like. The correction is marked as a
+correction (struck text kept, dated, attributed) rather than silently rewritten, on
+`docs/29`'s own pattern one document over.
+
+**What this decision deliberately does not do.**
+
+- **It does not describe the audio design.** § D344 and #258 are that account, and `docs/29`'s
+  header states the reason in its own case: two accounts of one design drift apart.
+- **It does not touch § 15.1's lede** (*"how the game looks **and sounds** to you"*). Under the cut
+  that sentence was a false promise needing correction; under this ruling it is a promise that
+  becomes true when the sound arrives, which is #258's to deliver.
+- **It does not amend `docs/29`.** That document is a superseded recommendation, already headed
+  *OVERRULED*, and it says outright that it is not amended to describe what replaced it. Its § 8
+  reasoning for the Sound half — *"Sound closes because the work is cancelled: there is no consumer
+  to build"* — is therefore **stale on its face and correctly so**, because the document above it
+  says the conclusion was overruled and the evidence was not. Rewriting § 8 would be the second
+  account this repository has twice refused to keep.
+
+**The consequence for #170.** Its two halves separate for good, which `docs/29` § 8 and this issue's
+own verification comment both predicted: Sound is #258's and is not this lane's to build, and Units
+is #170's alone. The Units half is this lane's and is built beside this entry; it cites this one,
+rather than this one citing forward into work that had not landed when it was written.
+
+---
+
+## D448 — the Units preference converts, and the module's shape is what keeps it out of a run
+
+**Date: 2026-09-01 · Wave K lane C · GitHub issue [#170](https://github.com/mrpeanut01/elevator-sim/issues/170), Units half**
+
+**Decision.** § 15.1's `Units` row ships. `everyday/units.ts` is the consumer whose absence was the
+refusal, the preference lives as a **sibling of `profile`** in the Everyday slot at envelope version
+3, and the `SETTINGS_ABSENCES` entry plus its `ABSENCE_TRIAGE` row are deleted on the commit that
+makes them false. [§ D447](#d447) is the Sound half, which stays refused and is #258's.
+
+### What was refused, and what makes the refusal false now
+
+The entry read *"Units — nothing in the viewer reads a metres-or-feet preference, so there is nothing
+for the switch to switch"*, and its evidence was a grep: `grep -rin "imperial" packages/viz/src
+--include='*.ts'` found no non-test occurrence. That was true of every build until this one. The work
+was never the control — the control is designed, and § 18's prototype state has carried an `imperial`
+field the whole time — it was **a consumer**, which is the shape `CLAUDE.md`'s standing requirement
+names from the other side: a seam with no caller, filed as a control with no seam.
+
+`ENGINE_CONTRACT.md` § 13 is what the consumer had to satisfy: *metres by default; the `Units`
+setting switches machine specs to feet and **must convert, not relabel***.
+
+### The correctness bite, and why it is answered with a module shape rather than a rule
+
+`CLAUDE.md`'s conventions keep units **SI internally** and allow imperial values only in reference
+data and display formatting, always with the unit in the identifier (`ratedLoadLb`, `speedFpm`). A
+display-layer conversion that leaked into a stored figure would be a defect of a different order from
+a mislabelled one: it would reach a run record, a persisted profile, a submitted run or a published
+interval, every one of which is compared against numbers taken under the other preference. Two runs
+that cannot be compared while both look valid is the failure mode this repository's statistical
+discipline exists to prevent, arriving through a settings row.
+
+**So the guarantee is structural rather than remembered.** `feetOf` and `METRES_PER_FOOT` are
+module-private and **every export that touches them returns a `string`**. There is no signature in
+`units.ts` through which a converted quantity can be assigned to anything, so the invariant is a fact
+about the types. `units.test.ts` holds it from three directions:
+
+1. **The export surface**, walked rather than listed, so an export added later is covered on the
+   commit that adds it — every entry point must answer a string. Mutated to return a `number`, this
+   is caught **twice**: `tsc -b` refuses the call site, and the case names the export.
+2. **The legs.** Flipping the *shipped singleton* leaves `legsOf(baseState())` byte-identical. Legs
+   rather than a window statistic, for [§ D177](#d177)'s reason. This is
+   `docs/05`'s standing requirement in its contrapositive, and it is the shape #258 states for a
+   presentation control: it must reach a sink and **must not** reach the legs. Verified by mutation —
+   a `shiftRunConfigOf` that read the preference and moved one car's `ratedSpeedMps` reddens this case
+   **and nothing else in the suite**, `boundaries.test.ts` and the whole of `scope/` included.
+3. **The storage.** What is persisted is one of two words, so there is no number in the envelope the
+   preference can move.
+
+### Where the preference lives, and why not on the profile
+
+A **sibling** of `profile` and `progress` in the Everyday slot, at schema version 3, on
+[§ D433](#d433)'s precedent one version down. `EverydayProfile` is *identity* — the name and colour
+§ 15.1's lede says travel with every run you post — and a display preference folded into it would
+ride along with a submission. It is not in `menu/types.ts#Settings` either, for `profile.ts`'s own
+stated reason: that envelope is the Engineer session, with a different owner and a different version
+number, and nothing on the Engineer surface reads this preference.
+
+The `withUnits` migration **determines** `metric` rather than guessing it, which is the only ground on
+which a migration may invent a value: before version 3 nothing in the viewer read a metres-or-feet
+preference at all — that is the whole of what #170 reported — so metres is what any earlier build's
+player was looking at, not a preference chosen on their behalf.
+
+### The scope is a list, and the list is checked
+
+The preference reaches **machine specifications**: § 13.2's rating plate (`RATED SPEED`, `TRAVEL`),
+the drawing board's machine-class band and its speed chips, the tuner's machine card (whose readout's
+own docstring says it is *"in the units the plate uses"*, so the two could not be allowed to
+disagree), and the daily loop's *Rated speed* fact. Three neighbours are deliberately left alone:
+`CAPACITY … lb` on the plate, because `ratedLoadLb` is reference data with the unit in the identifier
+and § 13's clause is about metres and feet; the fix screen's `+0.5 m/s` repair step, because that is a
+**price** quoted in the unit § 9 prices it in; and `shift/contracts.ts`'s stat line, which is shared
+with the Engineer surface and governed by its own contract.
+
+That list is a claim about this tree, so it is **asserted rather than described**: a bare `m/s`
+literal anywhere in `everyday/` must go through this module or arrive in `units.test.ts`'s allowance
+with its reason, and an allowance whose file stopped printing one must go with it.
+
+**The chip labels convert and the values they write do not**, which is *convert, not relabel* pointed
+at a control rather than at a readout: a player picking `8.20 ft/s` on the drawing board writes `2.5`
+to `ratedSpeedMps`, exactly as they did before this preference existed.
+
+### One metric string moved, and it is named rather than left to be discovered
+
+`today.ts`'s *Rated speed* fact printed `String(max) + ' m/s'` — `2.5 m/s`, and `8 m/s` for a shuttle
+— while the plate two screens over printed `2.50 m/s` for the same car. The fact takes the plate's
+precision now. It is the only metric arm this lane changed, it changes no figure's value, and it is
+recorded here because a change nobody declares is how a string count stops being attributable.
+
+### What the corpus gains
+
+Both faces are seeded: the rating plate under both preferences, the machine-class band's range and
+declared rise under both, the tuner's readout under both, one settings sub-case carrying `imperial`,
+and the daily facts **diffed** so only what actually differs is pushed — `todayOf` is total in
+`units`, so seeding an identical record again would be the same string twice under two names.
+
+`derive.test.ts` found five unclassified producers on its first run after the consumers landed,
+which is what it is for. Four are this module's and one is `profile.ts#loadUnits`;
+`tunerModel.ts#tuneSpeedReadout` stopped being a producer at the same moment, because it authored a
+literal and now delegates, so its `covers` entry was **moved rather than kept** — a coverage claim
+for a declaration the derivation no longer finds is a claim about nothing.
+
+**No adapter was added or removed, so the surfaces column does not move**, and the deep tier's
+one-surface lead is undisturbed. Under [§ D343](#d343) this lane does not measure the corpus. Its
+forecast — published so an independent measurement can confirm or refute it, which is the only thing
+a lane may honestly say about this figure — is **+52 strings per case in both tiers**, decomposing
+exactly: 18 for the settings row (three strings over six sub-cases), 18 for the plate (six rows over
+three arms, doubled), 12 for the class band (two figures over three arms, doubled), 2 for the tuner
+readout (two arms), and 2 for the daily loop (one fact over two days). Cases, simulations, surfaces,
+suppressed runs and failing cases all unmoved.

@@ -1153,8 +1153,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '(one slot, one writer, and it takes both payloads), and `createProfileStore` moved to ' +
         'the group below because the clause *they produce no words at all* stopped being true of ' +
         'it the moment the store grew a progress notice — § D227’s stale exclusion, corrected on ' +
-        'the commit that made it stale rather than a wave later.',
-      ids: ['everyday/profile.ts#loadProfile'],
+        'the commit that made it stale rather than a wave later. **It holds two again**: GitHub ' +
+        'issue #170’s Units half added `loadUnits`, which is the same case exactly — it reads the ' +
+        'same slot through the same `readEnvelope`, is derived for the same key, and returns one ' +
+        'of two preference words that no screen prints. The words a player *reads* for that ' +
+        'preference are `everyday/units.ts#UNITS_ROW_COPY`’s, driven by `EVERYDAY_SETTINGS`, and ' +
+        'the figures it switches are `speedFigure`’s and `lengthFigure`’s, driven by ' +
+        '`EVERYDAY_STANDALONE_SCREENS` in both preferences.',
+      ids: ['everyday/profile.ts#loadProfile', 'everyday/profile.ts#loadUnits'],
     },
     {
       reason:

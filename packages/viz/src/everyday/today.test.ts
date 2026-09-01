@@ -77,6 +77,7 @@ const recordFor = (
     dispatcherName: 'Steady hand',
     goals: pendingGoals(day),
     seed: 424_242n,
+    units: 'metric',
   });
 
 describe('the wrinkle is the day’s event, not this module’s choice', () => {
@@ -150,6 +151,7 @@ describe('the facts come from the resolved building', () => {
       dispatcherName: undefined,
       goals: [],
       seed: 1n,
+      units: 'metric',
     });
     expect(record.facts).toEqual([]);
     expect(record.load).toBeUndefined();
@@ -260,6 +262,7 @@ function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
     dispatcherName: 'Steady hand',
     goals: pendingGoals(state.week.day),
     seed: state.seed,
+    units: 'metric',
   });
 }
 

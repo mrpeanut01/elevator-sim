@@ -28,6 +28,7 @@ import {
   everydayProgressWith,
   loadProfile,
   loadProgress,
+  loadUnits,
   PROGRESS_BUDGET_CHARACTERS,
   PROGRESS_REFUSALS,
   saveEveryday,
@@ -105,7 +106,7 @@ describe('persistence, both directions', () => {
   it('round-trips a profile through the slot', () => {
     const backing = memoryBacking();
     const profile = { name: 'Nadia R.', avatarColor: '#4F8A5B' };
-    expect(saveEveryday(backing, profile, EMPTY_EVERYDAY_PROGRESS).ok).toBe(true);
+    expect(saveEveryday(backing, profile, EMPTY_EVERYDAY_PROGRESS, 'metric').ok).toBe(true);
     expect(loadProfile(backing)).toEqual(profile);
   });
 
@@ -113,7 +114,7 @@ describe('persistence, both directions', () => {
     expect(loadProfile(memoryBacking())).toBeUndefined();
     expect(loadProfile(refusingBacking)).toBeUndefined();
     expect(
-      saveEveryday(refusingBacking, DEFAULT_EVERYDAY_PROFILE, EMPTY_EVERYDAY_PROGRESS).ok,
+      saveEveryday(refusingBacking, DEFAULT_EVERYDAY_PROFILE, EMPTY_EVERYDAY_PROGRESS, 'metric').ok,
     ).toBe(false);
   });
 
@@ -122,15 +123,16 @@ describe('persistence, both directions', () => {
     backing.slots.set('elevator-sim.everyday-profile', 'not json');
     expect(loadProfile(backing)).toBeUndefined();
     /*
-     * **Version 3, not version 2** — and the change is the point rather than an edit to keep a case
-     * green. This assertion read `schemaVersion: 2` from the day it was written, because 2 was the
-     * first unknown shape. Issue #224 made 2 the shape this build *writes*, so the unreadable one
-     * moved up by one. The claim is unchanged: a version outside
-     * `PROFILE_SCHEMA_VERSIONS_READ` is refused rather than guessed at.
+     * **Version 4, not version 3 and not version 2** — and the change is the point rather than an
+     * edit to keep a case green. This assertion read `schemaVersion: 2` from the day it was
+     * written, because 2 was the first unknown shape; issue #224 made 2 the shape this build
+     * *writes*, and issue #170's Units half made 3. Each time, the unreadable one moves up by one
+     * and the claim is unchanged: a version outside `PROFILE_SCHEMA_VERSIONS_READ` is refused
+     * rather than guessed at.
      */
     backing.slots.set(
       'elevator-sim.everyday-profile',
-      JSON.stringify({ schemaVersion: 3, profile: DEFAULT_EVERYDAY_PROFILE }),
+      JSON.stringify({ schemaVersion: 4, profile: DEFAULT_EVERYDAY_PROFILE }),
     );
     expect(loadProfile(backing)).toBeUndefined();
     // And in the other direction: version 0 is older than anything this build reads.
@@ -177,6 +179,7 @@ describe('the live store', () => {
       backing,
       { name: 'Nadia R.', avatarColor: '#5F7268' },
       EMPTY_EVERYDAY_PROGRESS,
+      'metric',
     );
     const store = createProfileStore(backing);
     expect(store.current()).toEqual({ name: 'Nadia R.', avatarColor: '#5F7268' });
@@ -247,7 +250,7 @@ describe('the slot keeps what a player earns — issue #224', () => {
       solvedCaseIds: ['leaky-lobby', 'slow-morning'],
       ratings: [savedRatingOf(entry('mine', 40))],
     };
-    expect(saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, progress)).toEqual({
+    expect(saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, progress, 'metric')).toEqual({
       ok: true,
       notice: null,
     });
@@ -315,21 +318,132 @@ describe('the version 1 → 2 migration', () => {
     expect(backing.slots.get(SLOT)).toBe(before);
   });
 
-  it('carries the migrated profile into the version 2 envelope the next write produces', () => {
+  it('carries the migrated profile into the current envelope the next write produces', () => {
     /*
      * The half a migration usually gets wrong: reading the old shape is not the same as *keeping*
      * what it held. A player who saved a name under version 1 and then solves a building must have
      * both afterwards, and the write that stores the building is the one that could lose the name.
+     *
+     * **It is version 3 now and the extra key is asserted rather than allowed in**, which is the
+     * whole reason `toEqual` is used here rather than `toMatchObject`: a v1 envelope that skipped
+     * *two* migrations and came out with a `units` key it never held is exactly the failure this
+     * case is for, and only an exact shape catches the other direction — a key silently dropped.
      */
     const backing = versionOneSlot();
     const store = createProfileStore(backing);
     expect(store.setProgress({ solvedCaseIds: ['leaky-lobby'], ratings: [] })).toBe(true);
     expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toEqual({
-      schemaVersion: 2,
+      schemaVersion: 3,
       profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
       progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
+      units: 'metric',
     });
     expect(loadProfile(backing)).toEqual({ name: 'Nadia R.', avatarColor: '#4F8A5B' });
+  });
+});
+
+describe('the version 2 → 3 migration, and the units preference beside it', () => {
+  /** What the build before GitHub issue #170's Units half wrote: three keys and no fourth. */
+  function versionTwoSlot(): SessionStore & { readonly slots: Map<string, string> } {
+    const backing = memoryBacking();
+    backing.slots.set(
+      SLOT,
+      JSON.stringify({
+        schemaVersion: 2,
+        profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
+        progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
+      }),
+    );
+    return backing;
+  }
+
+  it('reads a version 2 envelope as a player reading metres, and keeps both older payloads', () => {
+    /*
+     * The absence **determines** the value, `withProgress`'s own test applied one version up:
+     * before version 3 nothing in the viewer read a metres-or-feet preference — that is the whole
+     * of what issue #170 reported — so every machine specification any earlier build drew was in
+     * metres. `metric` is what that player was looking at rather than a guess about what they
+     * wanted, which is the only ground on which a migration may invent a value at all.
+     */
+    const backing = versionTwoSlot();
+    expect(loadUnits(backing)).toBe('metric');
+    expect(loadProfile(backing)).toEqual({ name: 'Nadia R.', avatarColor: '#4F8A5B' });
+    expect(loadProgress(backing).progress.solvedCaseIds).toEqual(['leaky-lobby']);
+  });
+
+  it('round-trips a chosen preference, and carries the other two payloads with it', () => {
+    const backing = versionTwoSlot();
+    const store = createProfileStore(backing);
+    expect(store.units()).toBe('metric');
+    expect(store.setUnits('imperial')).toBe(true);
+    expect(store.units()).toBe('imperial');
+    expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toEqual({
+      schemaVersion: 3,
+      profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
+      progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
+      units: 'imperial',
+    });
+    expect(loadUnits(backing)).toBe('imperial');
+  });
+
+  it('notifies subscribers, so the screen that wrote it is not the only one that hears', () => {
+    const store = createProfileStore(memoryBacking());
+    let heard = 0;
+    const stop = store.subscribe(() => {
+      heard += 1;
+    });
+    store.setUnits('imperial');
+    expect(heard).toBe(1);
+    stop();
+    store.setUnits('metric');
+    expect(heard).toBe(1);
+  });
+
+  it('answers metric for a value this build cannot vouch for, rather than restoring it', () => {
+    /*
+     * The pill has two faces. A third value restored from storage would select neither, which is
+     * the inert-control shape `persist/validate.ts`'s `playbackSpeed` check exists to catch,
+     * arriving through storage instead of through wiring.
+     */
+    for (const bad of ['feet', 'IMPERIAL', 3, null, {}]) {
+      const backing = memoryBacking();
+      backing.slots.set(
+        SLOT,
+        JSON.stringify({
+          schemaVersion: 3,
+          profile: DEFAULT_EVERYDAY_PROFILE,
+          progress: EMPTY_EVERYDAY_PROGRESS,
+          units: bad,
+        }),
+      );
+      expect(loadUnits(backing), `a stored units value of ${JSON.stringify(bad)}`).toBe('metric');
+    }
+  });
+
+  it('answers metric where there is no storage at all, and keeps the choice for the tab', () => {
+    // A memory-only store works completely within the tab; only its durability answer differs.
+    const store = createProfileStore(undefined);
+    expect(store.units()).toBe('metric');
+    expect(store.setUnits('imperial')).toBe(false);
+    expect(store.units()).toBe('imperial');
+  });
+
+  it('leaves the preference where it was when a sibling write is refused for size', () => {
+    /*
+     * One slot, written whole. The budget refuses **before** the store is touched, so a save that
+     * declines oversized progress may not take the units preference down with it.
+     */
+    const backing = memoryBacking();
+    const store = createProfileStore(backing);
+    store.setUnits('imperial');
+    const before = backing.slots.get(SLOT);
+    const oversize: EverydayProgress = {
+      solvedCaseIds: ['x'.repeat(PROGRESS_BUDGET_CHARACTERS + 1)],
+      ratings: [],
+    };
+    expect(store.setProgress(oversize)).toBe(false);
+    expect(backing.slots.get(SLOT)).toBe(before);
+    expect(loadUnits(backing)).toBe('imperial');
   });
 });
 
@@ -339,7 +453,7 @@ describe('a store this build cannot read degrades to a labelled refusal', () => 
     ['bytes that are not JSON at all', 'not json', PROGRESS_REFUSALS.parse],
     [
       'a version this build does not read',
-      JSON.stringify({ schemaVersion: 3, profile: DEFAULT_EVERYDAY_PROFILE, progress: {} }),
+      JSON.stringify({ schemaVersion: 4, profile: DEFAULT_EVERYDAY_PROFILE, progress: {} }),
       PROGRESS_REFUSALS.version,
     ],
     [
@@ -427,7 +541,7 @@ describe('a store this build cannot read degrades to a labelled refusal', () => 
       saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, {
         solvedCaseIds: ['a-case-no-build-ships'],
         ratings: [],
-      }).ok,
+      }, 'metric').ok,
     ).toBe(true);
     const back = loadProgress(backing);
     expect(back.notice).toBeNull();
@@ -448,10 +562,10 @@ describe('a store past its budget refuses before it writes', () => {
   it('leaves the previous save exactly where it was, and names what was too big', () => {
     const backing = memoryBacking();
     const kept: EverydayProgress = { solvedCaseIds: ['leaky-lobby'], ratings: [] };
-    expect(saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, kept).ok).toBe(true);
+    expect(saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, kept, 'metric').ok).toBe(true);
     const before = backing.slots.get(SLOT);
 
-    const refused = saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, oversized());
+    const refused = saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, oversized(), 'metric');
     expect(refused.ok).toBe(false);
     /*
      * The ordering is the whole value of the budget: one slot, and `write` replaces it whole, so a
@@ -463,7 +577,7 @@ describe('a store past its budget refuses before it writes', () => {
 
   it('says the two counts, the size and the ceiling, so the sentence can be acted on', () => {
     const progress = oversized();
-    const refused = saveEveryday(memoryBacking(), DEFAULT_EVERYDAY_PROFILE, progress);
+    const refused = saveEveryday(memoryBacking(), DEFAULT_EVERYDAY_PROFILE, progress, 'metric');
     const notice = refused.notice ?? '';
     expect(notice).toContain(`${String(progress.ratings.length)} ratings`);
     expect(notice).toContain(`${String(PROGRESS_BUDGET_CHARACTERS)}`);
@@ -504,7 +618,7 @@ describe('a store past its budget refuses before it writes', () => {
       ratings: [],
     };
     expect(JSON.stringify(under).length).toBeLessThan(PROGRESS_BUDGET_CHARACTERS);
-    expect(saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, under).ok).toBe(true);
+    expect(saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, under, 'metric').ok).toBe(true);
   });
 });
 

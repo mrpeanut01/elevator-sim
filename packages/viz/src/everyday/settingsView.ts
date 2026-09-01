@@ -18,18 +18,38 @@
  *   `set-setting` intent, so the two surfaces cannot disagree. While the Engineer surface is
  *   still booting the bridge is absent and the row is **absent too**, with a sentence in its
  *   place: a toggle whose write would land nowhere is § 20.12's lie with a race for an excuse.
- * - **Sound — not drawn.** `grep -rn "mute\|Audio\|chime" packages/viz/src --include='*.ts'`
- *   finds no audio machinery anywhere in the tree; the prototype's own build note (§ 15.1) says
- *   this row had nothing behind it *there* either. Named in {@link SETTINGS_ABSENCES} instead.
+ * - **Sound — not drawn, and now not drawn *yet*.** `grep -rn "mute\|Audio\|chime"
+ *   packages/viz/src --include='*.ts'` finds no audio machinery anywhere in the tree; the
+ *   prototype's own build note (§ 15.1) says this row had nothing behind it *there* either. Named
+ *   in {@link SETTINGS_ABSENCES} instead. **§ 20.12 offered two ways out and the choice has been
+ *   made**: [§ D344](../../../../DECISIONS.md) is a product-owner ruling that audio **ships**,
+ *   speed-tiered, overruling the written cut `docs/29-audio-direction.md` recommended — so this
+ *   row gains a consumer rather than losing its label. What was blocking it was the speed ladder
+ *   having no 1:1 rung for a discrete cue to play at, and § D354 closed that. The entry below is
+ *   therefore a **queue item with an owner** (`buildNotes.test.ts#ABSENCE_TRIAGE`, § D370) rather
+ *   than a holding position, and it is deleted on the commit that makes a sound play and not
+ *   before. [§ D447](../../../../DECISIONS.md) records that reading and the correction it owed the
+ *   design guide, whose § 20.12 and § 15.1 both still put the choice as open.
  * - **Default speed — not drawn.** The prototype's row writes `st.speed`, § 18's Everyday
  *   `run.speed(1..5)` — state this build does not have: the day a player runs is the Engineer
  *   stage (§ D335's hand-off), whose ×-chips and `settings.playbackSpeed` multiplier belong to
  *   that surface and mean *how fast to watch a recording*, not *how fast a day starts*. Wiring
  *   this label to that mechanism would be a control doing something other than what it says.
- * - **Units — not drawn.** `grep -rin "imperial" packages/viz/src --include='*.ts'` finds **no
- *   non-test occurrence**: no field of `menu/types.ts`'s `Settings`, no display formatter, reads
- *   a metres-or-feet preference (`ratedLoadLb` and friends are reference-data identifiers, not a
- *   preference — CLAUDE.md's units convention). A row would persist a bit nothing consults.
+ * - **Units — shipped, and it is the newest of the two wired rows.** It used to be refused, and the
+ *   refusal's own evidence was the grep: `grep -rin "imperial" packages/viz/src --include='*.ts'`
+ *   found **no non-test occurrence**, so a row would have persisted a bit nothing consults.
+ *   **The consumer is built** — `everyday/units.ts`, ENGINE_CONTRACT § 13's *metres by default; the
+ *   `Units` setting switches machine specs to feet and must convert, not relabel* — and the row
+ *   goes up on the same commit that makes the refusal false ([§ D448](../../../../DECISIONS.md),
+ *   GitHub issue #170). It reaches the drawing board's rating plate and machine panel, the tuner's
+ *   machine card, and the daily loop's *Rated speed* fact; what it deliberately does not reach is
+ *   enumerated and asserted in `units.ts` rather than described here, and the row's own note says
+ *   *machine specifications* rather than *everything* so that the promise matches the scope.
+ *   **This row holds its own value**, unlike Motion: there is no Engineer switch to be a second
+ *   answer to, because nothing on that surface reads the preference. It lives in the Everyday slot
+ *   beside the profile rather than on it — identity travels with a posted run and a display
+ *   preference must not — and so it is drawn whether or not the Engineer bridge has arrived, which
+ *   is why the *Playing* section can be non-empty while the Motion row is still absent.
  * - **Post runs to the board — not drawn.** `honesty/generate.ts` says it outright: *"There is
  *   no `settings.noPost` flag in this tree"* — the real gates are `menu/account.ts#postingRefusal`
  *   and `shift/banking.ts#bankingRefusalFor`, and neither reads a switch. The Everyday boards
@@ -73,6 +93,11 @@ import {
  * it was keeping, and the arrow runs one way: that module has never imported this one.
  */
 import { STAGE_SPEEDS } from './stageScreenModel.js';
+import {
+  DEFAULT_EVERYDAY_UNITS,
+  UNITS_ROW_COPY,
+  type EverydayUnits,
+} from './units.js';
 
 /** One avatar swatch, drawable: § 15.1's six, with the picked one carrying the ink edge. */
 export interface SettingsSwatchView {
@@ -104,7 +129,7 @@ export interface SettingsYouView {
 
 /** One shipped toggle row — label, one-clause effect, and the pill's two faces. */
 export interface SettingsToggleView {
-  readonly id: 'motion';
+  readonly id: 'motion' | 'units';
   readonly label: string;
   /** § 16's register: what the row does, in one clause. */
   readonly note: string;
@@ -164,7 +189,19 @@ export interface SettingsScreenView {
 export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
   'Sound — nothing in this build plays a sound, and a toggle that toggles nothing is a lie in a settings panel',
   `Default speed — the stage has its own ${String(STAGE_SPEEDS.length)} speeds and resets to the same one on every run, so the preference this row would set is buildable now and is not built`,
-  'Units — nothing in the viewer reads a metres-or-feet preference, so there is nothing for the switch to switch',
+  /*
+   * **`Units` was the third entry and it is deleted, not reworded** — GitHub issue #170,
+   * [§ D448](../../../../DECISIONS.md).
+   *
+   * It read *"Units — nothing in the viewer reads a metres-or-feet preference, so there is nothing
+   * for the switch to switch"*, and that was true of every build until this one: the refusal's own
+   * evidence was a grep that found no non-test reader. `everyday/units.ts` is that reader, the row
+   * is drawn above, and a register still refusing it would be § D227's defect in the direction that
+   * bites *after* a lane lands — a refusal standing over a seam that works, telling a player not to
+   * press a control that does something. The triage row that owned it goes on the same commit
+   * (`buildNotes.test.ts#ABSENCE_TRIAGE`, § D370), which is what that table's second assertion is
+   * for.
+   */
   'Post runs to the board — the boards need a server this build has none of, and no posting path reads such a switch',
   'Sign out — nothing on this surface is signed in; the name and picture above live on this device',
   'Clear saved progress — not offered yet: the running session would write itself straight back on its next save',
@@ -193,6 +230,16 @@ export interface SettingsScreenInput {
   readonly durable?: boolean | undefined;
   /** `engineerSettings()?.reduceMotion()` — `undefined` while the Engineer surface is booting. */
   readonly reduceMotion?: boolean | undefined;
+  /**
+   * `everydayProfileStore().units()` — how machine specifications read (GitHub issue #170).
+   *
+   * Optional, and it is the **only** optional field here whose absence is not a state a player can
+   * be in: the store is total in this value, so `undefined` means *a caller did not pass it* rather
+   * than *nothing is stored*, and § 13's default is what it falls back to. That asymmetry with
+   * {@link reduceMotion} is the point — a missing bridge is a real window a player can meet and is
+   * drawn as one, while a missing preference is not, so this row never has an absent arm.
+   */
+  readonly units?: EverydayUnits | undefined;
 }
 
 /** § 15.1's screen for this state. Total; every sentence a player can meet starts here. */
@@ -200,6 +247,7 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
   const committed = input.profile ?? DEFAULT_EVERYDAY_PROFILE;
   const nameValue = input.draftName ?? committed.name;
   const bridgeAbsent = input.reduceMotion === undefined;
+  const units = input.units ?? DEFAULT_EVERYDAY_UNITS;
   return {
     eyebrow: 'ELEVATOR SIM · EVERYDAY MODE',
     title: 'Settings',
@@ -224,22 +272,43 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
       home: 'Nothing on this screen is signed in — your name and picture live on this device.',
       saveNotice:
         input.durable === false
-          ? 'This device is not keeping storage, so the name and picture last until this tab closes.'
+          ? 'This device is not keeping storage, so the name, the picture and the Units choice ' +
+            'below last until this tab closes.'
           : undefined,
     },
     playing: {
       heading: 'PLAYING',
-      rows: bridgeAbsent
-        ? []
-        : [
-            {
-              id: 'motion',
-              label: 'Motion',
-              note: 'cars and figures animate',
-              value: input.reduceMotion === true ? 'reduced' : 'full',
-              on: input.reduceMotion !== true,
-            },
-          ],
+      rows: [
+        /*
+         * Motion first, § 15.1's own order — and **absent** rather than dead while the Engineer
+         * surface is still booting, because that row holds no value of its own and a press would
+         * land nowhere. Units is below it and does not share that window: it holds its own value in
+         * this device's own slot, so it is drawable from the first paint.
+         */
+        ...(bridgeAbsent
+          ? []
+          : ([
+              {
+                id: 'motion',
+                label: 'Motion',
+                note: 'cars and figures animate',
+                value: input.reduceMotion === true ? 'reduced' : 'full',
+                on: input.reduceMotion !== true,
+              },
+            ] as const)),
+        {
+          id: 'units',
+          label: UNITS_ROW_COPY.label,
+          note: UNITS_ROW_COPY.note,
+          value: UNITS_ROW_COPY.face[units],
+          /*
+           * `on` is the pill's *filled* face rather than a claim about which unit is right, and it
+           * is the non-default one here for the reason the Motion pill fills on `full`: the filled
+           * face is the state a player chose, and metres is § 13's default rather than a choice.
+           */
+          on: units === 'imperial',
+        },
+      ],
       absentNote: bridgeAbsent
         ? 'The Motion switch is the simulator’s own, and the simulator is still loading — the row appears when it has.'
         : undefined,

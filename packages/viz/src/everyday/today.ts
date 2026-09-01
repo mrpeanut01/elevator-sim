@@ -53,6 +53,7 @@ import type { GoalReading, ShiftEvent, WeekState, Weekday } from '../shift/types
 import { weekdayOf } from '../shift/types.js';
 
 import { countFigure, EM_DASH, groupThousands } from './figures.js';
+import { speedFigure, type EverydayUnits } from './units.js';
 
 /**
  * People per working car at which § 6.2's tinted panel stops saying *Busy* — the prototype's
@@ -135,6 +136,19 @@ export interface TodayInput {
   /** `host.goalsToday()` — pending before a run, which is what *what today asks* wants. */
   readonly goals: readonly GoalReading[];
   readonly seed: bigint;
+  /**
+   * How machine specifications read — § 15.1's `Units` row, GitHub issue #170,
+   * [§ D448](../../../../DECISIONS.md).
+   *
+   * **Required rather than optional, and for the same reason `calendar` is.** An optional
+   * preference would default to metres, every caller that forgot it would silently draw metres,
+   * and the *Rated speed* fact would go on reading `m/s` for a player who had asked for feet —
+   * which is § D227's stale claim arriving through a default instead of through a sentence.
+   *
+   * **Presentation only.** This record is a description of the day; nothing derived from this
+   * field reaches the run, and everything it touches below is a string.
+   */
+  readonly units: EverydayUnits;
 }
 
 /** How many cars the building has, across every bank. A double-deck car is one car. */
@@ -178,7 +192,11 @@ function outOfServiceOf(
 }
 
 /** § 6.2's five rows, from the resolved building. Empty when there is no document to read. */
-function factsOf(building: ResolvedBuilding | undefined, held: number): readonly TodayFact[] {
+function factsOf(
+  building: ResolvedBuilding | undefined,
+  held: number,
+  units: EverydayUnits,
+): readonly TodayFact[] {
   if (building === undefined) return [];
   const cars = carCountOf(building);
   const working = Math.max(0, cars - held);
@@ -215,8 +233,13 @@ function factsOf(building: ResolvedBuilding | undefined, held: number): readonly
           : `${String(smallest)} · ${String(smallest * working)} a trip with ${String(working)} working`,
     },
     {
+      /*
+       * The one machine specification on the daily loop, so it is the one row § 13's `Units`
+       * preference reaches here (GitHub issue #170, § D448). The **fastest** car, which is what a
+       * spec sheet leads with and what `shift/contracts.ts#statLineOf` quotes for the same reason.
+       */
       label: 'Rated speed',
-      value: speeds.length === 0 ? EM_DASH : `${String(Math.max(...speeds))} m/s`,
+      value: speeds.length === 0 ? EM_DASH : speedFigure(Math.max(...speeds), units),
     },
   ];
 }
@@ -280,7 +303,7 @@ export function todayOf(input: TodayInput): TodayRecord {
     lede: ledeOf(building, event, held),
     wrinkle: event,
     outOfService: outOfServiceOf(building, event),
-    facts: factsOf(building, held),
+    facts: factsOf(building, held, input.units),
     load: loadOf(building, held),
     asks: input.goals.map((reading) => reading.goal.label),
     seedLine: `tower ${input.buildingId} · crowd ${input.seed.toString()} · everyone identical`,
