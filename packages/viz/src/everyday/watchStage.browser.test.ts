@@ -180,8 +180,11 @@ describe.skipIf(!HAS_BROWSER)('watching, in the Everyday shell — GAMEPLAY § 1
    *
    * It also drives the entry rule's guard from the other end: the mount's first act on a watch must
    * not be `startRun`, and a run started there would be the player's own day landing on the stage
-   * under a stranger's chrome. What that would look like from here is the band coming up and the
-   * building name under it changing a beat later.
+   * under a stranger's chrome. **The first draft of this case could not see that**, and the fix is
+   * worth stating rather than quietly applying: it watched the band's name, which is drawn from the
+   * *row* and would go on saying the record's name over a replaced run — the very state being
+   * refused. The header is drawn from the **recording**, so it is what moves. Measured with the
+   * guard removed: `06:00 · FILLING` became `08:00 · STEADY` inside four seconds.
    */
   it('files nothing, and does not start a day of its own on the way in', async () => {
     const page = await openEveryday();
