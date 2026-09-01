@@ -43,14 +43,25 @@
  * synchronous pair computes, and the relabel is deferred one frame so it paints first. A case's
  * four figures need one as-built run, taken synchronously on the case's first open and cached.
  *
- * ## FIXED is session-local, and the absence has a name
+ * ## FIXED survives the tab now, and the rest of the session does not
  *
- * No solved-cases seam exists in `persist/` — the one slot carries the week and the dispatcher
- * library (`persist/session.ts`), and nothing in `viz/src` stores a fixit result. So the solved
- * set, the per-case selections and the cached runs live in module scope: they survive leaving
- * the screen and returning, and they end with the tab. A parallel store invented here would be
- * a second persistence door for the lead to reconcile later; the day the slot grows a fixit key,
- * this store is what it replaces.
+ * This section used to name an absence: *no solved-cases seam exists in `persist/`… the solved set
+ * ends with the tab*. GitHub issue #224 closed it, and the slot that grew the key is the one that
+ * sentence pointed at — **not** `persist/`'s envelope but the Everyday one,
+ * `everyday/profile.ts` ([§ D433](../../../../DECISIONS.md)), which is where an Everyday screen's
+ * earnings belong.
+ *
+ * So the split inside this module is now three ways rather than two:
+ *
+ * - **The solved set is durable.** {@link solvedIds} is still read off `sessions`, and `sessions`
+ *   is seeded once per tab from the store by {@link ensureRestored}. Every press that changes a
+ *   case's badge writes the whole set back.
+ * - **The per-case selections and the cached as-built runs are still session-local**, and
+ *   deliberately: a `FixitState` is a working draft a player is in the middle of, and a
+ *   `RecordedRun` is megabytes of legs. Neither is progress; both end with the tab, as before.
+ * - **The badge still follows the latest run in both directions** (`fixit/engine.ts#fixedBadgeAfter`,
+ *   `docs/20` defect 16). A restored case arrives badged and is re-badged by the next run it has,
+ *   including out of FIXED — restoring the badge does not make it a high-water mark.
  *
  * ## Data, loaded through the same doors
  *
@@ -94,6 +105,8 @@ import {
   fixitSpendSummary,
   type FixitSpendSummary,
 } from './fixitScreenModel.js';
+import { solvedCaseSetOf } from './profile.js';
+import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
@@ -131,7 +144,8 @@ interface LoadedFixit {
 }
 
 /* ------------------------------------------------------------------------- *
- * The module-scope store — see the docstring's FIXED-is-session-local note.
+ * The module-scope store — seeded from the slot, see the docstring's
+ * FIXED-survives-the-tab note for which of these outlive it and which do not.
  * ------------------------------------------------------------------------- */
 
 let loaded: LoadedFixit | undefined;
@@ -140,6 +154,56 @@ let loadPromise: Promise<void> | undefined;
 const sessions = new Map<string, CaseSession>();
 let selectedId: string | undefined;
 let running = false;
+
+/** Whether {@link ensureRestored} has already run. Once per tab, like the case file's own load. */
+let restored = false;
+
+/**
+ * Seed the solved set from what the last sitting earned — GitHub issue #224.
+ *
+ * Materialised into `sessions` rather than held as a second set beside it, and that is the whole of
+ * why the badge rule survives: `solvedIds`, `selectFirstUnsolved` and `fixitBar` all read
+ * `sessions` and are untouched, and the next run of a restored case overwrites its `fixed` exactly
+ * as it overwrites a case solved a minute ago. A separate *restored* set would have had to be
+ * consulted beside the session's answer at three sites, and the day one of them forgot, a case
+ * would stay badged FIXED beside an outcome card saying it is not — `docs/20` defect 16, rebuilt.
+ *
+ * The restored session carries **no outcome and no cached run**: `outcome: undefined` is true — this
+ * sitting has not run this case — and it is what makes the § 3.3 primary read `Run the day` rather
+ * than `Run it again` on a case whose verdict this tab has never seen.
+ */
+function ensureRestored(): void {
+  if (restored) return;
+  restored = true;
+  for (const id of solvedCaseSetOf(everydayProfileStore().progress())) {
+    sessions.set(id, {
+      state: emptyFixitState(),
+      fixed: true,
+      outcome: undefined,
+      asBuilt: undefined,
+    });
+  }
+}
+
+/**
+ * Write the solved set back.
+ *
+ * The whole set on every change rather than one id, because the slot holds one value and `write`
+ * replaces it whole — and because the set shrinks as well as grows: a case that stops being FIXED
+ * has to stop being stored, which an append-only write could not express.
+ *
+ * Spread over the store's current progress rather than built fresh, so the ratings beside it are
+ * carried through: two payloads in one value, and a writer that supplied only its own half would
+ * delete the other's on every press.
+ *
+ * Returns nothing, and does not check the answer. Whether the write survived the tab is
+ * `progressNotice()`'s to say and the rail draws it on the very next render, which this caller
+ * always performs — so a second reading here would be the same fact told twice.
+ */
+function keepSolved(): void {
+  const store = everydayProfileStore();
+  store.setProgress({ ...store.progress(), solvedCaseIds: [...solvedIds()] });
+}
 
 function sessionOf(entry: FixitCase): CaseSession {
   let session = sessions.get(entry.id);
@@ -210,6 +274,8 @@ function mountFixit(
 ): MountedEverydayScreen {
   const doc = host.ownerDocument;
   let alive = true;
+  // Before anything reads `sessions` — the rail, `selectFirstUnsolved` and the § 3.3 bar all do.
+  ensureRestored();
 
   const root = el(doc, 'div', 'everyday-fixit');
   root.style.cssText = [
@@ -281,6 +347,21 @@ function mountFixit(
     count.style.cssText = `margin-left:auto;${MONO(10.5, C.terracotta)};flex:none`;
     head.append(heading, count);
     rail.append(head);
+
+    /*
+     * What the player is owed about their kept progress — GitHub issue #224.
+     *
+     * Drawn under the `{fixed}/{total}` count on purpose: the count is exactly the figure a refused
+     * restore makes wrong, and a `0/3 fixed` on a player who solved two yesterday is the silent
+     * empty state the notice exists to stop. The sentence is `everyday/profile.ts`'s, so the ladder
+     * says the same thing about the same store rather than wording it a second time.
+     */
+    const notice = everydayProfileStore().progressNotice();
+    if (notice !== null) {
+      const line = el(doc, 'p', 'everyday-fixit-progress-notice', notice);
+      line.style.cssText = `margin:8px 0 0;font-size:12px;line-height:1.5;color:${C.terracotta}`;
+      rail.append(line);
+    }
 
     const list = el(doc, 'div');
     list.style.cssText = `display:grid;gap:${String(GAP.row)}px;margin-top:12px`;
@@ -799,6 +880,9 @@ function mountFixit(
        * Engineer panel consume, so the two surfaces cannot come to disagree about what FIXED means.
        */
       session.fixed = fixedBadgeAfter(session.outcome);
+      // In both directions — see `keepSolved`. A case that has just stopped being FIXED stops
+      // being kept, or a reload would restore a badge this run has already taken away.
+      keepSolved();
       running = false;
       if (!alive) return;
       render();
@@ -835,6 +919,9 @@ function mountFixit(
  * for a redraw (`refreshBar`) whenever a press changes one of the four flags.
  */
 function fixitBar(state: EverydayState): ActionBarModel {
+  // The shell draws the bar independently of the mount, so this reader seeds the set too — a
+  // restored FIXED case must reach § 3.3's `Next building` on the first draw, not the second.
+  ensureRestored();
   const base = actionBarFor(state);
   const entry = currentEntry();
   const session = entry === undefined ? undefined : sessions.get(entry.id);

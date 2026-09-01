@@ -1131,20 +1131,60 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
-        'A storage slot with no sentence in it — **the id/key case again**. All three are derived ' +
-        'only because `PROFILE_KEY`’s value, `elevator-sim.everyday-profile`, reads to the two-' +
+        'A storage slot with no sentence in it — **the id/key case again**. It is derived only ' +
+        'because `PROFILE_KEY`’s value, `elevator-sim.everyday-profile`, reads to the two-' +
         'adjacent-words scanner as a phrase; it is a `localStorage` key in the same family as ' +
-        '`persist/types.ts#SESSION_KEY`, and nothing any of the three returns is shown to ' +
-        'anybody. What they carry is a player’s own name and one of six colours, and the screen ' +
-        'that draws those is `everyday/settingsView.ts`, driven by `EVERYDAY_SETTINGS`. The ' +
-        'refusals here are refusals to *restore* — a version this build cannot read, a colour ' +
-        'outside the curated six — and they produce no words at all, only `undefined`, which is ' +
-        'the whole reason the caller has a fallback profile. `everyday/profile.test.ts` asserts ' +
-        'each of them directly.',
+        '`persist/types.ts#SESSION_KEY`, and nothing it returns is shown to anybody. What it ' +
+        'carries is a player’s own name and one of six colours, and the screen that draws those ' +
+        'is `everyday/settingsView.ts`, driven by `EVERYDAY_SETTINGS`. Its refusals are refusals ' +
+        'to *restore* — a version this build cannot read, a colour outside the curated six — and ' +
+        'they produce no words at all, only `undefined`, which is the whole reason the caller has ' +
+        'a fallback profile. `everyday/profile.test.ts` asserts each of them directly. **This ' +
+        'group held three ids and holds one**: `saveProfile` was deleted by GitHub issue #224 ' +
+        '(one slot, one writer, and it takes both payloads), and `createProfileStore` moved to ' +
+        'the group below because the clause *they produce no words at all* stopped being true of ' +
+        'it the moment the store grew a progress notice — § D227’s stale exclusion, corrected on ' +
+        'the commit that made it stale rather than a wave later.',
+      ids: ['everyday/profile.ts#loadProfile'],
+    },
+    {
+      reason:
+        'The Everyday slot’s progress half — **player-facing, and not driven here**, said plainly ' +
+        'in `dev/shiftRunner.ts`’s own form a few groups above. GitHub issue #224 made the solved ' +
+        'fix cases and the gauntlet rating survive the tab, and gave every refusing path a ' +
+        'sentence: an empty ladder is exactly what a player who has earned nothing sees, so a ' +
+        'silent refusal here would read as *your afternoon did not happen*. Producing one of ' +
+        'those sentences means handing this module a `SessionStore` whose bytes are corrupt, ' +
+        'whose version is unreadable, or whose payload is past `PROGRESS_BUDGET_CHARACTERS` — and ' +
+        'the corpus hands an adapter a finished recording, never a storage port, which is the ' +
+        'same *cannot be reached from this context* the DOM-bound group states about a mount. ' +
+        '`everyday/profile.test.ts` asserts every sentence against a fabricated store, and ' +
+        '`everyday/progress.browser.test.ts` asserts the corrupt-store one on the shipped page ' +
+        'after a real reload; both are weaker than the search and are stated as a limitation ' +
+        'rather than presented as coverage.',
       ids: [
-        'everyday/profile.ts#loadProfile',
-        'everyday/profile.ts#saveProfile',
+        'everyday/profile.ts#PROGRESS_REFUSALS',
+        'everyday/profile.ts#loadProgress',
+        'everyday/profile.ts#saveEveryday',
         'everyday/profile.ts#createProfileStore',
+      ],
+    },
+    {
+      reason:
+        'Validator reasons that reach no screen — the shape `persist/validate.ts` established and ' +
+        'the reason this group is separate from the one above rather than folded into it. Both ' +
+        'answer *why are these bytes not ours*, in a sentence rather than a boolean so that a ' +
+        'refusal can name the field that was wrong; and `everyday/profile.ts#loadProgress` ' +
+        'collapses every one of them to the single player sentence `PROGRESS_REFUSALS.shape`, so ' +
+        'no string either of them composes is ever rendered. `ladderEntryOf` is here for the ' +
+        '**id case** instead: it authors nothing at all, returning a `LadderEntry` whose only ' +
+        'strings are a dispatcher id, a name the library supplied and a weight-vector digest — ' +
+        'every word on the row it becomes is `ladderRowsOf`’s, which the `GAUNTLET` adapter ' +
+        'drives. `gauntlet/ladder.test.ts` asserts all three directly.',
+      ids: [
+        'gauntlet/ladder.ts#savedRatingIssue',
+        'gauntlet/ladder.ts#ladderEntryOf',
+        'gauntlet/rating.ts#ratedCaseIssue',
       ],
     },
     {
