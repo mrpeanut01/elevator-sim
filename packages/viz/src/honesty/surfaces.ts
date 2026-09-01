@@ -169,6 +169,8 @@ import {
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  STAGE_SWITCH_PICKER_LABEL,
+  type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
 import {
@@ -8586,6 +8588,10 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * and a refusal that belongs to a control is read where the control is.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
+    /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_NO_GHOST',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
@@ -8640,18 +8646,62 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     for (const speed of STAGE_SPEEDS) {
       seeds.push({ field: `stage.speed.${String(speed.simPerRealS)}`, text: speed.label, role: 'label' });
     }
-    for (const arm of STAGE_INTERVENTIONS) {
-      seeds.push({
-        field: `stage.intervene.${arm.change.kind}.label`,
-        text: arm.label,
-        role: 'label',
+    /*
+     * **Every arm the control can offer, including the one that is built per call** — GitHub issue
+     * **#171**. `STAGE_INTERVENTIONS` holds only the arms whose whole content is their kind, so
+     * iterating it would sweep the park button and miss § 7.6's handover entirely: that row carries
+     * a whole profile and is assembled by `stageInterventionsOf` from the dispatcher the picker
+     * names. Driving the model over both states is what puts its label, its title *and* its own
+     * refusal into the corpus.
+     *
+     * The two profiles are the shipped file's own, so the label seeded is a dispatcher name a player
+     * can actually be handed the day by. `offered` hands to a different vector and `already` hands to
+     * the one driving, which is the only way the refusal is ever produced.
+     */
+    const [driving, elsewhere] = context.dispatcherProfiles.profiles;
+    const switchStates: readonly (readonly [string, StageSwitchTarget | undefined])[] = [
+      ['plain', undefined],
+      ...(driving === undefined || elsewhere === undefined
+        ? []
+        : ([
+            ['offered', { target: elsewhere, driving: () => driving }],
+            ['already', { target: driving, driving: () => driving }],
+          ] as const)),
+    ];
+    for (const [state, switchTo] of switchStates) {
+      const arms = stageInterventionsOf({
+        interventions: [],
+        simTimeS: recording.startedAt,
+        hasRun: true,
+        dayClosed: false,
+        recomputing: false,
+        ...(switchTo === undefined ? {} : { switchTo }),
       });
-      seeds.push({
-        field: `stage.intervene.${arm.change.kind}.explains`,
-        text: arm.explains,
-        role: 'prose',
-      });
+      for (const arm of arms.rows) {
+        seeds.push({
+          field: `stage.intervene(${state}).${arm.change.kind}.label`,
+          text: arm.label,
+          role: 'label',
+        });
+        seeds.push({
+          field: `stage.intervene(${state}).${arm.change.kind}.explains`,
+          text: arm.explains,
+          role: 'prose',
+        });
+        if (arm.refusal !== undefined) {
+          seeds.push({
+            field: `stage.intervene(${state}).${arm.change.kind}.refusal`,
+            text: arm.refusal,
+            role: 'reason',
+          });
+        }
+      }
     }
+    seeds.push({
+      field: 'stage.intervene.switch.pickerLabel',
+      text: STAGE_SWITCH_PICKER_LABEL,
+      role: 'label',
+    });
     seeds.push({ field: 'stage.race.noGhost', text: STAGE_NO_GHOST, role: 'reason' });
 
     /* § 14's overflow chip — the one string `stageCrowdCapOf` produces. */

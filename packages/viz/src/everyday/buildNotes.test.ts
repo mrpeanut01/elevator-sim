@@ -176,7 +176,7 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /* The stage. The camera is #283's — it may be a deliberate position rather than a gap. */
   { register: 'STAGE_ABSENCES', fragment: 'no campaign dock', issue: 181 },
   { register: 'STAGE_ABSENCES', fragment: 'no camera', issue: 283 },
-  { register: 'STAGE_ABSENCES', fragment: 'no decisions during a run', issue: 171 },
+  { register: 'STAGE_ABSENCES', fragment: 'no answer to a live incident', issue: 171 },
   /* The same missing second recording the shell's *Racing a second dispatcher* entry is about,
      said from the stage's side. One mechanism, one issue, two registers that both meet it. */
   { register: 'STAGE_ABSENCES', fragment: 'no rival lane', issue: 226 },

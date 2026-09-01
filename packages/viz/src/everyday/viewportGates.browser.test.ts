@@ -587,6 +587,15 @@ function failuresOf(cell: Cell): readonly string[] {
  * between 33 and 321 px. A build whose text metrics differ by more than 9 px across a chip row would
  * flip that one entry to `×6`, and the failure would read as a layout change rather than as a font.
  * If this file goes red on exactly that line and on nothing else, measure before believing it.
+ *
+ * **Two counts moved and one line is new, and none of the three is a new defect** — GitHub issue
+ * **#171**, which put § 7.6's second arm on the stage. The intervention row was *already* wholly
+ * unreachable at both viewports; it now holds a picker and a second button, so
+ * `everyday-stage-intervene` reads **×2** and `everyday-stage-switch-pick ×1` joins it. The register
+ * counts controls rather than rows, so a row that grows moves its number without anything about the
+ * layout having changed — which is the one way this list can go red that means *the product grew*
+ * rather than *the product regressed*. The lines are #240's like every other entry: the same row, at
+ * the same two viewports, for the same reason.
  */
 const OUTSTANDING: readonly string[] = Object.freeze([
   '360×800 · main menu · clause 1 · content clipped horizontally',
@@ -595,18 +604,20 @@ const OUTSTANDING: readonly string[] = Object.freeze([
   '360×800 · stage · clause 1 · content clipped horizontally',
   '360×800 · stage · clause 3 · everyday-bar-primary ×1',
   '360×800 · stage · clause 3 · everyday-bar-timeline > button ×2',
-  '360×800 · stage · clause 3 · everyday-stage-intervene ×1',
+  '360×800 · stage · clause 3 · everyday-stage-intervene ×2',
   '360×800 · stage · clause 3 · everyday-stage-speed ×7',
   '360×800 · stage · clause 3 · everyday-stage-start ×1',
+  '360×800 · stage · clause 3 · everyday-stage-switch-pick ×1',
   '375×667 · main menu · clause 1 · content clipped horizontally',
   '375×667 · main menu · clause 3 · everyday-bar-primary ×1',
   '375×667 · main menu · clause 3 · everyday-mode ×4',
   '375×667 · stage · clause 1 · content clipped horizontally',
   '375×667 · stage · clause 3 · everyday-bar-primary ×1',
   '375×667 · stage · clause 3 · everyday-bar-timeline > button ×2',
-  '375×667 · stage · clause 3 · everyday-stage-intervene ×1',
+  '375×667 · stage · clause 3 · everyday-stage-intervene ×2',
   '375×667 · stage · clause 3 · everyday-stage-speed ×6',
   '375×667 · stage · clause 3 · everyday-stage-start ×1',
+  '375×667 · stage · clause 3 · everyday-stage-switch-pick ×1',
 ]);
 
 /* -------------------------------------------------------------------------- *

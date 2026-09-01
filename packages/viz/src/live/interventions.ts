@@ -20,7 +20,11 @@
  * means.
  */
 
-import type { InterventionChange, RunInterventionConfig } from '@elevator-sim/core/browser';
+import type {
+  DispatcherProfile,
+  InterventionChange,
+  RunInterventionConfig,
+} from '@elevator-sim/core/browser';
 
 import { clockAt } from './timeline.js';
 
@@ -55,6 +59,70 @@ export function switchDispatcherLabelOf(name: string): string {
 export const SWITCH_PINS_NOTE =
   'from this moment the day runs on this dispatcher’s weights alone — any rules or pattern ' +
   'switching stand down for the rest of the day';
+
+/**
+ * Whether handing the day to `target` would genuinely change nothing.
+ *
+ * ## Why this is here rather than in either shell
+ *
+ * The Engineer strip has carried this arm since Everyday slice 3 and worked out the shape the hard
+ * way (`dev/main.ts`, review finding 2): the **old** check compared base *ids*, and the profile that
+ * actually drives a run is derived — levers, the weight-set selector, the rule rows and the campaign
+ * kit are all folded in by `dev/state.ts#drivingProfileOf` — so an id comparison disabled the control
+ * at exactly the moment pressing it would have changed the run, a lever-moved player handing the day
+ * back to the plain baseline. That is § D177's inert-control class with its polarity reversed, and it
+ * is not a thing worth discovering twice.
+ *
+ * So when § 7's Everyday stage grew the same arm (GitHub issue **#171**) the predicate moved here
+ * rather than being written a second time. One implementation, two callers, and the pure/DOM split
+ * every module in `live/` keeps: this file already owns the control's *words*, and *whether the
+ * control can act* is the same kind of fact about the same control.
+ *
+ * ## The three grounds, in the order they are decided
+ *
+ * 1. **A handover already on the log pins the answer.** From the stamped instant the run obeys that
+ *    profile's vector alone (`dispatch/policy.ts#adoptWeights`, and {@link SWITCH_PINS_NOTE} is the
+ *    sentence a player reads), so nothing about the player's *later* state can make a second
+ *    handover to the same profile do anything. `latest === target.id` and no vector is consulted.
+ * 2. **Otherwise the vectors are compared canonically.** Key order is authoring noise rather than a
+ *    difference, so both sides are serialised with their keys sorted.
+ * 3. **And a live chooser is itself a difference.** On a rules or selector profile the switch also
+ *    stands the chooser down for the rest of the run, which is a change even at equal base weights —
+ *    so an equal vector under `selection.policy !== 'off'` is *not* a no-op.
+ *
+ * {@link SwitchNoopInput.driving} is a thunk and not a value, which is the one shape decision in
+ * this signature. Ground 1 answers without it, and deriving the driving profile means walking the
+ * whole spec chain; both callers draw on frames, so a value parameter would run that walk on every
+ * frame of every run that already carries a handover. The thunk is called at most once.
+ */
+export interface SwitchNoopInput {
+  /** Today's log, in press order — the same array the stamp reads. */
+  readonly interventions: readonly RunInterventionConfig[];
+  /** The profile the control would hand the day to. */
+  readonly target: DispatcherProfile;
+  /** The vector **actually driving**, derived — see the docstring for why it is a thunk. */
+  readonly driving: () => DispatcherProfile;
+}
+
+export function switchChangesNothing(input: SwitchNoopInput): boolean {
+  let latest: string | undefined;
+  for (const entry of input.interventions) {
+    if (entry.change.kind === 'switch-dispatcher') latest = entry.change.profile.id;
+  }
+  if (latest !== undefined) return latest === input.target.id;
+  const driving = input.driving();
+  return (
+    vectorOf(driving.weights) === vectorOf(input.target.weights) &&
+    (driving.selection?.policy ?? 'off') === 'off'
+  );
+}
+
+/** A profile's vector, canonically — key order is authoring noise, not a difference. */
+function vectorOf(weights: Readonly<Record<string, number>>): string {
+  return JSON.stringify(
+    Object.fromEntries(Object.entries(weights).sort(([a], [b]) => a.localeCompare(b))),
+  );
+}
 
 /**
  * The stage's `recomputing` beat — contract § 1.4's own requirement, verbatim in intent: a

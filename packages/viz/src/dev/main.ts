@@ -131,6 +131,7 @@ import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
   RECOMPUTING_BEAT,
+  switchChangesNothing,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
 } from '../live/interventions.js';
@@ -3290,37 +3291,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
     interveneAt(playback.simTimeS, { kind: 'switch-dispatcher', profile: switchTarget });
   });
 
-  /** A profile's vector, canonically — key order is authoring noise, not a difference. */
-  const vectorOf = (weights: Readonly<Record<string, number>>): string =>
-    JSON.stringify(
-      Object.fromEntries(Object.entries(weights).sort(([a], [b]) => a.localeCompare(b))),
-    );
   /** Memo per state object — the derivation walks the whole chain and this runs per frame. */
   let switchNoopCache: { readonly forState: ViewerState; readonly noop: boolean } | undefined;
   /**
-   * Whether pressing the switch would genuinely change nothing — review finding 2. The old
-   * check compared base **ids**, and the driving profile is *derived* (levers, selector, rules —
-   * `drivingProfileOf`'s chain), so it disabled the control exactly where pressing it would
-   * change the run: a lever-moved player handing the day back to the plain baseline. § D177's
-   * inert-control class with the polarity reversed. Now: with a handover already on the log, the
-   * press is a no-op only if that handover names this target (the pin makes later state moot);
-   * otherwise the press is a no-op only if the *vector actually driving* equals the target's —
-   * compared canonically, through the one derivation `shiftRunConfigOf` itself runs — **and** no
-   * chooser is live, because on a rules or selector profile the switch also stands the chooser
-   * down, which is a change even at equal base weights.
+   * Whether pressing the switch would genuinely change nothing — review finding 2, and since GitHub
+   * issue **#171** `live/interventions.ts#switchChangesNothing` rather than a second copy of it
+   * here. § 7's Everyday stage grew this same arm, and the thing worth sharing is not the words but
+   * the check that stopped this control being inert: comparing base **ids** disabled it exactly
+   * where pressing it would change the run (§ D177's class with its polarity reversed). That
+   * module's docstring carries all three grounds.
+   *
+   * What stays here is the **memo**, because it is the part that is about this surface rather than
+   * about the control: only this shell holds a `ViewerState` to key on, and `drivingProfileOf` walks
+   * the whole spec chain while `drawIntervention` runs on frames.
    */
   const switchWouldChangeNothing = (viewState: ViewerState): boolean => {
     if (switchTarget === undefined) return true;
-    let latest: string | undefined;
-    for (const entry of viewState.interventions) {
-      if (entry.change.kind === 'switch-dispatcher') latest = entry.change.profile.id;
-    }
-    if (latest !== undefined) return latest === switchTarget.id;
     if (switchNoopCache?.forState === viewState) return switchNoopCache.noop;
-    const driving = drivingProfileOf(resources, viewState);
-    const noop =
-      vectorOf(driving.weights) === vectorOf(switchTarget.weights) &&
-      (driving.selection?.policy ?? 'off') === 'off';
+    const noop = switchChangesNothing({
+      interventions: viewState.interventions,
+      target: switchTarget,
+      driving: () => drivingProfileOf(resources, viewState),
+    });
     switchNoopCache = { forState: viewState, noop };
     return noop;
   };

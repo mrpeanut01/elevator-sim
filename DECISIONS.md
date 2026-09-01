@@ -30090,3 +30090,62 @@ exactly: 18 for the settings row (three strings over six sub-cases), 18 for the 
 three arms, doubled), 12 for the class band (two figures over three arms, doubled), 2 for the tuner
 readout (two arms), and 2 for the daily loop (one fact over two days). Cases, simulations, surfaces,
 suppressed runs and failing cases all unmoved.
+
+
+## D451 — an absence that has half stopped being true is deleted whole and re-taken, never trimmed
+
+**Date: 2026-09-01 · Owner: wave K lane E · GitHub issue #171, closed in one arm of two.**
+
+**Decision.** When a register entry asserts two absences and one of them is built, the entry is
+**deleted on the commit that builds it** and a **narrower entry is taken afresh** for what is still
+missing — with its own words, its own triage row and its own pin. It is not edited down to the
+surviving clause.
+
+**Why the distinction is not pedantry.** A trimmed entry keeps its history, its fragment and its
+issue number while its *subject* has changed underneath it, and every instrument this repository has
+for keeping refusals honest is keyed on those three things:
+`everyday/buildNotes.test.ts#ABSENCE_TRIAGE` matches a fragment and asserts the mapping is total and
+has no stale rows; `everyday/refusalsAreCurrent.test.ts` compares a sentence against the screen
+registry. Both go on passing across a trim, because the fragment still matches and the screen names
+are unchanged. What has moved is the only thing neither can see: what the sentence is *about*.
+
+**The instance.** `STAGE_ABSENCES` read *"no decisions during a run — a day can carry a handover to
+another dispatcher and an answered incident, and this screen offers neither: a handover needs a
+dispatcher picked somewhere, and an incident needs the dock above"*. § 7.6's handover is now on the
+stage, so the entry's own verb — *offers neither* — was false the moment the picker landed. Left
+standing it is [§ D227](#d227)'s defect with its polarity reversed: a refusal telling a player not
+to look for a control that is there. The entry is gone; what stands is
+*"no answer to a live incident — a day can carry one, stamped with the moment it was given, and this
+screen offers none: the answer comes from the money-and-incident panel above, which is not drawn,
+over an incident this build does not raise while a day is running"*, and `ABSENCE_TRIAGE`'s row for
+issue #171 is re-pointed at the new fragment. It names **both** halves of what is missing rather than
+only the panel, because *"the panel is what is missing"* — the first draft of this entry — would have
+told a reader that drawing the dock is enough, and it is not.
+
+**The new entry is pinned by a run and not by a sentence**, which is what makes it a re-taking rather
+than a reword: `everyday/stageScreenModel.test.ts` requires that no row `stageInterventionsOf` can
+build carries an `answer-incident` change, in every state it can be asked. The day an answer arm
+lands, that case is red and the sentence has to come out with it — which is precisely what the
+deleted entry could not do for the handover, because nothing held it to the arm it described.
+
+**What was closed and what was not, stated rather than rounded.** Issue #171's acceptance names two
+arms and *both entries leave `STAGE_ABSENCES`*. One did. The handover was buildable because the
+screen already holds every dispatcher through the data façade; the answer is not, because § 7.5's
+dock is a panel that does not exist and the incident it would offer — a live one, with options
+carrying costs against the building's purse — has no producer in this build. `campaign/career.ts`
+authors two needs, a renewal and a service window, and both are decisions about the *career* taken
+between days rather than about the day on the stage. That is not this lane's reading of the code:
+`CAMPAIGN_ABSENCES`' first entry says it outright and is triaged to GitHub issue **#169** —
+*"Incidents here are the two the building implies … there is no seeded stream for a campaign day and
+no event calendar behind a contract."* So the second arm is blocked on an absence another issue
+already owns, and building it would have meant inventing the incident it answers, which is a larger
+decision than an intervention row and not this lane's to take.
+
+**And the arm that landed produces a day that cannot be posted.** `SUBMITTABLE_INTERVENTION_KINDS`
+admits `park-cars-lobby` alone, and `scope/runIdentity.ts` refuses a `switch-dispatcher` entry
+because it carries its weight vector inline, which a submission of ids may never hold. That refusal
+is worded and reachable, and no Everyday flow meets it today — § 15's *Post runs to the board* is
+still an absence of its own — but the handover has been an Engineer-only control until now, and this
+is the commit that lets a player reach that state from the Everyday stage. Watching is unaffected:
+`watch/record.ts#WATCH_RECORD_CARRIES` carries `viewer.interventions`, so a handed-over day travels
+to a spectator whole.

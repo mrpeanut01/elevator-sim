@@ -26,6 +26,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
+
 import type { VizRecording } from '../contract/types.js';
 import { WAIT_BANDS } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
@@ -65,6 +67,7 @@ import {
   STAGE_NO_PHASE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  STAGE_SWITCH_NO_CHANGE,
 } from './stageScreenModel.js';
 import { restBarWidthPx } from '../render/carRest.js';
 
@@ -508,17 +511,99 @@ describe('§ 7.2 — the alarm strip', () => {
  * -------------------------------------------------------------------------- */
 
 describe('§ 7.6 — the intervention control', () => {
-  it('ships one arm per InterventionChange kind this build has', () => {
+  /** A profile, as thin as the model reads one: an id, a name and a vector. */
+  const profile = (id: string, name: string, waitTime: number): DispatcherProfile => ({
+    id,
+    name,
+    weights: { waitTime, stopCount: 1 },
+  });
+  const PLAIN = profile('plain', 'Steady hand', 1);
+  const OTHER = profile('other', 'Lobby anchor', 4);
+
+  it('holds only the arms whose whole content is their kind', () => {
     /*
-     * The claim the docstring makes, checked: a row carries the whole `change`, so an arm is
-     * buildable here exactly when this screen holds everything that change needs. The kind union
-     * has three members and this table has one — the other two need a chosen profile (§ 11's
-     * workshop) and an answered incident (§ 7.5's dock), neither of which this screen holds.
+     * The constant's claim, checked: parking is the one change that needs nothing beyond its kind,
+     * so it is the one entry that can be a constant at all. The handover carries a whole profile and
+     * is therefore built per call — the case below is the one that checks it exists.
      */
     expect(STAGE_INTERVENTIONS.map((arm) => arm.change.kind)).toEqual(['park-cars-lobby']);
     for (const arm of STAGE_INTERVENTIONS) {
       expect(arm.label.length).toBeGreaterThan(4);
       expect(arm.explains).toMatch(/re-simulates/);
+      expect(arm.refusal).toBeUndefined();
+    }
+  });
+
+  const armsFor = (
+    switchTo: { target: DispatcherProfile; driving: DispatcherProfile } | undefined,
+    interventions: readonly RunInterventionConfig[] = [],
+  ) =>
+    stageInterventionsOf({
+      interventions,
+      simTimeS: 0,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      ...(switchTo === undefined
+        ? {}
+        : { switchTo: { target: switchTo.target, driving: () => switchTo.driving } }),
+    });
+
+  it('offers the handover only when the screen names somebody to hand to — GitHub issue #171', () => {
+    expect(armsFor(undefined).rows.map((row) => row.change.kind)).toEqual(['park-cars-lobby']);
+    const offered = armsFor({ target: OTHER, driving: PLAIN });
+    expect(offered.rows.map((row) => row.change.kind)).toEqual([
+      'park-cars-lobby',
+      'switch-dispatcher',
+    ]);
+  });
+
+  it('carries the whole profile on the row, because that is what the record carries', () => {
+    const [, handover] = armsFor({ target: OTHER, driving: PLAIN }).rows;
+    expect(handover?.change).toEqual({ kind: 'switch-dispatcher', profile: OTHER });
+    /* The name, never the id — a player hands the day to somebody, not to a key in a data file. */
+    expect(handover?.label).toContain('Lobby anchor');
+    expect(handover?.label).not.toContain('other');
+    expect(handover?.refusal).toBeUndefined();
+  });
+
+  it('refuses a handover to the vector already driving, and says why', () => {
+    /*
+     * The § D177 case with its polarity checked in both directions. Equal vectors under different
+     * **ids** is still a no-op — what drives a run is the vector, and the ids are two names for it.
+     */
+    const sameVector = armsFor({ target: profile('renamed', 'Renamed', 1), driving: PLAIN });
+    expect(sameVector.rows.at(-1)?.refusal).toBe(STAGE_SWITCH_NO_CHANGE);
+    /* And the direction that matters more: a moved lever makes the *standing name* a real change. */
+    const moved = armsFor({ target: PLAIN, driving: profile('plain', 'Steady hand', 9) });
+    expect(moved.rows.at(-1)?.refusal).toBeUndefined();
+  });
+
+  it('treats a handover already on the log as the pin it is', () => {
+    const log: readonly RunInterventionConfig[] = [
+      { atS: 120, change: { kind: 'switch-dispatcher', profile: OTHER } },
+    ];
+    /* Handing again to the profile the run is pinned to moves nothing, whatever the state says. */
+    const again = armsFor({ target: OTHER, driving: PLAIN }, log);
+    expect(again.rows.at(-1)?.refusal).toBe(STAGE_SWITCH_NO_CHANGE);
+    /* Handing to somebody else is still a change — the pin names one profile, not all of them. */
+    const elsewhere = armsFor({ target: PLAIN, driving: PLAIN }, log);
+    expect(elsewhere.rows.at(-1)?.refusal).toBeUndefined();
+  });
+
+  /**
+   * **The pin under the register's remaining absence** — [§ D227](../../../../DECISIONS.md): a
+   * refusal is held by a run, never by another sentence.
+   *
+   * `STAGE_ABSENCES` still says this screen offers no answer to a live incident. The day it does,
+   * this case goes red, and the sentence has to come out with the arm that made it false — which is
+   * what the entry it replaced failed to do for the handover.
+   */
+  it('builds no answered incident, which is what the register still says', () => {
+    for (const switchTo of [undefined, { target: OTHER, driving: PLAIN }]) {
+      for (const row of armsFor(switchTo).rows) {
+        expect(row.change.kind).not.toBe('answer-incident');
+      }
     }
   });
 
@@ -826,7 +911,7 @@ describe('the cutaway’s geometry', () => {
  * -------------------------------------------------------------------------- */
 
 describe('the stage’s own register of absences', () => {
-  it('names the ghost lane, the campaign dock and the two unbuilt intervention arms', () => {
+  it('names the ghost lane, the campaign dock and the one unbuilt intervention arm', () => {
     const joined = STAGE_ABSENCES.join('\n');
     expect(joined).toMatch(/ghost/);
     /*
@@ -836,7 +921,14 @@ describe('the stage’s own register of absences', () => {
      * what this case's own name has always said it was checking.
      */
     expect(joined).toMatch(/no campaign dock/);
-    expect(joined).toMatch(/no decisions during a run/);
+    expect(joined).toMatch(/no answer to a live incident/);
+    /*
+     * And the entry that came out. GitHub issue #171's first arm landed, so *"a handover … and this
+     * screen offers neither"* became a refusal about a control a player can press — § D227's defect
+     * with its polarity reversed. Asserted as an absence so a revert would have to face it.
+     */
+    expect(joined).not.toMatch(/no decisions during a run/);
+    expect(joined).not.toMatch(/handover/);
     for (const absence of STAGE_ABSENCES) expect(absence.length).toBeGreaterThan(20);
   });
 });
