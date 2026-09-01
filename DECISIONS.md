@@ -30447,3 +30447,56 @@ both are present — it plans the forty (`benchPlanOf` at the plan site) and it 
 *reports*, not just both diffs. Resolve to the union of intents, then assert each intent separately
 against the merged file. If the two intents genuinely cannot coexist, that is a design question for
 the lanes' owner and not a merge to be finished quietly.
+
+
+## D454 — wave K's corpus move, and four forecasts that are off by exactly one string per case
+
+**Date: 2026-09-01 · Owner: integrator, wave K · The measurement [§ D343](#d343) requires, taken once
+on the integrated tree.**
+
+**Decision.** The corpus was measured once after integration, both tiers in one sitting, on the
+integrated tree and never on a branch — and the base at `e8aac0d` was re-measured first in a detached
+worktree so a move could be told from a correction.
+
+**The base reproduced its published row exactly, in both tiers**, for the **fifth** consecutive wave:
+49 / 572 667 / 606 / 54 / 0 and 60 / 714 553 / 4 710 / 55 / 0.
+
+| | base `e8aac0d` | integrated | move |
+|---|---|---|---|
+| always-on strings | 572 667 | **575 999** | **+3 332** |
+| deep strings | 714 553 | **718 633** | **+4 080** |
+| always-on surfaces | 54 | **55** | **+1** |
+| deep surfaces | 55 | **56** | **+1** |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+**The surface sets were diffed rather than the counts compared**, in both tiers. Exactly one surface
+was added — `batch/library.ts#batchLibraryOf`, lane A's — and **nothing was removed**. The deep tier's
+one-surface lead survived and the diff names it: `campaign/judge.ts#judgeStage` is the only surface in
+deep and not in always-on, and nothing is in always-on and not in deep.
+
+**The finding is the arithmetic, and it is the first time this programme has been precise enough to
+have one.** Four lanes each published a decomposed per-case forecast before the measurement. Summed:
+
+| tier | forecast | measured | shortfall |
+|---|---|---|---|
+| always-on | +3 381 (A 245 · B 98 · C 2 548 · D 0 · E 490) | **+3 332** | **49** |
+| deep | +4 140 (A 300 · B 120 · C 3 120 · D 0 · E 600) | **+4 080** | **60** |
+
+**49 over 49 cases and 60 over 60 cases: exactly one string per case, in both tiers.** That rules out
+noise and rules out a single miscounted constant — a one-off would not scale with the case count, and
+an error in one lane's per-case figure would have to be exactly one in a decomposition that is
+internally consistent. All four decompositions were checked and each sums to its own claim: A 5/case,
+B 2/case, C 52/case (18 + 18 + 12 + 2 + 2), E 10/case (2 + 4 + 5 + 1, from a base of 2).
+
+So the forecasts are **not additive**, and one string that some lane counted as new is not new in the
+integrated tree — or one lane's change removes a string another adds. **Which lane is unattributed,
+and no mechanism is offered for it.** Establishing it means measuring each branch separately, which
+§ D343 forbids publishing and which nobody has done; asserting a plausible candidate instead would be
+the defect [§ D256](#d256) exists to refuse. It is recorded here so the next wave that forecasts can
+check whether the same one-per-case gap reappears — which would localise it far more cheaply than
+four branch measurements.
+
+**What is attributable is attributed exactly**: the surface, by set difference, to lane A.
+
+**Both registers are empty and both tiers are green**, so the verdict column means today what it was
+written to mean: 0 failing cases *and* nothing held in `honesty.test.ts`'s `OUTSTANDING`.
