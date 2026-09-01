@@ -352,7 +352,7 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   **The first decision landed as a module split**: the cells are imported through
   `@elevator-sim/experiments/browser` — measured first, the data is pure but `matrix.ts`'s graph
   reaches `node:url`, so the cells moved to `benchmark/matrixCells.ts` (docstring carries the
-  argument; a decision number is owed) and `matrix.ts` re-exports them byte-identically; the
+  argument; [§ D406](../DECISIONS.md) the ruling) and `matrix.ts` re-exports them byte-identically; the
   `data/` fallback was rejected there. **The mapping forced the request to grow**:
   `BatchRequest.demand` (a whole authored block, mutually exclusive with the panel's rate/level —
   `runBatch` refuses the combination by name) and `BatchRequest.reportWindow`, because the two

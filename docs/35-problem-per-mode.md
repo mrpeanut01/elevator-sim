@@ -1,6 +1,8 @@
 # 34 — A problem per mode
 
-**A decision number is owed for this document. Next free is D361; it is allocated at integration.**
+**This document is [§ D414](../DECISIONS.md)** (2026-08-29). It proposed **D361** for itself; that
+number had already been taken on a branch this document could not see, which is
+[§ D404](../DECISIONS.md)'s subject appearing in the very line that asked for a number.
 
 ---
 

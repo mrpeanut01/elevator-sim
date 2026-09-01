@@ -9,9 +9,9 @@ file, no `data/*.json` file and no shipped string is changed by this document. W
 *the moderator does X*, it is an instruction for a round that has not happened yet, not a report of
 one that has.
 
-**A decision number is owed** for the governing rule in § 2 and for the verdict gate in § 6.5. It is
-allocated at integration, never inside a lane, and this document carries no `§ D` citation of itself
-until that entry exists.
+**§ 2's governing rule and § 6.5's verdict gate are [§ D413](../DECISIONS.md)** (2026-08-29). That
+entry is an anchor and does not convert *the moderator does X* into a report of a round that has
+happened; no round has been run against this document.
 
 **Series are cited with their document** throughout — `charter S6`, `docs/23 A2`, `docs/25 X1`,
 `docs/26 P-1`, `docs/10 R13`, `RISKS.md R35` — never bare ([§ D343](../DECISIONS.md)). This

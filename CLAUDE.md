@@ -84,10 +84,42 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **570 560** | **606** | **51** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **711 737** | **4 710** | **52** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **571 205** | **606** | **53** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **712 547** | **4 710** | **54** | **0** | **green**, and the register is empty |
 
-  **Wave G's move is the first this row has been able to attribute exactly, and the arithmetic is the
+  **Wave H is the first time this row's *previous* figures were confirmed rather than trusted, and
+  that is the finding rather than the move.** Before publishing the new pair, the base commit
+  `6260dcb` was re-measured in a detached worktree and reproduced the row it had published
+  **exactly** — 49 cases, 570 560 strings, 606 simulations, 51 surfaces, 0 failures. Five times this
+  column has been wrong; this is the first time it has been checked in the one direction that can
+  tell a correction from a move.
+
+  | | wave G | wave H | move |
+  |---|---|---|---|
+  | always-on strings | 570 560 | **571 205** | **+645** |
+  | deep strings | 711 737 | **712 547** | **+810** |
+  | always-on surfaces | 51 | **53** | **+2** |
+  | deep surfaces | 52 | **54** | **+2** |
+
+  **The surface sets were diffed rather than the counts compared**, and the +2 is named in both
+  tiers with nothing removed: `everyday/rail.ts#railFooter` and `everyday/weekView.ts#weekScreenViewOf`
+  — GitHub issue #214's declared pair, § D362's shape, where a pair must carry the shipped
+  expression's id or a violation could not say *which* surface disagreed. Cases and simulations are
+  unmoved in both tiers, which is what declaring a pair rather than building a screen looks like.
+
+  **Unlike wave G's, this move is *not* attributable to the string.** 645 over 49 cases and 810 over
+  60 are not integers, and no arithmetic makes them one: the rail footer and the week header emit a
+  state-dependent number of strings, so there is no per-case constant to multiply. Saying so is the
+  point — wave G's exact attribution was possible because a chip face is seeded once per case, and
+  claiming the same precision here would be manufacturing it.
+
+  **The deep tier's one-surface lead survived, and it was verified by set difference rather than by
+  subtracting counts**: the only surface in deep and not in always-on is
+  `campaign/judge.ts#judgeStage`, and nothing is in always-on and not in deep. A wave that added two
+  surfaces to both tiers did not disturb the gap, which is how a real move would have been told
+  apart from this one.
+
+    **Wave G's move is the first this row has been able to attribute exactly, and the arithmetic is the
   whole of it.** Measured on the integrated tree after wave G, both tiers in one sitting: strings
   **+343** always-on and **+420** deep, with cases, simulations, surfaces and failing cases unmoved.
 
@@ -680,3 +712,20 @@ cite why.
 - If you hit a decision the docs don't cover, record it in the relevant doc rather than
   only in a commit message.
 - Do not weaken an acceptance criterion to make a phase pass. Raise it instead.
+
+**Decision numbers are reserved for you before you start, and *the relevant doc* is usually your own
+module.** Two halves, both [§ D404](DECISIONS.md) and [§ D405](DECISIONS.md), and they exist because
+reading the agreement above as *"every decision needs a `DECISIONS.md` entry"* while having no safe
+way to claim a heading produced **sixty-four** sites saying a number was owed and none allocated.
+**Your numbers are in your own dispatch brief** — the integrator pre-allocates a contiguous block per
+lane before any lane starts, you allocate from it sequentially, and you report the highest you used.
+Do **not** take numbers from `CHARTER_PROGRAMME.md`'s *Next free decision number* row: that row is
+the integrator's input, it is stale for the whole duration of a wave, and two lanes reading it both
+computed § D336. Need more than your block? Ask; never take the number above it, because the next
+lane holds it. A number your block does not spend stays **unused permanently** and is registered in
+`documentation.test.ts#KNOWN_DECISION_HOLES` — ids here are names, so backfilling one makes it mean
+two things. And a `DECISIONS.md` entry is owed only when the decision **reaches past the module that
+took it**: when it binds code or documents that module does not own, when it moves or refuses
+something already recorded, or when a document refuses to cite itself without one. Otherwise your
+docstring *is* the record the agreement asks for — say so and cite § D405, rather than writing that a
+number is owed, which `documentation.test.ts` counts as debt against a ratchet that may only fall.

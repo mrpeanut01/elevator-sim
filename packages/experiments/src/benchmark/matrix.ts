@@ -90,8 +90,8 @@ import { MATRIX_CELLS, type MatrixCell } from './matrixCells.js';
 import { armOf, runBenchmarkCase, type CaseResult } from './suite.js';
 
 /*
- * The cells live in `./matrixCells.ts` since Everyday Mode's slice 7 (a decision number is owed;
- * the argument is that module's docstring): the suite in `packages/viz` must import the fixture
+ * The cells live in `./matrixCells.ts` since Everyday Mode's slice 7 (§ D406; the argument is
+ * that module's docstring): the suite in `packages/viz` must import the fixture
  * list rather than retype it, and this module is not browser-safe — `validation/harness.ts`
  * reaches `node:url` — while the cells are pure data. Re-exported here so every existing consumer,
  * pin and document reference keeps its import path, byte-identical.

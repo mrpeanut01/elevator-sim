@@ -507,10 +507,13 @@ the deliverable does not support.
 five titles *"appear nowhere in the tree"* is wrong by one: Two Point Hospital appears at
 `docs/elevator-sim-playtest-report.md` line 34 (§ 1.1). The conclusion is unaffected.
 
-⬜ **[`DECISIONS.md`](../DECISIONS.md)** — a decision number is owed at integration if #186 adopts
-either § 9 item 4 (the mid-run control non-goal) or § 9 item 5 (the content-sequencing rules). This
-document allocates none; numbers are allocated at integration, never inside a lane
-([`MULTI_AGENT_PLAN.md`](../MULTI_AGENT_PLAN.md) § 0).
+✅ **[`DECISIONS.md`](../DECISIONS.md)** — **no number is owed, and the reason is that the condition
+has not fired.** This item was conditional from the day it was written: an entry becomes owed *if*
+#186 adopts either § 9 item 4 (the mid-run control non-goal) or § 9 item 5 (the content-sequencing
+rules), and #186 has adopted neither. A proposal nobody has accepted is not a decision, and
+manufacturing an entry for one would put a ruling in the log that no code and no document obeys.
+If #186 adopts either, the entry is owed then — and under [§ D404](../DECISIONS.md) its number comes
+from the adopting lane's own pre-allocated block rather than from an integration-time scramble.
 
 ---
 

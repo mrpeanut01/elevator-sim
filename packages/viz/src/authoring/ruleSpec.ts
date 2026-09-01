@@ -18,8 +18,8 @@
  * direction-conditional cost term exists, so the label would lie) — are not rows here either,
  * because they are not in `RULE_ACTIONS`. The reworded alternative for the second (*treat every
  * call as urgent*) is a design-owner decision, flagged in `RULE_ACTIONS`' docstring, not made
- * silently by this editor. A decision number is owed for the omission pair; the argument lives
- * on `RULE_ACTIONS`.
+ * silently by this editor. **The omission pair is § D415**; the argument lives on `RULE_ACTIONS`,
+ * which is also where the derivation lives, so neither screen carries a refusal of its own.
  *
  * ## Where the rows reach a run
  *

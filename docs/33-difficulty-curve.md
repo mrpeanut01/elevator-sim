@@ -802,8 +802,11 @@ three previous lanes were spent conflating them (§ 3.3a, § 3.3c, GitHub issue 
 refused on a measurement: the change does produce a failable count goal, and it breaches DC-2 or
 DC-2b — one or the other, unavoidably — in the same move.** The gameplay case is refused *for the
 campaign* and **not** as a mechanism: the mechanism already ships, in `data/fixit-cases.json`, on
-the mode whose building can actually show the fault. **A decision number is owed** (next free
-is D366).
+the mode whose building can actually show the fault. **The refusal is
+[§ D409](../DECISIONS.md)**, which also records that it is scoped to the campaign and is not a
+verdict on the mechanism. (This paragraph proposed D366 for it; that number had already been taken
+on a branch it could not see, which is [§ D404](../DECISIONS.md)'s subject arriving in the very
+sentence that asked for a number.)
 
 #### The re-measurement — § 3.3c's legal box reproduces cell for cell
 

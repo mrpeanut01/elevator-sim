@@ -2,7 +2,7 @@
  * **The shell's own surfaces while somebody else's run is on the stage** — § 14.1's differentiation
  * table, applied to the four places the table does not name.
  *
- * A decision number is owed; the argument is here.
+ * Recorded here rather than in `DECISIONS.md`, under § D405; the directory's one ruling is § D407.
  *
  * ## Why this module exists at all, which is the finding rather than the feature
  *

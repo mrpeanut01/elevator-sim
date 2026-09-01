@@ -1,6 +1,6 @@
 /**
  * The change-scope notes, measured in the one tier that can actually see a stylesheet —
- * GitHub issue #124. A decision number is owed for this file; the argument is here.
+ * GitHub issue #124. Recorded here rather than in `DECISIONS.md`, under § D405; the two tiers' division of labour is argued below.
  *
  * ## Why this exists beside `noteContrast.test.ts` rather than instead of it
  *

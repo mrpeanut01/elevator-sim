@@ -45,8 +45,9 @@
  * eighth goal kind, a regenerated table or a stage added to the campaign all reach this check
  * without an edit, which is the only way a curve rule stays a measurement.
  *
- * A decision number is owed for the register's one entry; the argument is in
- * {@link DC1_UNFAILABLE}'s own comment and the measurement is in `docs/33` § 3.3 C1.
+ * Recorded here rather than in `DECISIONS.md`, under § D405; the argument is in {@link DC1_UNFAILABLE}'s own
+ * comment and the measurement is in `docs/33` § 3.3 C1. The refusal that keeps stage 1 as it is
+ * is § D409.
  */
 
 import { readFile } from 'node:fs/promises';

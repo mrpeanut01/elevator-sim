@@ -498,9 +498,23 @@ function mountReportScreen(
       reportBuildingName = undefined;
       stopListening();
     },
-    /* § 3.3's daily report primary is `Your week` — the quiet button, since a report inverts. */
+    /**
+     * § 3.3's report primary — `Your week` in the daily flow, and the campaign's is its **own**.
+     *
+     * This was `context.go('week')` unconditionally, under a label that already read
+     * `Back to ⟨building⟩` in a campaign run ({@link reportBar} substitutes the name into it). So
+     * the one button that carries § 8's progression named the tower and opened somebody else's
+     * record: a player who had just had a day marked on their contract was sent to the daily
+     * loop's seven-day strip, which knows nothing about it. Found while wiring issue #223, which is
+     * the issue that gave the press something to go back *to*.
+     *
+     * `ctx` rather than the label, because the label is a rendering of this decision and reading it
+     * back would make the destination depend on a string. § 3.3's own row is where the pairing
+     * lives (`actionBar.ts` gives the campaign report row `wayOut: '⤺ All buildings'` and this
+     * primary), so a fifth run context answers by being in that table.
+     */
     primary: () => {
-      context.go('week');
+      context.go(context.ctx === 'campaign' ? 'building' : 'week');
     },
   };
 }

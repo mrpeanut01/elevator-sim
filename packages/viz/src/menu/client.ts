@@ -432,7 +432,9 @@ export interface LeaderboardClient {
  * written for the same reader. Preferring `detail` keeps the ordering honest where a route sends
  * both.
  *
- * A decision number is owed for this entry.
+ * Recorded here rather than in `DECISIONS.md`, under § D405 — the arm order is local to this function
+ * and `CLIENT_FAILURES.refused`'s rule is untouched: `issues` is the server's own wording, not an
+ * invention of this client's.
  */
 function refusalDetail(body: Record<string, unknown>): string {
   if (typeof body['detail'] === 'string') return body['detail'];

@@ -636,8 +636,8 @@ before the session, which is what § 3's *exists today?* column is for.
 Recorded here because a specification that hides its own open items is the defect it exists to
 prevent.
 
-- **A decision number is owed** for this slice definition, and is allocated at integration. This
-  document carries no `§ D` citation of itself until that entry exists.
+- ✅ **The slice definition is [§ D411](../DECISIONS.md)** (2026-08-29). That entry is an anchor
+  and does not choose the seed § 1.6 leaves open.
 - **The README *Documentation* table needs a row for this file**, or
   `packages/experiments/src/validation/documentation.test.ts` fails. **Owned by the integrator** —
   several M1 lanes would collide on that table.

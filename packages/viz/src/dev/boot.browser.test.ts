@@ -83,8 +83,9 @@ beforeAll(async () => {
      * mean that while `strictPort` is inherited.
      *
      * 5189 sits immediately below the 5190-block the rest of the tier occupies, because this file
-     * is the tier's first and belongs at the head of it. A decision number is owed for stating the
-     * measured mechanism here and leaving the three sibling notes to be corrected where they sit.
+     * is the tier's first and belongs at the head of it. **Recorded here rather than in
+     * `DECISIONS.md`, under § D405**: stating the measured mechanism here and leaving the three
+     * sibling notes to be corrected where they sit is a choice about four files in one tier.
      */
     server: { port: 5189, strictPort: false },
     logLevel: 'error',

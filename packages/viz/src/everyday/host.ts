@@ -111,6 +111,7 @@ import {
   type CampaignAction,
   type CampaignCareer,
 } from '../campaign/career.js';
+import { DIFFICULTIES } from '../campaign/economy.js';
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -121,6 +122,7 @@ import {
   buildingConfigOf,
   resolvedBuildingOf,
   shiftDemandTemplateId,
+  shiftLengthForContract,
   specsWithSaved,
   withDispatcher,
   type SavedDispatcher,
@@ -149,6 +151,8 @@ import type {
   WeekState,
 } from '../shift/types.js';
 import { nextDay } from '../shift/week.js';
+
+import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
 
 /**
  * What an Everyday screen may know and do. The exact method list is the contract the six screen
@@ -483,6 +487,13 @@ export interface EverydayHost {
    * File the day on the stage — § 3.3's *Close the day* (*stops the clock and writes the
    * report*). All of `closeShift`'s gates hold: a run nobody started, somebody else's run, and an
    * already-filed day all file nothing.
+   *
+   * **And, on a day {@link runCampaignDay} started, § 6.4 step 4** — *"evaluate the four tests and
+   * mark the day cleared or missed"* (issue #223). Two records move on this press, not one: the
+   * week that `closeShift` writes and the campaign career that only this closure holds. The
+   * implementation carries why the second is not `closeShift`'s to write; what belongs on the
+   * contract is that a caller presses this once and both are answered, so no screen has to know
+   * there are two.
    */
   closeDay(): void;
 
@@ -570,6 +581,12 @@ export interface EverydayHost {
    * {@link startRun} does, so moving the select on the triage screen changes the legs of the next
    * run rather than only a label — the standing requirement this repository has paid to learn,
    * applied to a control before the panel around it was written.
+   *
+   * **It also writes the length the contract is graded over, and arms the day's filing** — issue
+   * #223. The implementation carries the measurement for the first and
+   * `createEverydayHost`'s `campaignDayTowerId` the argument for the second; what belongs on the
+   * contract is that this press is the *only* one that arms it, so a day filed against a tower is a
+   * day that tower's own button started.
    *
    * A no-op for a tower the career does not hold, and for one whose building this build did not
    * resolve: running the shipped default under another building's name would be a substituted
@@ -811,6 +828,36 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     for (const listener of [...campaignListeners]) listener();
   };
 
+  /**
+   * Which tower the run on the stage is a day of, or `undefined` — GitHub issue **#223**.
+   *
+   * ## This is the fact `closeShift` was said to be missing, and it is not `closeShift`'s to have
+   *
+   * `AGENT_STATUS.md` recorded the gap as *"marking it cleared or missed needs `closeShift` to know
+   * which tower it belonged to"*. `closeShift` never needs to know. It writes `ViewerState.week` —
+   * the daily loop's record — and the campaign's career is deliberately **not** on `ViewerState`
+   * (see the binding above for the argument and its cost). The two records have different
+   * lifetimes, so a campaign day is a second write to a second record, and its owner is this
+   * closure: {@link EverydayHost.runCampaignDay} is the only function that turns a tower into a
+   * run, `campaignAct` is the only writer of the career, and `GAMEPLAY_AND_NAVIGATION.md` § 6.4
+   * gives *one* thing permission to file — *Close the day* — which for this product is
+   * {@link EverydayHost.closeDay}, three methods down. Every fact needed is already on this side of
+   * the façade.
+   *
+   * That is why the latch is a plain local rather than a field on `ViewerState`: a run context on
+   * the persisted state would be a fifth flag `closeShift` has to remember to consult, and issue
+   * #287's finding is that the *Engineer* surface's own filing paths (`tick`, `Ctrl`/`Cmd`+`Enter`,
+   * the report tab) are gated off while the cover is up, so none of them can reach a campaign day.
+   *
+   * ## Disarmed by the two daily presses, and that is what stops a cross-flow file
+   *
+   * `startRun` and `openTomorrow` are § 6's, and a day started by either is **not** this tower's.
+   * Without clearing here, a player who ran a campaign day, walked out to Today's tower and closed
+   * *that* day would have filed it against the campaign. Both write the latch on the same line they
+   * press the run, so a third run press cannot acquire the campaign by forgetting to.
+   */
+  let campaignDayTowerId: string | undefined;
+
   return {
     week: () => b.state().week,
     contract: () => contractById(b.state().week.contractId),
@@ -959,10 +1006,61 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
        */
       const day = dayFor(b);
       if (day !== undefined) b.applyPatch(wholeDayRun(day));
+      // § 6's day is not a campaign day — see {@link campaignDayTowerId} for what a stale latch
+      // here would file, and against which building.
+      campaignDayTowerId = undefined;
       b.startRun();
     },
+    /**
+     * § 6.4's *Close the day*, and — in a campaign run — § 6.4 **step 4** with it.
+     *
+     * ## The order, and why every fact is read back rather than assumed
+     *
+     * `b.closeDay()` is `dev/main.ts#closeShift`, which returns normally from three gates that file
+     * nothing: a run nobody started, a run this shell did not simulate, and one already filed. So
+     * the campaign day turns on `dayClosed` **crossing** — false before the call and true after —
+     * which is the same question `stageScreenModel.ts#stageFilingLandsOn` asks for the same reason
+     * and is the only form that cannot be fooled by a second press on a sheet already written.
+     *
+     * The observations are the **whole recording's**, at `endedAt`, never the playhead's: that is
+     * `closeShift`'s own rule (`watch/reproduce.ts` — *a day's account is the day's*) and a campaign
+     * day graded at a paused playhead would mark a contract against half a morning.
+     *
+     * ## What decides it, and what does not
+     *
+     * § 8.6's tests at the tower's own difficulty, folded by
+     * `campaignModel.ts#campaignDayVerdict` over the rows the desk and the contract sheet draw.
+     * **Not** `lastReport()?.verdict` — the Day report grades § 6's goals for the week's day
+     * against a different set of bars, so borrowing it would leave every difficulty button on the
+     * contract sheet moving three printed numbers and nothing else, which is this repository's
+     * signature defect wearing a control.
+     *
+     * An `ungraded` run files nothing at all; `campaignDayVerdict`'s docstring carries why, and
+     * `campaign/career.ts#CAMPAIGN_ABSENCES` says it where a player reads it.
+     */
     closeDay: () => {
+      const towerId = campaignDayTowerId;
+      const closedBefore = b.dayClosed();
       b.closeDay();
+      if (towerId === undefined || closedBefore || !b.dayClosed()) return;
+      campaignDayTowerId = undefined;
+      const state = b.state();
+      const tower = towerById(career, towerId);
+      const recording = state.recording;
+      if (tower === undefined || recording === undefined) return;
+      const verdict = campaignDayVerdict(
+        campaignTestRows(
+          DIFFICULTIES[tower.difficultyId],
+          tower,
+          shiftObservationsOf(observationsAt(recording, recording.endedAt)),
+          state.week.history,
+        ),
+      );
+      if (verdict === 'ungraded') return;
+      const next = applyCampaignAction(career, { kind: 'file-day', towerId, verdict });
+      if (next === career) return;
+      career = next;
+      notifyCampaign();
     },
     intervene: (atS, change) => {
       // Gated here as well as on the control, because the record cannot grow before it exists and
@@ -980,6 +1078,8 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       // running yet.
       b.applyPatch({ ...openTomorrowPatch(state.week), ...dayPatchFor(b) });
       b.openRunTab();
+      // § 6's tomorrow, for the same reason `startRun` clears it — {@link campaignDayTowerId}.
+      campaignDayTowerId = undefined;
       b.startRun();
     },
     setDispatcher: (dispatcherId) => {
@@ -1021,8 +1121,39 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       const tower = towerById(career, towerId);
       if (tower === undefined) return;
       if (!b.resources.buildings.some((building) => building.id === tower.buildingId)) return;
-      b.applyPatch({ buildingId: tower.buildingId, dispatcherId: tower.dispatcherId });
+      b.applyPatch({
+        buildingId: tower.buildingId,
+        dispatcherId: tower.dispatcherId,
+        /*
+         * **And the length this contract is graded over** — GitHub issue #223.
+         *
+         * `CampaignTower.id` **is** the contract id, so this is the same seed `scenariosPanel`'s
+         * *take* writes and the same expression, not a number authored here. It matters for the
+         * reason `ScenarioContract.shiftLengthS` measures: Garden Apartments — the one building
+         * `openingCareer` holds — produces a median of 18 arrivals in thirty minutes against a
+         * wake-up gate of twenty, so seven of twelve seeds grade **nothing**, and a day nothing
+         * graded is a day § 8's record may not mark. At the hour `c1` names, all twelve grade.
+         *
+         * **What it actually guards, stated narrowly rather than generously.** `initialState`
+         * already seeds `c1`'s hour, because the page opens on Garden Apartments — so on a cold
+         * load this writes the length that is already there and changes nothing. What it guards is
+         * a state left at another length, which is reachable and not exotic: `withBuilding`
+         * deliberately does **not** re-seed (`shiftLengthForContract`'s own docstring says why), so
+         * a player who has taken a different assignment or moved the Engineer length control
+         * carries it into § 8. The measurement above is what that would cost them.
+         *
+         * *Lock it in and run day N* is exactly the press that seed is for — the one moment a
+         * player has asked for *this contract* rather than for *this shift length* — which is why
+         * `withBuilding` is still excluded from it and this is not that case in disguise. § 8
+         * offers no length control at all, so there is no choice here to overwrite.
+         */
+        shiftLengthS: shiftLengthForContract(tower.id),
+        /* A contract declares a length and not a part of a day — `scenariosPanel`'s own line. */
+        windowStartS: null,
+      });
       b.openRunTab();
+      // The one place this is armed. See {@link campaignDayTowerId}.
+      campaignDayTowerId = towerId;
       b.startRun();
     },
     applyBuildingSpec: (spec) => {

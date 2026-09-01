@@ -113,8 +113,9 @@ if (!HAS_BROWSER) console.warn(SKIP_REASON);
 /**
  * **A page in this tier could raise an unhandled error on every case and the run stayed green.**
  *
- * A decision number is owed; `DECISIONS.md`'s next free is D361 and this argument is the whole of
- * what would go in it.
+ * Recorded here rather than in `DECISIONS.md`, under § D405 — the gate is local to this tier and this
+ * docstring is the whole of the argument. (It used to propose **D361** for itself; that number
+ * had already been taken on a branch it could not see, which is § D404's subject.)
  *
  * ## The measurement, which is the reason this is not a nicety
  *

@@ -8527,6 +8527,17 @@ and after, because `budgetFor` derives it from a declared spread that this chang
 the re-pin moved *estimates*, never a *budget* — which is the direction that would have been
 worrying, since a budget that moves with a result is a budget being fitted to it.
 
+> **⚠️ The clause *"a declared spread that this change does not touch"* is REFUTED by
+> [§ D396](#d396) (2026-08-29). The conclusion it was offered in support of is not.** Re-censused at
+> n = 200 at `MATRIX_SEED`, `vertical-city-up-peak`'s binding spread is **2.9722** on the tree that
+> declared it and **3.0370** on the first tree carrying this change: it was touched. The budget is
+> 50 before and after for a *different* reason than the one given here — the band **floor** binds at
+> both spreads, since `budgetFor` reads 34 and then 36 against a floor of 50 — so the sentence's
+> conclusion survives its own argument. Left standing rather than rewritten, because it is the
+> reason nobody re-ran `matrixCensus.test.ts`: this lane's stated ground for not re-deriving the
+> census was that the census had nothing to re-derive. `CLAUDE.md`'s *"a stated mechanism goes stale
+> the same way"*, applied to a mechanism offered for **not** measuring.
+
 **44 of 44 is the whole cell**, and that is the expected answer rather than a surprising one: at
 `vertical-city-up-peak` every arm runs on the same eight double-deck shuttles, so no arm could have
 been spared. **0 of 308 elsewhere** is the load-bearing half, and it is the fourth independent
@@ -26509,7 +26520,9 @@ is a guess with a number on it.
 
 **What is not claimed.** No corpus figure is published; [§ D343](#d343) takes that once, after
 integration, and this lane's job was to build the measurement a place to happen rather than to take
-it.## D394 — `core` and `server` take the simulating project's timeout, and the file that forced it simulates nothing
+it.
+
+## D394 — `core` and `server` take the simulating project's timeout, and the file that forced it simulates nothing
 
 **Date: 2026-08-29 · Owner: Lane B, wave G · Closes: GitHub issue #149. Discharges the debt
 [§ D361](#d361) recorded and answers the question [§ D331](#d331) left open.**
@@ -26741,6 +26754,1338 @@ shipped caller; what it has and does not have is recorded above as a finding and
 larger neighbour, not its scope. No claim is made that `readRunSetFile`, `parseRunSet`,
 `parseStoredRun` or `replaySimulationConfig` are dead — they are not, and `goldenChild.ts` is why.
 
+## D398 — the drain deadline gates where a move *lands*, not where it is commanded
+
+**Date:** 2026-08-29 · **Owner:** wave H lane B · **Rules on:** GitHub issue #305, the one
+counterexample the first scheduled `ELEVATOR_SIM_FUZZ=deep` run since T22 produced
+(`fuzz-1000130`, `[termination] run ended at t=3493.7775825325903, past its hard deadline of
+t=3493`), recorded as OPEN by [§ D393](#d393), which stands with its date.
+
+**Decision.** `Simulation.#depart` refuses a departure whose **arrival** would land past
+`#deadlineS`, instead of one whose **command instant** does. The arrival instant comes from a new
+`Car.plannedDepartureFor` — `departFor` with the three writes removed, both going through one
+`#planMotion` — so the instant checked is the instant the kernel is then handed.
+
+**Nothing in `packages/experiments/src/fuzz/` moved.** `checkTermination` is unchanged line for
+line, `EPSILON` is still `1e-9`, `PROPERTY_BOUNDS` is unmoved, and the generator was not narrowed.
+All four are the weaken-the-gate move and none of them was made.
+
+### The mechanism, and how it was found rather than guessed
+
+The shrink was not a diagnosis. Six steps, 167 candidate evaluations, and the reduced case reported
+the **identical** run — `timed-out`, 2 096 passengers, 3 493.8 s, the same violation to the last
+digit. A reduction that removes six things and moves no number has established that the removed
+things were never load-bearing and nothing else. What survived was the service schedule, which the
+closed `fuzz-1000384` also survives with, and the two share `service-schedule` and `sky-lobby` —
+which is the **neighbourhood the generator samples**, not the cause. It was recorded as unmeasured
+rather than written up as a mechanism, and this entry is what measuring it produced.
+
+`SimKernel.prototype.schedule` and `.cancel` were patched for the last thirty seconds of the run and
+every schedule, fire and cancel logged. Two `sim.carArrived` events were queued past the deadline —
+`low-low-1` at 3 493.7776 and `low-low-3` at 3 505.2351 — and **both fired**, because `Simulation.run`
+drains with `runUntilEmpty()`: the deadline is not a horizon the kernel enforces, it is a rule each
+scheduling site keeps.
+
+Ten sites put events on that queue. Two are bounded by construction — trace arrivals and queue
+samples never exceed the demand horizon, and the deadline is the horizon plus a non-negative grace.
+**Seven of the remaining eight gate the instant their event lands**: `#scheduleServiceEvents` and
+`#scheduleInterventions` on `entry.atS`, `#scheduleOpeningTransport` and `#scheduleTransfer` on the
+far end of the walk, `#armPatience` on when patience runs out, `#scheduleTick` on the retry, and
+`#scheduleDoor` on the next transition. `#depart` gated `at` — the instant the car is *commanded* —
+and then handed `motion.arrivesAt` to `#scheduleArrival` unconditionally. A car told to move a
+second inside the deadline carried the run a whole flight time past it.
+
+`SIM_DEFAULTS.drainGraceS` had already written the rule this restores, and in these words: the drain
+tail *"is a **hard timeout**: work scheduled past it is not scheduled at all — not a departure, not
+a dispatch retry, not a sky-lobby transfer, and not a door transition"*. The sentence was true of
+three of the four things it names. This is `CLAUDE.md`'s stale-refusal class with the polarity that
+makes it worse: a contract stating a bound the code did not keep.
+
+### Why P5 almost never sees it, which is the finding rather than the fix
+
+`endedAt` is `max(recorder.lastEventAt, demand horizon)`, and `MetricsRecorder.sampleTravel`
+**deliberately** does not advance `lastEventAt` (an instrument must not lengthen the window it
+measures). So a late arrival that only moved a car left `endedAt` untouched and `checkTermination`
+saw nothing at all.
+
+Swept over three shipped buildings × four shipped dispatchers × four drain tails × two demand
+levels — 96 cells, 600 s of demand, seed 20 260 726, on the tree carrying the defect:
+
+| | cells |
+|---|---|
+| ran | 96 (91 `timed-out`, 5 `completed`) |
+| **carried a completed move past the deadline** | **84** — every one of them `timed-out`, none of the five completed |
+| reported `endedAt` past the deadline | **0** |
+
+The largest overshoot was **39.2 s** at `vertical-city`/`destination-panel`, drain 60, rate 20 —
+about a third of a minute of a run reporting itself over. So the defect is neither rare nor
+seed-specific nor anything to do with service schedules; `fuzz-1000130` is visible only because it
+is a 2 096-passenger destination-panel run whose late arrival *also* registered a landing
+assignment, which the recorder does observe. The property caught the one case in which a general
+defect happened to surface.
+
+### The fix is strictly stronger than the gate it replaces
+
+`arrivesAt` is `at + motorStartDelayS + profile.duration + levelingSettleS`, every term
+non-negative and `profile.duration > 0`, so `at > deadlineS` implies `arrivesAt > deadlineS`: every
+departure the old gate refused, this one refuses too. The old check is subsumed rather than moved,
+which is why it is not kept beside the new one — a second gate that can never fire is a second
+authority, and this defect is what one of those looks like after it drifts.
+
+**`Car.plannedDepartureFor` exists so there is one arithmetic and not two.** The alternative was to
+rebuild the arrival instant in `Simulation` from `buildProfile` and the car's spec. That is the same
+formula in a second file, free to disagree with the one the kernel schedules against — and it is
+precisely the shape that produced this bug. `#planMotion` is `departFor`'s whole body except the
+three writes; `departFor` is `#planMotion` plus them.
+
+**`Car.departFor` keeps its callers.** `packages/viz/src/record/instrument.ts` and
+`packages/cli/src/timeline.ts` both monkey-patch `car.departFor` to record what a run looks like, so
+a fix that routed `Simulation` around it would have silently emptied both recorders. Named here
+because it is not visible from `sim/`.
+
+### Alternatives
+
+**(a) Gate `#scheduleArrival` instead** — let the car depart, drop its arrival, leave it in flight.
+Rejected, and it is the tempting one, because it matches how `#scheduleDoor` and `#scheduleTransfer`
+leave their actor mid-action. It breaks an invariant those two do not touch: `Car.departFor`
+increments `#departures` and only `completeArrival` advances the odometer and emits the travel
+sample, so a commanded move with no arrival is a departure with no sample, and
+`benchmark/energyLiveness.test.ts` asserts `samples.length === fleetDepartures` against the cars'
+own counters. Mutation-checked rather than argued: with the gate at `#scheduleArrival`,
+`midtown-office`/`collective` reports **138 samples against 141 departures**.
+
+**(b) Clamp `endedAt` to the deadline.** Rejected outright — the late arrival still fires, still
+takes a travel sample past the run's end and still steps the car into fresh dispatch work. It would
+delete the symptom `checkTermination` reads and leave the run doing the work.
+
+**(c) Declare the run legitimate and correct P5's docstring instead.** Rejected on the code:
+`SIM_DEFAULTS.drainGraceS` calls the tail a hard timeout that a departure may not cross, and
+`simulation.test.ts` already asserted `endedAt <= deadlineS` in three places. The contract was not
+ambiguous; the gate did not keep it.
+
+### Blast radius, measured
+
+`packages/core` is green: **112 files, 2 547 tests**, no assertion moved to accommodate the change.
+The change can only alter a run in which a car's move would cross the deadline, which is a
+`timed-out` run's last few seconds — all five `completed` cells in the sweep above had nothing past
+the deadline to cut. On the swept cells `endedAt` is unchanged in every cell but one
+(`vertical-city`/`collective`, drain 60, rate 8: 657.109 → 658.909), because the arrivals being cut
+were the ones the recorder was not observing anyway.
+
+`fuzz-1000130` itself: the same case — same `simSeed` 288 869 761, same `destination-panel` /
+`destination-entry`, same 2 096 passengers, still `timed-out` — now ends at **3 492.7189**, 0.281 s
+**inside** the deadline it declares, with **no violations at all**. 6 947 events becomes 6 945.
+
+### Validation
+
+`packages/core/src/sim/simulation.test.ts` carries the guard, always-on, on two shipped cells
+(`midtown-office`/`collective` and `vertical-city`/`destination-panel`) rather than on a fuzz seed —
+the defect is a property of the simulator, so the test must be able to fail without the fuzz
+machinery. It asserts on the **travel sample** rather than on `endedAt`, for the reason the table
+above gives: 0 of 96 cells would have failed an `endedAt` assertion. `endedAt` is asserted beside
+it as the shape the campaign caught.
+
+Mutated in two directions, each putting a case *into* scope:
+
+| mutation | result |
+|---|---|
+| gate back on `at > deadlineS` (the defect) | exit 1 — *"midtown-office/collective: arrivals completed past the run's hard deadline"*, listing `main-D +1.545s`, `main-B +3.549s`, `main-A +30.843s` |
+| gate moved to `#scheduleArrival` (alternative (a)) | exit 1 — *"a commanded move produced no travel sample: expected 138 to be 141"* |
+
+Both reverted; exit 0 restored.
+
+**What is not claimed.** No honesty-corpus figure is measured or published here — [§ D343](#d343)
+takes that once, after integration. The 2 000-case overnight deep pass has **not** been re-run; only
+the 250-case tier default has. Nothing here says the defect changed a published benchmark interval:
+the pinned studies were re-run and are quoted in [§ D399](#d399), and no pin was regenerated.
+
+## D399 — a register entry that has been fixed stops being a register entry, and the record that replaces it declares its own axis
+
+**Date:** 2026-08-29 · **Owner:** wave H lane B · **Rules on:** the disposition of
+`packages/experiments/src/fuzz/deep.test.ts`'s `OPEN` block for `fuzz-1000130`, now that
+[§ D398](#d398) has fixed what it recorded.
+
+**Decision.** The `OPEN` block and its ghost check are **deleted**. A `CLOSED` block replaces them,
+carrying the same reproduction against a **pinned axis of its own** (`AXIS_1000130`) and asserting
+that the case is still the case *before* asserting anything about it. The tier's status table keeps
+its RED row and gains a measured green one. The block stays **gated with the campaign**.
+
+### The ghost check is the evidence, and it was used that way
+
+The register's whole design is that it holds a finding accountable in both directions: the check
+asserts the violation **still reproduces**, so the day somebody fixes it the check goes red and the
+block must go. That is what happened, and in that order — the fix landed first, then the ghost check
+was run:
+
+```
+AssertionError: fuzz-1000130 no longer ends past its hard deadline. If that is a fix, DELETE this
+block and the RED row in the status table above … expected [] to not deeply equal []
+```
+
+Exit 1. `CLAUDE.md`: *a registered finding that has been fixed must stop being registered, or the
+register becomes decoration.*
+
+### It is a defect being fixed, not luck moving, and the two were told apart deliberately
+
+The `OPEN` entry named its own escape hatch: this case is indexed against the **live** profile
+library, so any edit to `data/dispatcher-profiles.json` or `data/traffic-profiles.json` re-maps seed
+1 000 130 onto a different building, and the ghost check would then go red about a case that no
+longer exists rather than a defect that was fixed. Three things separate this from that:
+
+1. **No data file was touched.** The whole diff is `core/src/model/car/car.ts`,
+   `core/src/sim/simulation.ts`, two test files and this document. `data/dispatcher-profiles.json`
+   and `data/traffic-profiles.json` are byte-identical to the tree the case was found on.
+2. **The case is identical.** Same `simSeed` 288 869 761, same `destination-panel` /
+   `destination-entry`, same 2 096 generated passengers, still `timed-out`, same 3 493 s deadline.
+   Only the ending moved: 3 493.7776 → **3 492.7189**, from 0.778 s outside its deadline to 0.281 s
+   inside it.
+3. **The scenario was constructed directly, without the seed at all.** [§ D398](#d398)'s sweep
+   reproduces the mechanism on 84 of 96 shipped-building cells with no fuzz machinery in the path,
+   and the always-on regression test names two of them. A fix that only moved a seed could not do
+   that.
+
+### The record now declares its own axis, which the `OPEN` entry could not
+
+`CORPUS_DISPATCHER_PROFILE_IDS` states the rule: a fuzz case is a seed decoded against an option
+space, the dispatcher and traffic lists are two axes of that space, and *a case recorded against a
+later library declares its own list beside it*. The `OPEN` entry did not — it reproduced with the
+campaign's own `generateOptionsFrom(config, DEEP_SPACE)`, over whatever ships — and said in its own
+text that this made it perishable.
+
+`AXIS_1000130` is that list: the **thirteen** dispatcher profiles and **five** traffic profiles
+shipped on the day the case was found, in `data/` order. Passing them explicitly reproduces exactly
+what the no-argument form reproduces today, so the case below **is** the case the campaign found —
+and it stays that case when the library next moves, which is the whole point.
+
+**The existing pinned lists could not be borrowed, and that is the trap this entry exists to close.**
+They are frozen at twelve dispatchers and four traffic profiles for the T21/T22 findings; under them
+seed 1 000 130 decodes to a *different* building and reports **zero violations**, which reads exactly
+like the defect having been fixed and is not. The `OPEN` block warned about this in prose. It is now
+a mechanism: the reproduction asserts `simSeed`, dispatcher, call type and deadline first, so an axis
+that has lost its subject fails saying so — *"seed 1 000 130 no longer decodes to the case this block
+records"* — instead of quietly reporting about something else.
+
+### Still gated with the campaign, and the argument is the original one unchanged
+
+The two closed blocks beside it are always-on; this one is not, and the reason § D393 gave still
+holds: it has been run on a single Linux container, once, and [§ D201](#d201) found the
+[§ D196](#d196) pins **exactly inverted** between Linux and darwin/arm64 — a pin is a claim about a
+machine as much as about a commit. This run's margin is 0.281 s inside its deadline on the one
+container it has been taken on, and nothing here establishes that the margin has the same sign on
+the other leg of the matrix.
+
+What has changed is that nothing is lost by leaving it there. The **mechanism** is covered always-on
+in `packages/core/src/sim/simulation.test.ts`, on two shipped cells, asserting a travel sample rather
+than a floating-point margin; the deep block is a *record of a finding*, and a record belongs where
+the finding was made. Promoting it out of the gate stays a one-line change for the wave that
+measures it on both legs.
+
+### The status table keeps its RED row
+
+The RED row of 2026-08-29 on `0cd422a` stays, with its date and its commit, and a green row is added
+under it — **measured**, not asserted: `ELEVATOR_SIM_FUZZ=deep`, 250 cases, exit 0, 6 tests passed,
+209 s. The pair is the point. A table showing only the green row would say *this tier passes*; the
+pair says *this tier failed here, and this is the run that shows the fix*. It is the same argument
+the file already makes for keeping the stale T22 green rows with their dates.
+
+**What is not claimed.** The 2 000-case overnight pass has not been re-run — only the 250-case tier
+default. No honesty-corpus figure is measured or published ([§ D343](#d343)). No claim is made that
+the deep tier is green on any platform other than the Linux container this ran on, which is the same
+claim the RED row above it made.
+
 
 
 ---
+
+
+## D396 — three census figures, three different causes, and the hypothesis was right about one of them
+
+**Date:** 2026-08-29 · **Owner:** wave H lane A · **Closes:** GitHub issue #306 · **Refutes a
+clause of:** [§ D150](#d150) · **Discharges the check** [§ D393](#d393) left open when it turned the
+`matrix-census` tier on and found it red · **Not a phase verdict:** no phase status moves here, and
+no published interval is recomputed
+
+**Decision.** `benchmark/matrixCells.ts` re-declares the three census figures that no longer
+reproduce, and **only** those three. Every one is attributed to a named tree by a run before it and
+a run on it, never by the direction of the drift. The re-declaration moves **no budget, no verdict,
+no front membership and no published interval**, and that is checked rather than argued. The
+`vertical-city-up-peak` rationale's double-deck disclaimer is **withdrawn**, because it has been
+false since the day the census beside it stopped reproducing, and for the same reason.
+
+| figure | declared | measured on this tree | cause, measured |
+|---|---|---|---|
+| `mixed-use-up-peak` / `destination-panel` first-invalid | 33 | **171** | [§ D333](#d333) alone |
+| `vertical-city-up-peak` / `destination-panel` first-invalid | *(none)* | **73** | the wave-10 tree at `22a1021`; the deck half isolated by control |
+| `vertical-city-up-peak` binding spread | 2.9722 | **3.1724** | `22a1021` **then** [§ D332](#d332), two moves and not one |
+
+### The hypothesis, and why it had to be run rather than read
+
+Issue #306 offered one attribution and said in as many words that it was a hypothesis: all three
+discrepancies touch `destination-panel`, and § D333 had bounded that arm's landing-panel promise.
+**One of the three is that, and two of them are not** — one of those two moved before § D333
+existed, and the third moved twice, once before it and once for a different reason after.
+
+Everything below is `matrixCensus.test.ts` at `MATRIX_SEED = 20 260 728`, unmodified except for a
+throwaway cell filter and, where stated, a replication count — the file is **byte-identical from
+`f895a16` to this tree**, so a difference between two rows is a difference between two simulators
+and nothing else.
+
+**The control first, because without it the rest measures the wrong thing.** At `f895a16` — the
+commit that declared these numbers — the census over both affected cells at n = 200 **passes**:
+2 tests, exit 0, 526 s. The declared figures were right when they were taken. This is not a number
+that never reproduced; it is three trees moving under one that did.
+
+The factorial, all at n = 200 over both cells. `ad7670e` (§ D332) and `b8b8733` (§ D333) are
+**siblings** — both have `29ee760` as their parent, and `103a8fe` is where they merge — so one run
+each isolates them completely:
+
+| tree | mixed-use `destination-panel` | vertical-city `destination-panel` | vertical-city binding sd |
+|---|---|---|---|
+| declared (`f895a16`, and the census passes there) | 33 | *(none)* | 2.9722 |
+| `29ee760` — parent of both fixes | **33** | **73** | **3.037002** |
+| `ad7670e` — § D332 only | **33** | 73 | **3.172435** |
+| `b8b8733` — § D333 only | **171** | 73 | **3.037002** |
+| `6260dcb` — this lane's base | **171** | **73** | **3.172435** |
+
+Read down the columns. `mixed-use` moves on § D333 and on nothing else, which is also what § D332's
+own structural argument predicts: `stopFloorIdOf` is the identity function on a single-deck shaft
+and `mixed-use-high-rise` declares no `servesFloorPairs`, so § D332 **could not** have moved it.
+`vertical-city`'s spread moves on § D332 and not on § D333, which is the mirror of the same
+structure: `zoned-uppeak` and `collective` are conventional arms and `#tellThePanel` never runs for
+them, so § D333 could not have moved *that* pair either. And `vertical-city`'s panel ceiling is
+**already 73 at the parent of both**, so neither fix owns it.
+
+### The third figure, bisected to the tree and then to the mechanism
+
+The remaining move is in `f895a16..29ee760`, 377 commits. Bisected with the same census restricted
+to `vertical-city-up-peak` at n = 74 — enough replications to see a first-invalid index of 73 or its
+absence, at about a third of the cost:
+
+| tree | position in the range | binding sd (n = 74) | `destination-panel` |
+|---|---|---|---|
+| `f895a16` | before the range | 2.914588 | *(none)* |
+| `ff43489` | 53 of 377 | **2.914588** | *(none)* |
+| `22a1021` | 54 of 377 | **3.102608** | **73** |
+| `5c8b809` | 94 of 377 | 3.102608 | 73 |
+| `5ac006b` | 188 of 377 | 3.102608 | 73 |
+| `aaf1bc0` | 282 of 377 | 3.102608 | 73 |
+
+`22a1021` is where [§ D131](#d131)'s deck simulation reaches this history: `stopFloorIdOf` exists in
+no tree before it and in every tree after. **The mechanism was then tested rather than inferred.**
+Taking `22a1021`'s own tree and dropping `servesFloorPairs` from `vertical-city.json` — § D332's own
+`withoutFloorPairs` control, applied at the data — gives **no `destination-panel` ceiling at all**
+and a binding sd of **3.135430**. So:
+
+- the **ceiling at 73 is the decks**, exactly: it appears when the pairs are simulated and
+  disappears when they are not, on one tree with one variable moved;
+- the **spread's first move is not**, or not only. Pre-`22a1021` is 2.914588, `22a1021` without its
+  pairs is 3.135430, `22a1021` with them is 3.102608. The decks move the spread by about a thirtieth
+  of what the rest of that tree moves it, and in the opposite direction.
+
+**That residual is attributed to `22a1021` and no further, and the reason is a property of this
+repository's history rather than of this lane's effort.** `22a1021` is a **root commit** — it has no
+parents; the wave-10 working tree arrived as an orphan import of **634 files and 265 283
+insertions**, of which 182 files and 83 343 insertions are `packages/core/src` alone.
+There is no in-branch history inside it to bisect, so *"the wave-10 tree"* is the finest grain the
+record permits. What is measured, and is the reason it is safe to re-declare anyway: **every other
+cell in the matrix is unmoved across the whole 32 days.** All six other binding spreads and all four
+other declared ceilings reproduce to the last digit at `6260dcb` — `midtown-up-peak` 4.5766 /
+`nearest-car`@174, `midtown-down-peak` 4.4899 / `nearest-car`@12, `midtown-interfloor` 9.4048,
+`garden-residential` 4.0834, `garden-down-peak` 3.6148, `secure-up-peak` 5.5574 /
+`nearest-car`@126. Whatever else moved in that tree moved the one building whose deck geometry and
+whose multi-leg sky-lobby transfers are unique to it, and moved nothing else this matrix measures.
+
+### What re-declaring costs, which is the question the issue actually asked
+
+Issue #306 refused to re-declare on the ground that doing so *"would silently re-baseline the
+statistical parameters the matrix publishes intervals under."* That was the right refusal for a lane
+that had not attributed the move, and it is checkable now rather than arguable:
+
+1. **The budget does not move, at either cell.** `budgetFor` is `ceil((z·sd/1)²)` clamped to
+   [50, 200]. At `vertical-city-up-peak` the unclamped figure goes **34 → 39** and the band **floor**
+   binds at both, so `replications` is 50 before and after. At `mixed-use-up-peak` the spread never
+   moved at all — 3.0616 at every point in the table above — because `destination-panel` is excluded
+   from the binding computation at *both* ceilings: 33 and 171 are both inside the census, and the
+   rule takes the widest arm with **zero** invalid replications.
+2. **`armCeilings` is not a statistical parameter.** Outside the two test files it is read in exactly
+   one place — `matrix.ts#runMatrixCell`, to write the *prose* of a front exclusion. It enters no
+   interval, no verdict and no front. `packages/viz` imports `MATRIX_CELLS` for `building`,
+   `traffic` and `reportWindow` and reads neither `armCeilings` nor `budgetBasis`; `cli` and
+   `server` read none of it.
+3. **The results these figures describe were re-derived when each change landed, and only the census
+   record was not.** § D150 regenerated this cell's 44 interval pins for `22a1021`; `103a8fe`
+   regenerated `mixed-use-up-peak`'s front, its verdict census and its pins for § D332 and § D333,
+   and its own message says *"destination-panel leaves mixed-use's unquotable set"*. Both checks are
+   always-on and both are green on this tree. So this is not a re-baseline; it is the half of two
+   completed re-measurements that nobody could see, because the tier that checks it is opt-in.
+
+### Two sentences that were true when written and are left saying so
+
+**§ D150's clause is refuted in place** — the note sits at that entry rather than replacing it. It
+said the budget was 50 before and after *"because `budgetFor` derives it from a declared spread that
+this change does not touch."* The spread moved 2.9722 → 3.0370 on that very change. The conclusion
+is right and the reason is not, and the reason is exactly what made re-running the census look
+unnecessary.
+
+**The `vertical-city-up-peak` rationale's double-deck disclaimer is withdrawn.** It read that the
+building's *"eight shuttle cars are configured double-deck and simulated single-deck — so every
+figure in this row is for a machine nobody ordered."* That was true at `f895a16` and became false at
+`22a1021`, the same commit that moved the two numbers beside it, and it has been false for 30 days.
+[§ D132](#d132) had already retired that disclaimer for this building by name, because its shuttle
+declares its four `servesFloorPairs`. `CLAUDE.md`'s *"a stated refusal goes stale the same way, and
+it is the more dangerous half"*, on the sentence that told a reader not to trust the row.
+
+### A third stale figure, found because the rationale being rewritten cited it
+
+That rationale gave a *reason* for running this building at 1 % rather than 2 %, and the reason is a
+census figure: `EXCLUDED_CELLS`' `vertical-city-up-peak-2pct` says the **baseline** loses its AWT at
+replication **46**, below `CLAUDE.md`'s 50-replication floor, *"so there is no admissible budget at
+this point — not an under-budgeted cell but an inadmissible one."* Nothing in this repository
+re-derives an `EXCLUDED_CELLS` mechanism — the census only reads `MATRIX_CELLS` — so it was measured
+here rather than restated, by running that operating point through the census's own code at n = 200
+and `MATRIX_SEED`.
+
+**It does not reproduce, and the direction matters.** `collective` first loses its AWT at
+replication **108**, which is *inside* the 50–200 band. The stated mechanism is therefore
+**withdrawn**: the point is not inadmissible. `destination-panel` is first invalid at **2** rather
+than 3, `nearest-car` at **7**, and seven further arms between **13** and **46** — so most of that
+table would be `UNQUOTABLE`, which is a result about those arms and not a property of the cell, and
+is exactly how `mixed-use-up-peak` is handled inside the matrix.
+
+**The cell is nonetheless not admitted, and that is deliberate.** It moves to *EXCLUDED PENDING A
+CRITERION*, the footing `secure-interfloor-mix` and `mixed-use-mixed-40-30-30` already stand on:
+admitting it adds a matrix row and a published pin group, and [§ D256](#d256) requires that
+re-design to be specified **before** its numbers are read. The numbers above were read to check a
+mechanism a rationale cites, not to decide an admission, and this lane does not decide one.
+
+The same run refuted the entry's closing clause too — *"the building appears at 1 % instead, where
+every arm but `nearest-car` is clean across the census"* — which stopped being true the moment
+`destination-panel` acquired its ceiling of 73 at 1 %. Both halves are corrected in place.
+
+### What is not claimed
+
+No corpus figure is measured here — [§ D343](#d343) takes that once, after integration. Nothing here
+says any of the three product changes was wrong: all three are accepted, and all three made the
+simulator more correct rather than less. And no claim is made about *which* of the wave-10 tree's
+non-deck changes moved the spread. It is one tree, it is a root commit, and offering a plausible
+name for it would be this file's own most-repeated mistake.
+
+---
+
+## D397 — a ceiling that heals is a change, and the always-on tier had no way to see one
+
+**Date:** 2026-08-29 · **Owner:** wave H lane A · **Consequence of:** [§ D396](#d396) · **Applies:**
+`CLAUDE.md` *"a published number goes stale the same way"*
+
+**Decision.** `matrix.test.ts`'s *"suppresses rather than averages an arm whose own AWT was invalid,
+and the census predicted which"* gains a **third direction**: an arm whose declared ceiling is
+**below** its cell's budget must come back `UNQUOTABLE`. It costs no simulation — the run is the one
+`matrixOf()` already holds.
+
+**The hole, stated as the two questions that were being asked and the one that was not.** The test
+looped over the arms that came back unquotable — each must have a declared ceiling, and it must be
+below the budget — and over the declared ceilings **at or above** the budget, whose arms must be
+quotable. Nothing asked the remaining quadrant: a ceiling *below* the budget whose arm was quotable
+anyway. That is a **healed** ceiling, and `matrixCensus.test.ts` — which does ask, in its own words
+*"a ceiling that has healed is as much a change as one that appeared"* — is behind
+`ELEVATOR_SIM_DEEP=1` and had, on [§ D393](#d393)'s evidence, never been run on a recent tree.
+
+**It is not a hypothetical quadrant.** `mixed-use-up-peak`'s `destination-panel` sat in it for
+eighteen days: declared 33 against a budget of 50, measuring 171. `103a8fe` re-derived that cell's
+front, its verdict census and all four of that arm's interval pins — `awtS`, `wt95S`, `energyKJ`,
+`ttdMeanS`, the only `mixed-use-up-peak` keys that commit moved — in the same commit as the fix that
+healed it, and left the census record beside them reading 33. Every always-on check in
+`matrix.test.ts`,
+`matrixFront.test.ts` and `published.test.ts` stayed green, correctly, because not one of them was
+looking at that number.
+
+**Exact rather than advisory, and both halves are properties of the apparatus.** Replication `i` is
+the same run at every budget — `harness.ts`'s `replicationSeed(seed, i)`, which is the whole basis of
+common random numbers here — and **one** invalid replication invalidates the cell, because
+`replicationRunner.ts#aggregateCell` is not a majority vote and says so. So `ceiling < replications`
+implies `UNQUOTABLE` with no tolerance anywhere in it, and the new loop is an equivalence rather than
+a heuristic: together with the loop above it, a declared ceiling and measured quotability now agree
+in both directions at every cell.
+
+**Mutation-validated by putting the defect back.** Restoring `mixed-use-up-peak`'s
+`destination-panel` ceiling to its declared 33 turns the file red on this assertion and on no other,
+naming the cell, the arm, the ceiling and the budget. Restored, green.
+
+**What this does not do.** It does not re-derive a ceiling — that is the census's job, and the census
+stays opt-in for the reason its own docstring gives. It asks only that two numbers already in the
+repository agree with each other, which is the question that was going unasked.
+
+---
+
+## D400 — the campaign day files, and `closeShift` never needed to know which tower it was
+
+**Date:** 2026-08-29 · **Owner:** wave H lane C · **Rules on:** GitHub issue #223 (and the closing
+half of #181, *"closing a day records nothing"*). Supersedes `AGENT_STATUS.md`'s stated blocker.
+
+**Decision.** A completed campaign day is filed by `EverydayHost.closeDay`, which advances the
+tower's contract day through a new `campaign/career.ts` action (`file-day`) and marks it cleared or
+missed from § 8.6's own tests. **No change to `dev/main.ts#closeShift` was needed, and none was
+made.**
+
+### The stated blocker was wrong, and it is the more useful half of this entry
+
+`AGENT_STATUS.md` recorded the gap as: *"marking it cleared or missed needs `closeShift` to know
+which tower it belonged to."* Checked rather than inherited, and it does not hold:
+
+- `closeShift` writes `ViewerState.week` — the **daily loop's** record. The campaign career is
+  deliberately not on `ViewerState`, and `everyday/host.ts`'s own binding carries the argument and
+  its cost (a schema, a migration, and two records both claiming to know what day it is). Two
+  records with different lifetimes means filing a campaign day is a **second write to a second
+  record**, not a branch inside the first.
+- That second record's owner is the host closure. `runCampaignDay(towerId)` is the only function
+  that turns a tower into a run; `campaignAct` is the only writer of the career; and `closeDay` is
+  the Everyday player's *own* press. All three are on the same side of the façade, so the fact the
+  blocker said was missing was never more than one closure local away.
+- § 6.4 and § 16 rule 1 give exactly one thing permission to file — *Close the day* — and issue
+  #287 already gated the Engineer surface's three filing paths (`tick`, `Ctrl`/`Cmd`+`Enter`, the
+  report tab) off while the cover is up. So no other path can reach a campaign day, which is what
+  makes a single seam sufficient rather than merely convenient.
+
+This is § D227's shape on a **register** rather than on a docstring: a sentence naming the obstacle
+sends the next reader to the wrong file, and this one would have sent them to a 7 000-line module to
+add a fourth flag to a function that already has three silent early returns.
+
+### What moves, and what is derived
+
+`file-day` writes **two fields** — `tower.day` advances, `tower.missed` grows on a miss — and
+`career.today` with them, because § 8.6 derives a contract's own start from the career day
+(`start(t) = careerToday − (t.day − 1)`) and a day filed on one alone would slide the whole contract
+under the grid. Everything else is already derived by `campaign/economy.ts`: the purse
+(`earnedSoFar` sums `rateOnDay` over past non-missed days), the record, the month grid's ✓ and ✗,
+the renewal's clear rate, the at-risk list, `contractIsLost`, and § 8.4's standing. A latched purse
+would be a second answer to a question one of them already contains.
+
+Two refusals: a tower the career does not hold, and a month already over (`day` reaches 21 when the
+twentieth is filed, and `rateOnDay` prices twenty days while `contractEndDay` draws twenty columns,
+so a twenty-first would be a day nobody published a fee or a cell for).
+
+**Named cost, with no shipped instance.** With more than one building held, only the tower whose day
+was run advances, so the unplayed towers' derived start slides forward a career day. `openingCareer`
+holds one contract and no action acquires a second. The alternative is worse: advancing every
+tower's `day` would pay the player for days they never ran, because a day that is neither cleared
+nor missed is not representable in `cleared = day − 1 − missed`.
+
+### What decides the mark
+
+`everyday/campaignModel.ts#campaignDayVerdict`, folded over **the rows the desk and the contract
+sheet are drawing** rather than over a second set of goals — so the difficulty buttons reach the
+record instead of moving three printed numbers. Explicitly **not** `lastReport()?.verdict`: the Day
+report grades § 6's goals for the week's day against different bars, and borrowing it would leave
+every difficulty button on the contract sheet binding nothing, which is this repository's signature
+defect wearing a control. Held by a case that files the same recording twice, once easy and once
+standard, and requires the record to differ — § D177's standing requirement pointed at the filing
+seam.
+
+Three tests decide it and the fourth is a refusal. § 8.6 says *all four*; the trip budget is the
+fourth and nothing in this simulator measures it (`TRIPS_REFUSAL`), so its row carries no reading
+and is absent from the fold in **both** directions — counted as failed it would refuse every day the
+campaign ever runs, counted as held it would report a bar nobody measured as met.
+`BUILDING_COPY.testsNote` said *"all four, or the day is missed"* and now says what actually decides
+it, which is § D227 on the line a player reads before pressing.
+
+**A run the tests could not read files nothing at all.** `wasGraded` is `shift/week.ts`'s predicate,
+so a reading is `pending` below the wake-up gate and on a censored worst wait. § D234's rule has two
+halves — *unjudged is not passed*, and it *did not cost anything either* — and `CampaignDayVerdict`
+has only two values because § 8.1's arithmetic partitions past days into exactly two. So the third
+answer lives at the seam that can act on it (file nothing) rather than being flattened into a missed
+day. The rule is on `testsNote` where a player meets it.
+
+### The evidence, and the two guards that had no red of their own
+
+`career.test.ts` holds the transitions, `campaignModel.test.ts` the fold,
+`host.test.ts` the seam over two real recordings, and `campaignJourney.browser.test.ts` the whole
+stage on the player's own controls with two negative controls. Every assertion was
+mutation-validated. Two were not, at first: removing the `dayClosed` **crossing** guard and removing
+the **latch clear** each left the suite green, because each covered for the other. Two cases now
+split them — a press in the window before tomorrow's recording lands (only the crossing refuses it,
+or day 2 is marked from the legs of day 1) and an intervention re-simulating a filed day (only the
+latch clear refuses it, and `shift/week.ts#closeDay`'s `recordGrew` makes the same argument one
+record down). An assertion no single mutation can redden is an assertion held by luck.
+
+### Two corrections travelling with it
+
+- `everyday/reportScreen.ts`'s primary was `context.go('week')` unconditionally, under a label that
+  already read `Back to ⟨building⟩` in a campaign run. The one button carrying § 8's progression
+  named the tower and opened the daily loop's seven-day strip. Found while wiring this, and fixed on
+  `ctx` rather than on the label, because a destination that reads its own rendering back is a
+  destination that moves when a string does.
+- `dev/state.ts#shiftLengthForContract` said *"called from exactly two places"* and now has three
+  (§ D401). A count in prose is a fact nothing re-derives.
+
+---
+
+## D401 — a campaign day runs the length its contract is graded over
+
+**Date:** 2026-08-29 · **Owner:** wave H lane C · **Rules on:** GitHub issue #223's grading half.
+Adds a third caller to `dev/state.ts#shiftLengthForContract`.
+
+**Decision.** `EverydayHost.runCampaignDay` patches `shiftLengthS: shiftLengthForContract(tower.id)`
+and `windowStartS: null` alongside the building and the dispatcher. A `CampaignTower.id` **is** a
+contract id, so this is the same expression `dev/scenariosPanel.ts`'s *take* writes, not a number
+authored here.
+
+**Why it is needed, measured rather than argued.** § D234 already established that Garden Apartments
+does not reach `WAKE_UP_ARRIVALS` in thirty minutes — twelve seeds, median 18, seven of twelve under
+the line — and authored `c1.shiftLengthS = 3600` for it. That measurement was re-taken on this tree
+through `recordRun` at the campaign's own building: at 1 800 s, three seeds give **16, 26 and 18**
+arrivals and two of the three grade **nothing**; at 3 600 s the same three give **29, 38 and 39** and
+all three grade. A campaign day nothing graded is a day § 8's record may not mark, so without this
+the shipped opening contract would refuse to file on most seeds.
+
+**What it actually guards, stated narrowly.** `initialState` already seeds `c1`'s hour, because the
+page opens on Garden Apartments — so on a cold load this press writes the length that is already
+there and changes nothing. Measured: with the patch removed, the browser journey stays **green**, and
+that is reported rather than hidden. What it guards is a state left at another length, which is
+reachable and not exotic: `withBuilding` deliberately does **not** re-seed, so a player who has taken
+a different assignment or moved the Engineer length control carries it into § 8. The host case
+therefore sets the state to the shipped default first — a press that only agreed with what was
+already there would pass on a build that writes no length at all.
+
+**Why this is the third caller and not `withBuilding` in disguise.** `shiftLengthForContract`'s
+docstring excludes `withBuilding` because changing building from the coach select is not taking an
+assignment. *Lock it in and run day N* **is** taking one: it is the one moment a player has asked for
+this contract rather than for this shift length, which is the same sentence `scenariosPanel`'s take
+is justified by. § 8 offers no length control at all, so there is no choice here to overwrite.
+
+**What is not claimed.** This does not make the campaign day the *whole authored day*
+(`dayPatchFor`'s `wholeDayRun`). Garden Apartments declares no whole day, so that seam would answer
+`{}` and change nothing here; for a contract whose building does declare one, § 8's day and § 6's
+day are different lengths, and reconciling them is not this lane's and is not measured.
+
+---
+
+## D402 — the rail's cold paint stops answering *there is no career* to *I have not been asked yet*
+
+**Date:** 2026-08-29 · **Owner:** wave H lane D · **Rules on:** GitHub issue #214, acceptance
+criterion 1 — *the rail reflects the actual saved state*. Settles what
+`everyday/shell.ts#weekRailOptions` answers before `dev/main.ts` publishes the host.
+
+**Decision.** The card's absence splits into **two lines**. `RailOptions.weekPending` is *a week is
+on its way* and draws `rail.ts#CAREER_PENDING` — a sentence with no career in it and no digit in
+it; a build with no host slot at all keeps `NO_CAREER_YET`, which is the honest answer there. And
+`shell.ts#connectDataHost` redraws the rail when the career line moves, so the pending state lasts
+exactly as long as the boot does.
+
+**The defect, and why it was not the one the issue opened on.** The headline contradiction — the
+card reading a `profile` field no producer ever wrote — was closed on `2c7b308`. What survived was
+one line:
+
+```ts
+if (dataHost === undefined) return {};
+```
+
+in a docstring that said *"the week is a fact about the host, so it is read at draw time and no
+host answers `{}`"*. Both halves are accurate; the trouble is that `{}` means two different things
+one function apart. On `campaignRailOptions` it is a **silence** — the `CAMPAIGN` group is not
+drawn, and a desk row labelled from nothing would be the invented-label defect. Here it is a
+**claim**: `rail.ts` renders *no days saved yet — close a day and it lands here* over it.
+
+So every cold load with a week in `localStorage` (`elevator-sim.session`, `schemaVersion: 7`) told
+that player they had saved nothing. It did not flicker past, which is the half worth reading twice:
+a `'menu'` route mounts no screen, `connectDataHost`'s redraw arm fires only for a mounted screen,
+and nothing else redraws a rail — so on § 3.2's front door the false claim stood for the whole
+visit.
+
+**What was refuted while finding it, and is not fixed here.** Three playtest readers reported the
+sidebar *inventing* progress — `2 days running · best 100%` after no play. That is false. The
+figures are genuinely restored from storage, and a truly fresh context holds nothing and keeps the
+card on its empty state. Nothing in this decision changes that behaviour.
+
+**Alternatives considered.**
+
+- *Read the session in the shell.* Rejected. `persist/` has one reader and `dev/main.ts` is it. A
+  second one is two answers to *what week is this* on the very screen that exists to have one, and
+  `restoreSession` carries notices and a failure path that would then have two owners.
+- *Merge the two stores.* Rejected outright — `everyday/profile.ts` argues at length why the
+  profile is not a fourth key in `persist/`'s envelope, and #214's fix is that the card asks the
+  store that keeps days, not that the stores become one.
+- *Redraw the rail unconditionally on every host notification.* Rejected. A notification is every
+  path through `dev/main.ts`'s `renderAll()`, and `drawRail` calls `replaceChildren`, which takes
+  focus off whatever rail row a keyboard player is on. The redraw is guarded on the career line
+  having moved — a pure string derivation through `railFooter`, which is also why `careerLineOf`
+  stays module-private: exporting it would put a second text producer under `everyday/rail.ts` for
+  `honesty/derive.ts` to classify.
+- *Draw nothing while pending.* Rejected. A blank third line is a card that changes height and
+  says nothing a reader can act on; the shell already has the opposite precedent one function away
+  in `drawHostPending`, which draws `host.ts#HOST_PENDING_REASON` rather than blanking a region.
+
+**Why the pending line carries no figure.** § 20.11's forbidden thing is a fixture presented as a
+player, and `0 days running · best —` on a week nobody has read yet is one. The line is prose.
+
+**Validation, and every assertion was mutation-checked.**
+
+| mutation | what went red |
+|---|---|
+| `CAREER_PENDING = NO_CAREER_YET` | `rail.test.ts` — *says it has not read the week yet rather than that there is none* |
+| `weekPending` checked before `week` | `rail.test.ts` — *lets a week that has arrived win over the flag* |
+| the redraw deleted from `connectDataHost` | `shell.browser.test.ts` × 2, below |
+
+The browser pair is what says the fix is on the shipped path rather than in the model. With the
+redraw deleted, the cold-load footer case reads `YPLAYING ASyoureading your saved days…` and fails
+the assertion that has stood there since the card was written — which is the front door's real
+behaviour under the defect, with the sentence swapped. The mid-run case then closes a day through
+the host and requires the career line to move off both no-week states; under the same mutation it
+fails with *the card still says nothing is saved over a filed day*. That is the standing
+requirement — **move the control and require the run to change** — pointed at the one control that
+writes a career, and read on the rail rather than on a window statistic.
+
+Both no-week literals are read out of `railFooter` in the test rather than quoted, because both are
+module-private and a copy would keep passing after somebody rewords the card. The streak line gains
+a class (`.everyday-identity-streak`) for the same reason: a positional selector passes over a card
+that has stopped drawing the line at all.
+
+**What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
+integration; this lane's seeding moves both tiers. Nothing here says the pending state is
+*unreachable* in the product: it is reachable, it is what a player sees for the length of
+`dev/main.ts`'s async boot, and the mutation above is what measured that.
+
+
+---
+
+## D403 — the career line enters the corpus, and the pair that watches it is declared with the state it needs
+
+**Date:** 2026-08-29 · **Owner:** wave H lane D · **Rules on:** GitHub issue #214, acceptance
+criterion 3 — a corpus property over the two surfaces that disagreed. Extends
+[§ D362](#d362)'s `surfaces-disagree`.
+
+**Decision.** `honesty/agreement.ts#AGREED_FIGURES` gains a second pair, `career-line`:
+`everyday/rail.ts#railFooter` against `everyday/weekView.ts#weekScreenViewOf`. And
+`honesty/surfaces.ts`'s `EVERYDAY_MENU` seeds the card's career line in **all three** of its states
+rather than driving `railModel` with no options at all.
+
+**Why the declaration alone would have passed vacuously, which is the whole of this entry.** Two
+things were missing and only one of them is a register row.
+
+1. `surfaces.ts` drove `railModel({ screen: 'menu', ctx: 'daily' })` with no options, so
+   `rail.footer.streak` could only ever render the absence. **The populated career line — the two
+   figures a player with a saved week reads — was in no case of either tier.**
+2. `agreementViews` built weeks with empty histories, on which the pair is out of scope. A pair
+   that is out of scope everywhere reports zero violations on every corpus, which is
+   byte-identical to a pair that agrees.
+
+So the state was built. `withTodayFiled` files a day with `record: null` — a shipped `DayOutcome`
+value, named in `shift/types.ts` as the measured state of a session written by a build that had no
+record to write, not a stub — and `closeDay` is total over it. No simulation, which is the
+constraint `agreement.ts`'s *Cost* section states in seconds. **One fixture builder, two
+readers:** the rail seed and the pair file a day the same way, so a change to what *a filed day*
+means moves the swept string and the compared figure together. Not the same *week*, and
+deliberately — the pair drives day 4 to sit on the bar-hardening ladder and the seed drives day 1,
+which is the card's line as a first-week player meets it.
+
+**The arms are one week with the axis flipped, and that is the design rather than a convenience.**
+
+| arm | week | `dayClosed` | what the pair sees |
+|---|---|---|---|
+| `day1` | nothing closed | `false` | out of scope — both surfaces are right and differ |
+| `day4` | today filed | `false` | both publish, and both must **withhold** today's figure |
+| `day4-filed` | today filed | `true` | both publish, and both must **release** it |
+
+The last two differ only in the flag, which makes them a test of the **gate** rather than of the
+arithmetic: `rail.ts#careerLineOf` asks `day.day < week.day || dayClosed` over the `HISTORY_DAYS`
+window and `weekView.ts#streakLineOf` takes a count off cards whose own gate is `!isToday ||
+dayClosed`. A pair driven only where both release goes green on a rail that has dropped the gate
+entirely. The horizon stays the **second** segment of the view id, because `agreement.test.ts`
+reads it off `split('/')[1]` to assert that § D359's pair still reaches both kinds of run.
+
+**Why an empty week is out of scope rather than a violation.** There the two surfaces say different
+things and **both are right**: the card draws a sentence with no digit in it (§ 20.11 forbids
+`0 days running · best —` on a week nobody has played) and § 14's header draws the week's zeroes,
+which is what a screen made of seven day cards is for. Requiring them equal would force the rail to
+drop its absence — `rail.ts`'s own rule 4 calls that *the same defect facing the other way*. Both
+sides share the **scope** gate and neither shares the **derivation**, so `checkSurfacesAgree`'s
+*one side dropped it* clause cannot fire on a state that is merely out of scope, and
+`agreement.test.ts` asserts the in-scope arms are reached on every fixture case.
+
+**Validation — the property was made to fail on a source mutation, not a test-local variant.**
+Dropping the `dayClosed` gate from `rail.ts#careerLineOf` turns `honesty.test.ts` itself red, with
+`surfaces-disagree` reporting on `agree(career-line)@day4/period.right`:
+
+> One says “1 day running · best 84%”; the other says “1 day running · best —”.
+
+Reverted, the tier is green. Two further clauses in `agreement.test.ts` were checked independently:
+a test-local variant that always passes `dayClosed: true` must produce violations on `day4/` and
+**nowhere else** (a check that also fired on `day4-filed` would be firing for a reason that is not
+the gate), and the two arms' rendered lines must be different strings, which the same source
+mutation also breaks.
+
+**One stale sentence closed in passing, § D227's class.** The comment over the seed block said the
+streak line *"is the honest-absence form (no profile store exists)"* — stale twice over:
+`everyday/profileStore.ts` exists, and the line stopped coming from the profile when #214 pointed
+it at the week. On the file whose job is to sweep for exactly that.
+
+**And one register entry corrected rather than left standing.** `agreement.test.ts#NOT_AGREED`'s
+verdict pair was refused because *"a driven side needs a closed day, which needs `outcomeOf` and
+`closeDay` over a recording"*. Half of that has stopped being true. The entry now says what still
+blocks it — `dayReportOf` is a function of a **run**, and this module does not simulate — rather
+than a reason that has been overtaken.
+
+**What is not claimed.** No corpus count is published — [§ D343](#d343) takes that once, after
+integration. The seeding moves the string counts in both tiers, and the pair's two `surfaceId`s
+move the surfaces column in both tiers by the same mechanism [§ D362](#d362) records: a declared
+pair must carry the shipped expression's id or a violation could not name which surface disagreed.
+No claim is made that the corpus can now see disagreements between undeclared surfaces; it is a
+register, and a register covers what it names.
+
+
+---
+
+## D404 — a lane's decision numbers are pre-allocated as a block at dispatch, and an unused one stays a hole
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Closes: GitHub issue #173, half one.**
+
+**Decision.** **The integrator pre-allocates a contiguous block of decision numbers to each lane in
+that lane's dispatch brief, before any lane starts work.** A lane allocates only from its own block,
+sequentially from the bottom, and reports the highest number it used. A number allocated and not
+used is **left unused permanently** and recorded in
+`packages/experiments/src/validation/documentation.test.ts#KNOWN_DECISION_HOLES`. At integration the
+integrator reconciles [`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md)'s *Next free decision number*
+row **once**, from the merged tree.
+
+### Why a lane cannot allocate its own
+
+Not because lanes are careless — because the information required is not available to them. A branch
+cannot see another branch. `main`'s highest heading is a lower bound on what is taken and never an
+upper one, so two lanes reading the same true number both compute the same next one.
+
+This is measured rather than feared. **Two lanes both claimed § D336 and one had to be renumbered at
+integration.** Before that, § D366's own preamble records the near-miss that predicted it: `main`
+ended at D360, and `integration/m2-wave-c` was already holding **D361–D365** on a branch — *unmerged,
+invisible from `main`, and unreserved*. That block only started at the right number because somebody
+thought to probe another branch by hand.
+
+The consequence a reader should carry away is the second-order one. Lanes did the safe thing: they
+stopped claiming headings and wrote the owed-decision marker in a docstring instead. **That is
+why there were sixty-four of them.** The backlog was not negligence; it was the correct local
+response to an allocation scheme that could not serve a lane, and it will come back the moment this
+rule stops being followed.
+
+### Where a lane looks, and the one place it must not
+
+**A lane's numbers are in its own dispatch brief, and nowhere else.** In particular a lane must
+**not** read `CHARTER_PROGRAMME.md`'s *Next free decision number* row and take from it. That row is
+an **integrator input** — it is how the next wave's blocks are computed — and a lane that allocates
+from it is doing exactly the racing thing this decision exists to stop. It is also, by construction,
+stale for the whole duration of a wave, because every lane's entries are unmerged while the wave is
+open.
+
+`documentation.test.ts` asserts that row equals the derived highest **+ 1**, so the reconciliation is
+checked rather than trusted. That case predates this decision and is what makes the row safe to
+treat as authoritative *between* waves.
+
+### The allocation is written where something can read it
+
+**Until this decision, the only record that wave H had reserved D396–D414 was the text of five
+dispatch briefs** — ungreppable, and gone when the wave closed. So the block is also recorded in
+`documentation.test.ts#OPEN_RESERVATION`, and three things are checked off it that were not checked
+before:
+
+- the charter row names the block's **floor** while the wave is open, which is what it actually says
+  during a wave and what the *"highest + 1"* form asserted was wrong — that form is true only of an
+  integrated tree and was red on every lane branch of this wave, all five at once;
+- **no lane writes above its block's ceiling**, which used to be discovered at integration;
+- and when every number in the block heads a decision or is a registered hole, the case **fails
+  until the reservation is closed and the charter row reconciled**. Between waves the assertion is
+  `highest + 1` byte for byte, so nothing about the settled check is relaxed.
+
+That last one is the point. Reconciling the row was a thing an integrator remembered, and D387 is
+what one un-remembered reconciliation costs.
+
+### A lane that needs more than its block asks for more
+
+It does not take the next number above its block: the lane above may hold it, and taking it silently
+is the collision in its original form. The integrator can extend a block upward when the adjacent one
+is undispatched, or grant a fresh block above the highest dispatched number. Asking costs a message;
+guessing costs a renumbering, and renumbering is what `RISKS.md` R1 forbids — ids here are **names**.
+
+### Evidence that this works, and the failure it introduced
+
+Three waves have now run on it — **F took D386–D392, G took D393–D395, and H's five lanes took
+D396–D403 and D404-upward** — with **no collision in any of them**, against two collisions in the two
+waves before it.
+
+**It introduced one new failure mode and this decision closes it in the same breath.** **D387 was
+allocated to wave F and never written.** Nothing noticed for a wave, because nothing was looking:
+`DECISION_HEADING` is anchored and a number that heads nothing simply leaves the derived set. So the
+rule above is not only *pre-allocate* — it is *pre-allocate and register what the block did not
+spend*.
+
+**The unused number is not backfilled and not returned to a pool.** Backfilling D387 with an
+unrelated later decision would make that id denote two things across time, which is precisely what
+R1 forbids and what makes the one registered duplicate (D63) a known defect rather than a style. It
+would also falsify the charter's own record that D386–D392 *was wave F's block. A hole is cheap; an
+ambiguous id is not.
+
+### The register catches the other cause too, and that is why it carries a reason per entry
+
+A number can head nothing for two reasons, and they need opposite responses. The second is a defect:
+**a heading that stopped being a heading.** Wave G's integration merged § D393's closing sentence and
+§ D394's heading onto one line, so D394 became body text; five `§ D394` citations in `.ts` files then
+named a section the file no longer carried, and **neither gate saw it** — mutation-validated by
+re-breaking the heading and watching both pass. `KNOWN_DECISION_HOLES` therefore stores a *reason*
+rather than a bare number, and an unregistered hole fails with both causes named in the message. A
+bare list would have accepted an eaten heading as bookkeeping.
+
+`validation/citations.test.ts` is the other half and was widened in the same wave to read `.ts` as
+well as markdown, because that is where most `§ Dnnn` citations in this repository live — **3 350
+against markdown's 3 119**, so more than half the citations were unchecked.
+
+### Validation — eleven mutations, each putting a case *into* scope rather than removing one
+
+Every instrument named above was shown able to fail, and reverted:
+
+| mutation | what went red |
+|---|---|
+| a temporary site carrying the owed-decision marker | the ratchet, `6 … against a ceiling of 5` |
+| a citation to a **D999** that does not exist, in a markdown document (spelled here without the section sigil, for the reason above) | the citation gate, naming the file |
+| the same dangling **D999**, in a **`.ts` docstring** | the citation gate — **and the pre-widening gate, run against the same mutated tree, passed 4/4** |
+| § D394's heading re-merged into § D393's last sentence | *both* gates: the hole register names `394`, the citation gate names all eight citing sites |
+| a `## D418` heading | *a lane may not take a number its block does not hold* |
+| the reservation's floor moved to 404, as if lanes A–D had merged | the charter row check and the hole boundary, together |
+| the reservation closed while the wave is open | the between-waves branch, with its original `highest + 1` message intact — `expected 396 to be 418` |
+| the marker pattern narrowed to something no site says | the pattern's control string, `expected +0 to be 1` |
+| **the debt simulated to zero with the old `owed > 0` guard restored beside the new ones** | **only the old guard**, `expected 0 to be greater than 0` — which is the whole argument for replacing it |
+| a `## D387` heading, filling a registered hole | *a number registered above as a hole now heads a decision* |
+| `SKIP_DIRS` widened to swallow `packages/` | the walk's own guard, `expected 79 to be greater than 500` |
+
+The ninth is the one to keep. It is the state this issue is trying to reach, and the guard that was
+supposed to protect the gate is the only thing that fails in it.
+
+### What is not claimed
+
+Nothing here says a wave must know its decisions in advance; a block is a reservation of *ids*, not a
+plan of *entries*, and under-spending one is expected. Nothing here changes how a decision is
+argued or where the argument lives — that is § D405. And this rule governs `DECISIONS.md` only; the
+`Tnn` lane-record series in this file are history and are never allocated from again.
+
+**Two things this wave found and did not fix, recorded so they are not re-found.** `DECISIONS.md`'s
+own preamble says *"142 entries span D1–D149"* against a file that now carries 400 headings spanning
+D1–D417; its list of gaps is correct but predates D387. It is `RISKS.md` R38 in the file this
+decision is about, and it is left standing because the preamble is outside this lane's territory and
+because the derivation above is now the authority — where the two disagree, the register is the
+measurement. Separately,
+[`docs/24-competitive-teardown.md`](docs/24-competitive-teardown.md) cites
+[`MULTI_AGENT_PLAN.md`](MULTI_AGENT_PLAN.md) § 0 for the rule *"numbers are allocated at
+integration, never inside a lane"*, and **§ 0 does not state it** — a rule cited to a section that
+does not carry it, which is the citation gate's own defect class in a form neither half of it
+checks. The rule it should have cited is this one.
+
+---
+
+## D405 — a decision is recorded in the relevant doc, and a numbered entry is for the ones that reach past their own module
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Closes: GitHub issue #173, half two.**
+
+**Decision.** [`CLAUDE.md`](CLAUDE.md)'s working agreement — *"If you hit a decision the docs don't
+cover, record it in the relevant doc rather than only in a commit message"* — is satisfied, for a
+decision **local to one module**, by that module's own docstring. A numbered `DECISIONS.md` entry is
+owed when **any** of the following holds, and not otherwise:
+
+1. **It binds code or documents the deciding module does not own.** A reader working elsewhere must
+   obey it and would never find the docstring.
+2. **It moves, narrows, refuses or deviates from something already recorded** — a numbered decision,
+   an invariant, or a specification the product is measured against. A numbered thing may only be
+   moved by a numbered thing, and a deviation from a spec has to be findable from the spec.
+3. **A document refuses to cite itself without one.** Several specifications here say outright that
+   they carry no `§ D` citation of themselves until an entry exists; the entry is then the
+   deliverable, and its content may be nothing more than an anchor.
+
+**A site settled under this decision cites `§ D405` and does not re-argue it.** One rule, one place.
+Thirty-odd bespoke paragraphs each explaining why *this* site needs no entry would be the
+write-it-in-four-places defect this repository keeps recording, and every one of them would go stale
+independently.
+
+### What went wrong, and it was a reading rather than a lapse
+
+The working agreement says *the relevant doc*. It was read as *`DECISIONS.md`*, and those are not the
+same claim: for a decision whose whole reach is one module, the relevant doc **is** the module. Read
+the stricter way, every argued choice in the tree owes an entry, which is unachievable — so lanes
+wrote the argument in the docstring, marked the number as owed, and moved on. Sixty-four times.
+
+**The mitigating half was real and is why this is a re-classification rather than a rescue.** Not one
+of those sites lost its argument. Every one carried the reasoning in prose beside the code it
+governs, which is the harder half of the working agreement and the half that actually helps the next
+reader. What was missing was a *number*, and a number is only worth having when somebody needs to
+cite it.
+
+### The marker is a debt, and it now costs something
+
+The owed-decision marker — the one sentence `documentation.test.ts` greps the tree for, spelled
+out there and deliberately not repeated here — is a claim that this site is incomplete. That file's
+ratchet counts them and may only fall. So a lane writing the phrase is taking on debt the wave must
+discharge, and a lane that means *this is recorded where it belongs* should say **that** instead, and
+cite this decision.
+
+**Write *about* the marker by naming it; do not utter it.** The ratchet is a grep and cannot tell a
+debt from a discussion of one, and this entry's first draft put the count up by three by quoting the
+sentence three times — the same trap that makes `documentation.test.ts` exclude its own file by path,
+arriving one level up in a file that cannot be excluded, because `DECISIONS.md` carries real markers
+of its own. It is the shape of `citations.test.ts`'s convention for a retired record's number, which
+is written *"its own decision 83"* without a section sigil: **a gate that greps prose imposes a way
+of writing about itself, and the answer is the convention rather than a cleverer pattern.** A pattern
+narrowed to miss a quotation would also miss a real site written as one.
+
+### What this does not license
+
+It does not license moving an argument out of `DECISIONS.md` into a docstring to make a count fall.
+Nothing already numbered is unnumbered by this decision, and the three criteria are tested against
+what a decision *reaches*, never against how inconvenient the entry would be. It also does not make
+a docstring optional: a module-local decision recorded in neither place is the original defect, and
+the working agreement is unchanged.
+
+---
+
+## D406 — the experiment matrix's eight cells live in their own module, because the data is browser-safe and its home was not
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering only; the decision is Everyday Mode slice 7's
+and its argument is `packages/experiments/src/benchmark/matrixCells.ts`.**
+
+**Decision.** `MATRIX_CELLS` lives in `benchmark/matrixCells.ts`, is re-exported byte-identically by
+`benchmark/matrix.ts` so every existing import path is unchanged, and is exposed on
+`packages/experiments/src/browser.ts` so `packages/viz/src/batch/suite.ts` can **import** the fixture
+list rather than retype it.
+
+**Numbered under [§ D405](#d405) criterion 1**: the rule *"never retype the cells"* binds four
+modules and one document that `matrixCells.ts` does not own, and a builder in `viz` who has not read
+that docstring is exactly the reader it has to reach. `docs/18` records what a hand copy produces —
+the matrix's eight are building × traffic-pattern cells over **five** buildings while `data/buildings/`
+holds **eight** buildings, so a list assembled from "the eight buildings" disagrees with the operating
+points this project actually measures.
+
+**The placement was measured before it was decided**, which is the part worth keeping. The cells are
+pure frozen data whose only import is a type already on the browser graph; the *module* was the
+blocker, because `matrix.ts` reaches `validation/harness.js` → `node:url` and the tuning reports →
+the runner, so re-exporting from there would put a `node:` edge into every bundle. The `data/`
+fallback `docs/18` names was rejected on its own ground: the cells embed per-cell derived budget
+bases and the prose that argues them, which are measurement records rather than reference data, and
+a JSON copy would need a schema, a loader and a validation pass nothing else wants.
+
+`browser.ts`'s surface is deliberately narrow — the list and the lookup, not `EXCLUDED_CELLS` and not
+the study runners — because a name on that barrel is a promise its guard must keep.
+
+---
+
+## D407 — a watched run is verified by re-simulation, and the pill may not say what the spec says
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering and ruling on one substitution; the design
+argument is `packages/viz/src/watch/types.ts` and its eight siblings.**
+
+**Decision.** `packages/viz/src/watch/` and `dev/watchPanel.ts` implement GAMEPLAY § 14.1 and
+ENGINE_CONTRACT § 1.5 with **one substitution, and it is the reason this is numbered**:
+`ENGINE_CONTRACT` § 1.5 says the replay is *"the identical computation the server performs to verify
+a post, which is why the pill can honestly say **verified by the server**."* **There is no server in
+this product.** The pill says `REPLAY_PILL_VERB` — *verified by re-simulation* — and `watch/view.ts`
+owns the wording.
+
+**Numbered under [§ D405](#d405) criterion 2**: this is a deviation from a specification the product
+is measured against, and a deviation recorded only in the deviating module is unfindable from the
+spec. The other nine sites in that directory are module-local and carry their arguments where they
+belong; they cite this entry rather than restating it.
+
+**The distinction is not pedantry, and the spec's own sentence says why it matters.** *Verified by
+the server* is a claim about an adversary: a forged submission was refused by a party the player does
+not control. Re-simulation on the player's own machine, over a record the player's own machine wrote,
+refuses **staleness** and refuses nothing else — a record whose figures no longer reproduce is
+caught, and a record somebody edited to match its own lie is not. Saying the stronger sentence would
+be this repository's named failure: a true-sounding claim about a check that did not happen.
+
+**What a record is** stays as the modules argue it: a `WatchRecord` is the *question* — seed,
+configuration, intervention log — never the answer, because a `VizRecording` is megabytes of step
+series that `persist/types.ts` already refuses to store on the ground that it is a pure function of
+the two. Watching is re-asking the simulator the same question.
+
+---
+
+## D408 — the session envelope's version moves for a new **value**, not only for a new key, and the newer direction stays a refusal
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the rule three paragraphs of
+`packages/viz/src/persist/types.ts` had each argued separately.**
+
+**Decision.** `SESSION_SCHEMA_VERSION` moves whenever the payload can say something an older reader
+has never seen — **whether the novelty is a key or a value** — and the two questions that decide a
+bump are asked in order at every one:
+
+1. **Does the absence determine the value?** If a build that could not write the field also could not
+   have had the thing, the completion is a *measurement* rather than a default.
+2. **Can an older build read what this one writes?** If not, the number moves.
+
+A build meeting a version it does not read refuses it as **newer**, never as **damaged**.
+
+**Numbered under [§ D405](#d405) criterion 1**: this governs every future bump by anybody, in any
+module that adds a field to a persisted shape, and `validate.ts` enforces half of it from a different
+file. It is the one rule the three paragraphs share; each application stays where it is argued.
+
+**The rule was read backwards off the evidence, which is why it is stated in both directions.**
+`validate.ts`'s extra-key branch already said *"the envelope version should have changed when that
+field landed"* — but only ever in the direction that **adds keys**. Version 5 added none: the
+worst-wait goal widened three value domains inside the week's persisted readings (`reads` gained
+`worstWaitS`, `unit` gained ` s`, the missed glyph became `×`), and a version-4 build checks those
+against **its** closed lists, so a session written by the newer build would have been refused as
+*damaged* — the exact false accusation the version-3 paragraph records. Version 6 then added a key one
+level deeper than any bump had reached (`DayOutcome.record`), and version 7 added keys at **two**
+depths at once. All three are the same rule; only the shape of the novelty changed.
+
+---
+
+## D409 — the DC-1 case is refused for the campaign, and the mechanism it wanted already ships elsewhere
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the verdict
+[`docs/33-difficulty-curve.md`](docs/33-difficulty-curve.md) § 3.3 reached and measured.**
+
+**Decision.** The DC-1 case — giving campaign stage 1 the failable count goal [§ D355](#d355) removed
+— is **refused**, on a measurement rather than on taste: the change does produce a failable count
+goal, and it breaches DC-2 or DC-2b, one or the other, unavoidably, in the same move.
+
+**Numbered under [§ D405](#d405) criterion 2**: it is a refusal to re-open something already
+numbered, and a refusal recorded only in the document that proposed it is a refusal the next lane
+will re-derive from scratch.
+
+**The refusal is scoped to the campaign and is not a verdict on the mechanism**, which is the half a
+later reader will need. The gameplay case for a failable count goal is good; what is refused is
+putting it on stage 1 of the campaign, where the curve rules bind. The mechanism already ships — in
+`data/fixit-cases.json`, on the mode whose building can actually show the fault — so nothing is lost
+by the refusal except the placement.
+
+---
+
+## The five M1 specification documents get their anchors — the block §§ D410 to D414
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Raised by GitHub issue #173.**
+
+**Why they are one block and why the entries are short.** Five M1 documents landed saying, in almost
+the same words: the owed-decision marker, then *"… and this document carries no `§ D` citation of itself
+until that entry exists"*. Each is [§ D405](#d405) criterion 3 exactly: **the anchor is the
+deliverable**. So each gets its own heading and its own number — they are five different subjects and
+a shared number would make `§ D410` ambiguous — recorded together because they were settled in one
+sitting, on the § D366 block's precedent.
+
+**These entries take no decision.** The decision in each case is the document, which landed and was
+accepted; what was missing was a citable id. Nothing below adds a ruling its document does not
+already carry, and where a document's own § is named, that § is the authority and this entry is the
+label.
+
+---
+
+## D410 — `docs/22-charter.md` is adopted, and its § 7 open items stay open
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/22-charter.md`](docs/22-charter.md) governs the game layer: its vision, its promise, its ten
+success criteria S1–S10 and its non-goals. This entry is the number § 7's first bullet asks for.
+**The other bullets of § 7 are unaffected and remain open** — the brief must link here, and README
+must quote the vision and promise verbatim — because they are edits to files that document does not
+own, and an adoption number does not discharge them.
+
+---
+
+## D411 — `docs/25-vertical-slice.md`'s slice definition is adopted
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/25-vertical-slice.md`](docs/25-vertical-slice.md) § 8's first bullet. **The seed is still not
+chosen** — § 1.6 pins the rule and X7 says what the run that chooses the integer must assert — and
+this entry does not choose it. An anchor for a slice definition is not a measurement of the slice.
+
+---
+
+## D412 — `docs/26-telemetry-and-privacy.md` § 1's posture is adopted, and it creates no telemetry module
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/26-telemetry-and-privacy.md`](docs/26-telemetry-and-privacy.md) is a specification: no `.ts`
+file, no `data/*.json` file and no shipped string. **The number does not license the schema.** The
+document's own § 11 lists what it does not settle — the lawful basis, the published privacy notice,
+whether an age statement is needed, and the visible-trouble threshold and dwell — and **all of those
+remain unsettled and are human decisions**. This entry answers the first bullet of § 11 and no other.
+
+The ordering that document argues is part of what is adopted: #202's material comes before #201's
+because the order is not recoverable. Data collected without a posture cannot be un-collected, and a
+schema written first *becomes* the posture by default.
+
+---
+
+## D413 — `docs/30-playtest-programme.md` § 2's governing rule and § 6.5's verdict gate are adopted
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/30-playtest-programme.md`](docs/30-playtest-programme.md) is a specification and **no round has
+been run against it**. Where it says *the moderator does X* it is an instruction for a round that has
+not happened, and this number does not convert one into a report of one that has. The `docs/30 Q1`–`Q12`
+series it opens in § 2.2 is cited with its document, per [§ D343](#d343).
+
+---
+
+## D414 — `docs/35-problem-per-mode.md` is adopted
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
+
+[`docs/35-problem-per-mode.md`](docs/35-problem-per-mode.md), whose header asked for a number and
+proposed **D361** — a number wave C had already taken on a branch it could not see, which is
+[§ D404](#d404)'s subject arriving in the very document that asked for it. The number is D414. The
+document's content is unchanged by the renumbering, which is the point of ids being names.
+
+---
+
+## D415 — the rule vocabulary ships eight of GAMEPLAY § 11.5's ten actions, and the two omissions are the model's refusal made once
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the refusal
+`packages/core/src/config/types.ts#RULE_ACTIONS` argues and two surfaces inherit.**
+
+**Decision.** `RULE_ACTIONS` declares **eight** ids. GAMEPLAY § 11.5 lists ten; the two it does not
+declare are **refused by omission**, and the refusal is made once — in the vocabulary, beside the
+model — rather than a second time on every screen that offers a rule.
+
+**Numbered under [§ D405](#d405) criterion 2**: it deviates from a specification the product is
+measured against, and a reader comparing § 11.5 against the shipped editor finds two rows missing
+with nothing at the spec's end to say why.
+
+**The two reasons are different and both load-bearing.**
+
+- ***skip everything above floor v* is not offered** because service range is **building fabric**
+  (`servesFloors`), and § 11.4's own header carries the boundary sentence — *zoning and service
+  ranges belong to the building, not the dispatcher*. A dispatcher-side floor mask would be a second
+  source of truth about which floors a shaft serves, which is CLAUDE.md's *three kinds of zoning are
+  distinct concepts* one layer down.
+- ***treat up-calls as urgent* is not offered** because **no term in the cost library prices
+  direction-conditional urgency**. Every wait and starvation weight prices up and down calls alike,
+  so the honest compile would move both and the label would lie. That is invariant 7's boundary read
+  in the strict direction: a genuinely new *cost term* would justify new code, and until one exists
+  the action cannot be expressed.
+
+**The reworded alternative is a design-owner decision and is not taken here.** *Treat every call as
+urgent* is expressible — it is the starvation weight — and whether to offer it is a question about
+the surface rather than about the model. It is flagged, not answered.
+
+**The omission propagates by derivation rather than by repetition**, which is the half worth
+keeping. `authoring/ruleSpec.ts` and `everyday/workshopModel.ts` both build their offered list
+**from `RULE_ACTIONS`**, so the two actions are unbuildable on either surface without either screen
+carrying a refusal of its own. Two screens each declining a row in their own words would be two
+places to keep in step.
+
+---
+
+## D416 — the Workshop deviates from the handoff twice, and both times because the simulator wins about numbers
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the two deviations
+`packages/viz/src/everyday/workshopModel.ts` argues, and the `playStyles` block under them.**
+
+**Decision.** `everyday/workshopModel.ts` does not transcribe two pieces of the design handoff's
+copy, and **the six play styles are `data/dispatcher-profiles.json`'s `playStyles` block** rather
+than a table in the renderer.
+
+**Numbered under [§ D405](#d405) criterion 2**: [`docs/12-design-handoff.md`](docs/12-design-handoff.md)
+makes the handoff canonical for the interface and exists to record *every deviation with the
+constraint that forced it*. A deviation recorded only in the deviating module is exactly what that
+document is for and does not have.
+
+**Deviation 1 — § 11.3's sign sentence is replaced, not transcribed.** The handoff says *"distance
+and a full car push a score up; a long wait pushes it down"*. That is true of its own toy simulator
+and **false of this one**: `CostTermDefinition.evaluate` must return a non-negative value — *a cost,
+never a bonus* — and the weighted sum is added, so nothing on the printed line can pull a score down.
+`mathsDisclosureOf` says what is true instead, and it is the more useful sentence anyway: every term
+is a kind of badness, and a weight decides which kind outranks which. This is CLAUDE.md's two-halves
+rule applied exactly as written — the handoff wins about what the screen looks like, the simulator
+wins about what a number means.
+
+**Deviation 2 — the style cards' trade sentences are re-authored in `data/`.** Two of
+`ENGINE_CONTRACT` § 6.2's are claims of *quality* — *"the biggest single win on a busy morning"* —
+and § 11.1's own rule for this copy is *"one plain sentence about the trade, not a claim of
+quality"*. The spec's copy fails the spec's own rule; the rule wins.
+
+**And the styles are data because invariant 7 says so.** A play style is a weight vector with a
+name. A renderer holding six names against six profile ids is the forbidden
+`if (strategy === 'nearest-car')` table with a friendlier key.
+
+---
+
+## D417 — *took the stairs* is an overlap, and every surface that names it says so
+
+**Date: 2026-08-29 · Owner: Lane E, wave H · Numbering the caption rule
+`packages/viz/src/shift/report.ts#stairsNote` argues.**
+
+**Decision.** `Observations.abandoned` counts **waits that crossed the abandonment horizon**,
+whether or not a car eventually came. It is a name for an *attribute*, never a fourth disjoint
+outcome — so **every surface that publishes it publishes the overlap with it**, from
+`Observations.abandonedCarried`, folded in the same pass as both counts so the three cannot disagree,
+and against the run's **own** horizon (`Observations.horizonS`) rather than a hard-coded fifteen
+minutes.
+
+**Numbered under [§ D405](#d405) criterion 1**: it binds four surfaces in three modules that
+`report.ts` does not own — its own note, the lever clause, `mode/casualDay.ts`'s Casual lead, and the
+goal label's window — and a fifth surface added tomorrow has to obey it without reading
+`stairsNote`'s docstring.
+
+**The defect it closes is arithmetic a reader does in their head.** The sheet printed `CARRIED 768
+of 768 who turned up` beside `TOOK THE STAIRS 348` with nothing connecting them: on a saturated
+no-patience run nobody actually leaves, so every one of those legs boards and lands inside CARRIED,
+and a reader totalling the people gets **1 116 out of 768**. Both counts were right. The captions
+treated overlapping cells as adding ones, which is this project's own standing failure — a true
+number in a frame that makes it mean something false.
+
+**It is CLAUDE.md's *beside, never folded in* rule, one register down.** Abandonment is published
+beside AWT and never inside it, on the footing `workPerServedLegKJ` sits beside raw energy; this says
+the same thing about the *caption* rather than about the statistic. The sentence *overlap, not an
+addition* is the whole reason the cell carries a note at all.
+
+---
+
+## D418 — `experiments` takes the simulating timeout, and the sentence that said it had no reason to is the finding
+
+**Date: 2026-08-29 · Owner: integrator, wave H · Closes: GitHub issue #310. Third application of
+[§ D331](#d331)'s argument, after [§ D394](#d394) took it to `core` and `server`.**
+
+**Decision.** `vitest.config.ts` passes `SIMULATING_TIMEOUT_MS` to `project('experiments')`. `cli`
+stays on vitest's 5 000 ms default. No test is annotated to close this, and no existing annotation is
+removed.
+
+**What was reported.** `validation/shippedRunConfig.test.ts`'s whole-tree importer scan failing at
+**5 454 ms** inside `--project experiments src/validation/` while two deep tiers ran in the
+background at load average ~12, and passing alone under that same background load.
+
+**The sentence in the config is the more interesting half.** It read *"`experiments` and `cli` are
+left alone, and that is a measurement rather than an omission: **neither has been reported failing at
+the default**"*. That was true when written and stopped being true the moment one was reported —
+[§ D227](#d227)'s stale refusal, on the file that decides whether the next reader needs to look. A
+sentence that records the absence of evidence has an expiry date that nothing was watching.
+
+**The survey, which changed the shape of the fix.** Taken on this tree with the ceiling lifted to
+900 000 ms so the numbers are *costs* rather than truncations: of **1 361** tests, **1 314** finish
+inside 2.4 s, **20** sit between 1.5 s and the 5 000 ms ceiling, 36 exceed it, and the slowest is
+**1 017 s** (`benchmark/selectionSweep.test.ts`).
+
+**The reported case is not intrinsically near its ceiling**, which is what rules annotation out. It
+costs **0.60 s**, and its whole 24-case file costs **1.04 s**; load amplified it about ninefold. So
+annotating it fixes the one case that happened to be observed under load and leaves the other
+nineteen in the same band — § D331's own rejected argument, reaching a third project unchanged.
+
+**Why 300 000 ms is right here for a different reason than it is for `viz`.** For `viz` the constant
+is about six times the observed maximum. Here the maximum is 1 017 s and the constant is a **third**
+of it. What makes it right anyway is that the population relying on the default is not the whole
+population: **every test above 5 000 ms that is green in CI today is necessarily annotated already**,
+or the default would be failing it. The slowest test that actually depends on this line is therefore
+under 5 s, and 300 000 ms is roughly sixty times it. The three tests past the constant — 1 017 s,
+559 s and 393 s — keep their own `TIMEOUT_MS`, which still wins over a project default.
+
+**A corroboration rather than an argument for annotating.** `shippedRunConfig.test.ts` already
+declares `const TIMEOUT_MS = 300_000` and applies it at three sites; its two whole-tree scans are
+simply not among them. That file had independently converged on this same number, which is the
+signal § D331 read off `viz`'s 113 sites.
+
+**Confirmed empirically in both directions**, as § D394 required of itself, rather than by reading
+the config object back: an unannotated six-second case in `experiments` reported vitest's own
+`Test timed out in 5000ms` (exit 1) before this change and passed at 6.01 s (exit 0) after it.
+
+**What is not claimed.** *The original red was not reproduced here.* On a 4-core container with
+twelve spinners the load average reached ~6.7 and the reported file's test time went 1.56 s →
+4.79 s — amplified, under the ceiling, and passing with and without the change. The 5 454 ms failure
+stands as measured under load ~12 with two deep tiers; nothing here contradicts it and nothing here
+confirms it. This decision rests on the survey and the probe, not on a red anybody re-ran.
+
+**The cost, stated rather than glossed**, is § D331's and unchanged: a genuinely hung pure-function
+test in `experiments` now takes five minutes to fail instead of five seconds. A hang is a bug found
+once and fixed; a 5 s ceiling under load is a false red on a required check that recurs forever and
+trains people to re-run the suite instead of reading it.

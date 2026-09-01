@@ -657,3 +657,211 @@ instrument: CI failed on it live.**
   record; § C of `ISSUE_TRIAGE_PLAN.md` names them.
 - **#270 and #275 were silently unblocked** when #280 merged on 2026-08-26. Nothing in this process
   watches for a blocker clearing.
+
+## Wave G closed — the CI and test-infrastructure cluster, 2026-08-29
+
+Merged as PR #307 → `6260dcb`, over wave F's `0cd422a`. Five lanes, **five issues closed with
+evidence** (#163, #149, #175, #130, #286) and **two new issues filed** (#305, #306) — both of them
+reds that only existed because a lane turned a tier on.
+
+Decision numbers pre-allocated **D393–D395**; three used, and lanes D and E each finished without
+needing one, which is the allocation working rather than a shortfall.
+
+### The wave's actual product: two tiers that had never run
+
+Lane A's issue (#163) was that seventeen opt-in tests, including the only seed-collision check in
+the repository, had never executed in CI — `ci.yml` runs a bare `npm test`, no workflow set a
+deep-tier variable, and **no workflow in the repository had a `schedule:` trigger at all**. The
+lane's deliverable was `.github/workflows/deep-tiers.yml`, nine jobs, one tier per job.
+
+Turning them on immediately produced two reds, and both were **recorded rather than fixed**:
+
+- **#305** — deep fuzz, 1 counterexample in 250 cases: `fuzz-1000130` ends at `t = 3493.7776`
+  against its own hard deadline of `t = 3493`. Not a rounding artefact; `checkTermination`'s
+  `EPSILON` is `1e-9` and the overshoot is 0.78 s.
+- **#306** — the 200-replication matrix census, which every declared ceiling and spread is derived
+  from, disagrees with `MATRIX_CELLS` in three places. These bound every interval the experiment
+  matrix publishes.
+
+Neither was re-baselined to make a tier green. **A declared figure that no longer reproduces is a
+finding about the budget published intervals were computed under, not a number to update** — both
+are worked in wave H as lanes A and B.
+
+### What the integrator verified rather than accepted
+
+- **One CI red, and it was invariant 6.** `deepTiers.test.ts` — the aliveness audit — named three
+  `packages/viz/...` paths from inside `packages/experiments`, so `boundaries.test.ts` failed
+  correctly. Three fixes were rejected before the right one: composing the path is rephrasing around
+  a grep, deriving both sides is a tautology, and loosening the pattern weakens a gate. The audit
+  moved to `packages/viz/src/` instead (`1052597`), where `boundaries.test.ts` itself lives.
+- **Two mutation attempts silently failed to apply** while validating that fix — one regex missed
+  the entry shape, one deleted a comment line. **Neither was counted as evidence.** A mutation that
+  does not land is not a mutation that failed to redden.
+- **The browser-tier file count was wrong at a sixth distinct value** (`c99e550`): 32, against two
+  documents saying 31. The series is now 25, 26, 29, 30, 31, 32 — every one correct where it was
+  taken. R38 caught by a gate built for R38, six times.
+
+### The process failure, which the lane caught and the integrator did not
+
+The integrator read 0 commits and 10 minutes of uptime, concluded the first dispatch had died in a
+container restart, and re-dispatched — producing **ten lanes on five issues**. It was caught by
+**Lane B**, which noticed its scratchpad file had been overwritten by a sibling, not by the
+integrator. Five duplicates were stopped.
+
+The reading was made from detached worktree HEADs rather than from branch refs, which is why a lane
+that was mid-A/B-run looked idle. **Branch refs, not worktree HEADs**, is the rule that follows.
+
+### The corpus measurement, and the first move this row could attribute exactly
+
+Measured once on the integrated tree, both tiers in one sitting, per [§ D343](DECISIONS.md):
+
+| tier | cases | strings | simulations | surfaces | failing |
+|---|---|---|---|---|---|
+| always-on | 49 | 570 560 | 606 | 51 | 0 |
+| deep | 60 | 711 737 | 4 710 | 52 | 0 |
+
+Strings moved **+343** and **+420** against wave F, with cases, simulations, surfaces and failing
+cases all unmoved. `EVERYDAY_STAGE` gained the stage's **seven** speed chip faces, seeded once per
+case: **7 × 49 = 343** and **7 × 60 = 420**. The move is the seeding and nothing else, to the
+string — the first time this row has been able to attribute its own movement rather than report it.
+
+The surface **sets** were diffed rather than the counts compared, and the deep tier's one-surface
+lead is still exactly `campaign/judge.ts#judgeStage`.
+
+### Owed to the next session, and discharged in wave H's opening
+
+- **The ledger had no wave G entry at all** until it was written retrospectively here. A wave that
+  merges without its record is a wave whose reasoning survives only in commit messages, which is the
+  thing `CLAUDE.md`'s working agreements exist to prevent.
+- **§ D394 had no heading.** Reconstructing this entry turned up `it.## D394 — …` on one line in
+  `DECISIONS.md`: § D393's closing sentence and § D394's heading were merged during this wave's own
+  integration. Five `.ts` files cite `§ D394`. **Re-breaking it leaves `citations.test.ts` and
+  `documentation.test.ts` green** — the resolver iterates markdown documents only, so a `§ Dnnn` in
+  a TypeScript file is checked by nothing. Fixed in `16abc54`; the gate hole is wave H lane E's.
+- **D387 was allocated in wave F and never written.** The heading audit reports 387 headings and
+  missing numbers `44, 55, 78–84, 387`. The first nine are historic; **387 is a hole this process
+  just made**, and nothing noticed for a wave. A block-allocation mechanism has to say what becomes
+  of an unused number.
+
+## Wave H — dispatched 2026-08-29
+
+Five lanes over a backlog of 78. Decision block **D396–D403** to lanes A–D, with lane E owning
+**D404 upward** because its burn-down needs a variable-size block.
+
+| lane | issue | subject |
+|---|---|---|
+| A | #306 | Attribute the census divergence before re-declaring anything, then re-derive what was computed under the old ceilings |
+| B | #305 | Root-cause the 0.78 s termination overshoot; `EPSILON`, `PROPERTY_BOUNDS` and the generator are all off limits |
+| C | #223 | Campaign days must file: the loop that records nothing when a day completes |
+| D | #214 | The rail's pre-attach paint, and the corpus pair that would have caught it |
+| E | #173 | A stated way for a lane to reserve a decision number, and the owed backlog it would stop regrowing |
+
+**Composition rule applied:** the two reds this process itself filed go first. A wave that files reds
+and then works new features leaves its own findings to rot, and #306 in particular invalidates the
+budget every published matrix interval was computed under.
+
+**Before dispatch**, `.worktree-setup.sh`'s `@elevator-sim` links were derived from `packages/*/`
+rather than from a hand-written list (`8aafd7e`). The list read `core experiments cli viz` and
+omitted `server` — so the one workspace it failed to name resolved to the **main checkout**, which is
+exactly the failure the script's own header comment exists to prevent, arriving through the list
+instead of through the symlink.
+
+## Wave H closed — the two reds this process filed, the campaign loop, and the ratchet, 2026-09-01
+
+Five lanes over a backlog of 78. **Six issues closed** (#306, #305, #223, #214, #173, #310), one of
+them filed and fixed inside the wave.
+
+### The lanes were stopped by a rate limit, and the wave survived it
+
+All five terminated mid-task on the account's weekly limit — not a wall in the work. **Every one had
+committed incrementally, so nothing was lost**, and the integrator finished, reviewed and verified
+the merge. `RISKS.md` R41 (*a lane that commits only at the end loses the lane*) is the reason this
+is a paragraph and not a re-run.
+
+Two lanes were mid-sentence when they stopped: Lane C's last words were *"now the DECISIONS entries
+and the `AGENT_STATUS.md` correction"* and Lane D's *"now the DECISIONS entries"* — both of which had
+already landed in earlier commits. A lane's plan for its next step is not a claim about its last one.
+
+### What the integration caught that no lane could
+
+**Lane A's figures predated Lane B's fix.** Lane A re-declared census ceilings measured *"on the tree
+carrying § D131's simulated decks, § D332 and § D333"* — a tree **without** Lane B's departure
+gating, which changes when a car may depart near the drain deadline, the exact regime the census runs
+in. Publishing them unchecked would be the measured-on-one-tree-published-against-another defect this
+file has recorded three times.
+
+Re-censused on the integrated tree: **2 tests, exit 0, 404 s**. The census is deterministic under a
+fixed `MATRIX_SEED` and common random numbers, so the result is exact rather than probabilistic —
+**Lane B's fix does not move the census figures**, and Lane A's re-declarations stand.
+
+That check was possible only because the two lanes were read against each other. Neither could have
+run it: Lane A's tree had no fix and Lane B's had no re-declaration.
+
+### The reservation mechanism caught the integrator on its first wave
+
+Lane E's § D404 makes a wave's decision block a checked object: while a reservation is open the
+charter row names the block's **floor**, no heading may exceed its **ceiling**, and the case goes red
+until the block is emptied and the row reconciled on the same commit.
+
+Its ceiling check fired on **§ D418**, written by the **integrator** mid-wave, one past the block.
+Not a lane — the author of the process. The number was kept (ids are names here, and it was already
+cited from `vitest.config.ts` and #310) and the block closed. **The sizing lesson is recorded in the
+file rather than in a person's memory: an integrator who works during a wave needs a number reserved
+too.**
+
+Lane E also repaired the ratchet's non-vacuity guard rather than deleting it, which is what the brief
+warned against and what the obvious reading invites. `expect(owed).toBeGreaterThan(0)` guards the
+**defect**, not the instrument: it is satisfied by any single site anywhere, and it goes red on the
+commit that settles the last one — the very commit the gate exists to reward. Replaced by two
+assertions on the instrument (the walk finds >500 files; the pattern still matches a control
+sentence), so `owed === 0` is a legitimate green. The ceiling fell **64 → 5**, lowered *to* the
+measured count and never below it.
+
+### The integrator's own defects, both found by writing things down
+
+- **§ D394 had no heading.** Reconstructing wave G's ledger entry turned up `it.## D394 — …` on one
+  line: § D393's closing sentence and § D394's heading merged during wave G's own integration. Five
+  `.ts` files cite it. **Mutation-validated that nothing catches this** — with the heading re-broken,
+  `citations.test.ts` and `documentation.test.ts` both pass, because the `§ Dnnn` resolver iterates
+  markdown only and the heading regex is anchored. The audit happened because the record was being
+  written, not because a test ran.
+- **A build break was pushed.** Closing the reservation with a bare `= null` narrowed the `const` to
+  `null`, making the open-wave branch `never`; `tsc -b` failed with eleven errors and took all three
+  CI checks with it. The edit had been validated by running the tests it belongs to, **and they
+  passed — vitest transpiles rather than type-checks**. `npm run typecheck` is the same `tsc -b` and
+  would have caught it; it was run after the merges and not after that edit. The rule is not new; the
+  failure was skipping it.
+
+### The corpus, and the first time this row's old figures were checked
+
+| tier | cases | strings | simulations | surfaces | failing |
+|---|---|---|---|---|---|
+| always-on | 49 (0 skipped) | **571 205** | 606 | **53** | **0** |
+| deep | 60 (0 skipped) | **712 547** | 4 710 | **54** | **0** |
+
+**Before publishing, the base was re-measured and reproduced its published row exactly** — 570 560 /
+606 / 51 / 0 at `6260dcb`, in a detached worktree so it could not disturb the deep tier running
+against the working tree. This column has been wrong five times, and this is the first time it has
+been checked in the one direction that distinguishes a correction from a move.
+
+Sets diffed rather than counts compared: **+2 in both tiers, nothing removed**, both named —
+`everyday/rail.ts#railFooter` and `everyday/weekView.ts#weekScreenViewOf`, #214's declared pair. The
+deep tier's one-surface lead verified by set difference: `campaign/judge.ts#judgeStage` is the only
+deep-only surface and nothing is always-on-only.
+
+**The string move is not attributable to the string, and that is published rather than glossed.** 645
+over 49 cases and 810 over 60 are not integers and no arithmetic makes them one — those two producers
+emit a state-dependent count. Wave G's exactness came from a chip face seeded once per case; claiming
+the same precision here would be manufacturing it.
+
+### Owed to the next session
+
+- **#176 is measured and unfixed.** *"The three DOM panels are statically swept"* is published in six
+  places and none names which three; derived, it is **17 `#mount*` ids and 16 `*_SCREEN` rows** of
+  216 exclusions, and even the narrowest reading is four rather than three. The derivation is on the
+  issue so nobody has to re-take it.
+- **The `§ Dnnn` citation gate still reads markdown only.** Lane E was handed it; whether it landed
+  widened is for the next reader to check rather than assume.
+- **D387 remains a registered hole**, and the mechanism that would have prevented it now exists.
+- **The ratchet sits on its ceiling again at 5 with zero headroom**, which is the ratchet working and
+  the next lane's operational constraint.

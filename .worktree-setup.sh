@@ -16,7 +16,14 @@ done
 for entry in "$ROOT/node_modules"/.bin; do
   [ -e "$entry" ] && ln -sfn "$entry" "$WT/node_modules/.bin"
 done
+# Derived from disk, never listed by hand. The hand-written list read
+# `core experiments cli viz` and omitted `server`, which is a declared workspace — so a lane
+# importing @elevator-sim/server in a worktree resolved it to the MAIN checkout, which is
+# exactly the failure the comment at the top of this file exists to prevent, arriving through
+# the list rather than through the symlink. A loop over packages/*/ cannot go stale when a
+# sixth package is added.
 mkdir -p "$WT/node_modules/@elevator-sim"
-for dep in core experiments cli viz; do
-  [ -d "$WT/packages/$dep" ] && ln -sfn "$WT/packages/$dep" "$WT/node_modules/@elevator-sim/$dep"
+for dir in "$WT/packages"/*/; do
+  dep=$(basename "$dir")
+  ln -sfn "$dir" "$WT/node_modules/@elevator-sim/$dep"
 done

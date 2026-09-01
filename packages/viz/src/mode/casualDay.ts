@@ -4,9 +4,11 @@
  * [#100](https://github.com/mrpeanut01/elevator-sim/issues/100), under
  * [`DECISIONS.md` § D299](../../../../DECISIONS.md) and [§ D301](../../../../DECISIONS.md).
  *
- * **A decision number is owed for this module.** It is not allocated here: two lanes have already
- * collided over one, so the argument lives in this docstring and the number is assigned at
- * integration. That declaration is the module's, not this docstring's alone: GitHub issue #291's
+ * **Recorded here rather than in `DECISIONS.md`, under § D405** — this module is the Casual
+ * reading of one sheet and binds nothing outside itself. (It used to say a number was owed and
+ * could not be allocated, because two lanes had already collided over one. That is § D404, and
+ * this docstring is the site that named the cause most exactly.) The cohort captions it inherits
+ * are § D417's. That declaration is the module's, not this docstring's alone: GitHub issue #291's
  * two window arguments — on {@link CASUAL_LEAD_BY_CELL}'s `average-wait` entry and on
  * {@link CASUAL_SMALL_PRINT_LEAD} — are covered by it and do not repeat it, because one declaration
  * per module is the unit this one chose and `validation/documentation.test.ts`'s owed-decision

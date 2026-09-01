@@ -118,7 +118,8 @@ export function fill(host: Element, ...children: readonly (Node | null | undefin
  *
  * ## Removing a child runs other people's code — GitHub issue #259
  *
- * **A decision number is owed for the paragraphs below; this docstring is the argument.**
+ * **Recorded here rather than in `DECISIONS.md`, under § D405** — the paragraphs below are about
+ * this module's two writes and the browser behaviour that separates them.
  *
  * `removeChild` is not a write to a data structure. Removing the node that holds focus makes the
  * browser blur it **synchronously, from inside the call**, and a blur fires `focusout`, `blur` and —

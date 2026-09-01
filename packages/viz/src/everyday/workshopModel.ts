@@ -52,8 +52,9 @@
  *    morning"*) and §11.1's own rule for this copy is *"one plain sentence about the trade, not a
  *    claim of quality"* — which is R2 one register up. The argument is on `PlayStyle`.
  *
- * A decision number is owed for both, and for the `playStyles` block; the arguments are here and on
- * `core/src/config/types.ts#PlayStyle`.
+ * **Both deviations and the `playStyles` block are § D416**; the arguments are here and on
+ * `core/src/config/types.ts#PlayStyle`, and the entry adds nothing they do not already say. The
+ * two § 11.5 actions this model cannot offer are § D415's, made once in the vocabulary.
  */
 
 import {

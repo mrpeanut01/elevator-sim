@@ -38,6 +38,7 @@ import {
   pressMenuRow,
   returnToEverydayMode,
 } from '../dev/browserTier.test-helper.js';
+import { railFooter } from './rail.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -116,6 +117,33 @@ async function stashHost(page: Page): Promise<void> {
     { timeout: 30_000 },
   );
 }
+
+/**
+ * The `PLAYING AS` card's career line, as the page draws it — issue #214's whole subject.
+ *
+ * Read off the rendered card rather than off any model, because the defect was a *paint*: the
+ * shell's `weekRailOptions` answered `{}` before `dev/main.ts` published the host, and on the
+ * front door nothing redraws a rail, so what a player saw and what the host held were two
+ * different things for the whole visit.
+ */
+async function careerLineOnPage(page: Page): Promise<string> {
+  return page.evaluate(
+    () => document.querySelector('.everyday-identity-streak')?.textContent ?? '',
+  );
+}
+
+/**
+ * The two lines the card may draw when it has no week, taken from `rail.ts` rather than quoted.
+ *
+ * Both are module-private constants there, on purpose (`honesty/derive.ts` would have to classify
+ * a second text producer under `everyday/rail.ts`), so they are reached the way the shell reaches
+ * them — through {@link railFooter}, over the two option shapes that produce them. A literal here
+ * would be a copy that keeps passing after somebody rewords the card.
+ */
+const NO_WEEK_LINES = {
+  absent: railFooter({ screen: 'menu', ctx: 'daily' }).identity.streak,
+  pending: railFooter({ screen: 'menu', ctx: 'daily' }, { weekPending: true }).identity.streak,
+};
 
 /** The host's own answer about the run on the stage, read live. */
 async function runStateOf(page: Page): Promise<{
@@ -350,6 +378,18 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       expect(footer.identity).toContain('you');
       expect(footer.identity).toContain('no days saved');
       /*
+       * **Issue #214, gap 1, and this line is what holds the redraw honest.** This page is a cold
+       * load: the shell mounts and paints its rail while `dev/main.ts` is still fetching `data/`,
+       * so the card is drawn from no week at all and says {@link NO_WEEK_LINES.pending}. Nothing
+       * on a `'menu'` route redraws a rail — `connectDataHost`'s screen arm only fires for a
+       * mounted screen — so before `shell.ts` learned to redraw on the career line moving, the
+       * pending sentence is what stood here for the whole visit. Deleting that redraw turns this
+       * assertion red, which is the evidence that the fix is on the shipped path and not only in
+       * the model.
+       */
+      expect(footer.identity).not.toContain(NO_WEEK_LINES.pending);
+      expect(await careerLineOnPage(page)).toBe(NO_WEEK_LINES.absent);
+      /*
        * The bordered Settings row is a destination, and it **opens** — the § 15.1 screen landed
        * and left `UNBUILT_REASONS` on the same commit, which is the registry's whole contract.
        * This case previously pinned the other side of it (disabled, captioned *not built*); the
@@ -561,6 +601,26 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
         () => (window as PageHostWindow).__everydayHost?.current()?.lastReport() !== undefined,
       );
       expect(filed, 'closeDay filed no sheet').toBe(true);
+
+      /*
+       * **Move the week, require the rail to change** — the standing requirement, pointed at the
+       * one control that writes a career. Before this press the card is the honest absence (no day
+       * had been closed); after it, the week the host holds has a day in it, and the `PLAYING AS`
+       * card must say so **without a reload and without a navigation**, because the player is
+       * standing on the stage and the rail beside them is the only place a career is drawn.
+       *
+       * Asserted on the shape rather than on a figure: whether the day came back clean decides the
+       * streak, and § D220 § 4 keeps metrics out of this tier either way. What is asserted is that
+       * the line moved off both no-week states and now carries the week's two figures — which is
+       * what a card reading the store that keeps days looks like, and what a card reading the
+       * profile store never could.
+       */
+      const afterClose = await careerLineOnPage(page);
+      expect(afterClose, 'the card still says nothing is saved over a filed day').not.toBe(
+        NO_WEEK_LINES.absent,
+      );
+      expect(afterClose).not.toBe(NO_WEEK_LINES.pending);
+      expect(afterClose).toMatch(/^\d+ days? running · best /);
 
       // A report is already after the fact: the same leave now goes straight to the menu.
       await page.locator('.everyday-rail-menu').click();
