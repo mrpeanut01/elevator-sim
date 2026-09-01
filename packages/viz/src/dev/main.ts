@@ -14,6 +14,7 @@
  * | `authoring/*` | the four editor mounts, and `shiftRunConfigOf` |
  * | `record/decisionLog.ts` | `recordRun` — called by `dev/shiftWorker.ts` for the shift, and directly by {@link runChallenge} for a challenge's seeds |
  * | `dev/shiftRunner.ts`, `dev/shiftWorker.ts` | {@link runShift} and {@link verifyCurrent}, which no longer simulate on this thread |
+ * | `dev/offThreadRuns.ts` | `dev/fixitPanel.ts` and `dev/watchPanel.ts`, both handed {@link boot}'s one `spawnRunWorker` — GitHub issue #165 |
  * | `dev/surfaces.ts` | {@link applyNavigation} |
  * | `frame/overlay.ts` | {@link drawStage} and the landing selector |
  * | `record/document.ts` | **Load recording**, **Save recording** and **Verify replay** |
