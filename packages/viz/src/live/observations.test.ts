@@ -451,12 +451,35 @@ describe('loaded departures are cut at the playhead like everything else here', 
        * **Checked against the motions and deliberately not against `summary.energy.starts`.** The
        * two count the same events over **different stretches**: `starts` is the *reporting window's*
        * moves and this is the *whole run's*, and every shipped template narrows its window — the
-       * suite above measured 0 of 8 spanning. Measured here, `garden-apartments` reports 265 loaded
-       * departures against 97 windowed starts, so an ordering between them is not a property at all.
+       * suite above measured 0 of 8 spanning. Measured on this loop's own recordings, `chancery-house`
+       * reports **265** loaded departures against **97** windowed starts and `vertical-city` reports
+       * **899** against **385**, so an ordering between them is not a property at all.
        * `GoalObservations.worstWaitS` is the same pair of cohorts and says so; the trip count has to
        * be whole-run because the fold serves a playhead, and a bar drawn against it grades the shift.
        */
       expect(recording.summary.energy.starts).not.toBeNull();
+    }
+  }, 300_000);
+
+  it('exceeds the windowed start count on the two buildings the paragraph above names', () => {
+    /*
+     * **The published pair, run rather than transcribed.** The comment one case up cites two
+     * measurements; a citation nobody re-derives is how a number in this repository goes stale, and
+     * a first draft of it named the wrong building. So the direction is asserted — whole-run count
+     * *above* windowed starts — on the two recordings the prose quotes.
+     *
+     * The direction rather than the digits: an ordering is the claim being made, and pinning 265 and
+     * 97 exactly would redden this file the next time a demand template moved without telling anyone
+     * anything about the cohorts.
+     */
+    for (const id of ['chancery-house', 'vertical-city'] as const) {
+      const recording = recordingOf(id);
+      const times = recording.loadedDepartures ?? [];
+      const starts = recording.summary.energy.starts;
+      expect(starts, id).not.toBeNull();
+      expect(times.length, `${id}: whole-run trips no longer exceed the windowed starts`).toBeGreaterThan(
+        starts ?? 0,
+      );
     }
   }, 300_000);
 });

@@ -881,8 +881,8 @@ export interface VizRecording {
    * {@link VizEnergy.starts}, which counts the same events inside the window. That is forced rather
    * than chosen: a playhead fold needs every instant, and a figure cut to the window could not answer
    * at a playhead outside it. The two are therefore two stated cohorts and an ordering between them
-   * is not a property — measured on `garden-apartments`' own day, 265 loaded departures against 97
-   * windowed starts. {@link VizSummary} carries the same pair for the worst wait, and
+   * is not a property — measured on `chancery-house`'s breadth recording, **265** loaded departures
+   * against **97** windowed starts. {@link VizSummary} carries the same pair for the worst wait, and
    * `shift/types.ts#GoalObservations.worstWaitS` is where that argument is written out.
    *
    * Written as absent (never an explicit `undefined`) by the same JSON-round-trip rule

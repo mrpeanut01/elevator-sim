@@ -112,18 +112,18 @@ describe('the wear clock', () => {
     expect(wearOf(after)).toBeGreaterThan(wearOf(before));
     expect(failureOddsPct(after)).toBeGreaterThan(failureOddsPct(before));
     /*
-     * **`daysLeft` does not move on one day at this cell, and that is measured rather than
-     * excused.** § 8.3 sizes it at `round((serviceAt − trips) / 1400)` — *1 400 trips a working
-     * day* — and a campaign day here is `garden-apartments` for one hour, which produced **265**
-     * loaded departures on this seed. So the printed figure goes 32 → 32: the clock moved and the
-     * rounding swallowed it.
+     * **`daysLeft` does not move on one day at this cell, and the size of the gap is the finding.**
+     * § 8.3 sizes it at `round((serviceAt − trips) / 1400)` — *1 400 trips a working day* — and a
+     * campaign day here is `garden-apartments` for one hour, which on this seed produces **16**
+     * loaded departures over **29** arrivals. So the printed figure goes 32 → 32, and it would take
+     * on the order of 45 000 / 16 ≈ **2 800** contract days to reach a service window.
      *
-     * That is a fact about the shipped cell rather than about this seam, and it is asserted in the
-     * direction it is true in rather than being strengthened by picking a different building. What
-     * it says is that § 8.3's own constant and § 8's own contract disagree about how long a working
-     * day is by roughly a factor of five, which is content for whoever owns the campaign's pacing —
-     * the alternative, scaling the count on its way in, would be inventing a number and hiding the
-     * disagreement inside it.
+     * That is a fact about the shipped cell rather than about this seam, and the assertion is made in
+     * the direction it is true in rather than strengthened by picking a different building. Two
+     * numbers this document's own owner has to reconcile fall out of it: § 8.3's *1 400 a working
+     * day* is off by roughly **ninety-fold** at the cell § 8 actually runs, and the tier bars
+     * (`tests.trips`, 620 / 520 / 470 / 430) are unmissable there by a factor of thirty. Scaling the
+     * count on its way in would have hidden both inside an invented constant, so it is not done.
      */
     expect(serviceDaysLeft(after)).toBeLessThanOrEqual(serviceDaysLeft(before));
   }, 300_000);

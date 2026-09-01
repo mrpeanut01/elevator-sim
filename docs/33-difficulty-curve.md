@@ -174,10 +174,11 @@ not surprised twice: `goalsForDay` has **no trip goal**. Its four bars are the c
 share, the landing queue and the worst wait, and the day ramp § 1.4 adopts has nothing to offer a trip
 budget. Deleting `Difficulty.tests` therefore requires authoring a day-indexed trip ladder, and
 authoring one requires knowing what a day's trips actually are at the campaign's own cell — measured
-in [§ D431](../DECISIONS.md#d431) as **265** on `garden-apartments` over its contract hour, against
-the four tier bars of 620 / 520 / 470 / 430 and against § 8.3's own *1 400 trips a working day*. Those
-three numbers do not agree with each other, and that disagreement is content this document's owner has
-to settle rather than something a grading lane may pick a side in.
+in [§ D431](../DECISIONS.md#d431) as **16** on `garden-apartments` over its contract hour, against the
+four tier bars of 620 / 520 / 470 / 430 and against § 8.3's own *1 400 trips a working day*. Those
+three numbers disagree by one and two orders of magnitude — the bar cannot be missed at that cell and
+the wear clock would take some 2 800 contract days to reach a window — and that disagreement is
+content this document's owner has to settle rather than something a grading lane may pick a side in.
 
 ### 1.5 A finding about § D345's own sequencing note, reported and not acted on
 

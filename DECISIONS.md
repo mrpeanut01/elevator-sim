@@ -28894,9 +28894,9 @@ contributed its trip, which is at most one move per car.
 
 **It is whole-run where `VizEnergy.starts` is windowed**, and that is forced by the same requirement:
 a figure cut to the reporting window could not answer at a playhead outside it. The two are two stated
-cohorts and no ordering holds between them — measured on `garden-apartments`' own day, **265** loaded
-departures against **97** windowed starts. `live/observations.test.ts` checks the count against the
-fleet's motions instead, and says why.
+cohorts and no ordering holds between them — measured on `chancery-house`'s breadth recording, **265**
+loaded departures against **97** windowed starts, and on `vertical-city`'s, **899** against **385**.
+`live/observations.test.ts` checks the count against the fleet's motions instead, and says why.
 
 **Absence is a gate, and this is the direction that matters.** `GoalObservations.loadedDepartures` is
 the type's **one optional member**. A trip budget is an `at-most` bar, so folding *nobody wrote it
@@ -28915,15 +28915,25 @@ way the other three do, with a `pending` reading and an em dash. `campaign/caree
 register carried the same claim in a comment and is corrected there.
 
 **What is measured and is content for somebody else.** § 8.3 sizes `daysLeft` at *1 400 trips a
-working day*. A campaign day at the campaign's own cell — `garden-apartments`, one hour — produced
-**265**, so the printed figure goes 32 → 32 while the clock moves underneath it.
-`campaign/wearClock.test.ts` asserts the direction that is true (`≤`) and records the disagreement
-rather than scaling the count on its way in, which would have been inventing a number and hiding the
-disagreement inside it.
+working day*. A campaign day at the campaign's own cell — `garden-apartments`, one hour, seed
+424 242 — produces **16** loaded departures over **29** arrivals, so the printed figure goes 32 → 32
+while the clock moves underneath it, and a service window is on the order of **2 800** contract days
+away. Two of § 8's own numbers fall out of that and neither is this lane's to move: *1 400 a working
+day* is off by roughly ninetyfold at the cell § 8 actually runs, and the tier bars (`tests.trips`,
+620 / 520 / 470 / 430) are unmissable there by a factor of thirty. `campaign/wearClock.test.ts`
+asserts the direction that is true (`≤`) and records the disagreement rather than scaling the count on
+its way in, which would have been inventing a number and hiding the disagreement inside it.
+
+**A first draft of this entry attributed the 265/97 pair to `garden-apartments` and then reused 265 as
+the campaign day's own count.** Both were wrong — 265/97 is `chancery-house`'s breadth recording, and
+the campaign cell produces 16 — and it is recorded rather than quietly fixed, because it is exactly
+the defect [`RISKS.md`](RISKS.md) R38 tracks: a measured figure carried across to a second claim it
+was never measured for. Catching it took a probe; re-reading the sentence would not have.
 
 **Not claimed.** Nothing here says what a good trip budget is, and `DIFFICULTIES`' four `tests.trips`
-figures are the design handoff's own and are unmoved. Whether they are reachable at the shipped cell
-is unmeasured.
+figures are the design handoff's own and are unmoved. What *is* now measured is that they cannot be
+missed at the campaign's own cell — 16 against 430 at the tightest tier — and moving them is a
+difficulty decision this lane may not take.
 
 ---
 
