@@ -29889,7 +29889,22 @@ recorded here because a change nobody declares is how a string count stops being
 
 ### What the corpus gains
 
-Both faces are seeded: the plate under both preferences, the tuner's readout under both, and the
-daily facts **diffed** so only what actually differs is pushed — `todayOf` is total in `units`, so
-seeding an identical record again would be the same string twice under two names. Under
-[§ D343](#d343) this lane does not measure the corpus; the forecast is in its report.
+Both faces are seeded: the rating plate under both preferences, the machine-class band's range and
+declared rise under both, the tuner's readout under both, one settings sub-case carrying `imperial`,
+and the daily facts **diffed** so only what actually differs is pushed — `todayOf` is total in
+`units`, so seeding an identical record again would be the same string twice under two names.
+
+`derive.test.ts` found five unclassified producers on its first run after the consumers landed,
+which is what it is for. Four are this module's and one is `profile.ts#loadUnits`;
+`tunerModel.ts#tuneSpeedReadout` stopped being a producer at the same moment, because it authored a
+literal and now delegates, so its `covers` entry was **moved rather than kept** — a coverage claim
+for a declaration the derivation no longer finds is a claim about nothing.
+
+**No adapter was added or removed, so the surfaces column does not move**, and the deep tier's
+one-surface lead is undisturbed. Under [§ D343](#d343) this lane does not measure the corpus. Its
+forecast — published so an independent measurement can confirm or refute it, which is the only thing
+a lane may honestly say about this figure — is **+52 strings per case in both tiers**, decomposing
+exactly: 18 for the settings row (three strings over six sub-cases), 18 for the plate (six rows over
+three arms, doubled), 12 for the class band (two figures over three arms, doubled), 2 for the tuner
+readout (two arms), and 2 for the daily loop (one fact over two days). Cases, simulations, surfaces,
+suppressed runs and failing cases all unmoved.
