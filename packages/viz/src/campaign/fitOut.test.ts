@@ -38,6 +38,7 @@ import { join } from 'node:path';
 import { parseBuilding, resolveBuilding, type BuildingConfig } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
+import { mixedFleetBanks } from '../commissioning/choices.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, drivingProfileOf, type ViewerState } from '../dev/state.js';
@@ -477,6 +478,52 @@ describe('every figure in the table is the design’s own or the data’s own', 
 /* -------------------------------------------------------------------------- *
  * The two edits with a rule of their own
  * -------------------------------------------------------------------------- */
+
+describe('a bank whose cars are not one machine', () => {
+  /**
+   * **The refusal `refusals.ts` draws on a screen, taken here where there is no screen to draw it.**
+   *
+   * A `BankChoice` collapses a bank to one class, one speed and one load, and `commissionedBuilding`
+   * applies whatever it is handed — so a shaft bought on `crown-hotel`'s `main` would rewrite its
+   * geared 1.75 m/s service car to the gearless 3.0 m/s machine beside it. That is the campaign
+   * flattening the thing the building was written to teach, and it is what
+   * `commissioning/choices.ts#mixedFleetBanks` exists to name.
+   */
+  const MIXED = ['crown-hotel', 'st-jude-hospital'];
+
+  it('is the pair the commissioning module names, so this is not a case about nothing', () => {
+    const found = SHIPPED.filter((base) => mixedFleetBanks(base).length > 0).map((base) => base.id);
+    expect([...found].sort()).toEqual(MIXED);
+  });
+
+  it('keeps its own fleet when shafts or machines are bought', () => {
+    for (const id of MIXED) {
+      const base = SHIPPED.find((candidate) => candidate.id === id);
+      expect(base, id).toBeDefined();
+      if (base === undefined) continue;
+      const mixed = new Set(mixedFleetBanks(base));
+      for (const category of ['shafts', 'machines'] as const) {
+        const after = fittedBuilding(base, kit(category, 1), RESOURCES.elevatorSpecs);
+        for (const bank of after.banks) {
+          if (!mixed.has(bank.id)) continue;
+          const before = base.banks.find((candidate) => candidate.id === bank.id);
+          expect(bank.cars, `${id} · ${bank.id} · ${category}`).toEqual(before?.cars);
+        }
+      }
+    }
+  });
+
+  it('still takes the tiers that edit each car on its own terms', () => {
+    // `cars`, `doors` and `tenants` do not collapse a bank to one machine — they raise a floor or
+    // shave a constant per car — so a mixed fleet stays mixed and still gets what was bought.
+    const base = SHIPPED.find((candidate) => candidate.id === 'crown-hotel');
+    expect(base).toBeDefined();
+    if (base === undefined) return;
+    const after = fittedBuilding(base, kit('doors', 3), RESOURCES.elevatorSpecs);
+    expect(after).not.toBe(base);
+    expect(mixedFleetBanks(after)).toEqual(mixedFleetBanks(base));
+  });
+});
 
 describe('the door cycle', () => {
   it('takes the saving off the close first, then the open, and floors both', () => {

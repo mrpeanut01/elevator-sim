@@ -53,7 +53,12 @@ import {
 
 import type { GroupLevers } from '../authoring/dispatcherSpec.js';
 import { commissionedBuilding } from '../commissioning/building.js';
-import { asBuiltChoices, choiceForBank, withBankChoice } from '../commissioning/choices.js';
+import {
+  asBuiltChoices,
+  choiceForBank,
+  mixedFleetBanks,
+  withBankChoice,
+} from '../commissioning/choices.js';
 import { commissionableClasses, type CommissioningChoices } from '../commissioning/types.js';
 
 import {
@@ -222,6 +227,19 @@ export function fittedBuilding(
  *
  * `asBuiltChoices` is what makes this a *delta*: a bank with no purchase against it keeps its own
  * shafts, class and speed, and `commissionedBuilding` then returns that bank untouched.
+ *
+ * ## A mixed-fleet bank is left exactly as authored, and that is a refusal rather than an omission
+ *
+ * A `BankChoice` collapses a bank to **one** class, **one** speed and **one** load, and two shipped
+ * banks are not one machine: `crown-hotel`'s `main` has a geared 1.75 m/s car beside gearless 3.0 m/s
+ * ones, and `st-jude-hospital`'s `main` has a bed car. `commissionedBuilding` applies whatever it is
+ * handed, so a shaft bought on either would rewrite every car to the first one's machine — *the
+ * campaign flattening the thing the building was written to teach*, which is exactly what
+ * `commissioning/refusals.ts` refuses to let a commissioning screen do. This module has no screen to
+ * draw a refusal on, so it takes the same decision the only way it can: the bank keeps its fleet, and
+ * the `shafts` and `machines` tiers buy nothing **there**. Every other bank of the same building, and
+ * every other category, is unaffected — `cars`, `doors` and `tenants` raise a floor or shave a
+ * constant per car, so a mixed fleet stays mixed and still gets what was bought.
  */
 function choicesFor(
   base: BuildingConfig,
@@ -231,9 +249,10 @@ function choicesFor(
   const classes = commissionableClasses(specs);
   let choices = asBuiltChoices(base, classes);
   if (fit.extraShafts === 0 && fit.machineClassId === undefined) return choices;
+  const mixed = new Set(mixedFleetBanks(base));
   for (const bank of base.banks) {
     const built = choiceForBank(choices, bank.id);
-    if (built === undefined) continue;
+    if (built === undefined || mixed.has(bank.id)) continue;
     choices = withBankChoice(choices, {
       ...built,
       shafts: built.shafts + fit.extraShafts,
