@@ -32,8 +32,13 @@
  * | `control` L2 | inert | Level-0 disclosure with two cars: this is `garden-apartments`' own documented collapse of the dispatcher menu, and § D112's finding that a destination which changes no decision is worth nothing | `midtown-office` at 1 800 s — and `control` L3, the Level-1 panel, moves at the campaign's own cell |
  */
 
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { parseBuilding, type BuildingConfig } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
+import { DATA_DIR } from '../fixtures.test-helper.js';
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, drivingProfileOf, type ViewerState } from '../dev/state.js';
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
@@ -97,6 +102,23 @@ const shipped = (id: string) => {
   if (entry === undefined) throw new Error(`${id} is not loaded`);
   return entry.config;
 };
+
+/**
+ * **Every building `data/buildings/` ships**, read off disk rather than off `RESOURCES`.
+ *
+ * `probes.test-helper.ts` deliberately loads two — the walk simulates, and § D216 § 5 bounds it —
+ * and two is not enough for the cases that ask a question about *the shipped set*. It is the
+ * difference between a decisive assertion and a vacuous one: the *never shrinks a car* case below
+ * is passed by a broken implementation on both loaded buildings and failed by `crown-hotel`'s 4 000
+ * lb service car and `mixed-use-high-rise`'s shuttles, which are the only cars in the repository
+ * above the `cars` ladder's own top rung. `commissioning.test.ts` reads the directory for the same
+ * reason.
+ */
+const SHIPPED: readonly BuildingConfig[] = readdirSync(join(DATA_DIR, 'buildings'))
+  .filter((name) => name.endsWith('.json'))
+  .map((name) =>
+    parseBuilding(JSON.parse(readFileSync(join(DATA_DIR, 'buildings', name), 'utf8')) as unknown),
+  );
 
 /* -------------------------------------------------------------------------- *
  * The negative control, first — because every case below is measured against it
@@ -176,17 +198,14 @@ describe('§ 8.2’s shop', () => {
     }
   });
 
-  it('produces a building the loader takes, for every tier of every loaded building', () => {
-    for (const entry of RESOURCES.entries) {
+  it('produces a building the loader takes, for every tier of every shipped building', () => {
+    expect(SHIPPED.length, 'data/buildings/ was not read').toBeGreaterThan(5);
+    for (const base of SHIPPED) {
       for (const { where, categoryId, tier } of TIERS) {
-        const fitted = fittedBuilding(
-          entry.config,
-          kit(categoryId, tier.level),
-          RESOURCES.elevatorSpecs,
-        );
+        const fitted = fittedBuilding(base, kit(categoryId, tier.level), RESOURCES.elevatorSpecs);
         expect(
           () => fittedBuildingLoads(fitted, RESOURCES.elevatorSpecs),
-          `${entry.config.id} · ${where}`,
+          `${base.id} · ${where}`,
         ).not.toThrow();
       }
     }
@@ -196,12 +215,9 @@ describe('§ 8.2’s shop', () => {
     const everything = fitOutOf(
       towerWith({ doors: 3, control: 3, machines: 3, cars: 2, shafts: 2, tenants: 3 }),
     );
-    for (const entry of RESOURCES.entries) {
-      const fitted = fittedBuilding(entry.config, everything, RESOURCES.elevatorSpecs);
-      expect(
-        () => fittedBuildingLoads(fitted, RESOURCES.elevatorSpecs),
-        entry.config.id,
-      ).not.toThrow();
+    for (const base of SHIPPED) {
+      const fitted = fittedBuilding(base, everything, RESOURCES.elevatorSpecs);
+      expect(() => fittedBuildingLoads(fitted, RESOURCES.elevatorSpecs), base.id).not.toThrow();
     }
   });
 });
@@ -327,22 +343,31 @@ describe('car size is live and the campaign’s building is what is insensitive 
     expect(bought.map((car) => car.ratedLoadLb)).toEqual(asBuilt.map((car) => car.ratedLoadLb));
   });
 
-  it('never makes a car smaller than it already is, on any tier of any loaded building', () => {
-    for (const entry of RESOURCES.entries) {
+  it('never makes a car smaller than it already is, on any tier of any shipped building', () => {
+    /*
+     * Swept over the **shipped** set rather than the two loaded ones, and that is what makes the
+     * case decisive rather than vacuous: without the `Math.max` in `carsFitted` this passes on both
+     * of `probes.test-helper.ts`'s buildings — Garden Apartments grows and Midtown is already at the
+     * tier — and fails on `crown-hotel`'s 4 000 lb service car, which the clamp alone would take to
+     * 2 500. Measured, not argued: those are the only cars in `data/buildings/` above the ladder.
+     */
+    let compared = 0;
+    for (const base of SHIPPED) {
       for (const level of [1, 2]) {
-        const before = entry.config.banks.flatMap((bank) => bank.cars);
-        const after = fittedBuilding(
-          entry.config,
-          kit('cars', level),
-          RESOURCES.elevatorSpecs,
-        ).banks.flatMap((bank) => bank.cars);
+        const before = base.banks.flatMap((bank) => bank.cars);
+        const after = fittedBuilding(base, kit('cars', level), RESOURCES.elevatorSpecs).banks.flatMap(
+          (bank) => bank.cars,
+        );
         after.forEach((car, index) => {
           const was = before[index]?.ratedLoadLb;
           if (was === undefined || car.ratedLoadLb === undefined) return;
-          expect(car.ratedLoadLb, `${entry.config.id} L${String(level)}`).toBeGreaterThanOrEqual(was);
+          compared += 1;
+          expect(car.ratedLoadLb, `${base.id} L${String(level)} car ${car.id}`).toBeGreaterThanOrEqual(was);
         });
       }
     }
+    // Non-vacuity: a sweep that compared nothing would agree with any implementation at all.
+    expect(compared).toBeGreaterThan(40);
   });
 });
 
