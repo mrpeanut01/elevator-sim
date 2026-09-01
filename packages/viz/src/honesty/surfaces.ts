@@ -150,7 +150,7 @@ import {
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { everydayReportViewOf } from '../everyday/reportView.js';
 import { SETTINGS_ABSENCES, settingsScreenViewOf } from '../everyday/settingsView.js';
-import { EVERYDAY_UNITS } from '../everyday/units.js';
+import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
   stageAlarmOf,
   stageBarModelOf,
@@ -7645,9 +7645,26 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/tunerModel.ts#tuneSandboxStrip',
     'everyday/tunerModel.ts#tuneDwellChips',
     'everyday/tunerModel.ts#tuneReadout',
-    'everyday/tunerModel.ts#tuneSpeedReadout',
+    /*
+     * `tuneSpeedReadout` is **no longer claimed, and its coverage did not go anywhere** — GitHub
+     * issue #170's Units half, § D448. It authored `${speed} m/s` and now delegates to
+     * `everyday/units.ts#speedFigure`, so the derivation stops seeing it as a text producer and a
+     * `covers` entry for it would be a claim about nothing. The formatter it delegates to is
+     * claimed below and driven here in **both** preferences, which is more of the surface than the
+     * old entry covered rather than less.
+     */
     'everyday/tunerModel.ts#tuneCapacityReadout',
     'everyday/tunerModel.ts#patternWithTune',
+    /*
+     * **§ 13's units, claimed here because this is the adapter that drives both of their
+     * preferences** — GitHub issue #170, § D448. `speedFigure` is driven on three sites (the
+     * rating plate, the machine-class band and the tuner's readout) and `lengthFigure` on two
+     * (`TRAVEL` and the class's declared rise); `EVERYDAY_DAILY_LOOP` drives `speedFigure` a fourth
+     * time on the *Rated speed* fact and does not re-claim it, because a declaration has one owner.
+     */
+    'everyday/units.ts#speedFigure',
+    'everyday/units.ts#lengthFigure',
+    'everyday/units.ts#speedRangeFigure',
   ],
   render(context) {
     void context;
@@ -7765,6 +7782,28 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
           text: warning.text,
           role: 'prose',
         });
+      }
+      /*
+       * **The machine-class band's range and rise, in both preferences.** The band's own sentence
+       * (*"… · up to 20 floors and 61 m of rise"*) is authored inline in `designerScreen.ts` and is
+       * excluded on the DOM mounts' shared ground, so what enters the corpus is the two figures
+       * rather than the sentence around them — which is what makes claiming `speedRangeFigure`
+       * above a coverage claim rather than a hope.
+       */
+      const band = classOfSpec(classes, drawn);
+      if (band !== undefined) {
+        for (const units of EVERYDAY_UNITS) {
+          seeds.push({
+            field: `designer.${arm}.class.${units}.speeds`,
+            text: speedRangeFigure(band.speedMinMps, band.speedMaxMps, units),
+            role: 'observation',
+          });
+          seeds.push({
+            field: `designer.${arm}.class.${units}.rise`,
+            text: lengthFigure(band.maxRiseM, units, 0),
+            role: 'observation',
+          });
+        }
       }
       /*
        * **Both units preferences, on the one surface that has a plate** — GitHub issue #170's Units
@@ -7890,6 +7929,15 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * on the build-information panel this screen opens, so they are {@link EVERYDAY_BUILD_NOTES}'s
      * to render and no longer reachable through `settingsScreenViewOf`.
      */
+    /*
+     * § 15.1's `Units` row, whose label, § 16 register clause and two pill faces are authored
+     * beside the conversion rather than on the screen (GitHub issue #170, § D448). They live there
+     * because the note is a **claim about what the control reaches**, and a note kept away from the
+     * conversion is § D227's stale claim waiting to happen; they are driven here because this is
+     * the surface a player reads them on, in both faces — one of the six cases below carries
+     * `units: 'imperial'` for exactly that.
+     */
+    'everyday/units.ts#UNITS_ROW_COPY',
   ],
   render(context) {
     void context;
@@ -7902,8 +7950,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       ['reduced', { profile: stored, reduceMotion: true }],
       /* The still-booting window: the Motion row's absence rather than the row. */
       ['booting', { profile: stored, reduceMotion: undefined }],
-      /* A refused draft — `menu/account.ts`'s sentence, drawn beside the field. */
-      ['refused-name', { profile: stored, draftName: 'x', reduceMotion: false }],
+      /*
+       * A refused draft — `menu/account.ts`'s sentence, drawn beside the field — **and the `Units`
+       * row's other face**, carried here rather than in a seventh case. The row is the only thing
+       * on this screen the preference changes, so a whole extra state would seed every other
+       * sentence a second time under a different name to reach one pill.
+       */
+      ['refused-name', { profile: stored, draftName: 'x', reduceMotion: false, units: 'imperial' }],
       /* A store that keeps nothing: the profile is real for this tab and says so. */
       ['not-durable', { profile: stored, durable: false, reduceMotion: false }],
     ] as const;
