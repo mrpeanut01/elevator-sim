@@ -58,6 +58,25 @@ describe('the conversion is a conversion', () => {
   });
 
   /**
+   * **§ 13's comma, on the arm that is the only one long enough to need it.**
+   *
+   * *Thousands separated with a comma.* No metric figure this module draws gets near four digits —
+   * `data/elevator-specs.json`'s tallest class declares a 700 m rise — but the conversion makes it
+   * `2,297 ft`, so a preference that lengthened a figure without grouping it would introduce the
+   * one formatting defect § 13 names, on the arm nobody was reading. Both shipped classes past the
+   * boundary are checked, and a metric figure below it is checked for the absence of a comma so
+   * this cannot be satisfied by grouping everything.
+   */
+  it('groups thousands, which only the converted arm is long enough to need', () => {
+    expect(lengthFigure(600, 'imperial', 0)).toBe('1,969 ft');
+    expect(lengthFigure(700, 'imperial', 0)).toBe('2,297 ft');
+    // The decimal place survives the grouping — the separator is the integer part's alone.
+    expect(lengthFigure(350, 'imperial')).toBe('1,148.3 ft');
+    expect(lengthFigure(700, 'metric', 0)).toBe('700 m');
+    expect(lengthFigure(42, 'metric')).not.toContain(',');
+  });
+
+  /**
    * **The relabel test, which is the clause § 13 spells out.**
    *
    * A relabel keeps the digits and swaps the suffix — `2.50 m/s` becoming `2.50 ft/s` — and it is

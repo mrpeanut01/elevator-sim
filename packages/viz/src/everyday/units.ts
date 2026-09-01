@@ -136,14 +136,36 @@ export function speedFigure(mps: number, units: EverydayUnits, decimals = 2): st
 }
 
 /**
- * A distance, converted and suffixed — `42.0 m` or `137.8 ft`.
+ * A distance, converted, grouped and suffixed — `42.0 m` or `137.8 ft`.
  *
  * Travel on the plate prints one place; a machine class's declared maximum rise prints none,
  * because the catalogue authors it as a whole number of metres.
+ *
+ * **The thousands separator is § 13's own rule and it is here because the conversion is what
+ * reaches it.** No metric figure this module draws gets near four digits — the tallest class in
+ * `data/elevator-specs.json` declares a 700 m rise and the tallest tower a player can draw is a few
+ * hundred — but `700 m` is `2,297 ft`, so a preference that made a figure longer without grouping
+ * it would introduce the one formatting defect § 13 spells out, on the arm nobody was reading. The
+ * grouping is applied to the integer part only, so a decimal place survives it.
  */
 export function lengthFigure(metres: number, units: EverydayUnits, decimals = 1): string {
   const value = units === 'imperial' ? feetOf(metres) : metres;
-  return `${value.toFixed(decimals)} ${LENGTH_UNIT[units]}`;
+  return `${groupedFixed(value, decimals)} ${LENGTH_UNIT[units]}`;
+}
+
+/**
+ * `value.toFixed(decimals)` with § 13's comma in the integer part.
+ *
+ * Hand-grouped rather than `toLocaleString`, on `figures.ts`'s stated ground: a locale-dependent
+ * separator makes the string depend on the machine the browser runs on and on the machine a test
+ * runs on, which is the non-determinism `CLAUDE.md`'s invariant 2 forbids one layer down.
+ */
+function groupedFixed(value: number, decimals: number): string {
+  const fixed = value.toFixed(decimals);
+  const dot = fixed.indexOf('.');
+  const whole = dot === -1 ? fixed : fixed.slice(0, dot);
+  const rest = dot === -1 ? '' : fixed.slice(dot);
+  return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}${rest}`;
 }
 
 /**
