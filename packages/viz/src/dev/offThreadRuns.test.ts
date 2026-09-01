@@ -99,10 +99,11 @@ function ask(
   seeds: readonly [bigint, ...bigint[]],
 ): Parameters<OffThreadRunnerHandle['start']>[0] {
   return {
-    runs: seeds.map((seed) => ({ config: configNamed(seed) })) as unknown as readonly [
-      { readonly config: SimulationConfig },
-      ...{ readonly config: SimulationConfig }[],
-    ],
+    runs: seeds.map((seed) => ({
+      config: configNamed(seed),
+      outOfServiceCarIds: [],
+      recordDecisions: false,
+    })) as unknown as Parameters<OffThreadRunnerHandle['start']>[0]['runs'],
     onDone: (recordings) => {
       h.answered.push(`${tag}:${recordings.map((recording) => recording.runId).join(',')}`);
     },
@@ -133,13 +134,31 @@ describe('one run, off the thread', () => {
     expect(h.runner.isRunning()).toBe(false);
   });
 
-  it('defaults the two switches the far side must not decide for itself', () => {
+  it('carries the two switches the far side must not decide for itself', () => {
     const h = harness();
     h.runner.start(ask(h, 'watch', [7n]));
-    // `recordDecisions: false` because no caller of this seam draws a decision log, and no cars
-    // held because every caller runs a full bank. Both are *sent* rather than left to the worker.
+    /*
+     * Both are **sent**, never defaulted here and never left to the worker. `recordRun` defaults
+     * `recordDecisions` to `true` and a decision log is part of the recording, so a runner that
+     * silently supplied `false` would change what the caller got back — which is why
+     * `OffThreadRun` requires the field rather than offering a convenient default.
+     */
     expect(h.workers[0]?.posted[0]?.recordDecisions).toBe(false);
     expect(h.workers[0]?.posted[0]?.outOfServiceCarIds).toEqual([]);
+    /*
+     * And the other value crosses too, rather than a default winning over what was asked for. It
+     * is read off the **second** worker: this ask supersedes the first, and a supersede takes the
+     * worker with it — which is `start`'s own rule showing up in an assertion about something
+     * else, and is why the reading is not `posted[1]` on the first one.
+     */
+    h.runner.start({
+      runs: [{ config: configNamed(9n), outOfServiceCarIds: ['main-D'], recordDecisions: true }],
+      onDone: () => undefined,
+      onFailed: () => undefined,
+    });
+    expect(h.workers).toHaveLength(2);
+    expect(h.workers[1]?.posted[0]?.recordDecisions).toBe(true);
+    expect(h.workers[1]?.posted[0]?.outOfServiceCarIds).toEqual(['main-D']);
   });
 });
 

@@ -91,17 +91,21 @@ import type { VizRecording } from '../contract/types.js';
 
 import type { ShiftWorkerLike, ShiftWorkerMessage } from './shiftRunner.js';
 
-/** One simulation, in `recordRun`'s own three arguments. */
+/**
+ * One simulation, in `recordRun`'s own three arguments — **all three required**.
+ *
+ * Neither switch is defaulted, and that is `dev/shiftRunner.ts`'s protocol rule for the same two
+ * fields: *passed rather than defaulted so the far side decides nothing*. It is load-bearing here
+ * rather than tidy. `recordRun` defaults `recordDecisions` to **true**, the Watch gate relied on
+ * that default, and a decision log is *in* the recording — so a convenient default of `false` on
+ * this interface would have handed the stage a different replay than the synchronous gate
+ * produced, silently, on a surface whose whole job is deciding whether a run reproduces.
+ */
 export interface OffThreadRun {
   readonly config: SimulationConfig;
-  /** `recordRun`'s second argument. Defaults to none held — every current caller runs a full bank. */
-  readonly outOfServiceCarIds?: readonly string[];
-  /**
-   * Whether the far side records decisions. Defaulted to `false` rather than to `recordRun`'s own
-   * default, because none of this seam's callers draws a decision log and two runs' worth of them
-   * would be carried across a thread boundary to no reader — `fixit/run.ts`'s own words.
-   */
-  readonly recordDecisions?: boolean;
+  /** `recordRun`'s second argument. `fixit/run.ts#FIXIT_RUN_SWITCHES` settles it for both shells. */
+  readonly outOfServiceCarIds: readonly string[];
+  readonly recordDecisions: boolean;
 }
 
 /**
@@ -166,8 +170,8 @@ export function createOffThreadRunner(options: OffThreadRunnerOptions): OffThrea
     warmWorker().postMessage({
       kind: 'run',
       config: run.config,
-      outOfServiceCarIds: run.outOfServiceCarIds ?? [],
-      recordDecisions: run.recordDecisions ?? false,
+      outOfServiceCarIds: run.outOfServiceCarIds,
+      recordDecisions: run.recordDecisions,
     });
   }
 
