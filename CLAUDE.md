@@ -97,11 +97,22 @@ verdict:
   Four of the five lanes could not have moved it — workflows, documents, a classifier's own test and
   a browser-tier harness render no player-facing string. **The fifth was expected to and did not**,
   and its lane said so in advance: § D427 makes a purchase reach the run, so *"any corpus case that
-  ever carries a non-`AS_BUILT` fit-out would move"*. None does. **The corpus holds no case in which
-  anything has been bought**, so the ten honesty properties have never read a fitted run's strings —
-  every campaign case they see is a tower as built. That is a hole in the corpus's coverage of § 8,
+  ever carries a non-`AS_BUILT` fit-out would move"*. None did. **The corpus held no case in which
+  anything had been bought**, so the ten honesty properties had never read a fitted run's strings —
+  every campaign case they saw was a tower as built. That was a hole in the corpus's coverage of § 8,
   found by a null result rather than by a violation, and it is the kind of thing this column exists to
   make visible.
+
+  **That gap is closed** ([§ D437](DECISIONS.md)): `HonestyCase.fitOutId` is a fit-out axis drawn
+  last, so every pinned seed keeps the configuration it had and a share of them now run a tower that
+  has bought something. Which kit is a survey rather than a preference — all sixteen shipped tiers
+  swept over all 49 always-on cases and compared **on the legs**, because § D427's table is measured
+  at the campaign's `garden-apartments`/3 600 s and this corpus runs 600–900 s. **The figures in this
+  row are not re-measured here**: § D343 puts that on the integrator, once, after integration, both
+  tiers in one sitting. Two things to expect when it is. The **strings move and nothing else does** —
+  a fitted case runs no extra simulation and renders no new surface. And the **suppressed-runs count
+  moves**, because three always-on cases publish a quotable mean as built and have it refused once
+  the tower is fitted, which is a class of thing a corpus of as-built towers could not see.
 
   **Wave H is the first time this row's *previous* figures were confirmed rather than trusted, and
   that is the finding rather than the move.** Before publishing the new pair, the base commit

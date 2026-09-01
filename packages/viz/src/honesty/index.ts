@@ -7,8 +7,9 @@
  * every `vitest run` by `honesty.test.ts` over {@link STANDARD_CORPUS}. That is the same answer
  * `packages/experiments/src/index.ts` gives for `fuzz/`, and it is the same answer for the same
  * reason: *"a search is a driver plus a corpus, and the corpus runs in the suite."* Every other
- * module here is reached from that driver — `generate.ts` makes the case, `run.ts` runs it,
- * `surfaces.ts` renders it, `properties.ts` judges it, `shrink.ts` reduces what failed.
+ * module here is reached from that driver — `generate.ts` makes the case, `fitOut.ts` says what the
+ * case's tower has bought, `run.ts` runs it, `surfaces.ts` renders it, `properties.ts` judges it,
+ * `shrink.ts` reduces what failed.
  *
  * `faults.ts` and `derive.test-helper.ts` are the two exceptions, and each is a *test* instrument
  * by construction: one injects a violation so a property can be shown to fire, the other reads
@@ -48,6 +49,15 @@ export {
   STANDARD_CORPUS,
 } from './campaign.js';
 export type { HonestyCampaignOptions, HonestyCampaignResult } from './campaign.js';
+
+export {
+  fitOutForCase,
+  fittedBuildingFor,
+  fittedProfileFor,
+  HONESTY_KITS,
+  HONESTY_KIT_IDS,
+} from './fitOut.js';
+export type { HonestyKit } from './fitOut.js';
 
 export { checkAll, PROPERTY_CHECKS } from './properties.js';
 
