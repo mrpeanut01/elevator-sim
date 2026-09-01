@@ -770,7 +770,8 @@ export const STAGE_NO_GHOST =
  *
  * That remaining entry is pinned by a run and not by another sentence: `stageScreenModel.test.ts`
  * asserts that no row this model can build carries an answer, so the day an answer arm lands the
- * check goes red and the sentence comes out with it.
+ * check goes red and the sentence comes out with it. The ruling, and what it says about trimming an
+ * entry rather than re-taking it, is [§ D451](../../../../DECISIONS.md).
  */
 export const STAGE_ABSENCES: readonly string[] = Object.freeze([
   STAGE_NO_GHOST,
