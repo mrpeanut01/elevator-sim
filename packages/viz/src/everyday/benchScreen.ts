@@ -40,7 +40,7 @@ import {
   type SuiteCellView,
   type SuiteRequest,
 } from '../batch/suite.js';
-import { savedProfilesOf } from '../batch/library.js';
+import { batchLibraryOf, savedProfilesOf } from '../batch/library.js';
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 
 import {
@@ -151,6 +151,23 @@ function mountBench(
   function start(): void {
     const request = requestOf();
     if (request === undefined) return;
+    /*
+     * The field's own dispatchers, admitted before a worker starts — issues #167 and #228,
+     * § D443, and the pre-flight matters more on this screen than on the Engineer bench. A suite
+     * runs one worker per ticked cell in sequence, so a shelf the worker refuses is refused once
+     * per cell with the reader watching a progress line between each; and this is the screen that
+     * *offered* a saved dispatcher in its field before it could run one, so a refusal arriving
+     * from the engine rather than from the field is the exact register to avoid here.
+     */
+    const library = batchLibraryOf(
+      api.dispatcherProfilesFile(),
+      savedProfilesOf(api.savedDispatchers()),
+    );
+    if (!library.ok) {
+      state.error = library.reason;
+      render();
+      return;
+    }
     let plans: readonly SuiteCellPlan[];
     try {
       plans = suitePlanOf(request);

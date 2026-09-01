@@ -204,6 +204,27 @@ describe.skipIf(!HAS_BROWSER)('a dispatcher a player built reaches the instrumen
     expect(group).toBe('YOURS');
   });
 
+  it('is a setting the Lab can resolve, not just an option it can draw', async () => {
+    /*
+     * **The picker and the lookup are two seams and only one of them is visible in a list.**
+     * `dev/campaignPanel.ts` resolved every id through a `profileById` that read the shipped file:
+     * with the picker widened and that lookup left alone, the Lab would *offer* a saved dispatcher,
+     * print its raw slug in the intent line, and refuse it at Run with *"this build's data/ does
+     * not carry the profile you picked"* — an option that cannot be honoured, which is the defect
+     * this lane is fixing wearing a different coat.
+     *
+     * The intent line is the cheap witness: `drawIntent` composes it from `labelFor`, which is
+     * `profileById` under another name, so the display name appearing there is the lookup having
+     * resolved. Asserted instead of a stage run because a stage is two batches and this file is
+     * forbidden from reading what they produce anyway.
+     */
+    await openTab('tab-campaign');
+    await page.selectOption('#campaign-profile', { label: `${MINE} (yours-1)` });
+    const intent = await textOf('#campaign-status');
+    expect(intent, 'the Lab drew the raw slug, so the lookup did not resolve').toContain(MINE);
+    expect(await textOf('#campaign-error')).toBe('');
+  });
+
   it('runs as an arm against a shipped dispatcher, and the row draws its interval', async () => {
     await openTab('tab-compare');
 

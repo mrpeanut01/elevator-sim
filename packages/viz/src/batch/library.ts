@@ -55,9 +55,20 @@
  *    keeps the **last**. A saved profile sharing a shipped id would therefore be silently ignored
  *    by one and silently obeyed by the other: the report would name the shipped dispatcher while
  *    a weight-set arm ran the player's. Neither surface would look wrong.
- * 2. **A document `parseDispatcherProfiles` will not have.** The whole merged file is parsed, so a
- *    restored session carrying a mangled profile is refused with `core`'s own schema message
- *    rather than a second opinion written here.
+ * 2. **A document `parseDispatcherProfiles` will not have.** The whole merged file is parsed, and
+ *    the refusal is `core`'s own schema message rather than a second opinion written here.
+ *
+ *    **Which half of the product this actually guards was measured rather than assumed, and it is
+ *    not the half it was written for.** A *restored* profile cannot reach here unparseable:
+ *    `persist/validate.ts#dispatcherIssue` already runs the same parser over each shelf entry and
+ *    **drops** the ones that fail, entry by entry, naming them. What has no such check is the
+ *    other producer — `dev/dispatcherEditor.ts#save` calls `profileFromSpec` and writes the result
+ *    straight to `savedDispatchers`, catching only what that conversion *throws*. So this refusal
+ *    exists for the editor's own output, and **the single-run path has no equivalent at all**: an
+ *    unauthorable saved profile would reach `resolveDispatchConfig` and throw mid-run. That is
+ *    worth fixing at the editor and is not this lane's file, so it is reported rather than patched
+ *    here — a second validator written at a batch would be the two-answers defect this module is
+ *    otherwise avoiding.
  * 3. **A weight naming a term the cost-term library does not declare** — which is check 2 rather
  *    than a third check, and finding that out is why there is no third check here. A
  *    `resolveWeights` call was written for it, on the reasoning that `weights` is
