@@ -1989,11 +1989,11 @@ made a § 8 purchase reach the run and predicted these figures would move, they 
 and the reason was that no case carried a fit-out. So none of the ten properties had ever read a
 string produced by a run whose doors, machines, cars, shafts, control or tenancy were fitted out —
 a surface can be honest about a tower as built and dishonest about a fitted one. `HonestyCase`
-carries a fit-out axis now, drawn last so every pinned seed keeps its own configuration, and which
-kit is a **survey rather than a preference**: all sixteen shipped tiers swept over every always-on
-case and compared on the legs, because § D427's own table is measured at the campaign's cell and
-this corpus does not run there. The figures in the row above are re-measured by the integrator after
-integration ([§ D343](../DECISIONS.md)) and not here.
+carries a fit-out axis now, drawn last so every seed in the corpus keeps the configuration it
+already had, and which kit is a **survey rather than a preference**: all sixteen shipped tiers swept
+over every always-on case and compared on the legs, because § D427's own table is measured at the
+campaign's cell and this corpus does not run there. The figures in the row above are re-measured by
+the integrator after integration ([§ D343](../DECISIONS.md)) and not here.
 
 **Named limits on clause 2.** Two of [§ D168](../DECISIONS.md)'s four are **closed** — Basic can now
 shorten a suppression reason, because `core` carries the ground beside the prose
