@@ -3700,6 +3700,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
     applyPatch: (patch) => {
       context.update(patch);
     },
+    /*
+     * § 14.1's six bindings, and every one of them is the *same* seam the Engineer picker presses —
+     * GitHub issue #182, § D436. `mountWatchPanel` above is handed `loadReferenceRuns`,
+     * `recordRun`, `enterWatch`, `stopWatching` and `playThisCrowd`; these are those five plus a
+     * read of the `watching` field, so the two shells enter, leave and convert a watch through one
+     * implementation. A second entry point would be a second answer to *whose day is on screen*,
+     * which is the property `dev/watchPanel.ts` is one file for.
+     */
+    loadReferenceRuns: () =>
+      loadReferenceRuns((id: string) => buildingNameOf(resources, state.savedBuildings, id)),
+    simulateRecord: (config) => recordRun(config).recording,
+    enterWatch: (run, view, recording) => {
+      enterWatch(run, view, recording);
+    },
+    stopWatching: () => {
+      stopWatching();
+    },
+    playThisCrowd: (run) => {
+      playThisCrowd(run);
+    },
+    watching: () =>
+      watching === undefined ? undefined : { run: watching.run, view: watching.view },
     onChange: (listener) => {
       everydayHostListeners.push(listener);
       return () => {

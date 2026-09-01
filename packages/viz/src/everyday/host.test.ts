@@ -39,6 +39,8 @@ import { recordRun } from '../record/recordRun.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
 import type { ShapedDayReport } from '../shift/report.js';
+import type { PostedResult, WatchableRun, WatchRecord } from '../watch/types.js';
+import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import { createEverydayHost, EVERYDAY_HOST, type EverydayHostBindings } from './host.js';
 
@@ -88,6 +90,12 @@ interface Harness {
   /** Every patch `applyPatch` received, in order. */
   readonly patches: Partial<ViewerState>[];
   state: ViewerState;
+  /** What `loadReferenceRuns` answers — § 14.1's second source, as a fixture. */
+  references: readonly WatchableRun[];
+  /** What the reproduction gate's simulator answers. See the § 14.1 cases below. */
+  simulate: (config: SimulationConfig) => VizRecording;
+  /** The session `enterWatch` opened, read back by `watching()`. */
+  watching: { readonly run: WatchableRun; readonly view: WatchingView } | undefined;
 }
 
 function harnessOf(
@@ -106,6 +114,11 @@ function harnessOf(
     calls,
     patches,
     state,
+    references: [],
+    simulate: () => {
+      throw new Error('this harness was not given a simulator');
+    },
+    watching: undefined,
     bindings: {
       resources,
       state: () => harness.state,
@@ -130,6 +143,31 @@ function harnessOf(
         calls.push('applyPatch');
         patches.push(patch);
       },
+      /*
+       * § 14.1's six, recorded rather than refused — GitHub issue #182. `watchRun`'s composition is
+       * driven below, and what it is asserted on is the *order* of these calls: the gate runs, and
+       * `enterWatch` is reached only when it passed.
+       */
+      loadReferenceRuns: () => {
+        calls.push('loadReferenceRuns');
+        return Promise.resolve(harness.references);
+      },
+      simulateRecord: (config) => {
+        calls.push('simulateRecord');
+        return harness.simulate(config);
+      },
+      enterWatch: (run) => {
+        calls.push(`enterWatch:${run.id}`);
+        harness.watching = { run, view: watchingViewOf(run, 'Steady hand') };
+      },
+      stopWatching: () => {
+        calls.push('stopWatching');
+        harness.watching = undefined;
+      },
+      playThisCrowd: (run) => {
+        calls.push(`playThisCrowd:${run.id}`);
+      },
+      watching: () => harness.watching,
       onChange: (listener) => {
         calls.push('onChange');
         void listener;
@@ -651,6 +689,15 @@ describe('filing the campaign day — issue #223', () => {
           patches.push(patch);
           h.state = { ...h.state, ...patch };
         },
+        /* § 14.1 is not this harness's subject; the campaign cases press none of these. */
+        loadReferenceRuns: () => Promise.resolve([]),
+        simulateRecord: () => {
+          throw new Error('the campaign harness does not simulate a record');
+        },
+        enterWatch: () => {},
+        stopWatching: () => {},
+        playThisCrowd: () => {},
+        watching: () => undefined,
         onChange: () => () => {},
       },
     };

@@ -19,10 +19,13 @@ import {
   ACTION_BAR_ROWS,
   actionBarFor,
   confirmStripFor,
+  GUIDE_WATCHING_NOTE,
   TIMELINE_STEPS,
+  WATCHING_NOTE,
   type TimelineFlow,
 } from './actionBar.js';
 import { EVERYDAY_SCREENS, RUN_CONTEXTS, type EverydayScreen, type RunContext } from './types.js';
+import { firstPersonWordsIn } from '../watch/view.js';
 
 /** One § 3.3 row as the guide prints it. `null` transcribes the table's `—`. */
 interface GuideRow {
@@ -36,6 +39,14 @@ interface GuideRow {
   readonly danger?: readonly string[];
   /** A string per state the guide's cell names, or `null` for `—`. */
   readonly notes: readonly string[] | null;
+  /**
+   * What the build ships instead, on the one cell it does not follow to the letter.
+   *
+   * Absent everywhere but the two `watch` rows. See {@link DEVIATIONS} for why one exists at all,
+   * and the case below it for what is asserted about it in both directions — a deviation that is
+   * only *allowed* is a deviation nobody re-reads.
+   */
+  readonly shipsInstead?: string;
   readonly inverted: boolean;
   readonly wayOut?: string;
 }
@@ -261,6 +272,8 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     timeline: null,
     primary: ['Play this crowd yourself'],
     notes: ['Their record, replayed. Nothing here is scored, and your own day is untouched.'],
+    /* § D435 — see {@link GuideRow.shipsInstead} and the deviation case below the table loop. */
+    shipsInstead: 'Their record, replayed. Nothing here is scored, and the day on this device is untouched.',
     inverted: false,
   },
 ];
@@ -301,11 +314,47 @@ describe('the table matches the guide, cell for cell', () => {
         ...(data.noteVariants ?? []),
       ];
       if (guide.notes === null) expect(notes, 'note').toEqual([]);
+      else if (guide.shipsInstead !== undefined) expect(notes, 'note').toEqual([guide.shipsInstead]);
       else expect(notes, 'note').toEqual(guide.notes);
       expect(data.inverted, 'inversion').toBe(guide.inverted);
       expect(data.wayOut, 'way out').toBe(guide.wayOut);
     });
   }
+
+  /**
+   * **The one cell this build does not transcribe, asserted in both directions** — § D435.
+   *
+   * § 3.3's `stage · watching` note says *"…and your own day is untouched"*, and § 14.1 says the
+   * word `you` on a watched run is a defect. That is the handoff disagreeing with itself on one
+   * screen, and `actionBar.ts#WATCHING_NOTE` carries the argument for which half wins.
+   *
+   * Three assertions, and the second is the one that keeps this honest. Allowing the deviation is
+   * easy; what stops it from outliving its reason is requiring the **guide's** sentence to still be
+   * first-person. A revision that dropped the pronoun would make this case red on the day it landed,
+   * with the fix being to delete the deviation rather than to keep it because nobody re-read it —
+   * which is § D227's rule pointed at a test instead of at a control.
+   */
+  it('deviates from the guide’s watching note only by its first person, and says so both ways', () => {
+    expect(GUIDE_WATCHING_NOTE, 'the transcription is not the guide’s sentence').toBe(
+      'Their record, replayed. Nothing here is scored, and your own day is untouched.',
+    );
+    expect(
+      firstPersonWordsIn(GUIDE_WATCHING_NOTE),
+      'the guide’s cell is no longer first-person — the deviation has outlived its reason',
+    ).toEqual(['your']);
+    expect(
+      firstPersonWordsIn(WATCHING_NOTE),
+      '§ 14.1: the word `you` on a watched run is a defect',
+    ).toEqual([]);
+    /* And the three claims the cell makes are all still made — a deviation, not a deletion. */
+    expect(WATCHING_NOTE).toContain('Their record, replayed');
+    expect(WATCHING_NOTE).toContain('Nothing here is scored');
+    expect(WATCHING_NOTE).toContain('untouched');
+    /* Both `watch` rows draw it, so neither can drift from the other. */
+    const watchNotes = ACTION_BAR_ROWS.filter((row) => row.ctx === 'watch').map((row) => row.note);
+    expect(watchNotes).toHaveLength(2);
+    expect(watchNotes).toEqual([WATCHING_NOTE, WATCHING_NOTE]);
+  });
 });
 
 describe('the § 3.3 rules, held over the data rather than the literals', () => {

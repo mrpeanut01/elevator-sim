@@ -109,6 +109,12 @@ import {
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
 import type { EverydayState } from './types.js';
+import {
+  playThisCrowdRefusalFor,
+  watchStageBarOf,
+  SPECTATOR_MAKES_NO_CHANGES,
+} from './watchStage.js';
+import type { WatchingView } from '../watch/view.js';
 
 /* -------------------------------------------------------------------------- *
  * The module store — what the § 3.3 refinement reads
@@ -127,6 +133,20 @@ import type { EverydayState } from './types.js';
  * exposes none. {@link syncTransport} is its one writer, on the edge rather than on every frame.
  */
 const barFacts = { hasRun: false, dayClosed: false, recomputing: false, dayEnded: false };
+
+/**
+ * The same store's spectator half — GitHub issue **#182**, [§ D436](../../../../DECISIONS.md).
+ *
+ * `bar(state)` is handed the shell's state and nothing else, so the § 3.3 `stage · watching` row's
+ * one refinement — § 20.15's withdrawal of the primary on a row from another day — has to be
+ * somewhere the refinement can see. Written by {@link mountStage} on every host notification, beside
+ * the four above, and cleared when the watch ends: a stale refusal is worse than none
+ * (§ D227), and this one would sit on a *player's own* day claiming it belonged to somebody else.
+ */
+const watchFacts: { hasReplay: boolean; playRefusal: string | undefined } = {
+  hasReplay: false,
+  playRefusal: undefined,
+};
 
 /* -------------------------------------------------------------------------- *
  * Small DOM helpers — the shell's own, kept local rather than exported
@@ -572,6 +592,47 @@ function mountStage(
     'font-weight:600',
   ].join(';');
 
+  /* --- § 14.1's identity band. Up exactly while a record is on the stage. --- */
+  const watchBand = el(doc, 'section', 'everyday-stage-watching');
+  watchBand.style.cssText = [
+    'display:none',
+    'align-items:center',
+    'flex-wrap:wrap',
+    `gap:${String(GAP.row + 4)}px`,
+    /* § 14.1's *"ink, inverted — the single strongest signal"*, read off `view.headerTone`. */
+    `background:${C.ink}`,
+    `color:${C.paper}`,
+    `border:1px solid ${C.ink}`,
+    `border-radius:${String(R.card)}px`,
+    'padding:12px 15px',
+  ].join(';');
+  const watchDisc = el(doc, 'span', 'everyday-stage-watching-initial');
+  watchDisc.style.cssText = [
+    'width:34px',
+    'height:34px',
+    'flex:none',
+    'border-radius:50%',
+    `background:${C.sun}`,
+    `color:${C.ink}`,
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    'font-size:16px',
+    'font-weight:700',
+  ].join(';');
+  const watchWho = el(doc, 'div');
+  watchWho.style.cssText = 'min-width:0';
+  const watchName = el(doc, 'div', 'everyday-stage-watching-name');
+  watchName.style.cssText = 'font-size:19px;font-weight:600';
+  const watchSource = el(doc, 'div', 'everyday-stage-watching-source');
+  watchSource.style.cssText = 'font-size:11.5px;opacity:.8';
+  watchWho.append(watchName, watchSource);
+  const watchFigures = el(doc, 'div', 'everyday-stage-watching-figures');
+  watchFigures.style.cssText = `display:flex;gap:${String(GAP.section)}px;margin-left:auto`;
+  const watchNote = el(doc, 'p', 'everyday-stage-watching-note');
+  watchNote.style.cssText = 'margin:0;flex-basis:100%;font-size:11px;opacity:.75';
+  watchBand.append(watchDisc, watchWho, watchFigures, watchNote);
+
   const stageWrap = el(doc, 'div', 'everyday-stage-wrap');
   stageWrap.style.cssText = [
     'position:relative',
@@ -579,6 +640,25 @@ function mountStage(
     `border-radius:${String(R.card)}px`,
     `background:${C.paper}`,
     'overflow:hidden',
+  ].join(';');
+  /*
+   * § 14.1's canvas cell: *"a pill, top left: `REPLAY · <name> · …`"*. Its verb is `watch/view.ts`'s
+   * — § D407's substitution — and it is drawn over the cutaway rather than painted into it so the
+   * honesty sweep and the browser tier read it as text.
+   */
+  const watchPill = el(doc, 'div', 'everyday-stage-watching-pill');
+  watchPill.style.cssText = [
+    'display:none',
+    'position:absolute',
+    'top:10px',
+    'left:10px',
+    'z-index:2',
+    `background:${C.ink}`,
+    `color:${C.paper}`,
+    `border-radius:${String(R.pill)}px`,
+    'padding:4px 10px',
+    `font:500 10px ${TYPE.mono}`,
+    'letter-spacing:.1em',
   ].join(';');
   const canvas = el(doc, 'canvas', 'everyday-stage-canvas');
   canvas.style.cssText = `display:block;width:100%;height:${STAGE_CANVAS_HEIGHT}`;
@@ -613,7 +693,7 @@ function mountStage(
     togglePlay();
   });
   status.append(statusText, startButton);
-  stageWrap.append(canvas, status);
+  stageWrap.append(canvas, watchPill, status);
 
   const legend = el(doc, 'div', 'everyday-stage-legend');
   legend.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.section)}px;font-size:11.5px;color:${C.warmGrey}`;
@@ -690,7 +770,7 @@ function mountStage(
    * one refusal a player still meets *here* is the ghost lane's, on the ghost lane's own card
    * (`STAGE_NO_GHOST`, three blocks up) — a control that cannot act says so where the control is.
    */
-  root.append(header, alarm, stageWrap, legend, interventions, race);
+  root.append(header, watchBand, alarm, stageWrap, legend, interventions, race);
   region.append(root);
 
   /* ------------------------------------------------------------- behaviour */
@@ -792,6 +872,21 @@ function mountStage(
     requestFrame();
   }
 
+  /**
+   * The § 14.1 session, or `undefined` — read here rather than from `context.ctx` alone.
+   *
+   * **Both** have to hold and neither is redundant. `context.ctx` is the shell's commitment, and
+   * `host.watching()` is whether a record is actually on the state; the shell can only be in the
+   * first for a frame before the second is true (`EverydayHost.watchRun` enters the spectator state
+   * *before* `enterWatch` navigates, so in the shipped route the second is true first), and the host
+   * can be in the second while the Engineer shell is the one watching. Drawing the spectator chrome
+   * on either alone would put somebody else's name over the player's own day, or the player's
+   * `DRIVING` over somebody else's.
+   */
+  function watchingNow(): WatchingView | undefined {
+    return context.ctx === 'watch' ? host.watching()?.view : undefined;
+  }
+
   /** The host said something changed. Adopt a new recording; otherwise just redraw the facts. */
   function onHostChange(): void {
     if (!alive) return;
@@ -801,6 +896,22 @@ function mountStage(
     context.setRunOpen(runState.open);
     const recording = host.recording();
     if (recording !== undefined && recording !== adopted) adopt(recording);
+    /*
+     * § 20.15's withdrawal, re-read on every notification rather than latched at mount — GitHub
+     * issue #182. The record does not move within one watch, but the **week** does: closing a day
+     * from another screen advances it, and a refusal computed once would then be describing a
+     * comparison that has changed under it. Cleared outright when nothing is being watched, so a
+     * player's own stage can never carry a spectator's refusal (§ D227).
+     */
+    const session = context.ctx === 'watch' ? host.watching() : undefined;
+    watchFacts.hasReplay = session !== undefined && adopted !== undefined;
+    watchFacts.playRefusal =
+      session === undefined
+        ? undefined
+        : playThisCrowdRefusalFor(session.run.record, {
+            day: host.week().day,
+            dayIdx: host.week().dayIdx,
+          });
     context.refreshBar();
     syncTransport();
     requestFrame();
@@ -892,14 +1003,23 @@ function mountStage(
       driverName:
         host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId,
     });
+    const watching = watchingNow();
     clock.textContent = head.clock;
-    drivingEyebrow.textContent = head.drivingLabel;
+    /*
+     * § 14.1's identity cell: `DRIVING` + the player's dispatcher becomes `THEIR DISPATCHER` + the
+     * record's. Both strings are the view's, so the band, the pill and this header cannot come to
+     * name three different runs — and `drivingLabel` stays the model's on a player's own day, which
+     * is the branch `watch/view.test.ts`'s *keeps the player's own arm first-person* case is the
+     * shape of: an arm that quietly became the only arm passes every grep and is wrong.
+     */
+    drivingEyebrow.textContent = watching?.dispatcherEyebrow ?? head.drivingLabel;
     phase.textContent = head.phase;
     /* Nothing rather than a placeholder: inside the last stretch there is no next one to name. */
     nextPhase.textContent = head.next ?? '';
     nextPhase.style.display = head.next === undefined ? 'none' : '';
-    drivingName.textContent = head.driverName;
+    drivingName.textContent = watching?.dispatcherName ?? head.driverName;
     drawFigures(head.figures);
+    drawWatching(watching);
 
     const alarmLine = stageAlarmOf(observations, labelOf);
     alarm.style.display = alarmLine === undefined ? 'none' : 'flex';
@@ -932,10 +1052,62 @@ function mountStage(
       recomputing: recomputingOver !== undefined,
     });
     interventionStamp.textContent = intervention.stamp;
-    interventionRefusal.textContent = intervention.refusal ?? '';
-    for (const button of interventionButtons) button.disabled = intervention.refusal !== undefined;
+    /*
+     * § 14.1: *"§ 7.6's intervention machinery is **disabled** while watching. A spectator who could
+     * intervene would be playing, not watching."* The refusal is composed here rather than added as
+     * a fourth arm of `stageInterventionsOf`, because that function is asked the same question on
+     * every run context and *who owns this run* is not one of its inputs — the Engineer shell
+     * disables the same controls from its own `isWatching()` for the same reason.
+     *
+     * The stamp is left exactly as it is: the record's own interventions **are** replayed
+     * (contract § 1.5 — *replayed, not offered*), so naming the latest one at or before the playhead
+     * is a true statement about the run on screen and hiding it would misdescribe the replay.
+     */
+    const refusal =
+      (watching === undefined ? undefined : SPECTATOR_MAKES_NO_CHANGES) ?? intervention.refusal;
+    interventionRefusal.textContent = refusal ?? '';
+    for (const button of interventionButtons) button.disabled = refusal !== undefined;
 
     drawRace(recording, simTimeS);
+  }
+
+  /**
+   * § 14.1's identity band and canvas pill — every cell of them read off {@link WatchingView}.
+   *
+   * `undefined` puts both down and restores § 7's own header. Nothing is *removed*: the band and the
+   * pill keep their node identity across the transition, which is `dev/watchPanel.ts`'s own reason
+   * — a rebuilt-every-frame element is an element whose buttons can never be pressed — and matters
+   * here because `draw` runs on frames.
+   *
+   * The figures are **the record's posted result**, which is § 14.1's own cell (*"so the replay is
+   * read against what it achieved"*) and is not the header's three: those are folded live at the
+   * playhead by `observationsAt` and stay exactly what they are. The note under them says which is
+   * which, in `watch/view.ts`'s words.
+   */
+  function drawWatching(view: WatchingView | undefined): void {
+    if (view === undefined) {
+      watchBand.style.display = 'none';
+      watchPill.style.display = 'none';
+      return;
+    }
+    watchBand.style.display = 'flex';
+    watchPill.style.display = 'block';
+    watchPill.textContent = view.pill;
+    watchDisc.textContent = view.initial;
+    watchName.textContent = view.name;
+    watchSource.textContent = `${view.sourceLine} · ${view.subtitle}`;
+    watchNote.textContent = view.figuresNote;
+    watchFigures.replaceChildren();
+    for (const figure of view.figures) {
+      const box = el(doc, 'div', 'everyday-stage-watching-figure');
+      box.style.cssText = 'display:flex;flex-direction:column;gap:1px';
+      const value = el(doc, 'span', undefined, figure.value);
+      value.style.cssText = `font:500 16px ${TYPE.mono}`;
+      const label = el(doc, 'span', undefined, figure.label);
+      label.style.cssText = `font:500 9.5px ${TYPE.mono};letter-spacing:.06em;opacity:.75;max-width:24ch`;
+      box.append(value, label);
+      watchFigures.append(box);
+    }
   }
 
   function drawFigures(list: readonly StageFigure[]): void {
@@ -999,7 +1171,19 @@ function mountStage(
       laneStanding.mark.setAttribute('y2', String(standing.markY));
       raceFooter.textContent = raceView.footer;
     }
-    raceVerdict.textContent = raceView.verdict;
+    /*
+     * § 14.1's race-strip cell: *"**their name** vs the world's middle, and **no verdict** — you are
+     * not in this comparison."* The verdict cell carries the view's eyebrow instead — which is
+     * `watch/view.ts`'s own `<NAME> · REPLAY`, the true half of the guide's eyebrow with the rival
+     * arm dropped rather than stubbed — so the strip names whose day it is plotting and claims
+     * nothing about a comparison that is not drawn.
+     *
+     * `raceView.verdict` on this build's *nobody* arm is `N standing now`, a live figure rather than
+     * a judgement, so what is being removed is a figure and not a verdict. It is removed anyway: it
+     * is the spectator's reading of somebody else's run in the cell § 14.1 reserves for identity,
+     * and the same figure is already in the header two rows up.
+     */
+    raceVerdict.textContent = watchingNow()?.eyebrow ?? raceView.verdict;
   }
 
   /* ------------------------------------------------------------------ wire */
@@ -1010,7 +1194,21 @@ function mountStage(
   };
   view?.addEventListener('resize', onResize);
 
-  if (stageEntryStartsARun(host.runState())) host.startRun();
+  /*
+   * **Never on a watch** — GitHub issue #182, § D436, and this is the one line that would have
+   * silently undone the whole route.
+   *
+   * `stageEntryStartsARun` reads `open`, which `everyday/host.ts` documents as false for *"a watched
+   * or file-loaded run — somebody else's"*, and `dayClosed`, which a watch leaves false. So the rule
+   * answers **true** on the way into a watch and the mount's first act would have been
+   * `host.startRun()`: the player's own day simulated over the top of the record they pressed
+   * `Watch it` on, in the same frame, with the spectator chrome coming up over it.
+   *
+   * The guard is `context.ctx` rather than a fifth clause inside the rule, because the rule is about
+   * *the player's day* and this is about *which flow the screen is serving* — § 18's own split, and
+   * the reason `ctx` is a parameter of the screen rather than a field of the run.
+   */
+  if (context.ctx !== 'watch' && stageEntryStartsARun(host.runState())) host.startRun();
   onHostChange();
 
   return {
@@ -1035,6 +1233,29 @@ function mountStage(
      * docstring is the argument; what happens here is that it is asked.
      */
     primary: () => {
+      /*
+       * § 14.1's primary on a watched stage is a different press entirely — *"drops the spectator
+       * state and opens the brief for the same day, which is the whole reason watching exists"* —
+       * and it is answered here rather than by a second handle, because § 3.1 gives the shell one
+       * primary and `screens.ts` gives one screen one answer to it.
+       *
+       * `host.playThisCrowd` leaves the spectator state itself, so the navigation below is what ends
+       * the § 18 context: `shell.ts#go` clears `ctx` on any move off the stage and calls
+       * `stopWatching` — idempotent, so the second call is a no-op rather than a second restore.
+       *
+       * The brief rather than the stage, which is the guide's own word and not a preference: the
+       * crowd has been set up and not yet met, and walking straight onto the stage would skip the
+       * screen that says what the day is. § 20.15's *that day's fixture* clause is why this press
+       * can be inert at all — see `watchStage.ts#playThisCrowdRefusalFor` — and the shell draws the
+       * button disabled with that sentence, so this handler is not reached on a row it refuses.
+       */
+      const session = context.ctx === 'watch' ? host.watching() : undefined;
+      if (session !== undefined) {
+        playback?.pause();
+        host.playThisCrowd(session.run);
+        context.go('brief');
+        return;
+      }
       playback?.pause();
       host.closeDay();
       syncTransport();
@@ -1145,8 +1366,18 @@ function breathingDot(doc: Document): HTMLElement {
   return dot;
 }
 
-/** The § 3.3 refinement — worded by `stageScreenModel.ts#stageBarModelOf`, over the module store. */
+/**
+ * The § 3.3 refinement — worded by `stageScreenModel.ts#stageBarModelOf`, over the module store.
+ *
+ * **The watch context is a different row and takes a different refinement**, which is why this is a
+ * branch rather than a fifth field on {@link barFacts}: `stageBarModelOf`'s three refusals are all
+ * about *the player's own day* (not started, filed, re-simulating), and every one of them is false
+ * of a replay — a watched stage has `hasRun: false` by `runState`'s own definition, so the unbranched
+ * call would have drawn *"the day has not started yet — there is nothing to file"* under a run that
+ * was visibly playing. `everyday/watchStage.ts#watchStageBarOf` is that row's own refinement.
+ */
 function stageBar(state: EverydayState): ActionBarModel {
+  if (state.ctx === 'watch') return watchStageBarOf(state, watchFacts);
   return stageBarModelOf(state, barFacts);
 }
 

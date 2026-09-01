@@ -73,8 +73,31 @@ describe('the stage’s entry rule', () => {
    */
   it('is what the mount asks, and the bare `open` test it replaced is gone', () => {
     const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
-    expect(source).toContain('if (stageEntryStartsARun(host.runState())) host.startRun();');
+    expect(source).toContain('stageEntryStartsARun(host.runState())) host.startRun();');
     expect(source).not.toContain('if (!host.runState().open) host.startRun();');
+  });
+
+  /**
+   * **And never on a watch** — GitHub issue #182, § D436.
+   *
+   * The guard is not a fifth clause of the rule above and is deliberately not asserted through it:
+   * the rule answers *does the player need a day of their own*, and on the way into a watch its
+   * honest answer is **yes** — `open` is false for somebody else's run by `everyday/host.ts`'s own
+   * definition, and `dayClosed` is false. So the rule is right and the call site has to ask a second
+   * question, which is § 18's: which flow is this screen serving?
+   *
+   * Pinned at the source for the same reason the line above it is — this tier has no document, and
+   * the consequence of losing this guard is not a wrong pixel: the mount's first act would be
+   * `startRun`, simulating the player's own day over the record they had just pressed `Watch it` on.
+   * `everyday/watchStage.browser.test.ts` presses the shipped route and reads the result.
+   */
+  it('does not ask for a day on the way into a watch', () => {
+    const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+    expect(source).toContain(
+      "if (context.ctx !== 'watch' && stageEntryStartsARun(host.runState())) host.startRun();",
+    );
+    /* The unguarded shape, by its own text — either half alone passes over a file that does both. */
+    expect(source).not.toContain('if (stageEntryStartsARun(host.runState())) host.startRun();');
   });
 });
 
@@ -115,10 +138,19 @@ describe('what the cutaway paints', () => {
   });
 
   it('draws the driving eyebrow from the model rather than from a second literal', () => {
-    expect(source).toContain('drivingEyebrow.textContent = head.drivingLabel;');
+    /*
+     * Two arms now, and both are read off a model — GitHub issue #182. The player's own is
+     * `stageHeaderOf`'s `drivingLabel`, unchanged and still the fallback; the spectator's is
+     * `watch/view.ts#WatchingView.dispatcherEyebrow`, which is § 14.1's `THEIR DISPATCHER` and is
+     * swept by `watch/view.test.ts`. Neither is a literal in this file, which is what this case has
+     * always been about.
+     */
+    expect(source).toContain('watching?.dispatcherEyebrow ?? head.drivingLabel;');
     expect(source).toContain('STAGE_DRIVING_LABEL');
     /* `stageHeaderOf` already publishes this word and the corpus already sweeps it. */
     expect(source).not.toContain("el(doc, 'span', undefined, 'DRIVING')");
+    /* And § 14.1's, likewise — it is the view's cell, never re-typed here. */
+    expect(source).not.toContain("'THEIR DISPATCHER'");
   });
 
   it('takes the overlay’s three sentences from the model too', () => {

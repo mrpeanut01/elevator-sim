@@ -111,6 +111,19 @@ export interface EverydayScreenShellContext extends EverydayScreenContext {
    * *inside* this shell, so it named a surface it did not open.
    */
   enterEngineer(): void;
+  /**
+   * § 14.1's `Watch it`, as a call — put the § 7 stage into `ctx: 'watch'`.
+   *
+   * Here for {@link enterEngineer}'s reason: § 18's `ctx` is the shell's, `screens.ts`' context
+   * hands a screen the ctx it was mounted in and no way to change it, and there is exactly one
+   * implementation. The **run** is not this method's — a caller presses `EverydayHost.watchRun`
+   * first and reads its answer, because a row whose record no longer reproduces must not be
+   * navigated to (§ 1.5), and a shell that entered the context on a refused row would be showing a
+   * spectator chrome over the player's own day.
+   *
+   * Its one non-test caller is `everyday/weekScreen.ts`'s `Watch it` row.
+   */
+  enterWatch(): void;
 }
 
 /**
@@ -205,6 +218,15 @@ export interface EverydayShell {
    * does not have. Idempotent.
    */
   enterEngineer(): void;
+  /**
+   * § 14.1's `Watch it`, as a call — put the § 7 stage into `ctx: 'watch'`.
+   *
+   * Exposed for {@link go}'s reason: it is a press a player makes, and a test that reached past this
+   * method would be testing a transition the product does not have. The run itself is
+   * `EverydayHost.watchRun`'s — see {@link EverydayScreenShellContext.enterWatch} for why the two
+   * are separate and why a caller must read the host's answer before calling this.
+   */
+  enterWatch(): void;
   /** Which world has the page. `'engineer'` between the two presses, `'everyday'` otherwise. */
   world(): EverydayWorld;
   /**
@@ -767,6 +789,20 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * with § D388's keeper, and the browser tier drives it.
    */
   function go(screen: EverydayScreen): void {
+    /*
+     * **A watch ends when the stage stops showing it** — GitHub issue #182, § D436.
+     *
+     * `requestLeave` handles `⤺ Stop watching`, and it is not the only way off this screen: every
+     * rail row calls {@link go} directly, and a row pressed while somebody else's record was on the
+     * stage would have left `ctx: 'watch'` standing over a screen that is not a stage, with the
+     * watched run still on `state.recording` and the player's own day still snapshotted inside
+     * `dev/main.ts`. That is the shape § 3.4 exempts a watch from warning about, and exactly
+     * therefore the shape nothing else was going to catch.
+     *
+     * Centralised here rather than added to each caller for {@link leaveWatch}'s reason: one exit,
+     * so a rail row and a bar button cannot end a watch differently.
+     */
+    if (state.ctx === 'watch' && screen !== 'stage') leaveWatch();
     state = { ...state, screen };
     draw();
     doc.defaultView?.scrollTo(0, 0);
@@ -787,7 +823,12 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   function requestLeave(): void {
     if (state.screen === EVERYDAY_ROOT) return;
     if (state.ctx === 'watch') {
-      state = { ...state, ctx: 'daily' };
+      /*
+       * § 14.1: *"`⤺ Stop watching` returns to the board immediately and clears the spectator
+       * state."* The clear is {@link go}'s now — see its guard — so this is the destination and
+       * nothing else. It used to write `ctx` here, which was correct for this one button and left
+       * every rail row able to walk out of a watch without ending it.
+       */
       go('board');
       return;
     }
@@ -799,9 +840,46 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     doLeave();
   }
 
+  /**
+   * End the watch — GitHub issue #182, § D436.
+   *
+   * Two halves, and the split is the same one the door between the shells keeps: the **context** is
+   * this shell's, and the **run** is the host's. `EverydayHost.stopWatching` puts the player's own
+   * recording, report, week, playhead, pause state and speed chip back — `dev/main.ts` holds that
+   * snapshot and this module deliberately does not, for `watch/session.ts`' stated reason (three of
+   * its fields are boot-scope closure state, and a second owner of them would be a second answer to
+   * who owns them).
+   *
+   * Idempotent through the host: `stopWatching` returns immediately when nothing is being watched,
+   * so a caller that guards on `ctx` and a caller that does not cannot disagree.
+   */
+  function leaveWatch(): void {
+    state = { ...state, ctx: 'daily' };
+    dataHost?.stopWatching();
+  }
+
+  /**
+   * § 14.1's `Watch it`, as the shell's half — GitHub issue #182, § D436.
+   *
+   * The **run** is already on the stage by the time this is called: `EverydayHost.watchRun` enters
+   * the spectator state, which makes `EverydayHost.recording()` the replay, and the § 7 stage adopts
+   * it on the ordinary host notification. What is left is the **context**, which only this module
+   * can write — § 18's `ctx` is set where a player commits, and this is that commitment for the
+   * fourth value.
+   *
+   * `go('stage')` rather than a bare `state` write, so the screen region, the rail's subline and the
+   * § 3.3 row are all drawn from one navigation. Its watch guard does not fire, because the screen
+   * being navigated to is the stage.
+   */
+  function enterWatchStage(): void {
+    state = { ...state, ctx: 'watch' };
+    go('stage');
+  }
+
   /** Leave for real: clear the flow and land on the menu. */
   function doLeave(): void {
     runOpen = false;
+    if (state.ctx === 'watch') leaveWatch();
     state = { ...state, ctx: 'daily' };
     go(EVERYDAY_ROOT);
   }
@@ -950,7 +1028,19 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     menuText.style.cssText = 'min-width:0';
     const menuLabel = el(doc, 'span', undefined, 'Main menu');
     menuLabel.style.cssText = `display:block;font:600 15px ${TYPE.heading}`;
-    const sub = el(doc, 'span', undefined, model.subline);
+    /*
+     * § 14.1's rail cell is `WATCHING · <NAME>`, and `rail.ts#sublineFor` returns the bare word by
+     * design — *"the live half is not composed here: this module has no run, and inventing a name
+     * would be a figure with no source … the shell appends the name when it has one."* This is the
+     * shell having one, and it is `watch/view.ts#railSubline` rather than a `WATCHING · ` composed
+     * here, so the strip's pill, its eyebrow and this cell name the run once.
+     *
+     * Guarded on the ctx **and** on the session, for `stageScreen.ts#watchingNow`'s reason: the
+     * Engineer shell can be the one watching while this shell sits behind the cover, and a rail
+     * that read the session alone would name somebody else's day over the player's own screen.
+     */
+    const watchSubline = state.ctx === 'watch' ? dataHost?.watching()?.view.railSubline : undefined;
+    const sub = el(doc, 'span', 'everyday-rail-subline', watchSubline ?? model.subline);
     sub.style.cssText = `display:block;font:500 9.5px ${TYPE.mono};letter-spacing:.06em;color:${onMenu ? C.ink : C.label};margin-top:1px`;
     menuText.append(menuLabel, sub);
     menuRow.append(home, menuText);
@@ -1611,6 +1701,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           },
           /* § 3.2's swap, handed to the screen unchanged — see the interface's own docstring. */
           enterEngineer,
+          /* § 14.1's `Watch it`, likewise — the context, never the run. */
+          enterWatch: enterWatchStage,
         };
         mounted = module.mount(screenRegion, context);
         /*
@@ -1719,6 +1811,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       runOpen = open;
     },
     enterEngineer,
+    enterWatch: enterWatchStage,
     world: () => world,
     destroy: () => {
       stopProfileWatch();

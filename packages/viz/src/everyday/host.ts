@@ -63,7 +63,18 @@
  *   Engineer closure, and nothing here reaches it. The stage draws `raceStripViewOf`'s *nobody* arm
  *   and names the absence (`everyday/stageScreenModel.ts#STAGE_NO_GHOST`); a ghost method with no
  *   rival behind it would be worse than none;
- * - **no watch entry** — § 14's spectator flow has no Everyday surface yet;
+ * - ~~no watch entry~~ — **built, and the absence is deleted rather than left standing** (GitHub
+ *   issue **#182**, [§ D436](../../../../DECISIONS.md)). It said *"§ 14's spectator flow has no
+ *   Everyday surface yet"*, and by the time it was deleted every other part of that flow was here:
+ *   `everyday/types.ts` declared the `watch` context, `everyday/actionBar.ts` carried the whole
+ *   § 3.3 `stage · watching` row, `everyday/rail.ts` carried its subline — and `everyday/shell.ts`
+ *   could not produce the context, so none of it could be reached. That is a route away from a dead
+ *   seam rather than a dead seam itself, which is the same shape with the polarity reversed and is
+ *   why the absence had to go with the route rather than after it. The five methods are
+ *   {@link EverydayHost.watchableRuns}, {@link EverydayHost.watchRun},
+ *   {@link EverydayHost.watchedRun}, {@link EverydayHost.stopWatching} and
+ *   {@link EverydayHost.playThisCrowd}, and every one of them arrived **with** its consumer — § 14's
+ *   *Your week* picker and § 7's stage — which is the rule these absences exist to keep;
  * - **no saved-pattern or saved-building *shelf* to browse** — and the narrowing is the point.
  *   {@link EverydayHost.applyBuildingSpec} and {@link EverydayHost.applyPatternSpec} both *write* to
  *   those shelves and hand back the id they took, because § 13's designer and § 3.3's tuner press
@@ -86,6 +97,7 @@ import type {
   ElevatorSpecs,
   ResolvedBuilding,
   RunInterventionConfig,
+  SimulationConfig,
   TrafficProfile,
 } from '@elevator-sim/core/browser';
 
@@ -123,6 +135,7 @@ import {
   buildingConfigOf,
   resolvedBuildingOf,
   shiftDemandTemplateId,
+  profileById,
   shiftLengthForContract,
   specsWithSaved,
   withDispatcher,
@@ -152,8 +165,23 @@ import type {
   WeekState,
 } from '../shift/types.js';
 import { nextDay } from '../shift/week.js';
+import { checkedRun, filedDayRuns } from '../watch/library.js';
+import type { WatchableRun } from '../watch/types.js';
+import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
+
+/**
+ * A watch in progress — the row and the § 14.1 view drawn from it, together.
+ *
+ * Together rather than through two reads, on `dev/watchPanel.ts#WatchPanel.showChrome`'s own rule:
+ * *"a chrome whose run could be set without its view is a chrome that can disagree with itself, and
+ * `Play this crowd yourself` would then open a crowd other than the one on screen."*
+ */
+export interface EverydayWatchSession {
+  readonly run: WatchableRun;
+  readonly view: WatchingView;
+}
 
 /**
  * What an Everyday screen may know and do. The exact method list is the contract the six screen
@@ -631,6 +659,75 @@ export interface EverydayHost {
    */
   setDoorDwell(choice: DwellChoice | undefined): void;
 
+  /* ------------------------------------------------- § 14.1, the spectator */
+
+  /**
+   * Every run a spectator may be offered, filed days first — GAMEPLAY § 14.1, `watch/library.ts`.
+   *
+   * A promise because one of the two sources is a fetch: the days this device filed are on the
+   * state and the reference runs are `data/reference-runs.json`, read once by `dev/data.ts`. The
+   * rows are `WatchableRun`s, which is plain data on this façade's own rule — a record is a seed
+   * and a configuration, never a recording (`watch/types.ts` argues why at length).
+   *
+   * A row may arrive already blocked, and that is not a failure: `watch/library.ts` marks the two
+   * grounds that need no simulation (a day filed by a build that kept no record, and a record this
+   * build cannot read) on the way out, so a picker can draw the reason instead of the affordance
+   * without paying for a run.
+   */
+  watchableRuns(): Promise<readonly WatchableRun[]>;
+
+  /**
+   * Put a row on the stage — § 1.5's *"never replay something approximate"*, and the press behind
+   * § 14.1's `Watch it`.
+   *
+   * The row is re-simulated and its four posted figures compared exactly; on a match the spectator
+   * state is entered and {@link recording} becomes the replay, so the § 7 stage adopts it through
+   * the ordinary {@link subscribe} notification and nothing new has to be plumbed. On a mismatch
+   * **nothing is entered** and the row comes back carrying `blocked`, which is what a caller draws
+   * in place of the button.
+   *
+   * The returned row is therefore the answer to *did this work*, and a caller must read it: a
+   * `blocked` row means the shell is still showing the player's own day.
+   *
+   * The gate runs a whole simulation on this thread — `dev/watchPanel.ts` states the same cost for
+   * the same press — which is why it is a press rather than something a picker does per row on
+   * open.
+   */
+  watchRun(run: WatchableRun): WatchableRun;
+
+  /**
+   * Whose run is on the stage and § 14.1's view of it, or `undefined` when the player's own is.
+   *
+   * The **view** rather than only the row, so the Everyday stage and the Engineer chrome draw one
+   * derivation. `watchingViewOf` is pure and would give the same answer twice, which is precisely
+   * why composing it twice is the wrong shape: the second call is a second author for the pill, the
+   * eyebrow and the name, and this repository's register of what that costs is long enough.
+   */
+  watching(): EverydayWatchSession | undefined;
+
+  /**
+   * Leave the spectator state, putting the player's own run back exactly as it was — § 14.1's
+   * `⤺ Stop watching`, and a no-op when nothing is being watched.
+   *
+   * *Exactly* is the shell's promise rather than this façade's: `dev/main.ts` holds the snapshot
+   * (the recording, the report, the week, the playhead, the pause state and the speed chip) and
+   * puts all of it back. What matters here is that the Everyday shell has one way to end a watch,
+   * so a rail row that navigates away and a bar button that leaves cannot end it differently.
+   */
+  stopWatching(): void;
+
+  /**
+   * § 14.1's primary — drop the spectator state and set the same crowd up to be played.
+   *
+   * It carries the record's **selection** (building, dispatcher, pattern, the two Free Play axes,
+   * the length, the window and the seed) and deliberately not its intervention log or its week day;
+   * `dev/main.ts#playThisCrowd` owns both omissions and their reasons. The second of them is what
+   * `everyday/watchStage.ts#playThisCrowdRefusalFor` makes visible: on a row from another day of the
+   * week the crowd would not be the one on the stage, so the Everyday primary is inert with that
+   * sentence rather than pressing this and producing something else (§ 20.15, § D392).
+   */
+  playThisCrowd(run: WatchableRun): void;
+
   /**
    * Hear about state changes, so a screen re-renders. Returns the unsubscribe. See the module
    * docstring for the cadence (state changes, never per frame).
@@ -674,6 +771,21 @@ export interface EverydayHostBindings {
   openRunTab(): void;
   /** Merge a patch into the state and re-render — `MountContext.update`. */
   applyPatch(patch: Partial<ViewerState>): void;
+  /** `data/reference-runs.json`, fetched and parsed once — `dev/data.ts#loadReferenceRuns`. */
+  loadReferenceRuns(): Promise<readonly WatchableRun[]>;
+  /**
+   * Re-simulate a record on this thread — the reproduction gate's simulator, injected for
+   * `watch/library.ts`'s stated reason: the gate must stay drivable with no worker and no canvas.
+   */
+  simulateRecord(config: SimulationConfig): VizRecording;
+  /** Enter the spectator state — `dev/main.ts#enterWatch`, unchanged and not re-implemented here. */
+  enterWatch(run: WatchableRun, view: WatchingView, recording: VizRecording): void;
+  /** Leave it, putting the snapshot back — `dev/main.ts#stopWatching`. */
+  stopWatching(): void;
+  /** § 14.1's conversion — `dev/main.ts#playThisCrowd`. */
+  playThisCrowd(run: WatchableRun): void;
+  /** The row being watched and its view, or `undefined` — `dev/main.ts`'s own `watching` field. */
+  watching(): EverydayWatchSession | undefined;
   /** Register a listener on `renderAll`'s notification list. Returns the unsubscribe. */
   onChange(listener: () => void): () => void;
 }
@@ -1227,6 +1339,57 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     },
     setDoorDwell: (choice) => {
       b.applyPatch({ levers: { ...b.state().levers, dwell: choice } });
+    },
+    /* ----------------------------------------------- § 14.1, the spectator */
+    watchableRuns: async () => {
+      const state = b.state();
+      /*
+       * The days this device filed, then the shipped references — `dev/watchPanel.ts`'s order and
+       * its reason: the filed days are the ones a player has a reason to look at, and the
+       * references are what makes the surface reachable on a first visit, which has no filed days
+       * for them to sit under.
+       *
+       * Every week, not only the live one, for `watch/library.ts#filedDayRuns`'s reason: a day
+       * played on a building the player has since stepped away from is no less filed.
+       */
+      const filed = filedDayRuns(
+        [state.week, ...state.parkedWeeks],
+        (id) => buildingConfigOf(b.resources, state.savedBuildings, id)?.name ?? id,
+      );
+      /*
+       * A fetch that fails costs the reference rows and nothing else. The filed days are already in
+       * hand and a picker that threw would show none of them — `dev/watchPanel.ts` keeps the same
+       * split by drawing its failure line beside the rows rather than instead of them.
+       */
+      const references = await b.loadReferenceRuns().catch(() => []);
+      return Object.freeze([...filed, ...references]);
+    },
+    watchRun: (run) => {
+      const checked = checkedRun(run, b.resources, b.state(), b.simulateRecord);
+      if (checked.run.blocked !== null || checked.recording === undefined) return checked.run;
+      /*
+       * The dispatcher's display name is resolved here rather than inside `watchingViewOf`, which
+       * loads nothing — `watch/view.ts`'s own split. `dispatcherById` is the honest lookup, so a
+       * record naming a profile this build no longer ships shows the id rather than somebody else's
+       * name; the row would in fact have been refused already by `recordUnreadableReason`, and this
+       * is the fallback rather than the answer.
+       */
+      const record = checked.run.record;
+      const profile =
+        record === null ? undefined : profileById(b.resources, b.state().savedDispatchers, record.dispatcherId);
+      b.enterWatch(
+        checked.run,
+        watchingViewOf(checked.run, profile?.name ?? record?.dispatcherId ?? ''),
+        checked.recording,
+      );
+      return checked.run;
+    },
+    watching: () => b.watching(),
+    stopWatching: () => {
+      b.stopWatching();
+    },
+    playThisCrowd: (run) => {
+      b.playThisCrowd(run);
     },
     /*
      * The campaign arm of this is the merge's, not either branch's: the career lives beside

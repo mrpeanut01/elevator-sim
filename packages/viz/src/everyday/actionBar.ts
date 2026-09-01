@@ -170,8 +170,48 @@ const LEAVE_RUSH = '⤺ Leave the rush';
 const STOP_WATCHING = '⤺ Stop watching';
 const MODES = '⌂ Modes';
 
-const WATCHING_NOTE =
+/**
+ * § 3.3's `stage · watching` note **as the guide wrote it**, kept so the deviation below can be
+ * read against it rather than asserted.
+ *
+ * It is transcribed and deliberately never drawn. See {@link WATCHING_NOTE}.
+ */
+export const GUIDE_WATCHING_NOTE =
   'Their record, replayed. Nothing here is scored, and your own day is untouched.';
+
+/**
+ * The note this build draws instead, and the one cell of § 3.3 it does not follow to the letter.
+ *
+ * ## Why the guide's own sentence may not ship here
+ *
+ * § 3.3's cell says *"…and your own day is untouched"*. § 14.1 says, in terms:
+ *
+ * > **No first-person copy anywhere in the mode.** Not `you`, not `your run`, not `your best`. The
+ * > word `you` on a watched run is a defect.
+ *
+ * The two are the same document disagreeing with itself, on the same screen: this note is drawn in
+ * the § 3.3 bar **under the § 14.1 stage**, so shipping the cell verbatim would draw the word § 14.1
+ * calls a defect on the surface § 14.1 is about. The rule wins over the cell, because § 14.1 states
+ * a *defect condition* — something a test can fail — while § 3.3 states copy, and `docs/12`'s
+ * documented-deviation pattern is what a build does when the handoff contradicts itself.
+ * `watch/view.ts#REPLAY_PILL_VERB` is the same substitution one directory over, made for the same
+ * reason and recorded the same way.
+ *
+ * ## What is preserved, which is the whole of the cell except its pronoun
+ *
+ * Three claims, all three kept: the run is **their record**, it is **replayed**, and **nothing here
+ * is scored**. The fourth — that the spectator's own day survives — is kept as a claim about the
+ * device rather than about the reader, which is `watch/shell.ts#RAIL_EYEBROW_WATCHING`'s own move
+ * (*The week on this device*) and is true for the reason that module states: `watchingStateOf`
+ * carries `week`, `report`, `tomorrow` and `interventions` by reference and moves none of them.
+ *
+ * `actionBar.test.ts` holds the guide's cell in its second transcription and asserts the deviation
+ * in **both** directions — that the guide's sentence is first-person and this one is not — so a
+ * future guide revision that drops the pronoun makes this substitution unnecessary and says so,
+ * rather than leaving a deviation nobody re-reads. [§ D435](../../../../DECISIONS.md).
+ */
+export const WATCHING_NOTE =
+  'Their record, replayed. Nothing here is scored, and the day on this device is untouched.';
 
 const row = (r: Omit<ActionBarRow, 'guide'> & { readonly guide?: boolean }): ActionBarRow => ({
   guide: true,
@@ -189,6 +229,11 @@ const primary = (variants: readonly string[], dangerVariants?: readonly string[]
  * § 3.3's table, row for row and in the guide's order. The one addition — `report`/`watch` — sits
  * last and carries `guide: false`; everything else is transcription, checked against a second
  * transcription in `actionBar.test.ts`.
+ *
+ * **One cell is a documented deviation rather than a transcription** — the two `watch` rows' note.
+ * {@link WATCHING_NOTE} carries the argument and {@link GUIDE_WATCHING_NOTE} carries the sentence it
+ * departs from, so the departure is readable in both directions instead of being a difference
+ * somebody has to notice.
  */
 export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   row({
