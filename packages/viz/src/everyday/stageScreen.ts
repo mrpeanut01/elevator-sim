@@ -483,6 +483,8 @@ function mountStage(
    * only signal the façade offers and the correct one — § 1.4's re-simulation keeps the `runId`.
    */
   let recomputingOver: VizRecording | undefined;
+  /** What § 14.1's band was last drawn for — see {@link drawWatching}. `''` while it is down. */
+  let watchKey = '';
 
   /* ---------------------------------------------------------------- chrome */
 
@@ -1083,15 +1085,28 @@ function mountStage(
    * read against what it achieved"*) and is not the header's three: those are folded live at the
    * playhead by `observationsAt` and stay exactly what they are. The note under them says which is
    * which, in `watch/view.ts`'s words.
+   *
+   * **Keyed on the view, so the figure boxes are built once per watch rather than once per frame.**
+   * `draw` runs on frames and the posted result does not move within one watch — it is the
+   * record's, folded at `endedAt` before the replay started — so an unkeyed `replaceChildren` would
+   * be `drawRace`'s own rejected shape: a pass rebuilt sixty times a second for a value that
+   * changes twice a sitting. The header's live figures are rebuilt per frame because theirs *do*
+   * move, which is why {@link drawFigures} is not keyed and this is.
    */
   function drawWatching(view: WatchingView | undefined): void {
     if (view === undefined) {
       watchBand.style.display = 'none';
       watchPill.style.display = 'none';
+      watchKey = '';
       return;
     }
     watchBand.style.display = 'flex';
     watchPill.style.display = 'block';
+    /* The whole view, because every field of it is drawn — `dev/watchPanel.ts`'s own rule: a key
+       over a subset is a key that stops noticing the field somebody adds next. */
+    const key = JSON.stringify(view);
+    if (key === watchKey) return;
+    watchKey = key;
     watchPill.textContent = view.pill;
     watchDisc.textContent = view.initial;
     watchName.textContent = view.name;
