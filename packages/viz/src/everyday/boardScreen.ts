@@ -137,11 +137,13 @@ function towerFactsOf(building: ResolvedBuilding): TowerFacts {
 }
 
 /**
- * Ratings measured on this device, this session. See the module docstring for the named absence.
+ * Ratings measured on this device — this sitting's, and every earlier one's.
  *
  * Keyed by dispatcher id, so a second gauntlet on the same dispatcher replaces its row rather than
  * adding one — a ladder is a *standing* rating and two rows for one dispatcher would be two claims
- * about one thing.
+ * about one thing. The same rule holds in the bytes, through
+ * `everyday/profile.ts#everydayProgressWith`; this map used to be the only place it held, and the
+ * two would drift the day a lane changed one of them.
  */
 const RATINGS = new Map<string, LadderEntry>();
 

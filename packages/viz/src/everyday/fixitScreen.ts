@@ -186,11 +186,19 @@ function ensureRestored(): void {
 }
 
 /**
- * Write the solved set back, and hand the caller what the player is owed about it.
+ * Write the solved set back.
  *
  * The whole set on every change rather than one id, because the slot holds one value and `write`
  * replaces it whole — and because the set shrinks as well as grows: a case that stops being FIXED
  * has to stop being stored, which an append-only write could not express.
+ *
+ * Spread over the store's current progress rather than built fresh, so the ratings beside it are
+ * carried through: two payloads in one value, and a writer that supplied only its own half would
+ * delete the other's on every press.
+ *
+ * Returns nothing, and does not check the answer. Whether the write survived the tab is
+ * `progressNotice()`'s to say and the rail draws it on the very next render, which this caller
+ * always performs — so a second reading here would be the same fact told twice.
  */
 function keepSolved(): void {
   const store = everydayProfileStore();
