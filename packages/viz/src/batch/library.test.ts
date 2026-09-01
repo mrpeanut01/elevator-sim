@@ -224,6 +224,18 @@ describe('a saved dispatcher reaches the batch', () => {
      * for the shipped half. A player who saves a dispatcher must not thereby move the baseline
      * every published figure in this project was measured against — otherwise *"better than
      * collective"* would mean something different on their machine.
+     *
+     * **This case does not catch the mutation it was written for, and saying so is worth more than
+     * quietly keeping it.** Breaking `batchLibraryOf` to hand back the *parsed* document — the
+     * shipped profiles round-tripped through zod rather than passed through — leaves these legs
+     * **identical**, because that round trip is lossless for everything a run reads. What fails is
+     * `leaves the shipped profiles object-identical when something is carried`, below.
+     *
+     * So the pair divides the work rather than duplicating it: this case states the **property** in
+     * the terms § D177 requires (on the legs, of a real run), and that one asserts the
+     * **mechanism** that makes it hold for reasons other than luck. Deleting either would leave the
+     * promise resting on the other's accident — a lossy `parseDispatcherProfiles` would be caught
+     * only here, and a future merge that stopped preserving identity only there.
      */
     const request = requestWith([{ armId: 'baseline', dispatcherProfileId: 'collective' }]);
     const bare = resourcesWith([]);
