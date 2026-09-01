@@ -159,7 +159,7 @@
 # | `golden-runs` (6 of 6, cross-process) | 55.6 s, green | 90 |
 # | `oracle-campaign` (11 banks at n = 128) | 5.5 min, green | 120 |
 # | `matrix-census` (200 replications) | 17.0 min, **RED** — three declared figures do not reproduce, issue #306 | 120 |
-# | `perf-sweep` (20 000 replications, workers) | 4.6 min, green | 180 |
+# | `perf-sweep` (20 000 replications, workers) | 4.6 min, green — **on an already-built tree; this job had none, and see below** | 180 |
 # | `perf-scaling` (the wall-clock fits) | 26.9 s, green | 90 |
 # | `honesty-deep` (60 cases) | **32.6 min green alone**; 43.9 min and *timed out* when contended | 90 |
 #
