@@ -29752,8 +29752,11 @@ stage, so the entry's own verb — *offers neither* — was false the moment the
 standing it is [§ D227](#d227)'s defect with its polarity reversed: a refusal telling a player not
 to look for a control that is there. The entry is gone; what stands is
 *"no answer to a live incident — a day can carry one, stamped with the moment it was given, and this
-screen offers none: answering needs the money-and-incident panel above, and that panel is what is
-missing"*, and `ABSENCE_TRIAGE`'s row for issue #171 is re-pointed at the new fragment.
+screen offers none: the answer comes from the money-and-incident panel above, which is not drawn,
+over an incident this build does not raise while a day is running"*, and `ABSENCE_TRIAGE`'s row for
+issue #171 is re-pointed at the new fragment. It names **both** halves of what is missing rather than
+only the panel, because *"the panel is what is missing"* — the first draft of this entry — would have
+told a reader that drawing the dock is enough, and it is not.
 
 **The new entry is pinned by a run and not by a sentence**, which is what makes it a re-taking rather
 than a reword: `everyday/stageScreenModel.test.ts` requires that no row `stageInterventionsOf` can
