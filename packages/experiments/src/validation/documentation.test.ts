@@ -1435,7 +1435,22 @@ type DecisionReservation = {
  * a citation promises a heading a reader can follow, and § D430 settled that a hole is named and
  * never cited. That gate caught this very line.)
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = {
+  wave: 'K',
+  /*
+   * D443–D454. Lanes A–E hold D443–D452, two apiece; **D453–D454 are the integrator's**, sized that
+   * way since wave I because § D418 was written past a block fitted to its lanes alone — and wave J
+   * spent both of its own on findings that only exist at integration (§ D441, § D442), which is the
+   * argument for keeping them rather than a coincidence.
+   *
+   * § D430's other half applies: a hole may sit anywhere inside this block except at its top, or the
+   * charter row ends up naming a number the register says nobody may take. Two waves running, a
+   * lane has returned its second number unspent because a survey is one decision however many cells
+   * it measures (D428, D438), so expect a hole and leave room for it below D453.
+   */
+  from: 443,
+  to: 454,
+} as DecisionReservation | null;
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
  *
