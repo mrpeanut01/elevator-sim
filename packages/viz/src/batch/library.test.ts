@@ -22,6 +22,10 @@
  * a round trip of them through the parser.
  */
 
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { replicationSeed } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -341,5 +345,127 @@ describe('batchLibraryOf', () => {
       expect(outcome.library.profiles[index]).toBe(shipped);
     }
     expect(outcome.library.profiles).toHaveLength(config.dispatcherProfiles.profiles.length + 1);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Every surface that posts a batch sends the shelf — derived, never listed
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The guard that stops a sixth batch surface forgetting** — issues #167 and #228.
+ *
+ * Five places in this package start a `dev/batchWorker.ts` and post a `BatchWorkerRequest`: the
+ * Compare bench, the suite, the Lab, the Everyday bench and the gauntlet. Each of them had to be
+ * edited by hand to carry `savedProfiles`, and a sixth added next year will not be — which is the
+ * precise shape of the defect this lane is fixing, arriving from the fix for it. The Everyday bench
+ * is the proof that this is not hypothetical: it *offered* saved dispatchers in its field from the
+ * day it was written, because it read `host.dispatchers()`, and it could not run one, because
+ * nobody thought about the other end of a `postMessage`.
+ *
+ * So the post sites are **found on disk** rather than named here — `src/index.test.ts`'s own
+ * discipline, where a guard iterates *"the entry-point set derived from the directory rather than
+ * five hand-written names."* A file that starts a batch and does not send the shelf fails this,
+ * and a file that is added fails it without anybody remembering this test exists.
+ *
+ * The check is textual and it is bounded to the call it is about: a `postMessage(` whose argument
+ * list contains `kind: 'run'` must also contain `savedProfiles`. It cannot tell whether the value
+ * is the *right* shelf — `library.test.ts`'s leg-level cases and
+ * `dev/savedDispatcher.browser.test.ts`'s journey own that — and it does not need to. It answers
+ * one question no other check in this repository can: *did somebody wire a new surface and stop
+ * halfway?*
+ *
+ * ## `kind: 'run'` is two protocols, and the first draft of this guard accused the wrong one
+ *
+ * `dev/shiftRunner.ts` posts a **`ShiftWorkerRequest`** with the same tag, and the scan reported it
+ * as a batch surface that had forgotten the shelf. It has not: a shift request carries
+ * `config: job.config` — a whole `SimulationConfig`, dispatcher profile **object** included, put
+ * there by `dev/state.ts#drivingProfileOf` — so the single-run path has always run a saved
+ * dispatcher and needs nothing from this module. That asymmetry is the entire subject of
+ * `batch/library.ts`'s docstring, and finding it again from the other end is a reasonable way to
+ * be sure it is true.
+ *
+ * So a site counts when its **file speaks the batch worker's protocol** — names
+ * `BatchWorkerRequest` — rather than when its call happens to use the tag. That is a discriminator
+ * about the contract rather than about the spelling of one field, and it is the reason this is not
+ * keyed on the presence of a `request:` key: two protocols may share a field name tomorrow as they
+ * share a tag today.
+ */
+describe('every batch a surface starts carries the reader’s shelf', () => {
+  /** One `postMessage(...)` call found in a shipped source file. */
+  interface PostSite {
+    readonly file: string;
+    readonly call: string;
+  }
+
+  function postSitesIn(source: string, file: string): readonly PostSite[] {
+    const sites: PostSite[] = [];
+    /*
+     * Balanced-paren scan rather than a regex, because every one of these calls spans lines and
+     * contains nested object literals — a `.*?\)` would stop at the first inner `)` and a greedy
+     * one would swallow the rest of the file. Depth counting is the smallest thing that is right.
+     */
+    let index = source.indexOf('postMessage(');
+    while (index !== -1) {
+      let depth = 0;
+      let end = index + 'postMessage'.length;
+      do {
+        const character = source[end];
+        if (character === '(') depth += 1;
+        else if (character === ')') depth -= 1;
+        end += 1;
+      } while (depth > 0 && end < source.length);
+      sites.push({ file, call: source.slice(index, end) });
+      index = source.indexOf('postMessage(', end);
+    }
+    return sites;
+  }
+
+  const VIZ_SRC = fileURLToPath(new URL('..', import.meta.url));
+
+  function shippedSources(directory: string): readonly string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const full = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        out.push(...shippedSources(full));
+      } else if (
+        entry.name.endsWith('.ts') &&
+        !entry.name.includes('.test.') &&
+        !entry.name.endsWith('.test-helper.ts')
+      ) {
+        out.push(full);
+      }
+    }
+    return out;
+  }
+
+  const runPosts = shippedSources(VIZ_SRC)
+    .flatMap((file) => {
+      const source = readFileSync(file, 'utf8');
+      // The protocol discriminator — see the docstring on `kind: 'run'` belonging to two of them.
+      if (!source.includes('BatchWorkerRequest')) return [];
+      return postSitesIn(source, relative(VIZ_SRC, file));
+    })
+    .filter((site) => site.call.includes("kind: 'run'"));
+
+  it('finds the five surfaces, so the assertion below is not vacuous', () => {
+    /*
+     * The floor is five and not `> 0`: this scan going quiet — a renamed method, a helper that
+     * wraps the post — would otherwise report *"every surface carries it"* about no surfaces at
+     * all, which is `browserTier.test.ts`'s own non-vacuity argument. It is a floor rather than an
+     * equality so that adding a sixth surface fails on the clause below, where the message names
+     * the file, rather than here on an arithmetic mismatch.
+     */
+    expect(runPosts.length, 'the batch post sites could not be found on disk').toBeGreaterThanOrEqual(5);
+  });
+
+  it('sends `savedProfiles` from every one of them', () => {
+    const forgetful = runPosts.filter((site) => !site.call.includes('savedProfiles'));
+    expect(
+      forgetful.map((site) => site.file),
+      'these files start a batch without the reader’s saved dispatchers, so an arm naming one ' +
+        'cannot resolve — see batch/library.ts',
+    ).toEqual([]);
   });
 });
