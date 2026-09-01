@@ -121,7 +121,7 @@ export function runBatch(
   assertRequest(request);
 
   const startedMs = options.clock?.now() ?? 0;
-  const configs = request.arms.map((arm) => baseConfigFor(request, resources, armProfile(resources, arm)));
+  const configs = request.arms.map((arm) => armConfigOf(request, resources, arm));
 
   /*
    * The equivalence class, recorded — **not** checked, and the difference is the point.
@@ -289,19 +289,25 @@ function demandOptionsFor(request: BatchRequest): { demand?: SimulationDemandOpt
 }
 
 /**
- * The whole `SimulationConfig` one arm runs, minus the seed — the shipped assembly, exported.
+ * The whole `SimulationConfig` one arm runs, minus the seed.
  *
- * Exported for **evidence**, and the evidence is the standing requirement's own: *move the control
- * and require the run to change, compared on the legs*. `runBatch` discards every recording it
- * makes, so the only things it hands back are window statistics — and § D177 is explicit that a
- * mean can be unchanged for a run that is entirely different. A test that wants the legs therefore
- * needs the config, and the one thing it must not do is build a second one: `scope/probes.test-helper.ts`
- * states the trap outright — *"an instrument that does not reproduce the shipped call path measures
- * the instrument."* This is that call path, by name, so a leg-level comparison of two arms is a
- * comparison of what a batch actually ran.
+ * **{@link runBatch} calls this — it is not an export written for a test.** The loop above used to
+ * spell `baseConfigFor(request, resources, armProfile(resources, arm))` inline, and giving that
+ * expression a name was worth doing on its own: it is *the* answer to *what does one arm of a batch
+ * actually run*, and until it had one there was nowhere for a caller to point.
  *
- * A caller still supplies `seed` and `replication`, exactly as the loop below does, because that
- * is the one line of CRN and it belongs to the loop.
+ * The reason it is **exported** is evidence, and the evidence is the standing requirement's own:
+ * *move the control and require the run to change, compared on the legs*. `runBatch` discards every
+ * recording it makes, so the only things it hands back are window statistics — and § D177 is
+ * explicit that a mean can be unchanged for a run that is entirely different. A test that wants the
+ * legs therefore needs the config, and the one thing it must not do is build a second one:
+ * `scope/probes.test-helper.ts` states the trap outright — *"an instrument that does not reproduce
+ * the shipped call path measures the instrument."* Because the loop above goes through this
+ * function too, a leg-level comparison of two arms is a comparison of what a batch really ran
+ * rather than of something equal to it by inspection.
+ *
+ * A caller still supplies `seed` and `replication`, exactly as the loop does, because that is the
+ * one line of CRN and it belongs to the loop.
  */
 export function armConfigOf(
   request: BatchRequest,
