@@ -30,7 +30,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { firstPersonWordsIn } from '../watch/view.js';
-import type { WatchRecord } from '../watch/types.js';
 
 import { WATCHING_NOTE } from './actionBar.js';
 import type { EverydayState } from './types.js';
@@ -48,9 +47,15 @@ import {
 
 const WATCHING: EverydayState = { screen: 'stage', ctx: 'watch' };
 
-/** A record on the day standing here, so the § 20.15 refusal is off unless a case turns it on. */
-const recordOn = (day: number, dayIdx: number): WatchRecord =>
-  ({ day, dayIdx }) as unknown as WatchRecord;
+/**
+ * A record's day pair, which is all {@link playThisCrowdRefusalFor} reads.
+ *
+ * A value rather than a cast `WatchRecord`: that function narrowed its parameter to this pair
+ * precisely so a driver of the rule is a driver rather than a fixture with fourteen unused fields
+ * in it, and a test written against `as unknown as WatchRecord` would keep passing over a rule that
+ * had started reading a fifteenth.
+ */
+const recordOn = (day: number, dayIdx: number): { day: number; dayIdx: number } => ({ day, dayIdx });
 
 /** Every state of the watched bar — the live primary, both refusals, in one list. */
 const BAR_STATES = [

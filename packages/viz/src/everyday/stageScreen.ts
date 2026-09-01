@@ -1222,6 +1222,14 @@ function mountStage(
       unsubscribe();
       playback = undefined;
       adopted = undefined;
+      /*
+       * {@link watchFacts} is module state and outlives this mount, so it is cleared here rather
+       * than left for the next one to overwrite: a refusal about somebody else's record, still
+       * standing on the § 3.3 row of a player's own stage, is § D227's stale refusal in the one
+       * place a player would believe it.
+       */
+      watchFacts.hasReplay = false;
+      watchFacts.playRefusal = undefined;
     },
     /**
      * § 3.3's primary on the stage: *Close the day* — *stops the clock and writes the report*.

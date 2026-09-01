@@ -107,7 +107,16 @@ export const WATCH_ROWS_LOADING = 'Reading the reference runs…';
  * (GitHub issue #177), which this build has not got.
  */
 export function playThisCrowdRefusalFor(
-  record: WatchRecord | null,
+  /**
+   * The record's day pair, or `null` for a row that carries no record.
+   *
+   * The **pair** rather than a whole {@link WatchRecord}, and the narrowing is deliberate: these are
+   * the only two fields the decision reads, a `WatchRecord` satisfies the shape structurally so no
+   * caller has to unpack one, and a parameter that asked for the whole record would make every
+   * driver of this rule construct fourteen fields it does not use — which is how a test comes to be
+   * written against a cast instead of against a value.
+   */
+  record: { readonly day: number; readonly dayIdx: number } | null,
   standing: { readonly day: number; readonly dayIdx: number },
 ): string | undefined {
   if (record === null) {
