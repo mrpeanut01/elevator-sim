@@ -870,3 +870,120 @@ the same precision here would be manufacturing it.
 - **D387 remains a registered hole**, and the mechanism that would have prevented it now exists.
 - **The ratchet sits on its ceiling again at 5 with zero headroom**, which is the ratchet working and
   the next lane's operational constraint.
+
+## Wave I closed — the instruments, and Wave H's leftovers given owners, 2026-09-01
+
+Five lanes. **Three carried scope wave H left behind**, assigned to an owner rather than kept as a
+note: #309's surviving red (A), #176 which wave H measured and deliberately did not fix (B),
+`M2_MEASUREMENT.md:410` which wave H deliberately left (C), and #181, #223's other half (E).
+
+### The wave's largest finding is that a scheduled tier had never run
+
+Lane A **refuted the integrator's hypothesis**, which is what it was asked to do. The `perf-sweep`
+job's four-second failure was offered as the signature of vitest's 5 000 ms default that § D418 had
+just removed. It was not. § D418 was already on `main` and the failure survived it:
+
+```
+RunnerError: Worker failed to initialize: Cannot find module
+  '@elevator-sim/core/dist/index.js'
+```
+
+The deep arm is the only tier running `parallel: { mode: 'workers' }`. **A worker thread is loaded by
+Node, not vitest**, so it resolves `@elevator-sim/core` through `node_modules` to `packages/core/dist`
+— which `npm ci` does not create and the job never built. The always-on cases in the same file passed
+because they are serial and resolve to source through vitest's alias. The timing settles it: the deep
+arm took **188 ms**, not four seconds. A timeout does not fail fast; this failed fast because nothing
+ran.
+
+**So #163's acceptance clause was never discharged.** The seed-collision check — the tier landed in
+wave G — was wired, scheduled, named in `deepTiers.test.ts`, counted in every audit, and had **never
+executed a replication**. A dead seam wearing a green tick, inside the workflow built to stop exactly
+that.
+
+### The browser tier was certifying an artifact players never receive
+
+Lane D measured the gap rather than listing Vite's documented differences, driving both servers side
+by side at one viewport. Most differences **do not bite**: the stylesheet is inline and byte-identical
+(same SHA-256), every box matches to 0.01 px, and nothing in `packages/viz/src` reads
+`import.meta.env`. **The asset surface is the whole of it** — `publicDir` is the repo's `data/`, so
+the dev server answers `/buildings/midtown-office.json` with `200 application/json` while the bundle
+answers the SPA fallback, `200 text/html`. A seventh fetched document would work on every machine here
+and fail in production.
+
+**Both CI reds on this PR had one cause, and it was the harness.** The old helper *built* on every
+call and two files called it — concurrent builds into one `dist-web` with `emptyOutDir: true`.
+Measured by running it twice: **404 on 63 of 87** requests for `/`, 62 of 87 for the entry chunk,
+18 of 140 for `/fixit-cases.json`, in a ~900 ms window. macOS's `ERR_HTTP_RESPONSE_CODE_FAILURE` is
+that directly; linux's *"no heading"* is `fixitScreen.ts`'s load-failure branch, which has no `h1`.
+
+**#281's own stated mechanism is refuted** and no replacement is offered — § D426. `scrollTop` reads
+0 the moment `reconcile` empties the container, before any layout is forced, and with the reset
+deleted **both** artifacts report offset 0, so the artifact was never the difference. What makes the
+offset survive on the deployed build is unmeasured, and #123 blocks the measurement that would settle
+it. That is § D256's discipline: refute the mechanism, publish the negative, and do not supply a
+second plausible sentence.
+
+**The tier got cheaper**: 268.98 s → 166.2 s. One build added, 29 dev-server startups removed.
+
+### A gate that had been green over five stale sites
+
+Lane C found `viewportGateClaims.test.ts` — R38's own instrument, and the gate that caught the
+browser-tier count during wave H — **passing over five stale sites**. Its shapes matched a literal
+space; Markdown wraps at 100 columns, and two sites had a newline where the regex wanted one. Three
+more spelled the count in no shape it knew. Shapes now join with `\s+`, a third is added, and the
+unshaped sentences were **reworded onto the shape** rather than the regex taught three phrasings.
+Its strengthened guard then found all three survivors unaided — better evidence than an injected
+fault.
+
+That is worth reading beside wave H's ledger entry, which reports the integrator fixing *"four live
+sites"* on this gate's say-so. Four was what the gate could see.
+
+### The count that was never a measurement
+
+Lane B published #176's figure as **33 — 17 mounts and 16 screen-registry rows** — rather than the 17
+the integrator's own derivation had suggested, and the reason is the better one: the classifier's
+reasons put all 33 in one class, so stopping at the mounts leaves 16 exclusions taken on identical
+ground uncounted, **which is exactly how `docs/14` came to put a fifth panel into a class of three**.
+It also refused a bare 33, because each screen row names the adapter that drives its words. The
+decomposition and that clause now travel with the number at all six sites, none of which carries it
+as a typed number.
+
+### A purchase reaches the run, proved on the legs
+
+Lane E's evidence is **13 of 16 tiers move the legs** at the campaign's own cell, same seed, purchase
+against none — and the three that do not are each asserted *with* a cell where they do, with a
+physical reason (two cars over an hour of residential trickle never fill). Its first finding is
+§ D112's defect bought with units: a tier that only set `callType` reached the run and changed
+nothing.
+
+**Its journey evidence got stronger during integration rather than weaker.** The cross-lane check —
+lane D changed which artifact the browser tier drives, and lane E's proof rests on journey tests in
+that tier — resolved positively: `campaignJourney.browser.test.ts` now calls `startShippedSite`, so
+that evidence runs against the **shipped bundle**, and the tier is green on the integrated tree
+(33 files, 192 tests, exit 0).
+
+### What the integrator's own commit ran into
+
+Wave H's block was fitted to its lanes and § D418 was written past it. Wave I's reserved D429–D430
+for the integrator, and closing it found the case § D404 could not have: **a hole at a block's top
+points the charter row straight at it.** Hence § D430 — holes may sit anywhere in a block except its
+top — and D428, lane E's unspent number, sits safely inside it.
+
+`citations.test.ts` then refused this commit twice, correctly both times: once for a relative path
+escaping the repo from a root document, and once for the hole cited as a section — including when the
+entry explained the refusal *by example*. That is § D405's convention arriving at a second gate:
+**name it, do not utter it.**
+
+### Owed to the next session
+
+- **#176's other two families are untouched** and § D421 says so: the mount-private prose is not
+  exported, R2's replication-budget clause is still deep-tier-only, and `UX.md` § 26's owed drive
+  coverage is unmoved. The counting half is closed; the gap is the same size.
+- **The `packages/viz` export count is unpublishable** until the audit's own figure can be read off a
+  run — two derivations disagree and vitest swallows the instrument's output (§ D429).
+- **`scenario-goals.json` removed left the tier green** — a coverage gap lane D reported rather than
+  hid.
+- **#181's remaining two breaks**: nothing increments `trips`, and `CampaignTower.buildId` reaches no
+  run.
+- **`assertCoreBuilt()` compares mtimes while `tsc -b` re-emits on content hashes**, so a touched
+  source leaves the guard red until a rebuild. Errs safe; worth a sentence in its docstring.
