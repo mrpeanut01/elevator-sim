@@ -28118,9 +28118,13 @@ RunnerError: Worker failed to initialize: Cannot find module
 ```
 
 That is a module-resolution failure at worker spawn, not `Test timed out in 5000ms`. **Reproduced on
-the current tree** — `255aff2` + `d5b53f5`, § D418 present — byte-for-byte the same error, exit 1,
-4.94 s. So the sweep had failed for a reason no timeout change could touch, and the four seconds
-were `npm ci` plus vitest boot plus a pool that died on its first `new Worker`.
+the current tree** — `255aff2` + `d5b53f5`, § D418 present — the same error with this tree's paths,
+exit 1, 4.94 s. So the sweep had failed for a reason no timeout change could touch.
+
+**And the four seconds are not even mysterious once the log is read to the end.** The job step ran
+09:06:41 → 09:06:45; vitest reports `Duration 3.35s`, of which the four *always-on* cases account for
+2.25 s and the deep arm for **188 ms** — the time it takes to construct a `Worker` and receive its
+`fatal`. A timeout does not fail fast; this failed fast because nothing ran.
 
 **The mechanism.** `vitest.config.ts` aliases `@elevator-sim/*` to package **source**, which is why
 the always-on suite needs no build and why four of that file's five cases passed. A worker thread is
