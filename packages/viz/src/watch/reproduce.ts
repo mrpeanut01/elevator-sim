@@ -15,7 +15,7 @@
  *
  * - `data/` changed under the record — a building gained a floor, a dispatcher's weights moved, a
  *   demand template was re-authored. Every one of those is a live possibility in this repository,
- *   and `configHashOf`'s own existence (§ D214 § 4) is the leaderboard's version of this worry.
+ *   and `runDataHashOf`'s own existence (§ D214 § 4) is the leaderboard's version of this worry.
  * - `core` changed — a dispatch rule, a door timing, a stage-7 park. `replay.test.ts` pins that a
  *   seed reproduces its recording, and this is that pin pointed at a record instead.
  * - The record was written by a build whose composition order differed.

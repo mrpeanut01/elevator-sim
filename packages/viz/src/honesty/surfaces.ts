@@ -5501,11 +5501,13 @@ const MENU: SurfaceAdapter = {
       id: `entry-${name}`,
       displayName: name,
       run,
+      // What the row was measured against — never the board it is on (ENGINE_CONTRACT § 12.1).
+      dataHash: 'abcdef0123456789',
       measured,
       submittedAtMs: 0,
     });
     const pageOf = (entries: readonly BoardEntry[]): BoardPage => ({
-      configHash: 'abcdef0123456789',
+      boardKey: 'daily:2026-09-01',
       metric: 'awtS',
       note: 'Ranked on the named metric alone. The others are shown beside it and never combined.',
       entries,
@@ -5542,7 +5544,7 @@ const MENU: SurfaceAdapter = {
           ...(arm.viewMode === undefined ? {} : { viewMode: arm.viewMode }),
           ...(arm.firstVisit === undefined ? {} : { firstVisit: arm.firstVisit }),
           ...(arm.everLeftTheMenu === undefined ? {} : { everLeftTheMenu: arm.everLeftTheMenu }),
-          boards: [{ configHash: 'abcdef0123456789', entries: 3 }],
+          boards: [{ boardKey: 'daily:2026-09-01', entries: 3 }],
           challenge: challengeInput,
         });
         const at = `screen.${arm.label}.${screen}`;
@@ -5583,7 +5585,7 @@ const MENU: SurfaceAdapter = {
         catalogue,
         canPost: true,
         hasRun: true,
-        boards: [{ configHash: page.configHash, entries: page.entries.length }],
+        boards: [{ boardKey: page.boardKey, entries: page.entries.length }],
         boardPage: page,
         challenge: challengeInput,
       });
@@ -7224,7 +7226,7 @@ const WITHHELD_MATRIX: SurfaceAdapter = {
          * the one this build is permanently in. The other arm is a board that answered, which is
          * what `MENU` already drives; here it is the axis's second value rather than the default.
          */
-        ...(state.worldAbsent ? {} : { boards: [{ configHash: 'abcdef0123456789', entries: 3 }] }),
+        ...(state.worldAbsent ? {} : { boards: [{ boardKey: 'daily:2026-09-01', entries: 3 }] }),
       });
       const postRow = board.rows.find((row) => row.id === 'leaderboard.submit');
       const postRefused = state.noPost || state.dayNotClosed || state.watching;

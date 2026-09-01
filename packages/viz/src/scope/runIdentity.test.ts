@@ -404,6 +404,45 @@ describe('every control is driven, both arms, and the refusal names the field', 
     );
   });
 
+  /**
+   * The controls whose **moved** arm now posts, because the wire grew a field for it — issue #179.
+   *
+   * ## Why this is a table rather than a widened assertion
+   *
+   * The case below used to read *every* control's moved arm as refused, and that was right while
+   * *"nothing outside `between-games` survives the server's replay"* was true. Two fields have made
+   * it false: `SubmittedRun.ruleRows` and `SubmittedRun.interventions` travel, and
+   * `packages/server`'s `verify.test.ts` replays each to the client's own metrics rather than
+   * asserting it.
+   *
+   * Loosening the assertion to *"refused, unless it is not"* would have deleted the property. So the
+   * exception is a value, named with its reason and its wire field, and the case asserts it **in
+   * both directions**: a control in this table whose moved arm is refused is red, and a control
+   * outside it whose moved arm posts is red. That is `EXPRESSIBLE_IN_A_SELECTION`'s own arrangement
+   * — the table is the fact the scope contract does not hold, and a test decides whether the code
+   * agrees with it.
+   *
+   * `viewer.interventions`' probe moves a `park-cars-lobby`, which is the one kind
+   * `SUBMITTABLE_INTERVENTION_KINDS` admits. A `switch-dispatcher` or an `answer-incident` is still
+   * refused, and `refuses the two intervention kinds the wire may not carry` below drives both.
+   */
+  const CARRIED_BY_THE_WIRE: Readonly<Record<string, string>> = Object.freeze({
+    'viewer.ruleRows':
+      'SubmittedRun.ruleRows — two ids and two values per row, from vocabulary core declares, ' +
+      'written onto the profile the server resolved for itself',
+    'viewer.interventions':
+      'SubmittedRun.interventions — ENGINE_CONTRACT § 1.4’s log, for the one kind that carries ' +
+      'nothing but its instant',
+  });
+
+  it('reaches every control the wire carries, and no control it does not', () => {
+    // The table cannot outlive its reason: an entry for a field with no probe, or for a key the
+    // module does not answer, is an exemption nobody can check.
+    for (const key of Object.keys(CARRIED_BY_THE_WIRE)) {
+      expect(drivable().map((entry) => entry.key)).toContain(key);
+    }
+  });
+
   it('accepts the reproducible arm and refuses the moved arm, naming the key', () => {
     for (const { key, field } of drivable()) {
       const states = PROBES[key]?.states;
@@ -422,9 +461,20 @@ describe('every control is driven, both arms, and the refusal names the field', 
         `${key}: the reproducible arm must post — ${clean.map((i) => i.message).join('; ')}`,
       ).toEqual([]);
 
-      /* Arm two moves the field. It must be refused, by a reason that names this key. */
+      /*
+       * Arm two moves the field. It must be refused, by a reason that names this key — **unless the
+       * wire carries it**, in which case it must post, which is the same assertion pointed the other
+       * way rather than a hole in it. See {@link CARRIED_BY_THE_WIRE}.
+       */
       const refusals = runIdentityIssues(moved(baseState()), RESOURCES, 'ranked');
       const mine = refusals.filter((issue) => issue.key === key);
+      if (CARRIED_BY_THE_WIRE[key] !== undefined) {
+        expect(
+          mine,
+          `${key}: the wire carries this, so the moved arm must post — ${CARRIED_BY_THE_WIRE[key]}`,
+        ).toEqual([]);
+        continue;
+      }
       expect(mine.length, `${key}: the moved arm must be refused`).toBe(1);
       expect(mine[0]?.scope, key).toBe(
         SCOPE_OF[key]?.kind === 'control' ? SCOPE_OF[key]?.scope : undefined,
@@ -492,6 +542,110 @@ describe('the refusal is pinned by a run — the artefact reproduces different l
   });
 });
 
+/* -------------------------------------------------------------------------- *
+ * What the wire still will not carry — issue #179
+ * -------------------------------------------------------------------------- */
+
+describe('the grounds that are still true after the refusals shrank', () => {
+  /**
+   * A state whose log holds one entry of `kind`.
+   *
+   * `atS: 120` is `probes.test-helper.ts`'s own measured instant on this cell, so the arm being
+   * refused is the arm the scope suite already drives.
+   */
+  function logged(change: ViewerState['interventions'][number]['change']): ViewerState {
+    return { ...baseState(), buildingId: 'midtown-office', shiftLengthS: 1800, interventions: [{ atS: 120, change }] };
+  }
+
+  it('refuses a mid-run dispatcher switch, and names the vector rather than the log', () => {
+    /*
+     * The ground `interventions`' arm called **structural** when it had two, and it is the one that
+     * survived: a switch carries a whole `DispatcherProfile` inline, which is `submission.ts`'s
+     * *ids rather than inline objects* violated exactly. `packages/server`'s
+     * `SUBMITTABLE_INTERVENTION_KINDS` refuses it there too, so the client is not stricter than the
+     * server — the failure direction this module exists to prevent.
+     */
+    const state = logged({ kind: 'switch-dispatcher', profile: RESOURCES.dispatcherProfiles.profiles[1]! });
+    const mine = runIdentityIssues(state, RESOURCES, 'ranked').filter(
+      (issue) => issue.key === 'viewer.interventions',
+    );
+    expect(mine.length).toBe(1);
+    expect(mine[0]?.message).toContain('weight vector inline');
+  });
+
+  it('refuses an incident answer, and names the missing cause rather than the answer', () => {
+    /*
+     * The ground that was **found** while shrinking, rather than one that survived. An
+     * `answer-incident` answers a campaign incident, and `shift/incidents.ts` writes that incident
+     * onto the building as `serviceEvents` from the week's day and the calendar — neither of which
+     * travels. So a replay would hold the answer and not the thing answered, which is a missing
+     * cause and not a missing field, and no widening of `SubmittedRun` would fix it.
+     */
+    const state = logged({ kind: 'answer-incident', option: 'Send it back to the lobby', serviceEvents: [] });
+    const mine = runIdentityIssues(state, RESOURCES, 'ranked').filter(
+      (issue) => issue.key === 'viewer.interventions',
+    );
+    expect(mine.length).toBe(1);
+    expect(mine[0]?.message).toContain('the answer and not the thing answered');
+  });
+
+  it('accepts the one kind that carries nothing but its instant', () => {
+    // The negative control. Refusing all three would satisfy both cases above and would be the
+    // widening undone, so the accepted arm is asserted beside them rather than elsewhere.
+    expect(
+      runIdentityIssues(logged({ kind: 'park-cars-lobby' }), RESOURCES, 'ranked').filter(
+        (issue) => issue.key === 'viewer.interventions',
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a rule row naming a condition this build does not declare', () => {
+    /*
+     * What is left of the rule refusal, and it is a question about the **value** rather than the
+     * field — the three *"saved on this device alone"* refusals' own shape. A `ViewerState` is
+     * rehydrated from a browser's own storage, so a row naming a vocabulary this build has dropped
+     * is reachable; the server would refuse it by name before it would simulate, and a client that
+     * posted it anyway would collect a refusal for something it could have said itself.
+     */
+    const state: ViewerState = {
+      ...baseState(),
+      ruleRows: [{ when: 'a-condition-this-build-lacks' as never, then: 'jump-queue' }],
+    };
+    const mine = runIdentityIssues(state, RESOURCES, 'ranked').filter(
+      (issue) => issue.key === 'viewer.ruleRows',
+    );
+    expect(mine.length).toBe(1);
+    expect(mine[0]?.message).toContain('does not declare');
+  });
+
+  it('and the CLI line refuses both, because no flag spells either', () => {
+    /*
+     * **The half that did not shrink, and the reason the shared predicate could.** `SubmittedRun`
+     * carries a rule list and a log; `elevator-sim run` takes a building, a dispatcher, a seed and a
+     * span, and there is no plausible flag for four scalars per row or for a time series. So the
+     * refusal moved into `provenanceLineOf`, beside the one `partFlagFor` already makes about a
+     * window on a template with no clock.
+     *
+     * Asserted here rather than in `main.test.ts` because the pair is the point: the submit path
+     * must **not** refuse these and the CLI line must, and a test that only saw one of them would
+     * pass over a build where both had gone quiet.
+     */
+    const ruled: ViewerState = { ...baseState(), ruleRows: [{ when: 'call-waited', whenValue: 30, then: 'jump-queue' }] };
+    expect(runIdentityIssues(ruled, RESOURCES, 'ranked')).toEqual([]);
+    const line = provenanceLineOf(ruled, RESOURCES);
+    expect(line.ok).toBe(false);
+    if (line.ok) return;
+    expect(line.reasons.join(' ')).toContain('no flag for a rule list');
+
+    const played = logged({ kind: 'park-cars-lobby' });
+    expect(runIdentityIssues(played, RESOURCES, 'ranked')).toEqual([]);
+    const playedLine = provenanceLineOf(played, RESOURCES);
+    expect(playedLine.ok).toBe(false);
+    if (playedLine.ok) return;
+    expect(playedLine.reasons.join(' ')).toContain('no flag for an intervention log');
+  });
+});
+
 describe('one derivation, both consumers — the client’s answer is the server’s shape', () => {
   /**
    * `packages/server/src/leaderboard/submission.ts`, read as text.
@@ -503,6 +657,12 @@ describe('one derivation, both consumers — the client’s answer is the server
    */
   const SERVER_SUBMISSION = readFileSync(
     fileURLToPath(new URL('../../../server/src/leaderboard/submission.ts', import.meta.url)),
+    'utf8',
+  );
+
+  /** The other half of the wire's shape: which board a run lands on, and what its digest names. */
+  const SERVER_BOARD_KEY = readFileSync(
+    fileURLToPath(new URL('../../../server/src/leaderboard/boardKey.ts', import.meta.url)),
     'utf8',
   );
 
@@ -524,6 +684,10 @@ describe('one derivation, both consumers — the client’s answer is the server
       'durationS',
       'windowStartS',
       'seed',
+      // Issue #179's two, and their arrival here is what this read is for: the day `SubmittedRun`
+      // grows a field for something the client refuses, this list is where somebody finds out.
+      'ruleRows',
+      'interventions',
     ]);
   });
 
@@ -542,17 +706,41 @@ describe('one derivation, both consumers — the client’s answer is the server
     }
   });
 
-  it('and the board identity does not digest them either', () => {
+  it('and the data digest does not name them either', () => {
     /*
-     * Issue #129's acceptance for the *other* shape — *"`configHashOf` must change, or two
-     * genuinely different runs land on one board"* — asserted as its contrapositive. Nothing here
-     * travels, so nothing here may be hashed: a digest over a field the wire does not carry would
-     * be a board partition nobody could reproduce.
+     * Issue #129's acceptance for the *other* shape — *"the digest must change, or two genuinely
+     * different runs are recorded as the same measurement"* — asserted as its contrapositive.
+     * Nothing here travels, so nothing here may be digested: a digest over a field the wire does not
+     * carry would be a distinction nobody could reproduce.
+     *
+     * **The function moved and it is read where it went.** `configHashOf` was two jobs in one value
+     * and § 12.1 forbids the second — no player-settable parameter may enter a board key — so the
+     * digest is `boardKey.ts#runDataHashOf`, which says only what a row was measured against, and
+     * the board is `placeSubmission`'s. This assertion is about the digest, so it follows the
+     * digest; the length check is what says the regex still found something.
      */
-    const digest = /export function configHashOf\([\s\S]*?\n\}/u.exec(SERVER_SUBMISSION)?.[0] ?? '';
+    const digest = /export function runDataHashOf\([\s\S]*?\n\}/u.exec(SERVER_BOARD_KEY)?.[0] ?? '';
     expect(digest.length).toBeGreaterThan(100);
     for (const absent of ['commissioning', 'calendar', 'selector']) {
-      expect(digest.toLowerCase(), `configHashOf must not digest ${absent}`).not.toContain(absent);
+      expect(digest.toLowerCase(), `runDataHashOf must not digest ${absent}`).not.toContain(absent);
+    }
+  });
+
+  it('names the board by the date or by the player, and by nothing a player picked', () => {
+    /*
+     * § 12.1's own sentence, checked from this side of the wire because it is this side that used to
+     * be told a board was a digest. `menu/boardRun.ts` still reads a board page and describes it, so
+     * a client that believed the old key would describe the wrong thing.
+     *
+     * A source-text read rather than an import for `menu/client.test.ts`'s reason: `viz` must build
+     * and test with `packages/server` absent.
+     */
+    const place = /export function placeSubmission\([\s\S]*?\n\}/u.exec(SERVER_BOARD_KEY)?.[0] ?? '';
+    expect(place.length).toBeGreaterThan(100);
+    expect(place).toContain('daily:${fixture.date}');
+    expect(place).toContain('personal:${userId}');
+    for (const forbidden of ['buildingId', 'dispatcherProfileId', 'demandTemplateId', 'durationS']) {
+      expect(place, `a board key may not carry ${forbidden}`).not.toContain(forbidden);
     }
   });
 });

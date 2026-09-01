@@ -50,7 +50,7 @@ import type { MenuCatalogue, MenuState } from '../menu/types.js';
  * because each render looks correct on its own.
  */
 export interface LeaderboardView {
-  readonly boards: readonly { readonly configHash: string; readonly entries: number }[];
+  readonly boards: readonly { readonly boardKey: string; readonly entries: number }[];
   readonly selected: string | undefined;
   readonly page: BoardPage | undefined;
   /** A sentence to show instead of rows — loading, unreachable, or nothing posted yet. */

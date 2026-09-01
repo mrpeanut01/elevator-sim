@@ -12,9 +12,18 @@
  *   event. Permitting a between-days field is the defect `docs/16` § 5 clause 3 names — a Start that
  *   left `week.day` at 7 ran a building 66 % fuller than the one the menu described, and said
  *   nothing. This row is that bug restated as a rule, which is the only form of it that stays fixed.
- * - **`ranked` permits `presentation` and `between-games` only.** Nothing else survives the server's
- *   replay (§ D214 § 3), and this row is not new — see `runIdentity.ts`, which found it already
- *   written out by hand in `dev/main.ts`.
+ * - **`ranked` permits `presentation` and `between-games` only.** This row is not new — see
+ *   `runIdentity.ts`, which found it already written out by hand in `dev/main.ts`.
+ *
+ *   Its stated reason used to be *"nothing else survives the server's replay (§ D214 § 3)"*, and
+ *   **that stopped being true when the wire grew two fields** (GitHub issue #179): a `within-day`
+ *   rule list and a `within-day` intervention log now travel on a `SubmittedRun` and re-simulate to
+ *   the client's own metrics. The row is unchanged and correct, because what it decides is not
+ *   *which runs may post*. Its one non-test caller is `runIdentity.ts#fieldsAnsweredFor`, where a
+ *   scope this mode forbids means the field is **asked about**, and `CARRY_CHECKS` gives the answer.
+ *   *May this move mid-day?* and *can the wire say it?* are two questions, and this file answers only
+ *   the first — which is the same distinction issue #129 wrote into `runIdentity.ts` for
+ *   `between-games`, arriving from the other side.
  * - **`commissioning` forbids `within-day`.** It is a design phase, not a shift: the whole point is
  *   that you choose the fabric and then live with it. A commissioning screen that let a player move
  *   a dispatcher weight would be the shift week with a different title.

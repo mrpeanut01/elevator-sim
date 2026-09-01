@@ -157,7 +157,7 @@ describe('what the board ran — “how did they do it”', () => {
 
   it('says nothing about what ran when the rows disagree about it', () => {
     /*
-     * A page whose rows do not share a configuration cannot happen while `configHashOf` digests all
+     * A page whose rows do not share a configuration cannot happen while `runDataHashOf` digests all
      * six fields — which is exactly why the check is here rather than assumed. If the server ever
      * drops one, this screen must go quiet rather than name the first row's dispatcher for all of
      * them.

@@ -144,7 +144,7 @@ export interface FreePlaySelection {
    *
    * ## The board cannot see this yet, and that is a named gap rather than a silence
    *
-   * `SubmittedRun` and `configHashOf` live in `packages/server` and digest `durationS` without this,
+   * `SubmittedRun` and `runDataHashOf` live in `packages/server` and digest `durationS` without this,
    * so a morning and an evening of equal length would share a board — two different exams scored on
    * one table. Until the submission carries the window, {@link canStart} still starts a windowed run
    * and `freePlayIssues` declines to *post* one, with the reason said on the screen. See § D288.
