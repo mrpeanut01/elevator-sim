@@ -27,14 +27,23 @@
  * **Not what the run measured.** § D220 § 4 and `fixitScreen.browser.test.ts`'s own rule: whether a
  * repair clears a case's three pass conditions is the engine's answer, and asserting it here would
  * make this file fail when a shipped building changed. So the journey case asserts *the state the
- * product produced survived the reload*, in both directions against the slot — and it would be
- * vacuous on its own, because a run that solved nothing would compare an empty badge set with an
- * empty one.
+ * product produced survived the reload*, in both directions against the slot.
  *
- * The positive control is the second case, which seeds the slot the way a **previous sitting** left
- * it — using a case id read from the product's own catalogue rather than written here — and requires
- * the badge, the count and the landing case to come back. Between the two, neither *the write
- * happened* nor *the read happened* can pass while the other is broken.
+ * That leaves one thing to say honestly about vacuity, in two halves.
+ *
+ * - **The write half cannot go vacuous.** `keepSolved` runs on every press that finishes a run,
+ *   whatever the verdict, so `schemaVersion: 2` is in the slot either way — measured by removing
+ *   the call, which reddens this case.
+ * - **The read half would, if the run solved nothing**, because two empty badge sets compare equal.
+ *   Measured on this host 2026-09-01: the shipped catalogue's diagnosed free repair solves exactly
+ *   **one** case, so the comparison is over a non-empty set today. That is a fact about `data/` and
+ *   not a property, which is why it is recorded here rather than asserted — an assertion would be
+ *   this tier claiming what a run measured, and it would fail the day a building was retuned.
+ *
+ * The standing positive control is therefore the second case, which seeds the slot the way a
+ * **previous sitting** left it — using a case id read from the product's own catalogue rather than
+ * written here — and requires the badge, the count and the landing case to come back. Between the
+ * two, neither *the write happened* nor *the read happened* can pass while the other is broken.
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
@@ -304,6 +313,79 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
 
       // A refusal is evidence: the bytes are still there for a build that can read them.
       expect(await slotContents(page)).toBe('unparseable');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('puts a rating a previous sitting earned back on the ladder, rebuilt from its cases', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await coldLoad(page);
+      /*
+       * **The forty are not run here, and that is `boardScreen.browser.test.ts`'s own rule**: § 1.4
+       * puts one simulation at 181 ms to 1 521 ms and forty of them is minutes, which is not what a
+       * page test is for. What this case drives is the whole restore chain on the shipped bundle —
+       * bytes, `loadProgress`, `savedRatingIssue`, `ladderEntryOf`, `ladderRowsOf`, the table — and
+       * the one thing it therefore does **not** cover is `boardScreen.ts#onFinished`'s single call
+       * to `savedRatingOf`, which `everyday/profile.test.ts` and `gauntlet/ladder.test.ts` drive
+       * directly. That limitation is stated rather than implied.
+       *
+       * The rating is written as its **cases**, which is § D434: nothing folded is stored, so the
+       * `62.5%` the table draws below has to be arithmetic this page performed on the two scores
+       * seeded here rather than a number copied out of storage.
+       */
+      await page.evaluate((key) => {
+        const caseOf = (index: number, score: number): unknown => ({
+          caseId: `tower-${String(index)}/crowd`,
+          buildingId: `tower-${String(index)}`,
+          crowdId: 'crowd',
+          seed: `seed-${String(index)}`,
+          score,
+          noScoreReason: null,
+        });
+        window.localStorage.setItem(
+          key,
+          JSON.stringify({
+            schemaVersion: 2,
+            profile: { name: 'you', avatarColor: '#F2A63B' },
+            progress: {
+              solvedCaseIds: [],
+              ratings: [
+                {
+                  dispatcherId: 'a-dispatcher-of-mine',
+                  dispatcherName: 'A dispatcher of mine',
+                  isReference: false,
+                  fingerprint: 'waitTime=1',
+                  casesTotal: 2,
+                  cases: [caseOf(0, 50), caseOf(1, 75)],
+                },
+              ],
+            },
+          }),
+        );
+      }, SLOT);
+
+      await reload(page);
+      await page.click('button:has-text("Boards & ladder")');
+      await page.waitForSelector('.everyday-board-tab-ladder', { timeout: 30_000 });
+
+      const ladder = await page.evaluate(() => ({
+        rows: [...document.querySelectorAll('.everyday-ladder-row')].map(
+          (row) => row.textContent ?? '',
+        ),
+        empty: document.querySelector('.everyday-ladder-empty')?.textContent ?? null,
+        notice: document.querySelector('.everyday-ladder-progress-notice')?.textContent ?? null,
+      }));
+
+      // The empty state is gone, which is the half a restore that drew nothing would fail.
+      expect(ladder.empty).toBeNull();
+      expect(ladder.notice).toBeNull();
+      expect(ladder.rows).toHaveLength(1);
+      expect(ladder.rows[0]).toContain('A dispatcher of mine');
+      // `(50 + 75) / 2`, computed here from the stored cases — § D434's whole point.
+      expect(ladder.rows[0]).toContain('62.5%');
+      expect(ladder.rows[0]).toContain('2 of 2');
     } finally {
       await page.close();
     }

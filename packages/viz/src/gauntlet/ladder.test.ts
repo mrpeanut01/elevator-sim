@@ -279,6 +279,32 @@ describe('a stored rating is its cases, and the mean is rebuilt from them', () =
     expect(restored.summary.complete).toBe(false);
     expect(restored.summary.rating).toBeCloseTo((91 + 74 + 88) / 3, 10);
   });
+
+  it('keeps the denominator, because a case that never ran has no row to count', () => {
+    /*
+     * The one figure {@link SavedRating} stores that {@link ratingOf} does not compute, and the
+     * case that says why. `ratingOf`'s own docstring: *"a rating that derived its denominator from
+     * the rows it happened to receive would report `40 of 40` on a gauntlet that ran twelve."* A
+     * restore reading `cases.length` instead would do exactly that, silently, and every other case
+     * in this file would stay green — because in all of them the two numbers are equal.
+     */
+    const twelve = Array.from({ length: 12 }, (_unused, index) => rated(index, 80));
+    const short: LadderEntry = {
+      dispatcherId: 'mine',
+      dispatcherName: 'Mine',
+      isReference: false,
+      fingerprint: 'waitTime=1',
+      summary: ratingOf(twelve, 40),
+    };
+    const restored = ladderEntryOf(savedRatingOf(short));
+    expect(restored.summary.casesTotal).toBe(40);
+    expect(restored.summary.complete).toBe(false);
+    // The cell a player reads, which is where the wrong denominator would have shown up.
+    expect(
+      ladderRowsOf([restored], { fingerprintOf: () => 'waitTime=1', caseNameOf: nameOf })[0]
+        ?.proofCases,
+    ).toBe('12 of 40');
+  });
 });
 
 describe('a saved rating is refused when this build cannot vouch for it', () => {
