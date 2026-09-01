@@ -28089,3 +28089,125 @@ confirms it. This decision rests on the survey and the probe, not on a red anybo
 test in `experiments` now takes five minutes to fail instead of five seconds. A hang is a bug found
 once and fixed; a 5 s ceiling under load is a false red on a required check that recurs forever and
 trains people to re-run the suite instead of reading it.
+
+## D419 — a scheduled tier that runs replications runs on a built tree, and the sweep had never run at all
+
+**Date: 2026-09-01 · Owner: lane A, wave I · Closes: the outstanding third of GitHub issue #309.
+[§ D393](#d393) built the workflow this corrects.**
+
+**Decision.** Every `--project experiments` job in `.github/workflows/deep-tiers.yml` runs
+`npm run build` before its tier — six jobs gained the step, `golden-runs` already had it.
+`validation/perfSweep.test.ts`'s deep arm calls `assertCoreBuilt()` before it spawns a pool, and
+`validation/deepTierBuild.test.ts` asserts the workflow property per job. The two jobs in the other
+project are deliberately left without a build step.
+
+**What was reported, and what it was not.** The weekly run on `6260dcb`
+([run 33303221167](https://github.com/mrpeanut01/elevator-sim/actions/runs/33303221167)) failed
+three of eleven jobs. Wave H closed two — `fuzz-deep` (#305) and `matrix-census` (#306). The third,
+`perf — the 20 000-replication sweep`, **failed in four seconds**: 09:06:41 → 09:06:45.
+
+Four seconds is the signature of vitest's 5 000 ms default, and [§ D418](#d418) had just given
+`experiments` `SIMULATING_TIMEOUT_MS`, so the hypothesis on the table was *already fixed on `main`*.
+**It is not, and the log says so in one line:**
+
+```text
+RunnerError: Worker failed to initialize: Cannot find module
+  '…/node_modules/@elevator-sim/core/dist/index.js'
+  imported from …/packages/experiments/src/runner/replication.ts
+ ❯ Worker.onMessage src/runner/parallel.ts:230:22
+```
+
+That is a module-resolution failure at worker spawn, not `Test timed out in 5000ms`. **Reproduced on
+the current tree** — `255aff2` + `d5b53f5`, § D418 present — byte-for-byte the same error, exit 1,
+4.94 s. So the sweep had failed for a reason no timeout change could touch, and the four seconds
+were `npm ci` plus vitest boot plus a pool that died on its first `new Worker`.
+
+**The mechanism.** `vitest.config.ts` aliases `@elevator-sim/*` to package **source**, which is why
+the always-on suite needs no build and why four of that file's five cases passed. A worker thread is
+loaded by Node, not by vitest: it resolves the same specifier through `node_modules` to
+`packages/core/dist`, and `npm ci` does not run `tsc -b`. `runner/parallel.ts`'s own docstring had
+said this for as long as the pool has existed. The job that needed to read it was written a year
+later, in another directory, by somebody measuring on a tree that had already been built.
+
+**So #163's acceptance clause was still undischarged.** *"The seed-collision check has run at least
+once on `main`"* is this job and no other — 20 000 distinct trace digests, the only place in the
+repository a seed derivation is looked at that scale. It had been wired, scheduled, named in
+`deepTiers.test.ts`, counted in every audit, and had never executed a single replication. That is
+#163's own defect surviving the workflow written to close it: not a tier nothing opts into, but a
+tier that opts in and cannot start.
+
+**Why the build is on every `experiments` job rather than on the one that needed it.** Whether a
+tier reaches a worker pool is **not readable from the tier's own source**:
+`RUNNER_DEFAULTS.parallelMode` is `'auto'` and `minReplicationsForWorkers` is 64, so a spec that
+says nothing about parallelism spawns workers as soon as the guaranteed work clears the threshold;
+`validation/harness.ts` pins `'serial'` inside `runGateExperiment`, which is the only reason the
+census and the oracle survive an unbuilt tree today, and it is three modules away from the tiers it
+protects; and `goldenRuns.test.ts` needs a built tree for an entirely different reason — a child
+`node` against `experiments/dist`. A per-file derivation would be wrong in the unsafe direction:
+green over exactly the tier it failed to classify. The job-level property has no such gap and is
+decidable from the workflow alone.
+
+**The cost is measured, not waved at**: `npm run build` from a fully cleaned tree is **11.2 s** on
+this 4-core container (`tsc -b`, five packages). Against tiers measured at 4.6 min to four hours
+that is under a percent, and it buys a typecheck on the commit each tier judges — `ci.yml` makes the
+same trade for the always-on suite in the same words.
+
+**Two instruments, because they catch different things.** `assertCoreBuilt()` turns
+*"Cannot find module"* — which names a path, not a cause — into a sentence naming the fix, and it
+also catches the case that error **cannot see at all**: a `dist` that exists but is older than
+`src`, where the pool and the parent run different code and agree about nothing for reasons that
+look like a concurrency bug. Both directions were driven: with `dist` moved aside the arm fails in
+6 ms with *"packages/core/dist is missing…"*, and with `src` newer it fails with
+*"…is older than packages/core/src"*. `deepTierBuild.test.ts` catches the other half — a **new** job
+that forgets the step, which no assertion inside a test file can see.
+
+**What is not claimed.** The other eight jobs of that run were not re-executed here; three of the
+eleven are the issue's subject and all three were run. And this decision does not touch
+`ci.yml`, which has built before testing since § D201.
+
+**The measurement, with the ceiling it was taken under.** Reproduced red at 4.94 s (exit 1) with no
+`dist`; green at 67.1 s and again at 72.9 s (exit 0, 5 of 5) with one. The workflow's header quotes
+4.6 min for this tier under contention, and the ceiling stays at 180 minutes: a hosted runner is
+slower, and a ceiling raised after a red has already cost the week it was meant to save.
+
+## D420 — a failure report points at the job that failed, and the flake caveat is scoped to the flake
+
+**Date: 2026-09-01 · Owner: lane A, wave I · Closes: the misdirection half of GitHub issue #309.
+Amends [§ D393](#d393)'s `report` job.**
+
+**Decision.** The `report` job's guidance paragraph is computed from the jobs that actually failed
+rather than written as one fixed sentence. `perf-scaling`'s wall-clock-flake caveat appears only
+when `perf-scaling` is among the failures; when it is not, the paragraph says so outright. A second
+sentence names the signature this issue turned on — a job that went red in seconds failed *before*
+its tier started.
+
+**Context.** The sentence being replaced read: *"These tiers run nowhere else, so a red here is the
+only place the finding exists. Read `perf-scaling` against its own note about wall-clock flake under
+load before treating it as a defect; the other eight are deterministic."* On 2026-08-30
+`perf-scaling` **passed** and `perf-sweep` failed, and the issue this job filed still sent its
+reader to the passing job.
+
+**Why that is worse than saying nothing.** The note it points at exists to explain a red *away* —
+*"expected 0.887 to be greater than 0.9"*, a gate about a machine rather than about the simulator. A
+reader who follows an unscoped pointer onto the wrong job comes back with *known flake* about a
+defect. § D393's own header is careful about exactly this distinction between kinds of red —
+*"reporting those as one number would say the same thing about a defect and a stale baseline"* — and
+then the issue body it generates undoes it for every future run. A caveat that does not name its own
+scope will be applied where it does not hold.
+
+**The count went too.** *"The other eight"* was a hand-written arithmetic over a `needs:` list that
+a tenth tier would falsify silently. It is derived now, and it is the count of *failing* jobs other
+than the flaky one, which is the number the sentence is actually about.
+
+**Verified by driving it rather than by reading it.** The generator is extracted from the workflow
+file itself — not copied — and exercised over three job-result sets: `perf-sweep` alone (the
+2026-08-30 shape) produces *"`perf-scaling` … is NOT among the failures above, so its note does not
+apply here"*; `perf-scaling` alone produces the caveat scoped with *"read THAT job, and only that
+one"*; both plus `matrix-census` produces the caveat **and** *"The other 2 failing job(s) are
+deterministic"*.
+
+**A constraint worth recording for the next person editing that step.** The generator runs as
+`node -e '…'` inside a single-quoted shell word, so **it may contain no apostrophe** — including in
+its prose. § D393's own header records the sibling of this trap: an apostrophe inside a template
+literal opened a bogus string in a comment-stripper and silently lost a tier. The extraction check
+asserts the absence rather than trusting it.
