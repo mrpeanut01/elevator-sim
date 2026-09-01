@@ -42,10 +42,17 @@
     "towers to invalidate the case (matrixCells.ts, garden-residential's rationale), and forty cases",
     "reported over two different windows would be forty numbers under one label.",
     "",
-    "THE SEED RULE IS NOT IN THIS FILE. Section 1: hash(towerId, crowdIndex), fixed forever. It is",
-    "computed in gauntlet/proofCases.ts#proofSeedOf so that a seed cannot be edited into",
-    "incomparability by a hand that meant to change a rate. Invariant 5 still holds -- every case",
-    "carries the seed it ran under, into the rating record."
+    "THE SEED RULES ARE NOT IN THIS FILE, AND THERE ARE TWO OF THEM. Section 1's table carries one",
+    "per reader over this one list: hash(towerId, crowdIndex) for the GAUNTLET, fixed forever, and",
+    "hash(testId, repIndex) for the BENCH, 'the same for every entrant -- that is what matched",
+    "crowds means'. They are computed in gauntlet/proofCases.ts#proofSeedOf and #benchSeedOf so that",
+    "a seed cannot be edited into incomparability by a hand that meant to change a rate. So 'one",
+    "list, three readers' is a claim about FIXTURES and never about traces -- and that is also",
+    "CLAUDE.md's hold-out discipline, since a bench sharing the gauntlet's seeds would let a player",
+    "tune a dispatcher against the exact forty runs it is about to be rated on. proofCases.test.ts",
+    "asserts the two seed SETS are disjoint over the shipped forty rather than trusting that two",
+    "hashes of different strings differ. Invariant 5 still holds -- every case carries the seed it",
+    "ran under, into the rating record. See DECISIONS.md section D445."
   ],
   "version": 1,
   "towers": [
