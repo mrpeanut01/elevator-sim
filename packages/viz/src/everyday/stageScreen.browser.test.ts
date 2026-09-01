@@ -679,7 +679,10 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
      * that arrived enabled would mean that refusal never reached the DOM.
      */
     expect(await page.getAttribute(SWITCH, 'disabled')).not.toBe(null);
-    expect(await page.getAttribute(SWITCH, 'title')).toContain('already running');
+    /* § 7.6's fourth rule: it *says so*, in the refusal line, rather than only in a tooltip. */
+    expect(await page.textContent('.everyday-stage-intervene-refusal')).toContain(
+      'already running',
+    );
 
     await page.selectOption('.everyday-stage-switch-pick', handTo);
     await page.waitForFunction(
@@ -687,6 +690,8 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
       SWITCH,
       { timeout: 30_000 },
     );
+    /* And the sentence goes with the refusal — a line about a control that can now act is § D227. */
+    expect(await page.textContent('.everyday-stage-intervene-refusal')).toBe('');
     const label = (await page.textContent(SWITCH)) ?? '';
     expect(label.startsWith('Switch to ')).toBe(true);
 

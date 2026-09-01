@@ -711,7 +711,8 @@ function mountStage(
     legend.append(item);
   }
 
-  /* --- § 7.6's control, one button per shipped arm. --- */
+  /* --- § 7.6's control: a button for the arm that needs nothing, a picker for the one that
+       needs a dispatcher. --- */
   const interventions = el(doc, 'div', 'everyday-stage-interventions');
   interventions.style.cssText = `display:flex;align-items:center;flex-wrap:wrap;gap:${String(GAP.row + 2)}px`;
   const ARM_BUTTON_CSS = [
@@ -1056,7 +1057,6 @@ function mountStage(
     status.style.display = 'none';
   }
 
-  /** One paint: the header, the cutaway, the alarm, the strip. */
   /**
    * § 7.6's second arm, drawn from the row the model built for it.
    *
@@ -1068,14 +1068,22 @@ function mountStage(
    * The shared refusal still wins. A filed day, a day nobody has started and a re-simulation in
    * flight are true of every arm at once; the row's own refusal is the narrower fact that this
    * particular handover would move nothing, and it leaves the arm beside it pressable.
+   *
+   * **And it owns the refusal line**, which is why the shared one is passed in rather than written
+   * by the caller. § 7.6's fourth rule is that a control which cannot act *says so* — a disabled
+   * button and a tooltip is not saying so — so the sentence a player reads is whichever refusal is
+   * standing, and one function decides which. Two writers would leave the narrower sentence on the
+   * page after the wider one had gone.
    */
   function applySwitchRow(view: StageInterventionView, sharedRefusal: string | undefined): void {
     switchRow = view.rows.find((row) => row.change.kind === 'switch-dispatcher');
-    if (switchRow === undefined) return;
-    switchButton.textContent = switchRow.label;
-    switchButton.title = switchRow.refusal ?? switchRow.explains;
-    switchButton.disabled = sharedRefusal !== undefined || switchRow.refusal !== undefined;
-    switchPicker.disabled = sharedRefusal !== undefined;
+    if (switchRow !== undefined) {
+      switchButton.textContent = switchRow.label;
+      switchButton.title = switchRow.refusal ?? switchRow.explains;
+      switchButton.disabled = sharedRefusal !== undefined || switchRow.refusal !== undefined;
+      switchPicker.disabled = sharedRefusal !== undefined;
+    }
+    interventionRefusal.textContent = sharedRefusal ?? switchRow?.refusal ?? '';
   }
 
   /** The handover arm re-asked from the live facts — for the picker, and for the mount. */
@@ -1090,7 +1098,7 @@ function mountStage(
       recomputing: recomputingOver !== undefined,
       ...(target === undefined ? {} : { switchTo: target }),
     });
-    applySwitchRow(view, sharedRefusalOf(view));
+    applySwitchRow(view, sharedRefusalOf(view, watchingNow()));
   }
 
   /**
@@ -1102,10 +1110,14 @@ function mountStage(
    * run* is not one of its inputs — the Engineer shell disables the same controls from its own
    * watching latch for the same reason.
    */
-  function sharedRefusalOf(view: StageInterventionView): string | undefined {
-    return (watchingNow() === undefined ? undefined : SPECTATOR_MAKES_NO_CHANGES) ?? view.refusal;
+  function sharedRefusalOf(
+    view: StageInterventionView,
+    watching: WatchingView | undefined,
+  ): string | undefined {
+    return (watching === undefined ? undefined : SPECTATOR_MAKES_NO_CHANGES) ?? view.refusal;
   }
 
+  /** One paint: the header, the cutaway, the alarm, the strip. */
   function draw(): void {
     const recording = adopted;
     if (recording === undefined || playback === undefined) return;
@@ -1184,8 +1196,7 @@ function mountStage(
      * (contract § 1.5 — *replayed, not offered*), so naming the latest one at or before the playhead
      * is a true statement about the run on screen and hiding it would misdescribe the replay.
      */
-    const refusal = sharedRefusalOf(intervention);
-    interventionRefusal.textContent = refusal ?? '';
+    const refusal = sharedRefusalOf(intervention, watching);
     for (const button of interventionButtons) button.disabled = refusal !== undefined;
     /*
      * The handover arm has a refusal of its own — a hand-over to the vector already driving moves
