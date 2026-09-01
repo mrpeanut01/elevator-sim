@@ -1342,7 +1342,18 @@ type DecisionReservation = {
  * the whole point: the next integrator opens a block by replacing `null` with an object literal
  * and nothing else has to compile for the first time.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = {
+  wave: 'I',
+  /*
+   * D419–D430. Lanes A–E hold D419–D428, two apiece; **D429–D430 are the integrator's**, and
+   * reserving them is § D418's lesson applied rather than restated. Wave H's block was fitted to
+   * its lanes alone, the integrator then wrote a decision mid-wave, and this file's ceiling check
+   * caught it one number past the block — on the one participant the process had not thought to
+   * allocate for.
+   */
+  from: 419,
+  to: 430,
+} as DecisionReservation | null;
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
  *
