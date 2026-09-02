@@ -17,6 +17,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { loadConfig, runSimulation, type LoadedConfig } from '@elevator-sim/core';
+import { reportWindowForBuilding } from '@elevator-sim/experiments/browser';
 
 import { configFor, metricsOf, type VerificationResources } from '../leaderboard/verify.js';
 import {
@@ -473,6 +474,49 @@ describe('every shipped challenge is playable with every shipped dispatcher', ()
     expect(runs).toBeGreaterThan(100);
     expect(unquotable).toEqual([]);
   }, 300_000);
+
+  it('names no building whose report window the client’s own challenge path does not set', () => {
+    /*
+     * **A tripwire for a gap this change opened and could not close** — GitHub issue #315.
+     *
+     * `configFor` now derives a `reportWindow` from the building id, because the leaderboard's
+     * client does and an honest submission has to reproduce. `viz`'s **challenge** client is a
+     * second mirror of `configFor` — `menu/challenge.ts#challengeRunConfigs`, whose own docstring
+     * says it *"mirrors `leaderboard/verify.ts#configFor` term for term"* — and it does **not** set
+     * that term. So a rotation entry naming a building the rule moves would be replayed by this
+     * server over a different window from the one the player's browser measured, and every honest
+     * challenge entry on it would be refused as unreproducible. That is issue #315 exactly, one
+     * surface over.
+     *
+     * **No shipped challenge is affected today**, which is why this is a tripwire rather than a
+     * failure: `garden-apartments` is the only building whose matrix cells are unanimously
+     * `full-run`, and the rotation is `midtown-office`, `chancery-house` and `crown-hotel` — the
+     * first not unanimous, the other two not in the matrix at all. All three get `undefined`, both
+     * sides omit the key, and the two configs are identical.
+     *
+     * The fix belongs in `viz` and is one line in `challengeRunConfigs`; this case is what stops the
+     * hazard arriving silently in the meantime. `menu/challenge.test.ts`'s key-parity guard names
+     * *"a `reportWindow`"* as its own worked example of what it exists to catch and did not catch
+     * this one: it extracts keys from `configFor`'s spread arms with a pattern that requires a
+     * colon, and a shorthand property (`{ reportWindow }` — `shiftRunConfigOf`'s own spelling for
+     * spread-or-omit) has none.
+     */
+    // The instrument first: a rule that moved nothing would make the filter below vacuous and this
+    // case would pass on a tree where the hazard had already shipped.
+    expect(
+      [...config.buildingsById.keys()].filter((id) => reportWindowForBuilding(id) !== undefined),
+      'the window rule moves no shipped building; this case would assert nothing',
+    ).not.toEqual([]);
+
+    const moved = CHALLENGE_ROTATION.filter(
+      (definition) => reportWindowForBuilding(definition.config.buildingId) !== undefined,
+    ).map((definition) => `${definition.slug} (${definition.config.buildingId})`);
+    expect(
+      moved,
+      'this rotation entry needs `viz`’s `menu/challenge.ts#challengeRunConfigs` to set ' +
+        '`reportWindow` from the building id first, or every honest entry on it is refused',
+    ).toEqual([]);
+  });
 
   it('has enough legs behind each run for the mean to mean something', () => {
     // R13 again, one level down. `garden-apartments` at 6 %/900 s produces a legitimately quotable

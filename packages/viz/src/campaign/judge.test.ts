@@ -23,6 +23,19 @@
  * Everything is driven over the shipped `data/`, through the shipped request constructor, for
  * `campaign.test.ts`'s stated reason: a suite that assembled its own would keep passing while the
  * panel drifted.
+ *
+ * ## Control 3, and the cleared branch of control 2, are in `judgeCleared.test.ts`
+ *
+ * GitHub issue #317. Both of them need a verdict that really clears, which means running the
+ * shipped dispatcher library against a stage; here that was one `it()` holding a thirteen-profile
+ * sweep, and it measured **78 328 ms of this file's 81 200 ms** on an idle box while every other
+ * case in it finished inside 9 ms. Inside a full `--project viz` run the same case was reported at
+ * **336 826 ms against the project's 300 000 ms ceiling**.
+ *
+ * The sibling file is one case per dispatcher, so the work vitest schedules and times out is a
+ * single dispatcher rather than the library. **No control was weakened to get there** — the sweep
+ * used to stop at the first profile that cleared, and every profile after it went unread, so the
+ * two controls are now made over all thirteen verdicts instead of over one.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -34,13 +47,12 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { restrictedFloorIds } from '../access/zoning.js';
 import { batchReport } from '../batch/report.js';
-import { runBatch } from '../batch/runBatch.js';
-import type { BatchResources, BatchResult } from '../batch/types.js';
+import type { BatchResult } from '../batch/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { GOAL_KINDS, goalLabel } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
-import { judgeStage, type StageReport } from './judge.js';
+import { judgeStage } from './judge.js';
 import { parseCampaign, type CampaignContext } from './parse.js';
 import {
   batchRequestForStage,
@@ -48,7 +60,6 @@ import {
   stageSeedSetOf,
   type StageSeedSet,
 } from './stageRun.js';
-import { runStageToVerdict } from './stageSequence.js';
 import type { Campaign, CampaignStage } from './types.js';
 
 let config: LoadedConfig;
@@ -91,15 +102,6 @@ function publishedFor(stage: CampaignStage): PublishedScenario {
   const entry = published.scenarios.find((candidate) => candidate.id === stage.id);
   if (entry === undefined) throw new Error(`no published entry for ${stage.id}`);
   return entry;
-}
-
-function resourcesFor(stage: CampaignStage): BatchResources {
-  return {
-    building: requireBuilding(config, stage.building),
-    dispatcherProfiles: config.dispatcherProfiles,
-    trafficProfiles: config.trafficProfiles,
-    elevatorSpecs: config.elevatorSpecs,
-  };
 }
 
 /**
@@ -162,7 +164,21 @@ describe('the headline is a tally of verdicts, not a goal claim', () => {
     expect(verdict.goals.every((goal) => goal.met === null)).toBe(true);
   });
 
-  it('names no goal kind and no goal label, cleared or not', async () => {
+  /**
+   * The **uncleared** half of what used to be one case — GitHub issue #317.
+   *
+   * The cleared half is `judgeCleared.test.ts`, one case per shipped dispatcher, and that file's
+   * docstring carries the measurement that moved it: sweeping the library inside a single `it()`
+   * put **78 328 ms of this file's 81 200 ms** into one unit that vitest can neither spread across
+   * workers nor fail in any smaller piece, and it exceeded the project's 300 000 ms ceiling inside
+   * a full `--project viz` run.
+   *
+   * Nothing was given up in the move. This half needs no simulation at all — an `emptyResult` and
+   * a `judgeStage` call — so it stays here beside the other cases it shares its fixtures with, and
+   * the assertions that needed a real clear are made over **all thirteen** dispatchers there
+   * rather than over the first one that happened to clear.
+   */
+  it('names no goal kind and no goal label on an uncleared verdict', () => {
     const words = goalWords();
     // Both ways: a `GOAL_KINDS` that emptied would make every assertion below vacuous.
     expect(words.length).toBeGreaterThan(6);
@@ -176,58 +192,12 @@ describe('the headline is a tally of verdicts, not a goal claim', () => {
     });
     expect(uncleared.cleared).toBe(false);
 
-    /*
-     * A **measured** clear, and it is stage 5 rather than stage 4 since § D265 — see
-     * `campaign.test.ts` § *stage 5, played*, which sweeps the thirteen shipped profiles and records
-     * that the clear moved buildings when § D254 changed what every conventional arm on an
-     * access-zoned building does.
-     *
-     * Searched rather than pinned to a profile id for that file's reason: which profile clears is a
-     * measurement that will move again, and a test naming one gets re-pinned without anybody
-     * re-reading the claim. What this file needs is *a* cleared verdict to check the headline of.
-     */
-    const stage = stageAt(4);
-    let cleared: StageReport | undefined;
-    for (const profile of config.dispatcherProfiles.profiles) {
-      /*
-       * Two batches, and the second only when the first met every bar — through
-       * `campaign/stageSequence.ts`, which is the sequence the Campaign tab runs. It was written
-       * out here, and a copy of the rule that decides whether a player cleared a stage is a copy
-       * that can drift from the surface: it did, for a whole wave, while the panel ran one batch.
-       * The skip is arithmetic rather than a shortcut, because `cleared` needs both halves.
-       */
-      const { verdict } = await runStageToVerdict({
-        stage,
-        published: publishedFor(stage),
-        candidateProfileId: profile.id,
-        run: (request) => runBatch(request, resourcesFor(stage)),
-      });
-      if (verdict.cleared) {
-        cleared = verdict;
-        break;
-      }
+    for (const word of words) {
+      expect(uncleared.headline.includes(word), `${word} in "${uncleared.headline}"`).toBe(false);
     }
-    expect(cleared, 'no shipped profile clears stage 5, so this case has no cleared verdict to check').toBeDefined();
-    if (cleared === undefined) return;
-    expect(cleared.cleared).toBe(true);
-
-    for (const verdict of [uncleared, cleared]) {
-      for (const word of words) {
-        expect(verdict.headline.includes(word), `${word} in "${verdict.headline}"`).toBe(false);
-      }
-      // R13's half of the same string: the count the tally is over is always in it.
-      expect(verdict.headline).toContain(`over ${String(verdict.replications)} runs`);
-    }
-
-    /*
-     * And the rate R12 does ask for is where R12 puts it — beside each goal, not in the headline.
-     * `beat-the-baseline` is `batch-only`, which § D160 says R12 never reached.
-     */
-    for (const goal of cleared.goals) {
-      if (goal.kind === 'beat-the-baseline') continue;
-      expect(/\b\d+ of \d+ runs\b/.test(goal.sentence), goal.sentence).toBe(true);
-    }
-  }, 300_000);
+    // R13's half of the same string: the count the tally is over is always in it.
+    expect(uncleared.headline).toContain(`over ${String(uncleared.replications)} runs`);
+  });
 });
 
 /* -------------------------------------------------------------------------- *

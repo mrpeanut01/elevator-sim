@@ -41,9 +41,11 @@
  * schema, a loader and a validation pass that nothing else wants. The split below is the smallest
  * change that makes the single source browser-reachable.
  *
- * Everything in this file is **data plus one lookup**. The machinery that runs a cell — budgets
- * from the census, the Pareto front, the pins — stays in `matrix.ts`, which documents the whole
- * study and remains the module a Node reader should start at.
+ * Everything in this file is **data plus two lookups** — {@link matrixCell}, and
+ * {@link reportWindowForBuilding}, which is a conclusion read off the cells rather than a second
+ * rule about them (GitHub issue #315; its own docstring carries the argument). The machinery that
+ * runs a cell — budgets from the census, the Pareto front, the pins — stays in `matrix.ts`, which
+ * documents the whole study and remains the module a Node reader should start at.
  */
 
 import type { TrafficArmSpec } from '../runner/types.js';
@@ -360,4 +362,118 @@ export function matrixCell(id: string): MatrixCell {
     );
   }
   return found;
+}
+
+/* -------------------------------------------------------------------------- *
+ * The one derived answer the cells are read for outside this package
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Which window a run on this building is reported over** — `'full-run'`, or `undefined` for
+ * *the demand template's own band*.
+ *
+ * ## Why the rule is here rather than in either consumer
+ *
+ * It is a **conclusion about {@link MATRIX_CELLS}**, and this module is where the cells are. It
+ * lived in `packages/viz/src/shift/reportWindow.ts` from `docs/20` defect 5 until GitHub issue
+ * **#315**, where it stopped being a viewer question: `packages/server`'s leaderboard verifier
+ * replays a submitted run on its own `data/` and compares the metrics, so **the two sides have to
+ * choose the same window or an honest run does not reproduce**. Measured on that issue's own case —
+ * `garden-apartments` / `collective` / `rise-and-fall` / 3 600 s / seed 20260901 — the server read
+ * `awtS 18.233` where the client read `13.462`, and every Garden submission was refused as
+ * unreproducible.
+ *
+ * They cannot share a `viz` module: § D215 § 3's *"`viz` may not depend on `server`"* runs in the
+ * other direction too, and the server may not import a browser bundle. They may not each carry a
+ * copy either, because the window is the divisor of every mean on the sheet and two copies that
+ * drift refuse honest scores — which is the defect, re-armed.
+ *
+ * They also may not agree by putting the window **on the wire**. A submitted report window is a
+ * player-settable parameter inside a board key (`ENGINE_CONTRACT.md` § 12.1) and a cheat lever with
+ * it: a player who picks their own window picks their own average. So both sides *derive* it, from
+ * this one function, keyed on the one thing a submission already carries — the building id.
+ *
+ * This module is the placement § D406 already argued for. The cells were moved out of `matrix.ts`
+ * into a browser-safe module of their own precisely so a consumer outside this package could
+ * **import them rather than retype them**; a rule read off them is that same decision one step on.
+ * `packages/server` is allowed to depend on this package — § D214 § 3: *"`packages/server` depends
+ * on `core`, which is allowed (invariant 6 forbids `core → viz`, nothing else)"* — and the shipped
+ * image already carries it (`Dockerfile` copies `packages/experiments/dist`).
+ *
+ * ## The defect it closes, and why the answer is read rather than invented
+ *
+ * Garden Apartments day 1 is the first sheet a new player ever sees, and it **withheld both of its
+ * headline numbers**: `AVERAGE WAIT withheld`, `WORST WAIT not recorded`, both under *"the reporting
+ * window held no arrivals"* — beside a goal row reading a perfectly good `38 s`. Forty people rode
+ * that day. None of them arrived in the five minutes the sheet was reading.
+ *
+ * The cause was an **absence**: the shift path set no `reportWindow`, so `core` fell back to the
+ * demand template's own measurement band — `rise-and-fall`'s five-minute hold, at a fixed position
+ * in the schedule. On a building whose whole day is forty arrivals over an hour, a fixed five-minute
+ * band is empty about as often as not, and `awtIsValid`'s *empty window* ground fires on a run that
+ * coped perfectly well.
+ *
+ * This project had already measured that exact question on that exact building. `arms.ts` § 2:
+ *
+ * > **Garden Apartments needs the full-run window, not peak-5min.** At the sparse rates where
+ * > parking policy actually dominates … the peak-5-minute window contains **1 to 11 arrivals**, and
+ * > a window with none has no AWT at all. Measured: at 1 % the peak-5min cell is invalid on **54
+ * > replications in 100**, at 2 % on 20, at 4 % on 11, at 6 % on 1, and only at 8 % is it clean.
+ *
+ * and {@link EXCLUDED_CELLS} reproduces it independently at n = 200: `garden-up-peak` is excluded
+ * because *"at 2 % the peak-5min window is invalid on 57 of 200 replications for every one of the
+ * twelve arms simultaneously"*. So this function returns the **conclusion the cells already
+ * encode** rather than a rule of its own. A second rule — an arrival-count threshold, a population
+ * heuristic — would be a second answer to a question this repository has already answered with a
+ * run, and the first thing that would happen is that the two would disagree.
+ *
+ * ## Why unanimity, and why that is not a hedge
+ *
+ * The predicate is *every* cell on this building declares `full-run`, not *any*. The distinction
+ * decides Midtown Office, which has three cells: `midtown-interfloor` declares `full-run` and the
+ * up-peak and down-peak cells do not. That cell is full-run because it is a 1 800 s interfloor
+ * study, not because Midtown's peak band is ever empty — at 1 % of 1 710 people it never is. So
+ * *any* would move a building whose window is fine, on the strength of a cell that says nothing
+ * about emptiness.
+ *
+ * What unanimity actually reads is: **at every rate this project has measured this building at, the
+ * narrow window was the wrong instrument.** That is a property of the building, which is what a
+ * caller holding only a building id needs.
+ *
+ * ## `undefined`, and why it is not `'peak-5min'`
+ *
+ * `'peak-5min'` is a **selection** that makes `core` search the arrivals for their busiest five
+ * minutes; `undefined` leaves the demand template's declared band in place. Those are different
+ * windows on the same run, and every shipped sheet before `docs/20` defect 5 was read over the
+ * second. Returning the first here would silently re-measure every building in the product to fix
+ * one, which is a change nobody asked for wearing a bug fix's clothes. A building the matrix does
+ * not measure at all — `chancery-house`, and anything a reader draws — keeps the template's band,
+ * which is the honest default: this module knows nothing about it, and inventing an answer for a
+ * building nobody censused is the thing the paragraph above refuses.
+ *
+ * ## What it costs, stated rather than glossed
+ *
+ * A day statistic instead of a peak statistic, on the buildings it moves — exactly the trade
+ * `arms.ts` names and defends: *"That trades a peak statistic for a day statistic and says so; it
+ * does not trade a valid interval for an invalid one."* The sheet says so too: every window-bearing
+ * caption on the Day report prints `summary.reportWindow.id`, so a full-run sheet reads *over 40
+ * legs in the full-run window* rather than claiming a peak it did not measure (`viz`'s
+ * `shift/report.ts#smallPrintFor`).
+ *
+ * ## Non-test callers
+ *
+ * `packages/viz/src/shift/reportWindow.ts#shiftReportWindowFor` — the name viz's three producers
+ * ask by (`dev/state.ts#shiftRunConfigOf`, `campaign/stageRun.ts` at both its call sites, and
+ * `scenario/measure.ts`) — and `packages/server/src/leaderboard/verify.ts#configFor`, the replay
+ * those producers have to agree with.
+ *
+ * @param buildingId the id a run is being configured on, **unresolved**: a building a reader
+ *   authored has no matrix cell and correctly falls through to `undefined`.
+ */
+export function reportWindowForBuilding(buildingId: string): MatrixCell['traffic']['reportWindow'] {
+  const cells = MATRIX_CELLS.filter((cell) => cell.building === buildingId);
+  if (cells.length === 0) return undefined;
+  // Unanimity — see the docstring. `every` over an empty list is vacuously true, which is why the
+  // length is checked first rather than relied upon.
+  return cells.every((cell) => cell.traffic.reportWindow === 'full-run') ? 'full-run' : undefined;
 }

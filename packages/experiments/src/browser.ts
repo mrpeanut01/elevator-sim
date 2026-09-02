@@ -317,9 +317,15 @@ export type {
  * Deliberately narrow: `EXCLUDED_CELLS` and the study runners are not here —
  * a name on this barrel is a promise the guard must keep, and the suite
  * consumes exactly the list and the lookup.
+ *
+ * `reportWindowForBuilding` joins them for GitHub issue #315: it is a
+ * conclusion read off the same cells, and its two consumers are `viz`'s shift
+ * path — which reaches this package only through this barrel
+ * (`viz/src/boundaries.test.ts`) — and `packages/server`'s replay verifier,
+ * which has to choose the same window or an honest score does not reproduce.
  * -------------------------------------------------------------------------- */
 
-export { MATRIX_CELLS, matrixCell } from './benchmark/matrixCells.js';
+export { MATRIX_CELLS, matrixCell, reportWindowForBuilding } from './benchmark/matrixCells.js';
 
 export type { BudgetBasis, MatrixCell } from './benchmark/matrixCells.js';
 

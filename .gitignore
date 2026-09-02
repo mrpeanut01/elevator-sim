@@ -1,5 +1,26 @@
 # Dependencies
-node_modules/
+#
+# No trailing slash on `node_modules`, and that is load-bearing rather than tidiness. A pattern
+# ending in `/` matches DIRECTORIES ONLY, so a `node_modules` that is a *symlink* is not ignored,
+# and `git add -A` tracks it. Two lanes in one wave did exactly that and each untracked it by hand.
+# Measured here, git 2.43.0, all four cells:
+#
+#   pattern         `node_modules` is   git status         git check-ignore
+#   node_modules/   a real directory    (ignored)          matches
+#   node_modules/   a symlink           ?? node_modules    NO MATCH, exit 1
+#   node_modules    a real directory    (ignored)          matches
+#   node_modules    a symlink           (ignored)          matches
+#
+# Dropping the slash gives up nothing: the real-directory case still matches, and its contents
+# still match through it — `node_modules/pkg/index.js` reports this line as its reason.
+#
+# The symlinks do NOT come from `.worktree-setup.sh`, which builds a real directory here; its
+# header says why the whole-directory symlink fails. `DECISIONS.md` § D4 chose "symlink the root
+# node_modules" and its heading still reads that way, so the practice is documented and nothing
+# has withdrawn it. Whether the two tracked symlinks came from there is unestablished — the
+# commits are not in this checkout. The point of the pattern is that the outcome no longer
+# depends on how the directory got made.
+node_modules
 .pnp
 .pnp.js
 

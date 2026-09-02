@@ -36,6 +36,32 @@
  * heuristic — would be a second answer to a question this repository has already answered with a
  * run, and the first thing that would happen is that the two would disagree.
  *
+ * ## The rule itself moved, and this module is now the viz-side name for it — GitHub issue #315
+ *
+ * That last sentence came true one package over. `packages/server`'s leaderboard verifier replays a
+ * submitted run on its own `data/` and refuses it unless the metrics reproduce — and it set **no**
+ * `reportWindow`, because it could not reach this module: `viz` is a browser bundle and § D215 § 3's
+ * *"`viz` may not depend on `server`"* runs in the other direction too. So every `garden-apartments`
+ * submission was refused as unreproducible. Measured on the issue's own case (`collective`,
+ * `rise-and-fall`, 3 600 s, seed 20260901): server `awtS 18.233`, client `13.462`.
+ *
+ * Putting the window on the wire is not the fix — a submitted window is a player-settable parameter
+ * inside a board key (`ENGINE_CONTRACT.md` § 12.1), and a player who picks their own window picks
+ * their own average. Both sides must *derive* it from the building id, and they must derive it with
+ * **one** function, because two copies of a rule that decides the divisor of every mean on the sheet
+ * drift into exactly this defect again.
+ *
+ * The rule therefore lives beside its only input, in
+ * `@elevator-sim/experiments`'s `benchmark/matrixCells.ts#reportWindowForBuilding` — the module
+ * § D406 made browser-safe precisely so a consumer outside that package could import the cells
+ * rather than retype them. Its docstring is the long version of everything above, plus the argument
+ * for the placement.
+ *
+ * **What survives here is the name and the shift-path evidence**, not a second answer.
+ * {@link shiftReportWindowFor} is the name this package's three producers ask by, {@link
+ * ShiftReportWindow} is `core`'s type narrowed to what they carry, and the re-measurement below was
+ * taken on this path and belongs with it.
+ *
  * ## Why unanimity, and why that is not a hedge
  *
  * The predicate is *every* matrix cell on this building declares `full-run`, not *any*. The
@@ -87,7 +113,7 @@
  * building nobody censused is the thing the paragraph above refuses.
  */
 
-import { MATRIX_CELLS } from '@elevator-sim/experiments/browser';
+import { reportWindowForBuilding } from '@elevator-sim/experiments/browser';
 import type { SimulationConfig } from '@elevator-sim/core/browser';
 
 /** The selection this module may return, which is `core`'s own type narrowed to what it decides. */
@@ -103,13 +129,26 @@ export type ShiftReportWindow = SimulationConfig['reportWindow'];
  * over the second. Passing the first here would silently re-measure every building in the product
  * to fix one, which is a change nobody asked for wearing a bug fix's clothes.
  *
+ * **This is the shared rule under this package's name for it, not a second one** — GitHub issue
+ * #315, and the module docstring's last section says why the distinction had to be drawn. The
+ * derivation is `@elevator-sim/experiments`'s `reportWindowForBuilding`, which `packages/server`'s
+ * replay verifier calls too; a copy here would be two answers to the question that decides whether
+ * an honest submission reproduces.
+ *
+ * Kept as a function rather than collapsed into `export { … as … }` on purpose: the three producers
+ * import this name, and `shift/reportWindow.test.ts` derives its caller set from disk by looking
+ * for **calls** of it — a re-export line makes no call, so the registry that exists to catch a
+ * fourth producer arriving unregistered would have been asserting over a set of three.
+ *
+ * One thing did move out with the literal, and it is recorded rather than left to be noticed:
+ * `honesty/derive.test.ts` used to carry a `NOT_PLAYER_FACING` exclusion for this expression,
+ * because `'full-run'` reads as a phrase to that corpus's two-adjacent-words scanner. The literal
+ * is in `experiments` now, the scanner no longer derives this function at all, and the exclusion
+ * was deleted as the ghost it had become — with the reason left where it used to sit.
+ *
  * @param buildingId the id a shift is being run on — `ViewerState.buildingId`, unresolved, because
  *   a building the reader authored has no matrix cell and correctly falls through to `undefined`.
  */
 export function shiftReportWindowFor(buildingId: string): ShiftReportWindow {
-  const cells = MATRIX_CELLS.filter((cell) => cell.building === buildingId);
-  if (cells.length === 0) return undefined;
-  // Unanimity — see the docstring. `every` over an empty list is vacuously true, which is why the
-  // length is checked first rather than relied upon.
-  return cells.every((cell) => cell.traffic.reportWindow === 'full-run') ? 'full-run' : undefined;
+  return reportWindowForBuilding(buildingId);
 }

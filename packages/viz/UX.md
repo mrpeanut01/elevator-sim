@@ -688,7 +688,7 @@ stronger than the static sweep, weaker than a drive, and S9 forbids citing it as
 | FP-06 | Free play | Every axis moves the legs | ✅ test (`state.freePlay.test.ts`, `scope.test.ts`) |
 | LB-01 | Leaderboard | All four metrics on every row, never combined, with the seed | ✅ test · ⚠️ mount |
 | LB-02 | Leaderboard | The server's own ranking note is printed **verbatim** | ✅ test |
-| LB-03 | Leaderboard | The screen says what a board *is* — one configuration across seeds | ✅ test (driven) · **⚠️ and see `GAPS.md` § 3: this is a mitigation, not a fix** |
+| LB-03 | Leaderboard | The screen says what the rows **share**, and names per row what they do not | ✅ test (driven; `boardRun.test.ts` drives a mixed daily board and a negative control) · **corrected 2026-09-02, GitHub issue #316** — this read *"what a board *is* — one configuration across seeds"*, which [§ D439](../../DECISIONS.md) made false: a daily board is keyed by the date alone, so its rows can carry different dispatchers. Its pointer to `GAPS.md` § 3 *"a mitigation, not a fix"* went with it — the row it named is struck through and closed |
 | LB-04 | Leaderboard | *Post this run* is refused with a reason, and the reason distinguishes *not signed in* from *this run cannot be ranked* | ✅ test (`runIdentity.test.ts`; the two are never collapsed) · ⚠️ mount |
 | LB-05 | Leaderboard | An empty board says so in words rather than drawing an empty table | ✅ test |
 | AC-01 | Account | A wrong password and an unknown address give the **same** sentence | ✅ test (`client.test.ts`, against the server's own source text) |
