@@ -10,12 +10,14 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 
 import { loadConfig, runSimulation, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
+import { MATRIX_CELLS } from '@elevator-sim/experiments/browser';
 
 import { runDataHashOf } from './boardKey.js';
 import { digestOf, submissionIssues, type Submission, type SubmittedRun } from './submission.js';
 import {
   METRIC_EPSILON,
   configFor,
+  metricsAgree,
   metricsOf,
   verifySubmission,
   type VerificationResources,
@@ -127,6 +129,7 @@ function asTheClientBuildsIt(run: SubmittedRun): SimulationConfig {
   const profile = config.dispatcherProfilesById.get(run.dispatcherProfileId);
   if (building === undefined || profile === undefined) throw new Error('fixture does not resolve');
   const rows = run.ruleRows ?? [];
+  const reportWindow = clientReportWindowFor(run.buildingId);
   return {
     building,
     dispatcherProfile:
@@ -145,14 +148,166 @@ function asTheClientBuildsIt(run: SubmittedRun): SimulationConfig {
     ...(run.windowStartS === null
       ? { durationS: run.durationS }
       : { windowStartS: run.windowStartS, windowEndS: run.windowStartS + run.durationS }),
+    ...(reportWindow === undefined ? {} : { reportWindow }),
     ...((run.interventions ?? []).length === 0 ? {} : { interventions: run.interventions }),
   } as SimulationConfig;
+}
+
+/**
+ * The window the **viewer** would report this building's run over — GitHub issue #315.
+ *
+ * Written out from `MATRIX_CELLS` rather than obtained from `reportWindowForBuilding`, for the
+ * reason the docstring above gives about every other term here: the shared function is what
+ * `configFor` calls, so asking it would be the verifier agreeing with itself. What has to be true is
+ * that the server reaches the same window `viz`'s `shift/reportWindow.ts#shiftReportWindowFor`
+ * reaches, and that function's rule is *every* matrix cell on this building declares `full-run` —
+ * `every` rather than `some`, which is the clause Midtown Office settles and the clause this
+ * transcription would get wrong if the shared rule quietly changed under it.
+ *
+ * A building the matrix does not measure returns `undefined`: **leave the demand template's own
+ * band alone**, which is not the same selection as `'peak-5min'`.
+ */
+function clientReportWindowFor(buildingId: string): 'full-run' | undefined {
+  const cells = MATRIX_CELLS.filter((cell) => cell.building === buildingId);
+  if (cells.length === 0) return undefined;
+  return cells.every((cell) => cell.traffic.reportWindow === 'full-run') ? 'full-run' : undefined;
 }
 
 /** What a client that ran `run` would claim, measured its own way. */
 function claimedByTheClient(run: SubmittedRun): Submission {
   return { run, claimed: metricsOf(runSimulation(asTheClientBuildsIt(run)).summary) };
 }
+
+/* -------------------------------------------------------------------------- *
+ * The window both sides have to choose the same way — GitHub issue #315
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The run the issue reports, verbatim: a whole hour of Garden Apartments on its own traffic profile.
+ *
+ * Not {@link RUN}, which is 900 s at 6 %. The length matters to nothing here — the defect is the
+ * window and not the horizon — but a case that reproduces the filed numbers is checkable against the
+ * issue by a reader who has only the issue.
+ */
+const WINDOW_RUN: SubmittedRun = Object.freeze({
+  buildingId: 'garden-apartments',
+  dispatcherProfileId: 'collective',
+  demandTemplateId: 'rise-and-fall',
+  arrivalRatePctPop5min: null,
+  durationS: 3600,
+  windowStartS: null,
+  seed: '20260901',
+});
+
+/**
+ * Buildings this server ships, split by the answer the matrix gives about their reporting window.
+ *
+ * **Derived, and that is the acceptance clause rather than a nicety.** The suite drove
+ * `midtown-office` and `garden-apartments` before this issue and still missed the defect, because
+ * every case that compared a *client-built* config against `configFor` used Midtown — the one
+ * building whose answer is *leave the template's band alone*, where an absent `reportWindow` and a
+ * correct one are the same run. So the cases below take one building from **each** side of the rule,
+ * chosen by the rule, and a matrix edit that emptied either side fails the premise rather than
+ * quietly making the pair vacuous.
+ */
+const buildingsBy = (window: 'full-run' | undefined): readonly string[] =>
+  [...config.buildingsById.keys()].filter((id) => clientReportWindowFor(id) === window);
+
+describe('the report window is derived on both sides, and never submitted', () => {
+  it('has a building on each side of the rule, so the pair below is not vacuous', () => {
+    // The premise. `garden-apartments` and `midtown-office` are named as well as derived: a matrix
+    // edit that moved either across the rule would change what these cases are testing, and it
+    // should say so here rather than in a passing test about a different building.
+    expect(buildingsBy('full-run')).toContain('garden-apartments');
+    expect(buildingsBy(undefined)).toContain('midtown-office');
+    expect(buildingsBy('full-run').length).toBeGreaterThan(0);
+    expect(buildingsBy(undefined).length).toBeGreaterThan(0);
+  });
+
+  it('replays a full-run building to the client’s own metrics', () => {
+    /*
+     * The defect, as a run. `viz`'s `shiftRunConfigOf` has set `reportWindow: 'full-run'` on this
+     * building since `docs/20` defect 5; `configFor` set none, so the server measured the same legs
+     * over `rise-and-fall`'s five-minute band and refused every honest Garden submission as
+     * `metrics-do-not-reproduce` — this product's one accusation, spent on a player who did nothing
+     * wrong.
+     */
+    for (const buildingId of buildingsBy('full-run')) {
+      const submission = claimedByTheClient({ ...WINDOW_RUN, buildingId });
+      const verification = verifySubmission(submission, resources);
+      expect(verification.ok, `${buildingId}: ${JSON.stringify(verification)}`).toBe(true);
+    }
+  }, 300_000);
+
+  it('leaves a building the matrix does not move exactly where it was', () => {
+    /*
+     * The other side, and the reason a fix here could not be *"always full-run"*. A building whose
+     * cells are not unanimous keeps the demand template's declared band, and the client and the
+     * server agree by both leaving it alone. Driven at 3 % rather than on its own profile because
+     * Midtown at its authored rate saturates over an hour and would be refused as `awt-not-quotable`
+     * before the comparison this case exists for.
+     */
+    let checked = 0;
+    for (const buildingId of buildingsBy(undefined)) {
+      const run = { ...WINDOW_RUN, buildingId, arrivalRatePctPop5min: 3, durationS: 900 };
+      const submission = claimedByTheClient(run);
+      // A run whose own mean is not quotable is refused by `awt-not-quotable` before the comparison
+      // this case is about, and says nothing either way. Skipped, and counted, because a loop that
+      // skipped every building would otherwise pass by testing nothing.
+      if (!submission.claimed.awtIsValid) continue;
+      const verification = verifySubmission(submission, resources);
+      expect(verification.ok, `${buildingId}: ${JSON.stringify(verification)}`).toBe(true);
+      checked += 1;
+    }
+    expect(checked, 'every band-window building was skipped; this case asserted nothing').toBeGreaterThan(0);
+  }, 300_000);
+
+  it('changes the figures on the building it moves, so the agreement is not a no-op', () => {
+    /*
+     * `CLAUDE.md`'s standing requirement pointed at a config term instead of a slider: **move the
+     * control and require the run to change**. Two configs that differ only in the window, on the
+     * same seed and the same legs — if the term were inert, every case above would pass on the tree
+     * that shipped the defect.
+     *
+     * The numbers are the issue's own, named rather than only compared: `garden-apartments` /
+     * `collective` / `rise-and-fall`, window null, 3 600 s, seed 20260901. A cell edited to one
+     * where the window goes quiet turns this red rather than vacuous.
+     */
+    const withWindow = configFor(WINDOW_RUN, resources);
+    if (typeof withWindow === 'string') throw new Error(`fixture does not resolve: ${withWindow}`);
+    const asItWas = { ...withWindow, reportWindow: undefined } as SimulationConfig;
+
+    const server = metricsOf(runSimulation(asItWas).summary);
+    const client = metricsOf(runSimulation(withWindow).summary);
+
+    expect(server.awtS).toBeCloseTo(18.233, 3);
+    expect(server.wt95S).toBeCloseTo(29.31, 3);
+    expect(server.ttdMeanS).toBeCloseTo(50.829, 3);
+    expect(client.awtS).toBeCloseTo(13.462, 3);
+    expect(client.wt95S).toBeCloseTo(28.119, 3);
+    expect(client.ttdMeanS).toBeCloseTo(40.348, 3);
+    expect(metricsAgree(server, client)).toBe(false);
+  }, 300_000);
+
+  it('refuses a window on the wire, because a chosen window is a chosen average', () => {
+    /*
+     * The half that keeps the fix from becoming a cheat. `ENGINE_CONTRACT.md` § 12.1 — *"No
+     * player-settable parameter may enter a board key"* — and the window is the divisor of every
+     * mean on the sheet, so a player who picked their own window would pick their own average.
+     *
+     * Asserted structurally rather than by a rejection code: a `SubmittedRun` has no field for it,
+     * so the wire cannot carry one at all. `submissionIssues` would never see it and `configFor`
+     * would never read it. Read off the shape a client actually builds, so a field added later
+     * fails here.
+     */
+    expect(Object.keys(WINDOW_RUN)).not.toContain('reportWindow');
+    const smuggled = { ...WINDOW_RUN, reportWindow: 'peak-5min' } as SubmittedRun;
+    const built = configFor(smuggled, resources);
+    if (typeof built === 'string') throw new Error(`fixture does not resolve: ${built}`);
+    // The window is the one the building's own id earns, not the one the submission carried.
+    expect(built.reportWindow).toBe('full-run');
+  });
+});
 
 describe('an Everyday run is submittable, and the server reaches the same figures', () => {
   it('replays a written rule list to the client’s own metrics', () => {
@@ -366,11 +521,28 @@ describe('a submission is accepted only if it replays', () => {
   });
 
   it('refuses a run whose mean the project would not report, whatever was claimed', () => {
-    // `garden-apartments` at 40 % of population per five minutes is far past anything two hydraulic
-    // cars can clear. Claiming `awtIsValid: true` cannot buy a ranking, because the flag is checked
-    // against the SERVER's run.
+    /*
+     * `garden-apartments` at 60 % of population per five minutes is far past anything two hydraulic
+     * cars can clear. Claiming `awtIsValid: true` cannot buy a ranking, because the flag is checked
+     * against the SERVER's run.
+     *
+     * **The rate is 60 % and used to be 40 %, and the reason is a finding rather than a tuning.**
+     * This case's premise was *this run saturates*, and it was true of the window the server used to
+     * read — `rise-and-fall`'s five-minute band, which at 40 % reports a queue rising 23.7 persons
+     * and refuses the mean. It was never true of the window the **product** reports this building
+     * over: under `full-run`, which `viz` has sent since `docs/20` defect 5 and which GitHub issue
+     * #315 makes the server agree with, 40 % is quotable at a mean of 76.07 s. So this case was
+     * passing on a run the client would have called quotable and the server would have refused —
+     * which is the *same* client/server disagreement #315 is about, wearing the other code.
+     *
+     * 60 % saturates under the window the product actually uses: the trend test sees the queue rise
+     * **107.6 persons (5.62/min, 9.5× its own scatter)** over the 1 149 s full-run window, against
+     * thresholds of 8 persons and 0.5/min. The assertion below is unchanged and the demand is
+     * higher, so nothing here is weakened — the fixture is measured against the window it is now
+     * read over instead of one nothing ships.
+     */
     const saturating: Submission = {
-      run: { ...RUN, arrivalRatePctPop5min: 40 },
+      run: { ...RUN, arrivalRatePctPop5min: 60 },
       claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
     };
     const verification = verifySubmission(saturating, resources);

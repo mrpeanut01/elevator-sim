@@ -436,6 +436,7 @@ export {
   budgetFor,
   cellResult,
   matrixCell,
+  reportWindowForBuilding,
   runMatrix,
   runMatrixCell,
   PHASE7_CASE_ID,

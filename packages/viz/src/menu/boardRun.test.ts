@@ -34,13 +34,14 @@ import {
   boardConfigurationOf,
   boardRevealOf,
   boardRevealRefusalOf,
+  rowVariationOf,
   selectionFromRun,
 } from './boardRun.js';
 import { catalogueOf } from './catalogue.js';
-import type { RunSubmission } from './client.js';
+import type { BoardEntry, RunSubmission } from './client.js';
 import { enterFreePlay } from './enterFreePlay.js';
 import { freePlayIssues } from './menu.js';
-import { applyIntent } from './screens.js';
+import { applyIntent, screenOf, type MenuAffordance, type MenuScreenView } from './screens.js';
 import type { FreePlaySelection, MenuState } from './types.js';
 import { initialMenuState } from './menu.js';
 
@@ -64,8 +65,32 @@ const ROW: RunSubmission = Object.freeze({
   seed: '1001',
 });
 
-/** The same board, a different player, a different seed. The only axis a row may differ on. */
+/** The same configuration, a different player, a different seed. */
 const OTHER_ROW: RunSubmission = Object.freeze({ ...ROW, seed: '1002' });
+
+/**
+ * The daily board's own shape — GitHub issue #316, and § D439's consequence in one constant.
+ *
+ * The **same** seed as {@link ROW}, because that is what a daily board is: the day's fixture and the
+ * day's crowd, with the dispatcher left free (`leaderboard/boardKey.ts#isDailyFixtureRun`). A row
+ * differing by seed would be a personal log's shape and would test the wrong thing.
+ */
+const ETA_ROW: RunSubmission = Object.freeze({ ...ROW, dispatcherProfileId: 'eta' });
+
+/**
+ * This build's name for a dispatcher id, resolved rather than transcribed — and it throws.
+ *
+ * A `?? ''` fallback would make every `toContain` below vacuously true the day an id was renamed in
+ * `data/`, which is the shape of silent degradation these assertions exist to catch elsewhere.
+ */
+function dispatcherName(id: string): string {
+  const name = CATALOGUE.dispatchers.find((entry) => entry.id === id)?.name;
+  if (name === undefined) throw new Error(`this build ships no dispatcher “${id}”`);
+  return name;
+}
+
+const COLLECTIVE_NAME = dispatcherName('collective');
+const ETA_NAME = dispatcherName('eta');
 
 const issuesFor = (selection: FreePlaySelection): readonly { readonly message: string }[] =>
   freePlayIssues(selection, CATALOGUE);
@@ -155,21 +180,94 @@ describe('what the board ran — “how did they do it”', () => {
     expect(beatRefusalOf(unknown, CATALOGUE, issuesFor)).toContain('not-shipped-here');
   });
 
-  it('says nothing about what ran when the rows disagree about it', () => {
-    /*
-     * A page whose rows do not share a configuration cannot happen while `runDataHashOf` digests all
-     * six fields — which is exactly why the check is here rather than assumed. If the server ever
-     * drops one, this screen must go quiet rather than name the first row's dispatcher for all of
-     * them.
-     */
-    const configuration = boardConfigurationOf([ROW, { ...ROW, dispatcherProfileId: 'eta' }], CATALOGUE);
+  /*
+   * What this test used to assert, and why the assertion moved rather than softened — issue #316.
+   *
+   * It read *"says nothing about what ran when the rows disagree about it"*, and it was correct
+   * about a board that was a configuration: a disagreeing page could only mean the client and the
+   * server had fallen out over what a board is, and silence was the only honest answer. § D439 made
+   * a daily board's rows disagree **by design**, so silence became a blank where the interesting
+   * fact was. What survives unweakened is the half that was load-bearing: an axis the rows disagree
+   * on is still never named as though they agreed, and the shape now makes that structural — a
+   * varying axis has no value in {@link BoardConfiguration} to print by accident.
+   */
+  it('names what a mixed board shares and never the axis it does not', () => {
+    const configuration = boardConfigurationOf([ROW, ETA_ROW], CATALOGUE);
     expect(configuration.agreed).toBe(false);
-    expect(boardRevealOf(configuration)).toBeUndefined();
-    expect(boardRevealRefusalOf(configuration)).toContain('do not all name the same configuration');
+    expect(configuration.varying).toEqual(['Dispatcher']);
+    expect(configuration.shared.map((axis) => axis.axis)).toEqual([
+      'Building',
+      'Traffic shape',
+      'Arrival rate',
+      'Part of the day',
+    ]);
+
+    const reveal = boardRevealOf(configuration);
+    expect(reveal).toContain('Midtown Office');
+    expect(reveal).toContain('3 % of population per 5 min');
+    // The refusal, asserted as an absence on both values rather than on the one that would look
+    // wrong: naming *either* dispatcher above the table is the false statement, not just the second.
+    expect(reveal).not.toContain(COLLECTIVE_NAME);
+    expect(reveal).not.toContain(ETA_NAME);
+    // And the reader is told where it went, because a sentence that simply omitted an axis would
+    // read as a board with no dispatcher.
+    expect(reveal).toContain('The rows differ on the dispatcher');
+    expect(reveal).toContain('named on each row');
   });
 
-  it('names an empty page as nothing to say rather than as a configuration', () => {
-    expect(boardConfigurationOf([], CATALOGUE).agreed).toBe(false);
+  it('agrees per axis exactly when it agrees over the whole key — the two definitions, pinned', () => {
+    /*
+     * `agreed` is measured on `configKeyOf`'s six fields and the axis table is measured field by
+     * field, and nothing but this holds them together: an axis added to the table and forgotten in
+     * the key (or the reverse) would make the screen speak about something the board never checked.
+     */
+    for (const rows of [
+      [ROW, OTHER_ROW],
+      [ROW, ETA_ROW],
+      [ROW, { ...ROW, buildingId: 'garden-apartments' }],
+      [ROW, { ...ROW, demandTemplateId: 'office-day' }],
+      [ROW, { ...ROW, arrivalRatePctPop5min: null }],
+      [ROW, { ...ROW, durationS: 900 }],
+      [ROW, { ...ROW, windowStartS: 1800 }],
+      [ROW],
+    ]) {
+      const configuration = boardConfigurationOf(rows, CATALOGUE);
+      expect(configuration.agreed).toBe(configuration.varying.length === 0);
+      expect(configuration.shared.length + configuration.varying.length).toBe(5);
+    }
+  });
+
+  it('tells two run lengths apart even when they wear the same part label', () => {
+    /*
+     * *Part of the day* is drawn from `windowStartS` **and** `durationS`, and the label is drawn
+     * from the template. So agreement has to be measured on the pair: a version comparing labels
+     * would call these two rows agreed and print a part neither of them ran for.
+     */
+    const configuration = boardConfigurationOf([ROW, { ...ROW, durationS: 900 }], CATALOGUE);
+    expect(configuration.varying).toEqual(['Part of the day']);
+    expect(boardRevealOf(configuration)).not.toContain('Part of the day:');
+  });
+
+  it('says nothing about a board whose rows share nothing, and says why', () => {
+    // A personal log's shape: whatever that player ran, in one place (§ D439).
+    const configuration = boardConfigurationOf(
+      [ROW, { ...ETA_ROW, buildingId: 'garden-apartments', demandTemplateId: 'office-day', arrivalRatePctPop5min: null, durationS: 3600, windowStartS: 0 }],
+      CATALOGUE,
+    );
+    expect(configuration.shared).toEqual([]);
+    expect(boardRevealOf(configuration)).toBeUndefined();
+    expect(boardRevealRefusalOf(configuration)).toContain('share no part of what they ran');
+  });
+
+  it('names an empty page as nothing to say rather than as rows that disagree', () => {
+    /*
+     * It used to answer the disagreement refusal here, which was a claim about rows that do not
+     * exist — an open board with nothing posted to it is a state `dev/menuPanel.ts` draws in words.
+     */
+    const configuration = boardConfigurationOf([], CATALOGUE);
+    expect(configuration.agreed).toBe(false);
+    expect(boardRevealOf(configuration)).toBeUndefined();
+    expect(boardRevealRefusalOf(configuration)).toBeUndefined();
   });
 
   it('does not print a weight vector, on any arm', () => {
@@ -184,6 +282,138 @@ describe('what the board ran — “how did they do it”', () => {
     for (const term of ['waitTime', 'weight', 'distanceTravelled', 'hardConstraint']) {
       expect(reveal).not.toContain(term);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The screen, not the sentence — GitHub issue #316
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The leaderboard as a player meets it, with a board open.
+ *
+ * Driven through `screenOf` rather than through {@link boardRevealOf} alone, because the claim under
+ * test spans the two: the reveal *promises* that what the rows differ on is named on each row, and
+ * only the screen can keep that promise. A sentence promising a disclosure a later edit removed
+ * would be § D227's stale refusal with its polarity reversed — a claim that something is said, in a
+ * place where it is not.
+ */
+function leaderboardWith(runs: readonly RunSubmission[]): MenuScreenView {
+  const entries: readonly BoardEntry[] = runs.map((run, index) => ({
+    id: `entry-${String(index)}`,
+    displayName: `Player ${String(index)}`,
+    run,
+    // What the row was measured against — never the board it is on (`ENGINE_CONTRACT.md` § 12.1).
+    dataHash: 'abcdef0123456789',
+    measured: { awtS: 24.6, wt95S: 51.2, ttdMeanS: 63.4, pctOverLongWait: 8.1, awtIsValid: true },
+    submittedAtMs: 0,
+  }));
+  return screenOf({
+    state: { ...initialMenuState(CATALOGUE), screen: 'leaderboard' },
+    catalogue: CATALOGUE,
+    canPost: true,
+    hasRun: true,
+    boards: [{ boardKey: 'daily:2026-09-01', entries: entries.length }],
+    boardPage: {
+      boardKey: 'daily:2026-09-01',
+      metric: 'awtS',
+      note: 'Ranked on the named metric alone. The others are shown beside it and never combined.',
+      entries,
+    },
+  });
+}
+
+/** The per-row controls, in board order. */
+function beatRows(view: MenuScreenView): readonly MenuAffordance[] {
+  return view.rows.filter((row) => row.id.startsWith('leaderboard.beat.'));
+}
+
+/** The nth per-row control, or a failure that names what was missing rather than a `TypeError`. */
+function beatRowAt(view: MenuScreenView, index: number): MenuAffordance {
+  const row = beatRows(view)[index];
+  if (row === undefined) throw new Error(`the board drew no row at index ${String(index)}`);
+  return row;
+}
+
+/**
+ * Every word one row puts in front of a reader, including the refused arm.
+ *
+ * `disabledWhy` is in it because `dev/menuPanel.ts` draws that **instead of** the detail on a
+ * disabled row, so a test reading only `detail` would pass over the rows where this build cannot
+ * name what it is refusing.
+ */
+function rowText(row: MenuAffordance): string {
+  return `${row.label} ${row.detail ?? ''} ${row.disabledWhy ?? ''}`;
+}
+
+describe('a mixed daily board reads as a comparison', () => {
+  it('names the shared axes above the table and the dispatcher on each row', () => {
+    const view = leaderboardWith([ROW, ETA_ROW]);
+    const notices = view.notices.join(' ');
+
+    // (a) The axes the rows do agree on are named, once, where a claim about the board belongs.
+    expect(notices).toContain('Midtown Office');
+    expect(notices).toContain('3 % of population per 5 min');
+
+    // (b) The dispatcher is on the rows and on **neither** notice: it is per row, not once.
+    expect(notices).not.toContain(COLLECTIVE_NAME);
+    expect(notices).not.toContain(ETA_NAME);
+    expect(beatRows(view)).toHaveLength(2);
+    expect(rowText(beatRowAt(view, 0))).toContain(COLLECTIVE_NAME);
+    expect(rowText(beatRowAt(view, 0))).not.toContain(ETA_NAME);
+    expect(rowText(beatRowAt(view, 1))).toContain(ETA_NAME);
+    expect(rowText(beatRowAt(view, 1))).not.toContain(COLLECTIVE_NAME);
+  });
+
+  it('names it once and on no row when every row shares it — the negative control', () => {
+    /*
+     * Without this, a change that simply printed the dispatcher on every row always would pass the
+     * test above while making the agreed board say the same thing three times. The rule is *once or
+     * per row*, and a rule with only one direction tested is half a rule.
+     */
+    const view = leaderboardWith([ROW, OTHER_ROW]);
+    expect(view.notices.join(' ')).toContain(COLLECTIVE_NAME);
+    for (const row of beatRows(view)) expect(rowText(row)).not.toContain(COLLECTIVE_NAME);
+  });
+
+  it('withdraws the seed-luck note from a board that is not one dispatcher', () => {
+    /*
+     * `BEATING_NOTE` says *every one of them is that same dispatcher … which is luck rather than
+     * skill*. That is true of a board whose rows agree and false of the one this issue is about, and
+     * its gate used to be *did the reveal say anything* — the same gate only while the reveal was
+     * silent on every mixed board.
+     */
+    expect(leaderboardWith([ROW, OTHER_ROW]).notices).toContain(BEATING_NOTE);
+    expect(leaderboardWith([ROW, ETA_ROW]).notices).not.toContain(BEATING_NOTE);
+  });
+
+  it('marks a row whose dispatcher this build does not carry, rather than leaving it blank', () => {
+    /*
+     * The two halves of a mixed board that a CDN-served viewer will actually meet (§ D308): one row
+     * this build can name and one it cannot. The unnamed one is still identified — by the id the
+     * server verified — because a row with nothing where the other rows carry a dispatcher reads as
+     * a row that ran none.
+     */
+    const view = leaderboardWith([ROW, { ...ROW, dispatcherProfileId: 'predictive-x' }]);
+    expect(rowText(beatRowAt(view, 1))).toContain('predictive-x');
+    expect(rowText(beatRowAt(view, 1))).toContain('not in this build');
+    // It is refused as well as named: this build cannot reproduce a run it cannot resolve.
+    expect(beatRowAt(view, 1).enabled).toBe(false);
+  });
+
+  it('says the row’s own configuration is what a press loads, because it is', () => {
+    /*
+     * The line under the control read *"loads this board's configuration with this row's own
+     * seed"*, and `selectionFromRun` has always taken **every** field from the row. The two were one
+     * sentence while a board was a configuration; on a mixed board the old wording named the wrong
+     * subject in the place a player is most likely to act on it.
+     */
+    const variation = rowVariationOf(ETA_ROW, boardConfigurationOf([ROW, ETA_ROW], CATALOGUE), CATALOGUE);
+    expect(beatDetailOf(ETA_ROW, variation)).toContain(`Dispatcher: ${ETA_NAME}`);
+    expect(beatDetailOf(ETA_ROW, variation)).toContain('this row’s own configuration');
+    expect(beatDetailOf(ROW)).not.toContain('this board’s configuration');
+    // And the press still produces that row's run, which is the assertion the legs make below.
+    expect(selectionFromRun(ETA_ROW).dispatcherProfileId).toBe('eta');
   });
 });
 

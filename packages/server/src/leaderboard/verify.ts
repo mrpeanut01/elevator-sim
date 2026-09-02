@@ -30,6 +30,7 @@ import {
   type RunSummary,
   type SimulationConfig,
 } from '@elevator-sim/core';
+import { reportWindowForBuilding } from '@elevator-sim/experiments/browser';
 
 import type { ClaimedMetrics, Submission, SubmittedRun } from './submission.js';
 
@@ -97,6 +98,9 @@ export function configFor(
   // The player's rules over the **server's** profile. Never a profile the submission carried.
   const dispatcherProfile = profileWithRules(shipped, run.ruleRows ?? []);
 
+  // Derived from the id, never read off the wire — the argument is at the spread below.
+  const reportWindow = reportWindowForBuilding(run.buildingId);
+
   return {
     building,
     dispatcherProfile,
@@ -138,6 +142,43 @@ export function configFor(
     ...(run.windowStartS === null
       ? { durationS: run.durationS }
       : { windowStartS: run.windowStartS, windowEndS: run.windowStartS + run.durationS }),
+    /*
+     * **Which window the figures are read over** — GitHub issue #315, and the *third* kind of
+     * window on this object rather than a variant of the two above it. `durationS` decides how much
+     * day is generated, `windowStartS`/`windowEndS` decide how much of it is run, and this decides
+     * how much of what ran is **measured**.
+     *
+     * It was absent, and the absence refused honest players. `viz`'s `shiftRunConfigOf` has set it
+     * since `docs/20` defect 5, so the client and the server were measuring the same legs over
+     * different windows and the comparison below could not agree: on `garden-apartments` /
+     * `collective` / `rise-and-fall` at 3 600 s, seed 20260901, the server read
+     * `awtS 18.233 / wt95S 29.310 / ttdMeanS 50.829` where the client read
+     * `13.462 / 28.119 / 40.348`, and **every** submission on that building was refused as
+     * `metrics-do-not-reproduce` — this product's one accusation, spent on a player who did nothing
+     * wrong. `midtown-office` reproduced perfectly, which is why the suite never saw it: the
+     * building the tests drove is the one building whose answer is *leave the template's band
+     * alone*.
+     *
+     * **Derived, never submitted, and that is the whole design rather than a preference.** A report
+     * window on the wire is a player-settable parameter inside a board key — `ENGINE_CONTRACT.md`
+     * § 12.1, the rule `boardKey.ts` exists to keep — and a cheat lever with it: the window is the
+     * divisor of every mean on the sheet, so a player who picks their own window picks their own
+     * average. It is keyed on the building id, which a submission already carries and the server
+     * already resolves against its own `data/`.
+     *
+     * **The same function as the client's, not the same rule written twice.** `viz`'s
+     * `shift/reportWindow.ts#shiftReportWindowFor` and this line both call
+     * `@elevator-sim/experiments`'s `reportWindowForBuilding`, which reads the conclusion
+     * `MATRIX_CELLS` already encodes. Two copies would drift, and the first symptom of the drift is
+     * the defect above. {@link profileWithRules} is transcribed rather than imported and says why —
+     * `core` refuses every shape but the one it writes, so that transcription **cannot** drift.
+     * Nothing plays that part here: a second copy of this rule would be free to disagree, so there
+     * is not one.
+     *
+     * Spread-or-omit, exactly as `shiftRunConfigOf` writes it: an absent key and a present
+     * `undefined` are different claims to `core`, and only the first means *the template's own*.
+     */
+    ...(reportWindow === undefined ? {} : { reportWindow }),
     /*
      * The run record's log — § 1.4, and **spread rather than written as `interventions: run.…`**,
      * for the reason `viz`'s `shiftRunConfigOf` gives at the same line: `core` promises a run with

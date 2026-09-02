@@ -49,6 +49,33 @@ const alias = {
  * **113 sites in `packages/viz` had already converged on** independently, so the default is what
  * the suite was telling us it wanted, rather than a new opinion.
  *
+ * **Re-measured 2026-09-02, and the headroom sentence above is now wrong by more than a factor of
+ * two** — GitHub issue #317, which is what sent anybody looking. The figures in that paragraph are
+ * left standing as the dated record they are; these are the same quantities on today's tree, taken
+ * from one full `--project viz` run on a quiet box (212 files, 4 882 passing cases, 369 s, exit 0):
+ *
+ * | | when the constant was chosen | 2026-09-02 |
+ * |---|---|---|
+ * | cases | 3 213 | **4 882** |
+ * | inside 2.4 s | 3 193 (99.4 %) | **4 843 (99.2 %)** |
+ * | over the old 5 s default | 10 | **25** |
+ * | slowest case | 49.4 s | **109.0 s** |
+ * | 300 000 ms as a multiple of it | ~6× | **2.75×** |
+ *
+ * The **shape** of the distribution is intact — 99 % of the suite is still under 2.4 s, which is
+ * what the constant was really resting on. What has gone is the margin: *"about six times the
+ * observed maximum"* is now 2.75×, and this file's own governing condition is *under load*. At the
+ * 4.5× amplification measured on this container under 16 spinners (see the `cli` section below),
+ * a 109 s case is a **490 s** case, and the ceiling is 300 s.
+ *
+ * **So the slowest case in `viz` is already past this ceiling under load, and it is named rather
+ * than left to be rediscovered**: `campaign/campaign.test.ts`'s *"clears from the dropdown, on the
+ * holdout seeds"*, at 109 041 ms, with `campaign/stageSequence.test.ts`'s *"clears a stage on two
+ * batches"* behind it at 77 363 ms. Both are the shape issue #317 fixed one file over — a shipped
+ * dispatcher sweep inside a single `it()` — and neither is fixed here. **The constant is not moved
+ * to cover them.** A budget raised to fit the thing it measures stops being a budget; what the
+ * `judge.test.ts` split did instead was make the unit vitest schedules smaller than the budget.
+ *
  * **What it costs, stated rather than glossed.** A genuinely hung pure-function test now takes five
  * minutes to fail instead of five seconds. That is the real price and it is worth paying: a hang is
  * a bug you find once and fix, while a 5 s ceiling under load is a false red that recurs forever and
@@ -164,13 +191,86 @@ export default defineConfig({
        * tiers running. This line rests on the survey above and on the probe, not on a red anybody
        * re-ran.
        *
-       * `cli` is still left alone, and now that is the whole of the claim: it has not been
-       * reported failing at the default and no survey has been taken over it.
+       * `cli` joined fourth — GitHub issue #320 — and it is the second time the sentence standing
+       * here had to be retracted rather than edited. It read: *"`cli` is still left alone, and now
+       * that is the whole of the claim: **it has not been reported failing at the default** and no
+       * survey has been taken over it."* The second half was true. The first half had stopped being
+       * true, in the same way and for the same reason as the `experiments` sentence directly above
+       * it — which is § D227's stale refusal recurring on the very paragraph written to record it.
+       *
+       * **The reports, all three of the same case** — `cli.test.ts`'s *"never prints a difference
+       * beside a verdict when the arms themselves are suppressed"*, which carries no annotation and
+       * so resolves to vitest's 5 000 ms default:
+       *
+       * | when | measured | conditions |
+       * |---|---|---|
+       * | wave J, lane E | 8 369 ms | full suite, multi-lane load — see below |
+       * | wave K, lane C | 6 536 ms | full suite, under load |
+       * | wave K, lane C | 14 997 ms | full suite, load average peaked ~35.9 |
+       *
+       * The first was confirmed **pre-existing** rather than introduced, by reverting `viz` and
+       * `server` to `df36e7c` and re-running it.
+       *
+       * It passes 158/158 under `--project cli` alone every time, so it is load sensitivity rather
+       * than a broken test — the shape this section already addressed three times.
+       *
+       * **The survey the retracted sentence said had not been taken.** Taken on this tree, on a
+       * quiet box (load ~1.3), with the ceiling lifted to 900 000 ms so the numbers are costs
+       * rather than truncations. The population is derived rather than transcribed: running
+       * `--project cli --testTimeout=1` fails exactly those cases that resolve to the default and
+       * no others, which is **55 of 158**. The remaining 103 either carry one of the project's 32
+       * explicit annotations or are synchronous, and a synchronous case cannot time out at all —
+       * vitest races a timer it never gets to run.
+       *
+       * Of those 55, the whole distribution of cost:
+       *
+       * | band | cases |
+       * |---|---|
+       * | ≥ 5 000 ms | **0** |
+       * | 1 000 – 5 000 ms | **0** |
+       * | 500 – 1 000 ms | 1 |
+       * | 250 – 500 ms | 4 |
+       * | 0 – 250 ms | 50 |
+       *
+       * **The reported case is the maximum of that population**, at **665 ms — 13.3 % of the
+       * ceiling.** The next four are 424, 412, 381 and 309 ms, and nothing at all sits between
+       * 1 s and the ceiling. So this is *not* the `experiments` picture above, where twenty cases
+       * sat between 1.5 s and the ceiling, and saying so matters: the class here is small.
+       *
+       * **It is small and it is not one, which is what decides this.** The three reports imply
+       * amplifications of 9.8×, 12.6× and 22.6× on a 665 ms case. Applied to the surveyed costs:
+       * at 9.8× one case exceeds the default, at 12.6× **three** do, and at 22.6× **five** do.
+       * Annotating the case that happened to be observed would therefore fix one of five and leave
+       * the rest, which is this section's own rejected argument, twice over.
+       *
+       * **The mechanism was reproduced here rather than inferred, and that is new** — the
+       * `experiments` paragraph above had to record that it could not be. Under 16 spinners on this
+       * 4-core container, load average 17.6, the reported case cost **4 422 ms: 88.4 % of the
+       * 5 000 ms ceiling, an amplification of 6.7×** — short of a red, at roughly half the load
+       * average of the report that produced the 14 997 ms figure. Median amplification across the
+       * population was 4.3× and the maximum 9.9×. A case that reaches 88 % of its budget at half
+       * the observed load is a case that exceeds it at the observed load.
+       *
+       * **The one thing this line does not answer, said plainly rather than buried.** That case is
+       * an outlier by 1.6× idle and 2.2× under load against its nearest neighbour, and the reason
+       * looks intrinsic to it. Nine cases in `cli.test.ts` name `midtown-office`; six carry their
+       * own annotation and two do not simulate at all (12 ms and 11 ms — a `list` and an error
+       * path). It is the **ninth**, and so the only case in the default-relying population that
+       * runs the building at its **full declared duration**: every sibling that simulates it either
+       * shortens the window — `SHORT = ['--duration', '600']`, or an explicit `--duration` — or is
+       * annotated. And the profile **saturates** at that duration, so no rider leaves the system
+       * and the simulation does maximal work.
+       *
+       * That may well be load-bearing, since the assertion is precisely that a saturated pair of
+       * arms quotes no difference, and a shortened window might not saturate. So it is **not**
+       * asserted to be a defect and it is **not fixed here**; it is named so that the next reader
+       * of this paragraph knows the constant did not make the question go away. It belongs to
+       * `packages/cli`, not to this file.
        */
       project('core', SIMULATING_TIMEOUT_MS),
       project('experiments', SIMULATING_TIMEOUT_MS),
       project('server', SIMULATING_TIMEOUT_MS),
-      project('cli'),
+      project('cli', SIMULATING_TIMEOUT_MS),
       project('viz', SIMULATING_TIMEOUT_MS),
       /*
        * The browser tier — `DECISIONS.md` § D220, and the only project here that is not hermetic.
