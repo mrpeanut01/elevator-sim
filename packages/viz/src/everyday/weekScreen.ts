@@ -17,11 +17,13 @@
  * ## § 14.1's rows, and why they are on this screen
  *
  * GitHub issue **#182**, [§ D436](../../../../DECISIONS.md). § 14.1 opens *"A board row is a run,
- * and a run can be watched"*, and the board's rows are the one thing this build genuinely cannot
- * have — a ranking of other people's runs needs a server to post and verify them, which is the
- * refusal the block above this one already draws. What it **does** have is two other sources of
- * runs, and they were reachable from the Engineer shell alone: days this device filed, and the
- * reference runs `data/reference-runs.json` ships.
+ * and a run can be watched"*, and this section was built because the board's rows were *"the one
+ * thing this build genuinely cannot have"*. **That premise expired with GitHub issue #221**: the
+ * daily board reads from the server now and its rows are real, so the block above no longer
+ * refuses and this picker is no longer standing in for something absent. It stays, because the two
+ * sources it offers are ones a board never had — days this device filed, and the reference runs
+ * `data/reference-runs.json` ships — and both were reachable from the Engineer shell alone.
+ * Watching a *board* row is § 14.1's own next step and is not built here.
  *
  * So the picker sits directly under that refusal, which is where a reader's next question is. It is
  * a section of this screen rather than a screen of its own because § 4's inventory has seventeen
@@ -213,7 +215,7 @@ function mountWeek(
     world.body.append(caption);
     root.append(world.root);
 
-    /* ---- the board, and why it is not here ---- */
+    /* ---- the board: where it is, and what may share one ---- */
     const board = section(doc, view.board.heading);
     board.body.className = 'everyday-week-board';
     board.body.style.cssText = `${CARD};display:grid;gap:13px`;
@@ -231,7 +233,7 @@ function mountWeek(
     }
     root.append(board.root);
 
-    /* ---- § 14.1's rows: what there is to watch, under why the board has none ---- */
+    /* ---- § 14.1's rows: what there is to watch, under where the board is ---- */
     root.append(watchSection());
   }
 

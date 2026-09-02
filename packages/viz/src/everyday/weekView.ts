@@ -266,18 +266,23 @@ function streakLineOf(week: WeekState, closed: number): string {
  * a fallback rather than through a stale literal, which is the arrival this file could not have
  * caught on either branch alone.
  *
- * The half that is still absent is the daily board itself, for the reason
- * `everyday/boardScreen.ts#DAILY_BOARD_ABSENCE` gives at length on the tab that would draw it: a
- * ranking of other people's runs needs a server to post and verify them, and the ladder beside it
- * needs none. Restated short here rather than imported, because this is the pure half of the
- * pure/DOM split and `boardScreen.ts` is the DOM half — importing it would put a worker
- * construction into the honesty sweep's module graph. `honesty/surfaces.ts` drives both sentences,
- * so a drift between them is a swept string rather than a discovery.
+ * **It then said the board itself was absent, and that is withdrawn rather than reworded.** It
+ * read *"that needs a server to post and rank runs, and this build has none — so there are no rows
+ * anywhere"*, restated short from `everyday/boardScreen.ts#DAILY_BOARD_ABSENCE`. Two things were
+ * wrong with it by the time GitHub issue #221 landed. The board reads now, so the claim was false
+ * on any served build — and worse, it was a claim **this screen cannot check**: the week screen
+ * asks no server anything, so it was asserting the outcome of a request it never makes. § D227
+ * pins a refusal to a run, and there is no run behind this one to pin it to.
+ *
+ * So the block stops refusing and starts pointing. What survives is the part this screen does
+ * know: § 14's two rules about what a board may be keyed by, which are true whether or not a
+ * server answered today, and a line saying where the board is. The heading changed with it — a
+ * section called *why it is not here* cannot introduce a signpost.
  */
-const DAILY_BOARD_REFUSAL =
-  'A daily board ranks other people’s runs, and every one of them is replayed and verified before ' +
-  'it appears. That needs a server to post and rank runs, and this build has none — so there are ' +
-  'no rows anywhere rather than invented ones.';
+const DAILY_BOARD_POINTER =
+  'Today’s board lives on Boards & ladder, where it is read from the server and every row on it ' +
+  'was replayed and re-measured before it appeared. Two rules decide what may share a board at ' +
+  'all, and they are the reason a ranking means anything.';
 
 /** § 14's two board rules, quoted close enough that a reader can check them against the guide. */
 const BOARD_RULES: readonly { readonly title: string; readonly body: string }[] = Object.freeze([
@@ -323,8 +328,8 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
       ? 'Today’s card opens the account of it.'
       : 'A day opens its own account once it has been closed.',
     board: {
-      heading: 'TODAY’S BOARD, AND WHY IT IS NOT HERE',
-      refusal: DAILY_BOARD_REFUSAL,
+      heading: 'TODAY’S BOARD, AND WHAT MAY SHARE ONE',
+      refusal: DAILY_BOARD_POINTER,
       rules: BOARD_RULES,
     },
   };
