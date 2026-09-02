@@ -1084,3 +1084,99 @@ cases where the brief and `vitest.config.ts` both said roughly 3 200.
   the integrated tree, so **no figure is published here**.
 - **#93 and #159 remain the older backlog's two untracked issues.** #93 is a combine candidate under
   #221, recorded and not actioned, because it carries four acceptance criteria #221 does not state.
+
+---
+
+# Wave M — 2026-09-02: two closed, four premises re-checked, and a register with no guard
+
+**Taken at `c3953bb`** (= `origin/main`, wave K merged). **Open issues at the start: 66. Open pull
+requests: 1** — #322, wave L, a *sibling session's*, covering #315–#318, #320 and #321.
+
+**This wave was planned around that pull request rather than across it.** Its twenty-six changed
+files were listed before a line of this wave was written, and every verification lane was told to
+report a collision against them. The tightest hazard was the one this repository already names:
+`honesty/surfaces.ts` is on wave L's list, and two of wave M's candidates would have touched it. One
+of them (#159) is not being built for other reasons; the other (#283) turned out not to need it,
+because that file iterates `DESIGNER_COPY` generically rather than naming its keys — so a new copy
+key joins the corpus with no edit to the file the sibling holds. **That was checked, not assumed.**
+
+## M.1 Reconciliation — eight issues had no row anywhere, and two were nobody's
+
+Every open issue number was grepped against this file, [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md)
+and [`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md). **Thirty-one have no ledger row. Eight have no row
+in any of the three.** Six of the eight are wave L's. The two that were nobody's are **#283** and
+**#323**, and both are closed here.
+
+That is the same finding snapshot C made and it has not improved: the ledger is still competing with
+a second record. Five of snapshot C's twenty-six carried adjudications posted as GitHub comments that
+never reached this file; this wave's dispositions for #146, #158, #159, #177 and #178 are posted as
+comments **and** recorded below, because posting alone is what produced the gap.
+
+## M.2 Four premises verified before anything was built. Three did not survive whole
+
+| issue | central claim | verdict |
+|---|---|---|
+| **#323** | the guard's remedy does not clear the state it names | **CONFIRMED, and reproduced by run** |
+| **#283** | three absence rows point at the triage issue itself | **CONFIRMED exactly**; the register's test cannot see it |
+| **#159** | *"a day's wrinkle is hard-coded"* | **REFUTED in both halves** |
+| **#146** | the editor prints the cost line in one register | **CONFIRMED literally, REFUTED in aim** |
+| **#177 / #178** | seven and nine open gaps | **13 of 16 stand; 3 are built, 1 before its issue was filed** |
+
+**#159 is the instructive one, and it fails in the direction this repository has learned to watch for
+second.** The shaft-C-out example the issue calls *the only wrinkle* is not in the tree at all: it is
+prototype prose in `ENGINE_CONTRACT.md:94` that was never ported, and the shipped daily fixture
+(`server/src/leaderboard/boardKey.ts:147-153`) has no wrinkle field. What does exist is a wrinkle
+library in code — `shift/events.ts:136-239`, five parameterised templates whose `EventEffect` fields
+reach demand, whole-shift holds and `serviceEvents`, with a *mechanically enforced* single caller. So
+the real gap is **five code-authored templates instead of twenty data-authored ones, no rotation, no
+gate**, and the naive build would produce about fifteen rows that parse, validate, draw a caption and
+change nothing. Rescoped on the issue rather than started.
+
+## M.3 What landed
+
+**#323 — the guard's named remedy is now true.** `runner/fixtures.test-helper.ts#assertCoreBuilt`
+compared the newest emitted `.js` against the newest source, and told the reader to run `npx tsc -b`.
+That command is content-incremental, so a working tree whose mtimes moved without its bytes moving —
+which is what `git merge` and `git checkout -B` produce — sat in a state the command could not leave.
+Reproduced verbatim: after `touch packages/core/src/index.ts`, `npx tsc -b` returned 0 three times
+while the guard stayed red, and `tsc -b --dry` said *"is up to date"* in the same breath. **TypeScript
+disagreed with the guard, and TypeScript was right.**
+
+The freshness marker is now the newer of the emitted `.js` and `dist/.tsbuildinfo` — TypeScript's own
+record of when it last reconciled the two. A no-op build rewrites that file and nothing else, which is
+exactly the fact the old comparison discarded. **The direction of the error is unchanged**: a tree not
+built since a source moved is still refused, and it was watched being refused. `coreBuildState.test.ts`
+drives all eight states over temporary trees in 17 ms, and `parallel.test.ts` was run in the failing
+state and passed 12 of 12.
+
+**#283 — the three placeholder rows are resolved, one built and two deleted** ([§ D455](DECISIONS.md)).
+The two designer entries said where a capability is *authored* rather than that this build cannot do
+it, which is an ownership boundary and not a queue item. They are deleted, **and their words moved**
+to hints beside the controls they qualify; the browser tier asserts both directions, that each hint is
+on the designer screen and that neither sentence is on the build-information panel any more. Deleting
+alone would have cost a player the one sentence that tells service zoning from access zoning, which
+`CLAUDE.md` names outright as a distinction never to collapse. The stage camera went the other way:
+§ 7.3 of the handoff lists the camera among what a player can touch, so it is a gap rather than the
+deliberate position #283 suspected, and it is **#324**'s now.
+
+**Found in the same file, and it is R38 on a file whose whole subject is R38.** `buildNotes.ts`'s
+docstring asserted *"there are twenty-seven"* entries in the present tense. There were twenty-six
+before this wave and twenty-four after. The sentence now states no count at all, which is the rule the
+same paragraph preaches two lines above.
+
+## M.4 Owed, and one thing not done
+
+- **The honesty corpus is not re-measured here.** Two copy keys enter it and two register entries
+  leave, so both tiers' string counts move. [§ D343](DECISIONS.md) puts that measurement on the
+  integrator of the *integrated* tree, and with #322 open this branch is not it. Forecast, so it can
+  be checked rather than trusted: **cases, simulations, surfaces and failing cases all unmoved**;
+  strings move by a small per-case constant in both tiers; `suppressed runs` unmoved.
+- **#146 and #158 need a ruling, not a lane.** Both are posted with the exits priced.
+- **`GAPS.md` has no staleness guard** and is the register issues are actually filed from —
+  [`RISKS.md`](RISKS.md) **R44**, and the reason #178 shipped with a fixed defect as its
+  headline. **#325 owns building it**, filed with the row so R44 does not itself become an R42.
+  The three realised rows are corrected in place against the code, each citing the file and line
+  that contradicts it and each kept rather than deleted, because they are the row's evidence.
+  **That discharges the instances and not the class**, which is the whole reason #325 exists:
+  a guard over free prose is not available, so #325 prices three shapes of fix rather than
+  prescribing one, and says which it would take.

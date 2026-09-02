@@ -484,6 +484,15 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     expect(await page.textContent('.everyday-bar-primary')).toBe('Run a day in it');
     expect(await page.$$eval('.everyday-designer-absences', (blocks) => blocks.length)).toBe(0);
 
+    /*
+     * GitHub issue #283's pairing, and it is the half a deletion usually loses. Two rows left the
+     * register because they named where a capability is *authored* rather than a thing this build
+     * cannot do. The words did not leave with them: each stands beside the control a reader would
+     * otherwise mistake for it, which is the only reason deleting the rows was not a loss.
+     */
+    expect(await page.textContent('.everyday-designer-service-scope')).toContain('building editor');
+    expect(await page.textContent('.everyday-designer-machine-owner')).toContain('machine editor');
+
     /* The rail's bordered gear row — the one Settings destination, as `settingsScreen.browser.test.ts` reaches it. */
     await page.click('.everyday-rail-settings');
     await page.waitForSelector('.everyday-settings-build-notes');
@@ -492,6 +501,9 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     );
     expect(rows.length).toBeGreaterThan(20);
     expect(rows.some((row) => row.includes('escalator rows'))).toBe(true);
+    /* And the other direction: the panel no longer offers either as something the build lacks. */
+    expect(rows.some((row) => row.includes('credential dots'))).toBe(false);
+    expect(rows.some((row) => row.includes('sky-lobby starter'))).toBe(false);
     await page.close();
   });
 });

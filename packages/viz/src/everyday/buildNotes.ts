@@ -42,9 +42,10 @@
  * this is a rule with an instrument rather than a convention. It applies here **especially**: this
  * panel is the one surface where all six registers are read at once, so a single lapse is on
  * screen beside every other sentence that got it right. (That count was written as a literal here
- * and is now derived, because it was measured wrong once — the census said twenty-six and there
- * are twenty-seven, § D370 — and a file whose subject is registers going stale is the last place
- * to write a number nothing re-derives.)
+ * and is now derived, because it was measured wrong once — the census undercounted by one, § D370
+ * — and a file whose subject is registers going stale is the last place to write a number nothing
+ * re-derives. The literal it was replaced with went stale anyway, twice: § D448 deleted an entry
+ * and #283 deleted two more, and the sentence still said twenty-seven. It now says none.)
  *
  * ## The register is a queue, not a display
  *
