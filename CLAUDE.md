@@ -887,6 +887,25 @@ cite why.
 - If you hit a decision the docs don't cover, record it in the relevant doc rather than
   only in a commit message.
 - Do not weaken an acceptance criterion to make a phase pass. Raise it instead.
+- **One push per wave, not one per commit.** Commit as often as you like; push when the wave is
+  ready. Every push cancels the CI run in flight (`ci.yml` sets `cancel-in-progress: true`) and
+  starts a fresh ~45-minute suite, and the cancelled run completes a check suite on a head nobody
+  cares about — which arrives as a `check_suite.completed` notification saying *"no third-party check
+  suite is still running or failed"* about a commit that is no longer the head. Measured on
+  2026-09-02: four pushes in one hour, three of them cancelling a run (one 45 minutes in), five
+  spurious notifications, and one of those envelopes described a head whose sibling job had been
+  **cancelled rather than passed**. Acting on any of them would have meant declaring CI green while
+  it was still running. **This is discipline and not a gate** — nothing enforces it, which is why it
+  is written where it will be read rather than asserted somewhere a test could pretend to check it.
+
+**Two things that look like the fix for that and are not, so nobody spends an afternoon on them.**
+`paths-ignore` on `**.md` would be **wrong**: `validation/documentation.test.ts`,
+`validation/citations.test.ts` and `everyday/viewportGateClaims.test.ts` read the documents
+themselves, so a markdown-only change can legitimately fail this suite and skipping it would skip the
+guards that exist for exactly that. And a `paths:` filter does not narrow a pull request at all —
+GitHub evaluates it against the **whole PR diff** rather than the individual push, which is why
+`deploy-viz.yml` already carries a `paths:` list naming only `packages/**` and friends and still ran
+on a push that touched two root `.md` files and nothing else.
 
 **Decision numbers are reserved for you before you start, and *the relevant doc* is usually your own
 module.** Two halves, both [§ D404](DECISIONS.md) and [§ D405](DECISIONS.md), and they exist because
