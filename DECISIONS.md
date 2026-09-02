@@ -30600,3 +30600,56 @@ needed no amendment; the charter needed to catch up with it.
 refusing an unsupportable figure is a constraint the session is built under. A document that
 confuses the two will keep producing screens that are correct and no fun, and will keep passing every
 gate while it does.
+
+## D457 — waves L and M each moved the corpus by zero, and one of the zeros is arithmetic
+
+**Date: 2026-09-02 · Owner: integrator, wave N · The measurement [§ D343](#d343) requires, taken once
+on the integrated tree.**
+
+**Decision.** The corpus was measured once after integration, both tiers in one sitting, on the
+integrated tree at `aea42b5` and never on a branch — and the base at `39c1f1c` was re-measured first
+in a detached worktree so a move could be told from a correction.
+
+**The base reproduced its published row exactly, in both tiers**, for the **sixth** consecutive wave:
+49 / 575 999 / 606 / 55 / 0 and 60 / 718 633 / 4 710 / 56 / 0.
+
+| | base `39c1f1c` | integrated `aea42b5` | move |
+|---|---|---|---|
+| always-on strings | 575 999 | **575 999** | **0** |
+| deep strings | 718 633 | **718 633** | **0** |
+| always-on surfaces | 55 | **55** | **0** |
+| deep surfaces | 56 | **56** | **0** |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+**Two zeros, and they are different kinds of thing.**
+
+**Wave L's zero was worth measuring precisely because the row looked stale.** `CLAUDE.md` was last
+touched by wave K, wave L merged five lanes including edits to `honesty/surfaces.ts` itself, and no
+corpus row moved. The integrator of this wave wrote *"the row is stale by two waves"* into a
+scheduled check-in **before** measuring it, and the measurement refuted that: the base reads exactly
+what wave K published. Five lanes touching the corpus's own surface file, `menu/`,
+`shift/reportWindow.ts` and `campaign/judge.ts` added and removed no string at all.
+
+That is this repository's oldest lesson arriving on the person applying it, and it is recorded here
+rather than quietly corrected, because the inference was reasonable and still wrong. **A row that
+looks stale and a row that is stale are different claims**, and only one of them can be settled by
+reading commit history.
+
+**Wave M's zero is exact, and the arithmetic is the whole of it.** GitHub issue #283 added two keys
+to `everyday/designerModel.ts#DESIGNER_COPY`, which `honesty/surfaces.ts` iterates generically rather
+than naming, and deleted two entries from `DESIGNER_ABSENCES`, which the build-notes adapter seeds.
+**+2 − 2 = 0 per case**, so 49 × 0 and 60 × 0. A substitution on a player screen is invisible to a
+string count by construction, and the only thing that distinguishes it from *nobody measured* is that
+the base was measured too.
+
+**The forecast was wrong in the direction that matters more.** Wave M's ledger predicted *"strings
+moving by a small per-case constant in both tiers"*. The constant is zero. § D454 recorded four
+forecasts short by exactly one string per case; this one predicted motion where there is none, which
+is worse: a forecast expecting a move teaches its reader to treat a correct zero as a failed
+measurement, and the next integrator who sees no change may go looking for the run that did not
+happen instead of publishing the result.
+
+**The surface sets were diffed rather than the counts compared**, in both tiers. Identical, nothing
+added, nothing removed. The deep tier's one-surface lead survives and the set difference names it:
+`campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is in
+always-on and not in deep.

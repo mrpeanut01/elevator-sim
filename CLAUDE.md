@@ -87,6 +87,46 @@ verdict:
   | always-on | 49 | **575 999** | **606** | **55** | **0** | **green**, and the register is empty |
   | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **718 633** | **4 710** | **56** | **0** | **green**, and the register is empty |
 
+  **Waves L and M each moved this row by exactly zero, and the second zero is arithmetic rather than
+  luck** ([§ D457](DECISIONS.md)). Measured once on the integrated tree at `aea42b5`, both tiers in
+  one sitting, with the base at `39c1f1c` re-measured first in a detached worktree — where it
+  reproduced its published row **exactly in both tiers**, the **sixth** consecutive wave that has
+  held.
+
+  | | base `39c1f1c` (wave L integrated) | wave M integrated | move |
+  |---|---|---|---|
+  | always-on strings | 575 999 | **575 999** | **0** |
+  | deep strings | 718 633 | **718 633** | **0** |
+  | always-on surfaces | 55 | **55** | **0** |
+  | deep surfaces | 56 | **56** | **0** |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+  **Wave L's zero is measured rather than assumed, and it is why the row was not stale.** The base is
+  wave L integrated, and it reads exactly what wave K published — so five merged lanes touching
+  `honesty/surfaces.ts`, `menu/`, `shift/reportWindow.ts` and `campaign/judge.ts` added and removed
+  no string at all. That was worth measuring precisely because it looked stale: `CLAUDE.md` was last
+  touched by wave K, wave L edited the corpus's own surface file, and the integrator of this wave
+  wrote *"the row is stale by two waves"* into a check-in before measuring it. **It was not.** Sixth
+  instance of the same lesson and the first where the wrong inference was written down first.
+
+  **Wave M's zero is exact and the arithmetic is the whole of it.** GitHub issue #283 added two keys
+  to `everyday/designerModel.ts#DESIGNER_COPY`, which `honesty/surfaces.ts` iterates generically, and
+  deleted two entries from `DESIGNER_ABSENCES`, which the build-notes adapter seeds. **+2 − 2 = 0 per
+  case**, so 49 × 0 and 60 × 0. A wave that moved words on a player screen and moved the corpus by
+  nothing is what a substitution looks like from here, and it is distinguishable from *nobody
+  measured* only because the base was measured too.
+
+  **The forecast this wave published was wrong, and in the more embarrassing direction.** Wave M's
+  ledger entry predicted *"strings moving by a small per-case constant in both tiers"*. The constant
+  is zero. Wave K's entry recorded four forecasts short by one string per case; this one predicted a
+  move where there is none, which is worse, because a forecast that expects motion will read a
+  correct zero as a failed measurement. Recorded rather than quietly dropped.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical, nothing
+  added, nothing removed. The deep tier's one-surface lead survives and the diff names it —
+  `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is in
+  always-on and not in deep.
+
   **Wave K's move is the first this row has been able to check against a forecast that was wrong, and
   the size of the error is the finding** ([§ D454](DECISIONS.md)). Measured once on the integrated
   tree, both tiers in one sitting, with the base at `e8aac0d` re-measured first in a detached
