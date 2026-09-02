@@ -106,6 +106,7 @@ import type {
  * of `menu/client.js` are exactly `dev/main.ts` and `honesty/surfaces.ts`, and it exempts type
  * imports by name. The row shape crosses this façade; the transport does not.
  */
+import { signedOut, type AccountState } from '../menu/account.js';
 import type { BoardEntry, BoardPage, BoardsPage, Result } from '../menu/client.js';
 
 import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
@@ -213,6 +214,25 @@ export type EverydayDailyBoard =
       readonly note: string;
       readonly rows: readonly BoardEntry[];
     };
+
+/**
+ * What {@link EverydayHost.account} answers on a build served with no API origin.
+ *
+ * **The state is shared with the Engineer menu; the sentence is not, and that split is deliberate.**
+ * `menu/account.ts`'s `signedOut` is the same transition both shells use, so neither can think it is
+ * signed in while the other does not. The *notice* is this shell's own, in this shell's voice, the
+ * way every Everyday copy table is — `dev/main.ts`'s equivalent sentence is a closure-local built
+ * for a screen that also explains challenge scoring, and borrowing it would put the Engineer
+ * register on an Everyday screen. Two products, one account.
+ *
+ * It is a **state, not an error**: § D456's second refusal test asks whether the player can still
+ * play, and the whole game is playable signed out. Only posting asks for an account, which is why
+ * this reads as a fact about the build rather than as something the player should go and fix.
+ */
+const SIGNED_OUT_NO_SERVER: AccountState = signedOut(
+  'This build has no account server behind it, so there is nowhere to sign in and nothing leaves ' +
+    'this device. Everything except posting a run works exactly the same.',
+);
 
 /**
  * Compose the two board reads into one of {@link EverydayDailyBoard}'s four states.
@@ -837,6 +857,47 @@ export interface EverydayHost {
    */
   playThisCrowd(run: WatchableRun): void;
 
+  /* -------------------------------------------------------------- account */
+
+  /**
+   * The signed-in state, or the signed-out one — `menu/account.ts`'s own `AccountState`.
+   *
+   * **The same object the Engineer menu renders, and that is the decision** (§ D464). A second
+   * state machine over the same account is two surfaces that can disagree about whether you are
+   * signed in, which is the `surfaces-disagree` property's exact shape and the reason it exists.
+   * `menu/account.ts` is reusable here rather than confined to the other shell: it imports
+   * `client.js` **type-only**, so `boundaries.test.ts`'s rule — which forbids *value* imports of
+   * the leaderboard client and nothing else — does not reach it, and `everyday/profile.ts` and
+   * `everyday/settingsView.ts` have both value-imported it since long before this port.
+   *
+   * Every transition, every validation and `postingRefusal` come from that module. Nothing here
+   * re-derives them.
+   */
+  account(): AccountState;
+
+  /**
+   * Ask for a sign-in link at this address — § D241's mailed link, from this shell.
+   *
+   * Takes the address rather than reading it off {@link AccountState}'s shared form, so an Everyday
+   * field and the Engineer menu's field are not one input wearing two labels. The state it lands in
+   * is shared; the box you typed into is not.
+   *
+   * Resolves when the attempt is over, however it went. Nothing is thrown: the outcome is in
+   * {@link account}, which is the same rule `menu/client.ts` states about itself.
+   */
+  requestSignInLink(email: string): Promise<void>;
+
+  /**
+   * Name yourself, once — § D241 § 7. Only meaningful while `namingStage(account())` is true.
+   *
+   * A no-op with no session, rather than an error, for the reason the sign-out row gives: a screen
+   * that can be opened signed out must not have a control that throws when it is.
+   */
+  chooseDisplayName(name: string): Promise<void>;
+
+  /** Drop the session. Local and immediate; the server is told, and is not waited for. */
+  signOut(): void;
+
   /**
    * Hear about state changes, so a screen re-renders. Returns the unsubscribe. See the module
    * docstring for the cadence (state changes, never per frame).
@@ -909,6 +970,21 @@ export interface EverydayHostBindings {
    * imported one would be the third.
    */
   readonly dailyBoard: (() => Promise<EverydayDailyBoard>) | undefined;
+  /**
+   * The account bindings, or `undefined` on a build with no server.
+   *
+   * One optional object rather than four optional members, because they are four halves of one
+   * capability: a build that can read the state can also drive it, and a build that cannot has
+   * none of them. A screen that had to check four separately would eventually check three.
+   */
+  readonly signIn:
+    | {
+        readonly state: () => AccountState;
+        readonly requestLink: (email: string) => Promise<void>;
+        readonly chooseDisplayName: (name: string) => Promise<void>;
+        readonly signOut: () => void;
+      }
+    | undefined;
   /** Register a listener on `renderAll`'s notification list. Returns the unsubscribe. */
   onChange(listener: () => void): () => void;
 }
@@ -1501,6 +1577,17 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
        */
       const read = b.dailyBoard;
       return read === undefined ? { kind: 'no-server' } : read();
+    },
+    /* --------------------------------------------------- § D241, the account */
+    account: () => b.signIn?.state() ?? SIGNED_OUT_NO_SERVER,
+    requestSignInLink: async (email) => {
+      await b.signIn?.requestLink(email);
+    },
+    chooseDisplayName: async (name) => {
+      await b.signIn?.chooseDisplayName(name);
+    },
+    signOut: () => {
+      b.signIn?.signOut();
     },
     watchableRuns: async () => {
       const state = b.state();

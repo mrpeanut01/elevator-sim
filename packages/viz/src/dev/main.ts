@@ -2166,17 +2166,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
           drawMenu();
           return;
         }
-        void (namingStage(accountState) ? chooseDisplayName(client) : askForLink(client));
+        void (namingStage(accountState)
+          ? chooseDisplayName(client, accountState.form.displayName.trim())
+          : askForLink(client, accountState.form.email.trim()));
         return;
       }
 
       case 'sign-out': {
-        const token = accountState.token;
-        accountState = signedOut('Signed out.');
-        drawMenu();
-        // The local state is cleared first and the server is told second. A sign-out that waited for
-        // the network would leave a player looking signed in while their connection was down.
-        if (client !== undefined && token !== undefined) void client.logout(token);
+        signOutNow();
         return;
       }
     }
@@ -2254,9 +2251,30 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * whether anybody else has been asking about the address; the duration is carried into the state
    * so the form stops offering a second request the server has already promised to refuse.
    */
-  async function askForLink(api: LeaderboardClient): Promise<void> {
+  /**
+   * `email` is a parameter rather than a read of `accountState.form`, since GitHub issue #332.
+   *
+   * The Everyday shell has its own sign-in screen with its own field, and the two surfaces share
+   * the account **state** but not the box you type into — a shared form would be one input wearing
+   * two labels, where clearing one clears the other. The Engineer caller passes its own form's
+   * value, which is what this used to read, so that path is unchanged.
+   */
+  /**
+   * Drop the session — one path, so both shells sign out the same way (GitHub issue #332).
+   *
+   * The local state is cleared first and the server is told second. A sign-out that waited for the
+   * network would leave a player looking signed in while their connection was down.
+   */
+  function signOutNow(): void {
+    const token = accountState.token;
+    accountState = signedOut('Signed out.');
+    drawMenu();
+    if (client !== undefined && token !== undefined) void client.logout(token);
+  }
+
+  async function askForLink(api: LeaderboardClient, email: string): Promise<void> {
     const done = startWaiting('Asking for a sign-in link…');
-    const result = await api.requestLink(accountState.form.email.trim());
+    const result = await api.requestLink(email);
     done();
     if (result.ok) {
       accountState = linkRequested(accountState, result.value);
@@ -2290,11 +2308,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * **409 is reported as taken**, unlike a taken address, and the asymmetry is deliberate: a
    * display name is drawn on every board, so it is already public.
    */
-  async function chooseDisplayName(api: LeaderboardClient): Promise<void> {
+  async function chooseDisplayName(api: LeaderboardClient, name: string): Promise<void> {
     const token = accountState.token;
     if (token === undefined) return;
     const done = startWaiting('Saving your name…');
-    const result = await api.setDisplayName(token, accountState.form.displayName.trim());
+    const result = await api.setDisplayName(token, name);
     done();
     accountState = result.ok
       ? signedIn(accountState, token, result.value)
@@ -3741,6 +3759,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       client === undefined
         ? undefined
         : () => dailyBoardOf(() => client.boards(), (key, metric) => client.board(key, metric)),
+    /*
+     * The account, for GitHub issue #332's Everyday sign-in. Wiring only — every transition is
+     * `menu/account.ts`'s and every effect is a function this file already had.
+     *
+     * `state` reads the live `accountState`, so the two shells cannot disagree about whether you
+     * are signed in; the Everyday screen hears about changes through the ordinary `onChange`
+     * notification below, because each of these ends in `drawMenu()` which is on that path.
+     */
+    signIn:
+      client === undefined
+        ? undefined
+        : {
+            state: () => accountState,
+            requestLink: (email) => askForLink(client, email),
+            chooseDisplayName: (name) => chooseDisplayName(client, name),
+            signOut: signOutNow,
+          },
     state: () => state,
     playheadS: () => playback?.simTimeS ?? state.recording?.startedAt ?? 0,
     dayClosed: () => state.recording !== undefined && filedRunId === state.recording.runId,

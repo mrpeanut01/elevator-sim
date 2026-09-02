@@ -118,6 +118,7 @@ function harness(): { readonly host: EverydayHost; state: () => ViewerState } {
       watching: () => undefined,
     /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
     dailyBoard: undefined,
+    signIn: undefined,
     onChange: () => () => {},
   };
   return { host: createEverydayHost(bindings), state: () => state };

@@ -108,6 +108,7 @@ describe('the wear clock', () => {
       watching: () => undefined,
       /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
       dailyBoard: undefined,
+    signIn: undefined,
       onChange: () => () => {},
     };
     return { host: createEverydayHost(bindings) };

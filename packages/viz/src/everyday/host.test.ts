@@ -21,6 +21,8 @@ import {
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { SIGNED_OUT, signedIn, type AccountState } from '../menu/account.js';
+
 import { towerById, type CampaignTower } from '../campaign/career.js';
 import { clearedDays, purseOf, type ShopCategoryId } from '../campaign/economy.js';
 import { AS_BUILT } from '../campaign/fitOut.js';
@@ -177,6 +179,7 @@ function harnessOf(
       watching: () => harness.watching,
       /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
       dailyBoard: undefined,
+    signIn: undefined,
       onChange: (listener) => {
         calls.push('onChange');
         void listener;
@@ -741,6 +744,7 @@ describe('filing the campaign day — issue #223', () => {
         watching: () => undefined,
         /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
         dailyBoard: undefined,
+    signIn: undefined,
         onChange: () => () => {},
       },
     };
@@ -1166,6 +1170,105 @@ describe('§ 14.1 — the spectator entry', () => {
  * Driven through {@link dailyBoardOf} rather than through the shell, because the composition is the
  * part worth checking and `boundaries.test.ts` keeps the client out of every module but two.
  */
+describe('the account port', () => {
+  /** A signed-in state, built through the state machine rather than as a literal. */
+  const signedInState = (): AccountState =>
+    signedIn(SIGNED_OUT, 'tok', {
+      id: 'u1',
+      email: 'ada@example.com',
+      displayName: 'Ada',
+      displayNameChosen: true,
+    });
+
+  it('answers a signed-out state with a reason when the build has no server', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost({ ...h.bindings, signIn: undefined });
+    const account = host.account();
+    expect(account.token).toBeUndefined();
+    /*
+     * A state and not an error — § D456's second test asks whether the player can still play. The
+     * notice says what the build is, not what the player should do about it.
+     */
+    expect(account.notice).toContain('no account server');
+    expect(account.notice).toContain('Everything except posting');
+  });
+
+  it('reads the live state rather than a copy, so the two shells cannot disagree', () => {
+    const h = harnessOf(base());
+    let live: AccountState = SIGNED_OUT;
+    const host = createEverydayHost({
+      ...h.bindings,
+      signIn: {
+        state: () => live,
+        requestLink: async () => {},
+        chooseDisplayName: async () => {},
+        signOut: () => {},
+      },
+    });
+    expect(host.account().token).toBeUndefined();
+    // The Engineer menu signs in. The Everyday host must see it without being told.
+    live = signedInState();
+    expect(host.account().token).toBe('tok');
+    expect(host.account().user?.displayName).toBe('Ada');
+  });
+
+  it('passes the address through rather than reading a shared form', async () => {
+    const h = harnessOf(base());
+    const asked: string[] = [];
+    const host = createEverydayHost({
+      ...h.bindings,
+      signIn: {
+        state: () => SIGNED_OUT,
+        requestLink: async (email) => {
+          asked.push(email);
+        },
+        chooseDisplayName: async () => {},
+        signOut: () => {},
+      },
+    });
+    await host.requestSignInLink('grace@example.com');
+    expect(asked).toEqual(['grace@example.com']);
+  });
+
+  it('is inert rather than throwing on every effect when there is no server', async () => {
+    /*
+     * The screen is reachable signed out on a build with no server, so each of these is a control a
+     * player can press in that state. A throw here would be the § D456 failure exactly: a refusal
+     * that stops the game rather than declining one action.
+     */
+    const h = harnessOf(base());
+    const host = createEverydayHost({ ...h.bindings, signIn: undefined });
+    await expect(host.requestSignInLink('ada@example.com')).resolves.toBeUndefined();
+    await expect(host.chooseDisplayName('Ada')).resolves.toBeUndefined();
+    expect(() => {
+      host.signOut();
+    }).not.toThrow();
+  });
+
+  it('drives the name and the sign-out through the port', async () => {
+    const h = harnessOf(base());
+    const named: string[] = [];
+    let out = 0;
+    const host = createEverydayHost({
+      ...h.bindings,
+      signIn: {
+        state: () => signedInState(),
+        requestLink: async () => {},
+        chooseDisplayName: async (name) => {
+          named.push(name);
+        },
+        signOut: () => {
+          out += 1;
+        },
+      },
+    });
+    await host.chooseDisplayName('Grace');
+    host.signOut();
+    expect(named).toEqual(['Grace']);
+    expect(out).toBe(1);
+  });
+});
+
 describe('the daily board read', () => {
   /*
    * Deliberately not the date this test runs on. A stub carrying the real today passes whether the
