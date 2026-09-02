@@ -30500,3 +30500,47 @@ four branch measurements.
 
 **Both registers are empty and both tiers are green**, so the verdict column means today what it was
 written to mean: 0 failing cases *and* nothing held in `honesty.test.ts`'s `OUTSTANDING`.
+
+## D455 — an ownership boundary is not an absence, and a register of absences is the wrong home for one
+
+**Date: 2026-09-02 · Owner: wave M · The third triage outcome [§ D370](#d370) allows, taken for the
+first time on entries that were never absences.**
+
+**Decision.** Two entries leave `DESIGNER_ABSENCES`, and they leave by deletion rather than by being
+built or by acquiring an owning issue. Each said where a capability is *authored*, not that this
+build cannot do it: access credentials and a sky lobby's starting floor are the Engineer surface's to
+set, and both sentences said so in their own words. § D370 rules that the six registers are a queue,
+and a queue item is a thing somebody will do. Neither of these was one.
+
+**The words do not leave with the rows.** Both are now hints standing beside the control a reader
+would otherwise mistake for them — `DESIGNER_COPY.serviceScopeHint` under the service column and
+`machineOwnershipHint` under the machine panel — and the browser tier asserts both directions: each
+hint is on the designer screen, and neither sentence is on the build-information panel any more.
+That pairing is the whole of the decision. Deleting the rows alone would have cost a player the one
+sentence in the product that tells service zoning and access zoning apart, which `CLAUDE.md` names
+outright as a distinction never to collapse; keeping them would have left a queue naming work nobody
+was ever going to do.
+
+**Why this is a ruling and not an edit.** It answers a question GitHub issue #283 posed and could not
+answer from inside the register: *may an entry describe a boundary between two surfaces?* The answer
+is no, and it binds every one of the six registers rather than this one. A sentence that a reader
+could act on by opening a different screen belongs beside a control. A register entry is a promise
+that something will change.
+
+**The third entry went the other way, and the reason is worth stating because the reflex runs
+against it.** `STAGE_ABSENCES`' *no camera* reads like a rationale rather than a gap — the cutaway
+draws the whole building, so there is nothing to pan — and #283 raised the possibility that it was a
+deliberate design position, in which case § D370's deletion route applied to it too. It does not.
+§ 7.3 of the design handoff lists the camera among what a player can touch on the stage, and
+`CLAUDE.md` makes the handoff canonical for what the screen looks like. So the entry stays, and it is
+#324's. An entry whose own sentence argues for its deletion is exactly the one to check against the
+document it deviates from.
+
+**What this leaves unchecked, stated rather than implied.** `buildNotes.test.ts` still cannot tell an
+owner that will build an entry from an owner that will only re-file it. All three of these rows named
+#283 and the map was green, because the tier checks that the mapping is total and has no stale rows,
+never what the issue on the other end is for. That is the same bound the file already records about
+open-versus-closed, and it has the same cause: it needs something this tier does not have. The
+defence is procedural rather than mechanical — a placeholder must be resolved before the issue that
+created it closes — and naming it here is worth more than a guard that could only ever recognise the
+one number.
