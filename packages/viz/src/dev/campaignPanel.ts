@@ -40,6 +40,11 @@ import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { restrictedFloorIds } from '../access/zoning.js';
+import {
+  batchLibraryOf,
+  SHIPPED_GROUP_LABEL,
+  YOURS_GROUP_LABEL,
+} from '../batch/library.js';
 import { populationLineOf, type BatchReport } from '../batch/report.js';
 import type {
   BatchRequest,
@@ -109,6 +114,15 @@ export interface CampaignPanelOptions {
    * page header and this panel must read it at draw time rather than at mount time.
    */
   readonly mode: () => ViewMode;
+  /**
+   * The dispatchers the reader has saved — issues #167 and #228,
+   * [§ D443](../../../../DECISIONS.md).
+   *
+   * A getter for the same reason {@link mode} is one: this panel mounts after an async fetch and
+   * lives for the page, while the shelf is authored later and elsewhere. See
+   * `dev/batchPanel.ts`'s own field for the full argument.
+   */
+  readonly savedProfiles: () => readonly DispatcherProfile[];
 }
 
 export interface CampaignPanelHandle {
@@ -175,20 +189,71 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   for (const [index, stage] of loaded.campaign.stages.entries()) {
     ui.stage.append(new Option(`${String(index + 1)}. ${stage.name}`, stage.id));
   }
-  /*
+  fillDispatcherOptions();
+
+  /**
    * `Name (slug)` — see `dev/batchPanel.ts`'s picker for the finding. This list had the same
    * defect: `your setting` offered thirteen raw ids against a rail that names the same thirteen.
+   *
+   * **And it offered only the thirteen**, which is #167 § 3.1 (4)'s third select and the reason
+   * this is a function now: a dispatcher the reader built could not be the setting they took into
+   * a stage, on the one surface in the product whose entire subject is *change one thing and see
+   * what it does*. Rebuilt on every visit rather than at mount, off the same visibility signal
+   * `dev/batchPanel.ts` uses and for the same reason.
+   *
+   * **The stage's admission is unchanged and is what makes this safe.** `admitProfile` runs against
+   * the *resolved* dispatcher in {@link admitted}, so a saved profile that moves a dimension the
+   * stage did not open is refused with the dimension named — by the same function and the same
+   * sentence a shipped profile gets. Offering the option is not promising it clears; the contract
+   * asks for exactly that (*"refused by name, exactly as an edit is today"*).
    */
-  for (const profile of resources.dispatcherProfiles.profiles) {
-    ui.profile.append(new Option(`${profile.name} (${profile.id})`, profile.id));
+  function fillDispatcherOptions(): void {
+    const saved = options.savedProfiles();
+    const chosen = ui.profile.value;
+    ui.profile.replaceChildren();
+    if (saved.length === 0) {
+      for (const profile of resources.dispatcherProfiles.profiles) {
+        ui.profile.append(optionFor(profile));
+      }
+    } else {
+      ui.profile.append(groupOf(SHIPPED_GROUP_LABEL, resources.dispatcherProfiles.profiles));
+      ui.profile.append(groupOf(YOURS_GROUP_LABEL, saved));
+    }
+    if ([...ui.profile.options].some((option) => option.value === chosen)) ui.profile.value = chosen;
+  }
+
+  function optionFor(profile: DispatcherProfile): HTMLOptionElement {
+    return new Option(`${profile.name} (${profile.id})`, profile.id);
+  }
+
+  function groupOf(label: string, profiles: readonly DispatcherProfile[]): HTMLOptGroupElement {
+    const group = doc.createElement('optgroup');
+    group.label = label;
+    for (const profile of profiles) group.append(optionFor(profile));
+    return group;
   }
 
   function currentStage(): CampaignStage | undefined {
     return loaded.campaign.stages.find((stage) => stage.id === ui.stage.value);
   }
 
+  /**
+   * The profile an id names — **shipped or saved** (issues #167, #228, § D443).
+   *
+   * Every consumer in this file goes through here: the picker's label, the stage's baseline, the
+   * weight editor's starting point, the admission and the candidate the batch runs. Widening this
+   * one function is what makes a saved dispatcher a first-class setting rather than an option that
+   * draws its own id and then fails; leaving any one caller on the shipped list would have
+   * produced a panel that ran the right dispatcher and named the wrong one.
+   *
+   * The stage's own `startingProfileId` is authored in `data/` and therefore always resolves in the
+   * shipped half; nothing here depends on that, which is why there is no second lookup for it.
+   */
   function profileById(id: string): DispatcherProfile | undefined {
-    return resources.dispatcherProfiles.profiles.find((profile) => profile.id === id);
+    return (
+      resources.dispatcherProfiles.profiles.find((profile) => profile.id === id) ??
+      options.savedProfiles().find((profile) => profile.id === id)
+    );
   }
 
   /** `Nearest car (nearest-car)` — the picker's own form, for the status line beside it. */
@@ -628,6 +693,16 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    * exists to prevent.
    */
   function admitted(stage: CampaignStage): boolean {
+    /*
+     * The shelf, admitted before the stage is — `dev/batchPanel.ts#start`'s argument, placed here
+     * because this panel's single gate is `admitted` and a second refusal path would be a second
+     * answer to *may this run*.
+     */
+    const library = batchLibraryOf(resources.dispatcherProfiles, options.savedProfiles());
+    if (!library.ok) {
+      fail(library.reason);
+      return false;
+    }
     const baseline = profileById(stage.dispatcher.startingProfileId);
     if (baseline === undefined) {
       fail('this build’s data/ does not carry one of the two dispatcher profiles this stage needs.');
@@ -777,7 +852,11 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         fail(`the batch worker failed to start: ${event.message}`);
         reject(RUN_FAILED);
       });
-      next.postMessage({ kind: 'run', request } satisfies BatchWorkerRequest);
+      next.postMessage({
+        kind: 'run',
+        request,
+        savedProfiles: options.savedProfiles(),
+      } satisfies BatchWorkerRequest);
     });
   }
 
@@ -1242,8 +1321,26 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   drawWeights();
   drawIntent();
 
+  /*
+   * **The setting picker is refilled every time this tab is shown**, off the panel's own `hidden`
+   * attribute — `dev/batchPanel.ts`'s observer, third application, and here it is the *only*
+   * caller available: `dev/main.ts` assigns this handle to a variable and never reads it, so
+   * {@link CampaignPanelHandle.refresh} has no non-test caller at all. Hanging the refill on that
+   * handle would have been CLAUDE.md's standing requirement broken inside the fix for a defect of
+   * the same class. The stale handle is reported rather than repaired here; it belongs to whoever
+   * owns `dev/main.ts`'s tab wiring.
+   */
+  const panel = ui.output.closest('[role="tabpanel"]');
+  if (panel !== null && typeof MutationObserver === 'function') {
+    const observer = new MutationObserver(() => {
+      if (!panel.hasAttribute('hidden')) fillDispatcherOptions();
+    });
+    observer.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+  }
+
   return {
     refresh: () => {
+      fillDispatcherOptions();
       drawBrief();
       drawWeights();
       /* Only while nothing is on screen: a finished run's timing line is not to be overwritten. */

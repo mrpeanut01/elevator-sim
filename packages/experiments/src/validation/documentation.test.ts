@@ -1435,6 +1435,17 @@ type DecisionReservation = {
  * a citation promises a heading a reader can follow, and § D430 settled that a hole is named and
  * never cited. That gate caught this very line.)
  */
+/*
+ * No wave is open. The annotation is load-bearing and must stay: a bare `= null` narrows the const
+ * to `null`, the open-wave arm below becomes `never`, and `tsc -b` fails with eleven
+ * `Property 'wave' does not exist on type 'never'`. Vitest transpiles rather than type-checks, so
+ * that break passes the tests it belongs to and is caught by CI instead. Do not simplify it away.
+ *
+ * Wave K's block was D443–D454: lanes A–E held D443–D452 and the integrator held D453–D454. Three
+ * of its numbers are holes — D444, D450 and D452, registered above — which is the most any block
+ * has returned, and the reason is the same in each case: an issue closed end to end is one decision
+ * however many modules it touches. The charter row is reconciled to D455 on this same commit.
+ */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
@@ -1493,6 +1504,30 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
       'lane’s second number went unspent for the same reason: a survey is one decision however many cells ' +
       'it measures. It sits inside wave J’s block and not at its top — § D441 and § D442 close the block, ' +
       'so the charter row names D443 and points at no hole.',
+  ],
+  [
+    450,
+    'wave K allocated it to lane D, which spent § D449 on GitHub issue #165 whole — the three surfaces ' +
+      'moved off the painting thread, the measurement that corrected their stated costs, and the two ' +
+      'consequences that reach past them (`runFixitPair` deleted, `checkedRun` split) — and reported the ' +
+      'number unspent. Registered rather than backfilled because ids here are names (§ D430). This is the ' +
+      'third consecutive wave a lane has returned its second number, and the reason is the same each time: ' +
+      'one issue closed end to end is one decision however many modules it touches. It sits inside wave ' +
+      'K’s block and not at its top, which § D430’s other half requires.',
+  ],
+  [
+    444,
+    'wave K allocated it to lane A, which spent § D443 on GitHub issues #167 and #228 together — the ' +
+      'batch library seam, the five surfaces it reaches, and the cell the leg-level proof is measured ' +
+      'at — and reported the number unspent. Two issues closed through one seam is still one decision.',
+  ],
+  [
+    452,
+    'wave K allocated it to lane E, which spent § D451 on the absence it deleted and re-took, and ' +
+      'recorded the shared-predicate extraction and the `drivingProfile` façade method in their own ' +
+      'docstrings under § D405 rather than taking a second number for them. A decision that reaches no ' +
+      'further than the module taking it does not need an entry here, which is what makes this a hole ' +
+      'rather than an omission.',
   ],
 ]);
 

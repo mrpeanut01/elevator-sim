@@ -643,6 +643,78 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     await page.close();
   });
 
+  /**
+   * **§ 7.6's second arm, pressed on the page** — GitHub issue **#171**.
+   *
+   * The pure half of this control is `stageScreenModel.test.ts`'s and the run it produces is
+   * `stageHandover.test.ts`'s — legs before the stamp byte-identical, the day after it moved. What
+   * needs a document is the thing neither can vouch for: that the picker and the button are wired to
+   * *each other* and to the host, so the profile a player selects is the profile the record grows.
+   *
+   * The picker opens on the dispatcher the player has standing, which is a press that may well move
+   * nothing — so the case selects somebody else first and requires the button to come alive. That
+   * ordering is the assertion: a button that was already enabled would mean the model's refusal was
+   * not reaching the DOM, and a button that stayed disabled after the pick would mean the picker was
+   * not reaching the model.
+   */
+  it('hands the day to another dispatcher, and stamps who took it', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+
+    const SWITCH = '.everyday-stage-intervene[data-intervention-kind="switch-dispatcher"]';
+    await page.waitForSelector('.everyday-stage-switch-pick', { timeout: 30_000 });
+    /* The standing dispatcher is what the picker opens on — § 7.6's own *who is driving*. */
+    const standing = await page.evaluate(
+      "(document.querySelector('.everyday-stage-switch-pick')).value",
+    );
+    const other = (await page.evaluate(
+      "Array.from(document.querySelectorAll('.everyday-stage-switch-pick option')).map((o) => o.value)",
+    )) as readonly string[];
+    const handTo = other.find((value) => value !== standing) ?? '';
+    expect(handTo).not.toBe('');
+
+    /*
+     * Dead first, and this half is the one that would go quietly missing. On a cold load the picker
+     * names the dispatcher the day is already running, so the model refuses the press — and a button
+     * that arrived enabled would mean that refusal never reached the DOM.
+     */
+    expect(await page.getAttribute(SWITCH, 'disabled')).not.toBe(null);
+    /* § 7.6's fourth rule: it *says so*, in the refusal line, rather than only in a tooltip. */
+    expect(await page.textContent('.everyday-stage-intervene-refusal')).toContain(
+      'already running',
+    );
+
+    await page.selectOption('.everyday-stage-switch-pick', handTo);
+    await page.waitForFunction(
+      (selector) => document.querySelector(selector)?.hasAttribute('disabled') === false,
+      SWITCH,
+      { timeout: 30_000 },
+    );
+    /* And the sentence goes with the refusal — a line about a control that can now act is § D227. */
+    expect(await page.textContent('.everyday-stage-intervene-refusal')).toBe('');
+    const label = (await page.textContent(SWITCH)) ?? '';
+    expect(label.startsWith('Switch to ')).toBe(true);
+
+    await page.click('.everyday-stage-play');
+    await page.click(SWITCH);
+    /*
+     * § 7.6: the stamp is what says the record grew, and it names the profile rather than its id —
+     * a player hands the day to somebody, not to a key in a data file.
+     */
+    await page.waitForFunction(
+      () =>
+        (document.querySelector('.everyday-stage-stamp')?.textContent ?? '').includes(
+          'switched to ',
+        ),
+      undefined,
+      { timeout: 60_000 },
+    );
+    const stamp = (await page.textContent('.everyday-stage-stamp')) ?? '';
+    expect(stamp).toContain(label.replace('Switch to ', 'switched to '));
+    expect(stamp).not.toContain(handTo);
+    await page.close();
+  });
+
   it('closes the day, and leaving afterwards does not warn', async () => {
     const page = await coldLoad();
     await enterEverydayStage(page);

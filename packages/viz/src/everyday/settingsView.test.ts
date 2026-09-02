@@ -80,32 +80,77 @@ describe('You — the name, the disc and the six swatches', () => {
   });
 });
 
-describe('Playing — one wired row, never a dead toggle (§ 20.12)', () => {
+describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
   it('draws Motion from the Engineer switch, in the prototype’s two faces', () => {
     const full = settingsScreenViewOf({ ...BASE, reduceMotion: false });
-    expect(full.playing.rows).toEqual([
-      { id: 'motion', label: 'Motion', note: 'cars and figures animate', value: 'full', on: true },
-    ]);
+    expect(full.playing.rows[0]).toEqual({
+      id: 'motion',
+      label: 'Motion',
+      note: 'cars and figures animate',
+      value: 'full',
+      on: true,
+    });
     const reduced = settingsScreenViewOf({ ...BASE, reduceMotion: true });
     expect(reduced.playing.rows[0]).toMatchObject({ value: 'reduced', on: false });
   });
 
-  it('draws the row’s absence — not the row — while the Engineer surface is still booting', () => {
+  /**
+   * **Units, in both faces, and it is the row that closed GitHub issue #170's second half.**
+   *
+   * `value` is what the pill says, and § 18's prototype state calls this preference `imperial`, so
+   * the two words are the prototype's own. `on` is the *filled* face rather than a claim about
+   * which unit is correct: filled means the player chose it, and metres is § 13's default.
+   *
+   * What this case cannot see is whether the preference reaches a figure — that is
+   * `units.test.ts`'s and `designerModel.test.ts`'s, where a converted number can be compared
+   * against an unconverted one. A row that said *feet* over a screen still drawing metres would
+   * pass here and fail there, which is why both exist. See [§ D448](../../../../DECISIONS.md).
+   */
+  it('draws Units in both faces, filled on the preference a player chose', () => {
+    const metres = settingsScreenViewOf({ ...BASE, units: 'metric' });
+    expect(metres.playing.rows.find((row) => row.id === 'units')).toEqual({
+      id: 'units',
+      label: 'Units',
+      note: 'machine specifications read in metres or feet',
+      value: 'metres',
+      on: false,
+    });
+    const feet = settingsScreenViewOf({ ...BASE, units: 'imperial' });
+    expect(feet.playing.rows.find((row) => row.id === 'units')).toMatchObject({
+      value: 'feet',
+      on: true,
+    });
+    // § 13's default, for a caller that has nothing stored to pass.
+    expect(settingsScreenViewOf(BASE).playing.rows.find((row) => row.id === 'units')).toMatchObject(
+      { value: 'metres' },
+    );
+  });
+
+  it('draws the Motion row’s absence — not the row — while the Engineer surface is booting', () => {
     const view = settingsScreenViewOf({ profile: undefined, reduceMotion: undefined });
-    expect(view.playing.rows).toEqual([]);
+    expect(view.playing.rows.map((row) => row.id)).toEqual(['units']);
     expect(view.playing.absentNote).toContain('still loading');
     // And never both: a sentence about a missing switch beside the switch would be a contradiction.
     expect(settingsScreenViewOf(BASE).playing.absentNote).toBeUndefined();
+    /*
+     * **Units does not share that window, and the asymmetry is the claim.** Motion holds no value
+     * of its own — it reads the Engineer's — so before the bridge arrives a press would land
+     * nowhere. Units holds this device's own preference, so it is drawable from the first paint,
+     * and hiding it while an unrelated surface booted would be a control withheld for no reason a
+     * player could act on.
+     */
   });
 
-  it('offers no Sound, Default speed, Units or posting toggle — the seams do not exist', () => {
+  it('offers no Sound, Default speed or posting toggle — those seams do not exist', () => {
     /*
-     * The roster rule, asserted as a negative. The evidence is the module docstring's greps:
-     * no audio machinery, no Everyday `run.speed`, no imperial-preference reader, no
-     * `settings.noPost` flag in this tree (`honesty/generate.ts` says so outright).
+     * The roster rule, asserted as a negative — and **Units has left this list**, which is the half
+     * worth reading. The evidence for the three that remain is the module docstring's greps: no
+     * audio machinery, no Everyday `run.speed`, no `settings.noPost` flag in this tree
+     * (`honesty/generate.ts` says so outright). Units was here on exactly that footing until
+     * `everyday/units.ts` became the reader its refusal said did not exist.
      */
     const ids = settingsScreenViewOf(BASE).playing.rows.map((row) => row.id);
-    expect(ids).toEqual(['motion']);
+    expect(ids).toEqual(['motion', 'units']);
   });
 });
 
@@ -136,7 +181,6 @@ describe('This device — statements of fact, and the register of refusals besid
     for (const label of [
       'Sound',
       'Default speed',
-      'Units',
       'Post runs to the board',
       'Sign out',
       'Clear saved progress',
@@ -148,6 +192,18 @@ describe('This device — statements of fact, and the register of refusals besid
     ]) {
       expect(entries.some((entry) => entry.startsWith(label)), label).toBe(true);
     }
+    /*
+     * **`Units` is asserted gone, in the same direction and for the same reason** — GitHub issue
+     * #170, [§ D448](../../../../DECISIONS.md). Its consumer is built and the row is drawn, so a
+     * register still carrying it would be § D227's stale refusal: a sentence telling a player there
+     * is nothing behind a control they can press. Asserted rather than merely dropped from the list
+     * above, because a list that stopped naming it would pass just as well if somebody re-added the
+     * entry tomorrow.
+     */
+    expect(
+      entries.filter((entry) => entry.startsWith('Units')),
+      'the Units refusal outlived its consumer',
+    ).toEqual([]);
     // § 20.12's own sentence rides with the Sound entry.
     expect(entries.find((entry) => entry.startsWith('Sound'))).toContain(
       'a toggle that toggles nothing is a lie',

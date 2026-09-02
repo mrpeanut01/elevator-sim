@@ -17,15 +17,16 @@
  *
  * ## Three things this module deliberately does not do
  *
- * - **It does not retype §12.1's eight test shapes.** The guide names eight buildings and crowds
- *   (*Chancery House · 14 fl · 3 lifts*, *A coach at eleven*), and this project already has eight
- *   authored operating points — `MATRIX_CELLS`, the cells every published interval in the
- *   repository was measured at. A hand-written second list would be the defect `batch/suite.ts`'s
- *   docstring names outright: a fixture list that disagrees with the one the project measures. So
- *   the tests **are** the matrix, drawn under the cells' own labels. Two of the guide's shapes
- *   (*A lift out of service*, *Sky lobby transfer*) have no matrix cell and are therefore not
- *   offered; that absence is real and is reported rather than papered over with an invented cell.
- * - **It does not run anything.** `suitePlanOf` plans, a worker runs, and `suiteCellViewOf` folds.
+ * - **It does not retype §12.1's eight test shapes, and it does not invent a ninth list.** The
+ *   tests are `data/proof-cases.json`'s forty — eight towers × five crowd shapes — read through
+ *   `gauntlet/proofCases.ts`, which is § 12.3's *one list, three readers* with this module as the
+ *   third. It ran `MATRIX_CELLS` until [§ D445](../../../../DECISIONS.md); the argument for the
+ *   move is there and in {@link benchTestsOf}. Two of the guide's shapes (*A lift out of service*,
+ *   *Sky lobby transfer*) are not proof cases and are therefore not offered; that absence is real,
+ *   is now **two** rather than the six it was under the matrix, and is reported rather than papered
+ *   over with an invented case.
+ * - **It does not run anything.** {@link benchPlanOf} plans, a worker runs, and `suiteCellViewOf`
+ *   folds.
  * - **It does not decide the pairwise verdict.** `SuiteCellView.verdictShown` is
  *   `report.comparisons.length === 1`, and `batchReport` compares every arm after the first *with*
  *   the first — so a field of three produces two comparisons and no verdict block, with the
@@ -33,16 +34,23 @@
  *   the top of the screen so a reader meets it before the cells rather than after.
  */
 
-import { MATRIX_CELLS } from '@elevator-sim/experiments/browser';
-
 import { MIN_REPLICATION_BUDGET, MAX_REPLICATION_BUDGET } from '../batch/report.js';
 import {
   suiteSummaryOf,
+  SuiteError,
   type SuiteCellView,
   type SuiteField,
   type SuiteSummary,
 } from '../batch/suite.js';
-import type { BatchArmRequest } from '../batch/types.js';
+import type { BatchArmRequest, BatchRequest } from '../batch/types.js';
+import { caseNameOf } from '../gauntlet/ladder.js';
+import {
+  benchSeedOf,
+  proofCaseRequestOf,
+  proofCasesOf,
+  type ProofCase,
+  type ProofCaseSet,
+} from '../gauntlet/proofCases.js';
 
 /* -------------------------------------------------------------------------- *
  * The screen's own chrome
@@ -69,13 +77,40 @@ export const BENCH_COPY = Object.freeze({
   testsHeading: 'THE TESTS',
   testsHint:
     'Ticked independently, because a dispatcher that wins one can lose another. These are the ' +
-    'operating points every published figure in this project was measured at.',
-  /** The two §12.1 shapes with no operating point behind them — named rather than invented. */
+    'forty proof cases the ladder rates on — every building, every crowd shape, fixed forever.',
+  /**
+   * Why the bench's crowds are not the ladder's crowds, said on the screen.
+   *
+   * The bench runs the ladder's **cases** and not the ladder's **runs**, which is § 1's own pair of
+   * seed rules and CLAUDE.md's hold-out discipline — [§ D446](../../../../DECISIONS.md). A player who could tune against the exact forty
+   * traces they are about to be rated on would be validating on the training set, and the gain
+   * would vanish the moment anything moved. Drawn here rather than left in a docstring because a
+   * reader comparing a bench figure with a ladder rating will otherwise assume they are the same
+   * measurement.
+   */
+  testsSeedNote:
+    'Same buildings and same crowd shapes as the ladder, different crowds. The bench is where you ' +
+    'try things out and the ladder is what rates them, so they must not share their arrivals — a ' +
+    'dispatcher tuned against the exact runs it is about to be rated on would look better here ' +
+    'than it will anywhere else.',
+  /** The two §12.1 shapes that are not proof cases — named rather than invented. */
   testsAbsent:
     'Two of the shapes the design asks for — a building short a lift, and a sky-lobby transfer — ' +
-    'have no measured operating point in this build, so they are not offered. An invented one ' +
-    'would be a test whose answer nobody has checked.',
+    'are not among the forty, because each changes the building rather than the crowd and a crowd ' +
+    'shape is a property of the people. An invented case would be a test whose answer nobody has ' +
+    'checked, and one the ladder could not rate.',
   noTests: 'No tests ticked. Pick at least one.',
+  /**
+   * The labelled state between the screen painting and the forty arriving.
+   *
+   * § 12.2's rule about the withheld matrix is the local one and it is general: *"every combination
+   * renders `—` or a labelled unavailable state; none renders a zero, a spinner or a stale figure"*.
+   * The tick list is fetched (§ D445), so there is a beat where it is empty — and an empty list
+   * under *"No tests ticked. Pick at least one."* is a small lie, because it says there is something
+   * to tick. This is drawn instead, and `benchTestsRefusal` is not: a reader is told what is
+   * happening rather than blamed for it.
+   */
+  testsLoading: 'Fetching the forty proof cases…',
   /**
    * Why the § 3.3 primary cannot be pressed while the suite is in flight — `BarPrimary.inert`'s
    * sentence, not a status line. The matrix's own cells report progress; this answers the other
@@ -215,30 +250,172 @@ export function benchFieldOf(pickedIds: readonly string[]): SuiteField | undefin
  * The tests
  * -------------------------------------------------------------------------- */
 
-/** One ticked-or-not test. The label is the cell's own — it names the pattern the id does. */
+/** One ticked-or-not test. A test **is** one of the forty; the label is the ladder's own name. */
 export interface BenchTest {
-  readonly cellId: string;
+  /** `${towerId}/${crowdId}` — `ProofCase.id`, the key the ladder stores a per-case row under. */
+  readonly caseId: string;
+  /** The tower's name, and the crowd's label. Grouped so a screen can head each tower once. */
+  readonly towerName: string;
+  /** `caseNameOf` — *Tower · Crowd*. One source with the ladder's progress line and *weakest at*. */
   readonly label: string;
   readonly ticked: boolean;
 }
 
 /**
- * The tests, from `MATRIX_CELLS` — **imported, never retyped**.
+ * The tests: **the forty**, derived — never retyped, and never `MATRIX_CELLS`.
  *
- * See the module docstring: the eight shapes §12.1 authors and the eight cells this project
- * measures are not the same list, and only one of them has numbers behind it.
+ * ## Why this is the forty and not the matrix — § D445
+ *
+ * `ENGINE_CONTRACT.md` § 12.3 says *one list, three readers*, and § 14.2 says the same thing in the
+ * form that decides a tie: *"The eight buildings and five shapes are the **same fixtures the bench
+ * uses** (§12.1) — one set of proof cases, not two."* Three things made obeying it right rather
+ * than merely obedient:
+ *
+ * 1. **The ladder's own caveat points here.** `gauntlet/rating.ts#RATING_CAVEAT` is drawn under
+ *    every rating: *"A rating orders this table; a gap between two rows is not a measured
+ *    difference … The bench is where two dispatchers are compared on matched crowds with an
+ *    interval."* A bench measuring a *different set of buildings and crowds* cannot answer the
+ *    question that sentence raises. It sent a reader to an instrument pointed somewhere else.
+ * 2. **The matrix could not offer the screen's own tests.** §12.1 names eight shapes across
+ *    Chancery House, Midtown Office, Ashgate, Crown Hotel, St Jude, Garden Apartments and Vertical
+ *    City. `MATRIX_CELLS` covers **five** buildings and holds no cell on Chancery House, Crown
+ *    Hotel or St Jude at all — so at most two of the eight were reachable, while
+ *    {@link BENCH_COPY.testsAbsent} told the player **two** were missing. Under the forty, six of
+ *    the eight are reachable and the absent two are exactly the two that sentence names. The copy
+ *    was written for the fixtures the contract asks for and had been shipping against the ones the
+ *    code had, which is [§ D227](../../../../DECISIONS.md)'s class exactly.
+ * 3. **Nothing was given up.** The per-cell derived budget is the one real argument for the matrix,
+ *    and the bench never read it: no module in `packages/viz` touches `MatrixCell.replications`,
+ *    `budgetBasis`, `armCeilings` or `admissibleReplications`. The budget here is the player's
+ *    control and always was, gated by `report.ts`'s `under-budget` refusal below fifty.
+ *
+ * The Engineer's `dev/suitePanel.ts` keeps `MATRIX_CELLS` and is **not** a fourth reader: § 12.3
+ * names the *bench's* suite, § 12 is this screen, and the Engineer surface asks the matrix's
+ * question at the matrix's points. Two products, two questions, one fixture list each.
+ *
+ * `towerNameOf` resolves a tower id to the building's authored name, so this module holds no
+ * building name — the property `gauntlet/proofCases.test.ts` asserts across every reader.
  */
-export function benchTestsOf(tickedIds: readonly string[]): readonly BenchTest[] {
+export function benchTestsOf(
+  set: ProofCaseSet,
+  tickedIds: readonly string[],
+  towerNameOf: (towerId: string) => string,
+): readonly BenchTest[] {
   return Object.freeze(
-    MATRIX_CELLS.map((cell) =>
-      Object.freeze({ cellId: cell.id, label: cell.label, ticked: tickedIds.includes(cell.id) }),
-    ),
+    proofCasesOf(set).map((proofCase) => {
+      const towerName = towerNameOf(proofCase.tower.id);
+      return Object.freeze({
+        caseId: proofCase.id,
+        towerName,
+        label: caseNameOf(proofCase, towerName),
+        ticked: tickedIds.includes(proofCase.id),
+      });
+    }),
   );
 }
 
-/** Why the suite cannot run for want of a test, or `undefined`. §12.1's own sentence. */
-export function benchTestsRefusal(tickedIds: readonly string[]): string | undefined {
+/**
+ * Why the suite cannot run for want of a test, or `undefined`.
+ *
+ * §12.1's own sentence when there are tests and none is ticked, and
+ * {@link BENCH_COPY.testsLoading} while the forty are still arriving — two different facts, and
+ * telling a reader to pick from an empty list is the one this split exists to stop. `offered` is
+ * the number of tests the screen is drawing, so the refusal is a function of what is in front of
+ * the reader rather than of a flag a renderer sets.
+ */
+export function benchTestsRefusal(
+  tickedIds: readonly string[],
+  offered = 1,
+): string | undefined {
+  if (offered === 0) return BENCH_COPY.testsLoading;
   return tickedIds.length === 0 ? BENCH_COPY.noTests : undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * The plan
+ * -------------------------------------------------------------------------- */
+
+/** What to run: which of the forty, at what budget, with which dispatchers. */
+export interface BenchSuiteRequest {
+  /** `ProofCase.id`s, ticked. Resolved against the parsed set, which refuses an unknown one. */
+  readonly caseIds: readonly string[];
+  /** Per case, per entrant. The player's control — see {@link BENCH_REPLICATION_CHOICES}. */
+  readonly replications: number;
+  readonly field: SuiteField;
+}
+
+/**
+ * One ticked case, with the request that runs it.
+ *
+ * `test` is `{ id, label }` because that is all `batch/suite.ts#suiteCellViewOf` reads — its
+ * parameter is structurally typed rather than a `MatrixCell`, which is why the fold, the index and
+ * every sentence below them work unchanged over a fixture list they were not written for.
+ */
+export interface BenchCasePlan {
+  readonly test: { readonly id: string; readonly label: string };
+  readonly request: BatchRequest;
+}
+
+/**
+ * One `BatchRequest` per ticked case, in the forty's own tower-major order of the ids given.
+ *
+ * The guards are `batch/suite.ts#suitePlanOf`'s, for its reasons: nothing ticked is not a suite, a
+ * case ticked twice would run once under two names, and a field under two arms is not a comparison
+ * (the type forbids it at compile time; a deserialised state can still arrive here). An unknown id
+ * is refused by name rather than dropped — a suite quietly missing a case is a suite over a
+ * different set of crowds than the one the reader ticked.
+ *
+ * **The seed is {@link benchSeedOf}, never the case's own**, and that is the whole of the hold-out
+ * discipline: same buildings, same crowd shapes, different arrivals from the ones the ladder rates
+ * on. `proofCaseRequestOf` requires the seed for exactly this reason — see its docstring, § 1's
+ * two-row table and [§ D446](../../../../DECISIONS.md).
+ *
+ * @throws SuiteError with the sentence the screen draws.
+ */
+export function benchPlanOf(
+  set: ProofCaseSet,
+  request: BenchSuiteRequest,
+  towerNameOf: (towerId: string) => string,
+): readonly BenchCasePlan[] {
+  if (request.caseIds.length === 0) {
+    throw new SuiteError(
+      'no tests are ticked: a suite is one comparison over at least one of the forty, so there is nothing to run.',
+    );
+  }
+  if (new Set(request.caseIds).size !== request.caseIds.length) {
+    throw new SuiteError('a test is ticked twice; a suite runs each ticked case once.');
+  }
+  if (request.field.length < 2) {
+    throw new SuiteError(
+      `a suite compares a field of at least two dispatchers; this one carries ${String(request.field.length)}.`,
+    );
+  }
+  const byId = new Map<string, ProofCase>(
+    proofCasesOf(set).map((proofCase) => [proofCase.id, proofCase]),
+  );
+  return Object.freeze(
+    request.caseIds.map((caseId) => {
+      const proofCase = byId.get(caseId);
+      if (proofCase === undefined) {
+        throw new SuiteError(
+          `no proof case "${caseId}" — this build's forty do not include it, and running the suite ` +
+            'without it would report on a different set of crowds than the one ticked.',
+        );
+      }
+      return Object.freeze({
+        test: Object.freeze({
+          id: proofCase.id,
+          label: caseNameOf(proofCase, towerNameOf(proofCase.tower.id)),
+        }),
+        request: proofCaseRequestOf(
+          proofCase,
+          request.field,
+          request.replications,
+          benchSeedOf(proofCase),
+        ),
+      });
+    }),
+  );
 }
 
 /* -------------------------------------------------------------------------- *

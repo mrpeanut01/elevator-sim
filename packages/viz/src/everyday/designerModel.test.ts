@@ -248,11 +248,48 @@ describe('§ 10’s three warnings, in the guide’s priority order', () => {
 
 describe('the plate, the capacity line and the register', () => {
   it('reads the plate’s persons from the load-to-persons table rather than a second rule', () => {
-    const rows = designerPlateRows(SIZED, classOfSpec(CLASSES, SIZED));
+    const rows = designerPlateRows(SIZED, classOfSpec(CLASSES, SIZED), 'metric');
     const keys = rows.map((row) => row.key);
     expect(keys).toEqual(['CAPACITY', 'PERSONS', 'RATED SPEED', 'TRAVEL', 'LANDINGS', 'CLASS']);
     expect(rows.find((row) => row.key === 'CAPACITY')?.value).toBe(`${String(SIZED.ratedLoadLb)} lb`);
     expect(rows.find((row) => row.key === 'TRAVEL')?.value).toBe(`${riseM(SIZED).toFixed(1)} m`);
+  });
+
+  /**
+   * § 13's *convert, not relabel*, on the two rows the preference reaches and the one it does not.
+   *
+   * Asserted on the plate rather than only in `units.test.ts` because the failure this guards
+   * against is a **site** failure: a row that draws the imperial suffix over the metric number
+   * passes every test the formatter has, and only a comparison taken here can tell the two apart.
+   * The load row is asserted **unchanged** in the same case, on `documentation.test.ts`'s pattern of
+   * asserting an exclusion in both directions — a lane that decided to convert `ratedLoadLb` as
+   * well would be changing a decision rather than fixing a bug, and would have to come here to do
+   * it. See [§ D448](../../../../DECISIONS.md).
+   */
+  it('converts the plate’s two metre-denominated rows to feet, and leaves the load alone', () => {
+    const machineClass = classOfSpec(CLASSES, SIZED);
+    const metric = designerPlateRows(SIZED, machineClass, 'metric');
+    const imperial = designerPlateRows(SIZED, machineClass, 'imperial');
+    const valueOf = (rows: readonly { key: string; value: string }[], key: string): string =>
+      rows.find((row) => row.key === key)?.value ?? '';
+
+    // The number moves, not just the suffix — a relabel would leave the digits identical.
+    const metricSpeed = valueOf(metric, 'RATED SPEED');
+    const imperialSpeed = valueOf(imperial, 'RATED SPEED');
+    expect(metricSpeed).toMatch(/ m\/s$/u);
+    expect(imperialSpeed).toMatch(/ ft\/s$/u);
+    expect(imperialSpeed.replace(/ ft\/s$/u, '')).not.toBe(metricSpeed.replace(/ m\/s$/u, ''));
+    expect(imperialSpeed).toBe(`${(SIZED.ratedSpeedMps / 0.3048).toFixed(2)} ft/s`);
+
+    const metricTravel = valueOf(metric, 'TRAVEL');
+    const imperialTravel = valueOf(imperial, 'TRAVEL');
+    expect(imperialTravel).toBe(`${(riseM(SIZED) / 0.3048).toFixed(1)} ft`);
+    expect(imperialTravel.replace(/ ft$/u, '')).not.toBe(metricTravel.replace(/ m$/u, ''));
+
+    // And the three rows the preference does not reach are byte-identical under both.
+    for (const key of ['CAPACITY', 'PERSONS', 'LANDINGS', 'CLASS']) {
+      expect(valueOf(imperial, key), key).toBe(valueOf(metric, key));
+    }
   });
 
   it('prints the per-floor figure with the floor count it was divided by', () => {

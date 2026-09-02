@@ -17,6 +17,7 @@ import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
   RECOMPUTING_BEAT,
+  switchChangesNothing,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
 } from './interventions.js';
@@ -151,5 +152,84 @@ describe('interventionLogOf', () => {
     expect(interventionLogOf([{ atS: 0, change: PARK }], 8 * 3600)).toEqual([
       '08:00 · parked the cars in the lobby',
     ]);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The handover's own refusal — one predicate, two shells
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The check that stopped § 7.6's second arm being an inert control**, on both surfaces that draw
+ * it (`dev/main.ts`'s Engineer strip, `everyday/stageScreen.ts`'s stage — GitHub issue #171).
+ *
+ * The case worth reading first is *a moved lever under the same name*. Comparing base **ids** — the
+ * shape this replaced — answers *no change* there, and it is wrong: what drives a run is the vector,
+ * the player has moved it, and handing the day back to the name they started under is a real change
+ * to every decision from that instant. § D177's inert-control class with its polarity reversed.
+ */
+describe('switchChangesNothing', () => {
+  const profileOf = (id: string, weights: Readonly<Record<string, number>>): DispatcherProfile => ({
+    id,
+    name: id,
+    weights,
+  });
+  const PLAIN = profileOf('plain', { waitTime: 1, stopCount: 2 });
+
+  it('is true when the target is the vector already driving', () => {
+    expect(
+      switchChangesNothing({ interventions: [], target: PLAIN, driving: () => PLAIN }),
+    ).toBe(true);
+  });
+
+  it('ignores key order, which is authoring noise rather than a difference', () => {
+    const reordered = profileOf('plain', { stopCount: 2, waitTime: 1 });
+    expect(
+      switchChangesNothing({ interventions: [], target: reordered, driving: () => PLAIN }),
+    ).toBe(true);
+  });
+
+  it('is false where an id comparison would have said true — a lever has moved the vector', () => {
+    const driving = profileOf('plain', { waitTime: 9, stopCount: 2 });
+    expect(
+      switchChangesNothing({ interventions: [], target: PLAIN, driving: () => driving }),
+    ).toBe(false);
+  });
+
+  it('counts a live chooser as a difference at equal weights', () => {
+    /* A switch also stands the chooser down for the rest of the run, which is a change by itself. */
+    const driving: DispatcherProfile = { ...PLAIN, selection: { policy: 'rules' } };
+    expect(
+      switchChangesNothing({ interventions: [], target: PLAIN, driving: () => driving }),
+    ).toBe(false);
+  });
+
+  it('lets a handover already on the log decide, without consulting a vector at all', () => {
+    let asked = 0;
+    const driving = (): DispatcherProfile => {
+      asked += 1;
+      return profileOf('plain', { waitTime: 9, stopCount: 2 });
+    };
+    const log = [{ atS: 60, change: { kind: 'switch-dispatcher', profile: PLAIN } }] as const;
+    expect(switchChangesNothing({ interventions: log, target: PLAIN, driving })).toBe(true);
+    /*
+     * The thunk's whole reason, asserted rather than described: the pinned case answers from the log
+     * and never walks the spec chain, and both callers run this on frames.
+     */
+    expect(asked).toBe(0);
+    const other = profileOf('other', { waitTime: 1, stopCount: 2 });
+    expect(switchChangesNothing({ interventions: log, target: other, driving })).toBe(false);
+    expect(asked).toBe(0);
+  });
+
+  it('reads the last handover on the log, not the first', () => {
+    const other = profileOf('other', { waitTime: 3 });
+    const log = [
+      { atS: 60, change: { kind: 'switch-dispatcher', profile: PLAIN } },
+      { atS: 120, change: { kind: 'switch-dispatcher', profile: other } },
+    ] as const;
+    expect(
+      switchChangesNothing({ interventions: log, target: other, driving: () => PLAIN }),
+    ).toBe(true);
   });
 });

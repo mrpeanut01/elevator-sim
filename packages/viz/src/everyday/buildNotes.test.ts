@@ -176,7 +176,7 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /* The stage. The camera is #283's — it may be a deliberate position rather than a gap. */
   { register: 'STAGE_ABSENCES', fragment: 'no campaign dock', issue: 181 },
   { register: 'STAGE_ABSENCES', fragment: 'no camera', issue: 283 },
-  { register: 'STAGE_ABSENCES', fragment: 'no decisions during a run', issue: 171 },
+  { register: 'STAGE_ABSENCES', fragment: 'no answer to a live incident', issue: 171 },
   /* The same missing second recording the shell's *Racing a second dispatcher* entry is about,
      said from the stage's side. One mechanism, one issue, two registers that both meet it. */
   { register: 'STAGE_ABSENCES', fragment: 'no rival lane', issue: 226 },
@@ -206,7 +206,13 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /* Settings. Two of the six are #229's remainder after its premise was refuted (§ D368). */
   { register: 'SETTINGS_ABSENCES', fragment: 'Sound —', issue: 258 },
   { register: 'SETTINGS_ABSENCES', fragment: 'Default speed', issue: 229 },
-  { register: 'SETTINGS_ABSENCES', fragment: 'Units —', issue: 170 },
+  /*
+   * `Units` left this table on the commit that built its consumer — GitHub issue #170, § D448.
+   * The row it owned is drawn on the settings screen now, so a triage row still pointing at the
+   * absence would be the stale half this file's second case exists to catch. #170's other half,
+   * `Sound`, was never this row's: it is #258's above, and the two were separated by § D344's
+   * ruling and § D447's correction rather than by this deletion.
+   */
   { register: 'SETTINGS_ABSENCES', fragment: 'Post runs to the board', issue: 161 },
   { register: 'SETTINGS_ABSENCES', fragment: 'Sign out', issue: 221 },
   { register: 'SETTINGS_ABSENCES', fragment: 'Clear saved progress', issue: 229 },

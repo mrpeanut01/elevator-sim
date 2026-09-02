@@ -54,7 +54,25 @@ async function openBench(): Promise<Page> {
   );
   await page.click('.everyday-rail button:has-text("Test bench")');
   await page.waitForSelector('.everyday-bench');
+  /*
+   * The tick list is § 12.3's forty, fetched (§ D445), so the screen paints before it has any
+   * tests. Waiting for the first row is waiting for the load — and this file deliberately never
+   * names a row: a browser case that clicked *"Midtown Office, up-peak"* held a copy of the fixture
+   * list in the tier that would have to be edited every time the list moved, which is the second
+   * copy `gauntlet/proofCases.test.ts` exists to prevent, one directory over from where it looks.
+   */
+  await page.waitForSelector('.everyday-bench-test', { timeout: 30_000 });
   return page;
+}
+
+/** Tick the first of the forty, whatever it is, and wait for the refusal to clear. */
+async function tickFirstTest(page: Page): Promise<void> {
+  await page.locator('.everyday-bench-test').first().click();
+  await page.waitForFunction(
+    () => document.querySelector('.everyday-bench-tests-refusal') === null,
+    undefined,
+    { timeout: 15_000 },
+  );
 }
 
 describe.skipIf(!HAS_BROWSER)('the Everyday test bench', () => {
@@ -75,21 +93,39 @@ describe.skipIf(!HAS_BROWSER)('the Everyday test bench', () => {
     );
     expect(await page.locator('.everyday-bar-primary').isDisabled()).toBe(true);
 
-    await page.click('.everyday-bench-test:has-text("Midtown Office, up-peak")');
-    await page.waitForFunction(
-      () => document.querySelector('.everyday-bench-tests-refusal') === null,
-      undefined,
-      { timeout: 15_000 },
-    );
+    await tickFirstTest(page);
     expect(await page.locator('.everyday-bar-primary').isDisabled()).toBe(false);
     await page.close();
   }, 120_000);
 
-  it('names the two design shapes it has no operating point for, rather than inventing them', async () => {
+  it('names the two design shapes that are not proof cases, rather than inventing them', async () => {
     const page = await openBench();
     const absent = await page.textContent('.everyday-bench-tests-absent');
     expect(absent).toContain('short a lift');
     expect(absent).toContain('sky-lobby transfer');
+    await page.close();
+  }, 120_000);
+
+  /**
+   * § 12.3's third reader, asked of the page — GitHub issue #157, § D445.
+   *
+   * `benchModel.test.ts` proves the model derives the forty and `gauntlet/proofCases.test.ts` proves
+   * no reader holds a name. What only a page can say is that the **screen** draws them: that the
+   * rows are the cross product rather than eight operating points, and that they arrive grouped by
+   * tower so forty rows read as eight groups of five. Counted rather than named, for the reason
+   * `tickFirstTest` exists.
+   */
+  it('draws the forty, grouped by tower, rather than the eight matrix cells', async () => {
+    const page = await openBench();
+    const rows = await page.locator('.everyday-bench-test').count();
+    const groups = await page.locator('.everyday-bench-test-group').count();
+    expect(groups).toBeGreaterThan(1);
+    expect(rows).toBe(groups * (rows / groups));
+    expect(rows / groups).toBe(Math.round(rows / groups));
+    expect(rows).toBeGreaterThan(8);
+    expect(await page.textContent('.everyday-bench-tests-seed-note')).toContain(
+      'different crowds',
+    );
     await page.close();
   }, 120_000);
 
@@ -141,7 +177,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday test bench', () => {
    */
   it('moves the live count of the work when the budget or the field changes', async () => {
     const page = await openBench();
-    await page.click('.everyday-bench-test:has-text("Midtown Office, up-peak")');
+    await tickFirstTest(page);
     await page.waitForTimeout(150);
     const at50 = await page.textContent('.everyday-bench-work');
     expect(at50).toBe('1 test · 100 days of simulation');

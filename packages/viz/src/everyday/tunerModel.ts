@@ -74,6 +74,7 @@ import type { MachineClass } from '../authoring/machineSpec.js';
 import type { PatternSpec } from '../authoring/patternSpec.js';
 import type { ActionBarModel } from './actionBar.js';
 import { loadStepsFor, speedStepsFor, stepAtOrBelow } from './designerModel.js';
+import { speedFigure, type EverydayUnits } from './units.js';
 
 /* -------------------------------------------------------------------------- *
  * The state — § 18's seven, and nothing else
@@ -417,9 +418,17 @@ export function snapToStep(steps: readonly number[], value: number): number {
   return stepAtOrBelow(steps, value);
 }
 
-/** The machine card's two readouts, in the units the plate uses. */
-export function tuneSpeedReadout(tune: TuneState): string {
-  return `${tune.speed.toFixed(2)} m/s`;
+/**
+ * The machine card's speed readout, in the units the plate uses.
+ *
+ * *In the units the plate uses* was a sentence about precision when it was written and is a
+ * sentence about the `Units` preference now (GitHub issue #170,
+ * [§ D448](../../../../DECISIONS.md)): § 13.2's rating plate reads metres or feet, and this readout
+ * is the same machine specification on another screen. Two answers to that would be a player
+ * setting feet on Settings and meeting `m/s` here.
+ */
+export function tuneSpeedReadout(tune: TuneState, units: EverydayUnits): string {
+  return speedFigure(tune.speed, units);
 }
 
 export function tuneCapacityReadout(tune: TuneState): string {

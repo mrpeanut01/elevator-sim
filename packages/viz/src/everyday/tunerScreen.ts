@@ -23,6 +23,7 @@
 
 import type { BuildingSpec } from '../authoring/buildingSpec.js';
 import { actionBarFor } from './actionBar.js';
+import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
@@ -49,6 +50,7 @@ import {
   type TuneKey,
   type TuneState,
 } from './tunerModel.js';
+import { speedValueFigure, type EverydayUnits } from './units.js';
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 
@@ -82,6 +84,15 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
   const building = dataHost.buildingSpec();
   const pattern = dataHost.patternSpec();
+
+  /**
+   * How this screen's machine specifications read — § 15.1's `Units` row, GitHub issue #170.
+   *
+   * Read per draw for `designerScreen.ts`'s stated reason: the preference is set on another screen
+   * and this shell mounts one at a time. **Presentation only** — every use is inside a string, and
+   * the rungs this screen writes are `tuneMachineSteps`' SI ladder either way.
+   */
+  const unitsNow = (): EverydayUnits => everydayProfileStore().units();
 
   const root = el(doc, 'div', 'everyday-tuner');
   root.style.cssText = 'display:grid;gap:16px;max-width:1040px';
@@ -314,8 +325,13 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
             COPY.speedLabel,
             steps.speeds,
             tune.speed,
-            tuneSpeedReadout(tune),
-            (step) => `${step.toFixed(2)}`,
+            tuneSpeedReadout(tune, unitsNow()),
+            /*
+             * Converted with the readout above it, never left in metres beside a readout in feet —
+             * that pairing is § D359's incoherence, each half honest and the two contradictory. The
+             * chip is bare because the row names the unit once; `next` is still the SI rung.
+             */
+            (step) => speedValueFigure(step, unitsNow()),
             'every car’s ratedSpeedMps',
             (next) => {
               set({ speed: next });

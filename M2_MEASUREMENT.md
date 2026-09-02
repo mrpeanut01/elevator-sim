@@ -160,8 +160,8 @@ asserted at both (`packages/viz/src/everyday/viewportGates.browser.test.ts`).
 than about this machine.** Measured:
 
 ```
-grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 35
-find packages -name "*.browser.test.ts" | wc -l                            # → 35
+grep -rl "chromium.launch" packages --include="*.browser.test.ts" | wc -l   # → 36
+find packages -name "*.browser.test.ts" | wc -l                            # → 36
 grep -rn "firefox\|webkit\|Firefox\|WebKit\|Gecko" packages --include="*.ts"  # → no output
 ```
 

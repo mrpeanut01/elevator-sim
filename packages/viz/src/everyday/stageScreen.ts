@@ -57,6 +57,8 @@
  * *Run this shift* performs, so the day it produces may file.
  */
 
+import type { DispatcherProfile } from '@elevator-sim/core/browser';
+
 import { Playback } from '../playback/playback.js';
 import { systemClock } from '../playback/clock.js';
 import type { Frame, VizRecording } from '../contract/types.js';
@@ -99,8 +101,12 @@ import {
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  STAGE_SWITCH_PICKER_LABEL,
   type StageFigure,
   type StageGeometry,
+  type StageInterventionRow,
+  type StageInterventionView,
+  type StageSwitchTarget,
 } from './stageScreenModel.js';
 import {
   EVERYDAY_COLORS as C,
@@ -708,35 +714,137 @@ function mountStage(
     legend.append(item);
   }
 
-  /* --- § 7.6's control, one button per shipped arm. --- */
+  /* --- § 7.6's control: a button for the arm that needs nothing, a picker for the one that
+       needs a dispatcher. --- */
   const interventions = el(doc, 'div', 'everyday-stage-interventions');
   interventions.style.cssText = `display:flex;align-items:center;flex-wrap:wrap;gap:${String(GAP.row + 2)}px`;
+  const ARM_BUTTON_CSS = [
+    'background:transparent',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    'padding:6px 12px',
+    `color:${C.ink}`,
+    'font-size:12.5px',
+    'font-weight:600',
+    'cursor:pointer',
+  ].join(';');
   const interventionButtons = STAGE_INTERVENTIONS.map((arm) => {
     const button = el(doc, 'button', 'everyday-stage-intervene', arm.label);
     button.type = 'button';
     button.dataset['interventionKind'] = arm.change.kind;
     button.title = arm.explains;
-    button.style.cssText = [
-      'background:transparent',
-      `border:1px solid ${C.rule}`,
-      `border-radius:${String(R.control)}px`,
-      'padding:6px 12px',
-      `color:${C.ink}`,
-      'font-size:12.5px',
-      'font-weight:600',
-      'cursor:pointer',
-    ].join(';');
+    button.style.cssText = ARM_BUTTON_CSS;
     button.addEventListener('click', () => {
       intervene(arm.change);
     });
     return button;
   });
+
+  /*
+   * § 7.6's second arm — *switch who is driving* — as a picker and a button (GitHub issue **#171**).
+   *
+   * **Two elements rather than one per dispatcher**, because the change a press appends carries the
+   * whole profile: the picker chooses *who*, the button is the press, and the row that joins them is
+   * `stageScreenModel.ts`'s. Every word on the button and every reason it is disabled comes from that
+   * model — this block only decides which element they go in, which is the split `dev/main.ts` keeps
+   * for the same control on the Engineer strip.
+   *
+   * **The list is re-read on every host notification, and the first draft of this comment said it
+   * could not need to be.** It claimed the saved shelf cannot grow while this screen holds the page,
+   * because the workshop that writes it is another screen. That is false in the one direction that
+   * matters: § 3.2's door covers the Everyday root rather than hiding it (a canvas under
+   * `display:none` never recovers its box), so this screen stays **mounted** while the player is in
+   * the Engineer world — where they can save a dispatcher. A list read once at mount would then
+   * refuse to offer a driver that exists, under a picker that says *any style or saved dispatcher*.
+   *
+   * So {@link refreshSwitchOptions} rebuilds the options when the shelf's ids **or names** move and
+   * at no other time: an element rebuilt every frame is an element whose menu closes as the player
+   * opens it, which is `dev/watchPanel.ts`'s own reason for keying its cells. It runs on every host
+   * notification, which is what a save produces.
+   *
+   * **Said as a limitation rather than presented as coverage**: what is *pinned* by a run is that
+   * the picker's options come from the façade at all — `stageScreen.browser.test.ts` reads them off
+   * the page and hands the day to one of them. That a shelf grown in the *other world* reaches this
+   * list is implemented and not asserted, because no method on the façade writes the shelf: saving a
+   * dispatcher is `dev/dispatcherEditor.ts`'s press, and driving it from here would be a cross-world
+   * case for one list.
+   *
+   * The picker opens on the dispatcher the player has standing rather than on a stranger, so the
+   * first thing it says is true of the day they are watching. That is often *not* a no-op press: a
+   * player who has moved the plain levers is driving a vector the standing name no longer describes,
+   * and handing the day to that name is a real change — which is exactly the case an id comparison
+   * got wrong on the other surface.
+   */
+  let switchable: readonly DispatcherProfile[] = [];
+  let renderedShelf: string | undefined;
+  const switchPicker = el(doc, 'select', 'everyday-stage-switch-pick');
+  switchPicker.style.cssText = [
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    `background:${C.paper}`,
+    `color:${C.ink}`,
+    'padding:5px 7px',
+    `font-family:${TYPE.body}`,
+    'font-size:12.5px',
+    'max-width:100%',
+  ].join(';');
+  switchPicker.setAttribute('aria-label', STAGE_SWITCH_PICKER_LABEL);
+  /**
+   * The shelf, rebuilt only when it has moved — see the block comment above for why once is wrong.
+   *
+   * The player's own selection survives a rebuild wherever the profile still exists; when it does
+   * not — they were pointed at a dispatcher that has just been deleted — the picker falls back to
+   * the standing one rather than to whatever ended up first, so what it names is still a fact about
+   * the day.
+   */
+  function refreshSwitchOptions(): void {
+    const latest = host.dispatchers();
+    const shelf = latest.map((profile) => `${profile.id}\u0001${profile.name}`).join('\u0000');
+    switchable = latest;
+    if (shelf === renderedShelf) return;
+    renderedShelf = shelf;
+    const wanted = switchPicker.value;
+    switchPicker.replaceChildren(
+      ...latest.map((profile) => {
+        const option = el(doc, 'option', undefined, profile.name);
+        option.value = profile.id;
+        return option;
+      }),
+    );
+    const keep = latest.some((profile) => profile.id === wanted) ? wanted : host.selection().dispatcherId;
+    switchPicker.value = latest.some((profile) => profile.id === keep) ? keep : (latest[0]?.id ?? '');
+    switchPicker.hidden = latest.length === 0;
+    switchButton.hidden = latest.length === 0;
+  }
+  const switchButton = el(doc, 'button', 'everyday-stage-intervene');
+  switchButton.type = 'button';
+  switchButton.dataset['interventionKind'] = 'switch-dispatcher';
+  switchButton.style.cssText = ARM_BUTTON_CSS;
+  /** The handover row as of the last {@link draw} — the model's, never composed here. */
+  let switchRow: StageInterventionRow | undefined;
+  switchButton.addEventListener('click', () => {
+    if (switchRow === undefined || switchRow.refusal !== undefined) return;
+    intervene(switchRow.change);
+  });
+  switchPicker.addEventListener('change', () => {
+    syncSwitchArm();
+  });
+  const switchTarget = (): StageSwitchTarget | undefined => {
+    const target = switchable.find((profile) => profile.id === switchPicker.value);
+    return target === undefined ? undefined : { target, driving: () => host.drivingProfile() };
+  };
   const interventionStamp = el(doc, 'span', 'everyday-stage-stamp');
   interventionStamp.setAttribute('role', 'status');
   interventionStamp.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
   const interventionRefusal = el(doc, 'span', 'everyday-stage-intervene-refusal');
   interventionRefusal.style.cssText = `font-size:11.5px;color:${C.label}`;
-  interventions.append(...interventionButtons, interventionStamp, interventionRefusal);
+  interventions.append(
+    ...interventionButtons,
+    switchPicker,
+    switchButton,
+    interventionStamp,
+    interventionRefusal,
+  );
 
   /* --- § 7.4's strip. SVG rather than a second canvas: `raceLaneOf` computes polyline
        attributes for exactly this, and one canvas is one thing to size and one thing to
@@ -915,6 +1023,13 @@ function mountStage(
             dayIdx: host.week().dayIdx,
           });
     context.refreshBar();
+    /*
+     * The shelf, on the notification a save produces — the other half of {@link refreshSwitchOptions}'s
+     * argument. A dispatcher saved in the Engineer world while this screen sits covered arrives here
+     * and nowhere else: `draw` does not run while another world has the page, and the picker's own
+     * `change` event fires only when a player touches it.
+     */
+    syncSwitchArm();
     syncTransport();
     requestFrame();
   }
@@ -988,6 +1103,67 @@ function mountStage(
     status.style.display = 'none';
   }
 
+  /**
+   * § 7.6's second arm, drawn from the row the model built for it.
+   *
+   * Split from {@link draw} because it has two callers and one of them has no frame: the picker
+   * fires outside the render loop, and the arm must also be correct **before any run exists** —
+   * a button with no words on it is what a mount-time-only label would leave while the stage waits
+   * for its first press.
+   *
+   * The shared refusal still wins. A filed day, a day nobody has started and a re-simulation in
+   * flight are true of every arm at once; the row's own refusal is the narrower fact that this
+   * particular handover would move nothing, and it leaves the arm beside it pressable.
+   *
+   * **And it owns the refusal line**, which is why the shared one is passed in rather than written
+   * by the caller. § 7.6's fourth rule is that a control which cannot act *says so* — a disabled
+   * button and a tooltip is not saying so — so the sentence a player reads is whichever refusal is
+   * standing, and one function decides which. Two writers would leave the narrower sentence on the
+   * page after the wider one had gone.
+   */
+  function applySwitchRow(view: StageInterventionView, sharedRefusal: string | undefined): void {
+    switchRow = view.rows.find((row) => row.change.kind === 'switch-dispatcher');
+    if (switchRow !== undefined) {
+      switchButton.textContent = switchRow.label;
+      switchButton.title = switchRow.refusal ?? switchRow.explains;
+      switchButton.disabled = sharedRefusal !== undefined || switchRow.refusal !== undefined;
+      switchPicker.disabled = sharedRefusal !== undefined;
+    }
+    interventionRefusal.textContent = sharedRefusal ?? switchRow?.refusal ?? '';
+  }
+
+  /** The handover arm re-asked from the live facts — for the picker, and for the mount. */
+  function syncSwitchArm(): void {
+    refreshSwitchOptions();
+    const target = switchTarget();
+    const view = stageInterventionsOf({
+      interventions: host.interventions(),
+      simTimeS: playback?.simTimeS ?? 0,
+      dayStartS: host.dayStartS(),
+      hasRun: adopted !== undefined,
+      dayClosed: barFacts.dayClosed,
+      recomputing: recomputingOver !== undefined,
+      ...(target === undefined ? {} : { switchTo: target }),
+    });
+    applySwitchRow(view, sharedRefusalOf(view, watchingNow()));
+  }
+
+  /**
+   * The refusal that is true of **every** arm at once — the run's state, or the spectator rule.
+   *
+   * § 14.1: *"§ 7.6's intervention machinery is disabled while watching. A spectator who could
+   * intervene would be playing, not watching."* Composed here rather than as a fourth arm of the
+   * model, because that function is asked the same question in every run context and *who owns this
+   * run* is not one of its inputs — the Engineer shell disables the same controls from its own
+   * watching latch for the same reason.
+   */
+  function sharedRefusalOf(
+    view: StageInterventionView,
+    watching: WatchingView | undefined,
+  ): string | undefined {
+    return (watching === undefined ? undefined : SPECTATOR_MAKES_NO_CHANGES) ?? view.refusal;
+  }
+
   /** One paint: the header, the cutaway, the alarm, the strip. */
   function draw(): void {
     const recording = adopted;
@@ -1045,6 +1221,7 @@ function mountStage(
       });
     }
 
+    const target = switchTarget();
     const intervention = stageInterventionsOf({
       interventions: host.interventions(),
       simTimeS,
@@ -1052,6 +1229,7 @@ function mountStage(
       hasRun: true,
       dayClosed: barFacts.dayClosed,
       recomputing: recomputingOver !== undefined,
+      ...(target === undefined ? {} : { switchTo: target }),
     });
     interventionStamp.textContent = intervention.stamp;
     /*
@@ -1065,10 +1243,15 @@ function mountStage(
      * (contract § 1.5 — *replayed, not offered*), so naming the latest one at or before the playhead
      * is a true statement about the run on screen and hiding it would misdescribe the replay.
      */
-    const refusal =
-      (watching === undefined ? undefined : SPECTATOR_MAKES_NO_CHANGES) ?? intervention.refusal;
-    interventionRefusal.textContent = refusal ?? '';
+    const refusal = sharedRefusalOf(intervention, watching);
     for (const button of interventionButtons) button.disabled = refusal !== undefined;
+    /*
+     * The handover arm has a refusal of its own — a hand-over to the vector already driving moves
+     * nothing — and it is drawn beside the control rather than in the shared line, because the park
+     * arm next to it is still pressable in that state. The whole-control refusal above still wins:
+     * a filed day cannot be handed to anybody either.
+     */
+    applySwitchRow(intervention, refusal);
 
     drawRace(recording, simTimeS);
   }
@@ -1224,6 +1407,12 @@ function mountStage(
    * the reason `ctx` is a parameter of the screen rather than a field of the run.
    */
   if (context.ctx !== 'watch' && stageEntryStartsARun(host.runState())) host.startRun();
+  /*
+   * The handover arm is drawn from inside this call, before any frame — `draw` returns early with
+   * no recording, so without it the button would sit on the awaiting-run stage with no words on it.
+   * § 7.6's fourth rule is about controls that cannot act *saying so*, and a blank button says
+   * nothing at all.
+   */
   onHostChange();
 
   return {

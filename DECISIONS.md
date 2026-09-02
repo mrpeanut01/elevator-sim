@@ -29726,3 +29726,777 @@ mean.** It is unmeasured, and a second plausible sentence in place of a measurem
 
 **Both registers are empty and both tiers are green**, so the verdict column means today what it was
 written to mean: 0 failing cases *and* nothing held in `honesty.test.ts`'s `OUTSTANDING`.
+
+## D443 — a dispatcher a player built is one more entry in the library, and the batch resolves it there
+
+**Date: 2026-09-01 · Owner: wave K, lane A · GitHub issues
+[#167](https://github.com/mrpeanut01/elevator-sim/issues/167) § 3.1 (4) and
+[#228](https://github.com/mrpeanut01/elevator-sim/issues/228).**
+
+**Decision.** The player's saved dispatchers ride on the **worker message** as profile documents,
+`batch/library.ts#batchLibraryOf` folds them into the dispatcher-profile *file* the batch resolves
+against, and **`batch/runBatch.ts` is unchanged**. A saved dispatcher is not a new kind of arm; it is
+one more entry in `data/dispatcher-profiles.json`'s own shape, and it earns that by surviving the
+file's own parser.
+
+### The defect, as a wire rather than as a complaint
+
+`dev/dispatcherEditor.ts#save` appends to `ViewerState.savedDispatchers` and `persist/` stores it.
+Every **single**-run surface then works, because `dev/state.ts#drivingProfileOf` carries the profile
+*object* into `SimulationConfig`. Every **batch** surface failed, because a batch crosses a
+`postMessage` carrying an *id* and `dev/batchWorker.ts` calls `loadBrowserResources()` on the far
+side — which loads `data/` and nothing anybody authored. `armProfile` then said:
+
+> dispatcher profile "yours-1" for arm "candidate" is not in this build's data/. A batch cannot run
+> an arm it cannot resolve.
+
+That one line is the whole of #113 § 1's *"both surfaces point at a locked door"*: Compare, the
+suite, the Lab, the Everyday bench and the gauntlet all run through that function.
+
+**The Everyday bench is the sharpest case and is why this is a defect rather than a gap.**
+`everyday/benchScreen.ts` fills its field from `host.dispatchers()`, which **is** `allDispatchers(…)`
+and has carried saved profiles since it was written. So the bench offered a saved dispatcher, let a
+reader put it in the field, and failed at *Run the suite* with an engine sentence about `data/`. A
+control that cannot be honoured being offered anyway is `docs/16` S7 inverted, and it had been
+shipping.
+
+### Why the library is a resource and not a field of `BatchRequest`
+
+`BatchRequest` is *what to run* and names things by id, a building among them. `BatchResources` is
+*"the resolved objects a batch needs. Assembled by the caller; never fetched here."* A dispatcher the
+player authored is a resolution, not an instruction. Putting it there also keeps a stored request
+replayable-by-description: a request that named `yours-1` **and** embedded a copy would be two
+sources for one dispatcher, and the copy is the one that goes stale.
+
+The consequence is that the runner did not change at all. `armProfile` was already reading the
+library rather than a shipped array; the library was simply short.
+
+### The evidence is on the legs, and the cell is a measurement rather than a taste
+
+`batch/library.test.ts` compares `[passengerId, carId, boardedAt]` per rider — never a window
+statistic, § D177's own rule — over configs built by `runBatch`'s own exported `armConfigOf`, so the
+comparison is of what a batch actually runs rather than of a reconstruction.
+
+The cell was chosen by sweeping seven buildings × four demand settings × two horizons and counting
+how many legs change car when the saved weight vector moves from `waitTime` to `distanceTravelled`:
+
+| cell | legs | legs whose car changes |
+|---|---|---|
+| `garden-apartments`, own profile, 900 s | **6** | **0** |
+| `chancery-house`, own profile, 900 s | 222 | 137 |
+| **`midtown-office`, own profile, 900 s** | **448** | **360** |
+| `vertical-city`, own profile, 900 s | 1 851 | 1 525 |
+
+**The first row is the finding.** `garden-apartments`/900 s is the cell the rest of `batch/` measures
+at and was this test's first choice: six riders in fifteen minutes, so there is never more than one
+call outstanding and *every* dispatcher answers it with the same car. Two completely different
+dispatchers produce byte-identical legs there. A leg-level test written at that cell would have gone
+green on a seam carrying nothing — this lane's own failure mode, arriving in the test.
+
+**Both directions, because only the pair is evidence.** A spec read off `collective` and saved
+*unchanged* must reproduce `collective` byte for byte on the legs (`specRoundTrips`' claim, checked
+through the batch), and one with a weight moved must not. Without the first, *"the legs differ"*
+could be a save path that mangles a profile.
+
+**A flag as well as a weight** — `DispatcherFlags.bypass` writes `answer.bypassLoadThreshold`, a
+different field in a different stage, so a merge carrying `weights` and dropping the rest passes the
+weight case and fails this one. It needs the cell more than the weights do: at `midtown-office` on
+the building's own profile it moves 266 of 448 legs; at 3 %pop/5 min it moves **none**, and at
+`chancery-house` and `crown-hotel` it moves none at any setting under 900 s. A load threshold cannot
+bite until a car fills.
+
+**And the negative pin: a batch carrying a player's dispatcher may not move the arm it is compared
+against.** `batchLibraryOf` parses the merged document as a *gate* and then rebuilds the library from
+the loaded file's own profile objects plus the parsed saved ones, so *"better than collective"* means
+the same thing on every machine.
+
+### Three findings recorded rather than papered over
+
+1. **A third refusal was written and deleted.** `resolveWeights` was called to catch a weight on a
+   term the library does not declare, on the reasoning that `weights` is
+   `z.record(identifier, z.number())` and a misspelling is a valid identifier. It can never fire:
+   `dispatcherProfilesSchema` cross-checks every weight against the file's own `terms`, and `core`'s
+   `policy.test.ts` asserts `DECLARED_TERM_IDS` **equals** that array. A guard that cannot fire is
+   decoration. It was found by a typo in this lane's own test — `travelDistance` for
+   `distanceTravelled` — refused by the parser one line before the guard written for it.
+
+2. **The parse refusal guards the half it was not written for.** `persist/validate.ts#dispatcherIssue`
+   already runs the same parser over each restored shelf entry and **drops** the failures by name. It
+   is `dev/dispatcherEditor.ts#save` that has no check: it writes `profileFromSpec`'s output straight
+   to the shelf, catching only what that conversion throws. **The single-run path has no equivalent
+   at all** — an unauthorable saved profile reaches `resolveDispatchConfig` and throws mid-run. Left
+   to the editor's own lane rather than patched at a batch, because a second validator there would be
+   the two-answers defect this module exists to avoid.
+
+3. **`kind: 'run'` is two protocols.** The guard that requires every batch post site to carry the
+   shelf accused `dev/shiftRunner.ts`, which is right to send nothing: a `ShiftWorkerRequest` carries
+   a whole `SimulationConfig` with the dispatcher profile as an object. That asymmetry is the whole
+   subject above, found again from the other end. The guard now keys on the file speaking the batch
+   worker's contract rather than on a field's spelling.
+
+### What is offered and what is refused, precisely
+
+**Reached, and each with a named non-test caller:** Compare (`dev/batchPanel.ts`), the suite
+(`dev/suitePanel.ts`), the Lab (`dev/campaignPanel.ts`), the Everyday bench
+(`everyday/benchScreen.ts`), the gauntlet (`gauntlet/run.ts`, from `everyday/boardScreen.ts`). The
+ghost arm needed nothing: `dev/ghostRun.ts` has resolved *your latest saved* from the profile object
+since it was written.
+
+**Not reached, and its refusal already stands on its own face:** the **Everyday** workshop has no
+Save. `everyday/workshopModel.ts#yoursEmpty` says so — *"Saving a dispatcher of your own is the
+Engineer workshop's Save as new — this build has no save here yet"* — and that sentence is still
+true, so it is not touched. It is left rather than half-built because #180's transfer into #228
+names four behaviours § 11.1 requires of Save (overwrite, save-as-a-copy, auto-versioned names, the
+warning before an overwrite), and *"saves and persists"* admits an implementation that satisfies
+#228 and none of them.
+
+### The guard, and why it is derived
+
+Five surfaces post a batch and each was edited by hand; a sixth added next year will not be, which is
+this defect arriving from its own fix. `library.test.ts` finds the post sites **on disk** —
+`src/index.test.ts`'s discipline, *"the entry-point set derived from the directory rather than five
+hand-written names"* — and requires each to carry the shelf, with a non-vacuity floor so the scan
+going quiet cannot report success about no surfaces at all.
+
+### Two things deliberately not added
+
+**No handle method nobody calls.** The refill was briefly on `BatchPanelHandle`, on the argument that
+a shell could drive it. `dev/main.ts` **discards** that handle — which is how `prefill` came to be a
+configurable behaviour with no caller (issue #119 item 7) — and assigns `CampaignPanelHandle` to a
+variable it never reads, so `refresh()` has no non-test caller either. Each panel refills from its
+own `hidden`-attribute observer instead. **The stale campaign handle is reported, not repaired**: it
+belongs to whoever owns `dev/main.ts`'s tab wiring.
+
+**No latch on the refill.** `prefill` is latched because it is a courtesy a reader may overrule; a
+missing option is not. The two behaviours sit behind one signal and neither is the other's default.
+
+### The refusals are player-facing prose, and they are **searched** rather than excluded
+
+`honesty/derive.test.ts` found two new text producers — `batchLibraryOf` and the group labels — and
+they are driven by a `BATCH_LIBRARY` adapter rather than entered in `NOT_PLAYER_FACING`. The
+precedent is one file over: `EDITED_PROFILE` drives `controls/editedProfile.ts`'s three refusals,
+which are the same shape on the same subject, and excluding one while driving its twin would leave
+the search blind to half of one thing.
+
+**Writing them for the search found a defect in them first.** The loudest renderer of these
+sentences is `everyday/benchScreen.ts` — a **Casual** screen, because the bench admits the shelf
+before starting a worker — and the first draft read *"which this build's
+data/dispatcher-profiles.json already ships"*: a file path in front of a reader who has never seen
+one, which is what `internal-notation` exists to catch. They now name the dispatcher by the name the
+player gave it and name the move that clears it. **The parse refusal still quotes `core`'s schema
+message verbatim**, notation and all, with a short attribution in front — `editedProfile.ts`'s rule
+(*"whatever `core` refuses, this refuses, with `core`'s own message"*), because a friendlier
+paraphrase of a loader error is a second answer to *why not*.
+
+**The corpus figures will move, and the prediction is arithmetic** ([§ D343](#d343) reserves the
+measurement for the integrator, once, after integration; this lane does not take it). The adapter
+seeds **five strings per case** and runs **no simulation**: the two group labels, the two refusals,
+and the accepted profile's name. So:
+
+| column | prediction |
+|---|---|
+| always-on strings | **+245** — exactly 5 × 49 |
+| deep strings | **+300** — exactly 5 × 60 |
+| surfaces | **+1 in each tier**, `batch/library.ts#batchLibraryOf`, nothing removed |
+| cases, simulations, failing cases | **unmoved** |
+| the deep tier's one-surface lead | **unchanged** — the new surface is in both tiers |
+
+The string move is exactly attributable for wave G's reason and not wave H's: the seeds are a
+constant per case rather than a state-dependent count, so if either number is not the integer above,
+something other than this adapter moved and the difference is the thing to look at.
+
+---
+
+## D445 — the bench's suite is the forty, and the contract wins because the ladder's own caveat sends a reader there
+
+**Date: 2026-09-01 · Owner: wave K lane B · GitHub issue #157 · Binds `ENGINE_CONTRACT.md` § 12.3,
+`everyday/benchModel.ts`, `batch/suite.ts`, `benchmark/matrixCells.ts`, `data/proof-cases.json` and
+`docs/18`.**
+
+**Decision.** `ENGINE_CONTRACT.md` § 12.3's forty proof cases have **three readers**: the gauntlet
+(`gauntlet/run.ts`), the ladder's disclosure (`gauntlet/ladder.ts#whatAreTheFortyOf`) and the
+**Everyday bench** (`everyday/benchModel.ts`), which ran `MATRIX_CELLS` and now runs the forty. The
+Engineer's suite panel (`dev/suitePanel.ts`) keeps `MATRIX_CELLS` and is **not** a fourth reader.
+The seed does not move with the list: § 1's table gives one rule per reader, and the bench keeps its
+own.
+
+### Why this was a decision and not a wiring job
+
+The two lists are not the same *kind* of list, and the issue said so. `MATRIX_CELLS` are eight
+**measured operating points** over five buildings, each carrying a derived replication budget and
+the 200-replication census that argued it — the points every published interval in this project was
+measured at. The forty are **fixed-forever proof cases**, eight towers × five crowd shapes, seeded
+`hash(towerId, crowdIndex)`, *whose whole value is that they never move*. A bench that silently
+swapped one for the other would change what its intervals are intervals **about**. That is a
+statistical-validity question, so the argument had to be made on validity rather than on obedience.
+
+### The contract wins, and here is the argument rather than the citation
+
+**1. § 14.2 already decided it, in the form that settles a tie inside the handoff.** § 12.1 tabulates
+eight named test shapes; § 14.2 says *"The eight buildings and five shapes are the **same fixtures
+the bench uses** (§12.1) — one set of proof cases, not two."* The handoff does not disagree with the
+simulator here; it disagrees with **itself**, and it supplies its own tie-break. CLAUDE.md's rule
+(*the handoff wins about what the screen looks like, the simulator wins about what a number means*)
+would have pointed the same way regardless: which fixtures an interval is estimated over is
+emphatically a question about what a number means.
+
+**2. The ladder's own caveat sends a reader to the bench, and the bench was pointed elsewhere.**
+`gauntlet/rating.ts#RATING_CAVEAT` is drawn under **every** rating: *"A rating orders this table; a
+gap between two rows is not a measured difference … The bench is where two dispatchers are compared
+on matched crowds with an interval."* A bench measuring a different set of buildings and crowds
+cannot answer the question that sentence raises. This is the substantive defect — not that a
+document was disobeyed, but that the product's own instruction pointed at an instrument aimed
+somewhere else. It is the reason *both suites* was rejected: offering two incomparable suites on
+the screen whose closing rule is **never present a two-run subtraction as a comparison** adds a way
+to confuse two measurements, on the one screen that exists to prevent that.
+
+**3. The matrix could not offer the screen's own tests, and the screen said otherwise.**
+`MATRIX_CELLS` covers **five** buildings and holds no cell on Chancery House, Crown Hotel or St Jude
+at all, so four of § 12.1's eight named shapes named a building the matrix does not measure, and of
+the remaining four only about two matched a cell's pattern. `BENCH_COPY.testsAbsent` told the player
+that **two** shapes were missing. Under the forty, six of the eight are reachable and the absent two
+are *exactly* the two that sentence names — *a lift out of service* and *a sky-lobby transfer*,
+neither of which is a crowd shape, because each changes the building rather than the people. The
+copy was written for the fixtures the contract asks for and had been shipping against the ones the
+code had. That is [§ D227](#d227)'s class — a stale *statement about what an instrument covers* —
+on a player-facing screen, and it is the finding this lane would report even if the ruling had gone
+the other way.
+
+**4. Nothing was given up, and that was measured rather than assumed.** The per-cell derived budget
+is the one real argument for keeping the matrix in the bench, and **the bench never read it**: no
+module in `packages/viz` touches `MatrixCell.replications`, `budgetBasis`, `armCeilings` or
+`admissibleReplications`. It consumed a cell's building, horizon, demand block, report window, id
+and label — every one of which a proof case carries. `SuiteRequest.replications` says why in its own
+docstring: *"one number for the whole suite rather than each cell's own derived budget, because this
+is the player's control"*.
+
+### The budget question, answered plainly
+
+**The bench's budget is asserted, not derived — and it was asserted before this ruling and is
+asserted no differently after it.** It is the player's choice from § 12.1's four (10 / 30 / 50 /
+200), and what makes it honest is not a derivation but a **refusal**: below `MIN_REPLICATION_BUDGET`
+every separating row comes back `under-budget` with the winner deliberately unnamed, and
+`benchBudgetNoteOf` draws two distinct sentences (below thirty, a claim about the instrument; below
+fifty, a claim about what the report will do). A gate is unaffected by which fixtures it gates. The
+forty have no derived budgets and the bench has not lost one, because it never had one to lose.
+
+### The seed does not move with the list
+
+That is [§ D446](#d446), split out because it is separately citable and is the clause most at risk
+of being undone by a reader who takes *one list, three readers* to mean *one list, one seed*.
+
+### No published figure moves, and that was checked before the edit
+
+`benchmark/published.ts` keys the matrix's pins `cell/arm/metric` off `MATRIX_CELLS`, and every one
+is produced by `packages/experiments`' own runner from a `MatrixCellResult`. The browser bench
+produces no `MatrixCellResult` and **no pin reads a browser**, so what the bench measures cannot move
+a published interval. `MATRIX_CELLS` itself is untouched: the eight cells, their derived budgets,
+their `armCeilings` and the study over them are exactly as they were.
+
+### The losing sentences, corrected in the same commits
+
+`BENCH_COPY.testsHint` (*"the operating points every published figure in this project was measured
+at"*) and `testsAbsent` (the two-absent claim, false by four to six under the matrix);
+`everyday/benchModel.ts`'s *"the tests **are** the matrix"*; `batch/suite.ts`'s fixture-list clause,
+which now names the split and says that everything below `suitePlanOf` is shared;
+`benchmark/matrixCells.ts`'s *"its fixture list must be imported from `MATRIX_CELLS`"*, which named
+the wrong list for the wrong screen (the *never retyped* half is untouched and binds both);
+`docs/18`'s *"the bench's suite is not yet the third reader"*; and `data/proof-cases.json`'s *"THE
+SEED RULE IS NOT IN THIS FILE"*, which described one rule where § 1 has two.
+
+**The vendored `ENGINE_CONTRACT.md` and `GAMEPLAY_AND_NAVIGATION.md` are not edited.** § 12.1's table
+of eight named shapes is the clause the code departs from, and the vendored handoff is a record that
+does not move (docs/12's rule, restated in docs/18). The departure is recorded here and in
+`docs/18`, and six of the eight shapes are in fact reachable under the forty — which is four more
+than were reachable under the matrix.
+
+### What a reader should distrust about this
+
+The forty include cells the matrix **excluded for being unresolvable** — no proof case is dropped for
+being hard to resolve, which is the point of the set. So a bench cell can now come back with a
+suppressed mean where a matrix cell would not have. That is reported honestly (`suppressed` is one of
+`report.ts`'s six verdicts, and it is a different claim from `unresolved`), and it is a *less
+informative* bench at those cells rather than an *invalid* one. What has not been measured is **how
+often** across the forty, at which budgets. That is a real gap and no sentence here should be read as
+closing it.
+
+### A new copy line, and why it is on the screen rather than in a docstring
+
+`BENCH_COPY.testsSeedNote` — *"Same buildings and same crowd shapes as the ladder, different
+crowds…"*. A reader comparing a bench figure with a ladder rating will otherwise assume they are the
+same measurement, and the whole value of the shared list is that a finding carries from one screen to
+the other. The sentence that makes that safe has to be where the reader is.
+
+---
+
+## D446 — the bench runs the ladder's cases and not the ladder's crowds
+
+**Date: 2026-09-01 · Owner: wave K lane B · GitHub issue #157 · The seed half of
+[§ D445](#d445) · Binds `gauntlet/proofCases.ts`, `gauntlet/run.ts`, `everyday/benchModel.ts` and
+`data/proof-cases.json`.**
+
+**Decision.** The Everyday bench and the gauntlet run the **same forty proof cases** and **must not
+share their seeds**. The gauntlet keeps § 1's `hash(towerId, crowdIndex)`, fixed forever; the bench
+uses its own, `gauntlet/proofCases.ts#benchSeedOf`. `proofCaseRequestOf` **requires** a seed rather
+than defaulting to the case's own, so every caller says in the call which of the two rules it is
+using. The two seed **sets** are asserted disjoint over the shipped forty.
+
+### Why this is not pedantry about a table
+
+§ 1's table already carries two rules over this one fixture set — `hash(towerId, crowdIndex)` for the
+gauntlet, *"fixed forever; a rating is only comparable if the cases never move"*, and
+`hash(testId, repIndex)` for the bench, *"the same for every entrant — that is what matched crowds
+means"*. So § 12.3's *one list, three readers* is a claim about **fixtures** and never about traces,
+and the contract is internally consistent on the point.
+
+But the table is not the reason. **CLAUDE.md § Tuning discipline** is: *"Hold out traffic seeds. Tune
+on one seed set, validate on a disjoint one, or you overfit the weight vector to specific passenger
+traces and the gain vanishes on new traffic."* The bench is where a player iterates on a dispatcher.
+The gauntlet is what rates it and posts the rating to a standing public ladder. A bench sharing the
+gauntlet's seeds would let a player tune a dispatcher against the **exact forty runs it is about to
+be rated on**, and the rating would be a measurement on the training set — a number that would not
+survive contact with any other traffic, published as a standing claim.
+
+**Same operating points, disjoint traces** is the textbook arrangement. It is also strictly better
+than what shipped before § D445, where the fixtures differed as well and a bench result therefore
+said nothing about a rating at all: the hold-out property is *new*, not preserved.
+
+### What makes it hold rather than be intended
+
+Three things, and the first is the one that will still be true in a year.
+
+1. **`proofCaseRequestOf` requires the seed.** It defaulted to `proofCase.seed`. A default is one of
+   two rules worn silently by the other reader — [§ D227](#d227)'s shape — so it is now a required
+   parameter, and making it required is what made `tsc` name all four call sites rather than leaving
+   three of them correct by luck.
+2. **CRN is untouched, and that is why the change is safe.** *"The same for every entrant"* is
+   `runBatch`'s, not the request's: one seed per replication index, drawn once and shared by every
+   arm (*"this line is the whole of CRN"*). Changing which seed a request carries changes the crowd;
+   it cannot change whether the arms meet the same one.
+3. **Disjointness is asserted, not reasoned.** `proofCases.test.ts` checks the two seed **sets** over
+   the shipped forty — set disjointness rather than pairwise inequality, because a bench seed
+   colliding with *some other* case's gauntlet seed is the same defect one row over. Two hashes of
+   two different strings are only *probably* different, and a probability is not an argument. The
+   bench rule is also pinned by value, for `proofSeedOf`'s reason: changing it silently moves every
+   crowd the bench has ever run.
+
+### The sentence a player reads
+
+`BENCH_COPY.testsSeedNote`, drawn above the tick list: *"Same buildings and same crowd shapes as the
+ladder, different crowds. The bench is where you try things out and the ladder is what rates them,
+so they must not share their arrivals…"*. A reader comparing a bench figure with a ladder rating
+will otherwise assume they are the same measurement — and the whole value of the shared list is that
+a finding carries from one screen to the other, so the sentence that makes that safe has to be where
+the reader is rather than in a docstring.
+
+## D447 — the Sound row is a queue item, not a holding position, and the guide's binary is closed
+
+**Date: 2026-09-01 · Wave K lane C · GitHub issue [#170](https://github.com/mrpeanut01/elevator-sim/issues/170), Sound half**
+
+**Decision.** The Everyday Settings `Sound` row **stays refused**, and the refusal is now recorded
+as *unbuilt with an owner* rather than as *undecided*. The design guide's § 20.12 —
+*"Either give it doors, chimes and lobby murmur, or remove the row"* — is **corrected in place** to
+say that the first branch was taken, by whom, and which lane carries it.
+
+**Why this is not the third option wearing a new hat.** § 20.12 offers two ways out and the issue
+that raised this says the stated absence is *"a reasonable holding position, but not an ending"*.
+It is an ending now, because the decision has been made elsewhere and this lane's job was to find
+it rather than to make it again: [§ D344](#d344) is a product-owner ruling of 2026-08-24 that
+**audio ships**, speed-tiered, overruling the written cut `docs/29-audio-direction.md`
+recommended. The lane that builds it is
+[#258](https://github.com/mrpeanut01/elevator-sim/issues/258), which was blocked on
+`STAGE_SPEEDS` having no 1:1 rung for a discrete cue to fit inside a 9.8 s door cycle
+([#257](https://github.com/mrpeanut01/elevator-sim/issues/257), closed by [§ D354](#d354) — seven
+rungs, every label equal to its ratio). **The block is gone and the work is live.**
+
+So the three options are not equally open: *build it* is chosen, *remove the row* is refused, and
+what is drawn today is what the chosen option looks like before it lands.
+
+**Why the refusal may stand while the work is owed.** § 20.12's rule is that *a toggle that toggles
+nothing is a lie in a settings panel* — and there is no drawn toggle. `settingsView.ts`'s
+`SETTINGS_ABSENCES` states the absence in words, and `buildNotes.test.ts#ABSENCE_TRIAGE`
+([§ D370](#d370)) already names #258 as its owner, in both directions: an entry with no triage row
+fails, and a triage row whose entry has gone fails too. That is the mechanism that makes this a
+queue rather than a permanent refusal, and it was already in place — this decision adds no
+apparatus, it reads the one that exists.
+
+**What was actually wrong, and it was a document rather than a build.** The guide said the choice
+was open. It had been closed for eight days, on a ruling in this repository's own decision log, and
+nothing pointed the reader of § 20.12 at it. That is [§ D227](#d227)'s class — a stated position
+that has stopped being true — in its documentary form: not a stale *refusal* (the refusal is
+accurate) but a stale *open question*, which sends the next lane to re-decide something already
+decided. Both sites are corrected: § 20.12's bullet and § 15.1's build note, which carried the same
+sentence.
+
+**The guide is edited rather than annotated from outside, and that is the precedent this entry
+sets.** `docs/design/design_handoff_casual_mode/` has been vendored twice and never edited, so this
+is the first change to it. Two things make it the right place. Its own § 21 says the guide *"is
+maintained alongside the prototype, not written once"* and names § 20's work order as the section
+that *"rots fastest"*, and its README says § 20 is **work, not design** — so correcting a work
+order is not overruling the canonical interface, which is what `CLAUDE.md` protects when it makes
+the handoff win every disagreement about what the screen looks like. The correction is marked as a
+correction (struck text kept, dated, attributed) rather than silently rewritten, on
+`docs/29`'s own pattern one document over.
+
+**What this decision deliberately does not do.**
+
+- **It does not describe the audio design.** § D344 and #258 are that account, and `docs/29`'s
+  header states the reason in its own case: two accounts of one design drift apart.
+- **It does not touch § 15.1's lede** (*"how the game looks **and sounds** to you"*). Under the cut
+  that sentence was a false promise needing correction; under this ruling it is a promise that
+  becomes true when the sound arrives, which is #258's to deliver.
+- **It does not amend `docs/29`.** That document is a superseded recommendation, already headed
+  *OVERRULED*, and it says outright that it is not amended to describe what replaced it. Its § 8
+  reasoning for the Sound half — *"Sound closes because the work is cancelled: there is no consumer
+  to build"* — is therefore **stale on its face and correctly so**, because the document above it
+  says the conclusion was overruled and the evidence was not. Rewriting § 8 would be the second
+  account this repository has twice refused to keep.
+
+**The consequence for #170.** Its two halves separate for good, which `docs/29` § 8 and this issue's
+own verification comment both predicted: Sound is #258's and is not this lane's to build, and Units
+is #170's alone. The Units half is this lane's and is built beside this entry; it cites this one,
+rather than this one citing forward into work that had not landed when it was written.
+
+---
+
+## D448 — the Units preference converts, and the module's shape is what keeps it out of a run
+
+**Date: 2026-09-01 · Wave K lane C · GitHub issue [#170](https://github.com/mrpeanut01/elevator-sim/issues/170), Units half**
+
+**Decision.** § 15.1's `Units` row ships. `everyday/units.ts` is the consumer whose absence was the
+refusal, the preference lives as a **sibling of `profile`** in the Everyday slot at envelope version
+3, and the `SETTINGS_ABSENCES` entry plus its `ABSENCE_TRIAGE` row are deleted on the commit that
+makes them false. [§ D447](#d447) is the Sound half, which stays refused and is #258's.
+
+### What was refused, and what makes the refusal false now
+
+The entry read *"Units — nothing in the viewer reads a metres-or-feet preference, so there is nothing
+for the switch to switch"*, and its evidence was a grep: `grep -rin "imperial" packages/viz/src
+--include='*.ts'` found no non-test occurrence. That was true of every build until this one. The work
+was never the control — the control is designed, and § 18's prototype state has carried an `imperial`
+field the whole time — it was **a consumer**, which is the shape `CLAUDE.md`'s standing requirement
+names from the other side: a seam with no caller, filed as a control with no seam.
+
+`ENGINE_CONTRACT.md` § 13 is what the consumer had to satisfy: *metres by default; the `Units`
+setting switches machine specs to feet and **must convert, not relabel***.
+
+### The correctness bite, and why it is answered with a module shape rather than a rule
+
+`CLAUDE.md`'s conventions keep units **SI internally** and allow imperial values only in reference
+data and display formatting, always with the unit in the identifier (`ratedLoadLb`, `speedFpm`). A
+display-layer conversion that leaked into a stored figure would be a defect of a different order from
+a mislabelled one: it would reach a run record, a persisted profile, a submitted run or a published
+interval, every one of which is compared against numbers taken under the other preference. Two runs
+that cannot be compared while both look valid is the failure mode this repository's statistical
+discipline exists to prevent, arriving through a settings row.
+
+**So the guarantee is structural rather than remembered.** `feetOf` and `METRES_PER_FOOT` are
+module-private and **every export that touches them returns a `string`**. There is no signature in
+`units.ts` through which a converted quantity can be assigned to anything, so the invariant is a fact
+about the types. `units.test.ts` holds it from three directions:
+
+1. **The export surface**, walked rather than listed, so an export added later is covered on the
+   commit that adds it — every entry point must answer a string. Mutated to return a `number`, this
+   is caught **twice**: `tsc -b` refuses the call site, and the case names the export.
+2. **The legs.** Flipping the *shipped singleton* leaves `legsOf(baseState())` byte-identical. Legs
+   rather than a window statistic, for [§ D177](#d177)'s reason. This is
+   `docs/05`'s standing requirement in its contrapositive, and it is the shape #258 states for a
+   presentation control: it must reach a sink and **must not** reach the legs. Verified by mutation —
+   a `shiftRunConfigOf` that read the preference and moved one car's `ratedSpeedMps` reddens this case
+   **and nothing else in the suite**, `boundaries.test.ts` and the whole of `scope/` included.
+3. **The storage.** What is persisted is one of two words, so there is no number in the envelope the
+   preference can move.
+
+### Where the preference lives, and why not on the profile
+
+A **sibling** of `profile` and `progress` in the Everyday slot, at schema version 3, on
+[§ D433](#d433)'s precedent one version down. `EverydayProfile` is *identity* — the name and colour
+§ 15.1's lede says travel with every run you post — and a display preference folded into it would
+ride along with a submission. It is not in `menu/types.ts#Settings` either, for `profile.ts`'s own
+stated reason: that envelope is the Engineer session, with a different owner and a different version
+number, and nothing on the Engineer surface reads this preference.
+
+The `withUnits` migration **determines** `metric` rather than guessing it, which is the only ground on
+which a migration may invent a value: before version 3 nothing in the viewer read a metres-or-feet
+preference at all — that is the whole of what #170 reported — so metres is what any earlier build's
+player was looking at, not a preference chosen on their behalf.
+
+### The scope is a list, and the list is checked
+
+The preference reaches **machine specifications**: § 13.2's rating plate (`RATED SPEED`, `TRAVEL`),
+the drawing board's machine-class band and its speed chips, the tuner's machine card (whose readout's
+own docstring says it is *"in the units the plate uses"*, so the two could not be allowed to
+disagree), and the daily loop's *Rated speed* fact. Three neighbours are deliberately left alone:
+`CAPACITY … lb` on the plate, because `ratedLoadLb` is reference data with the unit in the identifier
+and § 13's clause is about metres and feet; the fix screen's `+0.5 m/s` repair step, because that is a
+**price** quoted in the unit § 9 prices it in; and `shift/contracts.ts`'s stat line, which is shared
+with the Engineer surface and governed by its own contract.
+
+That list is a claim about this tree, so it is **asserted rather than described**: a bare `m/s`
+literal anywhere in `everyday/` must go through this module or arrive in `units.test.ts`'s allowance
+with its reason, and an allowance whose file stopped printing one must go with it.
+
+**The chip labels convert and the values they write do not**, which is *convert, not relabel* pointed
+at a control rather than at a readout: a player picking `8.20 ft/s` on the drawing board writes `2.5`
+to `ratedSpeedMps`, exactly as they did before this preference existed.
+
+### One metric string moved, and it is named rather than left to be discovered
+
+`today.ts`'s *Rated speed* fact printed `String(max) + ' m/s'` — `2.5 m/s`, and `8 m/s` for a shuttle
+— while the plate two screens over printed `2.50 m/s` for the same car. The fact takes the plate's
+precision now. It is the only metric arm this lane changed, it changes no figure's value, and it is
+recorded here because a change nobody declares is how a string count stops being attributable.
+
+### What the corpus gains
+
+Both faces are seeded: the rating plate under both preferences, the machine-class band's range and
+declared rise under both, the tuner's readout under both, one settings sub-case carrying `imperial`,
+and the daily facts **diffed** so only what actually differs is pushed — `todayOf` is total in
+`units`, so seeding an identical record again would be the same string twice under two names.
+
+`derive.test.ts` found five unclassified producers on its first run after the consumers landed,
+which is what it is for. Four are this module's and one is `profile.ts#loadUnits`;
+`tunerModel.ts#tuneSpeedReadout` stopped being a producer at the same moment, because it authored a
+literal and now delegates, so its `covers` entry was **moved rather than kept** — a coverage claim
+for a declaration the derivation no longer finds is a claim about nothing.
+
+**No adapter was added or removed, so the surfaces column does not move**, and the deep tier's
+one-surface lead is undisturbed. Under [§ D343](#d343) this lane does not measure the corpus. Its
+forecast — published so an independent measurement can confirm or refute it, which is the only thing
+a lane may honestly say about this figure — is **+52 strings per case in both tiers**, decomposing
+exactly: 18 for the settings row (three strings over six sub-cases), 18 for the plate (six rows over
+three arms, doubled), 12 for the class band (two figures over three arms, doubled), 2 for the tuner
+readout (two arms), and 2 for the daily loop (one fact over two days). Cases, simulations, surfaces,
+suppressed runs and failing cases all unmoved.
+
+## D449 — three stated costs, measured rather than quoted, and one of them was an understatement
+
+**Date: 2026-09-01 · Owner: wave K lane D · GitHub issue #165.**
+
+**Decision.** The three surfaces that still ran `recordRun` synchronously on the thread that paints
+— both Fix-a-building shells and Watch's reproduction gate — go through a worker, and the cost
+sentences that stood in for a measurement are **deleted rather than reworded**
+([§ D227](#d227): a stated cost that has been paid is a stale refusal, and it is the more dangerous
+half because it tells the next reader not to touch the thing).
+
+This entry exists rather than a docstring under [§ D405](#d405) for one reason: the figures below
+are published in four modules, they **correct** figures three of those modules previously stated as
+fact, and CLAUDE.md's rule is that a published number is pinned to the run that produced it. The
+run is `packages/viz/src/dev/measure.surfaceRuns.test.ts`, env-gated on `SURFACE_RUNS_OUT` and
+writing to a file rather than logging, because vitest 4 intercepts `console.log` — the same trap
+that made `honesty/measure.corpus.test.ts` necessary. This is `RISKS.md` R38's shape on prose costs
+rather than on prose counts, and the deriver is the remedy R38 itself names.
+
+**What the issue quoted, and what the run says.** Blocking wall clock over the shipped population,
+Node v22.22.2, beside the transport that replaces it (`structuredClone` of the config out and the
+recording back, which is the *upper bound* on the main thread's remaining share for
+`dev/shiftRunner.ts`'s own reason — a `postMessage` splits the clone and this does not measure the
+split):
+
+| surface | stated | measured, blocking | transport |
+|---|---|---|---|
+| Fix-a-building, opening a case (1 run) | *"~0.5–1.5 s per run"* | **11–474 ms**, median 87 | 1.9–40.9 ms |
+| Fix-a-building, `Run the day` (the pair) | *"~0.5–1.5 s per run × 2"* | **24–846 ms**, median 146 | 3.2–72.0 ms |
+| Watch, the two shipped reference rows | *"~0.2–1.5 s"* | **6 ms and 150 ms** | 1.2 and 10.7 ms |
+| Watch, a filed `vertical-city` day at 7 200 s | — | **4 351 ms** | 387.6 ms |
+
+**Two of the three were overstatements and the third was an understatement, and the third is the
+finding.** Watch's sentence was measured on the cheap half of its own population. The rows a first
+visit can offer are the two reference runs, and both come in *under* the range it claimed; but a
+picker row is a **filed day**, which is whatever the player ran, up to
+`menu/types.ts#LONGEST_OFFERED_RUN_S` on any tower they have played. That row blocks for three
+times the stated ceiling, and 387 ms of the remaining transport is the recording's own clone. A
+cost quoted from the population that is easy to reach is the same defect as a refusal that has gone
+stale: both tell a reader the thing is smaller than it is.
+
+**4 351 ms is a floor on that, not a worst case, and the table says a filed day rather than *the
+worst* row for that reason.** It runs Vertical City on the building's own demand;
+[`dev/shiftRunner.ts`](packages/viz/src/dev/shiftRunner.ts) measured the same tower at the same
+7 200 s under `constant-iso` at **21–31 s** on `collective`, and a day run that way can be filed
+like any other. What this row establishes is that the stated ceiling was already exceeded well
+before the heaviest thing the menu allows.
+
+**The Everyday open run is the one nobody could see.** It ran inside `mainColumn`, so it had no busy
+state and could not have had one — nothing can paint while it runs. Measured through the browser
+tier on the shipped artifact, clicking a rail row stopped the page for **128 ms**; pressing the
+primary stopped it for **947 ms over 13 frames**, and the Engineer panel's press for
+**644–1 227 ms over 11–18 frames** across four samples. After: **126 ms over 158 frames** and
+**113–247 ms**.
+
+**Watch's browser-tier gain is inside the noise, and that is published rather than smoothed.**
+72–100 ms over 9–11 frames before, 38–102 ms over 22–52 frames after — the frame *count* moves and
+the gap does not, because the only rows the tier can reach are the two cheap ones. The case for
+moving that surface is the 4 351 ms row, not this tier. `dev/mainThreadFrames.test-helper.ts` says
+so where its threshold is defined, so nobody reads that bound as evidence it cannot supply.
+
+**Consequences that reach past the three surfaces.**
+
+- `fixit/run.ts#runFixitPair` is **deleted**. With both shells on the worker nothing outside a test
+  called it, and a behaviour with no non-test caller is exactly what `docs/05-roadmap.md`'s standing
+  requirement is about — the instructive instance being the whole of `tuning/`, which said so in its
+  own docstring while the roadmap called the phase green. `fixit/cases.test.ts` runs the pair
+  itself; what it must not reimplement — `fixitRunPlanOf`, and now `FIXIT_RUN_SWITCHES` — it still
+  calls. **This is not a twelfth dead seam**: it never shipped as one, because it was deleted on the
+  commit that made it one.
+- `watch/library.ts#checkedRun` is **split** into `watchGateBefore` and `watchGateAfter`, and
+  `checkedRun` is those two composed. One shell runs the gate's simulation on a worker and the other
+  keeps it synchronous, and two gates would be exactly the divergence CLAUDE.md's standing
+  requirement is about — invisible, because both would answer and only the rows they refuse would
+  disagree. `watch/record.test.ts` requires the composition to agree with the halves on all four
+  arms, including the two that must refuse before they simulate.
+- `dev/offThreadRuns.OffThreadRun` requires `recordDecisions` rather than defaulting it, and the
+  requirement is load-bearing: `recordRun` defaults it to **true**, the Watch gate relied on that
+  default, and a decision log is *in* the recording — so a convenient default of `false` would have
+  handed the stage a different replay than the synchronous gate produced, and the reproduction check
+  downstream compares recordings. `dev/shiftRunner.ts`'s protocol already made the same rule for the
+  same two fields: *passed rather than defaulted so the far side decides nothing*.
+
+## D451 — an absence that has half stopped being true is deleted whole and re-taken, never trimmed
+
+**Date: 2026-09-01 · Owner: wave K lane E · GitHub issue #171, closed in one arm of two.**
+
+**Decision.** When a register entry asserts two absences and one of them is built, the entry is
+**deleted on the commit that builds it** and a **narrower entry is taken afresh** for what is still
+missing — with its own words, its own triage row and its own pin. It is not edited down to the
+surviving clause.
+
+**Why the distinction is not pedantry.** A trimmed entry keeps its history, its fragment and its
+issue number while its *subject* has changed underneath it, and every instrument this repository has
+for keeping refusals honest is keyed on those three things:
+`everyday/buildNotes.test.ts#ABSENCE_TRIAGE` matches a fragment and asserts the mapping is total and
+has no stale rows; `everyday/refusalsAreCurrent.test.ts` compares a sentence against the screen
+registry. Both go on passing across a trim, because the fragment still matches and the screen names
+are unchanged. What has moved is the only thing neither can see: what the sentence is *about*.
+
+**The instance.** `STAGE_ABSENCES` read *"no decisions during a run — a day can carry a handover to
+another dispatcher and an answered incident, and this screen offers neither: a handover needs a
+dispatcher picked somewhere, and an incident needs the dock above"*. § 7.6's handover is now on the
+stage, so the entry's own verb — *offers neither* — was false the moment the picker landed. Left
+standing it is [§ D227](#d227)'s defect with its polarity reversed: a refusal telling a player not
+to look for a control that is there. The entry is gone; what stands is
+*"no answer to a live incident — a day can carry one, stamped with the moment it was given, and this
+screen offers none: the answer comes from the money-and-incident panel above, which is not drawn,
+over an incident this build does not raise while a day is running"*, and `ABSENCE_TRIAGE`'s row for
+issue #171 is re-pointed at the new fragment. It names **both** halves of what is missing rather than
+only the panel, because *"the panel is what is missing"* — the first draft of this entry — would have
+told a reader that drawing the dock is enough, and it is not.
+
+**The new entry is pinned by a run and not by a sentence**, which is what makes it a re-taking rather
+than a reword: `everyday/stageScreenModel.test.ts` requires that no row `stageInterventionsOf` can
+build carries an `answer-incident` change, in every state it can be asked. The day an answer arm
+lands, that case is red and the sentence has to come out with it — which is precisely what the
+deleted entry could not do for the handover, because nothing held it to the arm it described.
+
+**What was closed and what was not, stated rather than rounded.** Issue #171's acceptance names two
+arms and *both entries leave `STAGE_ABSENCES`*. One did. The handover was buildable because the
+screen already holds every dispatcher through the data façade; the answer is not, because § 7.5's
+dock is a panel that does not exist and the incident it would offer — a live one, with options
+carrying costs against the building's purse — has no producer in this build. `campaign/career.ts`
+authors two needs, a renewal and a service window, and both are decisions about the *career* taken
+between days rather than about the day on the stage. That is not this lane's reading of the code:
+`CAMPAIGN_ABSENCES`' first entry says it outright and is triaged to GitHub issue **#169** —
+*"Incidents here are the two the building implies … there is no seeded stream for a campaign day and
+no event calendar behind a contract."* So the second arm is blocked on an absence another issue
+already owns, and building it would have meant inventing the incident it answers, which is a larger
+decision than an intervention row and not this lane's to take.
+
+**And the arm that landed produces a day that cannot be posted.** `SUBMITTABLE_INTERVENTION_KINDS`
+admits `park-cars-lobby` alone, and `scope/runIdentity.ts` refuses a `switch-dispatcher` entry
+because it carries its weight vector inline, which a submission of ids may never hold. That refusal
+is worded and reachable, and no Everyday flow meets it today — § 15's *Post runs to the board* is
+still an absence of its own — but the handover has been an Engineer-only control until now, and this
+is the commit that lets a player reach that state from the Everyday stage. Watching is unaffected:
+`watch/record.ts#WATCH_RECORD_CARRIES` carries `viewer.interventions`, so a handed-over day travels
+to a spectator whole.
+
+
+## D453 — a merge conflict can be loud and still be resolved wrongly, and the fix is to read both intents
+
+**Date: 2026-09-01 · Owner: integrator, wave K · The case [§ D441](#d441) does not cover.**
+
+**Decision.** When two lanes edit the same function for different reasons and git raises a conflict,
+the resolution is not a choice between the two sides and is not a concatenation of them. It is a
+third text that carries **both intents**, written after reading what each lane was trying to do — and
+it is verified by asserting that both behaviours survive, not by the build passing.
+
+**Why this needed its own entry beside § D441.** That entry is about collisions git **cannot see**:
+two lanes writing the same value, producing no marker and a wrong result. This is the opposite
+failure and it is the more tempting one, because a conflict marker *looks* like the tool has told you
+what to do. It has told you only where the two texts differ, which is not the same as telling you
+what either was for.
+
+**The instance.** `everyday/benchScreen.ts`, wave K. Lane B had rewritten that screen's run path to
+plan § 12.3's forty proof cases — `benchPlanOf`, `BenchCasePlan`, a `state.data` guard — and had
+narrowed its `batch/suite.js` import accordingly, dropping `suitePlanOf`, `SuiteCellPlan` and
+`SuiteRequest`. Lane A had added a saved-dispatcher pre-flight to the same function, written against
+the `SuiteCellPlan` shape that lane B had just removed.
+
+Both sides were correct on their own branch. Taking either whole would have shipped a screen that
+was coherent and wrong: lane B's alone offers the player's dispatchers in its field and refuses them
+at Run, which is the exact defect #167 exists to close; lane A's alone plans matrix cells on a screen
+whose own copy now names the forty, which is the defect #157 exists to close. **A three-way merge
+tool cannot pick between those, because the information that decides it is in neither text.**
+
+The resolution keeps lane B's plan types and data guard, and inserts lane A's pre-flight between the
+guard and the plan — before any worker starts, which is where lane A's own argument put it. It was
+then checked in the only way that means anything: the merged screen was read for **both** halves, and
+both are present — it plans the forty (`benchPlanOf` at the plan site) and it carries
+`savedProfiles` on its `postMessage`. `tsc -b` would have passed on either side alone.
+
+**The rule.** A conflict in a function two lanes both rewrote is a signal to read both lanes'
+*reports*, not just both diffs. Resolve to the union of intents, then assert each intent separately
+against the merged file. If the two intents genuinely cannot coexist, that is a design question for
+the lanes' owner and not a merge to be finished quietly.
+
+
+## D454 — wave K's corpus move, and four forecasts that are off by exactly one string per case
+
+**Date: 2026-09-01 · Owner: integrator, wave K · The measurement [§ D343](#d343) requires, taken once
+on the integrated tree.**
+
+**Decision.** The corpus was measured once after integration, both tiers in one sitting, on the
+integrated tree and never on a branch — and the base at `e8aac0d` was re-measured first in a detached
+worktree so a move could be told from a correction.
+
+**The base reproduced its published row exactly, in both tiers**, for the **fifth** consecutive wave:
+49 / 572 667 / 606 / 54 / 0 and 60 / 714 553 / 4 710 / 55 / 0.
+
+| | base `e8aac0d` | integrated | move |
+|---|---|---|---|
+| always-on strings | 572 667 | **575 999** | **+3 332** |
+| deep strings | 714 553 | **718 633** | **+4 080** |
+| always-on surfaces | 54 | **55** | **+1** |
+| deep surfaces | 55 | **56** | **+1** |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+**The surface sets were diffed rather than the counts compared**, in both tiers. Exactly one surface
+was added — `batch/library.ts#batchLibraryOf`, lane A's — and **nothing was removed**. The deep tier's
+one-surface lead survived and the diff names it: `campaign/judge.ts#judgeStage` is the only surface in
+deep and not in always-on, and nothing is in always-on and not in deep.
+
+**The finding is the arithmetic, and it is the first time this programme has been precise enough to
+have one.** Four lanes each published a decomposed per-case forecast before the measurement. Summed:
+
+| tier | forecast | measured | shortfall |
+|---|---|---|---|
+| always-on | +3 381 (A 245 · B 98 · C 2 548 · D 0 · E 490) | **+3 332** | **49** |
+| deep | +4 140 (A 300 · B 120 · C 3 120 · D 0 · E 600) | **+4 080** | **60** |
+
+**49 over 49 cases and 60 over 60 cases: exactly one string per case, in both tiers.** That rules out
+noise and rules out a single miscounted constant — a one-off would not scale with the case count, and
+an error in one lane's per-case figure would have to be exactly one in a decomposition that is
+internally consistent. All four decompositions were checked and each sums to its own claim: A 5/case,
+B 2/case, C 52/case (18 + 18 + 12 + 2 + 2), E 10/case (2 + 4 + 5 + 1, from a base of 2).
+
+So the forecasts are **not additive**, and one string that some lane counted as new is not new in the
+integrated tree — or one lane's change removes a string another adds. **Which lane is unattributed,
+and no mechanism is offered for it.** Establishing it means measuring each branch separately, which
+§ D343 forbids publishing and which nobody has done; asserting a plausible candidate instead would be
+the defect [§ D256](#d256) exists to refuse. It is recorded here so the next wave that forecasts can
+check whether the same one-per-case gap reappears — which would localise it far more cheaply than
+four branch measurements.
+
+**What is attributable is attributed exactly**: the surface, by set difference, to lane A.
+
+**Both registers are empty and both tiers are green**, so the verdict column means today what it was
+written to mean: 0 failing cases *and* nothing held in `honesty.test.ts`'s `OUTSTANDING`.

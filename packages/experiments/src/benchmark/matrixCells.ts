@@ -4,11 +4,26 @@
  * ## Why this file exists — the suite's first decision, and it is § D406
  *
  * Everyday Mode's suite (docs/18 § Slice 7) runs one comparison over multiple fixed cells, and its
- * fixture list must be **imported from `MATRIX_CELLS`, never retyped**: docs/18 records that a
- * builder who assumes "the eight buildings" produces a list that disagrees with the matrix — the
- * matrix's eight are building × traffic-pattern cells over *five* buildings, `data/buildings/`
- * separately holds eight buildings, and a hand copy of either would be a second source of truth
- * about which operating points this project measures.
+ * fixture list must be **imported, never retyped**: docs/18 records that a builder who assumes "the
+ * eight buildings" produces a list that disagrees with the matrix — the matrix's eight are building
+ * × traffic-pattern cells over *five* buildings, `data/buildings/` separately holds eight buildings,
+ * and a hand copy of either would be a second source of truth about which operating points this
+ * project measures.
+ *
+ * **Which list it imports changed, and the file it moved to is the point.** This sentence read
+ * *"imported from `MATRIX_CELLS`"* and named the wrong list for the wrong screen. There are two
+ * suites: the **Engineer**'s (`viz/dev/suitePanel.ts`) plans over `MATRIX_CELLS` and always has,
+ * and the **Everyday** bench (`viz/everyday/benchModel.ts`) planned over them until
+ * [§ D445](../../../../DECISIONS.md) and now plans over `data/proof-cases.json`'s forty proof cases
+ * — `ENGINE_CONTRACT.md` § 12.3's *one list, three readers*, of which the bench is the third. The
+ * *"never retyped"* half is untouched and binds both: each surface imports its own list, and
+ * neither holds a copy.
+ *
+ * Nothing in this module moved with it, and nothing could: the browser bench never read
+ * {@link MatrixCell.replications}, {@link MatrixCell.budgetBasis}, {@link MatrixCell.armCeilings}
+ * or {@link MatrixCell.admissibleReplications} — its budget is the player's control, and always
+ * was. The eight cells, their derived budgets and every published pin over them are exactly as they
+ * were, because a pin is produced by this package's own runner and no pin reads a browser.
  *
  * The preferred route was to export the cells through `src/browser.ts`, whose seam is already
  * open (`dev/campaignPanel.ts` imports from it). **Measured before deciding, not assumed**: the

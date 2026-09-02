@@ -64,6 +64,7 @@ import {
   type SpecUpPeakAnalysis,
 } from '../authoring/buildingSpec.js';
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
+import { lengthFigure, speedFigure, type EverydayUnits } from './units.js';
 
 /* -------------------------------------------------------------------------- *
  * The copy — § 13's, and the prototype's
@@ -396,16 +397,31 @@ export interface DesignerPlateRow {
  * `personsOf` is `buildingSpec.ts`'s own reading of the load-to-persons table, so the plate and the
  * building editor's chips cannot disagree about how many people a 2 500 lb car holds. Landings is
  * the floor count the shaft opens onto, which for the whole design is every floor it has.
+ *
+ * ## The two rows the `Units` preference reaches, and the one it does not
+ *
+ * ENGINE_CONTRACT § 13 — *metres by default; the `Units` setting switches machine specs to feet and
+ * must convert, not relabel* — and this plate is § 13.2's, so `RATED SPEED` and `TRAVEL` are drawn
+ * through `everyday/units.ts` rather than formatted here. **`CAPACITY` is not**, and the exception
+ * is `CLAUDE.md`'s own worked example rather than an oversight: `ratedLoadLb` is reference data
+ * with the unit in the identifier, § 13's clause is about metres and feet, and a rating plate is
+ * exactly where a machine's imperial rated load belongs. See
+ * [§ D448](../../../../DECISIONS.md).
+ *
+ * `units` is **required**, for the reason `menu/screens.ts#applyIntent` gives about its catalogue:
+ * an optional preference would let a caller silently opt out of the conversion and keep drawing
+ * metres, which is the defect this parameter exists to close, wearing a default.
  */
 export function designerPlateRows(
   spec: BuildingSpec,
   machineClass: MachineClass | undefined,
+  units: EverydayUnits,
 ): readonly DesignerPlateRow[] {
   return [
     { key: 'CAPACITY', value: `${String(spec.ratedLoadLb)} lb` },
     { key: 'PERSONS', value: String(personsOf(spec.ratedLoadLb)) },
-    { key: 'RATED SPEED', value: `${spec.ratedSpeedMps.toFixed(2)} m/s` },
-    { key: 'TRAVEL', value: `${riseM(spec).toFixed(1)} m` },
+    { key: 'RATED SPEED', value: speedFigure(spec.ratedSpeedMps, units) },
+    { key: 'TRAVEL', value: lengthFigure(riseM(spec), units) },
     { key: 'LANDINGS', value: String(spec.floors + spec.belowLobby.length + 1) },
     { key: 'CLASS', value: machineClass?.name ?? spec.specClass },
   ];

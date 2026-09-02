@@ -53,6 +53,7 @@ import {
   withMachineClass,
   DESIGNER_COPY as COPY,
 } from './designerModel.js';
+import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
@@ -60,6 +61,12 @@ import {
   EVERYDAY_RADII as R,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
+import {
+  lengthFigure,
+  speedFigure,
+  speedRangeFigure,
+  type EverydayUnits,
+} from './units.js';
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 
@@ -101,6 +108,17 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    */
   let spec: BuildingSpec = context.host.buildingSpec() ?? BLANK_SPEC;
   let savedLine: string = COPY.savedNothing;
+
+  /**
+   * How this screen's machine specifications read — § 15.1's `Units` row, GitHub issue #170.
+   *
+   * Read per draw rather than captured at mount, on `settingsScreen.ts`'s own pattern with the
+   * profile store: the preference is set on another screen, and this shell mounts one screen at a
+   * time, so a value captured here would be the one that was standing when the board was opened.
+   *
+   * **Presentation only.** Nothing it returns reaches `spec`; every use below is inside a string.
+   */
+  const unitsNow = (): EverydayUnits => everydayProfileStore().units();
 
   const root = el(doc, 'div', 'everyday-designer');
   root.style.cssText = 'display:grid;gap:16px;max-width:1180px';
@@ -349,7 +367,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
         doc,
         'div',
         'everyday-designer-limits',
-        `${machineClass.speedMinMps.toFixed(2)}–${machineClass.speedMaxMps.toFixed(2)} m/s · up to ${String(machineClass.maxFloors)} floors and ${String(machineClass.maxRiseM)} m of rise`,
+        `${speedRangeFigure(machineClass.speedMinMps, machineClass.speedMaxMps, unitsNow())} · up to ${String(machineClass.maxFloors)} floors and ${lengthFigure(machineClass.maxRiseM, unitsNow(), 0)} of rise`,
       );
       limits.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey};margin-bottom:11px`;
       const application = el(doc, 'div', undefined, machineClass.application);
@@ -366,7 +384,13 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
         'Rated speed',
         speedStepsFor(machineClass),
         spec.ratedSpeedMps,
-        (step) => `${step.toFixed(2)} m/s`,
+        /*
+         * The **label** is converted and the value written below it is not — which is the whole of
+         * § 13's *convert, not relabel* pointed at a control rather than at a readout. `next` is a
+         * rung off `speedStepsFor`'s SI ladder, so a player picking `8.20 ft/s` writes `2.5` to
+         * `ratedSpeedMps` exactly as they did before this preference existed.
+         */
+        (step) => speedFigure(step, unitsNow()),
         (next) => {
           edit({ ratedSpeedMps: next });
         },
@@ -492,7 +516,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     const plateGrid = el(doc, 'div');
     plateGrid.style.cssText =
       'display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px 14px';
-    for (const row of designerPlateRows(spec, machineClass)) {
+    for (const row of designerPlateRows(spec, machineClass, unitsNow())) {
       const cell = el(doc, 'div');
       const key = el(doc, 'div', undefined, row.key);
       key.style.cssText = `font:500 9px ${TYPE.mono};letter-spacing:.16em;color:#5A554C`;

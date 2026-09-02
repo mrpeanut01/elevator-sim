@@ -19,8 +19,11 @@ import { describe, expect, it } from 'vitest';
 
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
+import { benchTestsOf } from '../everyday/benchModel.js';
+
 import { whatAreTheFortyOf } from './ladder.js';
 import {
+  benchSeedOf,
   parseProofCases,
   proofCaseRequestOf,
   proofCasesOf,
@@ -97,6 +100,35 @@ describe('the seed rule — § 1, fixed forever', () => {
       expect(entry.seed).toBe(proofSeedOf(entry.tower.id, entry.crowdIndex));
     }
   });
+
+  /*
+   * § 1's table has TWO rows over this one list — `hash(towerId, crowdIndex)` for the gauntlet and
+   * `hash(testId, repIndex)` for the bench — so *one list, three readers* is a claim about fixtures
+   * and never about traces. CLAUDE.md § Tuning discipline is why the distinction is load-bearing
+   * rather than pedantic: a bench sharing the gauntlet's seeds would let a player tune a dispatcher
+   * against the exact forty runs it is about to be rated on, and the gain would vanish on new
+   * traffic. See § D445.
+   */
+  it('gives the bench a second rule, pinned, and it is not the gauntlet’s', () => {
+    const [first] = proofCasesOf(SET);
+    if (first === undefined) throw new Error('no proof cases');
+    expect(benchSeedOf(first)).toBe('2151908670'); // FNV-1a of `bench#chancery-house/up-peak`
+    expect(benchSeedOf(first)).not.toBe(first.seed);
+  });
+
+  it('keeps the two seed SETS disjoint over the forty, not merely each pair unequal', () => {
+    /*
+     * Set disjointness rather than pairwise inequality: a bench seed colliding with *some other*
+     * case's gauntlet seed is the same defect one row over. Two hashes of two different strings are
+     * only probably different, and the probability is not the argument — so this is asserted about
+     * the shipped forty rather than reasoned about the function.
+     */
+    const cases = proofCasesOf(SET);
+    const gauntlet = new Set(cases.map((entry) => entry.seed));
+    const bench = cases.map((entry) => benchSeedOf(entry));
+    expect(bench.filter((seed) => gauntlet.has(seed))).toEqual([]);
+    expect(new Set(bench).size).toBe(cases.length);
+  });
 });
 
 describe('a case as a batch request', () => {
@@ -104,7 +136,7 @@ describe('a case as a batch request', () => {
 
   it('carries the tower’s building and level and the crowd’s horizon and shape', () => {
     if (first === undefined) throw new Error('no proof cases');
-    const request = proofCaseRequestOf(first, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1);
+    const request = proofCaseRequestOf(first, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1, first.seed);
     expect(request.buildingId).toBe(first.tower.id);
     expect(request.durationS).toBe(first.crowd.durationS);
     expect(request.seed).toBe(first.seed);
@@ -114,7 +146,7 @@ describe('a case as a batch request', () => {
 
   it('never sets the level twice — `runBatch` refuses the combination by name', () => {
     if (first === undefined) throw new Error('no proof cases');
-    const request = proofCaseRequestOf(first, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1);
+    const request = proofCaseRequestOf(first, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1, first.seed);
     expect(request.arrivalRatePctPop5min).toBeNull();
     expect(request.demandLevel).toBeUndefined();
   });
@@ -122,7 +154,8 @@ describe('a case as a batch request', () => {
   it('reports every case over the whole run, so forty figures share one label', () => {
     for (const entry of proofCasesOf(SET)) {
       expect(
-        proofCaseRequestOf(entry, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1).reportWindow,
+        proofCaseRequestOf(entry, [{ armId: 'a', dispatcherProfileId: 'eta' }], 1, entry.seed)
+          .reportWindow,
       ).toBe('full-run');
     }
   });
@@ -179,10 +212,16 @@ function codeOf(path: string): string {
 /**
  * Every module that reads the forty, and therefore every module that could hold a second copy.
  *
- * The list is the readers § 12.3 names — the gauntlet, the ladder's panel and the screen that draws
- * both — plus the sweep that renders them, which is inside the scope for the reason its own
- * placeholder labels are `⟨…⟩`: a corpus adapter that seeded a shipped crowd label would be the
- * second copy in the file that checks for one.
+ * The list is the readers § 12.3 names — the gauntlet, the ladder's panel and the **bench**, plus
+ * the screens that draw them — and the sweep that renders them, which is inside the scope for the
+ * reason its own placeholder labels are `⟨…⟩`: a corpus adapter that seeded a shipped crowd label
+ * would be the second copy in the file that checks for one.
+ *
+ * `everyday/benchModel.ts` and `everyday/benchScreen.ts` joined on
+ * [§ D445](../../../../DECISIONS.md), which made the bench the third reader. `batch/suite.ts` stays
+ * on the list although it is now the **Engineer** panel's model over `MATRIX_CELLS`: a matrix cell
+ * label is a shipped building name, and a suite model that grew one as a literal would be the
+ * defect whichever list it planned over.
  */
 const READERS: readonly string[] = [
   'gauntlet/proofCases.ts',
@@ -190,6 +229,8 @@ const READERS: readonly string[] = [
   'gauntlet/rating.ts',
   'gauntlet/run.ts',
   'everyday/boardScreen.ts',
+  'everyday/benchModel.ts',
+  'everyday/benchScreen.ts',
   'batch/suite.ts',
 ];
 
@@ -223,7 +264,56 @@ describe('one list, three readers — no reader holds a name of its own', () => 
     expect(view4x3().arithmetic).toContain('4 buildings × 3 crowd shapes = 12 runs');
     expect(view4x3().arithmetic).toContain('the mean of all 12');
   });
+
+  /*
+   * The third reader, § D445. The negative half is above — `everyday/benchModel.ts` and
+   * `everyday/benchScreen.ts` are in READERS and hold no name. This is the positive half, and it is
+   * the one that fails if somebody wires the bench back to a second list: a scan for literals
+   * passes trivially over a module that reads the WRONG list correctly.
+   */
+  it('the bench offers every tower and every shape — generated, in both directions', () => {
+    const tests = benchTestsOf(SET, [], (towerId) => nameOf(towerId));
+    expect(tests).toHaveLength(SET.towers.length * SET.crowds.length);
+    expect([...new Set(tests.map((test) => test.towerName))]).toEqual(names);
+    expect(tests.map((test) => test.caseId)).toEqual(
+      proofCasesOf(SET).map((proofCase) => proofCase.id),
+    );
+    for (const crowd of SET.crowds) {
+      expect(tests.filter((test) => test.label.endsWith(crowd.label))).toHaveLength(
+        SET.towers.length,
+      );
+    }
+  });
+
+  it('has three readers over one list, and they reconcile case for case', () => {
+    /*
+     * § 12.3's whole sentence, asserted as one identity. The gauntlet runs `proofCasesOf`, the
+     * disclosure names the towers and shapes, and the bench ticks cases: reconciling the three to
+     * the same cross product is what makes *"two lists is how the panel and the bench come to
+     * disagree about what a dispatcher was proved on"* unable to happen quietly.
+     */
+    const gauntlet = proofCasesOf(SET);
+    const disclosure = whatAreTheFortyOf(SET, (towerId) => ({
+      name: nameOf(towerId),
+      spec: '⟨spec⟩',
+    }));
+    const bench = benchTestsOf(SET, [], (towerId) => nameOf(towerId));
+    expect(bench.map((test) => test.label)).toEqual(
+      gauntlet.map((proofCase) => `${nameOf(proofCase.tower.id)} · ${proofCase.crowd.label}`),
+    );
+    expect(disclosure.towers.map((tower) => tower.name)).toEqual([
+      ...new Set(bench.map((test) => test.towerName)),
+    ]);
+    expect(disclosure.crowds.map((crowd) => crowd.label)).toEqual(
+      bench.slice(0, SET.crowds.length).map((test) => test.label.split(' · ')[1]),
+    );
+  });
 });
+
+/** A tower's authored name, from `data/buildings/` — the resolver every reader is handed. */
+function nameOf(towerId: string): string {
+  return BUILDINGS.find((building) => building.id === towerId)?.name ?? towerId;
+}
 
 /** A set that is deliberately not eight by five, so the arithmetic cannot be a coincidence. */
 function view4x3(): ReturnType<typeof whatAreTheFortyOf> {

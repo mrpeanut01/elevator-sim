@@ -49,8 +49,13 @@
  * the honesty search.
  */
 
-import type { DemandLevel } from '@elevator-sim/core/browser';
+import type { DemandLevel, DispatcherProfile } from '@elevator-sim/core/browser';
 
+import {
+  batchLibraryOf,
+  SHIPPED_GROUP_LABEL,
+  YOURS_GROUP_LABEL,
+} from '../batch/library.js';
 import type { BatchRequest, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { intervalPlotFor, type IntervalPlot } from '../batch/intervalPlot.js';
 import {
@@ -102,6 +107,21 @@ export interface BatchPanelOptions {
    * this tab, and the batch that follows should be about the building they were just looking at.
    */
   readonly inherit: () => { readonly buildingId: string; readonly seed: string; readonly durationS: string };
+  /**
+   * The dispatchers the reader has saved in the workshop — issues #167 and #228,
+   * [§ D443](../../../../DECISIONS.md).
+   *
+   * A function, and read at three separate moments, because a shelf is not a fixed resource: the
+   * panel mounts once at boot, the reader saves a dispatcher an hour later in another tab of the
+   * shell, and the option list has to gain it without a reload. It is read when the selects are
+   * filled (every time this tab is shown), when the form is pre-flighted, and again when the batch
+   * is posted.
+   *
+   * `DispatcherProfile[]` rather than `SavedDispatcher[]` so this module needs nothing from
+   * `dev/state.ts`; `dev/main.ts` supplies `savedProfilesOf(state.savedDispatchers)`, which is the
+   * one expression of *what a batch surface sends*.
+   */
+  readonly savedProfiles: () => readonly DispatcherProfile[];
 }
 
 export interface BatchPanelHandle {
@@ -137,11 +157,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
    * Free Play list from — one source, not a second table in a renderer. The slug stays because it
    * is what a URL, a saved session and a `DECISIONS.md` entry call the thing.
    */
-  for (const select of [ui.baseline, ui.candidate]) {
-    for (const profile of resources.dispatcherProfiles.profiles) {
-      select.append(new Option(`${profile.name} (${profile.id})`, profile.id));
-    }
-  }
+  fillDispatcherOptions();
   // `collective` is `docs/07` § 4's recommended reference arm and `eta` the other measured one;
   // the lists and the reason live in `dev/defaults.ts`, which `dev/defaults.test.ts` pins. This
   // function is their named non-test caller alongside `dev/main.ts`.
@@ -151,6 +167,62 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
   function applyPreference(select: HTMLSelectElement, preferred: readonly string[]): void {
     const found = preferredId(preferred, resources.dispatcherProfiles.profiles);
     if (found !== undefined) select.value = found;
+  }
+
+  /**
+   * Refill both arm pickers from the shipped library **and the reader's own shelf** — issues #167
+   * and #228, [§ D443](../../../../DECISIONS.md).
+   *
+   * ## Why it is a refill rather than a one-time loop
+   *
+   * The two selects were filled once, at mount, from `resources.dispatcherProfiles.profiles`. A
+   * player who saved a dispatcher after boot — which is every player, because the panel mounts
+   * before the workshop is ever opened — could not compare it against anything, and that is the
+   * whole of #113 § 1's *"both surfaces point at a locked door"*. So this runs again every time
+   * the tab is shown, off the same visibility observer that drives `prefill`, and is deliberately
+   * **not** latched the way `prefill` is: a prefill is a courtesy the reader may overrule, and a
+   * missing option is not something they can overrule.
+   *
+   * ## The selection survives, and that is the reason for the readback
+   *
+   * Refilling a `<select>` resets `value`. A reader who chose an arm, went to the workshop, saved
+   * something and came back would find the panel silently pointing at a different dispatcher — the
+   * same class of defect as the option being missing, arriving from the fix for it. So the current
+   * value is read first and restored when it still resolves.
+   *
+   * ## The grouping only appears when there is something to group
+   *
+   * With an empty shelf this produces exactly the flat list of `Name (slug)` options it always
+   * did, byte for byte, so nothing about the shipped first-run page moves. With a shelf it draws
+   * `<optgroup>`s, whose labels are the dispatcher editor's own two headings — one vocabulary for
+   * *what this build ships* and *what you made*, not a second one invented at a picker.
+   */
+  function fillDispatcherOptions(): void {
+    const saved = options.savedProfiles();
+    for (const select of [ui.baseline, ui.candidate]) {
+      const chosen = select.value;
+      select.replaceChildren();
+      if (saved.length === 0) {
+        for (const profile of resources.dispatcherProfiles.profiles) {
+          select.append(optionFor(profile));
+        }
+      } else {
+        select.append(groupOf(SHIPPED_GROUP_LABEL, resources.dispatcherProfiles.profiles));
+        select.append(groupOf(YOURS_GROUP_LABEL, saved));
+      }
+      if ([...select.options].some((option) => option.value === chosen)) select.value = chosen;
+    }
+  }
+
+  function optionFor(profile: DispatcherProfile): HTMLOptionElement {
+    return new Option(`${profile.name} (${profile.id})`, profile.id);
+  }
+
+  function groupOf(label: string, profiles: readonly DispatcherProfile[]): HTMLOptGroupElement {
+    const group = doc.createElement('optgroup');
+    group.label = label;
+    for (const profile of profiles) group.append(optionFor(profile));
+    return group;
   }
 
   function fail(text: string): void {
@@ -272,6 +344,19 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
   function start(): void {
     const request = requestFromForm();
     if (request === undefined) return;
+    /*
+     * The shelf is admitted **here**, at the control, before a worker is started — the rule
+     * `controls/editedProfile.ts` states for an edited vector, applied to a saved dispatcher for
+     * the same reason. `batchLibraryOf` is the function the worker will call, so a shelf this
+     * accepts cannot be refused there and a shelf this refuses cannot reach a simulation. Without
+     * it the reader would see the refusal wrapped in *"the batch failed: …"*, one indirection away
+     * from the dispatcher it is about.
+     */
+    const library = batchLibraryOf(resources.dispatcherProfiles, options.savedProfiles());
+    if (!library.ok) {
+      fail(library.reason);
+      return;
+    }
     ui.error.textContent = '';
     stopWorker();
     showingEmptyState = false;
@@ -311,7 +396,11 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
       fail(`the batch worker failed to start: ${event.message}`);
       stopWorker();
     });
-    next.postMessage({ kind: 'run', request } satisfies BatchWorkerRequest);
+    next.postMessage({
+      kind: 'run',
+      request,
+      savedProfiles: options.savedProfiles(),
+    } satisfies BatchWorkerRequest);
   }
 
   /* ------------------------------------------------------------------ *
@@ -1084,12 +1173,36 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
    */
   const panel = ui.output.closest('[role="tabpanel"]');
   if (panel !== null && typeof MutationObserver === 'function') {
-    if (!panel.hasAttribute('hidden')) prefill();
+    if (!panel.hasAttribute('hidden')) onShown();
     const observer = new MutationObserver(() => {
-      if (!panel.hasAttribute('hidden')) prefill();
+      if (!panel.hasAttribute('hidden')) onShown();
     });
     observer.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
   }
 
+  /**
+   * What happens each time this tab becomes visible: the arm pickers are refilled, then the form
+   * is prefilled once.
+   *
+   * The order matters and the asymmetry is the point. `fillDispatcherOptions` runs **every** visit,
+   * because a dispatcher saved since the last one has to appear; `prefill` runs on the first only,
+   * because it is a courtesy the reader may overrule and re-imposing it would undo their choices.
+   * Two behaviours behind one signal, and neither one is the other's default.
+   */
+  function onShown(): void {
+    fillDispatcherOptions();
+    prefill();
+  }
+
+  /*
+   * The arm-picker refill is deliberately **not** on the handle.
+   *
+   * It was, for one revision, on the argument that a shell knowing a dispatcher had just been saved
+   * could drive it directly. `dev/main.ts` discards this handle — which is how `prefill` came to be
+   * a configurable behaviour nobody called (see the observer above, issue #119 item 7) — so putting
+   * a second method beside it would have shipped that defect again, in the fix for a defect of the
+   * same class. The visibility observer is a real caller; a handle method is not one until
+   * somebody calls it.
+   */
   return { prefill };
 }

@@ -133,6 +133,7 @@ import {
   allBuildingIds,
   allDispatchers,
   buildingConfigOf,
+  drivingProfileOf,
   resolvedBuildingOf,
   shiftDemandTemplateId,
   shiftLengthForContract,
@@ -278,6 +279,28 @@ export interface EverydayHost {
 
   /** The dispatcher profile for an id, or `undefined`. Honest lookup, as {@link buildingById}. */
   dispatcherById(id: string): DispatcherProfile | undefined;
+
+  /**
+   * The vector **actually driving** today's run, derived — `dev/state.ts#drivingProfileOf`.
+   *
+   * Not the profile {@link selection} names, and the difference is the whole reason this is on the
+   * façade rather than left to a screen. `drivingProfileOf` folds the plain levers, the weight-set
+   * selector spec, the § 11.5 rule rows and the campaign kit onto the base profile, and
+   * `shiftRunConfigOf` builds the run through exactly that composition — so the base id answers
+   * *who the player picked* and this answers *what the building is obeying*.
+   *
+   * Added for § 7.6's second arm (GitHub issue **#171**), which cannot be drawn correctly without
+   * it: a control that hands the day to another dispatcher is a no-op only when the vector it hands
+   * to is the vector already driving, and comparing base ids instead disables the control at exactly
+   * the moment pressing it would change the run — a lever-moved player handing the day back to the
+   * plain baseline. That is § D177's inert-control class with its polarity reversed, and
+   * `dev/main.ts` had to be repaired for it once already (review finding 2).
+   *
+   * A **derivation**, not a run: it answers for the standing state at call time, so before any run
+   * has landed it describes what the next one would obey. `live/interventions.ts#switchChangesNothing`
+   * is what a screen compares it with.
+   */
+  drivingProfile(): DispatcherProfile;
 
   /** The traffic profile for an id, or `undefined`. Honest lookup, as {@link buildingById}. */
   trafficProfileById(id: string): TrafficProfile | undefined;
@@ -935,6 +958,8 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
    * starts on whatever is driving today rather than on an id this module chose.
    */
   let career: CampaignCareer = openingCareer(b.state().dispatcherId);
+  /** {@link EverydayHost.drivingProfile}'s memo — see the binding for why it is keyed on identity. */
+  let drivingCache: { readonly forState: ViewerState; readonly profile: DispatcherProfile } | undefined;
   const campaignListeners = new Set<() => void>();
   const notifyCampaign = (): void => {
     for (const listener of [...campaignListeners]) listener();
@@ -996,6 +1021,18 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     dispatchers: () => allDispatchers(b.resources, b.state().savedDispatchers),
     dispatcherById: (id) =>
       allDispatchers(b.resources, b.state().savedDispatchers).find((profile) => profile.id === id),
+    /*
+     * Memoised on the state object's identity, `dev/main.ts#switchNoopCache`'s own reason: the
+     * derivation walks the whole spec chain and the stage's control is drawn on frames. `ViewerState`
+     * is replaced wholesale on every patch, so `!==` is the whole invalidation rule.
+     */
+    drivingProfile: () => {
+      const state = b.state();
+      if (drivingCache?.forState !== state) {
+        drivingCache = { forState: state, profile: drivingProfileOf(b.resources, state) };
+      }
+      return drivingCache.profile;
+    },
     trafficProfileById: (id) =>
       b.resources.trafficProfiles.profiles.find((profile) => profile.id === id),
     buildingSpecLine: (id) => {
