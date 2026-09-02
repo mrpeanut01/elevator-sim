@@ -8,11 +8,37 @@
 # set exactly (§ D201). Both measurements were correct. Neither was portable, and no gate noticed,
 # because there was no CI.
 #
-# So the matrix is deliberately two operating systems rather than one. A single runner would restore
-# the status quo — one environment silently canonical, its pins indistinguishable from portable ones.
-# Running both makes portability a measured property: a pin that holds on both is portable, and a
-# pin that splits the matrix is an environment-dependent oracle wearing an equality assertion, which
-# is the defect § D201 names.
+# The matrix WAS deliberately two operating systems for exactly that reason, and it is one now.
+# DECISIONS.md § D462, on the product owner's call: this product deploys as a Linux container to
+# Azure, so a second leg spends runner minutes proving portability to a platform nothing is shipped
+# on. The paragraph above is kept rather than deleted because it is still the argument for what was
+# given up, and a workflow that quietly lost a leg would read as though it never had one.
+#
+# What is given up, stated so the next reader does not have to rediscover it:
+#
+#   * Portability stops being a MEASURED property and goes back to being an assumption. A pin that
+#     is environment-dependent is now indistinguishable from a portable one — precisely the status
+#     quo ante § D201 describes. The pins are still pinned; nothing checks that they travel.
+#   * A DISCOVERY channel for platform-specific behaviour. Three defects in this tree cite the macOS
+#     leg, and they were checked one at a time rather than counted, because counting them would have
+#     overstated this:
+#       - `packages/cli/src/index.ts`'s `ENOTCONN` — stdout a socket rather than a pipe — was
+#         genuinely FOUND here and nowhere else. Its coverage survives: `process.test.ts` fires every
+#         member of `BROKEN_PIPE_CODES` individually, written that way because *"a guard whose
+#         coverage depends on which machine ran it is not a guard"*. What is lost is finding an
+#         unknown fourth code, not the three that are known.
+#       - `dev/browserTierSite.test-helper.ts`'s `dist-web/` race was reported by BOTH legs on the
+#         same commit, macOS as `net::ERR_HTTP_RESPONSE_CODE_FAILURE` and linux as a missing heading.
+#         One leg would have caught it.
+#       - `everyday/viewportGates.browser.test.ts`'s pinned offset was found by the two legs agreeing
+#         with each other and disagreeing with a local machine. That is CI-versus-local, not
+#         macOS-versus-linux, and one leg plus a developer's machine still produces it.
+#     So the honest loss is the first bullet's second half and this one's: no second platform is
+#     watching, and nothing will surface a defect that only appears on one.
+#
+# Re-adding a leg is one `include:` entry. If the cost was the objection rather than the coverage, a
+# macOS job restricted to `packages/cli` would buy back the only finding that was uniquely this
+# leg's for a fraction of a full suite; nobody has been asked for that and it is not assumed here.
 #
 # Node is pinned to a single version ON PURPOSE. Both § D196 and the § D201 measurement independently
 # found the digests bit-identical across Node versions (22 vs 26, and 26.5.0 vs 26.5.1), so a Node
@@ -47,19 +73,18 @@ jobs:
     permissions:
       contents: read
     strategy:
-      # Both legs always run. `fail-fast: true` would cancel the second the moment the first went
-      # red, which would destroy exactly the comparison this matrix exists to make: "does this pin
-      # hold on both platforms?" is unanswerable if one leg is cancelled for being slow.
+      # Kept `false` on a one-leg matrix, which changes nothing today and is the right default the
+      # moment a second leg comes back: `fail-fast: true` would cancel the second the instant the
+      # first went red, and "does this pin hold on both platforms?" is unanswerable if one leg is
+      # cancelled for being slow.
       fail-fast: false
       matrix:
-        # Written out as an explicit `include:` rather than a free `os:` axis so that every leg is
-        # named in one place and the guard can read them. A free axis multiplies legs out of its
-        # sight, which is how a Node axis would come back.
+        # Still an explicit `include:` rather than a free `os:` axis, and still for the same reason
+        # with one entry as with two: every leg is named in one place. A free axis multiplies legs
+        # out of its sight, which is how a Node axis would come back.
         include:
           - platform: linux
             runner: ubuntu-latest
-          - platform: macos
-            runner: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -85,11 +110,15 @@ jobs:
           echo "node        : $(node --version)"
           echo "npm         : $(npm --version)"
 
-      - name: The Linux leg is x86-64, or it is a third pin environment
-        if: matrix.platform == 'linux'
+      - name: The Linux leg is x86-64, or it is a second pin environment
+        # The `if:` is gone with the second leg — every leg is Linux now, so a condition naming the
+        # platform would be a guard that cannot fail, which is this repository's most-repeated
+        # defect. It comes back with the leg.
+        #
         # Contract § 0.2. `ubuntu-latest` is x86-64 today, and a Linux leg that is not would not be
-        # a cheaper version of this one — it would be a third platform whose pin set nobody has
-        # measured. § D201 found the § D196 pins EXACTLY INVERTED between Linux and darwin/arm64,
+        # a cheaper version of this one — it would be a second platform whose pin set nobody has
+        # measured, and since § D462 it would be the ONLY environment, which makes this step the
+        # last thing standing between the pins and a silent change of machine. § D201 found the § D196 pins EXACTLY INVERTED between Linux and darwin/arm64,
         # 26 failing and the 26 they superseded passing, so a silent architecture swap here would
         # reproduce that investigation from scratch. Kept after the self-hosted pool was removed
         # because the thing it guards is GitHub changing what `ubuntu-latest` means, which is not
@@ -119,13 +148,14 @@ jobs:
       # line. Pointed at a local shell and run directly it came back 3 files and 8 tests red, and
       # nobody could date it.
       #
-      # **Both legs, not one.** The issue asked for "at least one platform" and one leg would have
-      # been cheaper — but a one-leg tier needs the guard in
-      # `packages/viz/src/dev/browserTier.test.ts` to carry a per-leg exemption, and an exemption is
-      # where this class of problem goes to be forgotten (`dispatch/deadCode.test.ts` says the same
-      # thing about its own allowlist). With a browser on both legs the rule is unconditional: in
-      # CI, a gated tier that would skip is a red run. The tier is ~157 s against a suite that runs
-      # for ~40 minutes.
+      # **The rule is unconditional, and § D462 did not touch that.** This block used to argue for
+      # a browser on *both* legs: a one-leg tier would need `packages/viz/src/dev/browserTier.test.ts`
+      # to carry a per-leg exemption, and an exemption is where this class of problem goes to be
+      # forgotten (`dispatch/deadCode.test.ts` says the same about its own allowlist). Read that
+      # argument precisely — it is about a browser on SOME legs and not others. With one leg there
+      # is nothing to exempt, so the rule stands exactly as written and needs no change: in CI, a
+      # gated tier that would skip is a red run. The tier is ~157 s against a suite that runs for
+      # ~40 minutes.
       #
       # Since GitHub issue #281 the tier serves the artifact this repository actually ships —
       # `dist-web/`, built once by the `viz-browser` project's own globalSetup — rather than a

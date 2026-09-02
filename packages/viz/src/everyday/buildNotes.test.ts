@@ -169,7 +169,16 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /* The shell — the front door, the week strip, the boards, the report's levers. */
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Replaying a past day', issue: 177 },
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Racing a second dispatcher', issue: 226 },
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'The daily board', issue: 161 },
+  /*
+   * **This row's fragment and its owner both moved, and neither moved on its own.** It read
+   * `'The daily board'` against #161 — the umbrella issue for everything that needed a server,
+   * whose own text says *"split them when the blocker clears"*. The blocker cleared and GitHub
+   * issue #221's read half landed, so the register entry narrowed from *there is no board* to
+   * *you cannot post to the one there is*, and the row follows it to the issue that will build
+   * that: #332, the Everyday sign-in surface posting waits on. A row left pointing at #161 would
+   * have kept an owner for an absence that no longer exists.
+   */
+  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Putting your run on the daily board', issue: 332 },
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'third piece of advice does not open the tuner', issue: 177 },
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Endless rush', issue: 220 },
 

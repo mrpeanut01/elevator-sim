@@ -238,6 +238,18 @@ export interface BoardEntry {
    */
   readonly dataHash: string;
   readonly measured: ClaimedMetrics;
+  /**
+   * Served legs in the row's measurement window — the `n` behind `measured.awtS`.
+   *
+   * `undefined` from a server too old to send it, and that is the whole reason it is optional: a
+   * board row that draws a mean with no count is R13 clause one, so a row that cannot say `n`
+   * withholds the figure rather than printing it bare. The alternative would have been a default,
+   * and a default here is a made-up denominator on the one screen where a number is a boast.
+   *
+   * Never sent by a client and never part of `ClaimedMetrics`, which is the *claim*. The server
+   * reads it off its own replay — see `packages/server/src/store/store.ts#EntryRow.legs`.
+   */
+  readonly legs: number | undefined;
   readonly submittedAtMs: number;
 }
 
@@ -254,6 +266,59 @@ export interface BoardSummary {
   readonly boardKey: string;
   readonly entries: number;
   readonly latestMs: number;
+}
+
+/**
+ * One row of the server's own board-key table — the contract's three keys, each with the route that
+ * reaches it or `null` for a key the product declares and cannot yet produce.
+ *
+ * It is on the wire rather than transcribed here for the reason `/api/boards` states: a client
+ * drawing a list has to tell *nothing has been posted yet* from *no route in this product could
+ * produce one*, and only the server knows which. A second copy of this table on the client would be
+ * a second answer to what a board is.
+ */
+export interface BoardKind {
+  readonly key: string;
+  readonly board: string;
+  readonly route: string | null;
+}
+
+/** The axes the daily board fixes. The server's, used as given — never rebuilt from parts. */
+export interface DailyFixtureAxes {
+  readonly buildingId: string;
+  readonly demandTemplateId: string;
+  readonly arrivalRatePctPop5min: number | null;
+  readonly durationS: number;
+  readonly windowStartS: number | null;
+}
+
+/**
+ * Today's fixture, as the server computed it from its own clock.
+ *
+ * `date` is UTC and is the daily board's whole key, so a caller reads `daily:${today.date}` rather
+ * than parsing a prefix off a key or asking its own clock what day it is. Both of those are the
+ * same defect — a second place deciding what a board key looks like — and {@link submit} refuses
+ * the first by name.
+ */
+export interface DailyFixture {
+  readonly date: string;
+  readonly seed: string;
+  readonly config: DailyFixtureAxes;
+}
+
+/**
+ * What `/api/boards` answers: the boards that have entries, the kinds this build has at all, and
+ * today's fixture.
+ *
+ * **`today` is optional and its absence is a real case rather than a defensive one.** The API image
+ * is deployed by hand and nothing rebuilds it on a push, so a running server can predate the field.
+ * `undefined` means *the server did not say*, which a caller must not read as *there is no board
+ * today*.
+ */
+export interface BoardsPage {
+  readonly boards: readonly BoardSummary[];
+  readonly kinds: readonly BoardKind[];
+  readonly today: DailyFixture | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -451,7 +516,15 @@ export interface LeaderboardClient {
     token: string,
     submission: { run: RunSubmission; claimed: ClaimedMetrics },
   ): Promise<Result<{ boardKey: string; placement: string; entry: BoardEntry }>>;
-  boards(): Promise<Result<readonly BoardSummary[]>>;
+  /**
+   * The board list, the kinds, and today's fixture — the whole of what `/api/boards` answers.
+   *
+   * This used to return `readonly BoardSummary[]` and discard `kinds` and `today`, which made the
+   * daily board unfindable without parsing a `daily:` prefix off a key — the exact thing
+   * {@link submit} refuses to do. The server has always sent both; the client was throwing them
+   * away.
+   */
+  boards(): Promise<Result<BoardsPage>>;
   board(boardKey: string, metric: string): Promise<Result<BoardPage>>;
   /**
    * The challenge index — **the only answer** to *"which challenge is it today"*.
@@ -481,6 +554,42 @@ export interface LeaderboardClient {
  * silently work in development and silently fail in a build served from a CDN, which is the class
  * of bug that only reproduces where it cannot be debugged.
  */
+/**
+ * Whether a value is the server's daily fixture, checked field by field.
+ *
+ * Shape-checked rather than cast, because this is the one field on this page a caller will build a
+ * run from: a partial fixture that type-asserted its way through would produce a run posted against
+ * the wrong axes, and the server would then correctly refuse it with an accusation the client
+ * earned. The other two fields on the page are read-only prose and a cast costs nothing.
+ */
+function isDailyFixture(value: unknown): value is DailyFixture {
+  const fixture = value as Record<string, unknown> | null | undefined;
+  if (typeof fixture?.['date'] !== 'string' || typeof fixture['seed'] !== 'string') return false;
+  const config = fixture['config'] as Record<string, unknown> | null | undefined;
+  return (
+    typeof config?.['buildingId'] === 'string' &&
+    typeof config['demandTemplateId'] === 'string' &&
+    typeof config['durationS'] === 'number' &&
+    (config['arrivalRatePctPop5min'] === null || typeof config['arrivalRatePctPop5min'] === 'number') &&
+    (config['windowStartS'] === null || typeof config['windowStartS'] === 'number')
+  );
+}
+/**
+ * One board row with its `legs` reduced to a count or nothing.
+ *
+ * A finite number is a count; anything else — absent, `null`, a string, `NaN` — is *no count*, and
+ * the row withholds its mean. See {@link BoardEntry.legs} for why there is no default.
+ */
+function withLegs(entry: unknown): BoardEntry {
+  const record = entry as Record<string, unknown>;
+  const legs = record['legs'];
+  return {
+    ...record,
+    legs: typeof legs === 'number' && Number.isFinite(legs) ? legs : undefined,
+  } as unknown as BoardEntry;
+}
+
+
 /**
  * The sentence a 4xx gets on screen — the server's `detail`, else its `issues`, else the fallback.
  *
@@ -603,8 +712,22 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
       }),
     boards: () =>
       call({ method: 'GET', url: `${base}/api/boards`, token: undefined, body: undefined }, (body) => {
-        const boards = (body as Record<string, unknown> | null)?.['boards'];
-        return Array.isArray(boards) ? (boards as BoardSummary[]) : undefined;
+        const record = body as Record<string, unknown> | null;
+        const boards = record?.['boards'];
+        if (!Array.isArray(boards)) return undefined;
+        /*
+         * `boards` decides whether the answer is readable; the other two are carried when present
+         * and left `undefined`/empty when not. A server that predates them is a real case — the
+         * image is hand-deployed — and it is not an `unexpected-response`, because the half this
+         * client has always read is exactly as readable as it ever was.
+         */
+        const kinds = record?.['kinds'];
+        const today = record?.['today'];
+        return {
+          boards: boards as readonly BoardSummary[],
+          kinds: Array.isArray(kinds) ? (kinds as readonly BoardKind[]) : [],
+          today: isDailyFixture(today) ? today : undefined,
+        };
       }),
     board: (boardKey, metric) =>
       call(
@@ -616,7 +739,18 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
         },
         (body) => {
           const record = body as Record<string, unknown> | null;
-          return Array.isArray(record?.['entries']) ? (record as unknown as BoardPage) : undefined;
+          const entries = record?.['entries'];
+          if (!Array.isArray(entries)) return undefined;
+          /*
+           * `legs` is normalised where every other field is taken on trust, and the asymmetry is
+           * deliberate. It is the one field whose *absence* changes what a screen may print — a row
+           * with no count withholds its mean rather than drawing it bare (R13 clause one) — so an
+           * older server's missing key and a newer one's number have to be told apart here rather
+           * than at each renderer. `null` and a string both mean *no count*, which is the safe
+           * reading: a board row's denominator may not be inferred.
+           */
+          const page = { ...record, entries: entries.map(withLegs) };
+          return page as unknown as BoardPage;
         },
       ),
     challenges: () =>

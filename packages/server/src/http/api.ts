@@ -799,6 +799,8 @@ async function submit(
       run: submission.run,
       // The **server's** figures. The claim is compared and then discarded; it is never what ranks.
       measured: verification.measured,
+      // And the count behind the mean, which no client ever sends — `EntryRow.legs`.
+      legs: verification.legs,
     });
   } catch (error) {
     if (error instanceof NoSuchUserError) return accountVanished();
@@ -1222,6 +1224,10 @@ function publicEntry(entry: EntryRow): Record<string, unknown> {
     run: entry.run,
     dataHash: entry.dataHash,
     measured: entry.measured,
+    // The `n` behind `measured.awtS`, in the same object as the mean for `publicChallengeEntry`'s
+    // stated reason: R13's clause one is that the count travels in the same unit as the figure, and
+    // a board row that could not draw one had to draw a bare mean.
+    legs: entry.legs,
     submittedAtMs: entry.submittedAtMs,
   };
 }

@@ -30653,3 +30653,280 @@ happen instead of publishing the result.
 added, nothing removed. The deep tier's one-surface lead survives and the set difference names it:
 `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is in
 always-on and not in deep.
+
+## D458 — two product calls on the social layer: the server names the day, and Everyday grows its own sign-in
+
+**Date: 2026-09-02 · Owner: the product owner, directly · Both taken against GitHub issue #221's
+implementation map, before any of it was built.**
+
+**Decision 1 — the server grows a fixture endpoint; the client does not recompute the day.**
+
+`leaderboard/boardKey.ts#placeSubmission` returns `daily:<date>` only for a run matching every axis of
+`DAILY_FIXTURE_CONFIG` and carrying today's UTC date as its seed. Everything else is
+`personal:<user id>`. So an Everyday run posted from the front door succeeds and the daily board stays
+empty — **worse than the refusal shipping today, because it looks broken rather than declining.**
+
+The alternative was for the shell to derive the fixture and `dailySeedFor(dailyDateOf(Date.now()))`
+itself. **Refused, and the codebase had already refused it once**: `menu/client.ts`'s `challenges()`
+takes no parameter and reads no clock, because *"there is nothing a caller could pass to move the
+answer."* A second answer to *which day is it* is that defect with a different subject, and
+`boardKey.ts` pins the reason — *"a board keyed by a date that depends on where the reader is
+standing is two boards wearing one name."* GitHub issue **#331**.
+
+**Decision 2 — the Everyday shell grows its own sign-in rather than borrowing the Engineer's token.**
+
+Both `submit` and `submitChallenge` take a token first, and `everyday/` holds no session state at all;
+`settingsView.ts` says so in player copy. Passing `dev/main.ts`'s `accountState.token` through the
+host port is cheaper and was refused, because it leaves the only route to *getting* a token inside the
+Engineer menu — **which fails #221's own third criterion, *the daily challenge is reachable without
+entering the Engineer surface*.** A product whose social layer can only be entered through the other
+product's menu has not turned the social layer on. GitHub issue **#332**.
+
+**What both rulings have in common, and why they were taken together.** Each was the cheap option
+against the honest one, and in each case the cheap option would have passed every test this repository
+runs. A client that computes the day agrees with the server until it does not, and a borrowed token
+posts runs successfully from a surface that cannot sign anybody in. **Neither failure is visible to a
+test; both are visible to a player**, which is why they were product calls rather than engineering
+ones.
+
+**What this does to #221.** It splits rather than grows. The **read half is unblocked by both
+rulings** — a board can be listed rather than computed and reading needs no token — so #221 keeps the
+port, the board reads, the challenge tab and the retraction of the stale refusals, and its posting
+half is sequenced behind #331 and #332. Recording that here because the alternative was a wiring issue
+quietly becoming a feature build, which is how an issue stops being closable.
+
+**One clause binds whatever #332 builds**, and it is [§ D456](#d456)'s: a sign-in wall in front of a
+single-player game fails `charter P2`'s second refusal test. The game stays playable signed out, and
+posting is the only thing that asks for an account.
+
+## D459 — a mean's denominator is the server's measurement, and it sits beside the claim rather than inside it
+
+**Date: 2026-09-02 · GitHub issue #221 · Found by the honesty corpus, not by a reviewer.**
+
+The daily board's rows drew `21.4 s` beside a player's name with no count anywhere in the box. That
+is R13 clause one — `honesty/properties.ts` puts it as *"`n = 5` is not a caveat on `11.3 s`; it is
+part of what `11.3 s` means"* — and it is the same defect GitHub issue #137 fixed for the Day
+report's delta row one wave before. The search reported it on 49 always-on cases within an hour of
+the row being written, which is worth recording as the instrument working rather than as an
+embarrassment: nothing else in this repository would have caught it, because the row was internally
+consistent and every number on it was real.
+
+**The fix reaches the wire, and there was no honest shortcut.** No field a client already holds is
+the count a board row's mean was taken over. `RunSubmission` carries a duration and an arrival rate;
+neither is a denominator. Marking the string something other than `estimate` to quiet the property
+would have been moving the gate, which `CLAUDE.md` forbids by name.
+
+**Where it goes is the decision.** `entries` gains a `legs` column, `verifySubmission` returns
+`summary.waiting.count` off its own replay, and it travels as a sibling of `measured` rather than as
+a sixth field of `ClaimedMetrics`.
+
+`ClaimedMetrics` is *what a player claims*, and § D214 § 3's whole point is that the claim is
+compared and then discarded. A denominator is the one number a dishonest client would most want to
+choose: halve it and a mean over the easy half of a run is indistinguishable from a mean over the
+run. Putting it in the claim would have created one more thing `metricsAgree` could refuse over,
+on the path this repository already calls *"this product's one accusation, spent on a player who
+did nothing wrong"* — an honest client on a slightly different build counting legs differently would
+be refused as a forgery. So it is never claimed, never compared, and never refused on.
+
+`challenge/submission.ts#ClaimedSeedMetrics.legs` **is** claimed, and the two are not in tension: a
+challenge aggregates across seeds, so the client must say which run each figure came from. A
+leaderboard row is one run the server has already replayed.
+
+**A row that cannot say `n` withholds its mean.** `BoardEntry.legs` is `number | undefined` and
+`menu/client.ts` normalises it — `null`, a string, an absent key and `NaN` all mean *no count* —
+because an older server's row and a newer one's can sit on one board a single client reads. That
+row keeps its rank and its name and drops its figure. The alternative was a default, and a default
+here is an invented denominator on the one screen where a number is a boast.
+
+## D460 — a refusal a surface cannot check is withdrawn, not reworded
+
+**Date: 2026-09-02 · GitHub issue #221 · Extends § D227.**
+
+Five player-facing sentences said, unconditionally, that this build has no server. They were already
+false on every build a player has ever loaded: `http/static.ts` injects
+`<meta name="elevator-sim-api">` into `index.html` as it reads it, and the CDN bundle gets an
+absolute origin from `apiOrigin.mjs`. The board's tab drawing rows under them only made it visible.
+
+Three of the five are corrected here, and **they were not corrected the same way, because they were
+not wrong in the same way.**
+
+`everyday/settingsView.ts`'s row kept its refusal and lost a reason that had gone stale beneath it.
+Nothing in this build posts a run, so there is still no path for a switch to turn off; *the boards
+need a server this build has none of* was a second, false reason bolted onto a true one.
+
+`everyday/buildNotes.ts`'s entry **narrowed** rather than leaving. The register's own convention is
+that an entry goes on the commit that closes it, and this absence did not close: the board reads and
+you still cannot post to it, because posting needs an account and this shell has no sign-in. Its
+`ABSENCE_TRIAGE` row moved with it, from #161 — the umbrella issue whose own text says *"split them
+when the blocker clears"* — to #332, which will build the sign-in. Both directions of that map fired
+on this change, which is what it is for.
+
+`everyday/weekView.ts`'s is **withdrawn**, and the reason is not that it was false. The week screen
+asks no server anything. It was stating the outcome of a request it never makes, so there was no run
+to pin it to and no edit that could have given it one — reword it to *"the board may be
+unavailable"* and it is still a guess dressed as a finding. § D227 says a refusal is pinned by a run
+and never by another sentence; a surface with no run available may not refuse at all. The block
+points at the board screen now and keeps § 14's two rules about what may share a board, which are
+true whether or not a server answered today.
+
+**The consequence worth naming is the one for the reader after this one.** `everyday/weekScreen.ts`
+built § 14.1's spectator picker on the premise that board rows were *"the one thing this build
+genuinely cannot have"*. The picker is still right and its premise is gone, so the docstring now
+rests on what the picker actually offers — filed days and reference runs, sources a board never had.
+A correct thing standing on an expired reason is how the next stale sentence gets written.
+
+
+## D461 — wave O's corpus move is exactly nineteen strings a case, in both tiers
+
+**Date: 2026-09-02 · The integrator's measurement, taken once on the integrated tree (§ D343).**
+
+Both tiers in one sitting, with the base at `d4636a5` re-measured first in a detached worktree —
+where it **reproduced its published row exactly in both tiers**, the seventh consecutive wave that
+has held.
+
+| | base `d4636a5` | wave O | move |
+|---|---|---|---|
+| always-on strings | 575 999 | **576 930** | **+931** |
+| deep strings | 718 633 | **719 773** | **+1 140** |
+| always-on surfaces | 55 | **55** | **0** |
+| deep surfaces | 56 | **56** | **0** |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+**931 ÷ 49 = 19 and 1 140 ÷ 60 = 19.** Both exact, and the same nineteen, which is the second time
+this row has been able to attribute a move to the string (wave G was the first, and § D442's could
+not be decomposed even in principle).
+
+The nineteen decompose without remainder, and the decomposition was checked against the code rather
+than inferred from the quotient:
+
+- **Fourteen** are `dailyBoardViewOf` driven over the six states the board adapter seeds. One line
+  each for *asking*, *no-server* and *undeclared*; **two** for *unreachable*, because the server's
+  own sentence is carried under ours rather than paraphrased; two for a board that was read and is
+  empty, which is its note plus *nobody has posted*; and seven for a board with rows — the note,
+  plus two seeds for each of three rows, one naming the player and one carrying the figure.
+- **Five** are `BOARD_SCREEN_COPY`'s new keys, which `honesty/surfaces.ts` iterates generically:
+  `dailyAsking`, `dailyUnreachable`, `dailyUndeclared`, `dailyEmpty`, `dailyRowWithheld`.
+
+**The three refusal corrections contributed zero, and that is the arithmetic rather than a
+coincidence.** Each is a substitution — one string in, one string out — so `weekView.ts`'s withdrawal,
+`buildNotes.ts`'s narrowing and `settingsView.ts`'s reworded row cannot move a count. § D457 recorded
+wave M's zero for the same reason at a different scale, and this is that lesson holding under a wave
+that *did* move.
+
+**The surface sets were diffed rather than the counts compared**, in both tiers: identical, nothing
+added, nothing removed. The daily tab's five states went into the **existing** board adapter rather
+than a new one, which is what a wave that gave one screen more to say should look like from here. The
+deep tier's one-surface lead survives and the diff names it — `campaign/judge.ts#judgeStage` is the
+only surface in deep and not in always-on, and nothing is in always-on and not in deep.
+
+**The third row that carries a forecast lesson.** § D454 recorded four lane forecasts short by one
+string per case and could not localise the gap; § D457 recorded a forecast that predicted motion
+where the answer was zero. This wave published no forecast at all, and the reason is worth stating:
+a single-worker wave has nobody to forecast *to*. The one-per-case gap § D454 asked the next
+forecasting wave to look for is therefore **not tested here**, and the next multi-lane wave inherits
+that question unchanged.
+
+**One measurement trap, recorded because it cost two runs.** The deep tier is selected by
+`CORPUS_TIER=deep`, not by `ELEVATOR_SIM_HONESTY=deep` alone. Two runs wrote always-on figures into a
+file named `deep`, and they were caught only because `measure.corpus.test.ts` prints the tier on the
+first line of its own output. That line is why this row is not wrong.
+
+
+## D462 — the CI matrix is one leg, on the product owner's call
+
+**Date: 2026-09-02 · Owner: the product owner, directly · GitHub issue #334's macOS red is the
+occasion, not the reason.**
+
+**The decision.** `.github/workflows/ci.yml` drops the `macos-latest` leg. The matrix keeps its
+explicit `include:` shape with one entry.
+
+**The reason, in the owner's terms.** This product deploys as a Linux container to Azure. A second
+leg spends runner minutes and tokens proving portability to a platform nothing is shipped on, and
+the objection was cost rather than coverage.
+
+**What was given up, written down because a workflow that quietly lost a leg would read as though it
+never had one.** `ci.yml`'s header kept its original argument and now records the trade beneath it.
+Portability stops being a *measured* property: § D196 re-pinned 26 values that failed in one
+environment, § D201 found the same 26 failing in the other with each environment reproducing its own
+pin set exactly, and the two-OS matrix existed so that an environment-dependent pin could be told
+apart from a portable one. It cannot be, from here. The pins are still pinned; nothing checks that
+they travel.
+
+**Three defects in this tree cite the macOS leg, and they were checked one at a time rather than
+counted — counting them would have overstated the loss, and the first draft of the `ci.yml` header
+did exactly that before this check was run.**
+
+- `packages/cli/src/index.ts`'s `ENOTCONN` — stdout a socket rather than a pipe — was genuinely
+  **found** on that leg and nowhere else. Its *coverage* survives: `process.test.ts` fires every
+  member of `BROKEN_PIPE_CODES` individually, written that way because *"a guard whose coverage
+  depends on which machine ran it is not a guard"*. What is lost is finding an unknown fourth code.
+- `dev/browserTierSite.test-helper.ts`'s `dist-web/` race was reported by **both** legs on the same
+  commit, macOS as `net::ERR_HTTP_RESPONSE_CODE_FAILURE` and linux as a missing heading. One leg
+  catches it.
+- `everyday/viewportGates.browser.test.ts`'s pinned offset was found by the two legs agreeing with
+  **each other** and disagreeing with a local machine. That is CI-versus-local, not
+  macOS-versus-linux, and one leg plus a developer's machine still produces it.
+
+So the honest loss is narrow and real: **no second platform is watching, and nothing will surface a
+defect that appears on only one.**
+
+**What was corrected rather than deleted.** Every present-tense claim that CI runs two legs is
+now false and is fixed at its site — `store/sql.ts`, `store/pglite.test-helper.ts`,
+`dev/browserTier.test.ts`, `traffic/dayStartIdentity.test.ts`, `traffic/transportIdentity.test.ts`,
+and `docs/31-support-matrix.md`, which is an **adopted specification of record** and is therefore
+**amended with a dated block rather than edited to match**. Every *historical* statement is left
+exactly as written: the three machines that agreed on `dayStartIdentity`'s six digests agreed, and a
+later change to the matrix does not make that untrue. The distinction between a record and a claim
+is the one that matters in all six files.
+
+**One consequence nobody had stated, and it is the one to carry forward.**
+`traffic/dayStartIdentity.test.ts` justified regenerating pins locally by pointing at three
+independent machines that agreed. That route is gone. A regeneration from here can say only that one
+machine reported a value, and a pin regenerated without the cross-check is an assumption wearing an
+equality assertion — § D201's defect exactly. The docstring now says so where somebody about to
+regenerate will read it.
+
+**`ci.yml`'s x86-64 step lost its `if:` and gained weight.** With one leg, a condition naming the
+platform is a guard that cannot fail, which is this repository's most-repeated defect; and the step
+is now the last thing standing between the pins and a silent change of machine.
+
+**What this does not do.** It does not close GitHub issue **#335**. That issue says
+`BLOCKED_FRAME_GAP_MS` is a wall-clock bound calibrated on Linux and enforced on both legs, and
+removing the second leg makes its red go away while answering nothing: the bound is still
+uncalibrated, and `docs/31-support-matrix.md` § 5 predicted this class of failure before it happened
+— *"a wall-clock budget on hardware with that spread will produce flaky red runs"*. The next
+wall-clock gate will have the same problem on the one leg that is left.
+
+**Re-adding a leg is one `include:` entry.** If cost is the constraint rather than coverage, a macOS
+job restricted to `packages/cli` would buy back the only finding that was uniquely that leg's for a
+fraction of a full suite. Nobody has been asked for that and it is not assumed anywhere.
+
+
+## D463 — the preview deploy stops commenting on pull requests
+
+**Date: 2026-09-02 · Owner: the product owner, directly · The same cost objection as § D462.**
+
+`Azure/static-web-apps-deploy@v1` posted *"Your stage site is ready!"* on every push to an open pull
+request. On #334 it fired five times in fifty minutes. The comment is removed; the preview is not.
+
+**How, and why this is not a guess.** The action's `repo_token` input is gone. Its own `action.yml`
+declares that input `required: false` and describes it as *"Token for interacting with the Github
+repository. Currently used only for commenting on Pull Requests."* That definition was fetched and
+read before the change, because a token removed on a hunch would have failed the deploy rather than
+quieting it, and a red deploy job is a worse outcome than the comments.
+
+**What survives.** The upload runs, the preview environment deploys, and the URL still reaches the
+pull request: the job declares `environment.url` as `steps.deploy.outputs.static_web_app_url`, so it
+appears in the Deployments panel and on the environment. What is lost is a comment in the thread —
+one click further away, and no longer in anyone's notifications.
+
+**A permission went with it.** `pull-requests: write` was on that job for the comment and nothing
+else, so it is removed rather than left standing as a grant nothing uses. A workflow holding write
+access it does not exercise is the same shape as a behaviour with no caller, one directory over.
+
+**The `close-preview` job is untouched.** It never passed `repo_token` and never commented; it tears
+the environment down on close, which is what keeps the three-preview quota a non-event.
+
+**What this does not do.** It does not stop the preview deploy, which still costs runner minutes on
+every push. If the minutes are the objection rather than the noise, the change is to the job's `if:`
+and is a different decision from this one — nobody has asked for it and it is not assumed here.

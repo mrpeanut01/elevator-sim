@@ -3,10 +3,14 @@
  *
  * PGlite is PostgreSQL compiled to WebAssembly, so this is not a dialect emulation and not a
  * SQLite-shaped stand-in — it is the same database the server talks to in production, running
- * without a daemon, a port or a container. That is what makes it usable here: `ci.yml` compares
- * two operating systems on purpose (§ D201), a `services:` container runs only on the Linux leg,
- * and GitHub's macOS runners have no Docker. A test that needed either would leave one leg of the
- * matrix running a smaller suite than the other, with nothing saying so.
+ * without a daemon, a port or a container. That is what made it usable here when `ci.yml` compared
+ * two operating systems on purpose (§ D201): a `services:` container runs only on the Linux leg,
+ * GitHub's macOS runners have no Docker, and a test that needed either would leave one leg of the
+ * matrix running a smaller suite than the other with nothing saying so.
+ *
+ * **§ D462 removed the macOS leg**, so that argument no longer applies and the choice is unchanged
+ * anyway — the reason it survives its own premise is that a container in CI would still be a
+ * daemon a developer's machine has to run, and this file's whole point is that it is not one.
  *
  * **This file is a test helper and is named as one**, matching `deadCode.test-helper.ts` and
  * `probes.test-helper.ts`. It has no non-test caller and is not supposed to acquire one: the

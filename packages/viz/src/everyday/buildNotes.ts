@@ -143,7 +143,20 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * is worth the number of people who read it, and an entry naming a closed absence is how one
    * stops being read.
    */
-  'The daily board — a ranking of other people’s runs needs a server to post them to and to check them, and this build has none. That tab opens on its own unavailable state, the ladder beside it is live because your rating is measured on this device, and Your week says what a board would be ranked on rather than drawing an empty one.',
+  /*
+   * **This row narrowed rather than left, which is the case between the two this register knows.**
+   *
+   * It read *"a ranking of other people's runs needs a server to post them to and to check them,
+   * and this build has none"*, and the second half of that stopped being true on the deployed
+   * build long before anybody noticed: the server injects `<meta name="elevator-sim-api">` into
+   * `index.html` as it serves it, so a played build has an API beside it and only a local `vite`
+   * one does not. GitHub issue #221's read half now asks that server for today's board and draws
+   * its rows. What is still absent is the *other* half, and the row says that instead of leaving:
+   * you can read today's board and you cannot put a run on it, because posting needs a signed-in
+   * account and this shell has no sign-in surface (issue #332). Narrowed on the commit that
+   * narrowed it, on the same rule that takes a closed entry out.
+   */
+  'Putting your run on the daily board — the board reads, and today’s rows are other people’s runs replayed and re-measured before they appeared. Posting to it needs an account, and the only sign-in in this build is on the Engineer surface, so from here the board is something you read rather than something you enter.',
   /*
    * **A sixth row left on the merge that registered the rush setup, the drawing board and the
    * tuner — and it left because that merge closed it, which is the one case this register has not

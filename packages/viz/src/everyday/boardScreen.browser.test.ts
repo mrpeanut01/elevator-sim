@@ -88,8 +88,17 @@ describe.skipIf(!HAS_BROWSER)('the Everyday board and ladder screen', () => {
   it('draws the daily board’s absence rather than rows it cannot verify', async () => {
     const page = await openBoard();
     await page.click('.everyday-board-tab-daily');
+    /*
+     * `.everyday-board-absent` is one of five states the tab can be in since GitHub issue #221, and
+     * it is the one this page is genuinely in: `index.html` carries no `elevator-sim-api` meta tag,
+     * so `dev/main.ts` builds no client and the host answers `no-server`. Asserting the class
+     * rather than the words is what makes that a measurement — a build served with the tag would
+     * fail this line rather than quietly keep drawing a sentence that had stopped being true.
+     */
     const absence = await page.textContent('.everyday-board-absent');
     expect(absence).toContain('needs a server');
+    /* The read has resolved, so the in-flight line is gone rather than sitting under the absence. */
+    expect(await page.$('.everyday-board-asking')).toBeNull();
     /* § 12.2: a labelled unavailable state, and the screen is otherwise complete. */
     expect(await page.$('.everyday-ladder')).toBeNull();
     await page.close();

@@ -7,11 +7,17 @@
  * of tests needed no infrastructure at all. PostgreSQL has neither property. The obvious
  * replacements both fail on something this repository already decided:
  *
- *   * **A `services:` container in CI** runs only on Linux runners. `ci.yml`'s matrix is two
- *     operating systems on purpose — § D201 found the § D196 pin set exactly inverted between
- *     Linux and darwin/arm64 — so a test that can only run on one leg would quietly make the
- *     other leg a weaker suite. Testcontainers fails the same way: GitHub's macOS runners have no
- *     Docker.
+ *   * **A `services:` container in CI** runs only on Linux runners. That was disqualifying when
+ *     `ci.yml`'s matrix was two operating systems on purpose — § D201 found the § D196 pin set
+ *     exactly inverted between Linux and darwin/arm64 — because a test that can only run on one
+ *     leg would quietly make the other leg a weaker suite. Testcontainers failed the same way:
+ *     GitHub's macOS runners have no Docker.
+ *
+ *     **§ D462 removed the macOS leg, so that particular objection is gone**, and this is written
+ *     out rather than quietly dropped because a reason that has expired is not the same thing as a
+ *     decision that has been reversed. The choice below is not revisited here: the second bullet
+ *     stands on its own and is the stronger of the two, PGlite costs no daemon and no container on
+ *     any machine including a developer's, and a leg can come back.
  *   * **SQLite in tests, PostgreSQL in production** would mean the shipped SQL is the SQL nothing
  *     runs. That is this repository's most-repeated defect wearing a database: a behaviour that is
  *     configurable, unit-tested and reached by no shipped path has now shipped eleven times, and

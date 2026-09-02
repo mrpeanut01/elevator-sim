@@ -1276,3 +1276,206 @@ as its subject.
 - **The API image is deployed by hand** and its store migration is manual, so #221's end-to-end
   acceptance has an operational prerequisite that is not code.
 - **#237 and #146 need a ruling, not a lane.** Both are posted with the exits priced.
+
+---
+
+# Wave O — the social layer's read half, opened 2026-09-02 at `d4636a5`
+
+**One worker, no lanes.** Wave N's hand-off said *"#221 first. No blocker, and it gates four other
+things."* This is that, and it is a single-worker wave on purpose: the work turned out to be one seam
+built from a database column to a rendered row, and a wire change split across lanes is how two lanes
+each publish a figure that is correct on their branch and wrong in the tree.
+
+| Piece | Issue | Commit |
+|---|---|---|
+| `boards()` returns the whole answer, not a third of it | #331 | `1ebba96` |
+| The daily board reads, and a row carries its own `n` | #221 | `5ea3805` |
+| Three refusals the read made false | #221 | `75b3071` |
+
+## O.1 What the corpus found, which is the wave's real story
+
+The board row I wrote drew `21.4 s` beside a player's name. It typechecked, every number on it was
+real, and it was internally consistent. **Within an hour the honesty search reported
+`estimate-without-n` on 49 of 49 always-on cases**: a mean wait with no denominator anywhere in its
+box. R13 clause one, and the same defect #137 fixed for the Day report's delta row one wave earlier.
+
+Nothing else in this repository would have caught it. That is worth saying plainly, because the
+corpus's cost is visible in every wave's wall clock and its value is only visible on days like this.
+
+**There was no shortcut, and the two that looked like ones are both named in `CLAUDE.md`.** No field
+a client already holds is the count a board row's mean was taken over — `RunSubmission` carries a
+duration and an arrival rate, and neither is a denominator. Marking the string something other than
+`estimate` would have been moving the gate. So the fix reaches the wire: `entries.legs`,
+`verifySubmission` returning `summary.waiting.count` off its own replay.
+
+**Where it sits is the decision worth reading** (§ D459). Beside `ClaimedMetrics`, never inside it.
+A mean's denominator is the single number a dishonest client would most want to choose — halve it and
+a mean over the easy half of a run is indistinguishable from a mean over the run — so putting it in
+the claim would have added a way to refuse an honest player on the path this repository already
+calls *"this product's one accusation, spent on a player who did nothing wrong."* Never claimed,
+never compared, never refused on.
+
+## O.2 Three refusals corrected three different ways, and two left alone
+
+Five player-facing sentences said *this build has no server*. **All five were already false on every
+build a player has ever loaded** — `http/static.ts` injects `<meta name="elevator-sim-api">` into
+`index.html` as it serves it, and the CDN bundle gets an absolute origin from `apiOrigin.mjs`. The
+board drawing rows under them only made it visible.
+
+They were not corrected uniformly, because they were not wrong in the same way (§ D460):
+
+- **`settingsView.ts`** kept its refusal and lost a second, false reason bolted onto a true one.
+  Nothing posts a run yet, so there is still no path for a switch to turn off.
+- **`buildNotes.ts`** *narrowed* rather than leaving. The absence did not close: you can read
+  today's board and you cannot post to it. Its `ABSENCE_TRIAGE` row followed it from #161 to #332.
+- **`weekView.ts`** was **withdrawn**, and not because it was false. The week screen asks no server
+  anything, so it was stating the outcome of a request it never makes. There was no run to pin it to
+  and no rewording that could have given it one. § D227 says a refusal is pinned by a run; a surface
+  with no run available may not refuse at all.
+
+**Two were left exactly as they are, and that is the finding.** `everyday/world.ts`'s and
+`everyday/rushScreenModel.ts`'s speak about endpoints that genuinely do not exist — a distribution
+(#327) and another player's rush. A lane briefed to sweep *the stale-refusal cluster* would have
+replaced two accurate refusals with two inaccurate ones, which is § D227's defect committed in the
+course of fixing § D227's defect.
+
+## O.3 The corpus, measured on the integrated tree
+
+Both tiers in one sitting, never on a branch (§ D343), with the base at `d4636a5` re-measured first
+in a detached worktree — where it **reproduced its published row exactly in both tiers**, the
+seventh consecutive wave that has held.
+
+| | base `d4636a5` | wave O | move |
+|---|---|---|---|
+| always-on strings | 575 999 | **576 930** | **+931** |
+| deep strings | 718 633 | **719 773** | **+1 140** |
+| surfaces, both tiers | 55 / 56 | **55 / 56** | **0** |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+**931 ÷ 49 = 19 and 1 140 ÷ 60 = 19.** Both exact and the same nineteen, which makes this the second
+time the row has been able to attribute a move to the string. The decomposition was checked against
+the code rather than inferred from the quotient: **fourteen** are `dailyBoardViewOf` driven over the
+six seeded states — two of them for `unreachable`, because the server's own sentence is carried under
+ours — and **five** are `BOARD_SCREEN_COPY`'s new keys, which the adapter iterates generically.
+
+**The three refusal corrections contributed zero**, and that is arithmetic rather than luck. Each is
+a substitution: one string in, one string out. § D457 recorded wave M's zero for exactly this reason
+at a different scale, and here the same rule holds inside a wave that did move.
+
+**The surface sets were diffed rather than the counts compared**, in both tiers: identical, nothing
+added, nothing removed. The daily tab's five states went into the *existing* board adapter rather
+than a new one. The deep tier's one-surface lead is still exactly `campaign/judge.ts#judgeStage`.
+
+## O.4 What I got wrong
+
+**I nearly shipped the row.** The seed loop marked the wait `role: 'estimate'` with no `countShown`,
+which is why the search fired. `role: 'observation'` would have looked like a reasonable choice for a
+figure the server measured, and the sweep would have been silent.
+
+**A default parameter ate two fixtures.** `legs: number | undefined = 312` takes the default when
+`undefined` is passed explicitly, so both *"the server sent no count"* cases ran with a count and
+both tests passed against the wrong fixture. Caught by an assertion, fixed by taking `null` for
+*deliberately none*.
+
+**The deep tier needs `CORPUS_TIER=deep`, not `ELEVATOR_SIM_HONESTY=deep` alone.** Two runs wrote
+always-on figures into a file named `deep`, and they were caught only because the file states its own
+tier on line one.
+
+## O.5 The owner's CI ruling, taken mid-wave
+
+The macOS red on #334 put the question in front of the product owner and the answer was to remove
+the leg: *"We're deploying out to Azure, so we don't need anything else burning CPU or tokens."*
+§ D462.
+
+**The reasoning holds where it was aimed.** A second leg proves portability to a platform nothing is
+shipped on, and the objection was cost. What it also removes is the instrument § D196/§ D201 built:
+portability stops being a *measured* property, and an environment-dependent pin goes back to being
+indistinguishable from a portable one.
+
+**The concern was raised once, in two sentences, and then the work was done in full.** That is the
+shape this file should record for the next time: a stated cost, an owner's call, and no
+re-litigation.
+
+**The cost was overstated on the first pass and corrected by checking.** The draft `ci.yml` header
+said three defects go unguarded. Checked one at a time:
+
+| finding | uniquely the macOS leg's? |
+|---|---|
+| CLI `ENOTCONN` | **Yes, found there and nowhere else** — but `process.test.ts` fires every `BROKEN_PIPE_CODES` member individually, written so coverage would not depend on the machine. The known codes stay covered; finding an unknown fourth does not |
+| `dist-web/` race | No — both legs reported it on the same commit, in different symptoms |
+| Pinned viewport offset | No — the two legs agreed with *each other* against a local machine. CI-versus-local, not macOS-versus-linux |
+
+Counting them would have made the trade look worse than it is, which is the same error in the
+opposite direction from the one this project usually makes. The honest loss is one sentence: no
+second platform is watching.
+
+**Six files claimed the two-leg matrix and all six were corrected at their sites**, with the
+present-tense claims changed and every historical measurement left exactly as written.
+`docs/31-support-matrix.md` is an **adopted specification of record**, so it got a dated amendment
+rather than an edit that matched it to the new reality.
+
+**The find worth carrying:** `traffic/dayStartIdentity.test.ts` justified regenerating pins locally
+by citing three machines that agreed. That route is gone, and nobody had said so. A pin regenerated
+from here rests on one machine, which is § D201's defect wearing an equality assertion. The
+docstring now warns where somebody about to regenerate will read it.
+
+## O.6 Two more owner calls on cost, and the noise this session made for itself
+
+**§ D463 — the preview deploy stops commenting.** `Azure/static-web-apps-deploy@v1` posted *"Your
+stage site is ready!"* on every push; on #334 it fired five times in fifty minutes. Its `repo_token`
+input is removed. **The action's own `action.yml` was fetched and read before the change** — it
+declares that input `required: false` and *"currently used only for commenting on Pull Requests"* —
+because a token dropped on a hunch would have failed the deploy rather than quieting it. The preview
+still deploys and its URL still reaches the pull request through `environment.url`.
+`pull-requests: write` went with it, since the comment was the only thing using it.
+
+**The superseded-head notifications were entirely self-inflicted, and the count is the finding.**
+Four pushes in one hour, three of them cancelling a CI run in flight — one **45 minutes** in. A
+cancelled run still *completes* its check suite, and that completion arrives saying *"no third-party
+check suite is still running or failed"* about a commit that is no longer the head. Five of those in
+one session. **One described a head whose sibling job had been cancelled rather than passed**, so
+acting on it would have meant declaring CI green while it was still running.
+
+The fix is a working agreement in `CLAUDE.md`: commit freely, push once per wave. **Stated as
+discipline rather than a gate, because nothing enforces it** — and this file should say plainly that
+a rule which cannot fail is the thing this repository most often catches, so the next reader should
+treat it as a habit to keep rather than a guarantee to rely on.
+
+**Two things that look like the fix and are not**, recorded so nobody spends an afternoon on them:
+
+- `paths-ignore` on `**.md` is **wrong here**. `validation/documentation.test.ts`,
+  `validation/citations.test.ts` and `everyday/viewportGateClaims.test.ts` read the documents
+  themselves, so a markdown-only change can legitimately fail this suite; skipping it would skip the
+  guards that exist for exactly that case.
+- **A `paths:` filter does not narrow a pull request.** GitHub evaluates it against the whole PR
+  diff rather than the individual push. `deploy-viz.yml` already carries one naming only
+  `packages/**` and friends, and it still ran on a push that touched two root `.md` files and
+  nothing else — which is how this was established rather than assumed.
+
+## O.7 Owed to the next wave
+
+- **#221 has three criteria left**, and the next one is **#332**, the Everyday sign-in. Posting is
+  blocked on it and nothing else. The daily challenge tab is the one after that.
+- **#161 should be split.** Its own text says to when the blocker clears; the blocker cleared and two
+  of its five bullets are now done. Commented with the split and left the body alone.
+- **#333 is filed and it is this wave's own debt.** `entries` gained a `NOT NULL` column, and
+  `CREATE TABLE IF NOT EXISTS` does not add a column to a table that already exists. `store.ts`'s
+  schema docstring said the honest thing — *"there is no migration framework because there is
+  nothing to migrate yet"* — and #179 closing on 2026-09-01 is what made that sentence expire. On a
+  database created before `5ea3805` the insert fails and `entryOf` reads `NaN`. No test catches it,
+  because every test opens an empty database. Filed rather than fixed here because a migration
+  runner is its own build with its own acceptance criteria, and because the pre-existing-row answer
+  is a decision to record rather than assume.
+- **#275 and #329** are still the two whose blockers cleared and which nothing has picked up. Three
+  consecutive waves now, which is #329's own subject arriving for the third time.
+- **#335 is re-aimed rather than closed.** Removing the macOS leg made its red go away and answered
+  nothing: `BLOCKED_FRAME_GAP_MS` is still a wall-clock bound calibrated on Linux and enforced as
+  though portable, and the Linux leg is the same kind of shared VM. `docs/31-support-matrix.md` § 5
+  had written this class down before it happened — *"a wall-clock budget on hardware with that
+  spread will produce flaky red runs"* — and that paragraph is now annotated with the run that
+  proved it.
+- **A notification pattern to distrust.** `check_suite.completed` envelopes saying *"no third-party
+  check suite is still running or failed"* arrived **three times for superseded heads**. Twice they
+  would have read as *CI is done* while the current head was still running, and once the sibling job
+  had been **cancelled** rather than passed. Verify with `list_workflow_jobs` against the current
+  head sha before acting on one.

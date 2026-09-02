@@ -1268,6 +1268,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'the deviation red rather than merely unnecessary.',
       ids: ['everyday/actionBar.ts#GUIDE_WATCHING_NOTE'],
     },
+    {
+      reason:
+        'A **composition that authors no string** — GitHub issue #221. `dailyBoardOf` turns two ' +
+        'client reads into one of four states, and every word it can put on a screen belongs to ' +
+        'somebody else: `detail` is `menu/client.ts`’s own failure sentence, `note` is the ' +
+        'server’s. It has no literal of its own, and the deriver collected it because ' +
+        '`literalsIn` scans comments too — a backticked module path in the docstring reads as ' +
+        'prose to `PROSE`. Over-collection is this instrument’s safe direction, so the answer is ' +
+        'to classify it rather than to loosen the scan. What holds it honest is not this search: ' +
+        'the states are seeded through `everyday/boardScreen.ts#dailyBoardViewOf`, which is the ' +
+        'surface that decides what any of them says, and `everyday/host.test.ts` drives the ' +
+        'composition itself against stubs.',
+      ids: ['everyday/host.ts#dailyBoardOf'],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));

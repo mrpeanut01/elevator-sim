@@ -139,6 +139,22 @@ export interface EntryRow {
   readonly displayName: string;
   readonly run: SubmittedRun;
   readonly measured: ClaimedMetrics;
+  /**
+   * Served legs in the measurement window — the `n` behind {@link measured}'s `awtS`.
+   *
+   * Beside `measured` rather than inside it, and the placement is the decision. `ClaimedMetrics` is
+   * *the claim a player makes*; this is never claimed, never compared, and never refused on. It is
+   * read off the server's own replay for the same § D214 § 3 reason the four means are, plus a
+   * sharper one: a mean's denominator is the single number a cheat would most want to choose, and
+   * putting it in the claim would create one more way to refuse an honest player who computed it
+   * differently. `challenge/submission.ts#ClaimedSeedMetrics.legs` *is* claimed, because a challenge
+   * aggregates across seeds and the client must say which run each figure came from.
+   *
+   * Here so a board row can print `21.4 s over 312 legs` rather than a bare mean — R13 clause one,
+   * which `honesty/properties.ts` states as *"`n = 5` is not a caveat on `11.3 s`; it is part of
+   * what `11.3 s` means"*. The row was drawing the mean alone until the honesty corpus said so.
+   */
+  readonly legs: number;
   readonly submittedAtMs: number;
 }
 
@@ -583,6 +599,8 @@ export class Store {
     readonly userId: string;
     readonly run: SubmittedRun;
     readonly measured: ClaimedMetrics;
+    /** {@link EntryRow.legs} — the server's own count, never the client's. */
+    readonly legs: number;
   }): Promise<EntryRow> {
     const user = await this.userById(input.userId);
     if (user === undefined) throw new NoSuchUserError('recordEntry');
@@ -594,6 +612,7 @@ export class Store {
       displayName: user.displayName,
       run: input.run,
       measured: input.measured,
+      legs: input.legs,
       submittedAtMs: this.#now(),
     };
     // Guarded, because the `userById` above is a check-then-act and `deleteUser` is what made its
@@ -602,11 +621,12 @@ export class Store {
     try {
       written = await this.#sql.query(
         'INSERT INTO entries (id, board_key, data_hash, user_id, seed, run_json, awt_s, wt95_s, ' +
-          'ttd_mean_s, pct_over_long_wait, submitted_at_ms) ' +
-          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ' +
+          'ttd_mean_s, pct_over_long_wait, legs, submitted_at_ms) ' +
+          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ' +
           'ON CONFLICT (board_key, data_hash, user_id, seed) DO UPDATE SET run_json = excluded.run_json, ' +
           'awt_s = excluded.awt_s, wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
-          'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms ' +
+          'pct_over_long_wait = excluded.pct_over_long_wait, legs = excluded.legs, ' +
+          'submitted_at_ms = excluded.submitted_at_ms ' +
           'RETURNING id',
         [
           randomUUID(),
@@ -619,6 +639,7 @@ export class Store {
           draft.measured.wt95S,
           draft.measured.ttdMeanS,
           draft.measured.pctOverLongWait,
+          draft.legs,
           draft.submittedAtMs,
         ],
       );
@@ -950,6 +971,7 @@ function entryOf(row: Record<string, unknown>): EntryRow {
       // Only quotable runs are ever stored, so this is a fact about the table rather than a column.
       awtIsValid: true,
     }),
+    legs: Number(row['legs']),
     submittedAtMs: Number(row['submitted_at_ms']),
   });
 }
@@ -1012,6 +1034,12 @@ CREATE TABLE IF NOT EXISTS entries (
   wt95_s              DOUBLE PRECISION NOT NULL,
   ttd_mean_s          DOUBLE PRECISION NOT NULL,
   pct_over_long_wait  DOUBLE PRECISION NOT NULL,
+  -- Served legs in the row's measurement window: the n behind awt_s, and the reason a board row
+  -- may print a mean at all (R13 clause one). The SERVER's count, from its own replay -- a client
+  -- never sends one, because a denominator is the number a cheat would most want to choose.
+  -- NOT NULL and no default: this landed before any database held a row, and the honest thing once
+  -- one does is the versioned migration this file's schema docstring names, not a backfilled zero.
+  legs                INTEGER NOT NULL,
   submitted_at_ms     BIGINT NOT NULL,
   UNIQUE (board_key, data_hash, user_id, seed)
 );

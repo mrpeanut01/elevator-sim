@@ -255,7 +255,11 @@ jobs:
     permissions:
       id-token: write # the OIDC token. The whole authentication story.
       contents: read
-      pull-requests: write # the preview URL comment on the pull request
+      # `pull-requests: write` was here for one thing — the preview URL comment
+      # `Azure/static-web-apps-deploy` posts — and § D463 removed that comment, so the permission
+      # went with it rather than being left as a grant nothing uses. The preview URL is still
+      # published: `environment.url` below reads `steps.deploy.outputs.static_web_app_url`, so it
+      # appears in the pull request's Deployments panel and on the environment itself.
     environment:
       name: ${{ github.event_name == 'pull_request' && 'viz-preview' || 'viz-production' }}
       url: ${{ steps.deploy.outputs.static_web_app_url }}
@@ -302,7 +306,12 @@ jobs:
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ steps.token.outputs.token }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          # `repo_token` is deliberately absent — § D463. The action's own `action.yml` declares it
+          # `required: false` and describes it as *"currently used only for commenting on Pull
+          # Requests"*, so withholding it removes the comment and touches nothing else: the upload
+          # still runs, the preview still deploys, and the URL still reaches the pull request
+          # through `environment.url`. Checked against the action definition rather than assumed,
+          # because a token removed on a guess would have failed the deploy instead of quieting it.
           action: upload
           # The site was built in the `build` job, from a lockfile install, on a pinned Node, and
           # its API origin was asserted there. Left to itself this action runs its own Oryx build

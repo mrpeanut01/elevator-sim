@@ -236,7 +236,7 @@ import {
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
-import { BOARD_SCREEN_COPY, DAILY_BOARD_ABSENCE } from '../everyday/boardScreen.js';
+import { BOARD_SCREEN_COPY, DAILY_BOARD_ABSENCE, dailyBoardViewOf } from '../everyday/boardScreen.js';
 import {
   caseNameOf,
   caseNamesOf,
@@ -5606,6 +5606,7 @@ const MENU: SurfaceAdapter = {
       // What the row was measured against — never the board it is on (ENGINE_CONTRACT § 12.1).
       dataHash: 'abcdef0123456789',
       measured,
+      legs: 312,
       submittedAtMs: 0,
     });
     const pageOf = (entries: readonly BoardEntry[]): BoardPage => ({
@@ -9185,6 +9186,39 @@ function placeholderProofSet(
 }
 
 /**
+ * The note a board page carries — the server's own sentence about what a row means, restated here
+ * because this corpus never reaches a server. Its content is the *shape* the property reads: a
+ * board's rows are only comparable because every one of them was replayed.
+ */
+const BOARD_NOTE = 'Every row here was replayed from its seed and re-measured before it appeared.';
+
+/** One posted row, with a plausible wait. Nothing here is authored copy: a name and a number. */
+function placeholderBoardEntry(
+  displayName: string,
+  awtS: number,
+  /** `null` is *the server sent no count*. Not `undefined`: that takes the default. */
+  legs: number | null = 312,
+): BoardEntry {
+  return {
+    id: `row-${displayName}`,
+    displayName,
+    run: {
+      buildingId: 'midtown-office',
+      dispatcherProfileId: 'eta',
+      demandTemplateId: 'up-peak',
+      arrivalRatePctPop5min: 4,
+      durationS: 900,
+      windowStartS: null,
+      seed: 'seed-1',
+    },
+    dataHash: 'placeholder',
+    legs: legs ?? undefined,
+    measured: { awtS, wt95S: awtS * 2, ttdMeanS: awtS * 3, pctOverLongWait: 0, awtIsValid: true },
+    submittedAtMs: 0,
+  };
+}
+
+/**
  * **The forty proof cases, the rating they produce, and the ladder that shows it.**
  *
  * ## Why this belongs in a corpus about honesty more than most surfaces do
@@ -9247,6 +9281,8 @@ const GAUNTLET: SurfaceAdapter = {
     // The board screen's own two string tables; its `mount` is excluded on the mounts' ground.
     'everyday/boardScreen.ts#BOARD_SCREEN_COPY',
     'everyday/boardScreen.ts#DAILY_BOARD_ABSENCE',
+    // The daily tab's five states — driven below, all five, rather than the copy table alone.
+    'everyday/boardScreen.ts#dailyBoardViewOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -9438,6 +9474,79 @@ const GAUNTLET: SurfaceAdapter = {
     seeds.push({ field: 'ladder.reference.label', text: REFERENCE_RUN_LABEL, role: 'label' });
     seeds.push({ field: 'rating.basis', text: RATING_BASIS, role: 'prose' });
     seeds.push({ field: 'rating.caveat', text: RATING_CAVEAT, role: 'reason' });
+
+    /*
+     * The daily tab, in all five of the states GitHub issue #221 gave it. Every one, rather than
+     * the reachable one: the corpus's job here is that *no* state says a thing the run cannot
+     * support, and the state most likely to say one is the state a developer never sees. The two
+     * that must never share a sentence — `board` with no rows, and `unreachable` — are both here
+     * for exactly that reason.
+     *
+     * The rows carry a plausible figure rather than a round one, because a board row's whole
+     * content is a name and a wait, and `21.4 s` beside a name is the shape R3 reads.
+     */
+    const dailyStates: readonly (readonly [string, Parameters<typeof dailyBoardViewOf>[0]])[] = [
+      ['asking', undefined],
+      ['noServer', { kind: 'no-server' }],
+      ['unreachable', { kind: 'unreachable', detail: 'The board service did not answer.' }],
+      ['undeclared', { kind: 'undeclared' }],
+      ['empty', { kind: 'board', date: '2026-09-02', note: BOARD_NOTE, rows: [] }],
+      [
+        'rows',
+        {
+          kind: 'board',
+          date: '2026-09-02',
+          note: BOARD_NOTE,
+          rows: [
+            placeholderBoardEntry('A. Turing', 21.4),
+            placeholderBoardEntry('G. Hopper', 29.5),
+            /*
+             * A row from a server too old to send `legs`. Here rather than in a sixth state,
+             * because the mixed board is the honest case: one client reads one board, and rows on
+             * it can come from before and after the field existed.
+             */
+            placeholderBoardEntry('K. Lovelace', 34.2, null),
+          ],
+        },
+      ],
+    ];
+    for (const [state, board] of dailyStates) {
+      const view = dailyBoardViewOf(board);
+      view.lines.forEach((line, index) => {
+        seeds.push({
+          field: `board.daily.${state}.line${String(index)}`,
+          text: line.text,
+          role: line.role === 'note' ? 'observation' : 'reason',
+        });
+      });
+      view.rows.forEach((row, index) => {
+        seeds.push({
+          field: `board.daily.${state}.row${String(index)}.who`,
+          text: `${row.place}. ${row.displayName}`,
+          role: 'label',
+        });
+        /*
+         * Two roles, and which one applies is the row's own answer rather than the adapter's
+         * preference. A row that printed a count is an `estimate` with `countShown` — from whether
+         * it *printed* one, never from whether one exists, which is R13's own rule about this flag
+         * and is what produced the finding: the row drew a bare mean, the adapter said so, and the
+         * search reported it on 49 cases before anybody argued about it. A row that printed no
+         * count is not a weak estimate; it is `suppressed`, the same role
+         * `rating.none.figure` carries three seeds above, because `no count` is a cell standing
+         * where a figure would be.
+         */
+        seeds.push(
+          row.count === undefined
+            ? { field: `board.daily.${state}.row${String(index)}.wait`, text: row.figure, role: 'suppressed' }
+            : {
+                field: `board.daily.${state}.row${String(index)}.wait`,
+                text: `${row.figure} ${row.count}`,
+                role: 'estimate',
+                countShown: true,
+              },
+        );
+      });
+    }
 
     return singleRun(this.id, seeds);
   },

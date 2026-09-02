@@ -484,6 +484,43 @@ describe('a submission is accepted only if it replays', () => {
     expect(verification.measured.awtIsValid).toBe(true);
   });
 
+  it('returns the count behind the mean, from its own replay', () => {
+    const submission = honest();
+    const verification = verifySubmission(submission, resources);
+    expect(verification.ok, JSON.stringify(verification)).toBe(true);
+    if (!verification.ok) return;
+    /*
+     * `legs` is why a board row may print `21.4 s` at all — R13 clause one, which
+     * `honesty/properties.ts` puts as *"`n = 5` is not a caveat on `11.3 s`; it is part of what
+     * `11.3 s` means"*. Asserted as a real count over this fixture rather than against a constant,
+     * because the number that matters is *the one this run produced*, and a fixture whose window
+     * served nobody would make the row's denominator a lie in the other direction.
+     */
+    expect(verification.legs).toBeGreaterThan(0);
+    expect(Number.isInteger(verification.legs)).toBe(true);
+  });
+
+  it('takes the count from the replay and not from anything a client can send', () => {
+    /*
+     * There is nowhere in a `Submission` to put a leg count, and this is the test that keeps it so.
+     * A denominator is the one number a cheat would most want to choose — halve it and a mean over
+     * the easy half of a run looks like a mean over the run — which is why it sits beside
+     * `ClaimedMetrics` rather than inside it: never claimed, never compared, never refused on.
+     */
+    const submission = honest();
+    const withJunk = {
+      ...submission,
+      legs: 1,
+      claimed: { ...submission.claimed, legs: 1 },
+    } as unknown as Submission;
+    const claimedIt = verifySubmission(withJunk, resources);
+    const plain = verifySubmission(submission, resources);
+    expect(claimedIt.ok && plain.ok).toBe(true);
+    if (!claimedIt.ok || !plain.ok) return;
+    expect(claimedIt.legs).toBe(plain.legs);
+    expect(claimedIt.legs).not.toBe(1);
+  });
+
   it('rejects a better wait than the run produced — the whole point', () => {
     const submission = honest();
     const forged: Submission = {

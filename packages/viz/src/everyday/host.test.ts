@@ -44,7 +44,12 @@ import { postedResultOf } from '../watch/reproduce.js';
 import type { PostedResult, WatchableRun, WatchRecord } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
-import { createEverydayHost, EVERYDAY_HOST, type EverydayHostBindings } from './host.js';
+import {
+  createEverydayHost,
+  dailyBoardOf,
+  EVERYDAY_HOST,
+  type EverydayHostBindings,
+} from './host.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
 const read = (path: string): unknown =>
@@ -170,6 +175,8 @@ function harnessOf(
         calls.push(`playThisCrowd:${run.id}`);
       },
       watching: () => harness.watching,
+      /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
+      dailyBoard: undefined,
       onChange: (listener) => {
         calls.push('onChange');
         void listener;
@@ -732,6 +739,8 @@ describe('filing the campaign day — issue #223', () => {
         stopWatching: () => {},
         playThisCrowd: () => {},
         watching: () => undefined,
+        /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
+        dailyBoard: undefined,
         onChange: () => () => {},
       },
     };
@@ -1142,5 +1151,109 @@ describe('§ 14.1 — the spectator entry', () => {
     host.stopWatching();
     expect(h.calls).toContain('playThisCrowd:reference-under-test');
     expect(h.calls).toContain('stopWatching');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The daily board — #221's read half
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Four states, and the pair that must never share a sentence is *nobody has posted yet* against
+ * *we could not ask*. The ladder beside this board already makes the same distinction for the same
+ * reason: its empty line is a claim about the player and is false when a store could not be read.
+ *
+ * Driven through {@link dailyBoardOf} rather than through the shell, because the composition is the
+ * part worth checking and `boundaries.test.ts` keeps the client out of every module but two.
+ */
+describe('the daily board read', () => {
+  /*
+   * Deliberately not the date this test runs on. A stub carrying the real today passes whether the
+   * key comes from the server or from a local clock — the assertion below would then be green for
+   * the wrong reason, which is the coincidence this repository has been caught by before. Mutating
+   * the source to compute the date locally must turn the next case red, and with a real date it
+   * does not.
+   */
+  const TODAY = { date: '2019-04-01', seed: '20190401', config: {} } as never;
+  const listed = (today: unknown): never => ({ ok: true, value: { boards: [], kinds: [], today } }) as never;
+  const failed = (detail: string): never => ({ ok: false, code: 'unreachable', detail, issues: [] }) as never;
+  const page = (note: string, entries: readonly unknown[]): never =>
+    ({ ok: true, value: { boardKey: 'daily:2019-04-01', metric: 'awtS', note, entries } }) as never;
+
+  it('answers no-server when the page was served with no API origin', async () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost({ ...h.bindings, dailyBoard: undefined });
+    // Not a failed request. Nothing was asked, because there was nothing to ask.
+    expect(await host.dailyBoard()).toEqual({ kind: 'no-server' });
+  });
+
+  it('asks for the key the server named, never one it worked out for itself', async () => {
+    const asked: string[] = [];
+    const board = await dailyBoardOf(
+      () => Promise.resolve(listed(TODAY)),
+      (key, metric) => {
+        asked.push(`${key}|${metric}`);
+        return Promise.resolve(page('Ranked on average wait.', []));
+      },
+    );
+    // The server's own date. A client that computed this would be a second answer to which day it
+    // is, and one that read `daily:` off a key would be a second answer to what a key looks like.
+    expect(asked).toEqual(['daily:2019-04-01|awtS']);
+    expect(board).toEqual({
+      kind: 'board',
+      date: '2019-04-01',
+      note: 'Ranked on average wait.',
+      rows: [],
+    });
+  });
+
+  it('keeps an empty board apart from a board it could not reach', async () => {
+    const empty = await dailyBoardOf(
+      () => Promise.resolve(listed(TODAY)),
+      () => Promise.resolve(page('Ranked on average wait.', [])),
+    );
+    const unreachable = await dailyBoardOf(
+      () => Promise.resolve(failed('The leaderboard server could not be reached.')),
+      () => Promise.reject(new Error('never asked')),
+    );
+    // Nobody has posted today, which is a board. Versus: we do not know, which is not.
+    expect(empty.kind).toBe('board');
+    expect(unreachable.kind).toBe('unreachable');
+  });
+
+  it('does not ask for a board when the list already failed', async () => {
+    let asked = 0;
+    const board = await dailyBoardOf(
+      () => Promise.resolve(failed('Refused.')),
+      () => {
+        asked += 1;
+        return Promise.resolve(page('', []));
+      },
+    );
+    expect(asked).toBe(0);
+    if (board.kind !== 'unreachable') throw new Error('expected unreachable');
+    // The server's own sentence, carried rather than replaced.
+    expect(board.detail).toBe('Refused.');
+  });
+
+  it('says undeclared when the server answered and named no day', async () => {
+    const board = await dailyBoardOf(
+      () => Promise.resolve(listed(undefined)),
+      () => Promise.reject(new Error('never asked')),
+    );
+    /*
+     * The API image is deployed by hand, so a running one can predate the field. *It did not say*
+     * is not *there is no board today*, and it is not a failed request either — collapsing it into
+     * either would put a sentence on screen that the server never supported.
+     */
+    expect(board).toEqual({ kind: 'undeclared' });
+  });
+
+  it('carries a board-read failure through rather than reporting an empty board', async () => {
+    const board = await dailyBoardOf(
+      () => Promise.resolve(listed(TODAY)),
+      () => Promise.resolve(failed('The server refused that request.')),
+    );
+    expect(board).toEqual({ kind: 'unreachable', detail: 'The server refused that request.' });
   });
 });

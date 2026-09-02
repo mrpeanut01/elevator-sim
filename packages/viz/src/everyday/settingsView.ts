@@ -52,9 +52,11 @@
  *   is why the *Playing* section can be non-empty while the Motion row is still absent.
  * - **Post runs to the board — not drawn.** `honesty/generate.ts` says it outright: *"There is
  *   no `settings.noPost` flag in this tree"* — the real gates are `menu/account.ts#postingRefusal`
- *   and `shift/banking.ts#bankingRefusalFor`, and neither reads a switch. The Everyday boards
- *   themselves are unbuilt (`screens.ts`: *needs a server to post and rank runs, and this build
- *   has none*).
+ *   and `shift/banking.ts#bankingRefusalFor`, and neither reads a switch. **The row's stated reason
+ *   changed under it and the row did not**: it used to add *"the boards need a server this build
+ *   has none of"*, which was false on every served build — the server injects the API tag into the
+ *   page it serves — and became visibly false when GitHub issue #221 made the board read. What is
+ *   actually absent is the posting path, so that is what it says now.
  * - **This device's two statements shipped; its two actions did not.** *Where progress lives* and
  *   *Replay verification* are statements of fact with real seams (`persist/session.ts` and this
  *   screen's own `profileStore.ts`; the server's replay-before-board, which `dev/main.ts` reports
@@ -202,7 +204,7 @@ export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
    * (`buildNotes.test.ts#ABSENCE_TRIAGE`, § D370), which is what that table's second assertion is
    * for.
    */
-  'Post runs to the board — the boards need a server this build has none of, and no posting path reads such a switch',
+  'Post runs to the board — nothing in this build posts a run yet, so there is no path for a switch to turn off',
   'Sign out — nothing on this surface is signed in; the name and picture above live on this device',
   'Clear saved progress — not offered yet: the running session would write itself straight back on its next save',
   /*

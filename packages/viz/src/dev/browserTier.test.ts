@@ -63,9 +63,12 @@
  *   tier imports the helper. A tier that is half gated is worse than one that is wholly gated: it
  *   reports as *ran*.
  * - **In CI, a gated tier may not be gated off.** `process.env['CI']` is set by GitHub Actions and by
- *   every other runner worth the name, and `ci.yml` provisions a Chromium on **both** legs of the
- *   matrix. So a CI run in which this tier would skip is a red run, naming the project, the files
- *   and the variable. There is deliberately **no opt-out variable**: an environment that cannot host
+ *   every other runner worth the name, and `ci.yml` provisions a Chromium on **every** leg of the
+ *   matrix — both of them until § D462, the one Linux leg since. The wording is deliberately the
+ *   quantifier rather than the count, because what this rule needs is that no leg lacks a browser,
+ *   which is what makes it unconditional; a per-leg exemption is where this class of problem goes
+ *   to be forgotten. So a CI run in which this tier would skip is a red run, naming the project,
+ *   the files and the variable. There is deliberately **no opt-out variable**: an environment that cannot host
  *   the tier has to say so by not running `npm test`, which is not a thing anybody does quietly. An
  *   `ELEVATOR_SIM_BROWSER_TIER=optional` escape was considered and refused for the reason
  *   `dispatch/deadCode.test.ts` gives about its own allowlist — the exemption becomes the place the

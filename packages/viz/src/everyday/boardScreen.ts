@@ -70,6 +70,7 @@ import type { ProofCaseSet } from '../gauntlet/proofCases.js';
 import { RATING_BASIS } from '../gauntlet/rating.js';
 import { runGauntlet, type GauntletHandle, type GauntletWorker } from '../gauntlet/run.js';
 
+import { DAILY_BOARD_METRIC, type EverydayDailyBoard } from './host.js';
 import { everydayProgressWith } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
@@ -102,6 +103,26 @@ export const BOARD_SCREEN_COPY = Object.freeze({
   sendEyebrow: 'PROVE A DISPATCHER',
   cancel: 'Stop the gauntlet',
   loading: 'Loading the proof cases…',
+  /*
+   * The daily tab's four non-row states. Short on purpose: § D456 gave `charter P2` a second
+   * refusal test — *can the player still play?* — and a board that cannot be shown is the moment a
+   * screen is most tempted to explain itself at length. Each of these says what happened and what
+   * it means for the tab beside it, and stops.
+   */
+  dailyAsking: 'Asking the server for today’s board…',
+  dailyUnreachable:
+    'Today’s board could not be reached just now. Nothing is wrong with your run, and the ladder ' +
+    'beside it is unaffected — its ratings are measured on this device.',
+  dailyUndeclared:
+    'The server answered but did not say which day is running. That is a server too old to name ' +
+    'one rather than a day with no board, so there is nothing to show rather than an empty table.',
+  dailyEmpty: 'Nobody has posted to today’s board yet. It resets tomorrow.',
+  /*
+   * A row whose server sent no `n`. Short, and in the figure's own place rather than a footnote,
+   * because the thing a reader wants to know is why *this* row has no number while its neighbours
+   * do — and the ranking is still the server's, which is why the row stays on the board at all.
+   */
+  dailyRowWithheld: 'no count',
   crowdsHeading: 'THE FIVE CROWD SHAPES',
   towersHeading: 'THE EIGHT BUILDINGS',
 } as const);
@@ -205,6 +226,8 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   let progressLine: string | undefined;
   let stoppedLine: string | undefined;
   let disposed = false;
+  /** `undefined` while the read is in flight — the fifth thing this tab can be drawing. */
+  let board: EverydayDailyBoard | undefined;
 
   const status = el(doc, 'div', BOARD_SCREEN_COPY.loading);
   status.style.cssText = NOTE;
@@ -511,6 +534,50 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
 
   /* --------------------------------------------------------------- drawing */
 
+  /**
+   * {@link dailyBoardViewOf}'s answer, drawn. The decision about *what* the tab says lives in that
+   * pure function so all five states are drivable without a document; this renders it and nothing
+   * more, which is the same split `dev/reportPanel.ts` uses for the same reason.
+   */
+  function dailyBlock(): HTMLElement {
+    const view = dailyBoardViewOf(board);
+    const wrap = el(doc, 'div');
+    wrap.style.cssText = `margin-top:${String(G.section)}px`;
+    for (const line of view.lines) {
+      const p = el(doc, 'p', line.text);
+      p.className = line.className;
+      p.style.cssText = line.role === 'reason' ? NOTE : `${NOTE};color:${C.label}`;
+      wrap.append(p);
+    }
+    if (view.rows.length === 0) return wrap;
+
+    const rows = el(doc, 'div');
+    rows.className = 'everyday-board-rows';
+    rows.style.cssText = `display:grid;gap:${String(G.row)}px;margin-top:${String(G.block)}px`;
+    for (const entry of view.rows) {
+      const row = el(doc, 'div');
+      row.className = 'everyday-board-row';
+      row.style.cssText = `display:flex;gap:${String(G.block)}px;align-items:baseline;font-size:13.5px`;
+      const place = el(doc, 'span', entry.place);
+      place.style.cssText = `font:600 12px ${TYPE.mono};color:${C.label};min-width:2ch`;
+      const who = el(doc, 'span', entry.displayName);
+      who.style.cssText = 'flex:1';
+      const wait = el(doc, 'span', entry.figure);
+      wait.style.cssText = `font:600 13px ${TYPE.mono}`;
+      row.append(place, who, wait);
+      if (entry.count !== undefined) {
+        /* In the row, beside the mean — R13's clause one is about the visual unit, not the page. */
+        const count = el(doc, 'span', entry.count);
+        count.className = 'everyday-board-row-count';
+        count.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label}`;
+        row.append(count);
+      }
+      rows.append(row);
+    }
+    wrap.append(rows);
+    return wrap;
+  }
+
   function redraw(): void {
     if (disposed) return;
     tabs.replaceChildren();
@@ -530,15 +597,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     );
 
     if (tab === 'daily') {
-      /*
-       * § 12.2: with the API unreachable every world figure renders a labelled unavailable state
-       * and the screen is otherwise complete. There are no authored rows here — § 20.11 lists
-       * `boardRows` among the fixtures needing a real source, and the real source is a server.
-       */
-      const absent = el(doc, 'p', DAILY_BOARD_ABSENCE);
-      absent.className = 'everyday-board-absent';
-      absent.style.cssText = `${NOTE};margin-top:${String(G.section)}px`;
-      body.append(absent);
+      body.append(dailyBlock());
       return;
     }
 
@@ -588,6 +647,18 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     body.append(world, sendBlock(set, resources), disclosure(set, resources));
   }
 
+  /*
+   * Asked once per mount, beside the proof-case load rather than after it: the two are independent
+   * and a board that waited on forty local case definitions would be slower for no reason. A
+   * rejection is impossible by the port's contract — every failure is one of its four states — so a
+   * `catch` here would be dead code, and `dailyBoard` is the one place that could make it not be.
+   */
+  void context.host.dailyBoard().then((answer) => {
+    if (disposed) return;
+    board = answer;
+    redraw();
+  });
+
   load()
     .then((result) => {
       if (disposed) return;
@@ -617,12 +688,142 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
  *
  * It says which half is absent and why, rather than the old whole-screen refusal that also covered
  * a ladder needing nothing. Exported so `screens.test.ts` and the sweep can read the one sentence.
+ *
+ * **It is now one arm of four rather than the tab's standing sentence, and that is issue #221's
+ * whole point.** It used to be drawn unconditionally, so it said *this build has none* about every
+ * build including one started against a server, which is § D227's stale refusal with the polarity
+ * that matters: a sentence telling a player not to expect a thing that works. It is drawn now only
+ * when {@link EverydayDailyBoard} comes back `no-server` — the host holds no client, so the claim
+ * is measured rather than asserted. The other three absences are {@link BOARD_SCREEN_COPY}'s, and
+ * a board that arrives draws rows.
  */
 export const DAILY_BOARD_ABSENCE =
   "Today's board ranks other people's runs, and every one of them is replayed and verified before " +
   'it appears. That needs a server to post and rank runs, and this build has none — so there are ' +
   'no rows here rather than invented ones. The ladder beside it needs no server: its ratings are ' +
   'measured on this device, over the same forty cases for everybody.';
+
+/** One line of the daily tab's prose. `note` is the quieter grey the loading line uses. */
+export interface DailyBoardLine {
+  readonly text: string;
+  readonly className: string;
+  readonly role: 'reason' | 'note';
+}
+
+/** One posted run, ranked. Both strings are pre-formatted so the renderer decides nothing. */
+export interface DailyBoardRowView {
+  readonly place: string;
+  readonly displayName: string;
+  /** The mean wait, or the withholding sentence when this row carries no count. */
+  readonly figure: string;
+  /**
+   * The `n` behind {@link figure}, in the row's own box — R13 clause one.
+   *
+   * `undefined` only when {@link figure} is the withholding, so the two are never both absent: a
+   * row either says a number and what it is over, or says why it is saying neither.
+   */
+  readonly count: string | undefined;
+}
+
+/** What the daily tab says and shows, for any one of its five states. */
+export interface DailyBoardView {
+  readonly lines: readonly DailyBoardLine[];
+  readonly rows: readonly DailyBoardRowView[];
+}
+
+/**
+ * § 12.2's rule, now that there is a server to ask: every state is labelled and the screen is
+ * otherwise complete. Five of them, and **the two that must never share a sentence are *nobody has
+ * posted today* and *we could not ask***. The ladder beside this board already makes that
+ * distinction, for the same reason — an empty line is a claim about the world, and a claim is false
+ * when the answer was never obtained.
+ *
+ * `undefined` is the fifth, and it is not an absence: the read is still in flight. Drawing an
+ * absence there would publish *nobody has posted* for as long as the network takes, which is the
+ * same defect one state early.
+ *
+ * There are still no authored rows anywhere in this file. What changed with issue #221 is that an
+ * absent board is four different absences rather than one, and only one of them is *this build has
+ * no server* — see {@link DAILY_BOARD_ABSENCE} for why that one used to be all four.
+ *
+ * Pure and exported so `boardScreen.test.ts` can drive every state without a document, and so the
+ * shape of the decision is readable without reading a renderer.
+ */
+export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBoardView {
+  const only = (text: string, className: string, role: 'reason' | 'note' = 'reason'): DailyBoardView => ({
+    lines: [{ text, className, role }],
+    rows: [],
+  });
+
+  if (board === undefined) {
+    return only(BOARD_SCREEN_COPY.dailyAsking, 'everyday-board-asking', 'note');
+  }
+  switch (board.kind) {
+    case 'no-server':
+      return only(DAILY_BOARD_ABSENCE, 'everyday-board-absent');
+    case 'unreachable':
+      /* Ours saying what happened, then the server's own sentence carried rather than paraphrased. */
+      return {
+        lines: [
+          {
+            text: BOARD_SCREEN_COPY.dailyUnreachable,
+            className: 'everyday-board-unreachable',
+            role: 'reason',
+          },
+          {
+            text: board.detail,
+            className: 'everyday-board-unreachable-detail',
+            role: 'note',
+          },
+        ],
+        rows: [],
+      };
+    case 'undeclared':
+      return only(BOARD_SCREEN_COPY.dailyUndeclared, 'everyday-board-undeclared');
+    case 'board': {
+      const note: DailyBoardLine = {
+        text: board.note,
+        className: 'everyday-board-note',
+        role: 'reason',
+      };
+      if (board.rows.length === 0) {
+        return {
+          lines: [
+            note,
+            { text: BOARD_SCREEN_COPY.dailyEmpty, className: 'everyday-board-empty', role: 'note' },
+          ],
+          rows: [],
+        };
+      }
+      return {
+        lines: [note],
+        /*
+         * One figure per row, and it is the one the board is ranked on. A row carrying more would
+         * invite a comparison the ranking does not make, and `dataHash` — which says whether
+         * another row is even the same question — is deliberately not drawn as though it were a
+         * score.
+         *
+         * **The count beside it is not decoration.** A mean wait with no `n` is R13 clause one, and
+         * the honesty corpus found this row drawing one the day it was written. `legs` is the
+         * server's own count off its own replay, so a row from a server too old to send one has no
+         * denominator this client could honestly supply — and it withholds rather than inventing.
+         */
+        rows: board.rows.map((entry, index) => ({
+          place: String(index + 1),
+          displayName: entry.displayName,
+          figure:
+            entry.legs === undefined
+              ? BOARD_SCREEN_COPY.dailyRowWithheld
+              : `${entry.measured[DAILY_BOARD_METRIC].toFixed(1)} s`,
+          count:
+            entry.legs === undefined
+              ? undefined
+              : `over ${entry.legs.toLocaleString('en-US')} rides`,
+        })),
+      };
+    }
+  }
+}
 
 /** The registry row — one import and one line in `screens.ts`, plus its refusal sentence deleted. */
 export const BOARD_SCREEN: EverydayScreenModule = {

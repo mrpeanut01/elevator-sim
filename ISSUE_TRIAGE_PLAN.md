@@ -857,3 +857,48 @@ transferred first, or open with the unmet criterion named. **A criterion is neve
 issue closable.** § D456 is the one case where a criterion moved, and it moved because the person who
 set it re-aimed it — which is the single route the working agreements leave open, and it is recorded
 as a trade rather than as a strengthening.
+
+---
+
+# Snapshot G — 2026-09-02, after wave O
+
+Wave O took snapshot F's first recommendation and did the half of it that was code. This snapshot
+records what that changed and one thing it corrected in F itself.
+
+## G.1 F.5's first line was right about the issue and wrong about two of the sentences
+
+F.5 said: *"Retract `everyday/buildNotes.ts`'s and `everyday/world.ts`'s* this build ships no server
+*on the same commit — both are live player-facing sentences that are now false."*
+
+`buildNotes.ts` was correct and is done. **`world.ts` was not**, and it is instructive. Its refusal is
+about *world figures* — yesterday's distribution, both histograms, the style split — and **no endpoint
+returns one**, which is #327 and is still open. The sentence is true, pinned, and was left exactly as
+it is. `rushScreenModel.ts`'s is the same case for the same reason.
+
+The sweep that would have taken all five is the one worth not running. Replacing an accurate refusal
+with an inaccurate one is § D227's defect committed while fixing § D227's defect, and the only thing
+separating the two groups is which endpoint exists — which is a fact about the server, not about the
+sentence. **A refusal cluster is not a category; it is five separate claims that happen to share
+wording.**
+
+## G.2 Dispositions moved by wave O
+
+| issue | before | after |
+|---|---|---|
+| **#331** | open, filed by wave N | **done, closes on merge** — `boards()` returns the whole answer |
+| **#221** | unblocked, highest leverage | **open, one of five criteria met**, and the next gate named: #332 |
+| **#161** | blocked umbrella | **open, two of five bullets done**, split proposed on the issue, body untouched |
+| **#333** | — | **filed**, and it is wave O's own debt: a `NOT NULL` column on a table a deployed database may hold rows in |
+
+## G.3 What the next batch should be
+
+1. **#332 — the Everyday sign-in.** It is now the sole gate on #221's posting criterion, which is in
+   turn the gate on #161's remaining bullets and on #248. Product decision already taken (§ D458).
+2. **#333 — the migration runner.** Filed by this wave and owed by it. It is not urgent *today*
+   because the schema block still opens an empty database correctly; it is urgent before the next
+   schema change, and there will be one.
+3. **#275 and #329.** Both have had cleared blockers for over a week and neither has been picked up
+   by two consecutive waves, which is #329's own subject arriving twice.
+
+**Still not in a batch:** anything needing the API redeployed. Unchanged from F, and #333 sharpens
+it — the image is deployed by hand and now has a schema change waiting for that deploy.

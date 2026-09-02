@@ -116,6 +116,8 @@ function harness(): { readonly host: EverydayHost; state: () => ViewerState } {
         throw new Error('this fixture does not drive watching');
       },
       watching: () => undefined,
+    /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
+    dailyBoard: undefined,
     onChange: () => () => {},
   };
   return { host: createEverydayHost(bindings), state: () => state };

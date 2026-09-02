@@ -84,8 +84,34 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **575 999** | **606** | **55** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **718 633** | **4 710** | **56** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **576 930** | **606** | **55** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **719 773** | **4 710** | **56** | **0** | **green**, and the register is empty |
+
+  **Wave O's move is exactly nineteen strings a case, in both tiers, and the nineteen decompose
+  without remainder** ([§ D461](DECISIONS.md)). Measured once on the integrated tree, both tiers in
+  one sitting, with the base at `d4636a5` re-measured first in a detached worktree — where it
+  reproduced its published row **exactly in both tiers**, the **seventh** consecutive wave that has
+  held.
+
+  | | base `d4636a5` | wave O | move |
+  |---|---|---|---|
+  | always-on strings | 575 999 | **576 930** | **+931** |
+  | deep strings | 718 633 | **719 773** | **+1 140** |
+  | surfaces, both tiers | 55 / 56 | **55 / 56** | **0** |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+  **931 ÷ 49 = 19 and 1 140 ÷ 60 = 19**, and the decomposition was checked against the code rather
+  than inferred from the quotient. Fourteen are `everyday/boardScreen.ts#dailyBoardViewOf` driven
+  over the six states the board adapter seeds — GitHub issue #221's daily board — and five are
+  `BOARD_SCREEN_COPY`'s new keys, which `honesty/surfaces.ts` iterates generically. **The three
+  refusal corrections in the same wave contributed zero**, because each is a substitution: one string
+  in, one string out. Second time this row has been able to attribute a move to the string.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical, nothing
+  added, nothing removed. The daily tab's five states went into the **existing** board adapter rather
+  than a new one. The deep tier's one-surface lead survives and the diff names it —
+  `campaign/judge.ts#judgeStage`, the only surface in deep and not in always-on, with nothing in
+  always-on and not in deep.
 
   **Waves L and M each moved this row by exactly zero, and the second zero is arithmetic rather than
   luck** ([§ D457](DECISIONS.md)). Measured once on the integrated tree at `aea42b5`, both tiers in
@@ -861,6 +887,25 @@ cite why.
 - If you hit a decision the docs don't cover, record it in the relevant doc rather than
   only in a commit message.
 - Do not weaken an acceptance criterion to make a phase pass. Raise it instead.
+- **One push per wave, not one per commit.** Commit as often as you like; push when the wave is
+  ready. Every push cancels the CI run in flight (`ci.yml` sets `cancel-in-progress: true`) and
+  starts a fresh ~45-minute suite, and the cancelled run completes a check suite on a head nobody
+  cares about — which arrives as a `check_suite.completed` notification saying *"no third-party check
+  suite is still running or failed"* about a commit that is no longer the head. Measured on
+  2026-09-02: four pushes in one hour, three of them cancelling a run (one 45 minutes in), five
+  spurious notifications, and one of those envelopes described a head whose sibling job had been
+  **cancelled rather than passed**. Acting on any of them would have meant declaring CI green while
+  it was still running. **This is discipline and not a gate** — nothing enforces it, which is why it
+  is written where it will be read rather than asserted somewhere a test could pretend to check it.
+
+**Two things that look like the fix for that and are not, so nobody spends an afternoon on them.**
+`paths-ignore` on `**.md` would be **wrong**: `validation/documentation.test.ts`,
+`validation/citations.test.ts` and `everyday/viewportGateClaims.test.ts` read the documents
+themselves, so a markdown-only change can legitimately fail this suite and skipping it would skip the
+guards that exist for exactly that. And a `paths:` filter does not narrow a pull request at all —
+GitHub evaluates it against the **whole PR diff** rather than the individual push, which is why
+`deploy-viz.yml` already carries a `paths:` list naming only `packages/**` and friends and still ran
+on a push that touched two root `.md` files and nothing else.
 
 **Decision numbers are reserved for you before you start, and *the relevant doc* is usually your own
 module.** Two halves, both [§ D404](DECISIONS.md) and [§ D405](DECISIONS.md), and they exist because
