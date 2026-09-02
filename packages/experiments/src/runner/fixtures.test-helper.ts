@@ -169,6 +169,34 @@ function newestMtime(dir: string, predicate: (name: string) => boolean): number 
   return newest;
 }
 
+/** What a built `core` is, measured against its own sources. */
+export type CoreBuildState = 'current' | 'stale' | 'missing';
+
+/**
+ * Classify `coreDir`'s `dist/` against its `src/`.
+ *
+ * Split out of {@link assertCoreBuilt} so that all three verdicts can be **driven** rather than
+ * argued: `coreBuildState.test.ts` lays out a temporary `src`/`dist` pair, sets the mtimes it wants
+ * and asserts the answer. The guard used to reach the real repository directly, so the only way to
+ * exercise it was to break the working tree — which is why its remedy went unchecked long enough to
+ * become wrong.
+ *
+ * @param coreDir a directory holding `src/` and `dist/`, absolute or relative to the process cwd.
+ */
+export function coreBuildState(coreDir: string): CoreBuildState {
+  const src = newestMtime(
+    `${coreDir}/src`,
+    (name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && !name.endsWith('.test-helper.ts'),
+  );
+  const emitted = newestMtime(`${coreDir}/dist`, (name) => name.endsWith('.js'));
+  if (emitted === 0) return 'missing';
+  const reconciled = Math.max(
+    emitted,
+    newestMtime(`${coreDir}/dist`, (name) => name.endsWith('.tsbuildinfo')),
+  );
+  return src > reconciled ? 'stale' : 'current';
+}
+
 /**
  * Refuse to compare the two executors against a stale build of `core`.
  *
@@ -179,23 +207,37 @@ function newestMtime(dir: string, predicate: (name: string) => boolean): number 
  * will disagree. That is a build problem, not a concurrency bug, and it deserves to say so instead
  * of surfacing as a mystifying diff.
  *
+ * ## Why the freshness marker is `.tsbuildinfo` and not the emitted `.js`
+ *
+ * This guard compares timestamps and `tsc -b` decides by **content**. It reads `.tsbuildinfo`, sees
+ * that no source text has changed, and correctly declines to re-emit — so a tree whose mtimes moved
+ * while its content did not is a state the guard rejected and the command it named could not leave.
+ * Ordinary git produces that state: `git merge`, `git checkout -B` and branch switches rewrite
+ * working-tree files and stamp them with the checkout time whether or not the bytes differ. That is
+ * the integrator's own sequence, which is why GitHub issue **#323** reports `npx tsc -b` returning 0
+ * three times running against a guard that stayed red. CI never meets it, because a fresh checkout
+ * builds after the source lands.
+ *
+ * So the marker is the newer of the emitted `.js` and `dist/.tsbuildinfo` — TypeScript's own record
+ * of when it last reconciled `dist` against `src`. A no-op `tsc -b` rewrites that file and nothing
+ * else, which is exactly the fact the old comparison discarded. The direction of the error is
+ * unchanged and deliberately so: a tree not built since a source moved is still refused, and one
+ * cheap `npx tsc -b` now clears it. What has gone is the state in which the named remedy did
+ * nothing, which under [§ D227](../../../../DECISIONS.md) is worse than naming no remedy at all.
+ *
  * @throws Error naming the fix when the build is missing or stale.
  */
-export function assertCoreBuilt(): void {
-  const core = fileURLToPath(new URL('../../../core', import.meta.url));
-  const src = newestMtime(
-    `${core}/src`,
-    (name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && !name.endsWith('.test-helper.ts'),
-  );
-  const dist = newestMtime(`${core}/dist`, (name) => name.endsWith('.js'));
-  if (dist === 0) {
+export function assertCoreBuilt(coreDir?: string): void {
+  const core = coreDir ?? fileURLToPath(new URL('../../../core', import.meta.url));
+  const state = coreBuildState(core);
+  if (state === 'missing') {
     throw new Error(
       'packages/core/dist is missing, so a worker thread cannot load @elevator-sim/core. Run `npx tsc -b` before `npx vitest run`.',
     );
   }
-  if (src > dist) {
+  if (state === 'stale') {
     throw new Error(
-      'packages/core/dist is older than packages/core/src. A worker thread loads the built core while vitest loads the source, so the two executors would be running different code. Run `npx tsc -b` first.',
+      'packages/core/src is newer than TypeScript last reconciled packages/core/dist. A worker thread loads the built core while vitest loads the source, so the two executors would be running different code. Run `npx tsc -b` first — a build clears this even when it decides nothing needs re-emitting.',
     );
   }
 }
