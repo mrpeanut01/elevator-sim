@@ -296,6 +296,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A predicate over two weight vectors, derived only because its docstring is prose — it ' +
+        'returns a boolean and puts nothing on a screen. It decides *whether* § 7.6’s handover ' +
+        'control can act; the sentence a player reads when it says no is ' +
+        '`everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE`, which the `EVERYDAY_STAGE` adapter ' +
+        'drives in the state that produces it rather than excusing it here. Its other caller, the ' +
+        'Engineer strip, draws no sentence at all and disables the button. The day this function ' +
+        'returns a reason instead of a boolean it stops being excludable.',
+      ids: ['live/interventions.ts#switchChangesNothing'],
+    },
+    {
+      reason:
         'Diagnostics for a failed **save**, and for the shape check beneath a failed restore — ' +
         'developer strings on the same footing as `SCOPE_OF`’s `why`. Nothing puts one on a screen: ' +
         '`saveSession` refuses in a value the shell drops, `jsonRoundTripIssue` and `snapshotIssue` ' +
@@ -630,7 +641,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/data.ts#loadReferenceRuns',
         'dev/watchPanel.ts#mountWatchPanel',
         'dev/watchPanel.ts#WATCHING_HEADER_CLASS',
+        /*
+         * GitHub issue #165 split `checkedRun` into its two halves so `dev/watchPanel.ts` could run
+         * the gate's simulation on a worker. All three are the same seam and carry the same words —
+         * every refusal either of them returns is `watch/record.ts`'s or `watch/reproduce.ts`'s,
+         * both driven — so they take the entry the whole gate already had rather than an exclusion
+         * of their own, which would read as a second seam that is not there.
+         */
         'watch/library.ts#checkedRun',
+        'watch/library.ts#watchGateAfter',
+        'watch/library.ts#watchGateBefore',
         'watch/library.ts#filedDayRuns',
         'watch/record.ts#PERIOD_BOOKS_THE_EVENT',
         'watch/record.ts#stateFromWatchRecord',
@@ -895,6 +915,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * parsed list, through the `GAUNTLET` adapter's `whatAreTheFortyOf` and the ladder rows.
          */
         'gauntlet/proofCases.ts#parseProofCases',
+        /*
+         * § 1's bench seed rule (§ D446). Not prose, and derived only by the identifier clause the
+         * `watch/` group above names first: the scanner reads the key template `bench#${caseId}` as
+         * words. What it returns is a decimal seed string that no surface prints — `proofSeedOf`,
+         * its gauntlet twin, is not derived at all, and the only difference between them is that
+         * this one's key carries a literal word. `proofCases.test.ts` pins the value and asserts
+         * the two seed sets are disjoint, which is the check that matters about it.
+         */
+        'gauntlet/proofCases.ts#benchSeedOf',
         'scenario/published.ts#classOfCounts',
         'scenario/published.ts#validatePublishedGoalRates',
         'editor/editorValidate.ts#validateBuildingText',
@@ -1133,8 +1162,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`dev/shiftRunner.test.ts` drives the shipped runner through a worker it answers for and ' +
         'asserts both, including the clause that stops the elapsed counter being read as progress; ' +
         'that is weaker than the search and is stated as a limitation rather than presented as ' +
-        'coverage.',
-      ids: ['dev/shiftRunner.ts#createShiftRunner'],
+        'coverage.\n\n' +
+        '`createOffThreadRunner` joins it on exactly that ground and with one narrower sentence ' +
+        '— *the run worker failed to start: …* — which three surfaces quote inside a refusal of ' +
+        'their own (GitHub issue #165). It is the same unreachability: producing that string means ' +
+        'a worker that did not load, and the corpus hands an adapter a finished recording. ' +
+        '`dev/offThreadRuns.test.ts` drives it through a worker it answers for, including the ' +
+        'failed-to-start arm and the ordering claims a moved run makes possible; that is weaker ' +
+        'than the search and is said as a limitation rather than offered as coverage.',
+      ids: ['dev/offThreadRuns.ts#createOffThreadRunner', 'dev/shiftRunner.ts#createShiftRunner'],
     },
     {
       reason:
@@ -1151,8 +1187,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '(one slot, one writer, and it takes both payloads), and `createProfileStore` moved to ' +
         'the group below because the clause *they produce no words at all* stopped being true of ' +
         'it the moment the store grew a progress notice — § D227’s stale exclusion, corrected on ' +
-        'the commit that made it stale rather than a wave later.',
-      ids: ['everyday/profile.ts#loadProfile'],
+        'the commit that made it stale rather than a wave later. **It holds two again**: GitHub ' +
+        'issue #170’s Units half added `loadUnits`, which is the same case exactly — it reads the ' +
+        'same slot through the same `readEnvelope`, is derived for the same key, and returns one ' +
+        'of two preference words that no screen prints. The words a player *reads* for that ' +
+        'preference are `everyday/units.ts#UNITS_ROW_COPY`’s, driven by `EVERYDAY_SETTINGS`, and ' +
+        'the figures it switches are `speedFigure`’s and `lengthFigure`’s, driven by ' +
+        '`EVERYDAY_STANDALONE_SCREENS` in both preferences.',
+      ids: ['everyday/profile.ts#loadProfile', 'everyday/profile.ts#loadUnits'],
     },
     {
       reason:

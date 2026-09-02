@@ -78,7 +78,12 @@ function resourcesFor(buildingId: string): BatchResources {
 
 const runCase = (proofCase: ProofCase): ReturnType<typeof runBatch> =>
   runBatch(
-    proofCaseRequestOf(proofCase, [{ armId: 'candidate', dispatcherProfileId: 'collective' }], 1),
+    proofCaseRequestOf(
+      proofCase,
+      [{ armId: 'candidate', dispatcherProfileId: 'collective' }],
+      1,
+      proofCase.seed,
+    ),
     resourcesFor(proofCase.tower.id),
   );
 

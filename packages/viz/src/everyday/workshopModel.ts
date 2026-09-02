@@ -160,8 +160,17 @@ export const WORKSHOP_COPY = Object.freeze({
    * criterion, and the same class as the promise its footer used to make.
    *
    * The replacement says where a save comes from rather than that one is coming, which is § D227's
-   * rule pointed at a promise instead of a refusal. It goes back to the first sentence when
-   * issues #228 and #167 give Everyday a save of its own.
+   * rule pointed at a promise instead of a refusal.
+   *
+   * **Issues #228 and #167 have landed and this sentence is unchanged, which is the note worth
+   * keeping** ([§ D443](../../../../DECISIONS.md)). That lane made a saved dispatcher reach
+   * Compare, the suite, the Lab, the bench and the gauntlet — so the shelf below is now worth
+   * filling, and the route it names is now worth taking. What it did **not** build is a Save here,
+   * and it declined deliberately rather than for want of time: #180's scope transfer into #228
+   * names four behaviours § 11.1 requires of one — overwrite, save-as-a-copy, auto-versioned names,
+   * and the warning before an overwrite — and *"saves and persists"* admits an implementation that
+   * satisfies #228 and none of them. So the sentence is still true, and it stays until a lane owns
+   * all four.
    */
   yoursEmpty:
     'Nothing saved yet. Saving a dispatcher of your own is the Engineer workshop’s Save as new — ' +

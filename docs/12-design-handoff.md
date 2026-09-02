@@ -624,7 +624,7 @@ renaming it would migrate data to fix a caption. The boundaries, the palette, th
 apportionment are all untouched, and `waitLegendEntries`' range tooltip stays: a range is the thing
 a reader checks a count against, and the fourth entry is still the one that most needs checking.
 
-### 4.12 The dispatcher switch has one fixed target, and the stamp keeps the handoff's sentence
+### 4.12 The dispatcher switch: a picker on § 7's stage, one fixed target on the Engineer strip
 
 **What the handoff says.** GAMEPLAY § 7.6's build order for interventions is *"park the cars in
 the lobby … then dispatcher switching"*, and its scope for the switch is **"any style or saved
@@ -632,18 +632,23 @@ dispatcher, from the stage"**. The stamp's worked example is `09:14 · switched 
 
 **What the product does.** The stamp is the handoff's sentence verbatim in shape — `switched to
 <name>`, `live/interventions.ts#stampVerbOf`, name and never id — so there is no copy deviation to
-record. The scope is deliberately narrower: the stage offers **one** switch target, the plain
-baseline (`dev/ghostRun.ts#plainBaselineOf`, § D134's own preference list), as a single button
-beside *Park the cars in the lobby*.
+record. **The scope is met on § 7's stage**: `everyday/stageScreen.ts` draws a picker over every
+style and every saved dispatcher and a press beside it, which is the handoff's *any style or saved
+dispatcher, from the stage* as written (GitHub issue **#171**).
 
-**The constraint.** *Any style or saved dispatcher* needs a picker, and a picker on the stage is a
-surface with its own § 7.6 obligations — a disabled-state sentence per row, the no-op case per
-target, the saved-shelf's own refusals — that belongs to the Everyday stage lane, not to the
-mechanism lane that landed the arm. The core arm already carries **any** profile (it is the whole
-`DispatcherProfile`, inline, exactly as `SimulationConfig.dispatcherProfile` serialises it), so
-widening the control from one target to a picker is a viz-only change; nothing in the record's
-shape or the engine narrows with the button. The one-target slice is the same shape § 20.12
-prescribes for the log itself — *start with park … then switching* — applied one level down.
+**The narrowing that remains, and where it now applies.** The **Engineer** strip still offers one
+target, the plain baseline (`dev/ghostRun.ts#plainBaselineOf`, § D134's own preference list), as a
+single button beside *Park the cars in the lobby*. That surface is not the one the handoff
+specifies — it is the developer tool the Everyday shell covers — so what stands here is a note about
+where the two controls differ rather than a deviation from the design.
+
+**The paragraph this replaced said the picker *"belongs to the Everyday stage lane"* and it did.**
+It also said widening the control is a viz-only change, which the widening bore out: the core arm
+already carried **any** profile (the whole `DispatcherProfile`, inline, exactly as
+`SimulationConfig.dispatcherProfile` serialises it), and nothing in the record's shape or the engine
+moved when the picker landed. The § 7.6 obligations that paragraph named as the cost — a
+disabled-state sentence, the no-op case per target — are met by
+`everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE` drawn on the arm's own row.
 
 **One rule the control keeps that the handoff implies but does not spell.** The button disables
 when pressing it would change nothing — and *nothing* is decided against the **vector actually

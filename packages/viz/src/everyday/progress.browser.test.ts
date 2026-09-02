@@ -37,7 +37,7 @@
  * That leaves one thing to say honestly about vacuity, in two halves.
  *
  * - **The write half cannot go vacuous.** `keepSolved` runs on every press that finishes a run,
- *   whatever the verdict, so `schemaVersion: 2` is in the slot either way — measured by removing
+ *   whatever the verdict, so `schemaVersion: 3` is in the slot either way — measured by removing
  *   the call, which reddens this case.
  * - **The read half would, if the run solved nothing**, because two empty badge sets compare equal.
  *   Measured on this host 2026-09-01: the shipped catalogue's diagnosed free repair solves exactly
@@ -201,7 +201,7 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
        * holding ids the rail does not badge, or a rail badging cases the store does not hold, is a
        * seam that will restore the wrong afternoon.
        */
-      expect(stored?.schemaVersion).toBe(2);
+      expect(stored?.schemaVersion).toBe(3);
       const kept = stored?.progress?.solvedCaseIds ?? [];
       expect(kept.length).toBe(ran.tags.filter((tag) => tag === 'FIXED').length);
 
@@ -239,6 +239,11 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
        * What a previous sitting left behind, written in the version this build writes and with a
        * case id taken from the product's own catalogue — never a literal here, which is how this
        * case survives a catalogue edit rather than pinning one.
+       */
+      /*
+       * Seeded at **version 2 deliberately, not refreshed to 3.** This is what a previous sitting
+       * left behind, and the point of the case is that this build reads it — so bumping it with
+       * every schema change would quietly turn a migration test into a same-version round trip.
        */
       await page.evaluate(
         ([key, id]) => {
@@ -430,18 +435,22 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
       expect(rail.count).toBe(`0/${String(rail.tags.length)} fixed`);
 
       /*
-       * And the next write carries the migrated profile into the version-2 envelope. This is the
-       * half a migration usually gets wrong: reading the old shape is not the same as keeping what
-       * it held, and the write that stores the first solved building is the one that could lose the
-       * name.
+       * And the next write carries the migrated profile into the **current** envelope — version 3
+       * since GitHub issue #170's Units half added a fourth key. This is the half a migration
+       * usually gets wrong: reading the old shape is not the same as keeping what it held, and the
+       * write that stores the first solved building is the one that could lose the name. A version
+       * 1 payload now crosses **two** migrations to get here, which is what makes this case worth
+       * more than it was: `withProgress` and `withUnits` run in sequence on one read, and a second
+       * migration that clobbered the first would be invisible to a one-step case.
        */
       await page.locator('.everyday-fixit-repair').nth(await freeRepairIndex(page)).click();
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-fixit-outcome', { timeout: 120_000 });
 
       expect(await slotContents(page)).toMatchObject({
-        schemaVersion: 2,
+        schemaVersion: 3,
         profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
+        units: 'metric',
       });
     } finally {
       await page.close();

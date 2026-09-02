@@ -84,8 +84,35 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **572 667** | **606** | **54** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **714 553** | **4 710** | **55** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **575 999** | **606** | **55** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **718 633** | **4 710** | **56** | **0** | **green**, and the register is empty |
+
+  **Wave K's move is the first this row has been able to check against a forecast that was wrong, and
+  the size of the error is the finding** ([§ D454](DECISIONS.md)). Measured once on the integrated
+  tree, both tiers in one sitting, with the base at `e8aac0d` re-measured first in a detached
+  worktree — where it reproduced its published row **exactly in both tiers**, the fifth consecutive
+  wave that has held.
+
+  | | base `e8aac0d` | wave K | move |
+  |---|---|---|---|
+  | always-on strings | 572 667 | **575 999** | **+3 332** |
+  | deep strings | 714 553 | **718 633** | **+4 080** |
+  | always-on surfaces | 54 | **55** | **+1** |
+  | deep surfaces | 55 | **56** | **+1** |
+
+  Four lanes each published a decomposed per-case forecast **before** the measurement. Summed, they
+  predict **+3 381** and **+4 140**. Measured: **+3 332** and **+4 080** — short by **49** and **60**,
+  which is *exactly one string per case in both tiers*. That scaling rules out noise and rules out a
+  single miscounted constant, and each lane's decomposition was checked and sums to its own claim.
+  So the forecasts are **not additive**: one string some lane counted as new is not new in the
+  integrated tree, or one lane's change removes a string another adds. **Which lane is unattributed
+  and no mechanism is offered** — establishing it means measuring each branch, which § D343 forbids
+  publishing, and naming a plausible candidate instead is what § D256 refuses. If the same
+  one-per-case gap reappears in the next wave that forecasts, that localises it far more cheaply.
+
+  **The surface sets were diffed rather than the counts compared.** Exactly one added per tier —
+  `batch/library.ts#batchLibraryOf`, lane A's — nothing removed, and the deep tier's one-surface lead
+  is still exactly `campaign/judge.ts#judgeStage`.
 
   **Wave J moved the strings and one surface, and a lane predicted the move before it was taken**
   ([§ D442](DECISIONS.md)). Measured once on the integrated tree, both tiers in one sitting, after

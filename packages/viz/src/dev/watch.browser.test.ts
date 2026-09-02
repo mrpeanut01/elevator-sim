@@ -39,6 +39,14 @@ import {
   startShippedSite,
   type ShippedSite,
 } from './browserTier.test-helper.js';
+import {
+  BLOCKED_FRAME_GAP_MS,
+  frameDisabled,
+  frameLabels,
+  frameReading,
+  paintedBusyFrame,
+  recordFrames,
+} from './mainThreadFrames.test-helper.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -108,7 +116,74 @@ async function latchedSpeed(page: Page): Promise<string> {
   );
 }
 
+/**
+ * Open the picker the player's way and hand back the first watchable row's button.
+ *
+ * `#open-menu` is the header's own way back — `dev/main.ts` dispatches the same `reopen` intent
+ * `?screen=` uses, so there is one answer to what reopening does. The row sits on the Scenarios
+ * screen rather than the root; § D299 pins the root's six rows. A **reference** row, because the
+ * fixtures are what make this surface reachable on a page that has closed no day.
+ */
+async function pickerRow(page: Page): Promise<ReturnType<Page['locator']>> {
+  await page.locator('#open-menu').first().click();
+  await page.waitForTimeout(400);
+  await pressMenuRow(page, 'main.campaign');
+  await page.waitForTimeout(400);
+  await pressMenuRow(page, 'campaign.watch');
+  await page.locator('.watch-overlay').first().waitFor({ timeout: 10_000 });
+  const watchIt = page.locator('.watch-overlay button', { hasText: 'Watch it' }).first();
+  await watchIt.waitFor({ timeout: 20_000 });
+  return watchIt;
+}
+
 describe.skipIf(!HAS_BROWSER)('watching somebody else’s run — GAMEPLAY § 14.1', () => {
+  it('says it is checking on a painted frame, and keeps painting — GitHub issue #165', async () => {
+    const page = await pageWithARun();
+    const watchIt = await pickerRow(page);
+
+    /*
+     * The acceptance for issue #165 on this surface, and the assertion that carries it is the
+     * **painted** busy frame rather than the gap below.
+     *
+     * The gap does not discriminate here, and saying so is the point. The only rows a cold page
+     * can offer are the two shipped reference runs, which `dev/measure.surfaceRuns.test.ts`
+     * measures at 6 ms and 150 ms — so on the base commit this press already kept the page
+     * painting, at 72–100 ms over 9–11 frames against 38–102 ms over 22–52 frames now. What the
+     * move is for is the population this tier cannot reach: a *filed day* is whatever the player
+     * ran, up to `menu/types.ts#LONGEST_OFFERED_RUN_S` on any tower they have played, and the same
+     * instrument measures a `vertical-city` day at 7 200 s blocking for **4 351 ms**.
+     *
+     * A painted frame carrying `Checking this day…` is evidence that does not depend on how
+     * expensive the row happens to be: a synchronous gate writes its label and calls `recordRun`
+     * in the same task, so no frame can be rendered between the two — see
+     * {@link paintedBusyFrame}. The gap is kept beside it as the regression guard it is.
+     *
+     * § D220 § 4 holds: nothing here reads a figure of a run.
+     */
+    await recordFrames(page, '.watch-row-press');
+    await watchIt.click();
+    await page.locator('.watch-chrome').first().waitFor({ timeout: 60_000 });
+
+    const busyAt = await paintedBusyFrame(page, /Checking this day/);
+    expect(
+      busyAt,
+      `no rendered frame carried the checking label: ${JSON.stringify(await frameLabels(page))}`,
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      await frameDisabled(page, busyAt),
+      'the row was relabelled but stayed pressable',
+    ).toBe(true);
+
+    const reading = await frameReading(page);
+    expect(reading.frames, 'the frame sampler recorded nothing').toBeGreaterThan(5);
+    expect(
+      reading.longestGapMs,
+      `the page stopped painting for ${reading.longestGapMs.toFixed(0)} ms over ${String(reading.frames)} frames — the gate is back on the main thread`,
+    ).toBeLessThan(BLOCKED_FRAME_GAP_MS);
+
+    await page.close();
+  });
+
   it('inverts the shell, and puts it all back exactly', async () => {
     const page = await pageWithARun();
 
@@ -139,21 +214,9 @@ describe.skipIf(!HAS_BROWSER)('watching somebody else’s run — GAMEPLAY § 14
 
     /* --- into the picker, and into somebody else's day ---------------------- */
 
-    // `#open-menu` is the header's own way back — `dev/main.ts` dispatches the same `reopen`
-    // intent `?screen=` uses, so there is one answer to what reopening does.
-    await page.locator('#open-menu').first().click();
-    await page.waitForTimeout(400);
-    // The row sits on the Scenarios screen rather than the root — § D299 pins the root's six rows.
-    await pressMenuRow(page, 'main.campaign');
-    await page.waitForTimeout(400);
-    await pressMenuRow(page, 'campaign.watch');
-    await page.locator('.watch-overlay').first().waitFor({ timeout: 10_000 });
-
-    // A reference row — the fixtures are what make this reachable on a page that has closed no day.
-    const watchIt = page.locator('.watch-overlay button', { hasText: 'Watch it' }).first();
-    await watchIt.waitFor({ timeout: 20_000 });
+    const watchIt = await pickerRow(page);
     await watchIt.click();
-    // The gate re-simulates on the main thread before the chrome appears.
+    // The gate re-simulates on a worker before the chrome appears — GitHub issue #165.
     await page.locator('.watch-chrome').first().waitFor({ timeout: 60_000 });
 
     expect(await chromeIsUp(page), 'the spectator chrome did not come up').toBe(true);

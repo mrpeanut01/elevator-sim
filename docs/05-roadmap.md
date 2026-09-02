@@ -46,6 +46,22 @@ called by nothing outside their own module.
 > is not an answer, for exactly the reason a barrel re-export is not a caller. If you are working
 > from a plan that says something is done, open the thing it names and check that it is the thing
 > the specification is describing.
+>
+> **And one more, 2026-09-01, which is deliberately not in the count either — because the behaviour
+> had a non-test caller all along, and that is what hid it** ([§ D443](../DECISIONS.md), GitHub
+> issues #167 and #228). A dispatcher a player saved was written by the editor, persisted, restored
+> entry by entry, and **run correctly by every single-run surface**, because
+> `dev/state.ts#drivingProfileOf` carries the profile *object* into `SimulationConfig`. It could not
+> be run by any of the five **batch** surfaces, because a batch crosses a `postMessage` carrying an
+> *id* and `dev/batchWorker.ts` loads `data/` on the far side — so the thing the workshop exists for,
+> proving your dispatcher beats the shipped ones, was the one thing it could not do.
+>
+> So the question *"name the non-test caller"* returns a caller, and the answer is still wrong. The
+> sharper form this instance argues for is **"name the caller on each path a player can reach it
+> by"** — because a feature can be alive on one and dead on another, and the live one is what stops
+> anybody looking. `everyday/benchScreen.ts` is the proof it was not theoretical: its field has
+> listed saved dispatchers since the day it was written, and running one failed at the worker with
+> an engine sentence about `data/`.
 
 **The fifth was Phase 7's `tuning/report`, and it is the instructive one** — because it happened
 *after* both guards below were installed, in a module those guards do not audit. Every function in

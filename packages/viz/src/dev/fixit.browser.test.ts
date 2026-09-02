@@ -14,7 +14,10 @@
  * § D220 § 4 holds: **no metric**. The first two cases read pressed-state, a glyph and two computed
  * background colours. The third runs a day and still asserts no metric — what it watches is the run
  * button's own state while the run is happening, which is a fact about the chrome and not about the
- * building.
+ * building. The fourth is GitHub issue #165's acceptance and asserts a fact about the *browser*:
+ * how long the page went without rendering a frame while a run was happening. That is not a metric
+ * of a run either — a run takes what it takes on a worker as much as on the main thread — it is
+ * the difference between a page that answers a click and one that does not.
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
@@ -31,6 +34,14 @@ import {
   startShippedSite,
   type ShippedSite,
 } from './browserTier.test-helper.js';
+import {
+  BLOCKED_FRAME_GAP_MS,
+  frameDisabled,
+  frameLabels,
+  frameReading,
+  paintedBusyFrame,
+  recordFrames,
+} from './mainThreadFrames.test-helper.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -170,8 +181,10 @@ describe.skipIf(!HAS_BROWSER)('Fix-a-building’s chrome — docs/20 defect 16',
 
     /*
      * The press relabels and disables the run button, that state reaches a rendered frame, and the
-     * button comes back — which is what stops a second press landing mid-run on a panel whose runs
-     * are deliberately not on a worker.
+     * button comes back — which is what stops a second press landing mid-run. It stopped being the
+     * *only* thing stopping one when the runs moved to a worker (issue #165), and it became more
+     * load-bearing rather than less: an asynchronous run leaves the page live, so a second press is
+     * now something a player can physically make.
      *
      * This panel had no browser case at all until now, which is why a comment claiming a mechanism
      * the code did not provide survived here for two waves. The mechanism is fixed; the evidence
@@ -181,7 +194,7 @@ describe.skipIf(!HAS_BROWSER)('Fix-a-building’s chrome — docs/20 defect 16',
     await sampleRunFrames(page);
     await page.locator('.fixit-run').click();
 
-    // A real run of a real case; the 120 s ceiling is the tier's for two synchronous `recordRun`s.
+    // A real run of a real case; the 120 s ceiling is the tier's for two `recordRun`s on a worker.
     await page.waitForSelector('.fixit-outcome', { timeout: 120_000 });
 
     const frames = await runFrames(page);
@@ -214,5 +227,46 @@ describe.skipIf(!HAS_BROWSER)('Fix-a-building’s chrome — docs/20 defect 16',
     expect(after.label).toBe('Run it again');
     // § D220 § 4: that a verdict was drawn, never what it measured.
     expect(after.outcomeRows).toBeGreaterThan(0);
+  });
+
+  it('keeps painting through both runs — GitHub issue #165', async () => {
+    const page = await fixitPage();
+
+    /*
+     * The acceptance for issue #165 on this surface, and it is asserted about the page rather than
+     * about the panel: while the pair of simulations happens, the browser goes on rendering frames.
+     * Before the runs moved to `dev/shiftWorker.ts` this could not have been true of the press —
+     * `dev/measure.surfaceRuns.test.ts` measures the pair at 24–846 ms of a seized main thread over
+     * the shipped cases — and it is what makes the busy state above worth drawing at all: a
+     * disabled button on a frozen page is a picture of a disabled button.
+     *
+     * The sampler is installed before the press for the reason its own docstring gives.
+     */
+    await recordFrames(page, '.fixit-run');
+    await page.locator('.fixit-run').click();
+    await page.waitForSelector('.fixit-outcome', { timeout: 120_000 });
+
+    /*
+     * A **painted** frame carrying the busy label, which is the assertion that does not depend on
+     * a threshold: a synchronous handler writes its label and calls `recordRun` in the same task,
+     * so no frame can be rendered between the two. It is also the discriminating case
+     * {@link sampleRunFrames} says it is not — see {@link paintedBusyFrame} for why the two differ.
+     */
+    const busyAt = await paintedBusyFrame(page, /Running the day/);
+    expect(
+      busyAt,
+      `no rendered frame carried the busy label: ${JSON.stringify(await frameLabels(page))}`,
+    ).toBeGreaterThanOrEqual(0);
+    expect(await frameDisabled(page, busyAt), 'the button was relabelled but stayed pressable').toBe(
+      true,
+    );
+
+    const reading = await frameReading(page);
+    // Both halves, because either alone can be produced by a sampler that never started.
+    expect(reading.frames, 'the frame sampler recorded nothing').toBeGreaterThan(10);
+    expect(
+      reading.longestGapMs,
+      `the page stopped painting for ${reading.longestGapMs.toFixed(0)} ms over ${String(reading.frames)} frames — a run is back on the main thread`,
+    ).toBeLessThan(BLOCKED_FRAME_GAP_MS);
   });
 });

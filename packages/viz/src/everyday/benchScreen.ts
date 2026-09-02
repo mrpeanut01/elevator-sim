@@ -32,21 +32,18 @@
 
 import { intervalPlotFor } from '../batch/intervalPlot.js';
 import { actionBarFor } from './actionBar.js';
-import {
-  suiteCellViewOf,
-  suitePlanOf,
-  SuiteError,
-  type SuiteCellPlan,
-  type SuiteCellView,
-  type SuiteRequest,
-} from '../batch/suite.js';
+import { suiteCellViewOf, SuiteError, type SuiteCellView } from '../batch/suite.js';
+import { batchLibraryOf, savedProfilesOf } from '../batch/library.js';
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
+import { loadBrowserResources, loadProofCases, type BrowserResources } from '../dev/data.js';
+import { proofCasesOf, type ProofCaseSet } from '../gauntlet/proofCases.js';
 
 import {
   benchBudgetNoteOf,
   benchEntrantsOf,
   benchFieldOf,
   benchFieldRefusal,
+  benchPlanOf,
   benchResultViewOf,
   benchTestsOf,
   benchTestsRefusal,
@@ -55,6 +52,8 @@ import {
   BENCH_COPY as COPY,
   BENCH_DEFAULT_REPLICATIONS,
   BENCH_REPLICATION_CHOICES,
+  type BenchCasePlan,
+  type BenchSuiteRequest,
 } from './benchModel.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -66,14 +65,34 @@ import {
 } from './tokens.js';
 
 /**
- * The seed every suite runs at.
+ * The forty and the buildings that name them, loaded once per tab.
  *
- * Fixed rather than offered, and the fixing is the honest half of *the same crowds for everyone*:
- * a bench whose seed a player could change is a bench two runs of which are not comparable, and
- * § 12's whole claim is that the crowd cancels out. It is a plain decimal string because
- * `BatchRequest.seed` carries 64 bits through JSON that way.
+ * `everyday/boardScreen.ts`'s arrangement and its reason: the parse needs the ids this build ships,
+ * which are derived from the loaded resources rather than written down beside it. Cached at module
+ * scope so opening the bench a second time draws immediately.
+ *
+ * There is no seed constant here any more. It used to be one master seed for the whole suite; the
+ * seed is now § 1's own bench rule per test, computed by `gauntlet/proofCases.ts#benchSeedOf` where
+ * the fixture list lives — see [§ D445](../../../../DECISIONS.md).
  */
-const BENCH_SEED = '20260812';
+let loaded: Promise<{ resources: BrowserResources; set: ProofCaseSet }> | undefined;
+
+/**
+ * What the tick list is drawn from before the forty arrive: nothing.
+ *
+ * An empty set renders zero tests and `benchTestsRefusal` keeps the primary refused, so the screen
+ * before the load is the screen with nothing ticked — a state it already draws honestly. It is not
+ * a placeholder tower with a placeholder crowd, which would be a second copy of the fixture list.
+ */
+const EMPTY_SET: ProofCaseSet = Object.freeze({ version: 1, towers: [], crowds: [] });
+
+function load(): Promise<{ resources: BrowserResources; set: ProofCaseSet }> {
+  loaded ??= (async () => {
+    const resources = await loadBrowserResources();
+    return { resources, set: await loadProofCases(resources) };
+  })();
+  return loaded;
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   doc: Document,
@@ -94,12 +113,15 @@ const CARD = `border:1px solid ${C.rule};border-radius:${String(R.card)}px;backg
 /** The screen's own state — the three controls, and whatever the last run produced. */
 interface BenchState {
   pickedIds: readonly string[];
+  /** `ProofCase.id`s. Empty until the forty have loaded, which is why nothing runs before then. */
   tickedIds: readonly string[];
   replications: number;
   cells: readonly SuiteCellView[];
   status: string;
   error: string | undefined;
   running: boolean;
+  /** The forty and the buildings that name them; `undefined` until {@link load} settles. */
+  data: { resources: BrowserResources; set: ProofCaseSet } | undefined;
 }
 
 function mountBench(
@@ -123,7 +145,19 @@ function mountBench(
     status: '',
     error: undefined,
     running: false,
+    data: undefined,
   };
+
+  /**
+   * A tower's authored name, from `data/buildings/`.
+   *
+   * `parseProofCases` refused any tower this build does not ship, so the lookup is total; the
+   * fallback is the statement of that rather than a branch a reader reaches. This screen therefore
+   * holds no building name, which `gauntlet/proofCases.test.ts` asserts across every reader.
+   */
+  function towerNameOf(towerId: string): string {
+    return state.data?.resources.buildings.find((b) => b.id === towerId)?.name ?? towerId;
+  }
 
   const root = el(doc, 'div', 'everyday-bench');
   root.style.cssText = 'max-width:1000px';
@@ -135,13 +169,12 @@ function mountBench(
   }
 
   /** The suite this screen's controls describe, or `undefined` when a refusal stands. */
-  function requestOf(): SuiteRequest | undefined {
+  function requestOf(): BenchSuiteRequest | undefined {
     const field = benchFieldOf(state.pickedIds);
     if (field === undefined) return undefined;
-    if (benchTestsRefusal(state.tickedIds) !== undefined) return undefined;
+    if (benchTestsRefusal(state.tickedIds, state.tickedIds.length) !== undefined) return undefined;
     return {
-      cellIds: state.tickedIds,
-      seed: BENCH_SEED,
+      caseIds: state.tickedIds,
       replications: state.replications,
       field,
     };
@@ -149,10 +182,28 @@ function mountBench(
 
   function start(): void {
     const request = requestOf();
-    if (request === undefined) return;
-    let plans: readonly SuiteCellPlan[];
+    const data = state.data;
+    if (request === undefined || data === undefined) return;
+    /*
+     * The field's own dispatchers, admitted before a worker starts — issues #167 and #228,
+     * § D443, and the pre-flight matters more on this screen than on the Engineer bench. A suite
+     * runs one worker per ticked test in sequence, so a shelf the worker refuses is refused once
+     * per test with the reader watching a progress line between each; and this is the screen that
+     * *offered* a saved dispatcher in its field before it could run one, so a refusal arriving
+     * from the engine rather than from the field is the exact register to avoid here.
+     */
+    const library = batchLibraryOf(
+      api.dispatcherProfilesFile(),
+      savedProfilesOf(api.savedDispatchers()),
+    );
+    if (!library.ok) {
+      state.error = library.reason;
+      render();
+      return;
+    }
+    let plans: readonly BenchCasePlan[];
     try {
-      plans = suitePlanOf(request);
+      plans = benchPlanOf(data.set, request, towerNameOf);
     } catch (error: unknown) {
       // `SuiteError`'s own sentence, which names the cell and says what could not be carried. A
       // second wording here would be a second answer to why a suite did not run.
@@ -188,7 +239,7 @@ function mountBench(
         const message = event.data as BatchWorkerMessage;
         if (message.kind === 'progress') {
           state.status =
-            `${plan.cell.label} — ${String(message.progress.completed)} of ` +
+            `${plan.test.label} — ${String(message.progress.completed)} of ` +
             `${String(request.replications * request.field.length)} days, and ` +
             `${String(plans.length - index - 1)} tests after this one.`;
           renderStatus();
@@ -197,13 +248,13 @@ function mountBench(
         if (message.kind === 'failed') {
           state.running = false;
           state.error =
-            `“${plan.cell.label}” could not be run: ${message.message}. Nothing is reported — a ` +
+            `“${plan.test.label}” could not be run: ${message.message}. Nothing is reported — a ` +
             'suite with a missing test would be a different suite.';
           stopWorker();
           render();
           return;
         }
-        done.push(suiteCellViewOf(plan.cell, message.result as BatchResult));
+        done.push(suiteCellViewOf(plan.test, message.result as BatchResult));
         stopWorker();
         runCell(index + 1);
       });
@@ -214,7 +265,19 @@ function mountBench(
         stopWorker();
         render();
       });
-      next.postMessage({ kind: 'run', request: plan.request } satisfies BatchWorkerRequest);
+      /*
+       * The player's own dispatchers ride with the request — issues #167 and #228,
+       * [§ D443](../../../../DECISIONS.md). This screen's field has listed them since it was
+       * written (`api.dispatchers()` **is** `allDispatchers(...)`), and until this line the run
+       * failed at the worker with an engine sentence about `data/`: a control that was offered and
+       * could not be honoured. Read at post time rather than captured at mount, so a dispatcher
+       * saved while the bench is open is one the bench can run.
+       */
+      next.postMessage({
+        kind: 'run',
+        request: plan.request,
+        savedProfiles: savedProfilesOf(api.savedDispatchers()),
+      } satisfies BatchWorkerRequest);
     };
 
     render();
@@ -297,18 +360,36 @@ function mountBench(
     hint.style.cssText = `${NOTE};margin:0 0 10px`;
     wrap.append(head, hint);
 
-    for (const test of benchTestsOf(state.tickedIds)) {
+    const seedNote = el(doc, 'p', 'everyday-bench-tests-seed-note', COPY.testsSeedNote);
+    seedNote.style.cssText = `${NOTE};margin:0 0 10px`;
+    wrap.append(seedNote);
+
+    /*
+     * Tower-major, with a heading where the tower changes. `proofCasesOf` guarantees that order —
+     * *"a reader scanning a rating's per-case rows meets all five crowds of one building together"*
+     * — so the grouping is read off the sequence rather than sorted here, and forty rows arrive as
+     * eight groups of five. The heading is `towerNameOf`'s, never a literal.
+     */
+    let group: string | undefined;
+    const tests = benchTestsOf(state.data?.set ?? EMPTY_SET, state.tickedIds, towerNameOf);
+    for (const test of tests) {
+      if (test.towerName !== group) {
+        group = test.towerName;
+        const heading = el(doc, 'div', 'everyday-bench-test-group', test.towerName);
+        heading.style.cssText = `${EYEBROW};color:${C.warmGrey};margin:11px 0 5px`;
+        wrap.append(heading);
+      }
       const row = el(doc, 'label', 'everyday-bench-test');
       row.style.cssText = `display:flex;gap:10px;align-items:center;padding:8px 11px;border:1px solid ${C.ruleLight};border-radius:${String(R.row)}px;background:${test.ticked ? C.amberWash : C.cardSunk};margin-bottom:6px;cursor:pointer;font-size:13px`;
       const box = el(doc, 'input');
       box.type = 'checkbox';
       box.checked = test.ticked;
       box.disabled = state.running;
-      box.value = test.cellId;
+      box.value = test.caseId;
       box.addEventListener('change', () => {
         state.tickedIds = box.checked
-          ? [...state.tickedIds, test.cellId]
-          : state.tickedIds.filter((id) => id !== test.cellId);
+          ? [...state.tickedIds, test.caseId]
+          : state.tickedIds.filter((id) => id !== test.caseId);
         render();
       });
       row.append(box, doc.createTextNode(test.label));
@@ -319,10 +400,12 @@ function mountBench(
     absent.style.cssText = `${NOTE};margin:9px 0 0`;
     wrap.append(absent);
 
-    const refusal = benchTestsRefusal(state.tickedIds);
+    const refusal = benchTestsRefusal(state.tickedIds, tests.length);
     if (refusal !== undefined) {
       const line = el(doc, 'p', 'everyday-bench-tests-refusal', refusal);
-      line.style.cssText = `${NOTE};color:${C.alarm};margin:9px 0 0`;
+      /* The loading state is not an alarm — it is a fact about the fetch, not about the reader. */
+      const colour = tests.length === 0 ? C.warmGrey : C.alarm;
+      line.style.cssText = `${NOTE};color:${colour};margin:9px 0 0`;
       wrap.append(line);
     }
     return wrap;
@@ -522,7 +605,11 @@ function mountBench(
        */
       refusal: state.running
         ? COPY.runningSuite
-        : (benchFieldRefusal(state.pickedIds) ?? benchTestsRefusal(state.tickedIds)),
+        : (benchFieldRefusal(state.pickedIds) ??
+            benchTestsRefusal(
+              state.tickedIds,
+              state.data === undefined ? 0 : proofCasesOf(state.data.set).length,
+            )),
     };
     root.replaceChildren();
     const eyebrow = el(doc, 'div', undefined, COPY.eyebrow);
@@ -545,6 +632,29 @@ function mountBench(
   }
 
   render();
+
+  /*
+   * The forty, then a redraw. `alive` is the same guard the worker messages use: a screen the
+   * player has left must not draw into a host the shell has replaced.
+   *
+   * A failed load draws the loader's own sentence in the error slot rather than an empty tick list
+   * with no explanation — a bench with no tests and no reason is the dead control with no sentence
+   * that `benchBar` exists to prevent, one level up.
+   */
+  void load().then(
+    (data) => {
+      if (!alive) return;
+      state.data = data;
+      render();
+    },
+    (error: unknown) => {
+      if (!alive) return;
+      state.error = `The forty proof cases could not be loaded, so there is nothing to test against: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+      render();
+    },
+  );
 
   return {
     unmount: () => {

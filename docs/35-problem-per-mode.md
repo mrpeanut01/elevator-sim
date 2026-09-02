@@ -310,7 +310,9 @@ beats **1 and 5** and no beat 3 or 4, on the ground that *the day does not come 
 `PARK_CARS_LOBBY_LABEL` (*"Park the cars in the lobby"*), `switchDispatcherLabelOf(name)`
 (*"Switch to …"*), a `RECOMPUTING_BEAT`, and `interventionStampOf`, which answers **for a playhead** —
 a player who scrubs back past their own press sees the stamp disappear, because at that instant it
-has not happened yet. `everyday/stageScreenModel.ts:572` mounts it. `INTERVENTION_KINDS` in
+has not happened yet. `everyday/stageScreenModel.ts#stageInterventionsOf` mounts it — cited by name
+rather than by the line number this sentence carried, which moved the first time the file did.
+`INTERVENTION_KINDS` in
 `packages/core/src/sim/types.ts` declares three arms: `park-cars-lobby`, `switch-dispatcher`,
 `answer-incident`.
 

@@ -40,6 +40,7 @@ import {
   RULE_ACTIONS,
   RULE_CONDITION_WORDS,
   RULE_CONDITIONS,
+  type DispatcherProfile,
   type DispatcherProfiles,
   type ElevatorSpecs,
   type ResolvedBuilding,
@@ -51,6 +52,11 @@ import { credentialLensFor, describeCredentialLens, LENS_LEGEND, LENS_OPERATIONA
 import { checkAccessCompatibility, credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { describePinnedQueues, pinnedQueuesAt, type PinnedQueue } from '../frame/pinnedQueue.js';
+import {
+  batchLibraryOf,
+  SHIPPED_GROUP_LABEL,
+  YOURS_GROUP_LABEL,
+} from '../batch/library.js';
 import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
 import { SuiteError, suiteCellViewOf, suitePlanOf, suiteSummaryOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult, type BatchWorkerMessage } from '../batch/types.js';
@@ -74,6 +80,7 @@ import {
   benchBudgetNoteOf,
   benchEntrantsOf,
   benchFieldRefusal,
+  benchPlanOf,
   benchResultViewOf,
   benchTestsOf,
   benchTestsRefusal,
@@ -150,6 +157,7 @@ import {
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { everydayReportViewOf } from '../everyday/reportView.js';
 import { SETTINGS_ABSENCES, settingsScreenViewOf } from '../everyday/settingsView.js';
+import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
   stageAlarmOf,
   stageBarModelOf,
@@ -167,6 +175,8 @@ import {
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  STAGE_SWITCH_PICKER_LABEL,
+  type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
 import {
@@ -2468,6 +2478,86 @@ const EDITED_PROFILE: SurfaceAdapter = {
         seeds.push({ field: `resolveEditedProfile.${label}.reason`, text: resolved.reason, role: 'reason' });
       }
     }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The dispatcher library a batch resolves its arms against, **refusing** — issues #167 and #228,
+ * [§ D443](../../../../DECISIONS.md).
+ *
+ * Driven rather than excluded, and the precedent is one file over: `EDITED_PROFILE` above drives
+ * `controls/editedProfile.ts`'s three refusals for exactly this reason — a pure function whose
+ * whole output on the unhappy path is prose a player reads, drawn by mounts that are themselves
+ * excluded on DOM ground. Excluding this one while driving its twin would leave the search blind to
+ * half of one subject.
+ *
+ * **Its loudest renderer is a Casual screen**, which is what makes the sweep worth having here.
+ * `everyday/benchScreen.ts` admits the shelf before it starts a worker, so these sentences land on
+ * the bench, not only in an Engineer error slot — and the first draft of them said things like
+ * *"this build's data/dispatcher-profiles.json"*, which is the register `internal-notation` exists
+ * to catch.
+ *
+ * Three points, two refusals and the pass, because the refusals are the strings:
+ *
+ * - **a shadowed id** — a saved dispatcher wearing a shipped one's slug;
+ * - **two saved dispatchers under one id**;
+ * - **the pass**, which authors no sentence at all and is seeded so that the adapter cannot come to
+ *   report a refusal on every case and be indistinguishable from one that always refuses.
+ *
+ * The **parse** refusal is deliberately not seeded. Its text is `core`'s schema message with a
+ * short attribution in front, so seeding it would put a `zod` diagnostic into the corpus and grade
+ * `parse.ts` through this surface — and the sentence this file is answerable for is the
+ * attribution, which the pass and the two refusals above already establish the register of.
+ *
+ * The group labels are covered here rather than at a fourth adapter: they are this module's own
+ * exports and they name the two halves of the library this module makes.
+ */
+const BATCH_LIBRARY: SurfaceAdapter = {
+  id: 'batch/library.ts#batchLibraryOf',
+  covers: ['batch/library.ts#batchLibraryOf', 'batch/library.ts#SHIPPED_GROUP_LABEL'],
+  render(context) {
+    const base = context.profiles[0];
+    if (base === undefined) return [];
+    const seeds: TextSeed[] = [
+      { field: 'groupLabel.shipped', text: SHIPPED_GROUP_LABEL, role: 'label' },
+      { field: 'groupLabel.yours', text: YOURS_GROUP_LABEL, role: 'label' },
+    ];
+
+    /*
+     * The player's own dispatcher, built the way the workshop builds one — `profileFromSpec` over a
+     * spec read off a shipped profile — so the name in the refusal is a name a reader could have
+     * typed rather than a fixture literal.
+     */
+    const mine = (id: string, name: string): DispatcherProfile =>
+      profileFromSpec(specFromProfile(base, name), { id, base });
+
+    const shadowed = batchLibraryOf(context.dispatcherProfiles, [mine(base.id, 'Kestrel')]);
+    if (!shadowed.ok) {
+      seeds.push({ field: 'batchLibraryOf.shadowed-id.reason', text: shadowed.reason, role: 'reason' });
+    }
+
+    const twice = batchLibraryOf(context.dispatcherProfiles, [
+      mine('yours-1', 'Kestrel'),
+      mine('yours-1', 'Merlin'),
+    ]);
+    if (!twice.ok) {
+      seeds.push({ field: 'batchLibraryOf.duplicate-id.reason', text: twice.reason, role: 'reason' });
+    }
+
+    /*
+     * The pass, seeded as the **name the report will print for the arm**. It is the only string
+     * this surface produces on the happy path, and it is the one a comparison puts in front of a
+     * reader — `BatchArmResult.dispatcherProfileName` is read off the resolved profile.
+     */
+    const accepted = batchLibraryOf(context.dispatcherProfiles, [mine('yours-1', 'Kestrel')]);
+    if (accepted.ok) {
+      const resolved = accepted.library.profiles.find((profile) => profile.id === 'yours-1');
+      if (resolved !== undefined) {
+        seeds.push({ field: 'batchLibraryOf.accepted.name', text: resolved.name, role: 'label' });
+      }
+    }
+
     return singleRun(this.id, seeds);
   },
 };
@@ -7651,9 +7741,26 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/tunerModel.ts#tuneSandboxStrip',
     'everyday/tunerModel.ts#tuneDwellChips',
     'everyday/tunerModel.ts#tuneReadout',
-    'everyday/tunerModel.ts#tuneSpeedReadout',
+    /*
+     * `tuneSpeedReadout` is **no longer claimed, and its coverage did not go anywhere** — GitHub
+     * issue #170's Units half, § D448. It authored `${speed} m/s` and now delegates to
+     * `everyday/units.ts#speedFigure`, so the derivation stops seeing it as a text producer and a
+     * `covers` entry for it would be a claim about nothing. The formatter it delegates to is
+     * claimed below and driven here in **both** preferences, which is more of the surface than the
+     * old entry covered rather than less.
+     */
     'everyday/tunerModel.ts#tuneCapacityReadout',
     'everyday/tunerModel.ts#patternWithTune',
+    /*
+     * **§ 13's units, claimed here because this is the adapter that drives both of their
+     * preferences** — GitHub issue #170, § D448. `speedFigure` is driven on three sites (the
+     * rating plate, the machine-class band and the tuner's readout) and `lengthFigure` on two
+     * (`TRAVEL` and the class's declared rise); `EVERYDAY_DAILY_LOOP` drives `speedFigure` a fourth
+     * time on the *Rated speed* fact and does not re-claim it, because a declaration has one owner.
+     */
+    'everyday/units.ts#speedFigure',
+    'everyday/units.ts#lengthFigure',
+    'everyday/units.ts#speedRangeFigure',
   ],
   render(context) {
     void context;
@@ -7772,8 +7879,43 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
           role: 'prose',
         });
       }
-      for (const row of designerPlateRows(drawn, classOfSpec(classes, drawn))) {
-        seeds.push({ field: `designer.${arm}.plate.${row.key}`, text: row.value, role: 'observation' });
+      /*
+       * **The machine-class band's range and rise, in both preferences.** The band's own sentence
+       * (*"… · up to 20 floors and 61 m of rise"*) is authored inline in `designerScreen.ts` and is
+       * excluded on the DOM mounts' shared ground, so what enters the corpus is the two figures
+       * rather than the sentence around them — which is what makes claiming `speedRangeFigure`
+       * above a coverage claim rather than a hope.
+       */
+      const band = classOfSpec(classes, drawn);
+      if (band !== undefined) {
+        for (const units of EVERYDAY_UNITS) {
+          seeds.push({
+            field: `designer.${arm}.class.${units}.speeds`,
+            text: speedRangeFigure(band.speedMinMps, band.speedMaxMps, units),
+            role: 'observation',
+          });
+          seeds.push({
+            field: `designer.${arm}.class.${units}.rise`,
+            text: lengthFigure(band.maxRiseM, units, 0),
+            role: 'observation',
+          });
+        }
+      }
+      /*
+       * **Both units preferences, on the one surface that has a plate** — GitHub issue #170's Units
+       * half, § D448. § 15.1's `Units` row switches machine specifications between metres and feet,
+       * so `RATED SPEED` and `TRAVEL` have two faces a player can produce and a corpus that saw one
+       * of them would be blind to half a screen. The other four rows are identical under both by
+       * construction, which is asserted in `designerModel.test.ts` rather than assumed here.
+       */
+      for (const units of EVERYDAY_UNITS) {
+        for (const row of designerPlateRows(drawn, classOfSpec(classes, drawn), units)) {
+          seeds.push({
+            field: `designer.${arm}.plate.${units}.${row.key}`,
+            text: row.value,
+            role: 'observation',
+          });
+        }
       }
       seeds.push({
         field: `designer.${arm}.capacity`,
@@ -7809,7 +7951,14 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         text: patternWithTune(DEFAULT_PATTERN, tune).name,
         role: 'label',
       });
-      seeds.push({ field: `tuner.${arm}.speed`, text: tuneSpeedReadout(tune), role: 'observation' });
+      /* Both faces of the machine card's speed readout — § 15.1's `Units` row, § D448. */
+      for (const units of EVERYDAY_UNITS) {
+        seeds.push({
+          field: `tuner.${arm}.speed.${units}`,
+          text: tuneSpeedReadout(tune, units),
+          role: 'observation',
+        });
+      }
       seeds.push({ field: `tuner.${arm}.cap`, text: tuneCapacityReadout(tune), role: 'observation' });
       for (const card of TUNE_CARDS) {
         for (const row of card.rows) {
@@ -7876,6 +8025,15 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * on the build-information panel this screen opens, so they are {@link EVERYDAY_BUILD_NOTES}'s
      * to render and no longer reachable through `settingsScreenViewOf`.
      */
+    /*
+     * § 15.1's `Units` row, whose label, § 16 register clause and two pill faces are authored
+     * beside the conversion rather than on the screen (GitHub issue #170, § D448). They live there
+     * because the note is a **claim about what the control reaches**, and a note kept away from the
+     * conversion is § D227's stale claim waiting to happen; they are driven here because this is
+     * the surface a player reads them on, in both faces — one of the six cases below carries
+     * `units: 'imperial'` for exactly that.
+     */
+    'everyday/units.ts#UNITS_ROW_COPY',
   ],
   render(context) {
     void context;
@@ -7888,8 +8046,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       ['reduced', { profile: stored, reduceMotion: true }],
       /* The still-booting window: the Motion row's absence rather than the row. */
       ['booting', { profile: stored, reduceMotion: undefined }],
-      /* A refused draft — `menu/account.ts`'s sentence, drawn beside the field. */
-      ['refused-name', { profile: stored, draftName: 'x', reduceMotion: false }],
+      /*
+       * A refused draft — `menu/account.ts`'s sentence, drawn beside the field — **and the `Units`
+       * row's other face**, carried here rather than in a seventh case. The row is the only thing
+       * on this screen the preference changes, so a whole extra state would seed every other
+       * sentence a second time under a different name to reach one pill.
+       */
+      ['refused-name', { profile: stored, draftName: 'x', reduceMotion: false, units: 'imperial' }],
       /* A store that keeps nothing: the profile is real for this tab and says so. */
       ['not-durable', { profile: stored, durable: false, reduceMotion: false }],
     ] as const;
@@ -8518,6 +8681,10 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * and a refusal that belongs to a control is read where the control is.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
+    /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_NO_GHOST',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
@@ -8572,18 +8739,62 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     for (const speed of STAGE_SPEEDS) {
       seeds.push({ field: `stage.speed.${String(speed.simPerRealS)}`, text: speed.label, role: 'label' });
     }
-    for (const arm of STAGE_INTERVENTIONS) {
-      seeds.push({
-        field: `stage.intervene.${arm.change.kind}.label`,
-        text: arm.label,
-        role: 'label',
+    /*
+     * **Every arm the control can offer, including the one that is built per call** — GitHub issue
+     * **#171**. `STAGE_INTERVENTIONS` holds only the arms whose whole content is their kind, so
+     * iterating it would sweep the park button and miss § 7.6's handover entirely: that row carries
+     * a whole profile and is assembled by `stageInterventionsOf` from the dispatcher the picker
+     * names. Driving the model over both states is what puts its label, its title *and* its own
+     * refusal into the corpus.
+     *
+     * The two profiles are the shipped file's own, so the label seeded is a dispatcher name a player
+     * can actually be handed the day by. `offered` hands to a different vector and `already` hands to
+     * the one driving, which is the only way the refusal is ever produced.
+     */
+    const [driving, elsewhere] = context.dispatcherProfiles.profiles;
+    const switchStates: readonly (readonly [string, StageSwitchTarget | undefined])[] = [
+      ['plain', undefined],
+      ...(driving === undefined || elsewhere === undefined
+        ? []
+        : ([
+            ['offered', { target: elsewhere, driving: () => driving }],
+            ['already', { target: driving, driving: () => driving }],
+          ] as const)),
+    ];
+    for (const [state, switchTo] of switchStates) {
+      const arms = stageInterventionsOf({
+        interventions: [],
+        simTimeS: recording.startedAt,
+        hasRun: true,
+        dayClosed: false,
+        recomputing: false,
+        ...(switchTo === undefined ? {} : { switchTo }),
       });
-      seeds.push({
-        field: `stage.intervene.${arm.change.kind}.explains`,
-        text: arm.explains,
-        role: 'prose',
-      });
+      for (const arm of arms.rows) {
+        seeds.push({
+          field: `stage.intervene(${state}).${arm.change.kind}.label`,
+          text: arm.label,
+          role: 'label',
+        });
+        seeds.push({
+          field: `stage.intervene(${state}).${arm.change.kind}.explains`,
+          text: arm.explains,
+          role: 'prose',
+        });
+        if (arm.refusal !== undefined) {
+          seeds.push({
+            field: `stage.intervene(${state}).${arm.change.kind}.refusal`,
+            text: arm.refusal,
+            role: 'reason',
+          });
+        }
+      }
     }
+    seeds.push({
+      field: 'stage.intervene.switch.pickerLabel',
+      text: STAGE_SWITCH_PICKER_LABEL,
+      role: 'label',
+    });
     seeds.push({ field: 'stage.race.noGhost', text: STAGE_NO_GHOST, role: 'reason' });
 
     /* § 14's overflow chip — the one string `stageCrowdCapOf` produces. */
@@ -8933,6 +9144,47 @@ const LIVE_METRICS: SurfaceAdapter = {
  * -------------------------------------------------------------------------- */
 
 /**
+ * A stand-in for the forty, for the two adapters that render a reader of them.
+ *
+ * Placeholder labels, in the `⟨…⟩` register this corpus already uses for a substituted cell: a
+ * shipped crowd label here would be the second copy of the fixture list that
+ * `gauntlet/proofCases.ts` exists to prevent, **in the file that checks for one**. The tower ids
+ * and names are the corpus case's own buildings, so the names on screen are real and the fixture
+ * list is not.
+ *
+ * One function rather than one per adapter, since § D445 made the bench a reader too and two
+ * inline copies of a placeholder set is the same defect at one remove.
+ */
+function placeholderProofSet(
+  towers: readonly { readonly id: string; readonly name: string }[],
+): ProofCaseSet {
+  return {
+    version: 1,
+    towers: towers.map((building, index) => ({
+      id: building.id,
+      arrivalRatePctPop5min: 1 + index,
+      why: '⟨why this building is in the set⟩',
+    })),
+    crowds: [
+      {
+        id: 'shape-a',
+        label: '⟨first crowd shape⟩',
+        tests: '⟨what the first shape tests⟩',
+        durationS: 900,
+        demand: { directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 } },
+      },
+      {
+        id: 'shape-b',
+        label: '⟨second crowd shape⟩',
+        tests: '⟨what the second shape tests⟩',
+        durationS: 900,
+        demand: { directionalSplit: { incoming: 0, outgoing: 1, interfloor: 0 } },
+      },
+    ],
+  };
+}
+
+/**
  * **The forty proof cases, the rating they produce, and the ladder that shows it.**
  *
  * ## Why this belongs in a corpus about honesty more than most surfaces do
@@ -8999,35 +9251,7 @@ const GAUNTLET: SurfaceAdapter = {
   render(context) {
     const seeds: TextSeed[] = [];
     const towers = context.buildings.slice(0, 2);
-    /*
-     * Placeholder labels, in the `⟨…⟩` register this corpus already uses for a substituted cell.
-     * A shipped crowd label here would be the second copy of the fixture list that
-     * `gauntlet/proofCases.ts` exists to prevent, in the file that checks for it.
-     */
-    const set: ProofCaseSet = {
-      version: 1,
-      towers: towers.map((building, index) => ({
-        id: building.id,
-        arrivalRatePctPop5min: 1 + index,
-        why: '⟨why this building is in the set⟩',
-      })),
-      crowds: [
-        {
-          id: 'shape-a',
-          label: '⟨first crowd shape⟩',
-          tests: '⟨what the first shape tests⟩',
-          durationS: 900,
-          demand: { directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 } },
-        },
-        {
-          id: 'shape-b',
-          label: '⟨second crowd shape⟩',
-          tests: '⟨what the second shape tests⟩',
-          durationS: 900,
-          demand: { directionalSplit: { incoming: 0, outgoing: 1, interfloor: 0 } },
-        },
-      ],
-    };
+    const set = placeholderProofSet(towers);
     const nameOf = (towerId: string): string =>
       towers.find((building) => building.id === towerId)?.name ?? towerId;
 
@@ -9298,6 +9522,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        /*
+         * The corpus's own arm. Both preferences reach the *Rated speed* fact, and the day record
+         * is seeded once per day rather than once per screen (§ 16 rule 14) — so the second
+         * preference is a second `todayOf` over the same day below rather than a second pass here.
+         */
+        units: 'metric',
       });
       const at = `day${String(entry.day)}`;
       seeds.push({ field: `${at}.today.label`, text: today.dayLabel, role: 'label' });
@@ -9305,6 +9535,33 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       seeds.push({ field: `${at}.today.seed`, text: today.seedLine, role: 'label' });
       for (const fact of today.facts) {
         seeds.push({ field: `${at}.today.fact.${fact.label}`, text: fact.value, role: 'observation' });
+      }
+      /*
+       * **The other units preference, on the one fact that has two faces** — § 15.1's `Units` row,
+       * GitHub issue #170, § D448. Seeded as the facts a preference *changes* rather than as a
+       * second whole record: `todayOf` is pure and total in `units`, so every other field of the
+       * imperial record is identical to the metric one by construction, and seeding them again
+       * would be the same string twice under two names. Diffed rather than assumed — only the
+       * facts that actually differ are pushed, so a preference that stopped reaching this screen
+       * would quietly seed nothing and `derive.test.ts`'s producer guard is what would notice.
+       */
+      const imperialFacts = todayOf({
+        week: entry.week,
+        calendar: null,
+        building: context.building,
+        buildingId: context.building.id,
+        dispatcherName: entry.report.metaLines[0],
+        goals: entry.readings,
+        seed: 424_242n,
+        units: 'imperial',
+      }).facts;
+      for (const [index, fact] of imperialFacts.entries()) {
+        if (fact.value === today.facts[index]?.value) continue;
+        seeds.push({
+          field: `${at}.today.fact.imperial.${fact.label}`,
+          text: fact.value,
+          role: 'observation',
+        });
       }
       if (today.load !== undefined) {
         seeds.push({ field: `${at}.today.load.word`, text: today.load.word, role: 'label' });
@@ -9872,6 +10129,15 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
     // § D389's heading, driven through `benchResultViewOf`, which is the only caller: the seed
     // below carries the composed string a player reads rather than the bare stem.
     'everyday/benchModel.ts#benchTooCloseHeadingOf',
+    /*
+     * § D445's planner. Covered rather than excluded, and the distinction was **measured rather
+     * than inherited**: this entry first said the derivation could not find it, copied by analogy
+     * from `SUITE_BENCH`'s note about `suitePlanOf`, and `derive.test.ts` reported it as an
+     * unclassified producer of its own prose on the next run. The two are not alike — `benchPlanOf`
+     * composes a case's label through `caseNameOf` as well as throwing — so the analogy was the
+     * defect. Its refusals are driven below, by manufacturing the state that produces each.
+     */
+    'everyday/benchModel.ts#benchPlanOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -9904,13 +10170,69 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
       }
     }
 
-    /* ---- the tests, and the empty-tick refusal ---- */
-    for (const test of benchTestsOf(['midtown-up-peak'])) {
-      seeds.push({ field: `test.${test.cellId}`, text: test.label, role: 'label' });
+    /*
+     * ---- the tests, and the empty-tick refusal ----
+     *
+     * The tests are the forty (§ D445), so the fixture is the same placeholder set the ladder's
+     * adapter drives, ticked on its first case. The seeded string is `caseNameOf`'s — the ladder's
+     * own name for a case — which is the point of the two readers sharing one list.
+     */
+    const benchSet = placeholderProofSet(context.buildings.slice(0, 2));
+    const firstCase = proofCasesOf(benchSet)[0];
+    for (const test of benchTestsOf(
+      benchSet,
+      firstCase === undefined ? [] : [firstCase.id],
+      (towerId) => context.buildings.find((b) => b.id === towerId)?.name ?? towerId,
+    )) {
+      seeds.push({ field: `test.${test.caseId}`, text: test.label, role: 'label' });
     }
-    const noTests = benchTestsRefusal([]);
-    if (noTests !== undefined) {
-      seeds.push({ field: 'tests.refusal', text: noTests, role: 'reason', provenance: 'authored' });
+    /*
+     * Both branches of `benchTestsRefusal`, because it has two now (§ D445): *pick at least one*
+     * when there are tests, and *the forty are still arriving* when the fetch has not landed. A
+     * producer with an undriven branch is a string path nothing has read.
+     */
+    for (const [name, offered] of [
+      ['tests.refusal', 40],
+      ['tests.loading', 0],
+    ] as const) {
+      const refusal = benchTestsRefusal([], offered);
+      if (refusal !== undefined) {
+        seeds.push({ field: name, text: refusal, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /*
+     * `benchPlanOf`'s refusals, driven by manufacturing the state that produces each — `SUITE_BENCH`
+     * does the same for `suitePlanOf`. Unlike `suitePlanOf` it **is** in `covers`, because the
+     * derivation finds it and the coverage claim is therefore real; the note beside that entry
+     * records how the opposite was briefly written here by analogy. The screen draws these in its
+     * error slot, so they are a player's strings.
+     *
+     * The field-of-under-two guard is not driven here: the type forbids it, only a deserialised
+     * state reaches it, and manufacturing one would need a cast. `SUITE_BENCH` leaves its twin
+     * undriven on the same ground rather than dressing a cast as coverage.
+     */
+    const benchField = [
+      { armId: 'arm-0', dispatcherProfileId: 'collective' },
+      { armId: 'arm-1', dispatcherProfileId: 'eta' },
+    ] as const;
+    for (const [name, caseIds] of [
+      ['planRefusal.noTests', []],
+      ['planRefusal.duplicateTick', firstCase === undefined ? [] : [firstCase.id, firstCase.id]],
+      ['planRefusal.unknownCase', ['⟨a case this build does not ship⟩']],
+    ] as const) {
+      if (caseIds.length === 0 && name !== 'planRefusal.noTests') continue;
+      try {
+        benchPlanOf(
+          benchSet,
+          { caseIds, replications: 50, field: benchField },
+          (towerId) => context.buildings.find((b) => b.id === towerId)?.name ?? towerId,
+        );
+      } catch (error: unknown) {
+        if (error instanceof SuiteError) {
+          seeds.push({ field: name, text: error.message, role: 'reason' });
+        }
+      }
     }
 
     /* ---- the budget: every choice's work line, and both notes ---- */
@@ -9933,7 +10255,7 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
      * because this is the surface a player reads them on; the per-row sentences below them are
      * `batchReport`'s and are deliberately not re-seeded (see the adapter docstring).
      */
-    const cell = { id: 'midtown-up-peak', label: 'Midtown Office, up-peak 1 %' };
+    const cell = { id: firstCase?.id ?? 'case-a', label: firstCase === undefined ? '⟨test⟩' : '⟨tower⟩ · ⟨crowd shape⟩' };
     const two = suiteCellViewOf(cell, context.batch);
     const third = context.batch.arms[1];
     const many =
@@ -10163,6 +10485,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   EDITOR,
   CONTROLS,
   EDITED_PROFILE,
+  BATCH_LIBRARY,
   REPLAY,
   BATCH_REPORT,
   GOAL_REPORT,

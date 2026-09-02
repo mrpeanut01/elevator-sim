@@ -20,28 +20,47 @@
  * and forwards presses. It is DOM-bound and therefore outside the honesty search's driven corpus;
  * the strings it prints are produced by modules that are in it.
  *
- * ## The gate runs on the press, not on the open
+ * ## The gate runs on the press, not on the open — and the run is on a worker
  *
- * Checking every row would run one simulation per filed day to draw a list — seven on a full week,
- * ~0.2–1.5 s each. So a row is offered provisionally and checked when it is pressed, and a row that
- * fails the check is redrawn **with its reason and without its affordance** rather than watched.
- * That is § 1.5's outcome reached one interaction later, and it is stated rather than glossed: the
- * cost of the earlier check is a list that takes seconds to appear, and the cost of this one is a
- * press that sometimes answers with a refusal. `watch/library.ts#checkedRun` is where the choice is
- * paid either way.
+ * Checking every row would run one simulation per filed day to draw a list: seven on a full week.
+ * So a row is offered provisionally and checked when it is pressed, and a row that fails the check
+ * is redrawn **with its reason and without its affordance** rather than watched. That is § 1.5's
+ * outcome reached one interaction later, and the trade is stated rather than glossed: the cost of
+ * the earlier check is a list that takes seconds to appear, and the cost of this one is a press
+ * that sometimes answers with a refusal.
  *
- * The two rows that are blocked *without* a simulation — a day with no record, a record this build
- * cannot read — are marked on open, because neither needs one.
+ * The two rows blocked *without* a simulation — a day with no record, a record this build cannot
+ * read — are still marked on open, because neither needs one. That split is now
+ * `watch/library.ts#watchGateBefore`'s, with `#watchGateAfter` reading the recording;
+ * `#checkedRun` is the two composed and remains the whole gate for the caller that runs
+ * synchronously.
+ *
+ * **This panel's run goes to `dev/shiftWorker.ts` through `dev/offThreadRuns.ts`** — GitHub issue
+ * #165. The sentence that used to stand here put the run's cost at *"~0.2–1.5 s"* and it is
+ * deleted rather than reworded, because a stated cost that has been paid is § D227's stale
+ * refusal — and because it was measured on the cheap half of its own population. The two shipped
+ * reference rows cost 6 ms and 150 ms, *under* the range claimed; but a picker row is a **filed
+ * day**, which is whatever the player ran up to `menu/types.ts#LONGEST_OFFERED_RUN_S` on any tower
+ * they have played, and `dev/measure.surfaceRuns.test.ts` measures a filed `vertical-city` day at
+ * 7 200 s blocking this thread for **4 351 ms** — three times the stated ceiling, with 386 ms of
+ * that being the recording's own clone. And that is a **floor** rather than a worst case: the same
+ * tower at the same horizon under `constant-iso` is `dev/shiftRunner.ts`'s own 21–31 s, and a day
+ * run that way is a day that can be filed.
+ *
+ * The busy state stays, because it is still honest: the pressed row's button reads
+ * `Checking this day…` and goes inert while its run is out. It is new — the blocking version had
+ * none and could have had none, since nothing could repaint while it ran.
  */
 
 import type { VizRecording } from '../contract/types.js';
-import type { SimulationConfig } from '@elevator-sim/core/browser';
-import { checkedRun, filedDayRuns } from '../watch/library.js';
+import { filedDayRuns, watchGateAfter, watchGateBefore } from '../watch/library.js';
 import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { BrowserResources } from './data.js';
 import { el, fill } from './dom.js';
+import { createOffThreadRunner } from './offThreadRuns.js';
+import type { ShiftWorkerLike } from './shiftRunner.js';
 import type { ViewerState } from './state.js';
 
 export interface WatchPanelHost {
@@ -51,8 +70,16 @@ export interface WatchPanelHost {
   readonly stateNow: () => ViewerState;
   /** `data/reference-runs.json`, fetched and parsed once on first open — `dev/data.ts`. */
   readonly loadReferenceRuns: () => Promise<readonly WatchableRun[]>;
-  /** The simulator. Injected so the gate is drivable without one — `watch/library.ts`. */
-  readonly simulate: (config: SimulationConfig) => VizRecording;
+  /**
+   * Start the worker the gate's run crosses to — `dev/offThreadRuns.ts`, GitHub issue #165.
+   *
+   * It replaced a `simulate: (config) => VizRecording` on this host, and the injection is kept for
+   * that field's reason: `new Worker(new URL(…))` is a bundler seam and a DOM global, so a panel
+   * that built one could not be driven without a document *or* a bundler. `watch/library.ts` stays
+   * drivable under plain Node either way — its gate takes no simulator at all now, only the two
+   * halves and the recording between them.
+   */
+  readonly spawnRunWorker: () => ShiftWorkerLike;
   readonly buildingNameOf: (buildingId: string) => string;
   readonly dispatcherNameOf: (dispatcherId: string) => string;
   /** The shell enters the spectator state. It owns the snapshot that `⤺ Stop watching` restores. */
@@ -161,8 +188,35 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
   /** A row the gate has since refused, by id — so the redraw shows the reason rather than the button. */
   const refused = new Map<string, WatchableRun>();
 
+  const runner = createOffThreadRunner({ spawn: host.spawnRunWorker });
+
+  /**
+   * The row whose gate run is out, by id — or `undefined`.
+   *
+   * The busy state a moved run makes possible **and** the guard a moved run makes necessary. A
+   * synchronous gate could not be re-entered: the press blocked the thread and no second click
+   * could be delivered. An asynchronous one can, so a second press on the same row is dropped, and
+   * a press on a *different* row supersedes — `dev/offThreadRuns.ts` answers one ask and the loser
+   * is silent, so the row this field names is the only one that can be watched.
+   */
+  let checking: string | undefined;
+
   const close = (): void => {
     root.style.display = 'none';
+    /*
+     * **A check the player walked away from is abandoned**, and this is a bug an asynchronous gate
+     * creates rather than a tidiness. `settle()` on the passing path calls `host.onWatch`, which
+     * puts the shell into the spectator state — so a run still in flight when the picker is
+     * dismissed would, seconds later, drop the player into somebody else's day they had just
+     * declined to watch. `dev/offThreadRuns.ts#cancel` is silent by construction, which is exactly
+     * what is wanted here.
+     *
+     * It is a no-op on the passing path even though `settle` calls this: the runner clears its
+     * current ask **before** handing the recordings on, so by the time `close` runs there is
+     * nothing in flight to cancel. The busy row is redrawn by `open`, which draws on every show.
+     */
+    runner.cancel();
+    checking = undefined;
   };
 
   doc.addEventListener('keydown', (event) => {
@@ -299,24 +353,37 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
          */
         ...(blocked === null
           ? [
-              button(
-                doc,
-                'Watch it',
-                { padding: '8px 16px', cursor: 'pointer', 'align-self': 'center' },
-                () => {
-                  press(run);
-                },
-              ),
+              (() => {
+                /*
+                 * Busy while this row's gate run is out on the worker. It is drawn from
+                 * {@link checking} rather than written onto the node, because `draw()` is a `fill`
+                 * — every row is rebuilt — so a flag set on the button would be lost by the next
+                 * redraw. That was invisible while the run blocked the thread, because nothing
+                 * could redraw; it is the first thing an asynchronous run breaks.
+                 */
+                const busy = checking === run.id;
+                const control = button(
+                  doc,
+                  busy ? 'Checking this day…' : 'Watch it',
+                  { padding: '8px 16px', cursor: 'pointer', 'align-self': 'center' },
+                  () => {
+                    press(run);
+                  },
+                );
+                control.className = 'watch-row-press';
+                control.disabled = busy;
+                return control;
+              })(),
             ]
           : []),
       ],
     });
   }
 
-  function press(run: WatchableRun): void {
-    const checked = checkedRun(run, host.resources, host.stateNow(), host.simulate);
+  /** Apply the gate's verdict: watch the row, or redraw it with its reason and without its button. */
+  function settle(checked: ReturnType<typeof watchGateAfter>): void {
     if (checked.run.blocked !== null || checked.recording === undefined) {
-      refused.set(run.id, checked.run);
+      refused.set(checked.run.id, checked.run);
       draw();
       return;
     }
@@ -329,6 +396,51 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
       ),
       checked.recording,
     );
+  }
+
+  function press(run: WatchableRun): void {
+    if (checking === run.id) return;
+    const gate = watchGateBefore(run, host.resources, host.stateNow());
+    if (gate.kind === 'settled') {
+      // No run needed, so none is taken and no busy state is drawn — the two grounds
+      // `watch/library.ts` refuses without a simulation reach their answer here, unchanged.
+      settle(gate.checked);
+      return;
+    }
+    checking = run.id;
+    draw();
+    runner.start({
+      /*
+       * `recordDecisions: true` — `recordRun`'s own default, which is what this gate used before
+       * the run moved. It matters rather than being tidy: a recording's decision log is *in* the
+       * recording, so sending `false` would hand the stage a different replay than the one the
+       * synchronous gate produced, and the reproduction check downstream compares recordings.
+       * `dev/offThreadRuns.ts` requires the field for exactly this reason.
+       */
+      runs: [{ config: gate.config, recordDecisions: true, outOfServiceCarIds: [] }],
+      onDone: ([recording]) => {
+        checking = undefined;
+        if (recording === undefined) return;
+        settle(watchGateAfter(run, recording));
+      },
+      onFailed: (message) => {
+        checking = undefined;
+        /*
+         * A run that threw is a row that cannot be replayed, which is § 1.5's own outcome — so it
+         * takes § 1.5's own shape: the reason on the row, and the affordance gone. It is filed
+         * under `does-not-reproduce` rather than a new ground because that is what a reader needs
+         * to know; the message names what actually happened.
+         */
+        refused.set(run.id, {
+          ...run,
+          blocked: {
+            ground: 'does-not-reproduce',
+            reason: `this day could not be re-simulated on this device — ${message}`,
+          },
+        });
+        draw();
+      },
+    });
   }
 
   /* --- the spectator chrome ------------------------------------------------ */

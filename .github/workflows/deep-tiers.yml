@@ -628,6 +628,19 @@ jobs:
           FITOUT_OUT: ${{ runner.temp }}/fit-out-tiers.txt
         run: npx vitest run --passWithNoTests=false --project viz src/honesty/measure.fitOut.test.ts
 
+      # § D449's deriver, in this job for the same reason the fit-out survey is: a prose **cost**
+      # goes stale exactly the way a prose count does.
+      #
+      # GitHub issue #165 tabulated three surfaces against costs each lane had written into its own
+      # docstring, and none had been re-derived since. Two were overstatements and Watch's was an
+      # understatement by more than threefold, because it had been measured on the cheap half of its
+      # own population. Seconds beside the corpus tiers, on `main`, and it publishes nothing: the
+      # artifact is for a person to read.
+      - name: Surface run costs
+        env:
+          SURFACE_RUNS_OUT: ${{ runner.temp }}/surface-runs.txt
+        run: npx vitest run --passWithNoTests=false --project viz src/dev/measure.surfaceRuns.test.ts
+
       # The commit is recorded beside the figures because a corpus count without the tree it was
       # taken on is the thing R38 exists to stop. The artifact is the whole answer, not a pointer
       # to a log line a reporter may have swallowed.
@@ -646,6 +659,7 @@ jobs:
             ${{ runner.temp }}/corpus-always-on.txt
             ${{ runner.temp }}/corpus-deep.txt
             ${{ runner.temp }}/fit-out-tiers.txt
+            ${{ runner.temp }}/surface-runs.txt
             ${{ runner.temp }}/corpus-provenance.txt
           retention-days: 90
 

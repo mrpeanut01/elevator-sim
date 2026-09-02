@@ -156,7 +156,15 @@ describe('§ 18’s seven, read off what is standing', () => {
   });
 
   it('prints its readouts in the units the run takes them in', () => {
-    expect(tuneSpeedReadout(STANDING)).toBe(`${BLANK_SPEC.ratedSpeedMps.toFixed(2)} m/s`);
+    expect(tuneSpeedReadout(STANDING, 'metric')).toBe(`${BLANK_SPEC.ratedSpeedMps.toFixed(2)} m/s`);
+    /*
+     * And in the other preference, converted rather than relabelled — the readout's own docstring
+     * says it is *in the units the plate uses*, and the plate reads feet when the player asked for
+     * feet (GitHub issue #170, § D448). A relabel would leave the digits alone.
+     */
+    expect(tuneSpeedReadout(STANDING, 'imperial')).toBe(
+      `${(BLANK_SPEC.ratedSpeedMps / 0.3048).toFixed(2)} ft/s`,
+    );
     expect(tuneCapacityReadout(STANDING)).toContain(String(personsOf(BLANK_SPEC.ratedLoadLb)));
     const floorsRow = TUNE_CARDS[0]?.rows[0];
     expect(floorsRow).toBeDefined();

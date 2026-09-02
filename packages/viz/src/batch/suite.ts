@@ -23,7 +23,20 @@
  *   five buildings, `data/buildings/` separately holds eight buildings, and a hand-written list
  *   would disagree with the one the project measures.
  *
- * ## The mapping, and why the request had to grow
+ * ## Who plans over this model, and who no longer does
+ *
+ * {@link suitePlanOf} is the **Engineer** suite panel's planner and the matrix is its fixture list.
+ * The **Everyday** bench planned over it until [§ D445](../../../../DECISIONS.md) and now plans over
+ * `ENGINE_CONTRACT.md` § 12.3's forty proof cases instead (`everyday/benchModel.ts#benchPlanOf`),
+ * because § 12.3 makes the bench one of the forty's three readers and the ladder's own caveat sends
+ * a player here to resolve a rating gap the forty produced. Two products, two questions, one
+ * fixture list each.
+ *
+ * Everything below {@link suitePlanOf} is **shared by both**, and is why the move cost so little:
+ * {@link suiteCellViewOf} takes `{ id, label }` rather than a `MatrixCell`, so the fold, the index,
+ * the six verdicts and every sentence in them work unchanged over a fixture list they were not
+ * written for. Read *"cell"* below as *"one fixed point of whichever list the caller planned over"*.
+ * * ## The mapping, and why the request had to grow
  *
  * A cell is more than a building and a rate: `midtown-up-peak` and `midtown-down-peak` share one
  * building and one 1 % rate and differ **only** in `directionalSplit`. `BatchRequest.demand` and

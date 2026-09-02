@@ -30,6 +30,9 @@
  * next batch. A terminated batch reports nothing, which is correct: it has no result.
  */
 
+import { batchLibraryOf } from '../batch/library.js';
+import type { DispatcherProfile } from '@elevator-sim/core/browser';
+
 import { runBatch } from '../batch/runBatch.js';
 import type {
   BatchResources,
@@ -55,16 +58,39 @@ function resources(): Promise<BrowserResources> {
   return resourcesPromise;
 }
 
-function batchResourcesFor(loaded: BrowserResources, buildingId: string): BatchResources {
+/**
+ * The resources one batch resolves against — the loaded `data/`, plus whatever the player
+ * authored, folded in through `batch/library.ts`.
+ *
+ * This function is **the** reason a saved dispatcher can be compared at all (issues #167, #228,
+ * [§ D443](../../../../DECISIONS.md)). `runBatch` has always resolved an arm against
+ * `BatchResources.dispatcherProfiles` rather than against a shipped list; what was missing is that
+ * this side of the `postMessage` boundary calls `loadBrowserResources()` for itself, so the
+ * library it assembled could only ever be `data/`. The player's shelf now arrives on the message
+ * and lands here.
+ *
+ * The refusal is raised rather than returned because the caller is `handle`, whose `catch` posts
+ * it as a `failed` message with the reason intact — which is how the sentence naming the offending
+ * dispatcher reaches the reader. `batchLibraryOf` returns the loaded file **by identity** when
+ * nothing is carried, so a batch with no saved dispatchers is byte-identical to one run before
+ * this existed.
+ */
+function batchResourcesFor(
+  loaded: BrowserResources,
+  buildingId: string,
+  savedProfiles: readonly DispatcherProfile[],
+): BatchResources {
   const building = loaded.buildings.find((candidate) => candidate.id === buildingId);
   if (building === undefined) {
     throw new Error(
       `building "${buildingId}" is not in this build's data/. The batch has nothing to run.`,
     );
   }
+  const library = batchLibraryOf(loaded.dispatcherProfiles, savedProfiles);
+  if (!library.ok) throw new Error(library.reason);
   return {
     building,
-    dispatcherProfiles: loaded.dispatcherProfiles,
+    dispatcherProfiles: library.library,
     trafficProfiles: loaded.trafficProfiles,
     elevatorSpecs: loaded.elevatorSpecs,
   };
@@ -72,7 +98,12 @@ function batchResourcesFor(loaded: BrowserResources, buildingId: string): BatchR
 
 async function handle(request: BatchWorkerRequest): Promise<void> {
   const loaded = await resources();
-  const result = runBatch(request.request, batchResourcesFor(loaded, request.request.buildingId), {
+  const batchResources = batchResourcesFor(
+    loaded,
+    request.request.buildingId,
+    request.savedProfiles ?? [],
+  );
+  const result = runBatch(request.request, batchResources, {
     clock: systemClock(),
     onProgress: (progress) => {
       scope.postMessage({ kind: 'progress', progress });

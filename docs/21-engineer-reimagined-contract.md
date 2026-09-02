@@ -370,13 +370,36 @@ dropped-pairs sentence; not one word of justification was cut.
    running or its results are on screen; the affordance is a `Day report ready →` chip.
    Seam: `dev/main.ts#reportOpensItself` (l.5893) — the pure decision already exists; it gains the
    batch-visible input.
-4. **Custom dispatchers enter Compare, the suite and the Lab** (#113 § 1 — *both surfaces point at
-   a locked door*). `#batch-candidate`, `#batch-baseline` and `#campaign-profile` list saved
-   dispatchers by display name. Seam: the selects' option sources in `dev/batchPanel.ts`,
-   `dev/suitePanel.ts`, `dev/campaignPanel.ts`, reading `state.savedDispatchers` through the same
-   `dispatcherProfilesWithSelector` path `shiftRunConfigOf` uses — one answer to *what profiles
-   exist*, not a second list. Campaign admission still runs `admitProfile`: a saved dispatcher out
+4. ~~**Custom dispatchers enter Compare, the suite and the Lab**~~ (#113 § 1 — *both surfaces point
+   at a locked door*). `#batch-candidate`, `#batch-baseline` and `#campaign-profile` list saved
+   dispatchers by display name. Campaign admission still runs `admitProfile`: a saved dispatcher out
    of a stage's editable scope is refused **by name**, exactly as an edit is today.
+
+   **Landed in wave K, and the seam this item named was the wrong one** ([§ D443](../DECISIONS.md),
+   GitHub issues #167 and #228). The selects' option sources were half of it. The other half — the
+   half that decides whether anything *runs* — is that a batch crosses a `postMessage` carrying an
+   **id**, and `dev/batchWorker.ts` calls `loadBrowserResources()` on the far side, so the library
+   it resolved against could only ever be `data/`. Widening the three pickers alone would have
+   produced three surfaces that offered a saved dispatcher and refused it at Run with an engine
+   sentence about `data/` — which is what the **Everyday bench** had been doing since it was
+   written, because its field reads `host.dispatchers()` and that has always included the shelf.
+
+   `dispatcherProfilesWithSelector` is **not** the path this uses, and that is a correction rather
+   than a deviation: its own docstring says *"arms may only name profiles the file declares … a
+   dispatcher the reader saved is not in it"*, because it writes the file-level `patternSwitching`
+   block and nothing else. What the batch needed is the library itself —
+   `batch/library.ts#batchLibraryOf`, which folds the shelf into the profile file, validated by
+   `parseDispatcherProfiles`, and returns the loaded file **by identity** when the shelf is empty.
+
+   **Five surfaces, not three**: Compare, the suite, the Lab, the Everyday bench and the gauntlet.
+   The ghost arm needed nothing. The pickers refill on every visit rather than at mount, because all
+   three panels mount at boot before the workshop has been opened.
+
+   Acceptance met with the evidence on the legs at `midtown-office`/own profile/900 s — 360 of 448
+   legs answered by a different car when the saved weight vector moves, and a saved copy of
+   `collective` reproducing it byte for byte — plus a browser journey that creates, saves, compares
+   and reads the drawn interval. The cell is a measurement: `garden-apartments`/900 s produces six
+   legs and cannot show the change at all.
 
 **Acceptance:** fresh profile saved in the editor → appears in all three selects → 50-replication
 batch runs → verdict names it by display name. Move one weight, re-run the batch: rows change.
@@ -384,6 +407,16 @@ Negative pin: the same profile in both arms stays the liveness control (every ro
 unresolved, no winner). First-run defaults: a browser-tier case presses *Run batch* with zero prior
 clicks and asserts ≥ 1 resolved non-axis row. Tab steal: browser-tier case runs a batch while a
 shift finishes and asserts the active tab did not change.
+
+**Item 4's half of that is met, and one clause of it was met differently on purpose.** *"Move one
+weight, re-run the batch: rows change"* is held at the **legs** rather than at the rows
+(`batch/library.test.ts`), because § D177 is explicit that a row can be unchanged for a run that is
+entirely different; and the journey's own batch is eight replications rather than fifty, because it
+asserts no figure — `batch/report.ts` returns `under-budget` there, draws the interval and names no
+winner, which is the refusal that keeps the fifty-replication clause meaning something. A second
+negative pin was added that this list does not ask for: **a batch carrying a saved dispatcher must
+leave the arm it is compared against byte-identical on the legs**, or *"better than collective"*
+would mean something different on every machine.
 
 ### 3.2 The dispatcher editor — what #92 still owes, which is not what it says
 

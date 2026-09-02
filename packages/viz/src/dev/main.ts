@@ -14,6 +14,7 @@
  * | `authoring/*` | the four editor mounts, and `shiftRunConfigOf` |
  * | `record/decisionLog.ts` | `recordRun` — called by `dev/shiftWorker.ts` for the shift, and directly by {@link runChallenge} for a challenge's seeds |
  * | `dev/shiftRunner.ts`, `dev/shiftWorker.ts` | {@link runShift} and {@link verifyCurrent}, which no longer simulate on this thread |
+ * | `dev/offThreadRuns.ts` | `dev/fixitPanel.ts` and `dev/watchPanel.ts`, both handed {@link boot}'s one `spawnRunWorker` — GitHub issue #165 |
  * | `dev/surfaces.ts` | {@link applyNavigation} |
  * | `frame/overlay.ts` | {@link drawStage} and the landing selector |
  * | `record/document.ts` | **Load recording**, **Save recording** and **Verify replay** |
@@ -131,6 +132,7 @@ import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
   RECOMPUTING_BEAT,
+  switchChangesNothing,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
 } from '../live/interventions.js';
@@ -192,6 +194,7 @@ import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js'
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 
+import { savedProfilesOf } from '../batch/library.js';
 import { mountBatchPanel } from './batchPanel.js';
 import { mountSuitePanel } from './suitePanel.js';
 import { mountCampaignPanel, type CampaignPanelHandle } from './campaignPanel.js';
@@ -1045,6 +1048,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * optional, so `index.html` is unchanged and `elementMap.test.ts`'s contract is untouched.
    */
   /**
+   * A worker that runs one simulation and hands the recording back — `dev/shiftWorker.ts`.
+   *
+   * One factory for all three of its near sides: `createShiftRunner` below, and
+   * `dev/offThreadRuns.ts` inside the Fix-a-building and Watch panels (GitHub issue #165). Hoisted
+   * here rather than written out per caller because `new Worker(new URL(…))` is a **bundler seam** —
+   * Vite rewrites that exact expression — and three copies of it are three chances for one to be
+   * spelled differently and silently fall back to a runtime fetch.
+   */
+  const spawnRunWorker = (): Worker =>
+    new Worker(new URL('./shiftWorker.ts', import.meta.url), { type: 'module' });
+
+  /**
    * Fix-a-building — GAMEPLAY § 10, mounted like the menu: a TypeScript-built overlay, so
    * `index.html` and `elementMap.test.ts`'s contract are untouched. The case file is fetched on
    * first open (`loadFixitCases`'s own note on why it is not part of boot).
@@ -1053,6 +1068,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     document,
     resources,
     loadCases: () => loadFixitCases(resources),
+    spawnRunWorker,
   });
 
   /**
@@ -1063,10 +1079,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * inserted into the page above the header — `parentElement?.insertBefore`, this package's one
    * insertion idiom — and the header itself is inverted by a class while a run is being watched.
    *
-   * `simulate` is `recordRun` on the main thread rather than through `shiftRunner`. That is the
-   * same trade `dev/fixitPanel.ts` states: a run costs ~0.2–1.5 s on the shipped buildings, the
-   * whole output is one replay, and a worker round-trip for it is complexity this slice does not
-   * need. Named as a limitation rather than discovered.
+   * The gate's run is on a worker — GitHub issue #165. This paragraph used to state a cost
+   * instead (*"~0.2–1.5 s on the shipped buildings"*, carried from `dev/fixitPanel.ts`) and it is
+   * deleted rather than reworded: a stated cost that has been paid is § D227's stale refusal. The
+   * measurement that replaced it is in `dev/watchPanel.ts`'s own header, and it found that
+   * sentence understated by more than threefold on a filed day this picker will offer.
    */
   const watchPanel = mountWatchPanel({
     document,
@@ -1074,7 +1091,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     stateNow: () => state,
     loadReferenceRuns: () =>
       loadReferenceRuns((id: string) => buildingNameOf(resources, state.savedBuildings, id)),
-    simulate: (config) => recordRun(config).recording,
+    spawnRunWorker,
     buildingNameOf: (id) => buildingNameOf(resources, state.savedBuildings, id),
     dispatcherNameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
     onWatch: (run, view, recording) => {
@@ -2908,7 +2925,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   };
 
   const shiftRunner = createShiftRunner({
-    spawn: () => new Worker(new URL('./shiftWorker.ts', import.meta.url), { type: 'module' }),
+    spawn: spawnRunWorker,
     clock,
     onStatus: (text) => {
       setText(ui.transport.status, text);
@@ -3290,37 +3307,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
     interveneAt(playback.simTimeS, { kind: 'switch-dispatcher', profile: switchTarget });
   });
 
-  /** A profile's vector, canonically — key order is authoring noise, not a difference. */
-  const vectorOf = (weights: Readonly<Record<string, number>>): string =>
-    JSON.stringify(
-      Object.fromEntries(Object.entries(weights).sort(([a], [b]) => a.localeCompare(b))),
-    );
   /** Memo per state object — the derivation walks the whole chain and this runs per frame. */
   let switchNoopCache: { readonly forState: ViewerState; readonly noop: boolean } | undefined;
   /**
-   * Whether pressing the switch would genuinely change nothing — review finding 2. The old
-   * check compared base **ids**, and the driving profile is *derived* (levers, selector, rules —
-   * `drivingProfileOf`'s chain), so it disabled the control exactly where pressing it would
-   * change the run: a lever-moved player handing the day back to the plain baseline. § D177's
-   * inert-control class with the polarity reversed. Now: with a handover already on the log, the
-   * press is a no-op only if that handover names this target (the pin makes later state moot);
-   * otherwise the press is a no-op only if the *vector actually driving* equals the target's —
-   * compared canonically, through the one derivation `shiftRunConfigOf` itself runs — **and** no
-   * chooser is live, because on a rules or selector profile the switch also stands the chooser
-   * down, which is a change even at equal base weights.
+   * Whether pressing the switch would genuinely change nothing — review finding 2, and since GitHub
+   * issue **#171** `live/interventions.ts#switchChangesNothing` rather than a second copy of it
+   * here. § 7's Everyday stage grew this same arm, and the thing worth sharing is not the words but
+   * the check that stopped this control being inert: comparing base **ids** disabled it exactly
+   * where pressing it would change the run (§ D177's class with its polarity reversed). That
+   * module's docstring carries all three grounds.
+   *
+   * What stays here is the **memo**, because it is the part that is about this surface rather than
+   * about the control: only this shell holds a `ViewerState` to key on, and `drivingProfileOf` walks
+   * the whole spec chain while `drawIntervention` runs on frames.
    */
   const switchWouldChangeNothing = (viewState: ViewerState): boolean => {
     if (switchTarget === undefined) return true;
-    let latest: string | undefined;
-    for (const entry of viewState.interventions) {
-      if (entry.change.kind === 'switch-dispatcher') latest = entry.change.profile.id;
-    }
-    if (latest !== undefined) return latest === switchTarget.id;
     if (switchNoopCache?.forState === viewState) return switchNoopCache.noop;
-    const driving = drivingProfileOf(resources, viewState);
-    const noop =
-      vectorOf(driving.weights) === vectorOf(switchTarget.weights) &&
-      (driving.selection?.policy ?? 'off') === 'off';
+    const noop = switchChangesNothing({
+      interventions: viewState.interventions,
+      target: switchTarget,
+      driving: () => drivingProfileOf(resources, viewState),
+    });
     switchNoopCache = { forState: viewState, noop };
     return noop;
   };
@@ -3568,6 +3576,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       seed: state.seed.toString(),
       durationS: String(state.shiftLengthS),
     }),
+    /*
+     * The reader's own dispatchers, so Compare can compare one — issues #167 and #228,
+     * [§ D443](../../../../DECISIONS.md).
+     *
+     * A closure over `state` rather than a value, and that is the whole reason it works: these
+     * three panels are mounted **once**, at boot, before the workshop has ever been opened. A
+     * snapshot taken here would be the empty shelf a fresh session starts with, for the life of
+     * the page, which is a picker that can never show anything a player made.
+     */
+    savedProfiles: () => savedProfilesOf(state.savedDispatchers),
   });
 
   /*
@@ -3576,7 +3594,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * or in `index.html` retypes the fixture list. It inherits nothing from the viewer on purpose:
    * a suite's cells fix the building and the traffic, which is the point of a fixed fixture list.
    */
-  mountSuitePanel({ elements: ui.suite, resources });
+  mountSuitePanel({
+    elements: ui.suite,
+    resources,
+    savedProfiles: () => savedProfilesOf(state.savedDispatchers),
+  });
 
   /*
    * The campaign needs its own data file, which is fetched separately. A page that could not load
@@ -3591,6 +3613,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         resources,
         loaded,
         mode: () => state.mode,
+        savedProfiles: () => savedProfilesOf(state.savedDispatchers),
       });
     })
     .catch((error: unknown) => {

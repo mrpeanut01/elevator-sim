@@ -50,6 +50,7 @@
 
 import type { DispatcherProfile, ResolvedBuilding } from '@elevator-sim/core/browser';
 
+import { savedProfilesOf } from '../batch/library.js';
 import { loadBrowserResources, loadProofCases, type BrowserResources } from '../dev/data.js';
 import {
   caseNamesOf,
@@ -385,6 +386,9 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     running = runGauntlet({
       set,
       dispatcherProfileId: candidate.id,
+      // The shelf the id is resolved against — issues #167 and #228, § D443. Without it a send
+      // of a *saved* dispatcher (which is what the gate above exists to admit) failed at case one.
+      savedProfiles: savedProfilesOf(context.host.savedDispatchers()),
       replications: 1,
       towerNameOf: (towerId) =>
         resources.buildings.find((building) => building.id === towerId)?.name ?? towerId,
