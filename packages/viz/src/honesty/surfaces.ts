@@ -5232,6 +5232,13 @@ const MENU: SurfaceAdapter = {
     'menu/boardRun.ts#boardConfigurationOf',
     'menu/boardRun.ts#boardRevealOf',
     'menu/boardRun.ts#boardRevealRefusalOf',
+    /*
+     * The other half of *an axis is named once, or on each row* — GitHub issue #316. A board keyed
+     * by a date can hold two dispatchers, so what the rows differ on is named per row, and those
+     * words reach a player exactly as the reveal's do. The `disagreeing` page below is what drives
+     * it: its two rows differ on the arrival rate, so every row carries its own naming.
+     */
+    'menu/boardRun.ts#rowVariationOf',
     'menu/boardRun.ts#BEAT_LABEL',
     'menu/boardRun.ts#beatDetailOf',
     'menu/boardRun.ts#beatRefusalOf',

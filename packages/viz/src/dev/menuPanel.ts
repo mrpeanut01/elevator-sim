@@ -1106,10 +1106,15 @@ function boardTable(draw: Draw, view: LeaderboardView, account: AccountState): H
         // Printed because it is what makes the row checkable: invariant 5 says a run replays from
         // its seed, and a leaderboard that hid the seed would be asking to be taken on trust.
         //
-        // The dispatcher is deliberately **not** here, and that is the one place this row differs
-        // from the challenge board's. There the dispatcher is the axis that varies and belongs on
-        // every row; here it is in the board's own key, so printing it per row would say it varies
-        // when it cannot. It is named once, above the table, by `menu/boardRun.ts#boardRevealOf`.
+        // The dispatcher is not in this line, and the reason it used to give has expired.
+        //
+        // It said *"here it is in the board's own key, so printing it per row would say it varies
+        // when it cannot"*. § D439 took the dispatcher out of every board key, so on a daily board
+        // it **does** vary, and `menu/boardRun.ts#rowVariationOf` names it on each of the per-row
+        // controls above (GitHub issue #316). What is left is a gap rather than a decision: this
+        // table draws four figures and a seed from `BoardPage` alone, and putting the row's own
+        // dispatcher *here* needs the resolved naming carried onto `LeaderboardView` — a decision
+        // `menu/` owns and this panel may not take, on `MenuViewInput.boardPage`'s stated rule.
         meta:
           `seed ${entry.run.seed} \u00b7 one run` +
           (isMine && ranked !== undefined && leader !== undefined

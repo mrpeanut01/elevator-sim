@@ -70,6 +70,7 @@ import {
   boardConfigurationOf,
   boardRevealOf,
   boardRevealRefusalOf,
+  rowVariationOf,
   selectionFromRun,
 } from './boardRun.js';
 import {
@@ -2117,12 +2118,25 @@ function leaderboardBody(input: MenuViewInput): Body {
     const why = beatRefusalOf(entry.run, input.catalogue, (selection) =>
       freePlayIssues(selection, input.catalogue),
     );
+    /*
+     * What this row ran that the board does not agree on — GitHub issue #316, and the delivery half
+     * of `boardRevealOf`'s promise that *what the rows differ on is named on each row*.
+     *
+     * On the **label** as well as in the detail, and that is not decoration. A disabled row draws
+     * `disabledWhy` in place of its detail (`dev/menuPanel.ts`), so a dispatcher named only in the
+     * detail would vanish from exactly the rows this build cannot resolve — the ones where a reader
+     * most needs to know which dispatcher the row is about. A label is always drawn.
+     */
+    const variation = rowVariationOf(entry.run, configuration, input.catalogue);
     return {
       // Indexed by position on the board, which is what the reader is looking at. The entry's own id
       // is a uuid and would put a database key in a DOM id for no reader's benefit.
       id: `leaderboard.beat.${String(index)}`,
-      label: `${BEAT_LABEL} — ${entry.displayName}`,
-      detail: beatDetailOf(entry.run),
+      label:
+        variation === undefined
+          ? `${BEAT_LABEL} — ${entry.displayName}`
+          : `${BEAT_LABEL} — ${entry.displayName} · ${variation.named}`,
+      detail: beatDetailOf(entry.run, variation),
       kind: 'commit' as const,
       // Every field of the row is the run's identity, hashed into the board it came from. Same scope
       // as **Start**, because it is the same six axes arriving from somewhere else. `docs/16` § 3.
@@ -2191,9 +2205,15 @@ function leaderboardBody(input: MenuViewInput): Body {
       LEADERBOARD_NOTE,
       ...(reveal === undefined ? [] : [reveal]),
       ...(revealRefusal === undefined ? [] : [revealRefusal]),
-      // Gated with the reveal rather than with the page, because its subject sentence — *every one
-      // of them is that same dispatcher* — is a claim about a board whose rows agree.
-      ...(reveal === undefined ? [] : [BEATING_NOTE]),
+      /*
+       * Gated on the rows **agreeing**, not on the reveal existing — GitHub issue #316.
+       *
+       * Its subject sentence is *every one of them is that same dispatcher*, which is a claim about
+       * a board whose rows agree, and the two gates were the same one only while the reveal was
+       * silent on every mixed board. The reveal speaks on a mixed board now, so a gate written on it
+       * would print this note in the one place it is false.
+       */
+      ...(configuration.agreed && reveal !== undefined ? [BEATING_NOTE] : []),
     ]),
     issues: Object.freeze([]),
   };
@@ -2202,21 +2222,34 @@ function leaderboardBody(input: MenuViewInput): Body {
 /**
  * What a board actually is, said where a player reads it.
  *
- * A board is keyed by a digest over the building, the dispatcher, the template, the rate, the
- * duration and the loaded `data/` — **everything except the seed**. So the entries on one board are
- * the same configuration played on different seeds, and picking a different dispatcher does not beat
- * anybody: it moves you to a different board.
+ * ## It described the board key, and the board key moved
  *
- * That is worth saying plainly rather than letting the word *leaderboard* imply a skill ranking it
- * is not. `docs/10` § 5.5 bans *"a leaderboard ranking dispatchers from single runs"*, and the
- * honest way to keep both the board and the ban is to describe the board correctly.
+ * It read *"each board is one configuration across seeds … a different dispatcher is a different
+ * board rather than a better score"*, which was an exact description of a board keyed by a digest
+ * over the building, the dispatcher, the template, the rate and the length. § D439 split that value:
+ * a board is now the **date**, or a player's own log, and the dispatcher is in neither key. So the
+ * sentence became false in the direction that matters most — it told a player that the axis the
+ * daily board exists to compare could not be compared here.
+ *
+ * It is corrected rather than deleted, because what it was written *for* has not changed: the word
+ * *leaderboard* implies a skill ranking, `docs/10` § 5.5 bans *"a leaderboard ranking dispatchers
+ * from single runs"*, and the honest way to keep both the board and the ban is to describe the board
+ * correctly. What it says now is what the screen below it actually does — an axis every row shares
+ * is named once above the table, an axis they differ on is named on each row (GitHub issue #316) —
+ * so a reader is told how to read the page rather than a rule about board membership that this
+ * browser cannot check.
+ *
+ * It deliberately does **not** state which boards exist or how a run is placed on one. That is the
+ * server's decision (`leaderboard/boardKey.ts`, `ENGINE_CONTRACT.md` § 12.1), this package computes
+ * no part of it, and a viewer served from a CDN can be a deployment behind the API it is reading
+ * (§ D308) — restating it here is how this sentence went stale the first time.
  */
 const LEADERBOARD_NOTE =
-  'Each board is one configuration across seeds, ranked on the named metric alone. A different ' +
-  'dispatcher is a different board rather than a better score. A configuration is the building, ' +
-  'the dispatcher, the traffic template, the arrival rate and the run length together; a seed is ' +
-  'the number the passengers are generated from, so the same seed brings the same people at the ' +
-  'same moments.';
+  'Rows are ranked on the named metric alone; the other figures sit beside it and are never ' +
+  'combined into a score. What every row ran in common is named above the table, and what they ' +
+  'differ on is named on each row — the dispatcher can be in either place, because a board does ' +
+  'not fix it. A seed is the number the passengers are generated from, so the same seed brings the ' +
+  'same people at the same moments.';
 
 /* ------------------------------------------------------------------ account */
 
