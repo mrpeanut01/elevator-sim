@@ -96,7 +96,7 @@ import { armOf, runBenchmarkCase, type CaseResult } from './suite.js';
  * reaches `node:url` — while the cells are pure data. Re-exported here so every existing consumer,
  * pin and document reference keeps its import path, byte-identical.
  */
-export { EXCLUDED_CELLS, MATRIX_CELLS, matrixCell } from './matrixCells.js';
+export { EXCLUDED_CELLS, MATRIX_CELLS, matrixCell, reportWindowForBuilding } from './matrixCells.js';
 export type { BudgetBasis, ExcludedCell, MatrixCell } from './matrixCells.js';
 
 /* -------------------------------------------------------------------------- *

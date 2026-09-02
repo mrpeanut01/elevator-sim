@@ -1043,21 +1043,28 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`campaign/brief.ts`, both driven.',
       ids: ['scenario/measure.ts#measureScenario', 'scenario/measure.ts#publishedScenarioFor'],
     },
+    /*
+     * `shift/reportWindow.ts#shiftReportWindowFor` was excluded here and is not any more, and the
+     * deletion is the record rather than an omission.
+     *
+     * The exclusion said, in as many words, that the expression *"is derived only because that
+     * literal reads as a phrase to the two-adjacent-words scanner"* — the literal being `'full-run'`.
+     * GitHub issue #315 moved the rule to `@elevator-sim/experiments`'s
+     * `benchmark/matrixCells.ts#reportWindowForBuilding`, because `packages/server`'s replay
+     * verifier has to choose the same window or an honest submission does not reproduce, and it may
+     * not import a browser bundle to ask. `shiftReportWindowFor` is still this package's name for
+     * the answer and still has its three producers; what it no longer holds is the literal, so the
+     * scanner no longer derives it and an exclusion for it is a ghost. The two cases below this
+     * block are what caught it.
+     *
+     * Nothing about the reasoning changed — a window selection is still not a sentence a player
+     * reads — so a reader looking for it will find it on the function that now carries the literal.
+     */
     {
       reason:
-        'Chooses a window, and authors nothing. `shiftReportWindowFor` returns `\'full-run\'` or ' +
-        '`undefined` — `core`\'s own `WindowSelection` — and is derived only because that literal ' +
-        'reads as a phrase to the two-adjacent-words scanner. Nothing a player sees comes from ' +
-        'here: what a reader is told about the window is `shift/report.ts`\'s figure notes and ' +
-        'small print, which quote `summary.reportWindow.id` and are driven through `dayReportOf`. ' +
-        'That the choice actually reaches the run is not a string question either, and is asserted ' +
-        'end to end in `shift/reportWindow.test.ts` against a recording\'s own summary.',
-      ids: ['shift/reportWindow.ts#shiftReportWindowFor'],
-    },
-    {
-      reason:
-        'Chooses a horizon, and authors nothing — `shiftReportWindowFor`\'s case one entry up, ' +
-        'and the same scanner artefact. `runHorizonOf` answers *which of the two kinds of run this ' +
+        'Chooses a horizon, and authors nothing — the same scanner artefact `shiftReportWindowFor` ' +
+        'was excluded for until GitHub issue #315 moved its literal out of this package (see the ' +
+        'note above). `runHorizonOf` answers *which of the two kinds of run this ' +
         'state is*, and both of its values are members of `shift/types.ts#RunHorizon`: `period`, ' +
         'and `whole-day`, which is derived **only** because the hyphen reads to the two-adjacent-' +
         'words scanner as a phrase. Nothing it returns is shown to anybody. What a player reads is ' +

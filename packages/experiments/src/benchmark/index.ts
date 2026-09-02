@@ -699,6 +699,7 @@ export {
   budgetFor,
   cellResult,
   matrixCell,
+  reportWindowForBuilding,
   runMatrix,
   runMatrixCell,
 } from './matrix.js';

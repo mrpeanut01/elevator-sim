@@ -10,5 +10,14 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../core" }]
+  // `experiments` is here for `leaderboard/verify.ts` only, and only through its `./browser`
+  // subpath — the environment-free barrel (DECISIONS.md § D121). The verifier has to choose the
+  // same report window the client chose or an honest run does not reproduce (GitHub issue #315),
+  // and that rule is a conclusion about `MATRIX_CELLS`, which lives in that package. The boundary
+  // permits it: § D214 § 3 — *"`packages/server` depends on `core`, which is allowed (invariant 6
+  // forbids `core → viz`, nothing else)"* — and the shipped image already carries the package
+  // (`Dockerfile` copies `packages/experiments/dist`). The `./browser` subpath rather than the bare
+  // specifier because this server has no use for the replication runner's worker pool or its
+  // filesystem persistence, and that barrel is measured to reach neither.
+  "references": [{ "path": "../core" }, { "path": "../experiments" }]
 }
