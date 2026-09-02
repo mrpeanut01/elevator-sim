@@ -39,9 +39,11 @@
  *   looking right — so the class is drawn once, and {@link DESIGNER_ABSENCES} says so.
  * - **No escalators, no duty, no credential dots on the elevation.** `SpecTransportMode` exists and
  *   is carried, but no control here authors one; § 13.2's grid is the Engineer building editor's
- *   surface and is not re-drawn in Casual clothes on this pass. The screen says so on its own face
- *   now rather than only here — {@link DESIGNER_COPY}'s `serviceScopeHint` — because a boundary a
- *   player cannot see reads to them as a capability the product lacks.
+ *   surface and is not re-drawn in Casual clothes on this pass. **The credential half of that is
+ *   now said on the screen's own face** rather than only here — {@link DESIGNER_COPY}'s
+ *   `serviceScopeHint` — because a boundary a player cannot see reads to them as a capability the
+ *   product lacks. The escalator half is not, and must not be: nothing authors an escalator on
+ *   either surface, so it is a genuine absence and stays a row in {@link DESIGNER_ABSENCES}.
  * - **The service column is bands, not hand-drawn cells.** § 10.2's *drawn by hand* override has no
  *   field in `BuildingSpec`; what it does have is `bandByCar` and `noLobby`, which are § 10.2's
  *   *zone's bands* and *shuttle* respectively, and those are the two this screen writes.
