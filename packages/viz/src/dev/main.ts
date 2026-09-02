@@ -1548,10 +1548,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const result = await client.boards();
       boardView = result.ok
         ? {
-            boards: result.value.map((board) => ({ boardKey: board.boardKey, entries: board.entries })),
+            boards: result.value.boards.map((board) => ({
+              boardKey: board.boardKey,
+              entries: board.entries,
+            })),
             selected: undefined,
             page: undefined,
-            notice: result.value.length === 0 ? 'No scores have been posted yet.' : undefined,
+            notice: result.value.boards.length === 0 ? 'No scores have been posted yet.' : undefined,
           }
         : { ...boardView, notice: result.detail };
     } finally {

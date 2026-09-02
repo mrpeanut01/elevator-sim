@@ -256,6 +256,59 @@ export interface BoardSummary {
   readonly latestMs: number;
 }
 
+/**
+ * One row of the server's own board-key table — the contract's three keys, each with the route that
+ * reaches it or `null` for a key the product declares and cannot yet produce.
+ *
+ * It is on the wire rather than transcribed here for the reason `/api/boards` states: a client
+ * drawing a list has to tell *nothing has been posted yet* from *no route in this product could
+ * produce one*, and only the server knows which. A second copy of this table on the client would be
+ * a second answer to what a board is.
+ */
+export interface BoardKind {
+  readonly key: string;
+  readonly board: string;
+  readonly route: string | null;
+}
+
+/** The axes the daily board fixes. The server's, used as given — never rebuilt from parts. */
+export interface DailyFixtureAxes {
+  readonly buildingId: string;
+  readonly demandTemplateId: string;
+  readonly arrivalRatePctPop5min: number | null;
+  readonly durationS: number;
+  readonly windowStartS: number | null;
+}
+
+/**
+ * Today's fixture, as the server computed it from its own clock.
+ *
+ * `date` is UTC and is the daily board's whole key, so a caller reads `daily:${today.date}` rather
+ * than parsing a prefix off a key or asking its own clock what day it is. Both of those are the
+ * same defect — a second place deciding what a board key looks like — and {@link submit} refuses
+ * the first by name.
+ */
+export interface DailyFixture {
+  readonly date: string;
+  readonly seed: string;
+  readonly config: DailyFixtureAxes;
+}
+
+/**
+ * What `/api/boards` answers: the boards that have entries, the kinds this build has at all, and
+ * today's fixture.
+ *
+ * **`today` is optional and its absence is a real case rather than a defensive one.** The API image
+ * is deployed by hand and nothing rebuilds it on a push, so a running server can predate the field.
+ * `undefined` means *the server did not say*, which a caller must not read as *there is no board
+ * today*.
+ */
+export interface BoardsPage {
+  readonly boards: readonly BoardSummary[];
+  readonly kinds: readonly BoardKind[];
+  readonly today: DailyFixture | undefined;
+}
+
 /* -------------------------------------------------------------------------- *
  * Results
  * -------------------------------------------------------------------------- */
@@ -451,7 +504,15 @@ export interface LeaderboardClient {
     token: string,
     submission: { run: RunSubmission; claimed: ClaimedMetrics },
   ): Promise<Result<{ boardKey: string; placement: string; entry: BoardEntry }>>;
-  boards(): Promise<Result<readonly BoardSummary[]>>;
+  /**
+   * The board list, the kinds, and today's fixture — the whole of what `/api/boards` answers.
+   *
+   * This used to return `readonly BoardSummary[]` and discard `kinds` and `today`, which made the
+   * daily board unfindable without parsing a `daily:` prefix off a key — the exact thing
+   * {@link submit} refuses to do. The server has always sent both; the client was throwing them
+   * away.
+   */
+  boards(): Promise<Result<BoardsPage>>;
   board(boardKey: string, metric: string): Promise<Result<BoardPage>>;
   /**
    * The challenge index — **the only answer** to *"which challenge is it today"*.
@@ -481,6 +542,27 @@ export interface LeaderboardClient {
  * silently work in development and silently fail in a build served from a CDN, which is the class
  * of bug that only reproduces where it cannot be debugged.
  */
+/**
+ * Whether a value is the server's daily fixture, checked field by field.
+ *
+ * Shape-checked rather than cast, because this is the one field on this page a caller will build a
+ * run from: a partial fixture that type-asserted its way through would produce a run posted against
+ * the wrong axes, and the server would then correctly refuse it with an accusation the client
+ * earned. The other two fields on the page are read-only prose and a cast costs nothing.
+ */
+function isDailyFixture(value: unknown): value is DailyFixture {
+  const fixture = value as Record<string, unknown> | null | undefined;
+  if (typeof fixture?.['date'] !== 'string' || typeof fixture['seed'] !== 'string') return false;
+  const config = fixture['config'] as Record<string, unknown> | null | undefined;
+  return (
+    typeof config?.['buildingId'] === 'string' &&
+    typeof config['demandTemplateId'] === 'string' &&
+    typeof config['durationS'] === 'number' &&
+    (config['arrivalRatePctPop5min'] === null || typeof config['arrivalRatePctPop5min'] === 'number') &&
+    (config['windowStartS'] === null || typeof config['windowStartS'] === 'number')
+  );
+}
+
 /**
  * The sentence a 4xx gets on screen — the server's `detail`, else its `issues`, else the fallback.
  *
@@ -603,8 +685,22 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
       }),
     boards: () =>
       call({ method: 'GET', url: `${base}/api/boards`, token: undefined, body: undefined }, (body) => {
-        const boards = (body as Record<string, unknown> | null)?.['boards'];
-        return Array.isArray(boards) ? (boards as BoardSummary[]) : undefined;
+        const record = body as Record<string, unknown> | null;
+        const boards = record?.['boards'];
+        if (!Array.isArray(boards)) return undefined;
+        /*
+         * `boards` decides whether the answer is readable; the other two are carried when present
+         * and left `undefined`/empty when not. A server that predates them is a real case — the
+         * image is hand-deployed — and it is not an `unexpected-response`, because the half this
+         * client has always read is exactly as readable as it ever was.
+         */
+        const kinds = record?.['kinds'];
+        const today = record?.['today'];
+        return {
+          boards: boards as readonly BoardSummary[],
+          kinds: Array.isArray(kinds) ? (kinds as readonly BoardKind[]) : [],
+          today: isDailyFixture(today) ? today : undefined,
+        };
       }),
     board: (boardKey, metric) =>
       call(

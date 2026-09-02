@@ -234,6 +234,72 @@ describe('the leaderboard client', () => {
     if (!bare.ok) expect(bare.detail).toBe(CLIENT_FAILURES.refused);
   });
 
+  /*
+   * `/api/boards` answers three things and this client used to read one of them. The two it
+   * discarded — the board-kind table and today's fixture — are what make the daily board findable
+   * without parsing a `daily:` prefix off a key, which `submit` refuses to do by name. These cases
+   * exist because the success shape had no coverage at all: every other `boards()` case in this
+   * file uses it as a convenient GET and asserts a failure path.
+   */
+  describe('the board list carries what the server sends', () => {
+    const TODAY = Object.freeze({
+      date: '2026-09-02',
+      seed: '20260902',
+      config: Object.freeze({
+        buildingId: 'chancery-house',
+        demandTemplateId: 'office-day',
+        arrivalRatePctPop5min: null,
+        durationS: 36_000,
+        windowStartS: 0,
+      }),
+    });
+
+    it('carries the boards, the kinds and today’s fixture', async () => {
+      const { transport } = scripted({
+        status: 200,
+        body: {
+          boards: [{ boardKey: 'daily:2026-09-02', entries: 3, latestMs: 1 }],
+          kinds: [{ key: 'date', board: 'the daily board', route: 'placeSubmission' }],
+          today: TODAY,
+        },
+      });
+      const result = await createClient('https://x', transport).boards();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.boards).toHaveLength(1);
+      expect(result.value.kinds[0]?.key).toBe('date');
+      // The whole point: the key is the server's date, never a prefix this client recognised.
+      expect(`daily:${result.value.today?.date ?? ''}`).toBe('daily:2026-09-02');
+      expect(result.value.today?.seed).toBe('20260902');
+      expect(result.value.today?.config.durationS).toBe(36_000);
+    });
+
+    it('accepts a server that sends neither, because a hand-deployed image can predate them', async () => {
+      const { transport } = scripted({ status: 200, body: { boards: [] } });
+      const result = await createClient('https://x', transport).boards();
+      // Not an `unexpected-response`: the half this client has always read is as readable as ever.
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.kinds).toEqual([]);
+      // `undefined` means *the server did not say*, which a caller must not read as *no board today*.
+      expect(result.value.today).toBeUndefined();
+    });
+
+    it('refuses a half-built fixture rather than passing one on', async () => {
+      // A run posted against the wrong axes earns a refusal from the server, and spending the
+      // product's one accusation on a client that type-asserted its way past a missing field is
+      // the defect. Field-checked, so a partial fixture is absent rather than plausible.
+      const { transport } = scripted({
+        status: 200,
+        body: { boards: [], today: { date: '2026-09-02', seed: '20260902', config: { buildingId: 'chancery-house' } } },
+      });
+      const result = await createClient('https://x', transport).boards();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.today).toBeUndefined();
+    });
+  });
+
   it('refuses a 2xx whose shape it does not understand', async () => {
     const { transport } = scripted({ status: 200, body: { something: 'else' } });
     const result = await createClient('https://x', transport).redeem('a-token');
