@@ -238,6 +238,18 @@ export interface BoardEntry {
    */
   readonly dataHash: string;
   readonly measured: ClaimedMetrics;
+  /**
+   * Served legs in the row's measurement window — the `n` behind `measured.awtS`.
+   *
+   * `undefined` from a server too old to send it, and that is the whole reason it is optional: a
+   * board row that draws a mean with no count is R13 clause one, so a row that cannot say `n`
+   * withholds the figure rather than printing it bare. The alternative would have been a default,
+   * and a default here is a made-up denominator on the one screen where a number is a boast.
+   *
+   * Never sent by a client and never part of `ClaimedMetrics`, which is the *claim*. The server
+   * reads it off its own replay — see `packages/server/src/store/store.ts#EntryRow.legs`.
+   */
+  readonly legs: number | undefined;
   readonly submittedAtMs: number;
 }
 
@@ -562,6 +574,21 @@ function isDailyFixture(value: unknown): value is DailyFixture {
     (config['windowStartS'] === null || typeof config['windowStartS'] === 'number')
   );
 }
+/**
+ * One board row with its `legs` reduced to a count or nothing.
+ *
+ * A finite number is a count; anything else — absent, `null`, a string, `NaN` — is *no count*, and
+ * the row withholds its mean. See {@link BoardEntry.legs} for why there is no default.
+ */
+function withLegs(entry: unknown): BoardEntry {
+  const record = entry as Record<string, unknown>;
+  const legs = record['legs'];
+  return {
+    ...record,
+    legs: typeof legs === 'number' && Number.isFinite(legs) ? legs : undefined,
+  } as unknown as BoardEntry;
+}
+
 
 /**
  * The sentence a 4xx gets on screen — the server's `detail`, else its `issues`, else the fallback.
@@ -712,7 +739,18 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
         },
         (body) => {
           const record = body as Record<string, unknown> | null;
-          return Array.isArray(record?.['entries']) ? (record as unknown as BoardPage) : undefined;
+          const entries = record?.['entries'];
+          if (!Array.isArray(entries)) return undefined;
+          /*
+           * `legs` is normalised where every other field is taken on trust, and the asymmetry is
+           * deliberate. It is the one field whose *absence* changes what a screen may print — a row
+           * with no count withholds its mean rather than drawing it bare (R13 clause one) — so an
+           * older server's missing key and a newer one's number have to be told apart here rather
+           * than at each renderer. `null` and a string both mean *no count*, which is the safe
+           * reading: a board row's denominator may not be inferred.
+           */
+          const page = { ...record, entries: entries.map(withLegs) };
+          return page as unknown as BoardPage;
         },
       ),
     challenges: () =>

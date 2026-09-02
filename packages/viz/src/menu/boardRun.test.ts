@@ -306,6 +306,7 @@ function leaderboardWith(runs: readonly RunSubmission[]): MenuScreenView {
     // What the row was measured against — never the board it is on (`ENGINE_CONTRACT.md` § 12.1).
     dataHash: 'abcdef0123456789',
     measured: { awtS: 24.6, wt95S: 51.2, ttdMeanS: 63.4, pctOverLongWait: 8.1, awtIsValid: true },
+    legs: 312,
     submittedAtMs: 0,
   }));
   return screenOf({

@@ -101,6 +101,13 @@ import type {
   TrafficProfile,
 } from '@elevator-sim/core/browser';
 
+/*
+ * Type-only, and it has to stay that way: `boundaries.test.ts` asserts that the value importers
+ * of `menu/client.js` are exactly `dev/main.ts` and `honesty/surfaces.ts`, and it exempts type
+ * imports by name. The row shape crosses this façade; the transport does not.
+ */
+import type { BoardEntry, BoardPage, BoardsPage, Result } from '../menu/client.js';
+
 import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
 import {
   specFromProfile,
@@ -170,6 +177,78 @@ import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
+
+/**
+ * What a read of today's board came back with — four states, because a screen that collapses them
+ * lies about at least one.
+ *
+ * *Nothing posted yet* and *we could not ask* are the pair that must never share a sentence, and the
+ * ladder beside this board already makes the same distinction for the same reason: its own empty
+ * line is a claim about the player, and it is false when a store could not be read.
+ *
+ * Plain data, on this façade's rule. `rows` are the server's entries as it ranked them; `note` is
+ * the server's own sentence about what the ranking means and is shown rather than paraphrased.
+ */
+export type EverydayDailyBoard =
+  /**
+   * This build was served with no API origin at all — the `<meta>` tag is absent, which is what a
+   * bundle served from a CDN gets. Not a server that failed to answer.
+   */
+  | { readonly kind: 'no-server' }
+  /**
+   * There is a server and it did not answer, or refused. `detail` is its own sentence, or the
+   * client's when the transport never reached it; either way it is renderable as it stands.
+   */
+  | { readonly kind: 'unreachable'; readonly detail: string }
+  /**
+   * The server answered and said nothing about today. The API image is deployed by hand, so one can
+   * predate the field — and *it did not say* is not *there is no board today*.
+   */
+  | { readonly kind: 'undeclared' }
+  /** Today's board. An empty `rows` is a board nobody has posted to yet, which is not a failure. */
+  | {
+      readonly kind: 'board';
+      /** `YYYY-MM-DD`, UTC, the server's own — never a local clock's answer. */
+      readonly date: string;
+      readonly note: string;
+      readonly rows: readonly BoardEntry[];
+    };
+
+/**
+ * Compose the two board reads into one of {@link EverydayDailyBoard}'s four states.
+ *
+ * Takes the two calls rather than a client, for one reason and it is not style: `boundaries.test.ts`
+ * permits exactly two modules to hold a leaderboard client, and the composition is the part worth
+ * driving. Handed functions, it is testable here with plain stubs and `dev/main.ts` keeps only the
+ * wiring — which is the same split this file already makes between a binding and a derivation over
+ * bindings.
+ *
+ * Two requests, and the first is what makes the second possible: the list carries the server's own
+ * `today`, so the key is `daily:${date}` on the server's clock. Nothing here works out which day it
+ * is, and nothing parses a prefix off a key — `menu/client.ts#submit` refuses the second by name and
+ * the first is the same defect with a clock instead of a string.
+ */
+export async function dailyBoardOf(
+  list: () => Promise<Result<BoardsPage>>,
+  read: (boardKey: string, metric: string) => Promise<Result<BoardPage>>,
+): Promise<EverydayDailyBoard> {
+  const listed = await list();
+  if (!listed.ok) return { kind: 'unreachable', detail: listed.detail };
+  const today = listed.value.today;
+  /*
+   * The server answered and said nothing about today. The API image is deployed by hand, so a
+   * running one can predate the field — and *it did not say* is not *there is no board today*,
+   * which is why this is its own state rather than an empty board.
+   */
+  if (today === undefined) return { kind: 'undeclared' };
+  const page = await read(`daily:${today.date}`, DAILY_BOARD_METRIC);
+  return page.ok
+    ? { kind: 'board', date: today.date, note: page.value.note, rows: page.value.entries }
+    : { kind: 'unreachable', detail: page.detail };
+}
+
+/** What the daily board is ranked on. The Engineer board list asks for the same one. */
+export const DAILY_BOARD_METRIC = 'awtS';
 
 /**
  * A watch in progress — the row and the § 14.1 view drawn from it, together.
@@ -699,6 +778,14 @@ export interface EverydayHost {
   watchableRuns(): Promise<readonly WatchableRun[]>;
 
   /**
+   * Today's board, or the labelled state that says why there is none.
+   *
+   * A promise because it is a network read, and the four states are the whole of its contract — a
+   * caller draws one of them and never invents a fifth. See {@link EverydayDailyBoard}.
+   */
+  dailyBoard(): Promise<EverydayDailyBoard>;
+
+  /**
    * Put a row on the stage — § 1.5's *"never replay something approximate"*, and the press behind
    * § 14.1's `Watch it`.
    *
@@ -808,6 +895,20 @@ export interface EverydayHostBindings {
   playThisCrowd(run: WatchableRun): void;
   /** The row being watched and its view, or `undefined` — `dev/main.ts`'s own `watching` field. */
   watching(): EverydayWatchSession | undefined;
+  /**
+   * Read today's board, or `undefined` when this build was served with no API origin.
+   *
+   * `undefined` rather than a method that answers `no-server` on purpose: the absence is a property
+   * of the page, decided once at boot, and a binding that exists and always refuses is the shape
+   * this repository keeps paying for. `everyday/world.ts` predicted this seam in writing — *"when a
+   * lane wires the server it adds the port beside its caller and this constant becomes the
+   * `undefined` arm of it."*
+   *
+   * The composition lives with the caller because it is client work: `dev/main.ts` is one of the
+   * two modules `boundaries.test.ts` permits to hold a leaderboard client, and a screen that
+   * imported one would be the third.
+   */
+  readonly dailyBoard: (() => Promise<EverydayDailyBoard>) | undefined;
   /** Register a listener on `renderAll`'s notification list. Returns the unsubscribe. */
   onChange(listener: () => void): () => void;
 }
@@ -1392,6 +1493,15 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       b.applyPatch({ levers: { ...b.state().levers, dwell: choice } });
     },
     /* ----------------------------------------------- § 14.1, the spectator */
+    dailyBoard: async () => {
+      /*
+       * The whole of the host's part: when the page was served with no API origin there is nothing
+       * to ask, and that is a different sentence from a server that did not answer. Everything else
+       * is the caller's, because everything else is the client's.
+       */
+      const read = b.dailyBoard;
+      return read === undefined ? { kind: 'no-server' } : read();
+    },
     watchableRuns: async () => {
       const state = b.state();
       /*

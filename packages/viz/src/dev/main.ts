@@ -50,7 +50,12 @@ import {
   provideEngineerSettings,
   type EngineerSettingsBridge,
 } from '../everyday/engineerBridge.js';
-import { createEverydayHost, EVERYDAY_HOST, type EverydayHostBindings } from '../everyday/host.js';
+import {
+  createEverydayHost,
+  dailyBoardOf,
+  EVERYDAY_HOST,
+  type EverydayHostBindings,
+} from '../everyday/host.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -3721,6 +3726,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const everydayHostBindings: EverydayHostBindings = {
     resources,
+    /*
+     * #221's read half, composed here because it is client work: `boundaries.test.ts` permits
+     * exactly two modules to hold a leaderboard client and a screen would be a third. `undefined`
+     * when the page was served with no API origin — what a CDN-served bundle gets, and the honest
+     * no-server case, which is a different sentence from a server that did not answer.
+     *
+     * Two requests, and the first is what makes the second possible: `boards()` carries the
+     * server's own `today`, so the key is `daily:${date}` from the server's clock. Neither the date
+     * nor the fixture is worked out here. A client deciding which day it is would be a second
+     * answer to that question, which `client.ts#challenges` refuses by name.
+     */
+    dailyBoard:
+      client === undefined
+        ? undefined
+        : () => dailyBoardOf(() => client.boards(), (key, metric) => client.board(key, metric)),
     state: () => state,
     playheadS: () => playback?.simTimeS ?? state.recording?.startedAt ?? 0,
     dayClosed: () => state.recording !== undefined && filedRunId === state.recording.runId,

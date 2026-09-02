@@ -288,10 +288,10 @@ describe('a board', () => {
       ['2', 30],
       ['3', 35],
     ] as const) {
-      await store.recordEntry({ boardKey: 'board-1', dataHash: 'data-1', userId: ada, run: { ...RUN, seed }, measured: metrics(awtS) });
+      await store.recordEntry({ boardKey: 'board-1', dataHash: 'data-1', userId: ada, run: { ...RUN, seed }, measured: metrics(awtS), legs: 200 });
       tick(1000);
     }
-    await store.recordEntry({ boardKey: 'board-1', dataHash: 'data-1', userId: bo, run: { ...RUN, seed: '9' }, measured: metrics(33) });
+    await store.recordEntry({ boardKey: 'board-1', dataHash: 'data-1', userId: bo, run: { ...RUN, seed: '9' }, measured: metrics(33), legs: 200 });
 
     const board = await store.board('board-1', 'awtS', 25);
     // Two rows, not four. A board that listed every entry would put Ada in the top three places
@@ -309,12 +309,14 @@ describe('a board', () => {
       userId: ada,
       run: RUN,
       measured: { awtS: 20, wt95S: 90, ttdMeanS: 60, pctOverLongWait: 5, awtIsValid: true },
+      legs: 200,
     });
     await store.recordEntry({
       boardKey: 'board-2', dataHash: 'data-1',
       userId: bo,
       run: RUN,
       measured: { awtS: 25, wt95S: 40, ttdMeanS: 70, pctOverLongWait: 1, awtIsValid: true },
+      legs: 200,
     });
     expect((await store.board('board-2', 'awtS', 25)).map((entry) => entry.displayName)).toEqual(['Ada', 'Bo']);
     expect((await store.board('board-2', 'wt95S', 25)).map((entry) => entry.displayName)).toEqual(['Bo', 'Ada']);
@@ -322,16 +324,16 @@ describe('a board', () => {
 
   it('replaces rather than appends when the same seed is submitted again', async () => {
     const { store, ada } = await fixture();
-    const first = await store.recordEntry({ boardKey: 'board-3', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(40) });
-    const again = await store.recordEntry({ boardKey: 'board-3', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(40) });
+    const first = await store.recordEntry({ boardKey: 'board-3', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(40), legs: 200 });
+    const again = await store.recordEntry({ boardKey: 'board-3', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(40), legs: 200 });
     expect(again.id).toBe(first.id);
     expect(await store.board('board-3', 'awtS', 25)).toHaveLength(1);
   });
 
   it('keeps two boards apart', async () => {
     const { store, ada } = await fixture();
-    await store.recordEntry({ boardKey: 'board-4', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10) });
-    await store.recordEntry({ boardKey: 'board-5', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(60) });
+    await store.recordEntry({ boardKey: 'board-4', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10), legs: 200 });
+    await store.recordEntry({ boardKey: 'board-5', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(60), legs: 200 });
     expect((await store.board('board-4', 'awtS', 25))[0]?.measured.awtS).toBe(10);
     expect((await store.board('board-5', 'awtS', 25))[0]?.measured.awtS).toBe(60);
     expect((await store.boards()).map((board) => board.boardKey).sort()).toEqual(['board-4', 'board-5']);
@@ -339,15 +341,15 @@ describe('a board', () => {
 
   it('honours its limit', async () => {
     const { store, ada, bo } = await fixture();
-    await store.recordEntry({ boardKey: 'board-6', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10) });
-    await store.recordEntry({ boardKey: 'board-6', dataHash: 'data-1', userId: bo, run: RUN, measured: metrics(20) });
+    await store.recordEntry({ boardKey: 'board-6', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10), legs: 200 });
+    await store.recordEntry({ boardKey: 'board-6', dataHash: 'data-1', userId: bo, run: RUN, measured: metrics(20), legs: 200 });
     expect(await store.board('board-6', 'awtS', 1)).toHaveLength(1);
   });
 
   it('refuses an entry for a user that does not exist', async () => {
     const { store } = await fixture();
     await expect(
-      store.recordEntry({ boardKey: 'board-7', dataHash: 'data-1', userId: 'nobody', run: RUN, measured: metrics(10) }),
+      store.recordEntry({ boardKey: 'board-7', dataHash: 'data-1', userId: 'nobody', run: RUN, measured: metrics(10), legs: 200 }),
     ).rejects.toThrow();
   });
 
@@ -355,7 +357,7 @@ describe('a board', () => {
     const { store, ada } = await fixture();
     // Invariant 5, at the storage layer: an entry that lost its seed would be a score nobody could
     // ever re-verify, which is the one property the whole design rests on.
-    await store.recordEntry({ boardKey: 'board-8', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10) });
+    await store.recordEntry({ boardKey: 'board-8', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10), legs: 200 });
     expect((await store.board('board-8', 'awtS', 25))[0]?.run).toEqual(RUN);
   });
 });
@@ -555,7 +557,7 @@ async function rowsFor(sql: PgliteSql, reference: UserReference, userId: string)
 async function populate(store: Store, userId: string, suffix: string): Promise<void> {
   await store.createSession(`session-${suffix}`, userId);
   await store.createLoginToken({ jti: `jti-${suffix}`, userId, expiresAtMs: 1_770_000_060_000 });
-  await store.recordEntry({ boardKey: 'board-erasure', dataHash: 'data-1', userId, run: RUN, measured: metrics(10) });
+  await store.recordEntry({ boardKey: 'board-erasure', dataHash: 'data-1', userId, run: RUN, measured: metrics(10), legs: 200 });
   await store.recordChallengeEntry({
     challengeId: issuedChallengeFor(0).id,
     dataHash: 'data-1',
@@ -656,7 +658,7 @@ describe('an account deleted underneath a submission', () => {
     // The pre-check passes — the account is there when `recordEntry` looks — and the row is gone by
     // the time the insert runs. Before this was mapped, what came out was PostgreSQL's own
     // sentence, naming the constraint and the table, as an unhandled rejection.
-    const failure = store.recordEntry({ boardKey: 'raced', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10) });
+    const failure = store.recordEntry({ boardKey: 'raced', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10), legs: 200 });
     await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
     await expect(failure).rejects.toThrow('recordEntry: no such user');
     await expect(failure).rejects.not.toThrow(/foreign key|constraint|entries_user_id_fkey/u);
@@ -796,18 +798,22 @@ describe('two callers doing the same thing at the same moment', () => {
       contend: async (inner) => {
         await inner.query(
           'INSERT INTO entries (id, board_key, data_hash, user_id, seed, run_json, awt_s, wt95_s, ' +
-            'ttd_mean_s, pct_over_long_wait, submitted_at_ms) ' +
-            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-          ['first-in', 'contested', 'data-1', ada, RUN.seed, JSON.stringify(RUN), 11, 22, 33, 0, 1_770_000_000_000],
+            'ttd_mean_s, pct_over_long_wait, legs, submitted_at_ms) ' +
+            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
+          ['first-in', 'contested', 'data-1', ada, RUN.seed, JSON.stringify(RUN), 11, 22, 33, 0, 99, 1_770_000_000_000],
         );
       },
     });
     arm();
-    const row = await store.recordEntry({ boardKey: 'contested', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10) });
+    const row = await store.recordEntry({ boardKey: 'contested', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(10), legs: 200 });
     // The winner's row is the row, updated — not a second one and not a rejection. Its id comes
     // back from the statement, so the caller is told which row it actually wrote.
     expect(row.id).toBe('first-in');
     expect(row.measured.awtS).toBe(10);
+    // `legs` rides the same upsert as the means: the row that wins carries its own denominator,
+    // not the contender's 99. A mean from one run over a count from another is the exact defect
+    // the field exists to prevent.
+    expect(row.legs).toBe(200);
     const count = await sql.query('SELECT COUNT(*) AS n FROM entries WHERE board_key = $1', ['contested']);
     expect(Number(count.rows[0]?.['n'])).toBe(1);
   });

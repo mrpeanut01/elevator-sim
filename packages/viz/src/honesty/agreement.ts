@@ -348,6 +348,8 @@ function hostBindingsFor(view: AgreementView): EverydayHostBindings {
     stopWatching: refuse('stop a watch'),
     playThisCrowd: refuse('play a watched crowd'),
     watching: () => undefined,
+    /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
+    dailyBoard: undefined,
     onChange: () => () => undefined,
   };
 }

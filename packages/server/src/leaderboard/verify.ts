@@ -63,6 +63,15 @@ export interface VerificationAccepted {
   readonly ok: true;
   /** The **server's** metrics, which are what get stored. The claim is never persisted. */
   readonly measured: ClaimedMetrics;
+  /**
+   * Served legs in the measurement window — the `n` behind `measured.awtS`.
+   *
+   * Beside `measured` rather than inside it, because `ClaimedMetrics` is *what a player claims* and
+   * this is never claimed. See `store/store.ts#EntryRow.legs` for the full reason; the short one is
+   * that a denominator in the claim would be one more way to refuse an honest player, over the one
+   * number a dishonest one would most want to choose.
+   */
+  readonly legs: number;
 }
 
 export type Verification = VerificationAccepted | VerificationRejected;
@@ -307,5 +316,5 @@ export function verifySubmission(
     };
   }
 
-  return { ok: true, measured };
+  return { ok: true, measured, legs: summary.waiting.count };
 }
