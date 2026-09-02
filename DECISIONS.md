@@ -30900,3 +30900,33 @@ wall-clock gate will have the same problem on the one leg that is left.
 **Re-adding a leg is one `include:` entry.** If cost is the constraint rather than coverage, a macOS
 job restricted to `packages/cli` would buy back the only finding that was uniquely that leg's for a
 fraction of a full suite. Nobody has been asked for that and it is not assumed anywhere.
+
+
+## D463 — the preview deploy stops commenting on pull requests
+
+**Date: 2026-09-02 · Owner: the product owner, directly · The same cost objection as § D462.**
+
+`Azure/static-web-apps-deploy@v1` posted *"Your stage site is ready!"* on every push to an open pull
+request. On #334 it fired five times in fifty minutes. The comment is removed; the preview is not.
+
+**How, and why this is not a guess.** The action's `repo_token` input is gone. Its own `action.yml`
+declares that input `required: false` and describes it as *"Token for interacting with the Github
+repository. Currently used only for commenting on Pull Requests."* That definition was fetched and
+read before the change, because a token removed on a hunch would have failed the deploy rather than
+quieting it, and a red deploy job is a worse outcome than the comments.
+
+**What survives.** The upload runs, the preview environment deploys, and the URL still reaches the
+pull request: the job declares `environment.url` as `steps.deploy.outputs.static_web_app_url`, so it
+appears in the Deployments panel and on the environment. What is lost is a comment in the thread —
+one click further away, and no longer in anyone's notifications.
+
+**A permission went with it.** `pull-requests: write` was on that job for the comment and nothing
+else, so it is removed rather than left standing as a grant nothing uses. A workflow holding write
+access it does not exercise is the same shape as a behaviour with no caller, one directory over.
+
+**The `close-preview` job is untouched.** It never passed `repo_token` and never commented; it tears
+the environment down on close, which is what keeps the three-preview quota a non-event.
+
+**What this does not do.** It does not stop the preview deploy, which still costs runner minutes on
+every push. If the minutes are the objection rather than the noise, the change is to the job's `if:`
+and is a different decision from this one — nobody has asked for it and it is not assumed here.
