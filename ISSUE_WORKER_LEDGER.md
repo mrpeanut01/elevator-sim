@@ -1076,4 +1076,10 @@ same paragraph preaches two lines above.
   strings move by a small per-case constant in both tiers; `suppressed runs` unmoved.
 - **#146 and #158 need a ruling, not a lane.** Both are posted with the exits priced.
 - **`GAPS.md` has no staleness guard** and is the register issues are actually filed from —
-  [`RISKS.md`](RISKS.md) **R44**, and the reason #178 shipped with a fixed defect as its headline.
+  [`RISKS.md`](RISKS.md) **R44**, and the reason #178 shipped with a fixed defect as its
+  headline. **#325 owns building it**, filed with the row so R44 does not itself become an R42.
+  The three realised rows are corrected in place against the code, each citing the file and line
+  that contradicts it and each kept rather than deleted, because they are the row's evidence.
+  **That discharges the instances and not the class**, which is the whole reason #325 exists:
+  a guard over free prose is not available, so #325 prices three shapes of fix rather than
+  prescribing one, and says which it would take.

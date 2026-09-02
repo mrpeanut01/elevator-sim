@@ -618,7 +618,7 @@ posted **and** recorded, because posting alone is what produced that gap.
 | disposition | issues |
 |---|---|
 | **closed with evidence** | #323, #283 |
-| **filed from a finding** | #324 (the stage camera, split out of #283 under [§ D455](DECISIONS.md)) |
+| **filed from a finding** | #324 (the stage camera, split out of #283 under [§ D455](DECISIONS.md)) · #325 (a staleness guard for `GAPS.md`, the owner [`RISKS.md`](RISKS.md) R44 needed) |
 | **needs a product ruling — both exits priced on the issue** | #158, #146 |
 | **rescope, then schedule — premise corrected on the issue** | #159 |
 | **narrow, do not close — evidence posted per item** | #177 (7 → 6), #178 (9 → 6) |
@@ -643,9 +643,12 @@ separately, which is the only part of this that is new.
 
 ## E.5 What the next batch should be, and why
 
-1. **A staleness guard for `GAPS.md`.** Highest value in the backlog now, for the reason above: it is
-   the input to the issues, so every wave that does not have it pays for it twice. The shape already
-   exists and is proven — `buildNotes.test.ts` is thirty lines and fails both ways.
+1. **A staleness guard for `GAPS.md`** — now **#325**, filed with three shapes of fix priced and a
+   recommendation. Highest value in the backlog, for the reason above: it is the input to the
+   issues, so every wave without it pays twice. The shape exists and is proven —
+   `buildNotes.test.ts` is thirty lines and fails both ways — but it will not transfer unchanged,
+   because `GAPS.md` § 3 is prose and closure there is a strikethrough applied inconsistently.
+   The three realised rows are already corrected; the class is not.
 2. **#159's engine half, split out.** The four § 17 templates `EventEffect` cannot express gate more
    than half the wrinkle library, and building the data file first is how fifteen dead rows get
    authored.
