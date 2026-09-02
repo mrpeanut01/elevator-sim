@@ -940,3 +940,48 @@ integrator can check it rather than trust it.
 `src/validation/` + `src/runner/` **31 files, 355 passed, 6 skipped** · `--project viz-browser` on the
 touched file **11 passed** · `runner/coreBuildState.test.ts` **12 passed in 17 ms** ·
 `runner/parallel.test.ts` **12 passed, run in the state that used to fail the guard**.
+
+---
+
+## Wave N — opened 2026-09-02 at `aea42b5`, on a tree with no sibling wave in flight
+
+**The condition that shaped wave M is gone**: #322 and #326 both merged, no pull request is open, and
+this wave had the tree to itself. That changes what is safe — `honesty/surfaces.ts` and
+`vitest.config.ts` are no longer held by anybody — and it is why the corpus measurement could be
+taken here rather than deferred again.
+
+| Lane | Task | Issues | Status |
+|---|---|---|---|
+| B1 | Have the R42-class rulings been built, and do their blockers still hold? | #123, #275, #130 | **reported** |
+| B2 | What does *blocked on a server* mean at HEAD? | #161, #179, #221, #222, #226, #248 | **reported** |
+| B3 | Which tester-gated criteria are actually tester-gated? | #208, #210, #211, #218 | **reported** |
+| B4 | Does #237's premise hold four waves later? | #237 | **reported** |
+| N-1 | The owner's charter ruling, across four documents | § D456 | **landed** |
+| N-2 | The corpus measurement owed under § D343 | § D457 | **landed** |
+
+All four verification lanes were read-only. **Every one found its issue's recorded state wrong**,
+which is a worse hit rate than wave M's three-of-four and is the reason snapshot F recommends the
+blocked set be re-read every wave until #329 exists.
+
+### What the integrator got wrong, recorded because it was written down first
+
+I wrote *"the row is stale by two waves"* into a scheduled check-in before measuring the corpus, on
+the reasoning that `CLAUDE.md` was last touched by wave K while wave L had edited
+`honesty/surfaces.ts`. **Measured, wave L moved both tiers by zero and the row was accurate.** The
+inference was reasonable and the measurement was cheap, which is exactly the combination this
+repository has recorded five times before and now six.
+
+### One claim I checked rather than relayed
+
+Lane B3 reported a human comment on #211 lifting its tester gate. That is load-bearing enough — it
+contradicts a snapshot and re-aims an issue — that I fetched the comment thread myself before acting
+on it, rather than taking the lane's word. It is there, it is from a different author than the
+Claude-generated comments on the same issue, and it is dated three days before the snapshot that
+contradicted it.
+
+### Verified
+
+`npx tsc -b` clean · `validation/documentation.test.ts` + `citations.test.ts` **35 passed** ·
+the four suites that read the changed documents (`refusalsAreCurrent`, `buildNotes`, `honesty/faults`,
+`honesty/honesty`) **4 files, 63 passed, 1 skipped** · corpus measured on the integrated tree, both
+tiers, base re-measured first.

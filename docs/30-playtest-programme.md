@@ -27,7 +27,11 @@ and `M` are all taken by a governing document in this tree, and `Q` is not.
 **Two of the charter's ten success criteria have no instrument other than this one, and neither can
 ever acquire a different one.**
 
-> **`charter S6`** — *6 of 10 testers can state, unprompted, why the simulator refused a number.*
+> **`charter S6`** — *6 of 10 testers can say, unprompted, what a refusal means for their next
+> change, and no tester is stopped by one.* **Reworded 2026-09-02** ([§ D456](../DECISIONS.md)); it
+> used to ask whether a tester could state the statistical ground. The trade is set out in
+> [`22-charter.md`](22-charter.md) § 4 and it is a trade, not a strengthening — softer on
+> articulation, and with no tolerance at all for a tester who stops.
 > **`charter S7`** — *lift-industry testers rate the model credible after inspecting it, not after
 > being told about it.*
 
@@ -79,7 +83,11 @@ answer, and who writes the verdict. §§ 4, 6 and 8 are that half.
 
 **One correction it carries forward.** `docs/25` X2 is **wider** than § M2's second criterion and
 deliberately so: § M2 measures the *diagnosis* (*what went wrong and why their change helped*) and
-never measures the *refusal*, which is `charter S6` and is the thing this product is actually for.
+never measures the *refusal*, which is `charter S6`. **That clause used to end *"and is the thing
+this product is actually for"*, and it is withdrawn** ([§ D456](../DECISIONS.md)): the refusal is
+what this product must never get wrong, and it is not what the product is for. A tower-management
+game is for the session; refusing an unsupportable figure is a constraint the session is built
+under, and a document that confuses the two will keep producing screens that are correct and no fun.
 The two halves fail independently. This document measures both and never collapses them, because a
 slice that is clear about the easy half and silent about the hard one would otherwise pass.
 

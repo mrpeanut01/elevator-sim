@@ -30544,3 +30544,112 @@ open-versus-closed, and it has the same cause: it needs something this tier does
 defence is procedural rather than mechanical — a placeholder must be resolved before the issue that
 created it closes — and naming it here is worth more than a guard that could only ever recognise the
 one number.
+
+## D456 — the honesty pillars are constraints on the session, not the reason for it
+
+**Date: 2026-09-02 · Owner: the product owner, directly · The first ruling that puts a price on a
+refusal.**
+
+**The instruction, quoted rather than paraphrased**, given on 2026-09-02 against the charter's
+central claim and its `charter S6` gate:
+
+> These are good goals, but not at the expense of game play.
+
+**Decision.** Three changes, and none of them softens a figure.
+
+1. **`charter P2` gains a second refusal test, pointing the other way.** The first asks *does this
+   change make the product say less?* The second asks *can the player still play?* A refusal that is
+   correct and stops the loop is a defect. Refusals may not accumulate into a wall, may not take the
+   space the player's next action needs, and may not require a statistical vocabulary before they can
+   be acted on.
+2. **§ 2 states that a pillar is not the reason the game exists.** A change satisfying all five and
+   leaving the game less worth playing is refused by the same review that would refuse a softened
+   figure, and the resolution is never to weaken the pillar and never to accept the loss quietly.
+3. **`charter S6` is reworded**, from *state, unprompted, why the simulator refused a number* to
+   *say, unprompted, what a refusal means for their next change, and no tester is stopped by one*.
+
+**Why the pillar needed a second test, in mechanical terms.** P2's test could only ever be failed in
+one direction. Every change that added refusal text passed it and no change could fail it, so the
+pillar behaved as a ratchet — and it ratcheted onto the surfaces a player actually reads. GitHub
+issues **#208** (*the first session presents no problem to solve*) and **#211** (*cut player-facing
+copy to a readable length without losing a claim*) are that ratchet reported from the other end, by
+people who could see the result and not the cause. A one-directional test on a pillar is the same
+defect class this repository already records for a control that can only be added to.
+
+**The S6 trade is stated rather than dressed up.** The new wording is **weaker on articulation** — a
+tester who says *it will not give me an average yet, so I should clear the backlog first* now passes
+where they once failed — and **strictly harder on blocking**, because a single tester abandoning the
+loop at a refusal now fails the criterion outright, where four of ten could previously be stopped and
+the gate still passed. Calling that a strengthening would be this repository's own worst habit
+performed on its charter, so it is called a trade.
+
+**What is not touched, and this is the load-bearing half.** The product still never prints a figure
+the run cannot support. `charter P1` is unchanged, `charter S8` is unchanged, and S8 is the criterion
+with the working instrument — the R1–R13 corpus over both tiers. `CLAUDE.md`'s suppression rules,
+the five `awtIsValid` grounds and every threshold are unchanged. **No acceptance criterion was
+weakened to make anything pass**, which the working agreements forbid outright; a criterion was
+re-aimed by the owner who set it, which is the one route that agreement leaves open.
+
+**The precedent this follows rather than invents.** `docs/32-game-design.md` § 4.3 already argued it
+in miniature: *a refusal and a miss may not share a visual treatment*, because a screen rendering
+both the same way teaches the player that the product's honesty is their punishment. That paragraph
+needed no amendment; the charter needed to catch up with it.
+
+**One sentence is withdrawn rather than reworded.** `docs/30-playtest-programme.md` said the refusal
+*"is the thing this product is actually for"*. It is not. A tower-management game is for the session;
+refusing an unsupportable figure is a constraint the session is built under. A document that
+confuses the two will keep producing screens that are correct and no fun, and will keep passing every
+gate while it does.
+
+## D457 — waves L and M each moved the corpus by zero, and one of the zeros is arithmetic
+
+**Date: 2026-09-02 · Owner: integrator, wave N · The measurement [§ D343](#d343) requires, taken once
+on the integrated tree.**
+
+**Decision.** The corpus was measured once after integration, both tiers in one sitting, on the
+integrated tree at `aea42b5` and never on a branch — and the base at `39c1f1c` was re-measured first
+in a detached worktree so a move could be told from a correction.
+
+**The base reproduced its published row exactly, in both tiers**, for the **sixth** consecutive wave:
+49 / 575 999 / 606 / 55 / 0 and 60 / 718 633 / 4 710 / 56 / 0.
+
+| | base `39c1f1c` | integrated `aea42b5` | move |
+|---|---|---|---|
+| always-on strings | 575 999 | **575 999** | **0** |
+| deep strings | 718 633 | **718 633** | **0** |
+| always-on surfaces | 55 | **55** | **0** |
+| deep surfaces | 56 | **56** | **0** |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+**Two zeros, and they are different kinds of thing.**
+
+**Wave L's zero was worth measuring precisely because the row looked stale.** `CLAUDE.md` was last
+touched by wave K, wave L merged five lanes including edits to `honesty/surfaces.ts` itself, and no
+corpus row moved. The integrator of this wave wrote *"the row is stale by two waves"* into a
+scheduled check-in **before** measuring it, and the measurement refuted that: the base reads exactly
+what wave K published. Five lanes touching the corpus's own surface file, `menu/`,
+`shift/reportWindow.ts` and `campaign/judge.ts` added and removed no string at all.
+
+That is this repository's oldest lesson arriving on the person applying it, and it is recorded here
+rather than quietly corrected, because the inference was reasonable and still wrong. **A row that
+looks stale and a row that is stale are different claims**, and only one of them can be settled by
+reading commit history.
+
+**Wave M's zero is exact, and the arithmetic is the whole of it.** GitHub issue #283 added two keys
+to `everyday/designerModel.ts#DESIGNER_COPY`, which `honesty/surfaces.ts` iterates generically rather
+than naming, and deleted two entries from `DESIGNER_ABSENCES`, which the build-notes adapter seeds.
+**+2 − 2 = 0 per case**, so 49 × 0 and 60 × 0. A substitution on a player screen is invisible to a
+string count by construction, and the only thing that distinguishes it from *nobody measured* is that
+the base was measured too.
+
+**The forecast was wrong in the direction that matters more.** Wave M's ledger predicted *"strings
+moving by a small per-case constant in both tiers"*. The constant is zero. § D454 recorded four
+forecasts short by exactly one string per case; this one predicted motion where there is none, which
+is worse: a forecast expecting a move teaches its reader to treat a correct zero as a failed
+measurement, and the next integrator who sees no change may go looking for the run that did not
+happen instead of publishing the result.
+
+**The surface sets were diffed rather than the counts compared**, in both tiers. Identical, nothing
+added, nothing removed. The deep tier's one-surface lead survives and the set difference names it:
+`campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is in
+always-on and not in deep.

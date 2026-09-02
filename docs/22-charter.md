@@ -53,6 +53,14 @@ A pillar is not a value. **A pillar is a sentence a reviewer may quote to refuse
 and every player-facing pull request names the pillar it serves
 ([`MULTI_AGENT_PLAN.md`](../MULTI_AGENT_PLAN.md) § 8).
 
+**And a pillar is not the reason the game exists.** All five are constraints a good session is built
+under. A change that satisfies every one of them and leaves the game less worth playing is refused by
+the same review that would refuse a softened figure. Where a pillar and the quality of the session
+genuinely conflict, the answer is never to weaken the pillar and never to accept the loss quietly: it
+is to change the design until both hold, and to say so on the issue rather than shipping whichever
+half was easier to measure. **Product owner, 2026-09-02** — *these are good goals, but not at the
+expense of game play* ([§ D456](../DECISIONS.md)).
+
 ### P1 — The building is real
 
 Every number on a player surface comes from the run, the batch, or `core/analytical`. No figure is
@@ -76,6 +84,21 @@ widens a threshold, hides a qualifier, or rewords a refusal into reassurance is 
 [§ D299](../DECISIONS.md)'s standing test, and it binds the game layer in both registers, not only
 Engineer. A stale refusal is the more dangerous half: a control that writes something may not claim
 it writes nothing ([§ D227](../DECISIONS.md)).
+
+**The second refusal test, and it points the other way.** *Can the player still play?* A refusal
+that is correct and stops the loop is a defect, not a success. Refusals may not accumulate into a
+wall, may not take the space the player's next action needs, and may not require a statistical
+vocabulary before they can be acted on.
+
+**Nothing is softened by this and no threshold moves.** The first test binds in full; the product
+still never prints a figure the run cannot support. What changed is that honesty had no price
+attached. Every lane that added refusal text passed P2, and no lane could ever fail it, so the
+pillar worked as a ratchet — and it had been ratcheting onto the surfaces a player actually reads.
+[`32-game-design.md`](32-game-design.md) § 4.3 already made this argument in miniature — *a refusal
+and a miss may not share a visual treatment*, because a screen that renders both the same way is
+teaching the player that the product's honesty is their punishment. This is that argument promoted
+to the pillar it belongs to. Adopted by the product owner on 2026-09-02,
+[§ D456](../DECISIONS.md).
 
 ### P3 — The stage shows what the report will later say
 
@@ -158,11 +181,25 @@ criteria*, which are untouched by this document and remain binding in full.
 | **S3** | **Median first session is 10 minutes or longer** | Session-length distribution | The median falls below 10 minutes |
 | **S4** | **25 %** of day-one players return within 7 days | Cohort retention | Under 25 % of the day-one cohort returns inside the window |
 | **S5** | **No campaign stage clears from the dispatcher dropdown alone** | Automated sweep over every stage × every admitted profile, paired intervals under CRN | Any stage records `verdict.cleared` on a dispatcher change with no other intervention |
-| **S6** | **6 of 10** testers can state, unprompted, why the simulator refused a number | Moderated playtest, recorded | Fewer than 6 of 10 can state the ground |
+| **S6** | **6 of 10** testers can say, unprompted, what a refusal means for their next change — and **no tester is stopped by one**. Stating the statistical ground counts and is not required | Moderated playtest, recorded | Fewer than 6 of 10 can say what to do next, **or** any tester abandons the loop at a refusal |
 | **S7** | Lift-industry testers rate the model credible **after inspecting it**, not after being told about it | Structured interview following a hands-on inspection | A majority of recruited practitioners name a modelling defect that changes their verdict |
 | **S8** | **Every player-facing claim survives the honesty search** | The R1–R13 corpus, both tiers, extended to every new surface | Either tier reports a violation not held in `honesty.test.ts`'s `OUTSTANDING` register |
 | **S9** | Cold load to interactive **under 3 s** on a mid-range laptop | CI budget, failing the build | The measured cold load exceeds 3 s on the target matrix |
 | **S10** | **Every shipped mode is completable end to end without leaving the mode** | Journey tests in [`TEST_MATRIX.md`](../TEST_MATRIX.md) | Any mode requires a detour through another mode, or any journey row regresses from `passing` |
+
+**S6 was reworded on 2026-09-02 and the trade is stated rather than presented as a strengthening**
+([§ D456](../DECISIONS.md)). It used to read *6 of 10 can state, unprompted, why the simulator
+refused a number*. That measured a player's statistical fluency, and a product optimising for it is
+pushed toward refusals that are prominent, frequent and long — which is the pressure GitHub issues
+**#208** and **#211** are reporting from the other end.
+
+The new wording is **weaker in one respect and strictly harder in another**, and both halves are
+deliberate. It no longer requires a tester to articulate the ground, so an answer like *it will not
+give me an average yet, so I should clear the backlog first* now passes where it once failed. In
+exchange it adds a clause with no tolerance at all: **any** tester abandoning the loop at a refusal
+fails the criterion outright, where previously four of ten could be stopped and the gate still
+passed. The honesty commitment itself is untouched and is measured mechanically by **S8**, which is
+the criterion that would catch the product printing something it cannot support.
 
 ### Which of these can be evaluated today, and which cannot
 

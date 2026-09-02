@@ -1180,3 +1180,99 @@ same paragraph preaches two lines above.
   **That discharges the instances and not the class**, which is the whole reason #325 exists:
   a guard over free prose is not available, so #325 prices three shapes of fix rather than
   prescribing one, and says which it would take.
+
+---
+
+# Wave N — 2026-09-02: the owner's ruling, and two corpus zeros
+
+**Taken at `aea42b5`** (= `origin/main`, wave M merged). **Open issues at the start: 69. Open pull
+requests: 0.**
+
+## N.1 The product owner re-aimed the charter, and it is the first ruling that puts a price on a refusal
+
+Given directly, and quoted rather than paraphrased ([§ D456](DECISIONS.md)):
+
+> These are good goals, but not at the expense of game play.
+
+**`charter P2`'s test could only ever fail in one direction.** It asks whether a change makes the
+product say *less*, so every change that added refusal text passed it and no change could fail it.
+The pillar behaved as a ratchet, and it had been ratcheting onto the surfaces a player actually
+reads. **GitHub issues #208 and #211 are that ratchet reported from the other end**, by people who
+could see the result and not the cause — which is why this ruling closes nothing and re-aims four
+open issues.
+
+P2 gains a second test (*can the player still play?*), § 2 states that a pillar is not the reason the
+game exists, and `charter S6` moves from *state why the simulator refused a number* to *say what a
+refusal means for your next change, and no tester is stopped by one*. **The S6 trade is written into
+the charter rather than dressed as a strengthening**: weaker on articulation, strictly harder on
+blocking, because one tester abandoning the loop now fails it outright where four of ten could
+previously be stopped. `charter P1` and `charter S8` are untouched and S8 is the one with a working
+instrument, so the honesty commitment itself did not move.
+
+One sentence was **withdrawn rather than reworded**: `docs/30` said the refusal *"is the thing this
+product is actually for"*. It is not, and a document that confuses a constraint with a purpose keeps
+producing screens that are correct and no fun.
+
+## N.2 The corpus moved by zero twice, and only one of the zeros is interesting
+
+[§ D457](DECISIONS.md). Measured once on the integrated tree, both tiers in one sitting, base
+re-measured first in a detached worktree — where it reproduced its published row **exactly in both
+tiers**, the sixth consecutive wave.
+
+| | base `39c1f1c` | integrated `aea42b5` | move |
+|---|---|---|---|
+| always-on strings | 575 999 | **575 999** | **0** |
+| deep strings | 718 633 | **718 633** | **0** |
+| surfaces, both tiers | 55 / 56 | **55 / 56** | **0** |
+
+**Wave M's zero is arithmetic.** #283 added two `DESIGNER_COPY` keys, which `honesty/surfaces.ts`
+iterates generically, and deleted two `DESIGNER_ABSENCES` entries, which the build-notes adapter
+seeds. **+2 − 2 = 0 per case.**
+
+**Wave L's zero is the one worth reading, because I got it wrong first.** `CLAUDE.md` was last
+touched by wave K, wave L merged five lanes including edits to the corpus's own surface file, and I
+wrote *"the row is stale by two waves"* into a scheduled check-in **before measuring it**. The base
+reads exactly what wave K published. A row that *looks* stale and a row that *is* stale are different
+claims, and only one of them can be settled by reading commit history. Sixth instance of this
+project's oldest lesson, and the first where the wrong inference was written down first.
+
+**The forecast wave M published was wrong in the worse direction** — it predicted *a small per-case
+constant* and the constant is zero. § D454 recorded forecasts short by one string per case; a
+forecast expecting motion teaches its reader to treat a correct zero as a failed measurement.
+
+## N.3 The blocked set, re-read for the first time
+
+Four read-only lanes checked whether snapshot C's blockers still held. **The sorting was wrong in
+every group** — the detail is [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md) snapshot F. Headlines:
+
+- **There is no server cluster.** A complete, deployed API with 329 passing tests, and #179 closed
+  2026-09-01. **#221 is unblocked and is the highest-leverage item in the backlog.**
+- **One of four tester-blocked issues is tester-blocked.** #211's gate was lifted by the owner on
+  2026-08-26 in a comment nothing in this repository had absorbed, and snapshot C asserted the
+  opposite three days later.
+- **#275's blocker merged 2026-08-26** and it sat blocked for a week.
+- **#237, the only P0, rests on a refuted premise** — 3 passing / 14 owned / 4 planned, and all **40**
+  named test files exist. Its own second criterion was satisfied before it was filed.
+
+**Filed from findings:** #327 (no endpoint returns a distribution), #328 (nothing runs on a
+schedule), #329 (a blocker that clears is watched by nothing). **Dispositioned on the issue with
+evidence:** #146, #158, #159, #161, #177, #178, #208, #210, #211, #218, #221, #222, #226, #237, #248,
+#275.
+
+## N.4 Two register corrections, both in the same direction
+
+[`RISKS.md`](RISKS.md) **R45** is new: *a blocker that clears is not an event anything watches for.*
+Realised three times in one wave, and the observation itself was written down by snapshot C on
+2026-08-29 and never built — R42 with a process note as its subject. #329 owns it.
+
+**R42's own citation was stale**, and is corrected: it cited a `docs/16` sentence that exists nowhere
+in the tree. **The register that tracks stale claims was carrying one**, which is R44 with `RISKS.md`
+as its subject.
+
+## N.5 Owed to the next wave
+
+- **#221 first.** No blocker, and it gates four other things. Retract `everyday/buildNotes.ts`'s and
+  `everyday/world.ts`'s *this build ships no server* on the same commit — both are live and false.
+- **The API image is deployed by hand** and its store migration is manual, so #221's end-to-end
+  acceptance has an operational prerequisite that is not code.
+- **#237 and #146 need a ruling, not a lane.** Both are posted with the exits priced.
