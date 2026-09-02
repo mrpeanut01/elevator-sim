@@ -409,6 +409,11 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     const hint = el(doc, 'p', undefined, COPY.machineStepsHint);
     hint.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.45;margin:11px 0 0`;
     machinePanel.append(hint);
+    /* Where the rest of a machine is authored. It used to be a row in DESIGNER_ABSENCES, which
+       read as *this build cannot do it* when the truth is that another surface owns it — #283. */
+    const owns = el(doc, 'p', 'everyday-designer-machine-owner', COPY.machineOwnershipHint);
+    owns.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.45;margin:7px 0 0`;
+    machinePanel.append(owns);
 
     /*
      * The class § 10.1's automatic choice would have picked, offered rather than applied. Applying
@@ -458,6 +463,12 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     );
     legend.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-bottom:11px`;
     servicePanel.append(legend);
+
+    /* Service zoning is not access zoning, and the board that sets one does not set the other.
+       This sentence is the half of a deleted absence row worth keeping — #283. */
+    const scope = el(doc, 'p', 'everyday-designer-service-scope', COPY.serviceScopeHint);
+    scope.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.45;margin:0 0 11px`;
+    servicePanel.append(scope);
 
     const rows = el(doc, 'div');
     rows.style.cssText = 'display:grid;gap:9px';

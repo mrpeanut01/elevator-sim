@@ -39,7 +39,9 @@
  *   looking right — so the class is drawn once, and {@link DESIGNER_ABSENCES} says so.
  * - **No escalators, no duty, no credential dots on the elevation.** `SpecTransportMode` exists and
  *   is carried, but no control here authors one; § 13.2's grid is the Engineer building editor's
- *   surface and is not re-drawn in Casual clothes on this pass.
+ *   surface and is not re-drawn in Casual clothes on this pass. The screen says so on its own face
+ *   now rather than only here — {@link DESIGNER_COPY}'s `serviceScopeHint` — because a boundary a
+ *   player cannot see reads to them as a capability the product lacks.
  * - **The service column is bands, not hand-drawn cells.** § 10.2's *drawn by hand* override has no
  *   field in `BuildingSpec`; what it does have is `bandByCar` and `noLobby`, which are § 10.2's
  *   *zone's bands* and *shuttle* respectively, and those are the two this screen writes.
@@ -105,6 +107,16 @@ export const DESIGNER_COPY = Object.freeze({
   /** Drawn for a figure the closed form refused. Never a stale number, never NaN. */
   withheld: '—',
   machineStepsHint: 'Rated speed and rated load are steps within the class, not free numbers.',
+  /*
+   * The two hints below carry what left {@link DESIGNER_ABSENCES} under GitHub issue #283. Each
+   * says where a capability is authored rather than that it is missing, and each stands beside the
+   * control a reader would otherwise mistake for it — which is why they are hints and not rows in
+   * a register of absences.
+   */
+  serviceScopeHint:
+    'This board sets which floors each lift physically serves. Who is allowed where is saved with the design as well, and is written in the simulator’s building editor.',
+  machineOwnershipHint:
+    'A sky lobby’s starting floor, and the finer ride characteristics behind a class, are set in the simulator’s machine editor.',
 } as const);
 
 /**
@@ -114,15 +126,22 @@ export const DESIGNER_COPY = Object.freeze({
  * registers — so a player can see the shape of the missing half rather than infer it from a gap.
  * Each entry names the thing that is missing rather than the feeling of missing it.
  *
- * **This was the one register in the tree with no plain-English row in it**: all five entries used
- * to open with a section number of the design document and one named a type by its identifier.
- * They say the same five things; GitHub issue #207 is why they say them in the screen's vocabulary.
+ * **This was the one register in the tree with no plain-English row in it**: every entry used to
+ * open with a section number of the design document and one named a type by its identifier. What
+ * each row claims is unchanged; GitHub issue #207 is why they say it in the screen's vocabulary.
+ *
+ * **Two entries left this register rather than being built, and the distinction is the point.**
+ * They said where a capability is *authored* — access credentials, and a sky lobby's starting floor
+ * — which is an ownership boundary between two surfaces and not a thing this build cannot do. A
+ * register of what is missing was the wrong home for a sentence whose subject exists, so they are
+ * now what they always were: hints standing beside the controls they qualify
+ * ({@link DESIGNER_COPY}'s `serviceScopeHint` and `machineOwnershipHint`). Deleting them without
+ * moving the words would have cost a reader the one sentence that tells service zoning and access
+ * zoning apart, which `CLAUDE.md` names outright as a thing never to collapse. GitHub issue #283.
  */
 export const DESIGNER_ABSENCES: readonly string[] = Object.freeze([
   'a machine class per shaft — a design carries one class, one rated speed and one rated load for the whole building, so a picker on each shaft would be five controls writing the same setting',
-  'the access panel and its credential dots — who is allowed where is saved with a design and is written in the simulator’s building editor, not here. What this board sets is which floors a lift physically serves, which is a different thing.',
   'escalator rows — a design can carry escalators through a save, and nothing on this board writes them',
-  'the sky-lobby starter and the five ride characteristics it would let you edit — the machine editor on the simulator side owns those',
   'the folded-up specification — the block below is what it would print, without the fold',
 ]);
 

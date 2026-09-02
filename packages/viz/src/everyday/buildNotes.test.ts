@@ -173,9 +173,14 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'third piece of advice does not open the tuner', issue: 177 },
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Endless rush', issue: 220 },
 
-  /* The stage. The camera is #283's — it may be a deliberate position rather than a gap. */
+  /*
+   * The stage. The camera was #283's, held there while it was open whether the whole-building
+   * cutaway is a deliberate read rather than a gap. § 7.3 of the design handoff lists the camera
+   * among what a player can touch, so it is a gap, and #324 is the issue that will build it or
+   * record the decision not to.
+   */
   { register: 'STAGE_ABSENCES', fragment: 'no campaign dock', issue: 181 },
-  { register: 'STAGE_ABSENCES', fragment: 'no camera', issue: 283 },
+  { register: 'STAGE_ABSENCES', fragment: 'no camera', issue: 324 },
   { register: 'STAGE_ABSENCES', fragment: 'no answer to a live incident', issue: 171 },
   /* The same missing second recording the shell's *Racing a second dispatcher* entry is about,
      said from the stage's side. One mechanism, one issue, two registers that both meet it. */
@@ -188,14 +193,14 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   { register: 'RUSH_ABSENCES', fragment: 'the standings', issue: 177 },
 
   /*
-   * The designer. #177 § 5 names three of these five by name; the other two say the capability
-   * lives on the Engineer surface, which is an ownership boundary rather than an absence — #283
-   * asks whether they belong in this register at all.
+   * The designer. All three are #177 § 5's, and there used to be five: the other two said the
+   * capability lives on the Engineer surface, which is an ownership boundary rather than an
+   * absence. #283 asked whether they belonged in this register and the answer was no — they are
+   * hints beside the controls they qualify now, and this table is shorter by two rather than
+   * pointing at two more issues.
    */
   { register: 'DESIGNER_ABSENCES', fragment: 'a machine class per shaft', issue: 177 },
-  { register: 'DESIGNER_ABSENCES', fragment: 'the access panel and its credential dots', issue: 283 },
   { register: 'DESIGNER_ABSENCES', fragment: 'escalator rows', issue: 177 },
-  { register: 'DESIGNER_ABSENCES', fragment: 'the sky-lobby starter', issue: 283 },
   { register: 'DESIGNER_ABSENCES', fragment: 'the folded-up specification', issue: 177 },
 
   /* The campaign. */
