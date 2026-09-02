@@ -1001,6 +1001,7 @@ publish a correct figure that is wrong in the integrated tree.
 | The daily board reads, and a row carries its own `n` | #221 | **landed** `5ea3805` |
 | Three refusals the read made false | #221, § D460 | **landed** `75b3071` |
 | The corpus, measured on the integrated tree | § D461 | **landed** — +19 strings a case, both tiers, exact |
+| The macOS CI leg removed, on the owner's call | § D462 | **landed** — six files claimed two legs and all six corrected |
 
 ### What found the defect, and what did not
 

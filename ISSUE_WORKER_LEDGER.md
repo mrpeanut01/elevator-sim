@@ -1381,7 +1381,45 @@ both tests passed against the wrong fixture. Caught by an assertion, fixed by ta
 always-on figures into a file named `deep`, and they were caught only because the file states its own
 tier on line one.
 
-## O.5 Owed to the next wave
+## O.5 The owner's CI ruling, taken mid-wave
+
+The macOS red on #334 put the question in front of the product owner and the answer was to remove
+the leg: *"We're deploying out to Azure, so we don't need anything else burning CPU or tokens."*
+§ D462.
+
+**The reasoning holds where it was aimed.** A second leg proves portability to a platform nothing is
+shipped on, and the objection was cost. What it also removes is the instrument § D196/§ D201 built:
+portability stops being a *measured* property, and an environment-dependent pin goes back to being
+indistinguishable from a portable one.
+
+**The concern was raised once, in two sentences, and then the work was done in full.** That is the
+shape this file should record for the next time: a stated cost, an owner's call, and no
+re-litigation.
+
+**The cost was overstated on the first pass and corrected by checking.** The draft `ci.yml` header
+said three defects go unguarded. Checked one at a time:
+
+| finding | uniquely the macOS leg's? |
+|---|---|
+| CLI `ENOTCONN` | **Yes, found there and nowhere else** — but `process.test.ts` fires every `BROKEN_PIPE_CODES` member individually, written so coverage would not depend on the machine. The known codes stay covered; finding an unknown fourth does not |
+| `dist-web/` race | No — both legs reported it on the same commit, in different symptoms |
+| Pinned viewport offset | No — the two legs agreed with *each other* against a local machine. CI-versus-local, not macOS-versus-linux |
+
+Counting them would have made the trade look worse than it is, which is the same error in the
+opposite direction from the one this project usually makes. The honest loss is one sentence: no
+second platform is watching.
+
+**Six files claimed the two-leg matrix and all six were corrected at their sites**, with the
+present-tense claims changed and every historical measurement left exactly as written.
+`docs/31-support-matrix.md` is an **adopted specification of record**, so it got a dated amendment
+rather than an edit that matched it to the new reality.
+
+**The find worth carrying:** `traffic/dayStartIdentity.test.ts` justified regenerating pins locally
+by citing three machines that agreed. That route is gone, and nobody had said so. A pin regenerated
+from here rests on one machine, which is § D201's defect wearing an equality assertion. The
+docstring now warns where somebody about to regenerate will read it.
+
+## O.6 Owed to the next wave
 
 - **#221 has three criteria left**, and the next one is **#332**, the Everyday sign-in. Posting is
   blocked on it and nothing else. The daily challenge tab is the one after that.
@@ -1395,4 +1433,16 @@ tier on line one.
   because every test opens an empty database. Filed rather than fixed here because a migration
   runner is its own build with its own acceptance criteria, and because the pre-existing-row answer
   is a decision to record rather than assume.
-- **#275 and #329** are still the two whose blockers cleared and which nothing has picked up.
+- **#275 and #329** are still the two whose blockers cleared and which nothing has picked up. Three
+  consecutive waves now, which is #329's own subject arriving for the third time.
+- **#335 is re-aimed rather than closed.** Removing the macOS leg made its red go away and answered
+  nothing: `BLOCKED_FRAME_GAP_MS` is still a wall-clock bound calibrated on Linux and enforced as
+  though portable, and the Linux leg is the same kind of shared VM. `docs/31-support-matrix.md` § 5
+  had written this class down before it happened — *"a wall-clock budget on hardware with that
+  spread will produce flaky red runs"* — and that paragraph is now annotated with the run that
+  proved it.
+- **A notification pattern to distrust.** `check_suite.completed` envelopes saying *"no third-party
+  check suite is still running or failed"* arrived **three times for superseded heads**. Twice they
+  would have read as *CI is done* while the current head was still running, and once the sibling job
+  had been **cancelled** rather than passed. Verify with `list_workflow_jobs` against the current
+  head sha before acting on one.
