@@ -1002,6 +1002,8 @@ publish a correct figure that is wrong in the integrated tree.
 | Three refusals the read made false | #221, § D460 | **landed** `75b3071` |
 | The corpus, measured on the integrated tree | § D461 | **landed** — +19 strings a case, both tiers, exact |
 | The macOS CI leg removed, on the owner's call | § D462 | **landed** — six files claimed two legs and all six corrected |
+| The preview deploy stops commenting on pull requests | § D463 | **landed** — `repo_token` withheld, checked against the action's own `action.yml` first |
+| One push per wave, not one per commit | working agreement | **landed** — the fix for noise this session generated itself |
 
 ### What found the defect, and what did not
 

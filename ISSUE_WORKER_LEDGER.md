@@ -1419,7 +1419,40 @@ by citing three machines that agreed. That route is gone, and nobody had said so
 from here rests on one machine, which is § D201's defect wearing an equality assertion. The
 docstring now warns where somebody about to regenerate will read it.
 
-## O.6 Owed to the next wave
+## O.6 Two more owner calls on cost, and the noise this session made for itself
+
+**§ D463 — the preview deploy stops commenting.** `Azure/static-web-apps-deploy@v1` posted *"Your
+stage site is ready!"* on every push; on #334 it fired five times in fifty minutes. Its `repo_token`
+input is removed. **The action's own `action.yml` was fetched and read before the change** — it
+declares that input `required: false` and *"currently used only for commenting on Pull Requests"* —
+because a token dropped on a hunch would have failed the deploy rather than quieting it. The preview
+still deploys and its URL still reaches the pull request through `environment.url`.
+`pull-requests: write` went with it, since the comment was the only thing using it.
+
+**The superseded-head notifications were entirely self-inflicted, and the count is the finding.**
+Four pushes in one hour, three of them cancelling a CI run in flight — one **45 minutes** in. A
+cancelled run still *completes* its check suite, and that completion arrives saying *"no third-party
+check suite is still running or failed"* about a commit that is no longer the head. Five of those in
+one session. **One described a head whose sibling job had been cancelled rather than passed**, so
+acting on it would have meant declaring CI green while it was still running.
+
+The fix is a working agreement in `CLAUDE.md`: commit freely, push once per wave. **Stated as
+discipline rather than a gate, because nothing enforces it** — and this file should say plainly that
+a rule which cannot fail is the thing this repository most often catches, so the next reader should
+treat it as a habit to keep rather than a guarantee to rely on.
+
+**Two things that look like the fix and are not**, recorded so nobody spends an afternoon on them:
+
+- `paths-ignore` on `**.md` is **wrong here**. `validation/documentation.test.ts`,
+  `validation/citations.test.ts` and `everyday/viewportGateClaims.test.ts` read the documents
+  themselves, so a markdown-only change can legitimately fail this suite; skipping it would skip the
+  guards that exist for exactly that case.
+- **A `paths:` filter does not narrow a pull request.** GitHub evaluates it against the whole PR
+  diff rather than the individual push. `deploy-viz.yml` already carries one naming only
+  `packages/**` and friends, and it still ran on a push that touched two root `.md` files and
+  nothing else — which is how this was established rather than assumed.
+
+## O.7 Owed to the next wave
 
 - **#221 has three criteria left**, and the next one is **#332**, the Everyday sign-in. Posting is
   blocked on it and nothing else. The daily challenge tab is the one after that.
