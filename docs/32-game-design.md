@@ -634,9 +634,11 @@ budget would not cover it. Two measured thresholds and the case's own budget dec
 
 This is `charter P2` — a refusal is a feature, not an error state — applied to the one surface where
 the temptation to soften is strongest, which is the sheet that tells somebody how their day went. It
-is also `charter S6`'s instrument: **six of ten testers being able to state, unprompted, why the
-simulator refused a number** is only achievable if refusals are drawn as information rather than as
-setbacks.
+is also `charter S6`'s instrument: **six of ten testers being able to say, unprompted, what a refusal
+means for their next change — with none of them stopped by one** — is only achievable if refusals
+are drawn as information rather than as setbacks. That criterion was reworded on 2026-09-02
+([§ D456](../DECISIONS.md)) toward the reading this section already had, which is why the paragraph
+below it needed no change at all.
 
 A practical corollary, and it is a copy rule: **a refusal and a miss may not share a visual
 treatment.** A missed goal and a withheld mean are different kinds of thing, and a screen that

@@ -30544,3 +30544,59 @@ open-versus-closed, and it has the same cause: it needs something this tier does
 defence is procedural rather than mechanical — a placeholder must be resolved before the issue that
 created it closes — and naming it here is worth more than a guard that could only ever recognise the
 one number.
+
+## D456 — the honesty pillars are constraints on the session, not the reason for it
+
+**Date: 2026-09-02 · Owner: the product owner, directly · The first ruling that puts a price on a
+refusal.**
+
+**The instruction, quoted rather than paraphrased**, given on 2026-09-02 against the charter's
+central claim and its `charter S6` gate:
+
+> These are good goals, but not at the expense of game play.
+
+**Decision.** Three changes, and none of them softens a figure.
+
+1. **`charter P2` gains a second refusal test, pointing the other way.** The first asks *does this
+   change make the product say less?* The second asks *can the player still play?* A refusal that is
+   correct and stops the loop is a defect. Refusals may not accumulate into a wall, may not take the
+   space the player's next action needs, and may not require a statistical vocabulary before they can
+   be acted on.
+2. **§ 2 states that a pillar is not the reason the game exists.** A change satisfying all five and
+   leaving the game less worth playing is refused by the same review that would refuse a softened
+   figure, and the resolution is never to weaken the pillar and never to accept the loss quietly.
+3. **`charter S6` is reworded**, from *state, unprompted, why the simulator refused a number* to
+   *say, unprompted, what a refusal means for their next change, and no tester is stopped by one*.
+
+**Why the pillar needed a second test, in mechanical terms.** P2's test could only ever be failed in
+one direction. Every change that added refusal text passed it and no change could fail it, so the
+pillar behaved as a ratchet — and it ratcheted onto the surfaces a player actually reads. GitHub
+issues **#208** (*the first session presents no problem to solve*) and **#211** (*cut player-facing
+copy to a readable length without losing a claim*) are that ratchet reported from the other end, by
+people who could see the result and not the cause. A one-directional test on a pillar is the same
+defect class this repository already records for a control that can only be added to.
+
+**The S6 trade is stated rather than dressed up.** The new wording is **weaker on articulation** — a
+tester who says *it will not give me an average yet, so I should clear the backlog first* now passes
+where they once failed — and **strictly harder on blocking**, because a single tester abandoning the
+loop at a refusal now fails the criterion outright, where four of ten could previously be stopped and
+the gate still passed. Calling that a strengthening would be this repository's own worst habit
+performed on its charter, so it is called a trade.
+
+**What is not touched, and this is the load-bearing half.** The product still never prints a figure
+the run cannot support. `charter P1` is unchanged, `charter S8` is unchanged, and S8 is the criterion
+with the working instrument — the R1–R13 corpus over both tiers. `CLAUDE.md`'s suppression rules,
+the five `awtIsValid` grounds and every threshold are unchanged. **No acceptance criterion was
+weakened to make anything pass**, which the working agreements forbid outright; a criterion was
+re-aimed by the owner who set it, which is the one route that agreement leaves open.
+
+**The precedent this follows rather than invents.** `docs/32-game-design.md` § 4.3 already argued it
+in miniature: *a refusal and a miss may not share a visual treatment*, because a screen rendering
+both the same way teaches the player that the product's honesty is their punishment. That paragraph
+needed no amendment; the charter needed to catch up with it.
+
+**One sentence is withdrawn rather than reworded.** `docs/30-playtest-programme.md` said the refusal
+*"is the thing this product is actually for"*. It is not. A tower-management game is for the session;
+refusing an unsupportable figure is a constraint the session is built under. A document that
+confuses the two will keep producing screens that are correct and no fun, and will keep passing every
+gate while it does.
