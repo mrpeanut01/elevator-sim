@@ -5,7 +5,8 @@
 gap it names is an open item rather than a plan already executed.
 
 **The document's main content is the distance between two sets.** One is *what CI tests today*, and
-it is small enough to state in a sentence: **Chromium only, on two desktop operating systems, at a
+it is small enough to state in a sentence: **Chromium only, on one desktop operating system since
+§ D462 and two before it, at a
 handful of desktop viewports, with no touch device anywhere.** The other is *what a browser-delivered
 simulator is expected to run on*, which is every current browser on every current desktop, and a
 phone. Everything below is an attempt to say which parts of that distance are commitments, which are
@@ -18,14 +19,29 @@ has a long record of claims that outlived the thing that made them true.
 
 Read this first. It is the difference between the rest of this document and a wish list.
 
+> **Amendment, 2026-09-02 — the matrix is one leg, and this document was adopted against two.**
+> [§ D462](../DECISIONS.md) removed the macOS leg on the product owner's call: the product deploys
+> as a Linux container to Azure, and a second leg spent runner minutes proving portability to a
+> platform nothing is shipped on. Amended rather than rewritten, because a specification of record
+> that quietly matched a later decision would stop being a record.
+>
+> **What this invalidates, so a reader does not have to work it out:** every row below that counts
+> two legs, tier 1's second row, § 5's per-leg timings as a *current* measurement, § 7's WebKit
+> recommendation (which was scoped *"on the existing macOS leg"* and now needs a leg first), and
+> gap 5, whose subject no longer exists. Each is marked in place.
+>
+> **What it does not invalidate:** every measurement taken while both legs ran. Those are records of
+> what happened on machines that existed, and a later change to the matrix does not make them
+> untrue. The distinction this section is named for is exactly the one that matters here.
+
 | Fact | Where it is true |
 |---|---|
-| CI runs **two** legs: `ubuntu-latest` and `macos-latest` | `.github/workflows/ci.yml`, an explicit `include:` matrix |
+| CI runs **one** leg: `ubuntu-latest`. It ran two until § D462 | `.github/workflows/ci.yml`, an explicit `include:` matrix — kept explicit with one entry for the reason its comment gives |
 | Node is pinned to **one** version, `26`, on purpose | Same file; the header block gives the reason (§ D196/§ D201 found digests bit-identical across Node versions, so a Node axis re-confirms the eliminated variable) |
 | The Linux leg must be **x86-64** or the run goes red | Same file, step *The Linux leg is x86-64, or it is a third pin environment* |
 | The browser tier installs **Chromium and nothing else**, on **both** legs | Same file: `npx playwright-core install --with-deps chromium`, path read back from `chromium.executablePath()` |
 | A browser tier that would skip in CI is a **red run**, with no opt-out variable | `packages/viz/src/dev/browserTier.test.ts` |
-| The suite takes **33 min** (Linux) and **56 min** (macOS) per leg | `AGENT_STATUS.md`, commit `aadaaaf` — the first uncancelled CI result on this branch |
+| The suite took **33 min** (Linux) and **56 min** (macOS) per leg *when both ran* | `AGENT_STATUS.md`, commit `aadaaaf` — the first uncancelled CI result on that branch. A record of two machines, not a current per-leg budget: since § D462 there is one leg, and runner throughput varies enough that a later Linux run finished the whole suite in 16 min |
 | The browser tier itself is **~157 s** of that | `.github/workflows/ci.yml`, the browser-tier comment block |
 | The build declares **no `build.target`**, so it inherits Vite 8's default | `packages/viz/vite.config.ts` — `build:` sets `copyPublicDir`, `outDir`, `sourcemap`, and no target |
 | No touch-specific code path exists anywhere in the product | Measured: a tree-wide search for `touchstart`/`touchend`/`TouchEvent`/`maxTouchPoints`/`pointer: coarse`/`hover: none` returns **nothing**. The two hits for `touch-action` are one CSS declaration on `.elev-occ` and the docstring of `dev/dom.ts#onHorizontalDrag` that explains it |
@@ -51,7 +67,7 @@ legs, and a run in which it would silently skip is red rather than green
 | Platform | Browser | Evidence |
 |---|---|---|
 | Linux, x86-64 (`ubuntu-latest`) | **Chromium** headless shell, from `playwright-core` | 36 `*.browser.test.ts` files, driven through a real Vite dev server against the built `core` |
-| macOS (`macos-latest`, ARM64 today) | **Chromium** headless shell, from `playwright-core` | The same 36 `*.browser.test.ts` files, same gate |
+| ~~macOS (`macos-latest`, ARM64 today)~~ | ~~**Chromium** headless shell~~ | **Withdrawn by § D462.** It drove the same 36 files under the same gate until 2026-09-02. Struck rather than deleted: the tier-1 claim for macOS rested on this row, and a claim that loses its evidence should be visibly unsupported rather than absent |
 
 Three things about this tier that a reader will otherwise assume wrongly:
 
@@ -65,10 +81,12 @@ Three things about this tier that a reader will otherwise assume wrongly:
 - **It is the headless shell, not a full browser.** The headless shell is missing the pieces a
   support matrix sometimes cares about — it is not where a printing bug, an extension conflict, or a
   media-codec problem shows up.
-- **macOS on ARM64 and Linux on x86-64 is a real architecture axis, and it was not chosen for
-  browsers.** It exists because `ci.yml`'s header records pins that inverted between the two
-  (§ D201). The browser tier gets it for free. Nobody has measured whether any *browser* behaviour
-  differs across it, and this document does not claim it has been.
+- **macOS on ARM64 and Linux on x86-64 was a real architecture axis, and it was not chosen for
+  browsers.** It existed because `ci.yml`'s header records pins that inverted between the two
+  (§ D201), and the browser tier got it for free. Nobody ever measured whether any *browser*
+  behaviour differed across it, and this document never claimed it had been. **§ D462 removed the
+  axis with the leg**, so the unmeasured question is now also unaskable here: one architecture, and
+  no arrangement of the remaining leg can produce a second.
 
 ### Tier 2 — Supported, tested by hand, with the date of the last drive
 
@@ -97,7 +115,7 @@ polyfills, no vendor prefixes anybody wrote deliberately, and no browser sniffin
 | Platform | Browser | Why it is expected to work | Why it is not tier 1 or 2 |
 |---|---|---|---|
 | Windows 10/11 | Chrome, Edge | Same Chromium engine the tier-1 gate drives | No Windows leg exists in `ci.yml`, and adding one is § 4's cost question |
-| macOS | Chrome, Edge | Same engine as tier 1, different host OS from the tier-1 macOS leg only in browser build | Never driven |
+| macOS | Chrome, Edge | Same engine as tier 1. This row used to read *different host OS from the tier-1 macOS leg only in browser build*, which was the whole of its claim to being nearly covered — § D462 withdrew that leg, so the gap is now a host OS as well as a browser build | Never driven |
 | Windows, macOS, Linux | **Firefox** (current) | Inside the Vite baseline target; no Chromium-only API is used | **Nothing has ever loaded this product in Gecko.** Canvas text metrics, `container` queries and flex shrink behaviour are exactly the places the layout assertions in `fold1280.browser.test.ts` would be engine-sensitive, and every one of those assertions is Chromium-only |
 | macOS | **Safari** (current) | Inside the baseline target | As Firefox, plus: WebKit is the engine most likely to differ on canvas rendering and on the `@container` rules `index.html` uses for the dispatcher editor's two-column layout |
 | Chrome OS | Chrome | Chromium | Never driven |
@@ -335,10 +353,20 @@ number in a table that means nothing.
 **A GitHub-hosted runner is not a mid-range laptop, and it is not consistently anything.**
 `ubuntu-latest` and `macos-latest` are shared virtual machines whose throughput varies with what else
 is on the host; the same suite measured **33 min** on Linux and **56 min** on macOS on one commit
-(`AGENT_STATUS.md`, `aadaaaf`). A wall-clock budget on hardware with that spread will produce flaky
-red runs, and a flaky gate gets an exemption, and an exemption *"is where this class of problem goes
-to be forgotten"* — `ci.yml`'s own words about the browser tier, and the reason it refused a one-leg
-matrix.
+(`AGENT_STATUS.md`, `aadaaaf`), and a later macOS run finished the whole thing in **16 min**. A
+wall-clock budget on hardware with that spread will produce flaky red runs, and a flaky gate gets an
+exemption, and an exemption *"is where this class of problem goes to be forgotten"* — `ci.yml`'s own
+words about the browser tier, and part of why it kept two legs rather than one.
+
+> **This paragraph came true on 2026-09-02 and is worth reading as a prediction that landed.**
+> `BLOCKED_FRAME_GAP_MS` is a wall-clock budget — 400 ms of main-thread block — and it went red on
+> the macOS leg at **404.9 ms** on a pull request that had not moved the number (measured on one
+> host: 41 ms on the base tree, 39 ms on the branch). Its calibration table was taken entirely on
+> Linux. That is GitHub issue **#335**, filed before this amendment, and it is the exact defect this
+> paragraph describes: a wall-clock gate on runners with that spread, enforced on a platform it was
+> never measured against. § D462 has since removed the leg, which makes the red go away and answers
+> nothing — #335 stays open, because the bound is still uncalibrated and the next wall-clock gate
+> will have the same problem on the one leg that is left.
 
 So the honest specification is three-part:
 
@@ -378,7 +406,8 @@ produced is not a budget.
 **A matrix nobody can afford to test is a matrix that will quietly become a lie.** That sentence is
 the reason this section is here rather than a list of browsers somebody would like. The costs below
 are derived from the one measurement this repository has: **33 min on Linux and 56 min on macOS per
-leg**, of which the browser tier is **~157 s** (`ci.yml`).
+leg**, of which the browser tier is **~157 s** (`ci.yml`). Both figures are from when two legs ran;
+since § D462 the macOS column is the price of *re-adding* a leg rather than of extending one.
 
 ### The arithmetic, and the one number that matters
 
@@ -399,7 +428,7 @@ shape of the answer rather than as a current figure.
 | What to add | What it buys | What it costs | Verdict |
 |---|---|---|---|
 | **Firefox** on the existing Linux leg | Tier 3's largest claim becomes a fact. Gecko is where the canvas and `@container` assertions are most likely to differ | ~157 s per leg when the tier held 25 files and the tier holds 36 now, so somewhat more, plus one more Playwright browser download (size unmeasured — `playwright-core install firefox` reports it), and a real risk of an initial burst of engine-specific failures that are the product's, not the tier's | **Recommended, and the highest-value single addition.** Run it on the **Linux leg only** — the engine is the variable, not the host OS |
-| **WebKit** on the existing macOS leg | Safari — and, more to the point, **every browser on iOS**, all of which are WebKit whatever their name | ~157 s on the leg that already takes 56 min; a Playwright WebKit download | **Recommended second.** On macOS, because Playwright's Linux WebKit is a build that is not Safari, and testing a not-Safari to claim Safari support is the shape of defect this repository records |
+| **WebKit** on a macOS leg | Safari — and, more to the point, **every browser on iOS**, all of which are WebKit whatever their name | **The price went up with § D462.** It was ~157 s on a leg that already existed; it is now a whole macOS leg plus a Playwright WebKit download | **Still recommended second, and it now costs a leg first.** The reason is unchanged and is why this cannot simply move to Linux: Playwright's Linux WebKit is a build that is not Safari, and testing a not-Safari to claim Safari support is the shape of defect this repository records. Anyone pricing this should read it against § D462's own note that re-adding a leg is one `include:` entry |
 | **A Windows leg** (`windows-latest`) | The largest desktop user base by share, on an engine tier 1 already covers | A **whole third leg** — ~33–56 min of runner time per PR, plus the pin-portability question `ci.yml`'s header opens: a third platform is *a third pin environment whose pin set nobody has measured*, and § D201 found 26 pins **exactly inverted** between two platforms | **Refused for now, and the reason is not the minutes.** It would fork the pinned-digest question three ways. If Windows support ever needs to be a tier-1 claim, it should be a **browser-tier-only** leg that runs no statistical pins |
 | **A touch/mobile emulation pass** | § 2's `best effort` becomes measurable | Small: Playwright's `hasTouch`/`isMobile` on the **already-installed** Chromium. A handful of files at a phone viewport | **Recommended, and cheapest of all.** It is #240's gate |
 | **A real device cloud** | Actual Safari on actual iOS; actual Android Chrome | A paid third-party service, credentials in CI, and a standing bill against a deployment whose entire design principle is that it *"bills nothing at rest"* ([`16-static-site-deployment.md`](16-static-site-deployment.md) § 2) | **Refused.** Out of proportion to a project viewer |
@@ -508,9 +537,12 @@ Recorded because a specification that hides its own open items is the defect it 
 4. **Nobody has enumerated the hover-dependent affordances**, which § 2 names as one of the three
    things blocking a touch `supported` claim. It is a count somebody can do in an afternoon and it
    has not been done.
-5. **The macOS leg's architecture is ARM64 today and is not asserted**, unlike the Linux leg's x86-64,
-   which `ci.yml` fails the run over. If GitHub changed what `macos-latest` means, this matrix's
-   tier-1 second row would silently become a different claim and nothing would say so.
+5. ~~**The macOS leg's architecture is ARM64 today and is not asserted**, unlike the Linux leg's
+   x86-64, which `ci.yml` fails the run over.~~ **Closed by removal rather than by fix, § D462.**
+   There is no macOS leg and no tier-1 second row, so nothing can silently become a different claim.
+   Recorded this way because a gap that disappears with its subject is not the same as one that was
+   answered, and the next person to add a leg back inherits this gap unfixed along with it — the
+   x86-64 assertion `ci.yml` makes about Linux still has no counterpart for any other platform.
 6. **A stale statement about a viewport was found while writing § 2 and is left in place**, because
    M1 changes no source. `packages/viz/src/render/canvas.ts` describes the landing `<select>` as
    `wide-only`, *"dropped below 1280 px"*, and `packages/viz/UX.md`'s `RS-02` records the same

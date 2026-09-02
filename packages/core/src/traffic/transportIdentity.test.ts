@@ -61,7 +61,12 @@ import {
  * precision, which asserts a bit-identical result on every machine. CI's two-OS matrix proved that
  * false: x64 and arm64 differ in the last bits of the traffic draws, so the same pins passed on
  * whichever platform last regenerated them and failed on the other
- * ([§ D196](../../../../DECISIONS.md), [§ D201](../../../../DECISIONS.md)).
+ * ([§ D196](../../../../DECISIONS.md), [§ D201](../../../../DECISIONS.md)). That matrix is one leg
+ * since [§ D462](../../../../DECISIONS.md) — which is why {@link structuralDigestOfResult} matters
+ * more now than it did when it landed, not less. It is the reason these pins do not *need* a second
+ * platform to stay honest: a structural digest holds every integer, boolean and string exactly and
+ * elides the magnitudes that differ, so it is portable by construction rather than by measurement.
+ * A whole-result digest re-introduced here would now go unchecked.
  *
  * {@link structuralDigestOfResult} keeps everything that made this guard worth having — every
  * served-leg count, stop count, journey count, `awtIsValid` flag and suppression code is an
@@ -189,6 +194,8 @@ const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
  *
  * Regenerated locally on the same measured-platform-stable grounds as {@link BASELINE_STRUCTURAL} —
  * CI's linux leg, CI's macOS leg and the local run reported these three character for character.
+ * That measurement stands as a record; the macOS leg it used is gone (§ D462), so see
+ * {@link BASELINE_STRUCTURAL}'s note on what a regeneration can and cannot claim from here.
  */
 const MOVED_STRUCTURAL: Readonly<Record<string, string>> = {
   'vertical-city|nearest-car': 'c27d5005cd0753365ec12f2a7ce73a6903f34d04343db7594287bf0b95b8b151',

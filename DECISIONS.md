@@ -30830,3 +30830,73 @@ that question unchanged.
 `CORPUS_TIER=deep`, not by `ELEVATOR_SIM_HONESTY=deep` alone. Two runs wrote always-on figures into a
 file named `deep`, and they were caught only because `measure.corpus.test.ts` prints the tier on the
 first line of its own output. That line is why this row is not wrong.
+
+
+## D462 — the CI matrix is one leg, on the product owner's call
+
+**Date: 2026-09-02 · Owner: the product owner, directly · GitHub issue #334's macOS red is the
+occasion, not the reason.**
+
+**The decision.** `.github/workflows/ci.yml` drops the `macos-latest` leg. The matrix keeps its
+explicit `include:` shape with one entry.
+
+**The reason, in the owner's terms.** This product deploys as a Linux container to Azure. A second
+leg spends runner minutes and tokens proving portability to a platform nothing is shipped on, and
+the objection was cost rather than coverage.
+
+**What was given up, written down because a workflow that quietly lost a leg would read as though it
+never had one.** `ci.yml`'s header kept its original argument and now records the trade beneath it.
+Portability stops being a *measured* property: § D196 re-pinned 26 values that failed in one
+environment, § D201 found the same 26 failing in the other with each environment reproducing its own
+pin set exactly, and the two-OS matrix existed so that an environment-dependent pin could be told
+apart from a portable one. It cannot be, from here. The pins are still pinned; nothing checks that
+they travel.
+
+**Three defects in this tree cite the macOS leg, and they were checked one at a time rather than
+counted — counting them would have overstated the loss, and the first draft of the `ci.yml` header
+did exactly that before this check was run.**
+
+- `packages/cli/src/index.ts`'s `ENOTCONN` — stdout a socket rather than a pipe — was genuinely
+  **found** on that leg and nowhere else. Its *coverage* survives: `process.test.ts` fires every
+  member of `BROKEN_PIPE_CODES` individually, written that way because *"a guard whose coverage
+  depends on which machine ran it is not a guard"*. What is lost is finding an unknown fourth code.
+- `dev/browserTierSite.test-helper.ts`'s `dist-web/` race was reported by **both** legs on the same
+  commit, macOS as `net::ERR_HTTP_RESPONSE_CODE_FAILURE` and linux as a missing heading. One leg
+  catches it.
+- `everyday/viewportGates.browser.test.ts`'s pinned offset was found by the two legs agreeing with
+  **each other** and disagreeing with a local machine. That is CI-versus-local, not
+  macOS-versus-linux, and one leg plus a developer's machine still produces it.
+
+So the honest loss is narrow and real: **no second platform is watching, and nothing will surface a
+defect that appears on only one.**
+
+**What was corrected rather than deleted.** Every present-tense claim that CI runs two legs is
+now false and is fixed at its site — `store/sql.ts`, `store/pglite.test-helper.ts`,
+`dev/browserTier.test.ts`, `traffic/dayStartIdentity.test.ts`, `traffic/transportIdentity.test.ts`,
+and `docs/31-support-matrix.md`, which is an **adopted specification of record** and is therefore
+**amended with a dated block rather than edited to match**. Every *historical* statement is left
+exactly as written: the three machines that agreed on `dayStartIdentity`'s six digests agreed, and a
+later change to the matrix does not make that untrue. The distinction between a record and a claim
+is the one that matters in all six files.
+
+**One consequence nobody had stated, and it is the one to carry forward.**
+`traffic/dayStartIdentity.test.ts` justified regenerating pins locally by pointing at three
+independent machines that agreed. That route is gone. A regeneration from here can say only that one
+machine reported a value, and a pin regenerated without the cross-check is an assumption wearing an
+equality assertion — § D201's defect exactly. The docstring now says so where somebody about to
+regenerate will read it.
+
+**`ci.yml`'s x86-64 step lost its `if:` and gained weight.** With one leg, a condition naming the
+platform is a guard that cannot fail, which is this repository's most-repeated defect; and the step
+is now the last thing standing between the pins and a silent change of machine.
+
+**What this does not do.** It does not close GitHub issue **#335**. That issue says
+`BLOCKED_FRAME_GAP_MS` is a wall-clock bound calibrated on Linux and enforced on both legs, and
+removing the second leg makes its red go away while answering nothing: the bound is still
+uncalibrated, and `docs/31-support-matrix.md` § 5 predicted this class of failure before it happened
+— *"a wall-clock budget on hardware with that spread will produce flaky red runs"*. The next
+wall-clock gate will have the same problem on the one leg that is left.
+
+**Re-adding a leg is one `include:` entry.** If cost is the constraint rather than coverage, a macOS
+job restricted to `packages/cli` would buy back the only finding that was uniquely that leg's for a
+fraction of a full suite. Nobody has been asked for that and it is not assumed anywhere.

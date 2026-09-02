@@ -94,11 +94,20 @@ const DISPATCHER_IDS = ['nearest-car', 'eta', 'collective'] as const;
  *
  * **These three digests were regenerated locally, and that is defensible here because they were
  * measured to be platform-stable rather than assumed to be.** § D196/D201 record that some pins in
- * this repository are environment-dependent, which is why CI runs a two-OS matrix. These are not
+ * this repository are environment-dependent, which is why CI ran a two-OS matrix. These are not
  * among them: the failing run on CI's **linux** and **macOS** legs and the local macOS run each
  * reported the same six replacement digests, character for character, so three independent machines
  * agree on the new values. A pin regenerated on one machine is only sound when that has been
  * checked, and this is the check.
+ *
+ * **That check is no longer available, and the next person to regenerate a pin here needs to know
+ * it before they start.** § D462 removed the macOS leg on the product owner's call, so CI is one
+ * Linux runner. The evidence above stands — it is a record of three machines that agreed, and it is
+ * not weakened by a later change to the matrix — but the *route* that produced it is gone. A
+ * regeneration from here can no longer say "and CI's other leg agreed", because there is no other
+ * leg; it can say only that one machine reported a value. Anyone who needs the three-machine
+ * argument again has to obtain it some other way, and a pin regenerated without it is an assumption
+ * wearing an equality assertion, which is the § D201 defect exactly.
  */
 const SUPERSEDED_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
