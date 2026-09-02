@@ -30930,3 +30930,49 @@ the environment down on close, which is what keeps the three-preview quota a non
 **What this does not do.** It does not stop the preview deploy, which still costs runner minutes on
 every push. If the minutes are the objection rather than the noise, the change is to the job's `if:`
 and is a different decision from this one — nobody has asked for it and it is not assumed here.
+
+
+## D464 — one account, two shells: the Everyday sign-in shares `menu/account.ts` rather than growing a second state machine
+
+**Date: 2026-09-02 · GitHub issue #332 · The design question that issue posed, answered against the
+tree rather than by preference.**
+
+#332 asked whether the auth plumbing **moves, is shared, or is written twice**. It is shared, and
+part of it already was.
+
+**`menu/account.ts` is not confined to the Engineer shell, and the boundary test is what says so.**
+`boundaries.test.ts`'s rule is narrower than it reads: its own regex is `import\s+(?!type\b)`, so it
+forbids **value** imports of `menu/client.js` — the module that can reach the network — and nothing
+else. `menu/account.ts` imports that module **type-only**, so the rule does not reach it, and
+`everyday/profile.ts` and `everyday/settingsView.ts` have both value-imported it since long before
+this port. The check ran unchanged after the port landed and stayed green, which is the evidence
+rather than the argument.
+
+**So the state is shared and the effects go through a host port.** `EverydayHost` gains `account()`,
+`requestSignInLink()`, `chooseDisplayName()` and `signOut()`; `dev/main.ts` supplies a `signIn`
+binding and keeps only the wiring, in the shape § D459's wave established for `dailyBoard()`.
+
+**Why not a second state machine, which was the cheap option.** Two machines over one account is two
+surfaces that can disagree about whether you are signed in — the `surfaces-disagree` property's exact
+shape, and the defect that property was built for (§ D362). `account()` reads the live binding rather
+than a snapshot, so a sign-in on either shell is immediately true of both. A test mutates the live
+state behind the host and asserts the host sees it; the mutation that makes `account()` ignore its
+binding turns that test red.
+
+**The input is a parameter, the state is shared, and those are different things.** `askForLink` and
+`chooseDisplayName` used to read `accountState.form`. They take their value now, because the two
+shells share the account **state** and must not share the box you type into — a shared form is one
+input wearing two labels, where clearing one clears the other. Sign-out became `signOutNow` so both
+shells take one path, rather than the Everyday port reimplementing the clear-then-tell-the-server
+ordering that exists so a player is never left looking signed in with the network down.
+
+**The copy is deliberately not shared.** The no-server notice is this shell's own sentence in this
+shell's voice, over the shared `signedOut` transition. `dev/main.ts`'s equivalent is a closure-local
+built for a screen that also explains challenge scoring, and borrowing it would put the Engineer
+register on an Everyday screen. **The state must not differ; the copy should** — that is the whole
+design of two products over one simulator.
+
+**Every effect is inert with no server rather than throwing.** § D456's second refusal test asks
+whether the player can still play. The sign-in screen is reachable signed out on a build with no
+server, so each of these is a control a player can press in that state, and a throw there stops the
+game rather than declining one action.

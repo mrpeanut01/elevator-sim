@@ -887,8 +887,8 @@ cite why.
 - If you hit a decision the docs don't cover, record it in the relevant doc rather than
   only in a commit message.
 - Do not weaken an acceptance criterion to make a phase pass. Raise it instead.
-- **One push per wave, not one per commit.** Commit as often as you like; push when the wave is
-  ready. Every push cancels the CI run in flight (`ci.yml` sets `cancel-in-progress: true`) and
+- **Never push over a CI run you care about; otherwise push freely.** Commit as often as you like.
+  Every push cancels the CI run in flight (`ci.yml` sets `cancel-in-progress: true`) and
   starts a fresh ~45-minute suite, and the cancelled run completes a check suite on a head nobody
   cares about — which arrives as a `check_suite.completed` notification saying *"no third-party check
   suite is still running or failed"* about a commit that is no longer the head. Measured on
@@ -897,6 +897,16 @@ cite why.
   **cancelled rather than passed**. Acting on any of them would have meant declaring CI green while
   it was still running. **This is discipline and not a gate** — nothing enforces it, which is why it
   is written where it will be read rather than asserted somewhere a test could pretend to check it.
+
+  **Corrected within the hour, by a container restart that could have taken the work.** This first
+  read *"one push per wave, not one per commit"*, which is the wrong rule with the right reason
+  attached. The cost being avoided is **cancelling a run in flight**, and it does not exist when
+  nothing is running: this workflow fires on `pull_request` and on `push` to `main` only, so a push
+  to a feature branch with **no open pull request triggers nothing at all**. Under the first wording
+  an hour of tested work sat unpushed through a container restart for a saving of zero. It survived,
+  which is luck rather than design. **Push when no run is in flight, hold while one is, and open the
+  pull request when the wave is ready** are three separate things, and the first version collapsed
+  them into one.
 
 **Two things that look like the fix for that and are not, so nobody spends an afternoon on them.**
 `paths-ignore` on `**.md` would be **wrong**: `validation/documentation.test.ts`,
