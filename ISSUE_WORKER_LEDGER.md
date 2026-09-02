@@ -987,3 +987,100 @@ entry explained the refusal *by example*. That is § D405's convention arriving 
   run.
 - **`assertCoreBuilt()` compares mtimes while `tsc -b` re-emits on content hashes**, so a touched
   source leaves the guard red until a rebuild. Errs safe; worth a sentence in its docstring.
+
+## Wave L closed — the six untriaged, and three premises that did not survive, 2026-09-02
+
+Four lanes over the six issues filed on 2026-09-01 out of waves J and K, none of which had reached
+any coordination artifact when this wave opened.
+
+| issue | disposition | evidence |
+|---|---|---|
+| #315 | **fixed** | `3e2d8f3` · one rule, both sides derive it; `tsc -b` clean, server 335/335, experiments barrels 103/103 |
+| #316 | **fixed** | `587dee0` · shared axes named above, varying named per row; menu + menuPanel + honesty 354 passed |
+| #317 | **fixed** | `0f5124b` · sweep split per dispatcher; **full `viz` 4 882 passed, 3 skipped, exit 0, 363 s** |
+| #320 | **fixed** | `0f5124b` · claim retracted, survey published, `cli` given the constant |
+| #321 | **fixed** | `a661238` · `.gitignore` matches a symlink, `pkill` hazard documented |
+| #318 | **deferred, premise refuted** | the check it asks for predates it by six days and runs green |
+
+### The wave's real subject is that most of these reports were wrong about something
+
+Not wrong to file. Every one of the five named a real defect, and every fix stands. But **three of
+the four carried a stated mechanism, figure or remedy that did not survive measurement**, and in each
+case the lane published the correction rather than quietly working around it. That is `RISKS.md`
+**R35** — *inbound feedback has a measured error rate* — recurring at full strength.
+
+- **#321's mechanism.** It says `.worktree-setup.sh` *"deliberately creates `node_modules` as a
+  symlink"*. It does `mkdir -p` and builds a real directory. The git behaviour is real and
+  reproduces in all four cells; the explanation is not.
+- **#321's exit code.** Reports cite 144. Measured: SIGTERM yields **143** for bash and node alike,
+  and 144 is 128+16, `SIGSTKFLT`, which a default `pkill` does not send. Flagged unresolved rather
+  than explained away, and the note written not to depend on it.
+- **#321's nominated safe form.** *"Check `/proc/<pid>/cwd` resolves inside the worktree, then kill
+  by PID"* still kills the agent's own harness, whose cwd **is** the worktree root. The committed
+  form walks the `PPid:` chain and excludes self and ancestors. Had the lane written the brief's
+  version verbatim it would have been a plausible sentence in place of a measurement.
+- **#315's suggested destination.** The brief said move the rule into `core`; `shiftReportWindowFor`
+  is defined entirely over `MATRIX_CELLS`, so `core` would have had to acquire the cells — the
+  brief's own stop condition. The lane inverted the move instead.
+- **#318's premise.** *"The collision survived because no check looks for it."* The check exists,
+  registers D63 deliberately, landed six days before the issue, and runs green.
+- **The integrator's own first reading.** A looser grep reported `D125` as a second duplicate. It is
+  not one: `DECISION_HEADING` requires the em dash immediately. Recorded because this file's subject
+  is stale counts.
+
+### Two lanes were told to stop, and stopping is what found the better answer
+
+Lane A's brief named an escalation trigger — *stop if moving the rule into `core` requires pulling
+`MATRIX_CELLS` in*. It hit exactly that, and rather than forcing it or halting, put the rule where
+the cells already live. `core` gained no dependency and no file under `packages/core/src` changed.
+
+Lane C was told not to raise a budget to hide a red. It did not, twice over: it split the unit so
+vitest schedules something smaller than the budget, and when it found the neighbouring `viz`
+headroom figures wrong by more than 2× it **published the correction and left the constant where it
+was**.
+
+### What each lane found that nobody asked for
+
+- **Lane B found three more false statements** on the screen it was fixing: an empty board printing a
+  *"rows disagree"* refusal about rows that do not exist; a notice diagnosing a mixed board as
+  client/server disagreement, which § D439 makes the working product; and `beatDetailOf` claiming it
+  *"loads this board's configuration"* when `selectionFromRun` has always taken every field from the
+  row.
+- **Lane D found `RISKS.md` R43**, now registered: § D4 still instructs the `node_modules` symlink
+  that `.worktree-setup.sh` exists to replace, and § D6 rests on the superseded form **as its
+  reason**. A reader following § D4 creates the symlink #321's `.gitignore` defect then tracked, so
+  the decision manufactures the hazard.
+- **Lane A found an existing fixture passing on a run the client called quotable and the server
+  refused** — this same defect wearing different code. Raised 40 % → 60 %, assertion unchanged.
+- **Lane C found the next #317, already worse.** `campaign/campaign.test.ts` at **109 041 ms**, the
+  same shape one file over; at the measured 4.5× amplification that is **490 s against a 300 s
+  ceiling**. `campaign/stageSequence.test.ts` behind it at 77 363 ms. Neither fixed.
+
+### The measurement that could not be taken, said plainly
+
+**The 336 s timeout in #317 was never reproduced**, and the lane declined to claim it. What was
+reproduced is the mechanism: 78 328 ms idle for the offending case, and 4.5× amplification measured
+under 16 spinners on this 4-core container. Their product is 352 s against a 300 s ceiling and a
+reported 336 826 ms. Worst case after the split needs **21.9×** to time out.
+
+Two brief figures were contradicted by measurement and are reported as data rather than reconciled:
+`judge.test.ts` measured **81.2 s** where the brief cited 162 s and 232 s, and `viz` holds **4 882**
+cases where the brief and `vitest.config.ts` both said roughly 3 200.
+
+### Owed to the next session
+
+- **The next #317 needs an issue**: `campaign/campaign.test.ts` and `campaign/stageSequence.test.ts`,
+  both a dispatcher sweep inside one `it()`.
+- **Four cross-references the split makes stale**: `honesty/surfaces.ts` and § D186 name
+  `judge.test.ts` for a claim that survives but moved file; `docs/05-roadmap.md` lists the Phase 9
+  gate suites; `ISSUE_VERIFICATION_FINDINGS.md` cites `judge.test.ts:165`.
+- **§ D4 and § D6 are wrong and were not fixed** — `DECISIONS.md` is open in PR #319, and correcting
+  a recorded decision is an owner's call. R43 holds it.
+- **`menu/challenge.ts` is a second mirror of `configFor`** that sets no report window, and the
+  parity guard that should catch it needs a colon its shorthand spelling does not have. Latent: no
+  shipped challenge names a moved building.
+- **The Phase 9 corpus row is owed a measurement.** `honesty/surfaces.ts` gained one surface
+  (`menu/boardRun.ts#rowVariationOf`), so both tiers move by one. Per § D343 that is taken once on
+  the integrated tree, so **no figure is published here**.
+- **#93 and #159 remain the older backlog's two untracked issues.** #93 is a combine candidate under
+  #221, recorded and not actioned, because it carries four acceptance criteria #221 does not state.
