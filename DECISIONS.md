@@ -30653,3 +30653,48 @@ happen instead of publishing the result.
 added, nothing removed. The deep tier's one-surface lead survives and the set difference names it:
 `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is in
 always-on and not in deep.
+
+## D458 — two product calls on the social layer: the server names the day, and Everyday grows its own sign-in
+
+**Date: 2026-09-02 · Owner: the product owner, directly · Both taken against GitHub issue #221's
+implementation map, before any of it was built.**
+
+**Decision 1 — the server grows a fixture endpoint; the client does not recompute the day.**
+
+`leaderboard/boardKey.ts#placeSubmission` returns `daily:<date>` only for a run matching every axis of
+`DAILY_FIXTURE_CONFIG` and carrying today's UTC date as its seed. Everything else is
+`personal:<user id>`. So an Everyday run posted from the front door succeeds and the daily board stays
+empty — **worse than the refusal shipping today, because it looks broken rather than declining.**
+
+The alternative was for the shell to derive the fixture and `dailySeedFor(dailyDateOf(Date.now()))`
+itself. **Refused, and the codebase had already refused it once**: `menu/client.ts`'s `challenges()`
+takes no parameter and reads no clock, because *"there is nothing a caller could pass to move the
+answer."* A second answer to *which day is it* is that defect with a different subject, and
+`boardKey.ts` pins the reason — *"a board keyed by a date that depends on where the reader is
+standing is two boards wearing one name."* GitHub issue **#331**.
+
+**Decision 2 — the Everyday shell grows its own sign-in rather than borrowing the Engineer's token.**
+
+Both `submit` and `submitChallenge` take a token first, and `everyday/` holds no session state at all;
+`settingsView.ts` says so in player copy. Passing `dev/main.ts`'s `accountState.token` through the
+host port is cheaper and was refused, because it leaves the only route to *getting* a token inside the
+Engineer menu — **which fails #221's own third criterion, *the daily challenge is reachable without
+entering the Engineer surface*.** A product whose social layer can only be entered through the other
+product's menu has not turned the social layer on. GitHub issue **#332**.
+
+**What both rulings have in common, and why they were taken together.** Each was the cheap option
+against the honest one, and in each case the cheap option would have passed every test this repository
+runs. A client that computes the day agrees with the server until it does not, and a borrowed token
+posts runs successfully from a surface that cannot sign anybody in. **Neither failure is visible to a
+test; both are visible to a player**, which is why they were product calls rather than engineering
+ones.
+
+**What this does to #221.** It splits rather than grows. The **read half is unblocked by both
+rulings** — a board can be listed rather than computed and reading needs no token — so #221 keeps the
+port, the board reads, the challenge tab and the retraction of the stale refusals, and its posting
+half is sequenced behind #331 and #332. Recording that here because the alternative was a wiring issue
+quietly becoming a feature build, which is how an issue stops being closable.
+
+**One clause binds whatever #332 builds**, and it is [§ D456](#d456)'s: a sign-in wall in front of a
+single-player game fails `charter P2`'s second refusal test. The game stays playable signed out, and
+posting is the only thing that asks for an account.
