@@ -766,3 +766,94 @@ transferred first, or open with the unmet criterion named. **A criterion is neve
 issue closable.** #146 is this snapshot's live test of that rule: its literal claim is still true and
 its aim is refuted, and the cheap move is to rewrite the title down to what the tree already does. It
 is a ruling for the owner, and it stays open until one is made.
+
+---
+
+# Snapshot F — 2026-09-02: 69 open, and the blocked set re-read for the first time
+
+**Taken at `aea42b5`** (= `origin/main`, wave M merged). **Open issues: 69. Open pull requests: 0.**
+
+Wave M closed #283 and #323 and filed #324 and #325; this snapshot's own lanes filed #327, #328 and
+#329. **The count rose while the backlog got smaller**, which is what happens when a sweep converts
+invisible work into tracked work, and it is the number to distrust if it starts falling without
+anything being built.
+
+## F.1 The headline: the blocked set had never been re-read, and most of it was not blocked
+
+Snapshot C sorted the backlog into *blocked on a server*, *blocked on a tester* and *blocked on a
+decision that exists and was never built*. **Nobody had checked whether any of those blockers still
+held.** Four read-only lanes did, and the sorting turns out to have been wrong in every group.
+
+| snapshot C said | measured 2026-09-02 |
+|---|---|
+| **blocked on a server** — #161, #179, #221, #222, #248, #226 | **the cluster does not exist.** There is a complete, deployed API with 329 passing tests, and #179 — the hard blocker — closed 2026-09-01. #221 is fully unblocked and unblocks more than anything else in the backlog |
+| **blocked on a tester** — #208, #210, #211, #218 | **one of the four is tester-blocked at all.** #208 waits on an unauthored tutorial building, #210 has zero lines of onboarding code, #211's tester gate was **lifted by the owner on 2026-08-26**, and #218 carries a criterion that is not a tester gate |
+| **blocked on a ruling never built** — #123, #275 | #123 holds, and is narrower than filed: the decision half is done and the doc that said otherwise is corrected. **#275's blocker merged 2026-08-26** and nothing noticed |
+
+**The claim that most needed checking was snapshot C's own.** It wrote that #211 is *"uncloseable by
+any lane as currently written, and splitting its tester gate out would let the other four land"*.
+Both halves are refuted. The gate had already been lifted three days earlier by a human comment on
+the issue, in the repository's own most-quotable form:
+
+> Ignore the need for first time players. Focus on content brevity, meaning, and humor / attitude.
+
+And it was never the binding constraint anyway — criteria 1 and 2 are unmet code work, so removing
+criterion 5 takes the issue from two-of-five to two-of-four and closes nothing. The issue's own
+ledger row said exactly that two days before snapshot C contradicted it.
+
+## F.2 The process finding, which is now a risk row and an issue
+
+**A blocker that clears is not an event anything watches for.** Snapshot C wrote that sentence and
+nothing was built, which is R42 with a process note as its subject. It is realised three times in
+this wave alone: #179's closure leaving five issues mislabelled, #280's merge leaving #275 blocked
+for a week, and this wave's own snapshot E describing a sibling wave as unmerged three hours before
+it merged. Filed as [`RISKS.md`](RISKS.md) **R45**, owned by **#329**.
+
+Two gaps under the dissolved server cluster had no issue and now do: **#327**, no endpoint returns a
+distribution, which is the single blocker under both #161's world figures and #226's `world` arm; and
+**#328**, nothing runs on a schedule, which is what #222 AC5 and #248 AC5 are actually waiting for.
+
+## F.3 What the charter ruling changes for the backlog
+
+[§ D456](DECISIONS.md) gives `charter P2` a second refusal test and rewords `charter S6`. **Four open
+issues are re-aimed rather than re-scoped by it**, and none of them needs re-filing:
+
+- **#211** — the owner's instruction and the ruling point the same way. Its work is brevity, meaning
+  and voice, not comprehension measured on newcomers.
+- **#208** and **#210** — the first session's job is to present a problem, not to teach a suppression
+  rule. S6 no longer rewards an onboarding flow that explains statistics.
+- **#213** — *every lever line opens what it names* is now backed by a pillar clause rather than only
+  by taste: a refusal that does not tell the player what to do next fails P2's second test.
+
+## F.4 Dispositions
+
+| disposition | issues |
+|---|---|
+| **closed with evidence** (wave M) | #283, #323 |
+| **filed from findings** | #324, #325, #327, #328, #329 |
+| **unblocked, schedule now** | **#221** (highest leverage in the backlog), #275, #226's *Race this run* arm |
+| **still blocked, blocker renamed** | #222 (→ #328 + a schema decision), #248 AC5 (→ #328), #161's world figures (→ #327), #226's `world` arm (→ #327), #123 (implementation only) |
+| **needs a product ruling** | #237 (rescope, and drop off P0), #146, #158, #248's weekly-versus-daily cadence |
+| **narrow, do not close** | #177 (7 → 6), #178 (9 → 6), #161 (split three ways), #226 (split two ways) |
+| **genuinely blocked, and now on the right thing** | #208 (unauthored tutorial building), #210 (nothing built), #218 (testers **and** #240's twenty viewport failures) |
+
+## F.5 What the next batch should be, and why
+
+1. **#221.** Client wiring only, no remaining blocker, and it is the sole gate on four other things.
+   Retract `everyday/buildNotes.ts`'s and `everyday/world.ts`'s *this build ships no server* on the
+   same commit — both are live player-facing sentences that are now false.
+2. **#275.** Unblocked for a week. One measurement, one goal, one `CLAUDE.md` edit on the same commit.
+3. **#329's check**, before the next sweep, or the next wave pays the same cost again.
+
+**Not in this batch:** anything needing the API redeployed. The image is deployed by hand, nothing
+rebuilds it on a push, and the store's `config_hash` → `board_key` migration is manual — so #221's
+end-to-end acceptance has an operational prerequisite that is not code and should be started in
+parallel rather than discovered at the end.
+
+## F.6 Exit criteria, unchanged
+
+Every issue reaches one of: closed with evidence, closed as duplicate with its unique scope
+transferred first, or open with the unmet criterion named. **A criterion is never narrowed to make an
+issue closable.** § D456 is the one case where a criterion moved, and it moved because the person who
+set it re-aimed it — which is the single route the working agreements leave open, and it is recorded
+as a trade rather than as a strengthening.
