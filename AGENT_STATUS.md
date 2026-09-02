@@ -1000,7 +1000,7 @@ publish a correct figure that is wrong in the integrated tree.
 | `boards()` returns the whole answer, not a third of it | #331 | **landed** `1ebba96` |
 | The daily board reads, and a row carries its own `n` | #221 | **landed** `5ea3805` |
 | Three refusals the read made false | #221, § D460 | **landed** `75b3071` |
-| The corpus, measured on the integrated tree | reserved, unspent | **in flight** — the deep tier is a ten-minute run and the row lands with it |
+| The corpus, measured on the integrated tree | § D461 | **landed** — +19 strings a case, both tiers, exact |
 
 ### What found the defect, and what did not
 

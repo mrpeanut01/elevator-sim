@@ -84,8 +84,34 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **575 999** | **606** | **55** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **718 633** | **4 710** | **56** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **576 930** | **606** | **55** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **719 773** | **4 710** | **56** | **0** | **green**, and the register is empty |
+
+  **Wave O's move is exactly nineteen strings a case, in both tiers, and the nineteen decompose
+  without remainder** ([§ D461](DECISIONS.md)). Measured once on the integrated tree, both tiers in
+  one sitting, with the base at `d4636a5` re-measured first in a detached worktree — where it
+  reproduced its published row **exactly in both tiers**, the **seventh** consecutive wave that has
+  held.
+
+  | | base `d4636a5` | wave O | move |
+  |---|---|---|---|
+  | always-on strings | 575 999 | **576 930** | **+931** |
+  | deep strings | 718 633 | **719 773** | **+1 140** |
+  | surfaces, both tiers | 55 / 56 | **55 / 56** | **0** |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+  **931 ÷ 49 = 19 and 1 140 ÷ 60 = 19**, and the decomposition was checked against the code rather
+  than inferred from the quotient. Fourteen are `everyday/boardScreen.ts#dailyBoardViewOf` driven
+  over the six states the board adapter seeds — GitHub issue #221's daily board — and five are
+  `BOARD_SCREEN_COPY`'s new keys, which `honesty/surfaces.ts` iterates generically. **The three
+  refusal corrections in the same wave contributed zero**, because each is a substitution: one string
+  in, one string out. Second time this row has been able to attribute a move to the string.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical, nothing
+  added, nothing removed. The daily tab's five states went into the **existing** board adapter rather
+  than a new one. The deep tier's one-surface lead survives and the diff names it —
+  `campaign/judge.ts#judgeStage`, the only surface in deep and not in always-on, with nothing in
+  always-on and not in deep.
 
   **Waves L and M each moved this row by exactly zero, and the second zero is arithmetic rather than
   luck** ([§ D457](DECISIONS.md)). Measured once on the integrated tree at `aea42b5`, both tiers in

@@ -30775,3 +30775,58 @@ genuinely cannot have"*. The picker is still right and its premise is gone, so t
 rests on what the picker actually offers — filed days and reference runs, sources a board never had.
 A correct thing standing on an expired reason is how the next stale sentence gets written.
 
+
+## D461 — wave O's corpus move is exactly nineteen strings a case, in both tiers
+
+**Date: 2026-09-02 · The integrator's measurement, taken once on the integrated tree (§ D343).**
+
+Both tiers in one sitting, with the base at `d4636a5` re-measured first in a detached worktree —
+where it **reproduced its published row exactly in both tiers**, the seventh consecutive wave that
+has held.
+
+| | base `d4636a5` | wave O | move |
+|---|---|---|---|
+| always-on strings | 575 999 | **576 930** | **+931** |
+| deep strings | 718 633 | **719 773** | **+1 140** |
+| always-on surfaces | 55 | **55** | **0** |
+| deep surfaces | 56 | **56** | **0** |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+**931 ÷ 49 = 19 and 1 140 ÷ 60 = 19.** Both exact, and the same nineteen, which is the second time
+this row has been able to attribute a move to the string (wave G was the first, and § D442's could
+not be decomposed even in principle).
+
+The nineteen decompose without remainder, and the decomposition was checked against the code rather
+than inferred from the quotient:
+
+- **Fourteen** are `dailyBoardViewOf` driven over the six states the board adapter seeds. One line
+  each for *asking*, *no-server* and *undeclared*; **two** for *unreachable*, because the server's
+  own sentence is carried under ours rather than paraphrased; two for a board that was read and is
+  empty, which is its note plus *nobody has posted*; and seven for a board with rows — the note,
+  plus two seeds for each of three rows, one naming the player and one carrying the figure.
+- **Five** are `BOARD_SCREEN_COPY`'s new keys, which `honesty/surfaces.ts` iterates generically:
+  `dailyAsking`, `dailyUnreachable`, `dailyUndeclared`, `dailyEmpty`, `dailyRowWithheld`.
+
+**The three refusal corrections contributed zero, and that is the arithmetic rather than a
+coincidence.** Each is a substitution — one string in, one string out — so `weekView.ts`'s withdrawal,
+`buildNotes.ts`'s narrowing and `settingsView.ts`'s reworded row cannot move a count. § D457 recorded
+wave M's zero for the same reason at a different scale, and this is that lesson holding under a wave
+that *did* move.
+
+**The surface sets were diffed rather than the counts compared**, in both tiers: identical, nothing
+added, nothing removed. The daily tab's five states went into the **existing** board adapter rather
+than a new one, which is what a wave that gave one screen more to say should look like from here. The
+deep tier's one-surface lead survives and the diff names it — `campaign/judge.ts#judgeStage` is the
+only surface in deep and not in always-on, and nothing is in always-on and not in deep.
+
+**The third row that carries a forecast lesson.** § D454 recorded four lane forecasts short by one
+string per case and could not localise the gap; § D457 recorded a forecast that predicted motion
+where the answer was zero. This wave published no forecast at all, and the reason is worth stating:
+a single-worker wave has nobody to forecast *to*. The one-per-case gap § D454 asked the next
+forecasting wave to look for is therefore **not tested here**, and the next multi-lane wave inherits
+that question unchanged.
+
+**One measurement trap, recorded because it cost two runs.** The deep tier is selected by
+`CORPUS_TIER=deep`, not by `ELEVATOR_SIM_HONESTY=deep` alone. Two runs wrote always-on figures into a
+file named `deep`, and they were caught only because `measure.corpus.test.ts` prints the tier on the
+first line of its own output. That line is why this row is not wrong.

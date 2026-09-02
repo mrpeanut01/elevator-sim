@@ -1348,17 +1348,23 @@ seventh consecutive wave that has held.
 | | base `d4636a5` | wave O | move |
 |---|---|---|---|
 | always-on strings | 575 999 | **576 930** | **+931** |
-| always-on surfaces | 55 | **55** | **0** |
-| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | **0** |
+| deep strings | 718 633 | **719 773** | **+1 140** |
+| surfaces, both tiers | 55 / 56 | **55 / 56** | **0** |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
 
-**The surface sets were diffed rather than the counts compared**: identical, nothing added, nothing
-removed. The daily tab's five states went into the *existing* board adapter rather than a new one,
-which is what a wave that gave one screen more to say should look like from here.
+**931 ÷ 49 = 19 and 1 140 ÷ 60 = 19.** Both exact and the same nineteen, which makes this the second
+time the row has been able to attribute a move to the string. The decomposition was checked against
+the code rather than inferred from the quotient: **fourteen** are `dailyBoardViewOf` driven over the
+six seeded states — two of them for `unreachable`, because the server's own sentence is carried under
+ours — and **five** are `BOARD_SCREEN_COPY`'s new keys, which the adapter iterates generically.
 
-**The move is not decomposable and no attribution is offered.** Six drawn states of the daily block,
-three refusals reworded, one narrowed, and a `no count` row seeded — 931 over 49 cases is not an
-integer and no arithmetic makes it one. Wave G could attribute its move exactly because a chip face
-is seeded once per case; claiming that precision here would be manufacturing it.
+**The three refusal corrections contributed zero**, and that is arithmetic rather than luck. Each is
+a substitution: one string in, one string out. § D457 recorded wave M's zero for exactly this reason
+at a different scale, and here the same rule holds inside a wave that did move.
+
+**The surface sets were diffed rather than the counts compared**, in both tiers: identical, nothing
+added, nothing removed. The daily tab's five states went into the *existing* board adapter rather
+than a new one. The deep tier's one-surface lead is still exactly `campaign/judge.ts#judgeStage`.
 
 ## O.4 What I got wrong
 
