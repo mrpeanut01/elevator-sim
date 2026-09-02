@@ -1276,3 +1276,117 @@ as its subject.
 - **The API image is deployed by hand** and its store migration is manual, so #221's end-to-end
   acceptance has an operational prerequisite that is not code.
 - **#237 and #146 need a ruling, not a lane.** Both are posted with the exits priced.
+
+---
+
+# Wave O — the social layer's read half, opened 2026-09-02 at `d4636a5`
+
+**One worker, no lanes.** Wave N's hand-off said *"#221 first. No blocker, and it gates four other
+things."* This is that, and it is a single-worker wave on purpose: the work turned out to be one seam
+built from a database column to a rendered row, and a wire change split across lanes is how two lanes
+each publish a figure that is correct on their branch and wrong in the tree.
+
+| Piece | Issue | Commit |
+|---|---|---|
+| `boards()` returns the whole answer, not a third of it | #331 | `1ebba96` |
+| The daily board reads, and a row carries its own `n` | #221 | `5ea3805` |
+| Three refusals the read made false | #221 | `75b3071` |
+
+## O.1 What the corpus found, which is the wave's real story
+
+The board row I wrote drew `21.4 s` beside a player's name. It typechecked, every number on it was
+real, and it was internally consistent. **Within an hour the honesty search reported
+`estimate-without-n` on 49 of 49 always-on cases**: a mean wait with no denominator anywhere in its
+box. R13 clause one, and the same defect #137 fixed for the Day report's delta row one wave earlier.
+
+Nothing else in this repository would have caught it. That is worth saying plainly, because the
+corpus's cost is visible in every wave's wall clock and its value is only visible on days like this.
+
+**There was no shortcut, and the two that looked like ones are both named in `CLAUDE.md`.** No field
+a client already holds is the count a board row's mean was taken over — `RunSubmission` carries a
+duration and an arrival rate, and neither is a denominator. Marking the string something other than
+`estimate` would have been moving the gate. So the fix reaches the wire: `entries.legs`,
+`verifySubmission` returning `summary.waiting.count` off its own replay.
+
+**Where it sits is the decision worth reading** (§ D459). Beside `ClaimedMetrics`, never inside it.
+A mean's denominator is the single number a dishonest client would most want to choose — halve it and
+a mean over the easy half of a run is indistinguishable from a mean over the run — so putting it in
+the claim would have added a way to refuse an honest player on the path this repository already
+calls *"this product's one accusation, spent on a player who did nothing wrong."* Never claimed,
+never compared, never refused on.
+
+## O.2 Three refusals corrected three different ways, and two left alone
+
+Five player-facing sentences said *this build has no server*. **All five were already false on every
+build a player has ever loaded** — `http/static.ts` injects `<meta name="elevator-sim-api">` into
+`index.html` as it serves it, and the CDN bundle gets an absolute origin from `apiOrigin.mjs`. The
+board drawing rows under them only made it visible.
+
+They were not corrected uniformly, because they were not wrong in the same way (§ D460):
+
+- **`settingsView.ts`** kept its refusal and lost a second, false reason bolted onto a true one.
+  Nothing posts a run yet, so there is still no path for a switch to turn off.
+- **`buildNotes.ts`** *narrowed* rather than leaving. The absence did not close: you can read
+  today's board and you cannot post to it. Its `ABSENCE_TRIAGE` row followed it from #161 to #332.
+- **`weekView.ts`** was **withdrawn**, and not because it was false. The week screen asks no server
+  anything, so it was stating the outcome of a request it never makes. There was no run to pin it to
+  and no rewording that could have given it one. § D227 says a refusal is pinned by a run; a surface
+  with no run available may not refuse at all.
+
+**Two were left exactly as they are, and that is the finding.** `everyday/world.ts`'s and
+`everyday/rushScreenModel.ts`'s speak about endpoints that genuinely do not exist — a distribution
+(#327) and another player's rush. A lane briefed to sweep *the stale-refusal cluster* would have
+replaced two accurate refusals with two inaccurate ones, which is § D227's defect committed in the
+course of fixing § D227's defect.
+
+## O.3 The corpus, measured on the integrated tree
+
+Both tiers in one sitting, never on a branch (§ D343), with the base at `d4636a5` re-measured first
+in a detached worktree — where it **reproduced its published row exactly in both tiers**, the
+seventh consecutive wave that has held.
+
+| | base `d4636a5` | wave O | move |
+|---|---|---|---|
+| always-on strings | 575 999 | **576 930** | **+931** |
+| always-on surfaces | 55 | **55** | **0** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | **0** |
+
+**The surface sets were diffed rather than the counts compared**: identical, nothing added, nothing
+removed. The daily tab's five states went into the *existing* board adapter rather than a new one,
+which is what a wave that gave one screen more to say should look like from here.
+
+**The move is not decomposable and no attribution is offered.** Six drawn states of the daily block,
+three refusals reworded, one narrowed, and a `no count` row seeded — 931 over 49 cases is not an
+integer and no arithmetic makes it one. Wave G could attribute its move exactly because a chip face
+is seeded once per case; claiming that precision here would be manufacturing it.
+
+## O.4 What I got wrong
+
+**I nearly shipped the row.** The seed loop marked the wait `role: 'estimate'` with no `countShown`,
+which is why the search fired. `role: 'observation'` would have looked like a reasonable choice for a
+figure the server measured, and the sweep would have been silent.
+
+**A default parameter ate two fixtures.** `legs: number | undefined = 312` takes the default when
+`undefined` is passed explicitly, so both *"the server sent no count"* cases ran with a count and
+both tests passed against the wrong fixture. Caught by an assertion, fixed by taking `null` for
+*deliberately none*.
+
+**The deep tier needs `CORPUS_TIER=deep`, not `ELEVATOR_SIM_HONESTY=deep` alone.** Two runs wrote
+always-on figures into a file named `deep`, and they were caught only because the file states its own
+tier on line one.
+
+## O.5 Owed to the next wave
+
+- **#221 has three criteria left**, and the next one is **#332**, the Everyday sign-in. Posting is
+  blocked on it and nothing else. The daily challenge tab is the one after that.
+- **#161 should be split.** Its own text says to when the blocker clears; the blocker cleared and two
+  of its five bullets are now done. Commented with the split and left the body alone.
+- **#333 is filed and it is this wave's own debt.** `entries` gained a `NOT NULL` column, and
+  `CREATE TABLE IF NOT EXISTS` does not add a column to a table that already exists. `store.ts`'s
+  schema docstring said the honest thing — *"there is no migration framework because there is
+  nothing to migrate yet"* — and #179 closing on 2026-09-01 is what made that sentence expire. On a
+  database created before `5ea3805` the insert fails and `entryOf` reads `NaN`. No test catches it,
+  because every test opens an empty database. Filed rather than fixed here because a migration
+  runner is its own build with its own acceptance criteria, and because the pre-existing-row answer
+  is a decision to record rather than assume.
+- **#275 and #329** are still the two whose blockers cleared and which nothing has picked up.

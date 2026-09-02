@@ -985,3 +985,64 @@ contradicted it.
 the four suites that read the changed documents (`refusalsAreCurrent`, `buildNotes`, `honesty/faults`,
 `honesty/honesty`) **4 files, 63 passed, 1 skipped** · corpus measured on the integrated tree, both
 tiers, base re-measured first.
+
+---
+
+## Wave O — opened 2026-09-02 at `d4636a5`, one worker, no lanes
+
+Wave N's own hand-off said what to do first: *"#221 first. No blocker, and it gates four other
+things."* This wave did that half. It is a single-worker wave rather than a dispatch, because the
+work is one seam built end to end and splitting a wire change across lanes is how two lanes each
+publish a correct figure that is wrong in the integrated tree.
+
+| Piece | Issue | Status |
+|---|---|---|
+| `boards()` returns the whole answer, not a third of it | #331 | **landed** `1ebba96` |
+| The daily board reads, and a row carries its own `n` | #221 | **landed** `5ea3805` |
+| Three refusals the read made false | #221, § D460 | **landed** `75b3071` |
+| The corpus, measured on the integrated tree | reserved, unspent | **in flight** — the deep tier is a ten-minute run and the row lands with it |
+
+### What found the defect, and what did not
+
+The board row drew a mean wait with no denominator. Nothing in this repository would have caught
+that except the honesty corpus, and it did, within an hour of the row being written — 49 always-on
+cases, all reporting `estimate-without-n`. The row was internally consistent, every number on it was
+real, and it typechecked. **A screen can be wrong in a way only a property can see**, and this is the
+clearest instance of it since the corpus was built.
+
+The fix reaches the server's wire, which is more than the read half was scoped for. It went in
+anyway, because the alternative was either a row that prints a bare mean or a role change that
+quiets the property — and `CLAUDE.md` names the second by name as moving the gate.
+
+### What I got wrong, in the order I got it wrong
+
+**I nearly shipped the row.** The seed loop I wrote marked the wait `role: 'estimate'` and set no
+`countShown`, which is correct and is why the search fired. Had I written `role: 'observation'` — a
+plausible-looking choice for a figure the server measured — the sweep would have been silent and the
+defect would have shipped inside the instrument meant to catch it.
+
+**A default parameter ate two test fixtures.** `legs: number | undefined = 312` takes the default
+when `undefined` is passed explicitly, so both *"the server sent no count"* cases silently ran with a
+count. Both tests passed against the wrong fixture until an assertion said otherwise. Fixed by taking
+`null` for *deliberately none*. It is the same shape as this wave's mutation-testing lesson two
+sittings ago, where a stub's date coincided with the real one.
+
+**The deep-tier corpus measurement needs `CORPUS_TIER=deep`, not `ELEVATOR_SIM_HONESTY=deep` alone.**
+Two runs wrote always-on figures into a file named `deep`. They were caught only because the file
+states its own tier on line one, which is why it does.
+
+### The refusal cluster, and the one I did not touch
+
+Five sentences said *this build has no server*. Three are corrected. **Two are not, and that is a
+finding rather than an omission**: `everyday/world.ts`'s and `everyday/rushScreenModel.ts`'s speak
+about endpoints that genuinely do not exist — a distribution (#327) and another player's rush — so
+they are still true and pinned. A lane that had swept all five as *the stale-refusal cluster* would
+have replaced two accurate refusals with two inaccurate ones.
+
+### Verified
+
+`npx tsc -b` clean · **viz** 216 files / 4 987 passed · **server** 14 / 337 · **core** 112 / 2 552 ·
+**cli** 10 / 158 · **viz-browser** 36 / 216 · **experiments** run separately, sequentially, never in
+parallel with another suite · corpus measured on the integrated tree, both tiers, with the base
+re-measured first in a detached worktree, where it reproduced its published row **exactly in both
+tiers** — the seventh consecutive wave.

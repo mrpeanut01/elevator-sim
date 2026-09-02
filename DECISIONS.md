@@ -30698,3 +30698,80 @@ quietly becoming a feature build, which is how an issue stops being closable.
 **One clause binds whatever #332 builds**, and it is [§ D456](#d456)'s: a sign-in wall in front of a
 single-player game fails `charter P2`'s second refusal test. The game stays playable signed out, and
 posting is the only thing that asks for an account.
+
+## D459 — a mean's denominator is the server's measurement, and it sits beside the claim rather than inside it
+
+**Date: 2026-09-02 · GitHub issue #221 · Found by the honesty corpus, not by a reviewer.**
+
+The daily board's rows drew `21.4 s` beside a player's name with no count anywhere in the box. That
+is R13 clause one — `honesty/properties.ts` puts it as *"`n = 5` is not a caveat on `11.3 s`; it is
+part of what `11.3 s` means"* — and it is the same defect GitHub issue #137 fixed for the Day
+report's delta row one wave before. The search reported it on 49 always-on cases within an hour of
+the row being written, which is worth recording as the instrument working rather than as an
+embarrassment: nothing else in this repository would have caught it, because the row was internally
+consistent and every number on it was real.
+
+**The fix reaches the wire, and there was no honest shortcut.** No field a client already holds is
+the count a board row's mean was taken over. `RunSubmission` carries a duration and an arrival rate;
+neither is a denominator. Marking the string something other than `estimate` to quiet the property
+would have been moving the gate, which `CLAUDE.md` forbids by name.
+
+**Where it goes is the decision.** `entries` gains a `legs` column, `verifySubmission` returns
+`summary.waiting.count` off its own replay, and it travels as a sibling of `measured` rather than as
+a sixth field of `ClaimedMetrics`.
+
+`ClaimedMetrics` is *what a player claims*, and § D214 § 3's whole point is that the claim is
+compared and then discarded. A denominator is the one number a dishonest client would most want to
+choose: halve it and a mean over the easy half of a run is indistinguishable from a mean over the
+run. Putting it in the claim would have created one more thing `metricsAgree` could refuse over,
+on the path this repository already calls *"this product's one accusation, spent on a player who
+did nothing wrong"* — an honest client on a slightly different build counting legs differently would
+be refused as a forgery. So it is never claimed, never compared, and never refused on.
+
+`challenge/submission.ts#ClaimedSeedMetrics.legs` **is** claimed, and the two are not in tension: a
+challenge aggregates across seeds, so the client must say which run each figure came from. A
+leaderboard row is one run the server has already replayed.
+
+**A row that cannot say `n` withholds its mean.** `BoardEntry.legs` is `number | undefined` and
+`menu/client.ts` normalises it — `null`, a string, an absent key and `NaN` all mean *no count* —
+because an older server's row and a newer one's can sit on one board a single client reads. That
+row keeps its rank and its name and drops its figure. The alternative was a default, and a default
+here is an invented denominator on the one screen where a number is a boast.
+
+## D460 — a refusal a surface cannot check is withdrawn, not reworded
+
+**Date: 2026-09-02 · GitHub issue #221 · Extends § D227.**
+
+Five player-facing sentences said, unconditionally, that this build has no server. They were already
+false on every build a player has ever loaded: `http/static.ts` injects
+`<meta name="elevator-sim-api">` into `index.html` as it reads it, and the CDN bundle gets an
+absolute origin from `apiOrigin.mjs`. The board's tab drawing rows under them only made it visible.
+
+Three of the five are corrected here, and **they were not corrected the same way, because they were
+not wrong in the same way.**
+
+`everyday/settingsView.ts`'s row kept its refusal and lost a reason that had gone stale beneath it.
+Nothing in this build posts a run, so there is still no path for a switch to turn off; *the boards
+need a server this build has none of* was a second, false reason bolted onto a true one.
+
+`everyday/buildNotes.ts`'s entry **narrowed** rather than leaving. The register's own convention is
+that an entry goes on the commit that closes it, and this absence did not close: the board reads and
+you still cannot post to it, because posting needs an account and this shell has no sign-in. Its
+`ABSENCE_TRIAGE` row moved with it, from #161 — the umbrella issue whose own text says *"split them
+when the blocker clears"* — to #332, which will build the sign-in. Both directions of that map fired
+on this change, which is what it is for.
+
+`everyday/weekView.ts`'s is **withdrawn**, and the reason is not that it was false. The week screen
+asks no server anything. It was stating the outcome of a request it never makes, so there was no run
+to pin it to and no edit that could have given it one — reword it to *"the board may be
+unavailable"* and it is still a guess dressed as a finding. § D227 says a refusal is pinned by a run
+and never by another sentence; a surface with no run available may not refuse at all. The block
+points at the board screen now and keeps § 14's two rules about what may share a board, which are
+true whether or not a server answered today.
+
+**The consequence worth naming is the one for the reader after this one.** `everyday/weekScreen.ts`
+built § 14.1's spectator picker on the premise that board rows were *"the one thing this build
+genuinely cannot have"*. The picker is still right and its premise is gone, so the docstring now
+rests on what the picker actually offers — filed days and reference runs, sources a board never had.
+A correct thing standing on an expired reason is how the next stale sentence gets written.
+
