@@ -887,3 +887,56 @@ consumer*).
 them behind it; nobody re-read either. **A blocker that clears is not an event this process watches
 for** — every dependency in the ledger is recorded as a blocker and none is recorded as a thing to
 re-check when its blocker lands.
+
+---
+
+## Wave M — opened 2026-09-02 at `c3953bb`, beside an open sibling wave
+
+**The unusual condition, and the one that shaped every decision below: a second wave was already in
+flight.** Pull request #322 is a sibling session's wave L, unmerged, holding twenty-six files
+including `honesty/surfaces.ts` and `vitest.config.ts`. Wave M was planned to be disjoint from it
+rather than sequenced behind it, and disjointness was **checked per lane** rather than asserted once.
+
+| Lane | Task | Issues | Status |
+|---|---|---|---|
+| V-159 | Does the wrinkle library exist, and would building it produce a dead seam? | #159 | **reported** |
+| V-283 | What do the absence registers hold, and what does their test actually enforce? | #283 | **reported** |
+| V-146 | Is the one-register claim still true, and is it still aimed at a live surface? | #146 | **reported** |
+| V-177/178 | How much of two umbrella lists is closed by ten waves of work? | #177, #178 | **reported** |
+| M-323 | The staleness guard, taken by the integrator | #323 | **landed** |
+| M-283 | The three placeholder rows, taken by the integrator | #283, #324 | **landed** |
+
+**All four verification lanes were read-only and none touched a file.** That is worth stating because
+it is what made running them concurrently with a sibling wave safe.
+
+### Three of four premises did not survive whole, and the two directions are both represented
+
+The habit this repository has built is *verify before you build*, and its usual payoff is finding an
+issue that overstates a defect. **This wave got one of each.**
+
+- **#159 understates the tree.** Its example wrinkle is not in the tree at all, and a five-template
+  library with real engine effects and a mechanically enforced single caller already exists.
+- **#146 overstates it, but only in aim.** The string is still drawn in one register; the surface it
+  was aimed at is no longer reachable from the product that complained.
+- **#178 does both, in one item.** Its energy-axis item was built **eleven minutes before the issue
+  was filed**, and its Bayesian item is real but its supporting count is wrong by one in the other
+  direction.
+
+### What the integrator ran into
+
+**The decision-number gate is worth its keep and it caught me.** § D455 was appended and
+`documentation.test.ts` immediately refused the commit: it *derives* the next-free number from
+`DECISIONS.md` and compares it with the charter row, which still said D455. The charter is reconciled
+to D456 on the same commit, which is the only way that row has ever stayed true.
+
+**The corpus is deliberately not re-measured on this branch.** Two copy keys enter it and two register
+entries leave. [§ D343](DECISIONS.md) puts that measurement on the integrator of the integrated tree,
+and with #322 open this branch is not it. A forecast is published in the ledger instead, so the next
+integrator can check it rather than trust it.
+
+### Verified
+
+`npx tsc -b` clean · `--project viz` **214 files, 4 945 passed, 4 skipped** · `--project experiments`
+`src/validation/` + `src/runner/` **31 files, 355 passed, 6 skipped** · `--project viz-browser` on the
+touched file **11 passed** · `runner/coreBuildState.test.ts` **12 passed in 17 ms** ·
+`runner/parallel.test.ts` **12 passed, run in the state that used to fail the guard**.

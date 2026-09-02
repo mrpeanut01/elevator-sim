@@ -573,3 +573,91 @@ issue closable.** #237 is the live test of that rule: the cheap move is to rewri
 criteria down to what the tree already does and close it. That would be weakening a criterion to make a
 phase pass, which `CLAUDE.md` forbids outright. It is **needs-information**, and it stays open until a
 human rescopes it.
+
+---
+
+# Snapshot E — 2026-09-02: 66 open, a sibling wave in flight, and the two issues that were nobody's
+
+**Taken at `c3953bb`** (= `origin/main`, wave K merged). **Open issues: 66. Open pull requests: 1.**
+
+**Lettered E because D is taken by a wave that has not merged.** Pull request #322 is a *sibling
+session's* wave L, and its first commit adds a snapshot D covering #315–#318, #320 and #321. Two
+snapshots numbered the same would be this file's own recorded defect, so this one skips to E and says
+why. That is also the first fact any reader of this snapshot needs: **two waves were open on this
+backlog at once**, and the planning below is about staying out of the other one's way.
+
+## E.1 The disjointness check, which came before the triage
+
+Wave L's twenty-six changed files were listed first, and every verification lane was briefed to report
+a collision against them. The result changed the batch:
+
+- **`honesty/surfaces.ts` is on wave L's list**, and it is still the tightest serialization hazard in
+  the tree. Two candidates would have touched it. #159 is not being built for other reasons; #283
+  turned out not to need it, because that file iterates `DESIGNER_COPY` generically rather than naming
+  its keys, so a new copy key joins the corpus without an edit. **Checked rather than assumed** — the
+  difference between the two is a merge conflict in the file this repository least wants one in.
+- `vitest.config.ts`, `menu/`, `shift/reportWindow.ts`, `campaign/judge.test.ts` and `dev/menuPanel.ts`
+  are wave L's. Nothing in wave M touches any of them.
+- **Three shared artefacts will conflict and are expected to**: this file, the ledger, and
+  `RISKS.md`. All three are appends at the end, which resolve mechanically and keep both texts. Wave M
+  takes **R44** because wave L takes R43, and the note beside `RISKS.md`'s highest-issued line says so
+  in both directions, so a reader can tell a hole from a missing row if #322 never lands.
+
+## E.2 Reconciliation — 31 with no ledger row, 8 with no row anywhere
+
+Every open number grepped against the ledger, this file and `CHARTER_PROGRAMME.md`. Thirty-one have no
+ledger row; **eight have no row in any of the three**. Six of the eight are wave L's. The two that were
+nobody's are **#283** and **#323**, and both close with wave M.
+
+Snapshot C's process finding therefore has not improved: the ledger is still competing with a second
+record, and five adjudications posted as GitHub comments never reached it. Wave M's dispositions are
+posted **and** recorded, because posting alone is what produced that gap.
+
+## E.3 Dispositions
+
+| disposition | issues |
+|---|---|
+| **closed with evidence** | #323, #283 |
+| **filed from a finding** | #324 (the stage camera, split out of #283 under [§ D455](DECISIONS.md)) |
+| **needs a product ruling — both exits priced on the issue** | #158, #146 |
+| **rescope, then schedule — premise corrected on the issue** | #159 |
+| **narrow, do not close — evidence posted per item** | #177 (7 → 6), #178 (9 → 6) |
+| **unchanged from snapshot C** | everything else |
+
+## E.4 The finding that outranks the dispositions
+
+**Three `GAPS.md` § 3 rows are contradicted by the code the same tree ships, none is struck through,
+and two of them became the headline items of #178.** The sharper half is the timing: #178's
+energy-axis item was already built **eleven minutes before the issue was filed**, at `4310d93`.
+
+So a stale register did not merely mislead a reader. It manufactured a P1-labelled backlog item
+against a defect that did not exist, and every subsequent triage of that issue spent effort on it.
+The asymmetry names its own fix: the six *player-facing* registers have `everyday/buildNotes.test.ts`,
+which fails in both directions, and `GAPS.md` — the register issues are actually filed from — has
+nothing. [`RISKS.md`](RISKS.md) **R44**.
+
+**This is also the reciprocal of snapshot C's own lesson, arriving again.** C recorded that a backlog
+is a set of claims about code and that claims go stale in both directions. C found two issues
+understating the tree. E found three, and traced them to a common source rather than filing them
+separately, which is the only part of this that is new.
+
+## E.5 What the next batch should be, and why
+
+1. **A staleness guard for `GAPS.md`.** Highest value in the backlog now, for the reason above: it is
+   the input to the issues, so every wave that does not have it pays for it twice. The shape already
+   exists and is proven — `buildNotes.test.ts` is thirty lines and fails both ways.
+2. **#159's engine half, split out.** The four § 17 templates `EventEffect` cannot express gate more
+   than half the wrinkle library, and building the data file first is how fifteen dead rows get
+   authored.
+3. **#177 and #178's remaining twelve**, once narrowed, are individually small and mostly independent.
+
+**Not in this batch, and the order is forced:** anything writing `honesty/surfaces.ts`, `menu/` or
+`vitest.config.ts` until #322 lands.
+
+## E.6 Exit criteria, unchanged
+
+Every issue reaches one of: closed with evidence, closed as duplicate with its unique scope
+transferred first, or open with the unmet criterion named. **A criterion is never narrowed to make an
+issue closable.** #146 is this snapshot's live test of that rule: its literal claim is still true and
+its aim is refuted, and the cheap move is to rewrite the title down to what the tree already does. It
+is a ruling for the owner, and it stays open until one is made.
