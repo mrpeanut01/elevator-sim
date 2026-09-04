@@ -1049,3 +1049,73 @@ have replaced two accurate refusals with two inaccurate ones.
 parallel with another suite · corpus measured on the integrated tree, both tiers, with the base
 re-measured first in a detached worktree, where it reproduced its published row **exactly in both
 tiers** — the seventh consecutive wave.
+
+---
+
+# Wave P — dispatched 2026-09-04 at `eb5b3b6`
+
+**Opened at `origin/main`, wave O merged, working tree clean, zero open pull requests. Open issues at
+the start: 71.**
+
+Wave O's hand-off named the next batch in order: **#332**, **#333**, then **#275 and #329**. This
+wave is that batch, with one addition the hand-off could not have known about. A reconciliation pass
+over the seven issues filed on 2026-09-01 and 2026-09-02 found, before any lane was dispatched, that
+at least two of them describe defects the tree has already fixed. `vitest.config.ts` names GitHub
+issue #320 in its own body and says the sentence that issue quotes was retracted; `.gitignore`
+line 23 carries #321's first fix with the four-cell measurement in its header, and
+`.worktree-setup.sh`'s header carries the second. So the wave opens with three read-only
+verification lanes rather than with a build.
+
+## Decision block allocation
+
+Pre-allocated per lane before any lane started, per the working agreement. `CHARTER_PROGRAMME.md`'s
+next-free row read **D464** and is the integrator's input rather than a lane's.
+
+| lane | block | may not take |
+|---|---|---|
+| A — #333 | **D464–D467** | D468 and above |
+| B — #332 | **D468–D471** *(reserved; map first, build not yet dispatched)* | — |
+| C — #275 | **D468–D471** | D472 and above |
+| integrator | **D472–D475** | — |
+
+**The B/C collision is real and is recorded rather than tidied.** Lane B was dispatched as a
+read-only mapping task that allocates nothing, and lane C was dispatched afterwards into the block B
+had been pencilled for. Only one lane can spend it and lane C is the one that will. If B's build
+follows in this wave it takes a fresh block above the integrator's. This is the failure § D404 was
+written for, arriving one wave later, and it is written down because two lanes both computing § D336
+is how the rule came to exist.
+
+## Lanes
+
+| task | issue | kind | branch | worktree | status |
+|---|---|---|---|---|---|
+| **P-V1** | #315, #317, #320 | read-only verification | — | main checkout | dispatched |
+| **P-V2** | #316, #318, #321 | read-only verification | — | main checkout | dispatched |
+| **P-V3** | #324, #325, #327, #328, #329 | read-only verification | — | main checkout | dispatched |
+| **P-A** | #333 | build | `fix/issue-333-store-migrations` | `.worktrees/wave-p-lane-a` | dispatched |
+| **P-B-MAP** | #332 | architect, investigation only | — | main checkout | dispatched |
+| **P-C** | #275 | build | `feat/issue-275-energy-goal` | `.worktrees/wave-p-lane-c` | dispatched |
+
+Three read-only lanes share the main checkout, which is safe because none of them writes. The two
+builders have their own worktrees, provisioned by `.worktree-setup.sh` so that built artifacts
+resolve against the worktree's own packages rather than the main checkout's. Every lane brief
+carries the `pkill -f` prohibition; three concurrent suites in one container is the exact condition
+that hazard needs.
+
+## The rulings taken at dispatch rather than at integration
+
+**#333's open question is answered before the lane starts.** The issue left the pre-existing-row
+answer as a decision to record. It is recorded: migration 1 adds `legs` as a **nullable** column and
+there is no replay backfill in the runner. `BoardEntry.legs` is already `number | undefined` on the
+client and a row with no count withholds its mean, so a `NULL` row keeps its rank and its name and
+loses a figure the server cannot substantiate. A replay backfill inside a migration runner would
+couple schema versioning to the simulation engine and make container startup unbounded, and the
+store's own docstring already refuses that shape for `board_key`, calling it a backfill only the
+application can write. The lane may return **needs decision** with evidence if it finds the ruling
+wrong; it may not quietly pick a different answer.
+
+**#275 needed no ruling and that is the finding.** § D367 permitted the independent energy bar on
+2026-08-25, § D106 absorbed the clause on 2026-08-26, and the blocker recorded on the issue was a
+pull request that merged hours after the comment naming it. The issue has been unblocked for over a
+week and three consecutive waves have passed it over. That is #329's own subject arriving for the
+fourth time, on the issue that is the clearest instance of it.
