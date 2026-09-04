@@ -420,6 +420,30 @@ describe('the summary — it counts and routes, and it never names a winner', ()
     expect(summary.sentence).not.toMatch(/\b(?:better|worse|beat|won|wins|winner)\b/i);
   });
 
+  it('agrees with its own count when a bucket holds exactly one measure — issue #295 F37', () => {
+    /*
+     * The playtest reported `1 are energy axes` and the code confirms it: `BATCH_METRICS` carries
+     * exactly two axes this project forbids ranking, so a batch where one of them measures nothing
+     * leaves the other on its own, and the same run leaves exactly one measure unmeasured. Both
+     * clauses read as an unfilled template on the sheet that carries the refusal; reverting the fix
+     * reproduces `1 are energy axes` and `1 were never measured` verbatim.
+     */
+    const everyReplication = Array.from({ length: 50 }, (_, index) => index);
+    const summary = summaryOf(
+      batchReport(
+        fakeResult({ delta: -3, nullMetric: 'energyKJ', nullMetricOn: everyReplication }),
+      ),
+    );
+    expect(summary.unmeasured).toEqual(['energyKJ']);
+    expect(summary.shown).toEqual(['energyPerServedLegKJ']);
+    expect(summary.sentence).toContain('1 was never measured');
+    expect(summary.sentence).toContain('1 is an energy axis, shown and never ranked');
+    expect(summary.sentence).not.toContain('1 were never measured');
+    expect(summary.sentence).not.toContain('1 are energy axes');
+    /* R11 is untouched by the wording: the axis is still shown and still ranks nothing. */
+    expect(summary.sentence).toContain('never ranked');
+  });
+
   it('says plainly, in the summary, when nothing separated the two', () => {
     // The tie: two bit-identical arms. Every interval contains zero and the reader is told that
     // in words rather than left to reconcile eight rows.
