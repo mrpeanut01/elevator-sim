@@ -849,10 +849,13 @@ later lane must not discover the hard way:
 
 ## 7. Accessibility as a visual constraint
 
-**Issue #204 writes the accessibility standard and this document does not.** What is stated here is
-the set of **visual consequences** that already bind, plus the measurements a standard will have to
-account for. Where #204 lands on a different floor, #204 wins and these rules move with it — but the
-measured facts below do not move, because they are facts about hex values.
+**The accessibility standard is [`36-accessibility-standard.md`](36-accessibility-standard.md)
+(issue #204, adopted 2026-09-04) and this document does not write it.** What is stated here is
+the set of **visual consequences** that already bind, plus the measurements that standard had to
+account for. Where `docs/36` lands on a different floor, `docs/36` wins and these rules move with
+it — but the measured facts below do not move, because they are facts about hex values. `docs/36`
+§ 4.1 re-derives every ratio in § 7.2 as its own instrument's control, and reproduces all ten
+exactly.
 
 **Method, stated so the numbers are reproducible and so nobody has to trust them.** WCAG 2.x relative
 luminance, ratio `(L₁ + 0.05) / (L₂ + 0.05)`, computed over `everyday/tokens.ts`'s literal values.
@@ -883,7 +886,11 @@ actually drawn against — the plot's `cardSunk` `#F5EFE3` well, not `paper`:
 drawn on.** That is below the 1.83:1 [§ D336](../DECISIONS.md) already measured for the same ink and
 refused for text on this palette, and below any non-text floor anyone would pick. *The band that
 means "this is starting to go wrong" is the hardest one on the screen to see.* Which floor actually
-applies is #204's to set; that this one value fails every candidate is not.
+applies was #204's to set and is now set: [`docs/36`](36-accessibility-standard.md) § 4.2 rules
+**`AX-7` at 3:1**, measured against the ground the mark is drawn on, so `tapping-foot` fails it.
+That this one value fails every candidate was never in question. `docs/36` § 8 item 2 records that
+the *remedy* is still unchosen between three viable ones, and that the choice is a design change
+this milestone may not make.
 
 The second measurement is worse, and it is the one a colour-blindness audit will find first. Band
 against band — **a discriminability measure rather than a compliance one**, since no standard sets a
@@ -1013,10 +1020,15 @@ the defect this repository has recorded most often.
 
 ## 9. Requests to files this document does not own
 
-⬜ **Issue #204 (accessibility standard)** — § 7's measurements are inputs to it, not a substitute for
-it. The two that need a ruling: the non-text contrast floor that decides whether `tapping-foot` at
-**1.78:1** against its own ground must move, and whether *hue plus size* satisfies the standard's
-non-colour-only requirement as AD-S7 assumes.
+✅ **Issue #204 (accessibility standard)** — **discharged.**
+[`36-accessibility-standard.md`](36-accessibility-standard.md) is the standard, and both rulings this
+row asked for are in it: the non-text floor is **3:1** (`AX-7`, § 4.2), so `tapping-foot` at
+**1.78:1** against its own ground must move; and *hue plus size* does satisfy the non-colour-only
+requirement (`AX-5`, § 4.2), which adopts AD-S7's height encoding by reference rather than
+re-arguing it. § 7's measurements were inputs to that document and it cites them rather than
+restating them. What `docs/36` sends back is one new measurement this section could not make: the
+eight shaft tints of § 8 item 4, measured in both themes, with **no** pair in either theme reaching
+2:1 (`docs/36` § 4.3).
 
 ⬜ **Issue #212** — its stated remedy (*rebuild the stage*) is refuted by
 [`../ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) § U and superseded by § 5.2

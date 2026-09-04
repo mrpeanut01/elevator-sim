@@ -31280,3 +31280,117 @@ type argument still holds and the count probably does not, but `workPerServedLeg
 member that reads `pending` when absent, which is a gate the original four do not have. Whether all
 five grade on that saturated day is a measurement, and this lane did not take it. A plausible sentence
 in place of one is what [§ D256](#d256) refuses.
+
+## D473 — the accessibility standard is adopted; the conformance target is not
+
+**Date: 2026-09-04 · Owner: wave Q lane E · Rules on: GitHub issue #204, and binds
+[`docs/28-art-direction.md`](docs/28-art-direction.md) § 7 and
+[`docs/31-support-matrix.md`](docs/31-support-matrix.md) § 5, which both deferred to that issue by
+name.**
+
+[`docs/36-accessibility-standard.md`](docs/36-accessibility-standard.md) is the standard this product
+is held to. Seventeen clauses, `AX-0` to `AX-16`, each naming the instrument that checks it or saying
+plainly that there is none and who does it instead. This entry exists because the standard reaches
+past the module that wrote it: it binds two adopted specifications, it hands an acceptance criterion
+to another issue, and it sets a contrast floor that decides a shipped colour. § D405's *your
+docstring is the record* does not cover any of those.
+
+### What is decided
+
+**The tiering rule is `docs/31` § 5's, adopted unamended.** A clause no instrument checks is a
+tier-3 claim and is labelled one. The standard extends it by one sentence and no more: where a clause
+can only be checked by a person, it names the role.
+
+**The non-text contrast floor is 3:1**, measured against the ground the mark is actually drawn on
+(`AX-7`). This is the ruling `docs/28` § 7.2 asked for by name, and it decides a shipped value:
+`tapping-foot` at **1.78:1** against `cardSunk` fails it. The *remedy* is deliberately not chosen.
+Three are viable, they cross `guide § 19`, the plot's surface token and AD-S7 respectively, and
+picking one is a design change a specifications milestone may not make.
+
+**Hue plus size satisfies the non-colour-only requirement** (`AX-5`), which adopts `docs/28` AD-S7's
+height encoding by reference rather than re-arguing it. That was the second ruling § 9 of that
+document asked for.
+
+**The screen-reader promise is split in two, and only one half is committed.** The accessibility tree
+being well formed is mechanisable and is promised. *A screen-reader user can complete a journey* is
+not mechanisable at any price and stays a tier-3 claim until a walkthrough is recorded with its date,
+its reader and its platform. `docs/31` § 5's *no record exists* is repeated and nothing is added to
+it, in either direction.
+
+**The automated-sweep criterion goes to #239.** It is word for word that issue's first criterion and
+this one's second, both issues' verification comments identify the duplication, and a sweep specified
+in a milestone that may not touch `.github/**` is not a sweep. Two candidate instruments are priced
+in § 6.2, `axe-core` against `playwright-core`'s own aria snapshot, and the cheaper one needs no new
+dependency.
+
+### What is deliberately not decided
+
+**The conformance target.** WCAG 2.2 AA, WCAG 2.1 AA, or no external standard. It is marked in § 1 as
+needing the product owner, on the footing `docs/29` used before § D344 ruled on it, and the three
+options are priced rather than described. The finding worth carrying out of that pricing is that
+Option A costs Option B **one unmeasured criterion and one small check**: of the six criteria WCAG 2.2
+adds at A and AA, 3.3.8 is already satisfied because § D241 deleted the password in favour of a
+mailed link, 3.2.6 and 3.3.7 have no subject, 2.5.7 is probably satisfied because
+`dev/dom.ts#onHorizontalDrag` sets its value on `pointerdown` before any move listener attaches, and
+only 2.5.8 target size is real work. **Nothing in the standard is blocked on the answer**, because
+every clause is invariant across the three options; what the answer changes is the size of the claim
+the product may make in public.
+
+### The measurement this entry pins
+
+The eight shaft tints, unmeasured since they were authored and recorded as unmeasured by `docs/28`
+§ 8 item 4, measured in both themes over `render/tokens.ts`'s literals by WCAG 2.x relative
+luminance. The instrument was licensed before it was used: it reproduces **all ten** of `docs/28`
+§ 7.2's published figures exactly, four band-against-ground and six band-against-band.
+
+**Twenty-eight pairs per theme, and not one pair in either theme reaches 2:1.** The light set's
+widest separation is 1.43:1 and its narrowest 1.02:1; the dark set's are 1.66:1 and **1.0014:1**. In
+the dark theme `--shaft-3`, `--shaft-4`, `--shaft-5` and `--shaft-7` all sit within 1.03:1 of each
+other, three of them within 1.004:1. Four of eight banks are one greyscale value.
+
+**No dichromat model was simulated, and the omission is the argument.** A luminance measurement is
+model independent: it establishes that the set is separated by hue and by essentially nothing else,
+and that holds under every model one might have picked next. A simulation would change which pairs
+collapse and could not produce a set in which hue is a reliable channel for a viewer with fewer hue
+channels. So `AX-8` asks for a second channel rather than for a ratio between simulated colours,
+because the requirement is identical under every model and naming one would add an argument and no
+constraint.
+
+**And the measurement does not establish that anything is broken for a player**, which is the half
+that would have been easy to leave out. `dev/buildingEditor.ts:815` already gives every car a legend
+carrying its id, its role and the floors it serves, so a greyscale reader loses the grouping and
+keeps the facts. That is why `AX-8` is worded as a **declaration** rather than as a threshold: declare
+each colour set load-bearing or decorative and hold the declaration to a test. An undeclared set is
+the defect, because it is the one where nobody can tell which case they are in.
+
+### Three findings the standard produced on the way
+
+**No clause is wholly tier 1.** Every clause that has an instrument has it on the Engineer shell, and
+the Engineer shell is the one a player meets second. `packages/viz/src/everyday/stageScreen.ts` line
+671 creates the stage canvas and line 672 sets `style.cssText`; nothing else in the file touches that
+element except sizing and `getContext`. The Engineer canvas has carried an `aria-label` from
+`render/describeFrame.ts` since `KB-13`, and that function is already a registered honesty surface
+(`honesty/surfaces.ts:951`), so the Engineer text alternative is held to all ten honesty properties
+and the Everyday stage is held to none. The remedy is an adapter onto words that exist, registered in
+the same file, which is why `AX-16` is the only clause that is tier 1 without anybody building an
+instrument.
+
+**"This project's own accessibility ledger" has never existed.** `dev/dom.ts:484` and
+`dev/reportPanel.ts:34` both cite it, both reason correctly about what happens under
+`prefers-contrast`, and both point at nothing. It is § D227's class in its quietest form, a sentence
+right in what it reasons and wrong in what it points at, and `docs/36` § 9 asks for the two citations
+to be repointed. The standard is that ledger now.
+
+**`UX.md` § 5's header is a stale claim of coverage.** It opens *"applies to every surface"* and its
+seventeen `KB-` rows, seven of them non-negotiable, are the Engineer shell's; the file does not
+mention Everyday Mode anywhere. That is worse than an absent row, because a reader checking whether
+keyboard operation is covered finds a sentence saying it is.
+
+### One correction to a figure this issue published
+
+#204's verification comment reports 66 `aria-label`, 49 `aria-pressed`, 38 `aria-describedby` and 19
+`aria-hidden` across 33 non-test modules. The module count is right. Three of the four attribute
+counts reproduce only when **test files are counted**, and the fourth reproduces at neither figure.
+Excluding tests, on `771e65f`, the counts are **41 / 29 / 20 / 13**. Published as a correction and
+then deliberately unused: a census of ARIA measures effort rather than coverage, a wrong label counts
+the same as a right one, and no clause in the standard is satisfied by adding an attribute.
