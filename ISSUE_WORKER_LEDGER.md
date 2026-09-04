@@ -1583,3 +1583,110 @@ because a lane's account of its own environment is evidence like any other.
 
 **One agent finding was corrected.** P-D reported #161 bullet 5's residue as ground 2 alone. The code
 names three grounds and the third is the substantive one.
+
+---
+
+# Wave P — 2026-09-04: the backlog was decaying faster than anyone was reading it
+
+**Opened at `eb5b3b6`** (= `origin/main`, wave O merged), clean tree, **zero open pull requests**,
+**71 open issues**. Closed at **69 open**: five closed, three filed, two built.
+
+## P.1 The wave's real subject, and it was not what the hand-off named
+
+Wave O handed over a build batch. This wave ran it, and also sent three read-only lanes at the seven
+issues filed on 2026-09-01 and 2026-09-02 before dispatching anything. That second half is what the
+wave turned out to be about. **Five of those seven described defects the tree had already fixed**,
+three of them within hours of being filed.
+
+The instances are worth naming individually, because the pattern only becomes visible when they sit
+together:
+
+- **#316** was fixed roughly seven hours after it was filed.
+- **#321** was fixed under two hours after it was filed, on both of its halves. `.gitignore:23`
+  carries the `node_modules` symlink fix with a four-cell measurement table in its own header, and
+  `.worktree-setup.sh`'s header carries the `pkill -f` hazard together with a safe kill-by-PID form.
+- **#318**'s premise did not survive at all: the first of the two `## D63` headings was never a
+  decision.
+- **#162** was a duplicate of #227.
+- **#161** was an umbrella whose own body said to split it when its blocker cleared. The blocker had
+  cleared, two of its five bullets were done, and it was split into #337 and #338 and closed.
+
+**The rule this wave would hand forward: an issue filed against a fast-moving tree is a hypothesis
+with a timestamp.** Verify against the code rather than against the last comment, and verify before
+scheduling. Three of these five would have become build lanes if anybody had trusted the titles.
+
+## P.2 What was built, and both lanes refused the same thing without conferring
+
+| lane | issue | branch | verified by the integrator |
+|---|---|---|---|
+| **A** | **#333** — the store gets a versioned migration table | `fix/issue-333-store-migrations` | `--project server` **15 files / 356 passed** (base 14 / 337), `tsc -b` exit 0 |
+| **C** | **#275** — the day asks a fifth thing, 80 kJ per delivered leg | `feat/issue-275-energy-goal` | `--project viz` **216 files / 4 999 passed, 4 skipped** (base 216 / 4 987), `tsc -b` exit 0 |
+
+Both suites were run by the integrator in the lane's own worktree rather than accepted from the
+lane's report, and the integrated tree typechecks clean.
+
+**The finding worth keeping is that the two lanes reached the same refusal independently, from
+opposite ends of the product.** Lane A ruled that a board row written before `entries.legs` existed
+gets `NULL` rather than a backfilled zero, because `Number(null)` is `0` and a zero *looks like an
+answer*. Lane C ruled that a persisted day played before the energy bar existed gets no energy
+reading rather than a stand-in, because the bar is `at-most` and a fabricated zero would read as a
+day that **passed** it. Neither lane could see the other's code. The shared rule underneath is one
+this repository already applies to `workPerServedLegKJ` beside raw energy: a figure nobody measured
+is withheld, and the dangerous substitute is not the obviously wrong one but the plausible one.
+
+**Lane C came in at 24 files against a brief naming six, and the overrun is justified rather than
+tolerated.** Adding a fifth goal necessarily widens the persisted envelope (version 7 to 8, with 1
+through 7 still read), the live observation types, and the honesty corpus. The scope was challenged
+before it was accepted, which is the only reason it can be called justified.
+
+**The threshold is derived rather than chosen**, which is the half of #275 that had been deferred for
+a week. 400 seeds pooled, two-thirds point at 78.30 kJ, and 80 taken because at n = 400 the standard
+error on a one-third proportion is 2.4 points and the move sits inside it. The lower bound was
+checked in the same run: 60 kJ leaves day one unpassable rather than difficult.
+
+## P.3 The decision block, and the guard catching the integrator for the second wave running
+
+Wave P reserved **D464–D471** and spent **two**: D464 and D468. That is a 4:1 reservation against a
+1:1 spend, and it is a sizing lesson rather than an accident. Wave H's note already said the block
+should be sized to include the integrator; what it had not said is that it should be sized to the
+**issues**, because one issue closed end to end is one decision however many modules it touches.
+Fourth consecutive wave in which a lane has returned its spare numbers for exactly that reason.
+
+**The integrator got the hole convention wrong and `documentation.test.ts` caught it.** All six
+unspent numbers were registered as holes and the charter row was set to **D472**. That is wrong:
+D469 to D471 sit *above* the highest written decision, so nothing was written past them and they are
+free rather than holed. A hole is a gap **between** written decisions, which is why every previously
+registered hole sits inside a block and not at its top. Corrected to three holes, D465 to D467,
+closed from above by D468, and a charter row naming **D469**.
+
+Second wave running that this guard has caught the process's author rather than a lane.
+
+## P.4 A notification pattern, now at four recorded instances
+
+A `check_suite.completed` envelope arrived saying no third-party suite was still running or failed,
+naming head `6aa4b99`. That head had been **superseded**, and its suite was **cancelled** by the
+push rather than passed. Acting on it would have meant declaring CI green while the real head's
+45-minute suite was 20 minutes in. A second envelope, naming the live head `d2c16bc`, was genuine.
+
+**The two are indistinguishable without checking the head sha**, which is why the working agreement
+says to check it. The agreement's other half also paid: a documentation commit was deliberately held
+unpushed rather than cancelling a run that was already 20 minutes deep.
+
+## P.5 Owed to the next wave
+
+- **#336 should be taken before #332, and this reverses wave O's hand-off.** A mailed sign-in link
+  redeems onto a surface the Everyday shell covers, so the product's only credential path is broken
+  in the direction that looks like nothing happening. It is small, and it is a strict prerequisite
+  for the sign-in screen #332 asks for.
+- **#332 is blocked on a product decision, not on capacity.** The design handoff specifies no
+  sign-in screen, and there are two display names where § 15.1 asserts one.
+- **Five issues are blocked on a decision rather than on work**: #327, #328, #329, #332, #338. Each
+  would be settled in a paragraph. None has been. That is a different failure from the one this file
+  usually tracks and probably a more expensive one.
+- **#174 needs a run, not an opinion.** Day variation is built and `docs/14`'s status line says it is
+  not, because that line means *its criterion has been measured* and the criterion is a variance
+  comparison nobody appears to have run. **#235's premise depends on the answer** and has not been
+  re-checked.
+- **#333 lands in the repository and not in the deployed database.** The image is deployed by hand
+  from `scripts/deploy-azure.sh`, invoked by nothing in CI, so a migration runner existing is not a
+  migration having run.

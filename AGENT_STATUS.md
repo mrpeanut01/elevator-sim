@@ -1119,3 +1119,28 @@ wrong; it may not quietly pick a different answer.
 pull request that merged hours after the comment naming it. The issue has been unblocked for over a
 week and three consecutive waves have passed it over. That is #329's own subject arriving for the
 fourth time, on the issue that is the clearest instance of it.
+
+## Wave P closed
+
+| task | issue | outcome |
+|---|---|---|
+| **P-V1** | #315, #317, #320 | reported; none closed, all three carry residue past the code fix |
+| **P-V2** | #316, #318, #321 | **all three closed**, two of them fixed within hours of filing |
+| **P-V3** | #324, #325, #327, #328, #329 | reported; #328 and #329 moved to **needs decision**, #325's preferred fix found unsound |
+| **P-D** | overlap clusters | **#162 closed as duplicate of #227**; **#161 split into #337, #338 and closed** |
+| **P-A** | #333 | **merged** — `d4d2e4f` |
+| **P-B-MAP** | #332 | map returned; **#332 is blocked on a product decision**, and the map found **#336** |
+| **P-C** | #275 | **merged** — `2808a0a` |
+
+**Verified by the integrator rather than accepted**, each in the lane's own worktree: lane A
+`--project server` **15 files / 356 passed** against a base of 14 / 337; lane C `--project viz`
+**216 files / 4 999 passed, 4 skipped** against a base of 216 / 4 987. `tsc -b` exit 0 in both
+worktrees and again on the integrated tree.
+
+**The B/C decision-block collision recorded at dispatch cost nothing**, because lane B was a mapping
+task that allocated no number and its build was not dispatched. The collision that did cost
+something was the integrator's own hole convention, and `documentation.test.ts` caught it: see
+[`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md) § P.3.
+
+**Both worktrees are kept until the push is confirmed green**, then removed with their branches.
+Neither holds uncommitted work.
