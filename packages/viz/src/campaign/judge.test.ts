@@ -272,6 +272,24 @@ describe('the headline inflects every count it prints — issue #295 F37, issue 
     const source = readFileSync(new URL('./judge.ts', import.meta.url), 'utf8');
     expect(source).toContain("from '../mode/disclosure.js'");
   });
+
+  it('inflects the Engineer panel’s mirror of the same tally', () => {
+    /*
+     * `dev/campaignPanel.ts` prints the same goal count on the Engineer side, off the same
+     * `verdict.goals`, so it reads `1 goals` on the same stage 1 for the same reason. It is
+     * DOM-bound, there is no jsdom here, and it has no test file of its own — so this is a source
+     * assertion, which is weaker than driving it and is the strongest thing available. It is here
+     * rather than in a new file because the class is this describe block's subject, and a guard
+     * filed away from the finding is a guard nobody reads.
+     */
+    const panel = readFileSync(
+      new URL('../dev/campaignPanel.ts', import.meta.url),
+      'utf8',
+    );
+    expect(panel).toContain("plural, rowClassesOf } from '../mode/disclosure.js'");
+    expect(panel).toContain("plural(verdict.goals.length, 'goal', 'goals')");
+    expect(panel).not.toContain('${String(verdict.goals.length)} goals');
+  });
 });
 
 /* -------------------------------------------------------------------------- *

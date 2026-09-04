@@ -79,7 +79,7 @@ import {
 } from '../controls/editedProfile.js';
 import { renderControls, valueAtSliderPosition } from '../controls/render.js';
 import type { Control, ControlValues } from '../controls/types.js';
-import { disclosureItems, rowClassesOf } from '../mode/disclosure.js';
+import { disclosureItems, plural, rowClassesOf } from '../mode/disclosure.js';
 import type { GlossaryTerm } from '../mode/glossary.js';
 import { parityRefusal } from '../mode/parity.js';
 import { itemsIn, type ViewMode } from '../mode/types.js';
@@ -1080,7 +1080,10 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const nodes: HTMLElement[] = [
       row(
         'the runs you made',
-        `${String(verdict.goals.length)} goals, judged on ${tuning.name} (seed ${tuning.seed}) — ` +
+        /* Inflected for `campaign/judge.ts`'s reason — issue #295's F37 on the Engineer mirror of
+           the same tally, reachable on the same stage 1 and its single goal. */
+        `${String(verdict.goals.length)} ${plural(verdict.goals.length, 'goal', 'goals')}, ` +
+          `judged on ${tuning.name} (seed ${tuning.seed}) — ` +
           'the seeds this setting was tuned against, and the batch every row below is about.',
         'These are the counts to play against: a goal missed here is one you can go and look at. ' +
           'Meeting all of them is half of clearing the stage.',
