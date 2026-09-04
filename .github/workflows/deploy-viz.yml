@@ -182,10 +182,16 @@ jobs:
             echo "::error::data/ has $on_disk buildings, the manifest names $in_manifest"; exit 1; }
           echo "artifact complete: $in_manifest buildings, $(du -sh . | cut -f1) total"
 
-      # The check this lane exists for, asserted BOTH WAYS. An armed build must carry the tag and a
-      # `connect-src` that permits it; an unarmed build must carry neither, because a bundle that
-      # acquired an origin without anyone asking is how the container's own `"/"` injection gets
-      # silently suppressed (both producers are idempotent).
+      # The check this lane exists for, asserted in two directions: **armed against unarmed**. An
+      # armed build must carry the tag and a `connect-src` that permits it; an unarmed build must
+      # carry neither, because a bundle that acquired an origin without anyone asking is how the
+      # container's own `"/"` injection gets silently suppressed (both producers are idempotent).
+      #
+      # That pair used to be described here as "asserted BOTH WAYS", which reads as though it also
+      # covered **how many** origins `connect-src` names. It never did. For as long as the sentence
+      # sat above it the armed arm admitted an arbitrary second origin, and the arm that runs on
+      # every production deploy was the looser of the two (issue #341, § D471). The origin count is
+      # a separate check now, below, and it is an equality rather than a substring.
       #
       # Comments are stripped before the match. `index.html` carries a comment naming this tag, to
       # tell the next reader not to write it by hand — and matching that comment is a bug that was
@@ -204,6 +210,30 @@ jobs:
             const c = JSON.parse(require('fs').readFileSync('staticwebapp.config.json','utf8'));
             process.stdout.write(c.globalHeaders['Content-Security-Policy']);
           ")
+          # `connect-src`'s source list, single-spaced — or empty when the policy names no such
+          # directive, or names two of them. Both arms below compare this for **equality** against a
+          # list written here, so the permitted origins are decided in this file rather than read
+          # off whatever a build happened to emit.
+          #
+          # The substring test this replaces (`*"connect-src 'self' $EXPECTED"*`) matched any policy
+          # that merely *contained* that text, so `connect-src 'self' <expected> <anything>;` passed.
+          # Pinning the terminator instead — `*"connect-src 'self' $EXPECTED;"*` — was measured and
+          # rejected: it stops the second origin and it also rejects a **correct** policy, because
+          # this CSP carries no trailing semicolon and whichever directive is written last therefore
+          # has none. `connect-src` is the sixth of eleven directives today, and
+          # `packages/server/src/http/static.test.ts` asserts the semicolon after it in both the
+          # committed and the widened form, so the pinned form would pass now and break on a
+          # reorder that changed nothing about the policy. Splitting on `;` and comparing tokens does
+          # not care where the directive sits.
+          connect=$(node -e "
+            const c = JSON.parse(require('fs').readFileSync('staticwebapp.config.json','utf8'));
+            const policy = c.globalHeaders['Content-Security-Policy'] || '';
+            const found = policy
+              .split(';')
+              .map((d) => d.trim().split(/\s+/u).filter(Boolean))
+              .filter((t) => t.length > 0 && t[0].toLowerCase() === 'connect-src');
+            process.stdout.write(found.length === 1 ? found[0].slice(1).join(' ') : '');
+          ")
           if [ -n "$EXPECTED" ]; then
             test "$declared" = "$EXPECTED" || {
               echo "::error::the built page declares '$declared', expected '$EXPECTED'. A page that"
@@ -211,22 +241,29 @@ jobs:
               echo "::error::challenge surface with no failing status code anywhere (issues #21, #28,"
               echo "::error::#29, #30, #32, #34). This is that failure, caught before it ships."
               exit 1; }
-            case "$csp" in
-              *"connect-src 'self' $EXPECTED"*) ;;
-              *) echo "::error::the page names $EXPECTED and the CSP forbids reaching it: $csp"; exit 1 ;;
-            esac
-            echo "armed: the page points at $EXPECTED and the CSP permits it"
+            # The allowlist. A second origin — an error-reporting endpoint, say (#242) — is added by
+            # editing this line, which is a reviewable diff in the gate. It is deliberately not
+            # something a config can acquire on its own.
+            permitted="'self' $EXPECTED"
+            test "$connect" = "$permitted" || {
+              echo "::error::connect-src must permit exactly [$permitted] and permits [$connect]."
+              echo "::error::An empty list there means the policy names no connect-src directive at"
+              echo "::error::all, or names more than one. Either way the page cannot be trusted to"
+              echo "::error::reach $EXPECTED and only $EXPECTED. The whole CSP: $csp"
+              exit 1; }
+            echo "armed: the page points at $EXPECTED and connect-src permits exactly [$permitted]"
           else
             test -z "$declared" || {
               echo "::error::unarmed, but the built page declares an API origin ('$declared')."
               echo "::error::That would suppress the server's own injection of '/' — the container"
               echo "::error::path is idempotent — and point the shipped image at somebody else."
               exit 1; }
-            case "$csp" in
-              *"connect-src 'self';"*) ;;
-              *) echo "::error::unarmed, but connect-src permits something: $csp"; exit 1 ;;
-            esac
-            echo "unarmed: no tag, connect-src permits nothing extra — identical to the container build"
+            permitted="'self'"
+            test "$connect" = "$permitted" || {
+              echo "::error::unarmed, but connect-src permits [$connect] rather than exactly"
+              echo "::error::[$permitted]. The whole CSP: $csp"
+              exit 1; }
+            echo "unarmed: no tag, connect-src permits exactly [$permitted] — identical to the container build"
           fi
 
       - uses: actions/upload-artifact@v4

@@ -31169,3 +31169,114 @@ in the viz suite would be a minute on every run for a figure that is interesting
 is pinned by `goals.test.ts` and the run is pinned here and in § 4.6, which is the discipline this
 repository asks for. If the catalogue's buildings or the growth rule move, this number goes stale
 the way every published number can, and § 4.6 names the instrument that re-derives it.
+
+## D471 — the deploy CSP gate names its permitted origins, and two live rules stop naming a goal count
+
+**Date: 2026-09-04 · Owner: wave Q lane C · Rules on: GitHub issue #341, and the documentation debt
+[§ D468](#d468) left behind.**
+
+One number covering two changes, because the lane holds one. They are unrelated in subject and
+identical in shape: a predicate and a rule each carried a count that had stopped being true, and
+neither had anything checking it.
+
+### The gate admitted an arbitrary second origin, and this was reproduced rather than read
+
+`.github/workflows/deploy-viz.yml` asserts that the built page's CSP permits reaching the API origin
+the page names. Its two arms were not equally strict:
+
+```sh
+armed:    case "$csp" in *"connect-src 'self' $EXPECTED"*) ;;   # no terminator
+unarmed:  case "$csp" in *"connect-src 'self';"*) ;;            # pinned by the semicolon
+```
+
+The armed arm has wildcards on both sides and nothing closing the directive, so it matched any policy
+merely *containing* that text. Replayed with the workflow's own expressions, a CSP reading
+`connect-src 'self' https://api.example.com https://evil.example.com;` **passed**. The arm that runs
+on every production deploy was the looser of the two, and the strict one ran only when nothing was
+configured.
+
+### Why an allowlist rather than the pinned terminator the issue suggests
+
+Issue #341 proposes `*"connect-src 'self' $EXPECTED;"*`, and names two things to check first. Both
+were checked by running them.
+
+**`connect-src` is not the final directive today.** The committed
+`packages/viz/staticwebapp.config.json` writes eleven directives and `connect-src` is the sixth;
+`frame-ancestors 'none'` is last and the string carries no trailing semicolon, so whichever directive
+is written last has none. `hostConfigWithApiOrigin` widens in place, so the sixth position survives
+widening. `packages/server/src/http/static.test.ts` already asserts the semicolon after `connect-src`
+in both the committed and the widened form, reading the file from disk. So the pinned form is correct
+today and is correct only by an ordering nothing in the workflow states.
+
+**Measured, it rejects a correct policy.** Three candidate gates were replayed against six built
+configs. The row that decides it is a legitimate widened policy whose `connect-src` is written last:
+
+| case | old | pinned terminator | source list compared |
+|---|---|---|---|
+| expected origin only | PASS | PASS | PASS |
+| expected origin **plus a second** | **PASS** | FAIL | FAIL |
+| expected origin only, `connect-src` written last | PASS | **FAIL** | PASS |
+| expected plus a second, `connect-src` written last | **PASS** | FAIL | FAIL |
+| a duplicated `connect-src *` directive | **PASS** | **PASS** | FAIL |
+
+So the gate extracts `connect-src`'s **source list**, single spaced, and both arms compare it for
+equality against a list written in the workflow. Armed expects `'self' $EXPECTED`; unarmed expects
+`'self'`. Splitting on `;` makes the check independent of where the directive sits, which is the
+column the pinned form loses.
+
+Two consequences worth stating. A second origin, an error reporting endpoint for #242 being the
+likely one, is now added by editing one line in the gate, which is a reviewable diff; it is not
+something a config can acquire on its own. And the duplicate row is a config hygiene catch rather
+than a closed hole: CSP semantics ignore a repeated directive, so the policy in that row is still
+safe, and a build emitting two of them is a build nobody understands.
+
+### `staticwebapp.config.json` is unchanged, deliberately
+
+The gate fix needed no edit to the hosting config, and none was made. The committed policy was
+already the shape the new predicate wants.
+
+### The comment said *"asserted BOTH WAYS"* and that was true of the wrong pair
+
+It described armed against unarmed, which is real and remains. Sitting directly above the block, it
+read as though it also covered how many origins `connect-src` names, and a reader planning #242 would
+have concluded that a second origin required changing the gate. It did not. The comment now names the
+pair it means and says outright that the origin count is a separate check.
+
+**Nothing automated guards this.** No test in the tree parses `.github/workflows/`, so the proof here
+is a reproduction run against the step body extracted from the YAML and against artifacts produced by
+the real `hostConfigWithApiOrigin`, quoted in the lane report. That is the same class of exposure as
+the defect being fixed, and it is named rather than implied.
+
+### Two live rules stop naming a goal count
+
+§ D468 made the day ask five things. Two governing rules still said four, and both are scored against
+open issues:
+
+- **`docs/33` DC-4**, *"must fail at least one of the day's four goals"*, which #234 and #270 are
+  measured against.
+- **`docs/25` X6**, an M2 exit row #218 is measured against.
+
+Both now read over *the day's goals* with no count in the rule, because a rule that names one goes
+stale the next time a goal lands and a stale rule is worse than a loose one. Each says where the count
+stands and that it has moved, so a figure quoted against either has to declare which set it was taken
+over.
+
+**A third instance was corrected and it was not on the lane's list.** `docs/33` § 1.4 tells the lane
+that lands the `Difficulty.tests` fix that *"`goalsForDay` has no trip goal. Its four bars are …"*.
+That is a present tense enumeration of a shipped function rather than a dated measurement, and it is
+read by a future lane as fact. It now reads five and names the energy bar as a constant rather than a
+rung, which is the property that lane needs.
+
+**What was deliberately left alone, on the rule that a dated record and a live claim are different
+things.** `docs/33` § 4.2's instrument and result prose, its F6 finding and its § 4.4 comparison table
+all say four and were all measured when the day asked four. Rewriting a measurement to say five would
+falsify it. § 4.6's *"the four wait goals"* is a correct designation of the four non energy goals, and
+§ 5's *"the other four goals grade the whole shift"* is correct as written for the same reason: the
+energy goal is the one on the reporting window and the other four are not.
+
+**One live claim is flagged and not corrected.** `docs/25` § 6.1 says *"The four goals still grade"*
+under saturation, with the argument that `GoalObservations` carries no suppressible mean field. The
+type argument still holds and the count probably does not, but `workPerServedLegKJ` is an optional
+member that reads `pending` when absent, which is a gate the original four do not have. Whether all
+five grade on that saturated day is a measurement, and this lane did not take it. A plausible sentence
+in place of one is what [§ D256](#d256) refuses.

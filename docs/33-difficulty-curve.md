@@ -170,15 +170,17 @@ section's specified remedy — read the campaign's day tests from `goalsForDay` 
 fourth row is a new breach of a kind the other three do not already have.
 
 **One thing the fourth row needs that the other three do not**, stated so the lane that lands § 1.4 is
-not surprised twice: `goalsForDay` has **no trip goal**. Its four bars are the carry share, the minute
-share, the landing queue and the worst wait, and the day ramp § 1.4 adopts has nothing to offer a trip
-budget. Deleting `Difficulty.tests` therefore requires authoring a day-indexed trip ladder, and
-authoring one requires knowing what a day's trips actually are at the campaign's own cell — measured
-in [§ D431](../DECISIONS.md#d431) as **16** on `garden-apartments` over its contract hour, against the
-four tier bars of 620 / 520 / 470 / 430 and against § 8.3's own *1 400 trips a working day*. Those
-three numbers disagree by one and two orders of magnitude — the bar cannot be missed at that cell and
-the wear clock would take some 2 800 contract days to reach a window — and that disagreement is
-content this document's owner has to settle rather than something a grading lane may pick a side in.
+not surprised twice: `goalsForDay` has **no trip goal**. Its five bars are the carry share, the minute
+share, the landing queue, the worst wait and, since [§ D468](../DECISIONS.md#d468), the work per ride
+delivered, which is a constant rather than a rung of the ladder. The day ramp § 1.4 adopts has nothing
+to offer a trip budget. Deleting `Difficulty.tests` therefore requires authoring a day-indexed trip
+ladder, and authoring one requires knowing what a day's trips actually are at the campaign's own
+cell — measured in [§ D431](../DECISIONS.md#d431) as **16** on `garden-apartments` over its contract
+hour, against the four tier bars of 620 / 520 / 470 / 430 and against § 8.3's own *1 400 trips a
+working day*. Those three numbers disagree by one and two orders of magnitude — the bar cannot be
+missed at that cell and the wear clock would take some 2 800 contract days to reach a window — and
+that disagreement is content this document's owner has to settle rather than something a grading
+lane may pick a side in.
 
 ### 1.5 A finding about § D345's own sequencing note, reported and not acted on
 
@@ -1165,8 +1167,16 @@ would have caught a difficulty knob wired to nothing.
 
 ### 4.3 The specified curve for a week
 
-> **DC-4.** A contract's day 1 must fail at least one of the day's four goals on **at least a third
+> **DC-4.** A contract's day 1 must fail at least one of the day's goals on **at least a third
 > and at most two thirds** of seeds under the shipped default configuration.
+
+**The rule reads over the day's goals as shipped, and that number has moved once.** It was written
+when `goalsForDay` returned four; [§ D468](../DECISIONS.md#d468) added the energy bar and the day now
+asks five. The count is deliberately kept out of the rule, because a rule that names one goes stale
+the next time a goal lands, and a stale rule is worse than a loose one. What a *figure* quoted against
+DC-4 must still say is which set it was taken over: § 4.2's miss rates below are four-goal
+measurements, and § 4.6 re-measures day 1 under both and tabulates the difference contract by
+contract.
 
 Both bounds do work, and both are stated so they can be argued with rather than assumed.
 
