@@ -74,6 +74,7 @@ import {
   type RaceStripView,
 } from '../live/raceStrip.js';
 import type { LiveObservations } from '../live/types.js';
+import type { GoalState } from '../shift/types.js';
 import type { ActionBarModel } from './actionBar.js';
 import type { EverydayHost } from './host.js';
 import type { EverydayScreenModule } from './screens.js';
@@ -88,6 +89,7 @@ import {
   stageCrowdCapOf,
   stageFilingLandsOn,
   stageGeometryOf,
+  stageGoalsOf,
   stageHeaderOf,
   stageInkFor,
   stageInterventionsOf,
@@ -171,6 +173,24 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 const EYEBROW = `font:500 9.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
+
+/**
+ * The three goal states in § 19's ink — GitHub issue **#277**.
+ *
+ * Here rather than in `stageScreenModel.ts` because a colour is not a decision about what to say,
+ * and here rather than taken from `dev/leftRail.ts#goalRowsOf` because that function answers in the
+ * Engineer stylesheet's custom properties (`var(--faint)`, `var(--edge-strong)`) and this shell's
+ * palette is `everyday/tokens.ts`. Every row short of the run's end is `pending`, so this table's
+ * busiest entry is the faint one.
+ *
+ * KB-15 — *no colour-only signal* — is kept by the row rather than by this table: `GOAL_GLYPHS`'
+ * `✓ × ·` sits at the head of every line and the value or the em dash sits at its end.
+ */
+const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
+  met: C.moss,
+  missed: C.alarm,
+  pending: C.faint,
+});
 
 /**
  * The cutaway's CSS height — GitHub issue **#303**, § D391.
@@ -586,6 +606,37 @@ function mountStage(
 
   header.append(clock, phase, nextPhase, driving, figures, playButton, speeds);
 
+  /*
+   * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
+   *
+   * The charter names P3 as the pillar this build fails outright, and its refusal test is *where on
+   * the stage would a player have seen this?* The day asks five things, the brief lists them, the
+   * report grades them, and until this element the stage the player actually watches said none of
+   * them. Everything drawn into it is decided by `stageScreenModel.ts#stageGoalsOf`; nothing here
+   * chooses a word.
+   *
+   * **Down until a recording lands**, which is `nextPhase`'s rule one block up: an empty strip of
+   * five ungraded rows before the first press is a control saying nothing. The brief is where the
+   * bars are read before a run.
+   */
+  const goals = el(doc, 'section', 'everyday-stage-goals');
+  goals.style.cssText = [
+    'display:none',
+    'flex-direction:column',
+    `gap:${String(GAP.row)}px`,
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.card)}px`,
+    `background:${C.card}`,
+    'padding:10px 14px 11px',
+  ].join(';');
+  const goalHeading = el(doc, 'span', 'everyday-stage-goals-heading');
+  goalHeading.style.cssText = EYEBROW;
+  const goalRows = el(doc, 'div', 'everyday-stage-goals-rows');
+  goalRows.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.tight)}px`;
+  const goalNote = el(doc, 'span', 'everyday-stage-goals-note');
+  goalNote.style.cssText = `font-size:11px;line-height:1.4;color:${C.label}`;
+  goals.append(goalHeading, goalRows, goalNote);
+
   const alarm = el(doc, 'div', 'everyday-stage-alarm');
   alarm.setAttribute('role', 'status');
   alarm.style.cssText = [
@@ -880,7 +931,7 @@ function mountStage(
    * one refusal a player still meets *here* is the ghost lane's, on the ghost lane's own card
    * (`STAGE_NO_GHOST`, three blocks up) — a control that cannot act says so where the control is.
    */
-  root.append(header, watchBand, alarm, stageWrap, legend, interventions, race);
+  root.append(header, goals, watchBand, alarm, stageWrap, legend, interventions, race);
   region.append(root);
 
   /* ------------------------------------------------------------- behaviour */
@@ -1197,6 +1248,7 @@ function mountStage(
     nextPhase.style.display = head.next === undefined ? 'none' : '';
     drivingName.textContent = watching?.dispatcherName ?? head.driverName;
     drawFigures(head.figures);
+    drawGoals(recording, simTimeS);
     drawWatching(watching);
 
     const alarmLine = stageAlarmOf(observations, labelOf);
@@ -1305,6 +1357,75 @@ function mountStage(
       label.style.cssText = `font:500 9.5px ${TYPE.mono};letter-spacing:.06em;opacity:.75;max-width:24ch`;
       box.append(value, label);
       watchFigures.append(box);
+    }
+  }
+
+  /**
+   * § 7.1's goal strip — GitHub issue **#277**, the charter's Pillar 3.
+   *
+   * Rebuilt per draw rather than keyed, on {@link drawFigures}' ground three lines down: the values
+   * are folded at the playhead and move every frame, so a key over the view would miss on every
+   * frame and buy nothing. {@link drawWatching} is keyed because the record's posted result does
+   * not move within a watch; these do.
+   *
+   * **{@link EverydayHost.goalsAt} at this screen's playhead, never {@link EverydayHost.goalsToday}.**
+   * The latter reads at `EverydayHostBindings.playheadS`, which is the **Engineer** transport's
+   * position — not moving while this shell has the page — so the strip would have drawn five
+   * constants while the day ran underneath it. That is the defect this repository's standing requirement is written against:
+   * move the control and require the run to change. `stageScreen.test.ts` holds it on the drawn
+   * figure rather than on an internal field.
+   *
+   * **The ink is chosen here and the verdict is not.** `stageGoalsOf` hands over
+   * {@link StageGoalRow.state}, which is `pending` at every playhead short of the run's end, and
+   * this function maps the three states onto `everyday/tokens.ts`' palette. It may not do anything
+   * else: `dev/leftRail.ts#goalRowsOf`'s own `color` and `fill` are the Engineer stylesheet's
+   * custom properties and would resolve against a palette that is not this shell's. KB-15 holds
+   * either way — the glyph and the value both say what the colour says, and a run short of its end
+   * draws `·` on every row.
+   */
+  function drawGoals(recording: VizRecording, simTimeS: number): void {
+    const week = host.week();
+    const strip = stageGoalsOf({
+      readings: host.goalsAt(simTimeS),
+      simTimeS,
+      endedAt: recording.endedAt,
+      history: week.history,
+      day: week.day,
+    });
+    goals.style.display = 'flex';
+    goalHeading.textContent = strip.heading;
+    goalNote.textContent = strip.note;
+    goalRows.replaceChildren();
+    for (const row of strip.rows) {
+      const ink = GOAL_INK[row.state];
+      const line = el(doc, 'div', 'everyday-stage-goal');
+      line.dataset['goal'] = row.id;
+      line.style.cssText = 'display:flex;flex-direction:column;gap:3px';
+
+      const top = el(doc, 'div');
+      top.style.cssText = 'display:flex;align-items:baseline;gap:8px;min-width:0';
+      const glyph = el(doc, 'span', 'everyday-stage-goal-glyph', row.glyph);
+      glyph.style.cssText = `font:500 12px ${TYPE.mono};color:${ink};flex:none;width:1ch`;
+      const label = el(doc, 'span', 'everyday-stage-goal-label', row.label);
+      label.style.cssText = `flex:1;min-width:0;font-size:12px;color:${C.inkSoft}`;
+      /* The handoff's *"was"* slot (§ 8.6) — last night's figure for the same quantity, or the
+         bare em dash. Never this run's, which is what `wasDisplayOf` matches on `reads` for. */
+      const was = el(doc, 'span', 'everyday-stage-goal-was', row.was);
+      was.style.cssText = `font:500 10px ${TYPE.mono};color:${C.faint};flex:none`;
+      const value = el(doc, 'span', 'everyday-stage-goal-value', row.value);
+      value.style.cssText = `font:500 13px ${TYPE.mono};color:${ink};flex:none;min-width:5ch;text-align:right`;
+      top.append(glyph, label, was, value);
+
+      /* Flat at every playhead short of the end — `stageGoalsOf` zeroes it, and its docstring owns
+         the argument: a full track on an untested `at-most` bar is a verdict with no word in it. */
+      const track = el(doc, 'div', 'everyday-stage-goal-track');
+      track.style.cssText = `height:3px;border-radius:2px;background:${C.ruleLight};overflow:hidden`;
+      const fill = el(doc, 'div', 'everyday-stage-goal-fill');
+      fill.style.cssText = `height:100%;width:${String(row.barPct)}%;background:${ink}`;
+      track.append(fill);
+
+      line.append(top, track);
+      goalRows.append(line);
     }
   }
 

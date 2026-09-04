@@ -163,6 +163,7 @@ import {
   stageBarModelOf,
   stageCarReadoutOf,
   stageCrowdCapOf,
+  stageGoalsOf,
   stageHeaderOf,
   stageInkFor,
   stageInterventionsOf,
@@ -170,6 +171,7 @@ import {
   stageOpeningLineOf,
   STAGE_ABSENCES,
   STAGE_AWAITING_RUN,
+  STAGE_GOALS_COPY,
   STAGE_INTERVENTIONS,
   STAGE_NO_GHOST,
   STAGE_OUT_OF_SERVICE,
@@ -8702,6 +8704,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_DAY_OVER',
     'everyday/stageScreenModel.ts#stageOpeningLineOf',
     'everyday/stageScreenModel.ts#stageNextStretchOf',
+    /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
+    'everyday/stageScreenModel.ts#stageGoalsOf',
+    'everyday/stageScreenModel.ts#STAGE_GOALS_COPY',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -8797,6 +8802,51 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       role: 'label',
     });
     seeds.push({ field: 'stage.race.noGhost', text: STAGE_NO_GHOST, role: 'reason' });
+
+    /*
+     * **Pillar 3's goal strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
+     *
+     * The chrome is iterated rather than listed, on `BOARD_SCREEN_COPY`'s and `DESIGNER_COPY`'s
+     * ground: a key added to `STAGE_GOALS_COPY` is swept the day it is added. Both notes are in
+     * that record, so the arm the sampling below does not reach is still read.
+     */
+    for (const [key, text] of Object.entries(STAGE_GOALS_COPY)) {
+      seeds.push({ field: `stage.goals.copy.${key}`, text, role: 'prose' });
+    }
+    /*
+     * The row's one playhead-independent slot, seeded once rather than at every sample time.
+     * `wasDisplayOf` reads a `DayOutcome` out of **another day's** history and folds nothing from
+     * this recording, so it does not move with this clock and is deliberately given no playhead:
+     * declaring this run's instant over last night's figure would be the false declaration
+     * `TextPlayhead`'s own docstring refuses.
+     *
+     * Both arms, which is `LIVE_RAIL`'s own pairing: the day the bundle closed holds no *previous*
+     * day and draws the em dash, and the morning after is the one shipped state whose slot carries
+     * a figure. Without the second the corpus would sweep the dash and never the number.
+     */
+    const goalWeeks = shiftBundleOf(context).days[0];
+    if (goalWeeks !== undefined) {
+      const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+      for (const [arm, week] of [
+        ['today', goalWeeks.week],
+        ['nextDay', nextDay(goalWeeks.week)],
+      ] as const) {
+        const strip = stageGoalsOf({
+          readings: readGoals(goalsForDay(week.day), atEnd),
+          simTimeS: recording.endedAt,
+          endedAt: recording.endedAt,
+          history: week.history,
+          day: week.day,
+        });
+        for (const row of strip.rows) {
+          seeds.push({
+            field: `stage.goals(${arm}).${row.id}.was`,
+            text: row.was,
+            role: 'observation',
+          });
+        }
+      }
+    }
 
     /* § 14's overflow chip — the one string `stageCrowdCapOf` produces. */
     const capped = stageCrowdCapOf(412);
@@ -8911,6 +8961,62 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           role: 'observation',
           playhead: atPlayhead(recording, at),
         });
+      }
+
+      /*
+       * **The five goals at this playhead** — the strip § D371 authorises and the reason it is a
+       * reading rather than a verdict.
+       *
+       * Driven over the sample times rather than at one instant, because the whole claim of this
+       * surface is that the figures move and the verdict does not appear. `sampleTimes` spans
+       * `startedAt` to `endedAt`, so both arms are read: four ungraded strips and, at the last
+       * sample, the graded one.
+       *
+       * **The label and the value are separate seeds, and the split is not cosmetic.** A goal's
+       * label is a caption carrying a *threshold* — `Keep the work inside 80 kJ per ride delivered`
+       * — which is `role: 'label'`'s own definition and the reason the temporal property exempts
+       * that role from its textual half. Seeding the composed row instead would put the bar's `80`
+       * in one clause with the word `delivered`, and a run whose `summary.delivered` happened to
+       * be 80 would report a violation about a threshold nobody folded. The value is the
+       * observation and carries the playhead, which is where the property should look.
+       *
+       * **One goal set here rather than two.** `GoalReading.display` is the observed figure and its
+       * unit, so the day-1 and morning-after bars read the *same* string at the same playhead and
+       * the second set would be twenty-five duplicate seeds. What actually differs between them is
+       * the *was* slot, which does not move with this clock and is swept once above.
+       */
+      const goalDay = shiftBundleOf(context).days[0];
+      if (goalDay !== undefined) {
+        const strip = stageGoalsOf({
+          readings: readGoals(goalsForDay(goalDay.day), shiftObservationsOf(observations)),
+          simTimeS: at,
+          endedAt: recording.endedAt,
+          history: goalDay.week.history,
+          day: goalDay.day,
+        });
+        seeds.push({
+          field: `stage(@${stamp}s).goals.note`,
+          /* The panel's own retraction while the shift is unfinished — § D293's shape. */
+          text: strip.note,
+          role: 'reason',
+          playhead: atPlayhead(recording, at),
+        });
+        for (const row of strip.rows) {
+          seeds.push({
+            field: `stage(@${stamp}s).goals.${row.id}.label`,
+            /* KB-15: the glyph is never the only signal, so the pair is read as a reader sees it. */
+            text: `${row.glyph} ${row.label}`,
+            role: 'label',
+          });
+          seeds.push({
+            field: `stage(@${stamp}s).goals.${row.id}.value`,
+            text: row.value,
+            role: 'observation',
+            /* R11 / § D106: the fifth bar's figure is an energy quantity and declares itself one. */
+            ...(row.id === 'energy' ? { energyAxis: true } : {}),
+            playhead: atPlayhead(recording, at),
+          });
+        }
       }
 
       const stamped = stageInterventionsOf({

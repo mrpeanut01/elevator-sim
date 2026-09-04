@@ -291,8 +291,34 @@ export interface EverydayHost {
    * Today's goals, read at the current playhead — the same derivation the Engineer rail draws
    * (`readGoals` over the live fold). Before any run every reading is `pending`, because zero
    * arrivals sits under the wake-up gate; that is the gate doing its work, not a stand-in.
+   *
+   * *The current playhead* is `EverydayHostBindings.playheadS`, which is the **Engineer**
+   * transport's. That is the right instant for every caller this method had when it was written —
+   * the brief, the door, the tile and the campaign screens are all read before a run or after one —
+   * and it is the wrong instant for a screen that runs a transport of its own. See
+   * {@link goalsAt}.
    */
   goalsToday(): readonly GoalReading[];
+
+  /**
+   * The same goals read at **an instant the caller names** — GitHub issue **#277**,
+   * [§ D470](../../../../DECISIONS.md).
+   *
+   * {@link goalsToday} is this method at `EverydayHostBindings.playheadS`, and the two are one
+   * derivation with two entry points rather than two folds: a screen that re-read `readGoals` over
+   * its own `observationsAt` would be the second implementation § D371 forbids, and a screen that
+   * kept calling `goalsToday` would draw the Engineer transport's instant.
+   *
+   * The port exists because the Everyday stage owns a `Playback` of its own — the Engineer
+   * transport is not the one moving while that shell has the page, so `goalsToday()` on the stage
+   * is a **constant**, not a reading. This repository's standing requirement is *move the control
+   * and require the run to change*; a mid-run goal strip fed from another screen's clock is a
+   * control that moves and a run that does not.
+   *
+   * Before any run the argument is ignored, because there is nothing to fold: every reading comes
+   * back `pending` from {@link NO_RUN_OBSERVATIONS}'s side of the wake-up gate.
+   */
+  goalsAt(simTimeS: number): readonly GoalReading[];
 
   /** The last filed day's sheet, or `undefined` while no closed day's report is standing. */
   lastReport(): ShapedDayReport | undefined;
@@ -1096,18 +1122,28 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
    */
   let campaignDayTowerId: string | undefined;
 
+  /**
+   * The one fold behind {@link EverydayHost.goalsAt} and {@link EverydayHost.goalsToday}.
+   *
+   * A local rather than two entries in the literal below, so that the second entry point cannot
+   * drift from the first: `goalsToday` is *this, at the Engineer transport's instant*, and that is
+   * one expression rather than a copy of one. GitHub issue #277.
+   */
+  const goalsAt = (simTimeS: number): readonly GoalReading[] => {
+    const state = b.state();
+    const observations =
+      state.recording === undefined
+        ? NO_RUN_OBSERVATIONS
+        : shiftObservationsOf(observationsAt(state.recording, simTimeS));
+    return readGoals(goalsForDay(state.week.day, horizonOf(b)), observations);
+  };
+
   return {
     week: () => b.state().week,
     contract: () => contractById(b.state().week.contractId),
     calendarPeriod: () => b.state().calendar,
-    goalsToday: () => {
-      const state = b.state();
-      const observations =
-        state.recording === undefined
-          ? NO_RUN_OBSERVATIONS
-          : shiftObservationsOf(observationsAt(state.recording, b.playheadS()));
-      return readGoals(goalsForDay(state.week.day, horizonOf(b)), observations);
-    },
+    goalsAt,
+    goalsToday: () => goalsAt(b.playheadS()),
     lastReport: () => b.state().report,
     lastOutcome: () => b.state().week.history.at(-1),
     selection: () => {

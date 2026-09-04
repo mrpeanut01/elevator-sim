@@ -36,8 +36,11 @@ import {
 } from '../dev/state.js';
 import { DATA_DIR, fixtureConfig } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
+/* Issue #277's port needs a run with legs spread over it — a stub recording cannot move. */
+import { servedLeg, syntheticRecording } from '../live/synthetic.test-helper.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
+import type { GoalReading } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import { watchRunConfigOf } from '../watch/record.js';
 import { postedResultOf } from '../watch/reproduce.js';
@@ -254,6 +257,43 @@ describe('the day-record reads', () => {
       expect(reading.state, reading.goal.id).toBe('pending');
       expect(reading.observed, reading.goal.id).toBeNull();
     }
+  });
+
+  /**
+   * **The playhead is a parameter now** — GitHub issue **#277**,
+   * [§ D470](../../../../DECISIONS.md).
+   *
+   * `goalsToday` reads at `EverydayHostBindings.playheadS`, which `dev/main.ts` binds to the
+   * **Engineer** transport. Every caller that method had when it was written is a screen shown
+   * before a run or after one, so that instant was the right one; the Everyday stage runs a
+   * `Playback` of its own and needed to name its own.
+   *
+   * Both halves are asserted, because the port is worth nothing if it is not the thing that moves:
+   * `goalsAt` tracks its argument over the same recording, and `goalsToday` stays where the
+   * binding put it. A port that quietly answered the binding's instant whatever it was handed would
+   * pass a test of the first clause alone.
+   */
+  it('reads goals at an instant the caller names, and today’s at the binding’s', () => {
+    const legs = [];
+    for (let index = 0; index < 40; index += 1) {
+      const arrivedAt = index * 8;
+      const waited = 20 + index * 3;
+      legs.push(
+        servedLeg(`rider-${String(index)}`, arrivedAt, arrivedAt + waited, arrivedAt + waited + 20),
+      );
+    }
+    const recording = syntheticRecording({ startedAt: 0, endedAt: 600, legs });
+    const host = createEverydayHost(
+      harnessOf({ ...base(), recording }, { playheadS: 200 }).bindings,
+    );
+
+    const worstAt = (readings: readonly GoalReading[]): string =>
+      readings.find((reading) => reading.goal.reads === 'worstWaitS')?.display ?? 'no such goal';
+
+    /* Named instants: the same run read twice, past the wake-up gate at both. */
+    expect(worstAt(host.goalsAt(200))).not.toBe(worstAt(host.goalsAt(500)));
+    /* And the unparameterised read is still the binding's — 200 s, whatever else is asked for. */
+    expect(worstAt(host.goalsToday())).toBe(worstAt(host.goalsAt(200)));
   });
 });
 
