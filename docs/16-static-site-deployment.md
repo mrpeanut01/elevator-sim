@@ -169,10 +169,15 @@ one's output.**
 |---|---|---|---|
 | 1 | The **API's** origin | GitHub variable `ELEVATOR_SIM_API_ORIGIN` | Built into `index.html` as `<meta name="elevator-sim-api">`, and into the CSP's `connect-src` |
 | 2 | The **site's** origin | `viewerOrigin` on `infra/azure/main.bicep` → `ELEVATOR_SIM_ORIGIN` | Where sign-in links point (§ D241 § 4) |
-| 3 | The **site's** origin, again | the same `viewerOrigin` → `ELEVATOR_SIM_ALLOW_ORIGIN` | Which origin may call the API from a browser |
+| 3 | The **site's** origin, again | the same `viewerOrigin` → `ELEVATOR_SIM_ALLOW_ORIGIN` | Which origins may call the API from a browser |
 
-2 and 3 are **one parameter**, so they cannot drift; `main.ts` refuses to start if they disagree
-anyway, because a rule that holds for one of two values that must match is not a rule.
+2 and 3 are **one parameter**, so they cannot drift; `main.ts` refuses to start if 2 is not a member
+of 3, because a rule that holds for one of two values that must match is not a rule.
+
+Since [§ D469](../DECISIONS.md), 3 may carry a second entry: the word `previews`, which admits this
+same Static Web App's per-pull-request hostnames. It names no hostname, because it is expanded from
+2 at boot. A pattern an operator could write is a pattern that can go stale against the site, and a
+stale allowlist fails closed and looks exactly like issue #123 again.
 
 ### 3.1 The one-command form
 
@@ -204,6 +209,15 @@ site loads, the page knows where the API is, and every request is refused by COR
 reports as a `TypeError`, so the client says the server is down and the reader goes looking at a
 server that is fine.
 
+**That check is still an equality, and [§ D469](../DECISIONS.md) did not change it.** `provision.sh`
+compares the deployed `ELEVATOR_SIM_ALLOW_ORIGIN` against the site's origin string, and
+`infra/azure/main.bicep` sets that variable to `viewerOrigin` alone, so both still describe the
+one-origin form. Nothing regresses: the API accepts a one-entry allowlist exactly as it did before.
+What it means is that appending `previews` to the variable would make this script refuse to arm, so
+turning previews on takes an `infra/` change as well as the server one. That is deliberately not
+done here, because the lane that implemented the server rule does not own `infra/` and a
+provisioning path changed without being run is the kind of claim § 9 exists to keep separate.
+
 ### 3.3 The step the script prints
 
 You kept both secrets from the first deployment (`infra/README.md` § 3 says to, because regenerating
@@ -230,7 +244,17 @@ reverts it. Named here so the choice is deliberate rather than unnoticed.
 - `ELEVATOR_SIM_ALLOW_ORIGIN` is `*`. The API answers session-bearing requests and a verification is
   a whole simulation; a wildcard publishes both to every page on the web. It is refused rather than
   warned about, because it is the value somebody reaches for at 2 a.m. when CORS is in the way.
-- `ELEVATOR_SIM_ALLOW_ORIGIN` and `ELEVATOR_SIM_ORIGIN` name different origins.
+- `ELEVATOR_SIM_ALLOW_ORIGIN` does not contain `ELEVATOR_SIM_ORIGIN`. Membership since
+  [§ D469](../DECISIONS.md), and the argument under it is unchanged: the page a sign-in link opens
+  is the page that then calls this API.
+- `ELEVATOR_SIM_ALLOW_ORIGIN` names an origin this deployment cannot mint. The list may hold the
+  site's own origin and the entry `previews`, and nothing else. A preview hostname written out by
+  hand is refused too, with a message naming the entry that replaces it.
+- `ELEVATOR_SIM_ALLOW_ORIGIN` says `previews` where `ELEVATOR_SIM_ORIGIN` is not a Static Web App
+  default hostname, so the entry would expand to the empty set. Permitting nothing and saying
+  nothing is issue #123's own shape, so it stops instead.
+- Any entry is blank, which a stray comma produces. An entry dropped for being blank is an origin
+  somebody meant to permit and a refusal nobody sees.
 - Either is not an *exact* origin — a trailing slash, a path, a query string, an uppercase scheme.
   `https://api.example/` and `https://api.example` are the same origin to a browser and different
   strings to the header comparison a CORS check performs.
@@ -351,19 +375,25 @@ exactly that reason, so the two hosts now have one 404 policy. **Verified agains
 App** (2026-08-08): `/no/such/page` answers 404 and `__buildings.json` is served as
 `application/json` rather than swallowed. This paragraph said *"Unverified"* until it was run.
 
-**A preview environment cannot reach the API**, and that is a consequence of § 3 rather than a
-defect in it: the allowlist holds exactly one origin and a preview gets a per-pull-request hostname.
-Previews are therefore good for layout and useless for accounts, the leaderboard, challenges and
+**A preview environment could not reach the API**, and that was a consequence of § 3 rather than a
+defect in it: the allowlist held exactly one origin and a preview gets a per-pull-request hostname.
+Previews were therefore good for layout and useless for accounts, the leaderboard, challenges and
 sign-in.
 
-**The decision has been made, and this sentence said otherwise for seventeen days.**
-[§ D330](../DECISIONS.md) took it on 2026-08-09: the allowlist becomes a **membership** relation
-bounded to this Static Web App's own preview pattern, under four conditions. It is **not
-implemented** — `packages/server/src/main.ts:125-144` still throws unless
-`ELEVATOR_SIM_ALLOW_ORIGIN` equals `ELEVATOR_SIM_ORIGIN` exactly — so issue **#123** stays open for
-the implementation rather than for the decision. That distinction is the whole of
-[`RISKS.md`](../RISKS.md) R42: a ruling with no consumer, beside prose still telling the reader the
-question is open.
+**That is implemented now, and the sentences above are kept in the past tense rather than deleted.**
+[§ D330](../DECISIONS.md) took the decision on 2026-08-09 and it went twenty-six days without a
+consumer, which is the whole of [`RISKS.md`](../RISKS.md) R42; [§ D469](../DECISIONS.md) is the
+implementation. `ELEVATOR_SIM_ALLOW_ORIGIN` is a comma-separated allowlist, the viewer's origin must
+be a **member** of it, and the one entry that is not an origin is the word `previews`, which
+`packages/server/src/http/static.ts#previewOriginsFor` expands from `ELEVATOR_SIM_ORIGIN` rather than
+from anything an operator types. Every other member is refused at boot, so an allowlist can permit
+this site and this site's own pull request previews and nothing else.
+
+**What is implemented is not what is verified.** No preview has yet called the API from a browser
+under the new rule, and nothing in § 9's verified column moves on this account. What is pinned is
+the refusal, by a run rather than by an argument: `packages/server/src/http/boot.test.ts` starts the
+built server with a wrong allowlist and requires the process to stop without binding a port. See
+§ 3.4.
 
 One thing has moved under it and narrows the blast radius rather than the argument: since
 [§ D335](../DECISIONS.md) the page opens on Everyday Mode, which reads no API at all — the only
@@ -483,9 +513,13 @@ run corrected both of them ([§ D308](../DECISIONS.md)):
    `curl` shows the API answering a preflight from that origin with the right three headers and no
    `Access-Control-Allow-Credentials`, which is the protocol and not the product.
 
-   That the preview origin is *never* permitted is a structural consequence of the one-origin
-   allowlist, not a misconfiguration, and it is **issue #123**: every pull request preview loads,
-   draws, and dead-ends every account, leaderboard and challenge surface.
+   That the preview origin was *never* permitted was a structural consequence of the one-origin
+   allowlist, not a misconfiguration, and it was **issue #123**: every pull request preview loaded,
+   drew, and dead-ended every account, leaderboard and challenge surface. [§ D469](../DECISIONS.md)
+   implements § D330's membership rule, so the allowlist can now admit those hostnames. **That half
+   is unverified in the same sense as this whole section**: no preview has called the API from a
+   browser under it, and the deployed app still sets the one-origin form until somebody re-runs
+   § 3.3 with `previews` appended.
 2. **The absent `navigationFallback` is unverified against a live site.** The reasoning is § 5's;
    the behaviour has not been observed.
 3. **The Standard-plan proxy timeout is documentation, not measurement.** § 2 uses it as an argument

@@ -31170,6 +31170,118 @@ is pinned by `goals.test.ts` and the run is pinned here and in § 4.6, which is 
 repository asks for. If the catalogue's buildings or the growth rule move, this number goes stale
 the way every published number can, and § 4.6 names the instrument that re-derives it.
 
+---
+
+## D469 — the preview allowlist is membership, and the pattern is derived rather than typed
+
+**Date: 2026-09-04 · Owner: wave Q lane A · Rules on: GitHub issue #123, implementing
+[§ D330](#d330).**
+
+§ D330 decided on 2026-08-09 that preview-origin handling should be membership rather than equality,
+and nothing consumed the ruling for twenty-six days. `RISKS.md` R42 exists because of this exact
+instance. This is the implementation, and it is deliberately not a redesign: § D330 chose Option 2,
+bounded by a deployment we control, and the only questions left open were how to parse an allowlist
+strictly and where the pattern comes from.
+
+### What changed
+
+`ELEVATOR_SIM_ALLOW_ORIGIN` is a comma-separated list. The viewer's origin must be a **member** of
+it, and every other member must be an origin this same Static Web App can mint. One entry is not an
+origin: the word `previews`, which `http/static.ts#previewOriginsFor` expands from
+`ELEVATOR_SIM_ORIGIN` into a base label, the labels after it, and a numeric environment.
+
+The argument under the old equality check survives untouched and is worth restating, because it is
+what the new rule has to keep providing: the page a sign-in link opens is the page that then calls
+this API, so an allowlist that omits the viewer either mails links to a page that cannot call the
+API or permits an origin that is not the viewer. Equality enforced that by making the set a
+singleton. Membership enforces it directly.
+
+### Why the pattern is a word and not a hostname
+
+§ D330's second condition. An operator who can write the pattern can write a stale one, and a stale
+allowlist fails closed: previews stop being permitted, every account surface dead-ends, and the
+symptom is indistinguishable from the issue this closes. So the pattern names no hostname anywhere,
+in code or in configuration, and `docs/16` § 3.5's claim that no file in this repository names a
+hostname still holds. A preview origin written out by hand is refused at boot with a message naming
+the entry that replaces it, rather than accepted as a one-pull-request allowlist that goes stale on
+the next one.
+
+The environment label is constrained to digits, which is tighter than Azure's rule and is the
+accurate expression of *what this deployment can mint*: `.github/workflows/deploy-viz.yml` passes no
+`deployment_environment`, so Azure names the environment after the pull request. If that workflow
+ever names its environments, this stops admitting them and the refusal is loud.
+
+### The parsing, because an allowlist is a security boundary
+
+Every comparison is an equality between parsed values. The host is split on `.` before anything is
+compared, the labels after the first must equal the production hostname's labels, and only then is
+the first label read, which must be the base plus a separator plus a number. There is no substring
+test and no suffix test, because both admit a lookalike for containing something permitted:
+`viz.azurestaticapps.net.evil.example` and `evil-azurestaticapps.net` fail at the label comparison
+rather than at where they happen to end. A blank entry stops the process instead of being dropped,
+since a dropped entry is an origin somebody meant to permit and a refusal nobody sees.
+
+**What this does not claim.** The binding is by hostname, and hostnames under `azurestaticapps.net`
+are Azure's to hand out. A third party whose Static Web App were assigned a default hostname of the
+shape `<our base>-<digits>.<our region>.azurestaticapps.net` would hold an origin this admits. That
+is not reachable by choosing a resource name, because the base label carries a hash its creator does
+not pick, and it is written down rather than argued away: this is weaker than the exact equality it
+replaces, and § D330 weighed that against every preview dead-ending every account surface.
+
+### The header can only carry one origin, so `serve.ts` had to change
+
+`ServeOptions.allowOrigin` used to say *singular on purpose*, on the grounds that a list would need
+`Vary: Origin` and a per-request match, *"which is a second place deciding who may call, and the only
+deployment this product has is one viewer, at one origin"*. Every clause of that is still true as a
+description of the cost, and § D330 withdrew the conclusion: a preview environment is also this
+product's deployment. The docstring records the withdrawal rather than being rewritten over, because
+a refusal that quietly stops being true is § D227's defect. There is still one decision site:
+`main.ts` parses the variable once, and `serve.ts` only chooses which half of the answer a given
+request gets. `Vary: Origin` is emitted only when previews are configured, because without them the
+header is a constant and claiming it varies would be false.
+
+### § D330's four conditions, individually
+
+1. **The boot refusal is kept and pinned by a run.** Met. `http/boot.test.ts` spawns the built
+   `dist/main.js` with a wrong allowlist and requires exit code 1, the message on stderr with no
+   stack frame, and no startup line on stdout. Four refusals and one acceptance, the last of which
+   shows a correct membership allowlist getting past the origin checks and stopping at the database
+   instead, which is how a run can show an allowlist was accepted without a database to accept it
+   into. The gap: no port is ever bound and no browser is involved, so this pins the refusal rather
+   than the permission.
+2. **The pattern is derived from the deployment's own name.** Met, and asserted in both directions:
+   a member is admitted, thirteen near misses are refused, and the derivation is checked against
+   eight origins that mint no previews at all.
+3. **The honest failure message does not regress.** Not established here. The message lives in
+   `packages/viz/src/menu/client.ts` and `everyday/boardScreen.ts`, which this lane may not touch
+   and did not; the claim that it is unchanged rests on the diff, and its own tests were not run.
+4. **The seeded board stays labelled.** Same standing. The label is
+   `packages/viz/src/dev/menuPanel.ts` and is untouched by this change.
+
+So two of the four are met by a run in this lane, and two are untouched rather than verified. Saying
+which is which is the point of listing them.
+
+### Turning it on takes an `infra/` change, and that is left undone on purpose
+
+`infra/azure/main.bicep` sets `ELEVATOR_SIM_ALLOW_ORIGIN` to `viewerOrigin` alone, and
+`infra/azure/swa/provision.sh` refuses to arm unless the deployed value **equals** the site's origin
+string. Both still describe the one-origin form, and nothing regresses: a one-entry allowlist is
+accepted exactly as before, so the shipped deployment boots unchanged and its previews stay
+unpermitted. Appending `previews` to that variable would make `provision.sh` refuse to arm, so the
+feature is reachable only after `infra/` moves too. That is named rather than done, because a
+provisioning path changed without being run is exactly the claim `docs/16` § 9 exists to keep apart
+from the verified ones.
+
+### One finding about the test that was supposed to pin the old rule
+
+`static.test.ts`'s *"refuses an allowed origin that is not where the viewer is"* was expected to turn
+red under membership. It does not, and it was checked by mutation rather than assumed: with the
+pre-§ D330 equality rule restored, all four pre-existing cases in that block still pass and eight of
+the new ones fail. The case asserts that a disagreeing allowlist throws, which is true under both
+rules, so it never distinguished them. It is kept, with the reason written into it. A test that
+survives the change it was believed to pin is worth a sentence, because the next reader will
+otherwise conclude the rule did not move.
+
 ## D471 — the deploy CSP gate names its permitted origins, and two live rules stop naming a goal count
 
 **Date: 2026-09-04 · Owner: wave Q lane C · Rules on: GitHub issue #341, and the documentation debt
