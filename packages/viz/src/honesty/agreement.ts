@@ -375,6 +375,10 @@ const A_CLEAN_DAY: GoalObservations = Object.freeze({
   abandoned: 0,
   worstWaitS: 30,
   worstWaitIsCensored: false,
+  // Under `GOAL_BARS.energyPerLegMaxKJ`, so the constant's name stays true after § D468 gave the
+  // day a fifth bar. Left absent it would read `pending`, and `outcomeOf` counts unjudged as not
+  // passed, so *a clean day* would quietly stop being one.
+  workPerServedLegKJ: 34.7,
 });
 
 /**

@@ -57,6 +57,10 @@ function readings(day: number, kind: 'met' | 'missed' | 'pending'): readonly Goa
             abandoned: 0,
             worstWaitS: 40,
             worstWaitIsCensored: false,
+            // Under `GOAL_BARS.energyPerLegMaxKJ`. A `met` fixture has to carry every observation
+            // the day's goals read, and the energy bar reads this one. Absent, it grades
+            // `pending`, and `outcomeOf` treats unjudged as not passed.
+            workPerServedLegKJ: 41.2,
           }
         : {
             arrived: 400,
@@ -66,6 +70,7 @@ function readings(day: number, kind: 'met' | 'missed' | 'pending'): readonly Goa
             abandoned: 9,
             worstWaitS: 940,
             worstWaitIsCensored: false,
+            workPerServedLegKJ: 260.5,
           };
   return readGoals(goalsForDay(day), observations);
 }

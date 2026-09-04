@@ -1544,6 +1544,19 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
       'further than the module taking it does not need an entry here, which is what makes this a hole ' +
       'rather than an omission.',
   ],
+  [
+    465,
+    'wave P reserved D464 to D467 for lane A, which spent § D464 on GitHub issue #333 whole: the ' +
+      'versioned register, the runner, and the ruling that a row predating `entries.legs` keeps its rank '  +
+      'and loses its count. It reported three numbers unspent. One issue closed end to end is one '  +
+      'decision, which is the fourth consecutive wave to return a lane’s spare numbers for that reason. '  +
+      'These sit inside wave P’s block and not at its top, because § D468 is written above them, so the '  +
+      'charter row names D469 and points at no hole. Lane C’s D469 to D471 were reserved and never '  +
+      'reached; nothing is written past them, so they are free rather than holed. The integrator '  +
+      'registered all six as holes and named D472, and the case below is what drew the distinction.',
+  ],
+  [466, 'wave P, lane A’s block; unspent for § 465’s reason.'],
+  [467, 'wave P, lane A’s block; unspent for § 465’s reason.'],
 ]);
 
 /**

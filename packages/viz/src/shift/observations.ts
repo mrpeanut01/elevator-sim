@@ -89,5 +89,13 @@ export function shiftObservationsOf(live: LiveObservations): Observations {
     // would grade *met* on every run nobody measured. `undefined` travels through instead, and
     // `goals.ts#readGoal` refuses it.
     ...(live.loadedDepartures === undefined ? {} : { loadedDepartures: live.loadedDepartures }),
+    // The energy bar's observation, copied like the three counts above it and derived nowhere else
+    // (§ D367, § D468, issue #275). `undefined` travels through for the same reason
+    // `loadedDepartures` does and for one more: `live/observations.ts#energyPerServedLegAt` returns
+    // it at every playhead short of the run's end, because the figure is a window statistic rather
+    // than a fold and a rail drawn at an instant may not publish one.
+    ...(live.workPerServedLegKJ === undefined
+      ? {}
+      : { workPerServedLegKJ: live.workPerServedLegKJ }),
   };
 }

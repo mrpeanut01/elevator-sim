@@ -28,6 +28,9 @@ const MET: GoalObservations = {
   abandoned: 0,
   worstWaitS: 30,
   worstWaitIsCensored: false,
+  // Under `GOAL_BARS.energyPerLegMaxKJ`, so a met day clears the energy bar too (§ D367, § D468).
+  // Absent, the fifth reading is `pending`, and `outcomeOf` treats unjudged as not passed.
+  workPerServedLegKJ: 34.7,
 };
 
 /** Missed: the same arrivals, a carried share no bar accepts. */

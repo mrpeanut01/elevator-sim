@@ -612,12 +612,35 @@ to **eleven in code plus two in `data/`**. The existing ordinals do not move: *t
 eleventh* name specific instances, and renumbering them would break every reference for a running
 total. None of that was allowed to round a verdict up.
 
-**Energy is an axis, never a score.** The matrix that closed Phase 8 measured `nearest-car` — the
-weakest shipped dispatcher, and the viewer's default until § D134 — **on the Pareto front at six of
-eight cells**, because it is best on energy and worst on wait. A dispatcher that drives less carries fewer people.
-So the energy proxy may be shown **beside** AWT and WT95 and never aggregated into a grade, and
+**Energy is an axis, never a score, and since 2026-09-04 it also carries exactly one bar.** The
+matrix that closed Phase 8 measured `nearest-car` (the weakest shipped dispatcher, and the viewer's
+default until § D134) **on the Pareto front at six of eight cells**, because it is best on energy and
+worst on wait. A dispatcher that drives less carries fewer people. So the energy proxy may be shown
+**beside** AWT and WT95 and never aggregated into a grade, and
 `EnergyStatistics.workPerServedLegKJ` goes beside the raw figure: a configuration that spends less
 by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
+
+**What that rule does not forbid, because four lanes read it as forbidding everything.** A
+**single, independent, unweighted** goal that passes or fails on energy alone is permitted and is
+not an aggregation ([§ D367](DECISIONS.md), [§ D106](DECISIONS.md)'s own added clause). It ships:
+`shift/goals.ts#goalsForDay` returns a fifth `ShiftGoal`, *"Keep the work inside 80 kJ per ride
+delivered"*, and the daily loop now asks five things rather than four. **Specified against
+`workPerServedLegKJ` and never raw `energyKJ`**, which is the whole of why it survives the rule
+above: the legs delivered are the denominator, so a day that saves work by carrying fewer people
+fails the bar instead of winning it. Still forbidden, unchanged: no weight, no combined score, no
+letter or star, and no ordering two arms on energy. `campaign/judge.ts`'s refusal is untouched.
+
+**80 is derived and the run is pinned** ([§ D468](DECISIONS.md), `docs/33` § 4.6). Eight contracts ×
+50 seeds at day 1 under `collective`, seeds `20 260 824 + 7 919 n`: the pooled two-thirds point is
+78.30 kJ and below about 70 kJ the day leaves `docs/33` DC-4's band at the top, so the bar is
+bracketed on both sides and 80 is the round figure 400 runs support. **It does not harden with the
+day**, because the quantity falls ×1.6 to ×15.6 over a twenty-day week as the building fills and no
+ladder tracks both ends. Two things the same measurement found and did not fix: the bar is dominated
+by building fabric rather than by play, which is `docs/33` O2 on a fifth goal, and
+`mixed-use-high-rise` day 1 stops clearing under every shipped dispatcher, which is #234's. The
+check § D106 most needed was run rather than argued: `nearest-car` wins the energy bar at all seven
+contracts measured and **loses the day at every one where the bar binds**, so the perverse ranking
+§ D106 measures is not reachable through this bar.
 
 **The page opens on Everyday Mode, and that changed on 2026-08-12.** `packages/viz/index.html` loads
 `everyday/boot.ts`, which imports `dev/main.ts` for its side effect — so the Engineer surface still

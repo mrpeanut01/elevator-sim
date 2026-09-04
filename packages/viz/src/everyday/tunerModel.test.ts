@@ -573,6 +573,9 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       abandoned: kind === 'met' ? 0 : 9,
       worstWaitS: kind === 'met' ? 40 : 940,
       worstWaitIsCensored: false,
+      // The energy bar (§ D367, § D468). A `met` fixture has to clear all five, and an absent
+      // figure grades `pending`, which `outcomeOf` counts as not passed.
+      workPerServedLegKJ: kind === 'met' ? 34.7 : 260.5,
     });
 
     /** The week a *Close the day* produces, from the week the press left standing. */

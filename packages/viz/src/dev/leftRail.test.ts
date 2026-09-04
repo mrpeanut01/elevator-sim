@@ -91,6 +91,7 @@ function observations(overrides: Partial<LiveObservations> = {}): LiveObservatio
     // § 5's `trips` at the playhead. A number rather than `undefined`, so this fixture stands for a
     // recording the current schema produced rather than for one nobody instrumented.
     loadedDepartures: 34,
+    workPerServedLegKJ: 41.2,
     ...overrides,
   };
 }
@@ -130,6 +131,9 @@ function goalObservations(overrides: Partial<GoalObservations> = {}): GoalObserv
     abandoned: 0,
     worstWaitS: 45,
     worstWaitIsCensored: false,
+    // Under `GOAL_BARS.energyPerLegMaxKJ`, so every row this fixture drives is gradeable. The
+    // energy bar reads it and an absent value grades `pending`.
+    workPerServedLegKJ: 41.2,
     ...overrides,
   };
 }

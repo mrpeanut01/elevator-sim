@@ -16,18 +16,24 @@
  * **A goal reads an observation. Never a mean, and never anything `awtIsValid` could suppress.**
  *
  * {@link GoalObservations} is the structural form of that rule. It is the *only* type
- * `readGoal` accepts, and it carries seven numbers and a censoring flag. Four of the numbers are
+ * `readGoal` accepts, and it carries eight numbers and a censoring flag. Four of the numbers are
  * the design's own (`design.html` :1428–1439): a carried share, an away-inside-a-minute share, a
  * peak queue depth and an abandonment count; the fifth gradeable one is the worst wait the
- * casual handoff's fourth test grades (§ 8.6), and the sixth is the loaded-departure count its
- * *fourth campaign* test grades (§ 7, GitHub issue #169) — the one that is optional, because its
- * absence is a gate. There is no `meanWaitS` on it, no `wait95S`, no
+ * casual handoff's fourth test grades (§ 8.6), the sixth is the loaded-departure count its
+ * *fourth campaign* test grades (§ 7, GitHub issue #169), and the seventh is the work per
+ * delivered leg the energy bar grades (§ D367, GitHub issue #275). The last two are optional,
+ * because their absence is a gate. There is no `meanWaitS` on it, no `wait95S`, no
  * `meanTimeToDestinationS` — so a goal that wanted to grade a suppressible estimate could not be
  * written against this type without changing the type, which is a visible diff and a decision
  * somebody has to make out loud. CLAUDE.md: *"If a configuration saturates, flag it and suppress
  * the AWT interval."* A grading rule that read the suppressed figure would be that rule's exact
  * inverse, and the handoff's own footer says so: *"nothing on this screen is averaged over a queue
  * that never settled"*.
+ *
+ * **The energy figure is the one member that is not a count and is nonetheless not an estimate.**
+ * `awtIsValid` speaks for exactly three figures and this is none of them, and the reason it may be
+ * graded at all is § D106's own: the legs delivered are its denominator, so it cannot be improved
+ * by carrying fewer people. See {@link GoalObservations.workPerServedLegKJ}.
  *
  * {@link Observations} widens it with the facts the **report** needs — the floor and instant of
  * the deepest queue, the served-leg denominator — and widens it with nothing suppressible either,
@@ -289,9 +295,17 @@ export interface ShiftEvent {
  *
  * `loadedDepartures` joined for the casual handoff's fourth campaign test — `ENGINE_CONTRACT.md`
  * § 7's `trips ≤ tests.trips` (GitHub issues #169, #313). No goal in `goals.ts#goalsForDay` reads
- * it: the daily loop still asks four things and this is not one of them. It is
+ * it: the daily loop asks five things and this is not one of them. It is
  * `everyday/campaignModel.ts#campaignTestGoals`' fourth bar and nothing else's, which is why the
  * id is here and the bar is over there.
+ *
+ * `workPerServedLegKJ` joined for the energy bar; see [§ D367](../../../../DECISIONS.md) and
+ * [§ D468](../../../../DECISIONS.md), GitHub issue #275. It is the **only** id here that is not
+ * a count, a ratio of counts or a maximum, and it earns the exception on the ground § D106 states
+ * outright: the people served are in its denominator, so it cannot be improved by carrying fewer of
+ * them. It is still not a suppressible estimate: `awtIsValid` speaks for `meanWaitS`, `wait95S`
+ * and `meanTimeToDestinationS` and for nothing else, and a saturated run publishes this figure
+ * exactly as an unsaturated one does.
  */
 export const GOAL_OBSERVATION_IDS = [
   'carryPct',
@@ -300,6 +314,7 @@ export const GOAL_OBSERVATION_IDS = [
   'abandoned',
   'worstWaitS',
   'loadedDepartures',
+  'workPerServedLegKJ',
 ] as const;
 
 export type GoalObservationId = (typeof GOAL_OBSERVATION_IDS)[number];
@@ -307,10 +322,11 @@ export type GoalObservationId = (typeof GOAL_OBSERVATION_IDS)[number];
 /**
  * Everything a goal may read — **and structurally nothing that `awtIsValid` could suppress**.
  *
- * Eight fields: six gradeable, and two gates. Every gradeable one is a *count*, a ratio of
+ * Nine fields: seven gradeable, and two gates. Six of the gradeable ones are a *count*, a ratio of
  * counts, or a maximum of measured durations: how many turned up, what share got carried, what
  * share was away inside a minute, how deep the worst landing got, how many gave up, how long the
- * worst-served rider stood, how many loaded departures the machines made. None of them is an
+ * worst-served rider stood, how many loaded departures the machines made. The seventh is a ratio of
+ * a measured quantity to a count, the work the fleet did per leg it delivered. None of them is an
  * estimate over a cohort, so none of them is refused on a saturated run, so a goal can be graded on
  * a day the building was outrun — which is the day a reader most needs a verdict.
  *
@@ -384,6 +400,39 @@ export interface GoalObservations {
    * other field is a count somebody took, and this one has a state for *nobody took it*.
    */
   readonly loadedDepartures?: number | undefined;
+  /**
+   * Out-of-balance mechanical work per leg that alighted, kilojoules, rounded to the tenth the
+   * report sheet prints. It is `VizEnergy.workPerServedLegKJ`, the figure `report.ts#energyFigures`
+   * draws as WORK PER DELIVERED LEG.
+   *
+   * ## Why an energy figure may be graded at all, and what may not be
+   *
+   * § D106 rule 2 forbids **folding** energy into a figure that also carries wait, because the
+   * dispatcher that drives least carries fewest people. An independent bar folds nothing, and
+   * § D367 rules it permitted. The ratio rather than `workKJ` is the whole of the permission: the
+   * legs delivered are the denominator, so a day that spends less by carrying fewer people moves
+   * the denominator against itself and **fails** the bar. Raw `workKJ` stays ungraded and there is
+   * no field here that carries it.
+   *
+   * ## Optional, and the absence is the gate, for two reasons rather than one
+   *
+   * `undefined` when the run recorded no travel at all (`VizEnergy.measured` is `false`, which is
+   * *nobody wrote down how far the cars moved* rather than *the cars did not move*), and
+   * `undefined` at any playhead short of the run's end. The second is the load-bearing one: this
+   * figure is a **window statistic** `core` computes once, not a fold the recording can be cut at
+   * an instant, so publishing it mid-run would be the temporal violation § D307's honesty axis
+   * exists to find. `live/observations.ts#energyPerServedLegAt` owns both gates and
+   * `goals.ts#readGoal` reads them as `pending`, exactly as it does for {@link loadedDepartures}.
+   *
+   * ## The window it is true of, stated because the label cannot say it
+   *
+   * The figure covers the run's **reporting window**, which on seven of the eight shipped contracts
+   * is the five-minute peak and on `garden-apartments` is the whole hour. The other four goals grade
+   * the whole shift. That is a real inhomogeneity and it is named in § D468 rather than papered
+   * over; what it is not is a second answer to one question, because this is the only
+   * work-per-delivered-leg figure the product has and the goal grades the one the sheet prints.
+   */
+  readonly workPerServedLegKJ?: number | undefined;
 }
 
 /**
@@ -473,18 +522,22 @@ export type RunHorizon = 'period' | 'whole-day';
  * {@link reads} is a **key of {@link GoalObservations}** rather than a closure, deliberately: a
  * predicate carrying its own reader can read anything it closes over, and the whole point of this
  * layer is that a goal cannot reach a suppressible figure. A key can only name one of
- * {@link GOAL_OBSERVATION_IDS}' five numbers, and the compiler is the thing that says so.
+ * {@link GOAL_OBSERVATION_IDS}' seven quantities, and the compiler is the thing that says so.
  */
 export interface ShiftGoal {
   readonly id: string;
   /** The sentence the rail and the report both print. Built by `goalsForDay`. */
   readonly label: string;
   /**
-   * `%`, ` s`, or the empty string. Appended to the observed value for display. The seconds
-   * variant carries its own leading space (`187 s`, SI style with a space before the unit) so
-   * `readGoal`'s one concatenation stays one concatenation.
+   * `%`, ` s`, ` kJ`, or the empty string. Appended to the observed value for display. The two
+   * dimensional variants carry their own leading space (`187 s`, `62.4 kJ`, SI style with a space
+   * before the unit) so `readGoal`'s one concatenation stays one concatenation.
+   *
+   * A closed union rather than a `string`, so a goal cannot invent a unit the report sheet has no
+   * matching figure for. ` kJ` joined with the energy bar (§ D468); it is the sheet's own unit on
+   * WORK PER DELIVERED LEG, which is the figure that goal grades.
    */
-  readonly unit: '%' | ' s' | '';
+  readonly unit: '%' | ' s' | ' kJ' | '';
   /** The bar itself, in {@link unit}. */
   readonly bar: number;
   readonly compare: GoalComparison;

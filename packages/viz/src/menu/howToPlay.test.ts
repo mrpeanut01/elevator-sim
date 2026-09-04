@@ -325,13 +325,20 @@ describe('the figures the guide quotes are the figures the code computes', () =>
     expect(text, 'the carried ceiling moved').toContain(`${String(GOAL_BARS.carryMax)} %`);
     expect(text, 'the queue floor moved').toContain(`${String(GOAL_BARS.queueMin)} people`);
     expect(text, 'the worst-wait floor moved').toContain(`${String(GOAL_BARS.worstMinS)} seconds`);
+    // The fifth bar (§ D367, § D468). It is a ceiling and not a ladder, so unlike the four above it
+    // there is no floor or cap to quote beside it: the constant *is* what the day asks, every day.
+    expect(text, 'the energy ceiling moved').toContain(
+      `${String(GOAL_BARS.energyPerLegMaxKJ)} kJ per ride delivered`,
+    );
   });
 
-  it('describes the four goals the shift layer actually asks, every day', async () => {
+  it('describes the five goals the shift layer actually asks, every day', async () => {
     /*
-     * This test pinned the odd-day abandonment goal's label. That goal is retired — the
-     * worst-wait ceiling subsumes it (`shift/goals.ts#goalsForDay`) — so what is pinned now is
-     * the shape that replaced it: four goals, no alternation, and a guide that says so.
+     * This test pinned the odd-day abandonment goal's label. That goal is retired: the worst-wait
+     * ceiling subsumes it (`shift/goals.ts#goalsForDay`), so what is pinned now is the shape that
+     * replaced it. **It went from four to five on the commit that shipped the energy bar**
+     * (§ D367, § D468), and this case is what caught the guide still saying *four goals* while the
+     * product asked five, which is the whole reason a prose file is pinned to the code at all.
      */
     const text = proseOf(await guide());
     expect(text).toContain(`under ${String(WAKE_UP_ARRIVALS)} arrivals`);
@@ -340,9 +347,11 @@ describe('the figures the guide quotes are the figures the code computes', () =>
       'minute',
       'queue',
       'worst-wait',
+      'energy',
     ]);
-    expect(text).toContain('four goals');
+    expect(text).toContain('five goals');
     expect(text).toContain('worst wait');
+    expect(text, 'the guide must not go back to counting four').not.toContain('four goals');
     expect(text, 'the guide must not resurrect the retired alternation').not.toContain(
       'alternating by day',
     );

@@ -134,6 +134,83 @@ import {
 const WORST_WAIT_WHOLE_DAY_FACTOR = 2;
 
 /**
+ * The energy ceiling, in kilojoules of out-of-balance mechanical work per leg the fleet delivered,
+ * and the one bar that is **not** on a ladder ([§ D367](../../../../DECISIONS.md),
+ * [§ D468](../../../../DECISIONS.md), GitHub issue #275).
+ *
+ * ## Why an energy bar exists at all, and what it is not
+ *
+ * § D106 rule 2 forbids **folding** energy into a figure that also carries wait. `nearest-car` is on
+ * the Pareto front at six of eight matrix cells purely by being worst on wait, so a combined score
+ * would rank the weakest shipped dispatcher first. This bar folds nothing: it is one goal, read
+ * alone, met or missed on its own, with no weight against any other and no combined number
+ * anywhere. `campaign/judge.ts`'s refusal to order two arms on energy is untouched, and raw
+ * `workKJ` stays ungraded: the ratio is graded and the total is not, because the legs delivered
+ * are the ratio's denominator and a day that saves work by carrying fewer people fails the bar
+ * rather than winning it.
+ *
+ * ## The number is derived and here is the run
+ *
+ * `shiftRunConfigOf` at seeds `20 260 824 + 7 919 n`, `n = 0…49`, day 1, the shipped default
+ * dispatcher (`collective`), each contract at its own shift length, ordinary day with no event,
+ * folded through `observationsAt(recording, recording.endedAt)`. **Eight contracts × 50 seeds =
+ * 400 runs**; every one of them recorded travel, so no cell is ungraded for want of a measurement.
+ * Medians of `workPerServedLegKJ`, kJ:
+ *
+ * | contract | building | median | seeds over 80 kJ |
+ * |---|---|---|---|
+ * | c1 | Garden Apartments | 25.6 | 0/50 |
+ * | c2 | Midtown Office | 10.4 | 0/50 |
+ * | c3 | Secure Tower | 60.1 | 2/50 |
+ * | c4 | Mixed-use High-rise | 131.8 | 50/50 |
+ * | c5 | Vertical City | 82.8 | 33/50 |
+ * | c6 | Chancery House | 57.4 | 4/50 |
+ * | c7 | Crown Hotel | 43.3 | 4/50 |
+ * | c8 | St Jude Hospital | 95.1 | 35/50 |
+ *
+ * Pooled over the 400, the two-thirds point is **78.30 kJ**, the value at which exactly one day in
+ * three across the shipped catalogue misses the bar, which is `docs/33` DC-4's own lower edge read
+ * over one goal instead of over a day. A second, independent constraint brackets it from below:
+ * below about 70 kJ the pooled day-1 miss rate over all five goals leaves DC-4's band at the top
+ * (73.2 % at 60 kJ), so a tighter bar makes day one unpassable rather than difficult.
+ *
+ * **80 rather than 78.3, and the arithmetic is the reason.** At `n = 400` the standard error on a
+ * one-third proportion is 2.4 points; moving the bar from 78.30 to 80 moves the proportion from
+ * 33.3 % to 32.0 %, which is half of one standard error. A decimal here would claim a precision
+ * 400 runs do not support, exactly as {@link WORST_WAIT_WHOLE_DAY_FACTOR}'s `2` refuses a third
+ * decimal four buildings do not support.
+ *
+ * ## It is a constant, and that is measured rather than lazy
+ *
+ * The other four bars harden nightly. This one does not, because the quantity itself falls steeply
+ * as the building grows and no single ladder tracks the fall. Same instrument, days 1, 5, 10 and 20
+ * at 50 seeds, median `workPerServedLegKJ`:
+ *
+ * | contract | day 1 | day 5 | day 10 | day 20 |
+ * |---|---|---|---|---|
+ * | c1 Garden Apartments | 25.6 | 22.1 | 19.4 | 16.2 |
+ * | c8 St Jude Hospital | 95.1 | 19.5 | 12.2 | 6.1 |
+ *
+ * More people share the same car travel, so the work per delivered leg drops, by a factor of 1.6
+ * over nineteen days on one contract and **15.6** on the other. A ladder fitted to either would be
+ * wrong about the other by an order of magnitude, and a ladder that hardened would tighten a bar
+ * the growth mechanism is already loosening far faster. So the bar holds still and the goal binds
+ * hardest on day one, which is the opposite shape from the other four. That is a finding rather
+ * than a design, and § D468 records it as one.
+ *
+ * ## What this bar does not do, stated so it is not over-read
+ *
+ * It does not discriminate between seeds on three of the eight contracts: c1 and c2 never miss it
+ * and c4 always does. The other five sit between 2 and 35 of 50. The figure is dominated by how far cars have to travel, which is fabric, so
+ * on the shipped catalogue this is closer to a per-building test than a per-day one. That is
+ * `docs/33` § 7's **O2**, whether a bar should move with the building rather than with the day,
+ * arriving on a fifth goal, and it is reported rather than fixed here, because fixing it means
+ * authoring a bar per contract and § 1.4 refused that for the wait bars on grounds this lane may
+ * not overturn on its own.
+ */
+const ENERGY_PER_LEG_MAX_KJ = 80;
+
+/**
  * The design's own hardening arithmetic (`design.html` :1428–1439), plus the worst-wait ceiling
  * the casual handoff's fourth test needs (`GAMEPLAY_AND_NAVIGATION.md` § 8.6, § 20.6).
  *
@@ -164,10 +241,29 @@ export const GOAL_BARS = Object.freeze({
   worstBaseS: 240,
   worstPerDayS: 10,
   worstWholeDayFactor: WORST_WAIT_WHOLE_DAY_FACTOR,
+  // One value and no ladder; see `ENERGY_PER_LEG_MAX_KJ`. There is deliberately no `energyBase`
+  // and no `energyPerDay` beside it: a key that existed and was always zero would read as a ladder
+  // somebody forgot to author rather than as one the measurement refused.
+  energyPerLegMaxKJ: ENERGY_PER_LEG_MAX_KJ,
 });
 
 /**
- * Today's goals — the handoff's four tests, every day, in tension (§ 8.6).
+ * Today's goals: the handoff's four tests every day, in tension (§ 8.6), plus the energy bar.
+ *
+ * ## The fifth goal, and why it is not the thing § D106 forbids
+ *
+ * § D367 rules that a single, independent, unweighted energy bar is **not an aggregation**: it adds
+ * no term to any other goal, produces no combined number, and orders no two arms. It is specified
+ * against the work per **delivered leg** rather than the raw work, because the legs are the
+ * denominator and a day that spends less by carrying fewer people therefore fails it. The bar, the
+ * run that derived it and the reason it does not harden are all on
+ * {@link ENERGY_PER_LEG_MAX_KJ}; what a reader most needs to know here is that it is read alone.
+ *
+ * **It is the one goal that can be `pending` on a completed day**, and that is deliberate rather
+ * than a gap: the figure is a window statistic `core` computes once, so
+ * `live/observations.ts#energyPerServedLegAt` withholds it at every playhead short of the run's end
+ * and on any run that recorded no travel. Unjudged is not passed, so a day whose energy reading is
+ * `pending` is not a clean day. That is `week.ts#outcomeOf`'s rule, unchanged.
  *
  * ## The `day % 2` alternation is retired, and here is the argument
  *
@@ -186,7 +282,9 @@ export const GOAL_BARS = Object.freeze({
  * § 20.6's own check (*a day that peaks the lobby at 26 against a cap of 25 is missed*) fails on
  * every day the queue goal sat out. Four tests, each load-bearing, every day, is what § 8.6
  * specifies; the odd-day goal survives where it belongs, as the report's *took the stairs*
- * figure and the add-a-car lever, both of which still read `Observations.abandoned`.
+ * figure and the add-a-car lever, both of which still read `Observations.abandoned`. The energy
+ * bar is a fifth test on top of those four and does not disturb the argument: it is not an
+ * alternation, and it is not an inverted bar the other four already supply two of.
  *
  * (`GOAL_OBSERVATION_IDS` keeps `'abandoned'` so restored histories that carry the retired
  * goal's readings stay restorable — see its docstring.)
@@ -312,7 +410,33 @@ export function goalsForDay(
     reads: 'worstWaitS',
   };
 
-  return Object.freeze([carry, minute, queue, worst]);
+  /*
+   * The fifth bar, and the only one that reads something other than a count, a share or a
+   * maximum. See § D367 and § D468, GitHub issue #275.
+   *
+   * *Per ride delivered*, in the label, is load-bearing rather than decorative (§ D227 at the scale
+   * of one phrase). The graded quantity is the ratio and never `workKJ`, and the phrase is where a
+   * player meets the reason: the rides are the denominator, so a day that spends less by carrying
+   * fewer people moves the number the wrong way. A label reading *"keep the work inside 80 kJ"*
+   * would describe a bar this product refuses to have.
+   *
+   * *Inside*, not *under*, for `worst-wait`'s reason four lines above: `at-most` meets the bar **at**
+   * the bar, and a label promising *under 80 kJ* about a day that spent exactly 80 would claim a
+   * strictness the comparison does not have. § D227 at the scale of one preposition, twice.
+   *
+   * The bar is `ENERGY_PER_LEG_MAX_KJ` on every day, not a rung of a ladder, and that constant
+   * carries the run it was derived from and the two measurements that fix it.
+   */
+  const energy: ShiftGoal = {
+    id: 'energy',
+    label: `Keep the work inside ${String(GOAL_BARS.energyPerLegMaxKJ)} kJ per ride delivered`,
+    unit: ' kJ',
+    bar: GOAL_BARS.energyPerLegMaxKJ,
+    compare: 'at-most',
+    reads: 'workPerServedLegKJ',
+  };
+
+  return Object.freeze([carry, minute, queue, worst, energy]);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -361,15 +485,17 @@ export const GOAL_GLYPHS: Readonly<Record<GoalState, string>> = Object.freeze({
  *
  * ## The third gate: a figure nobody took is not graded either
  *
- * {@link GoalObservations.loadedDepartures} is the type's one optional member, and an `undefined`
- * reads `pending` in both directions. Here the asymmetry runs the other way from the censoring
- * gate's: the trip budget is an `at-most` bar, so a recording with no travel record folded to a
- * zero would grade **met** — a pass awarded for a measurement nobody took. That is the shape
- * `campaign/career.ts`'s own rule refuses (*unjudged is not passed*), and it is why the absent case
- * is a gate rather than a default.
+ * {@link GoalObservations.loadedDepartures} and {@link GoalObservations.workPerServedLegKJ} are the
+ * type's two optional members, and an `undefined` reads `pending` in both directions. Here the
+ * asymmetry runs the other way from the censoring gate's: both are `at-most` bars, so a recording
+ * with no travel record folded to a zero would grade **met**, a pass awarded for a measurement
+ * nobody took. That is the shape `campaign/career.ts`'s own rule refuses (*unjudged is not
+ * passed*), and it is why the absent case is a gate rather than a default.
  *
- * The check is written over the *value* rather than over the goal's id, so a second optional
- * observation added later inherits it instead of needing a fourth branch here.
+ * The check is written over the *value* rather than over the goal's id, and the second optional
+ * observation is what says that was worth doing: `workPerServedLegKJ` inherited this gate whole,
+ * including its own extra reason for being absent, a playhead short of the run's end, without a
+ * fourth branch here.
  */
 export function readGoal(goal: ShiftGoal, observations: GoalObservations): GoalReading {
   if (observations.arrived < WAKE_UP_ARRIVALS) {
