@@ -30939,3 +30939,102 @@ the environment down on close, which is what keeps the three-preview quota a non
 **What this does not do.** It does not stop the preview deploy, which still costs runner minutes on
 every push. If the minutes are the objection rather than the noise, the change is to the job's `if:`
 and is a different decision from this one — nobody has asked for it and it is not assumed here.
+
+
+## D464 — the store gets a versioned migration table, and a row that predates `legs` keeps its rank and loses its count
+
+**Date: 2026-09-04 · Owner: the wave P lane A builder · GitHub issue #333.**
+
+**The decision, in two halves.** `packages/server/src/store/store.ts` gains a `schema_migrations`
+table and a runner. Migration 0 is the existing `SCHEMA` constant, by reference rather than by copy.
+Migration 1 is `ALTER TABLE entries ADD COLUMN IF NOT EXISTS legs INTEGER`, **nullable**, with no
+backfill. A row written before the column therefore carries `NULL`, `EntryRow.legs` becomes
+`number | undefined`, and the client withholds that row's figure instead of printing one.
+
+**Why there is now something to migrate, which is the part worth checking rather than believing.**
+`entries.legs INTEGER NOT NULL` landed in `5ea3805` on 2026-09-02. The infrastructure that gives
+this product a persistent Azure PostgreSQL landed on 2026-08-06. `CREATE TABLE IF NOT EXISTS` adds
+no column to a table that exists, so on any database created between those dates the column is
+simply absent, and both directions break. Measured against the in-process PostgreSQL rather than
+reasoned about: an `INSERT` naming the column raises SQLSTATE `42703`, and a `SELECT *` returns rows
+in which the key is **missing** rather than null, so the old mapping computed `Number(undefined)`,
+which is `NaN`. Both are asserted in `migrations.test.ts` against a database built to the old shape,
+because a premise nothing reproduces is a premise nobody has checked.
+
+**`challenge_entries.legs` is not in the same boat, and it was asked rather than assumed.**
+`git log -S` dates it to `f6569df` on 2026-08-06, the same commit that created the
+`challenge_entries` table and the whole PostgreSQL seam. The column has never not existed, so no
+database can hold that table without it, and it needs no migration. The issue did not claim
+otherwise; the check is recorded because *"the other column is probably fine"* is exactly the shape
+of an assumption that turns out not to be.
+
+**What a pre-existing row gets, and why it is not a zero and not a replay.** `BoardEntry.legs` is
+already `number | undefined` on the client, and `everyday/boardScreen.ts` draws
+`BOARD_SCREEN_COPY.dailyRowWithheld` for a row that carries no count, with its own reason written
+beside it: *"a row from a server too old to send one has no denominator this client could honestly
+supply, and it withholds rather than inventing"*. So `NULL` is a shipped outcome rather than a
+stopgap. The row keeps its rank and its name and loses a figure the server cannot substantiate,
+which is the footing `workPerServedLegKJ` already sits on beside raw energy (§ D106).
+
+The two alternatives were refused for stated reasons. A backfilled zero is ruled out by `SCHEMA`'s
+own comment on the column, and it is the worse of the two failure shapes, because `Number(null)` is
+`0` and a zero looks like an answer: a mean printed over a denominator of nothing. A replay would
+couple schema versioning to the simulation engine and make container startup unbounded in time, and
+this module already refuses that shape by name for `board_key`, calling it a backfill only the
+application can write.
+
+**The version row is written before its migration, and that is the concurrency design rather than a
+detail.** Each migration is one `Sql.exec` whose text is `INSERT INTO schema_migrations …` followed
+by the migration. PostgreSQL runs a multi-statement simple query as a single implicit transaction,
+so the two commit together or neither does; measured, not assumed, by execing `INSERT …; SELECT
+1/0;` and finding the table empty. Two containers starting at once therefore both read the same set
+of applied versions, PostgreSQL serialises them, and the loser's very first statement hits the
+primary key on `version`, raises `23505`, and rolls the whole batch back **before its migration
+runs**. The loser then asks the register whether the version is recorded and continues if it is. It
+asks rather than assuming, because a `23505` can also come out of a migration's own statements, and
+swallowing that one would skip a migration that had failed. Only the SQLSTATE is read, never the
+constraint name, which is § D358's rule.
+
+No explicit `BEGIN` appears anywhere, and no advisory lock. An explicit `BEGIN` would be worse than
+useless here, because `PgSql.query` takes a connection from a pool per call and the `COMMIT` would
+land on a different one, which is the trigger § D361 recorded for giving `Sql` a real transaction
+seam. This runner does not reach it: one `exec` is one statement batch on one connection. An
+advisory lock was refused for a second reason on top of that one. `pg_try_advisory_lock` returns
+true for a lock the same session already holds, measured, and `pglite.test-helper.ts` is one
+session, so a lock-based runner would have been untestable in this harness rather than merely partly
+tested.
+
+**One divergence is created, and it is measured rather than left to be found.** A database created
+today gets `legs` from migration 0 with its `NOT NULL` intact, and migration 1 is a no-op on it. A
+database created before 2026-09-02 gets the column here, nullable. The two schemas differ in that
+one constraint forever, which is the price of applying migration 0 unchanged, and it is asserted in
+both directions against `information_schema.columns`. Only the older database can ever hold a row
+with no count.
+
+**What this does not do, stated because half a migration presented as a whole one is the failure
+mode this issue is about.** `entries.config_hash` became `board_key` and `data_hash` in `e8aac0d` on
+2026-09-01, which is the **older** of the two drifts and would sort before `legs`. It is not
+migration 1 and it is not written at all. Its backfill is precisely the shape refused above: a board
+key is decided by replaying each old row's `run_json` through `leaderboard/boardKey.ts#placeSubmission`
+against the fixture for its `submitted_at_ms`, and neither input is a column in this table. So a
+database created before 2026-09-01 is still broken by this runner, in a way this runner records
+rather than repairs, and the steps it would need are written out in `store.ts`'s module docstring.
+Whether that database exists is a question about a deployment rather than about this repository, and
+nothing here can answer it.
+
+The § D241 migration on `users` is unwritten for the older and better reason: there is nothing to
+migrate, the password path never having been reachable from a viewer that could not find its own
+API (§ D243). That claim is about a specific database too, and it now has somewhere to go the day it
+stops being true.
+
+**Where the runner lives, and the audit consequence.** In `store.ts`, as module-private functions
+reached from `Store.open`, rather than in a new file. `concurrency.test-helper.ts` resolves calls
+within one file and `concurrency.test.ts` asserts that `store.ts` is the only file in the directory
+that issues SQL; a second SQL-issuing file would have made that assertion pass while being false,
+which is the one direction an audit may never fail in. The migration statements are reached through
+a parameter rather than through `this.#sql`, so the concurrency derivation does not see them, which
+is exactly the visibility today's `exec(SCHEMA)` already had. `MIGRATIONS_TABLE` is declared **after**
+`SCHEMA` for a sharper reason: `schemaFacts` finds the product's schema as the first string literal
+in the file containing `CREATE TABLE`, so a second such literal placed above it would leave the
+whole concurrency audit reading a four-line bookkeeping table as the schema and reporting no risk
+anywhere.
