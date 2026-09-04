@@ -1144,3 +1144,59 @@ something was the integrator's own hole convention, and `documentation.test.ts` 
 
 **Both worktrees are kept until the push is confirmed green**, then removed with their branches.
 Neither holds uncommitted work.
+
+---
+
+# Wave Q — dispatched 2026-09-04 at `771e65f`
+
+**Five builders in parallel, one integration branch, one regression run.** The combining is the point:
+five separate pull requests would cost five ~50-minute suites and five chances to cancel each other,
+and the working agreement's *one push per wave* exists for exactly that arithmetic.
+
+## Decision block, sized to the lesson wave P learned rather than to the lanes
+
+Wave P reserved four numbers per lane and spent one each, returning **six** unspent, the most any
+block has returned. The cause was sizing a block to a lane when the unit that consumes a number is an
+**issue**. So wave Q allocates **one number per lane** and no more:
+
+| lane | issue | number | worktree | branch |
+|---|---|---|---|---|
+| **Q-A** | #123 origin membership | **D469** | `.worktrees/q-a` | `fix/issue-123-origin-membership` |
+| **Q-B** | #277 the stage shows its goals | **D470** | `.worktrees/q-b` | `feat/issue-277-stage-goals` |
+| **Q-C** | #341 CSP gate, plus wave P's doc debt | **D471** | `.worktrees/q-c` | `fix/issue-341-csp-gate` |
+| **Q-D** | #295's three confirmed defects | **D472** | `.worktrees/q-d` | `fix/issue-295-confirmed-defects` |
+| **Q-E** | #204 the accessibility standard | **D473** | `.worktrees/q-e` | `docs/issue-204-a11y-standard` |
+| integrator | — | **D474** | main checkout | — |
+
+Every brief carries the same instruction: **if you need a second number, report it and stop.** Taking
+the next one is what produced two lanes computing § D336, and asking is cheap.
+
+## The conflict map, declared before dispatch rather than discovered at merge
+
+| file | owner | note |
+|---|---|---|
+| `packages/server/src/main.ts`, `http/static.test.ts` | Q-A | nobody else may touch `packages/server` |
+| `everyday/stageScreen.ts`, `stageScreenModel.ts` | Q-B | Q-D forbidden here |
+| `.github/workflows/deploy-viz.yml`, `docs/33`, `docs/25` | Q-C | nobody else may touch `.github` or those two documents |
+| `campaign/judge.ts`, `everyday/designerScreen.ts`, `gauntlet/rating.ts` | Q-D | Q-B forbidden here |
+| `docs/` new file, `docs/28` § 7.2, `docs/31` § 5 | Q-E | — |
+| **`honesty/surfaces.ts`** | **shared, Q-B and Q-D** | both add player-facing copy; both told to keep the edit minimal and localised, integrator resolves |
+| **`DECISIONS.md`** | **shared, all five** | all append; a conflict here is certain and is resolved in numeric order |
+
+Two files are deliberately shared rather than assigned. `honesty/surfaces.ts` is shared because both
+lanes ship new player copy and the corpus must sweep it; refusing one lane access would ship an
+unswept string, which is worse than a merge conflict. `DECISIONS.md` is shared because appending is
+what the file is for.
+
+## What each lane was told about its premise
+
+All five premises were verified read-only at `771e65f` before dispatch, and every brief nonetheless
+opens with *verify the premise first, and a refuted premise is a successful outcome*. Wave P closed
+five issues whose premises had expired, and three of those would have become build lanes if anybody
+had trusted the titles. The instruction costs a lane two minutes and has already saved this process
+three lanes.
+
+**One brief carries a correction rather than a specification.** Q-B's issue #277 says *four goals* in
+its own title and there are **five** since § D468 landed yesterday. A lane building four would drop
+the goal the report grades, which is the defect that issue exists to fix, committed while fixing it.
+The brief says so in those terms.
