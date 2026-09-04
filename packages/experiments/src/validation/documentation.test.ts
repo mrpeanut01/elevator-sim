@@ -1316,15 +1316,30 @@ const decisionNumbers = (): readonly number[] =>
   [...read('DECISIONS.md').matchAll(DECISION_HEADING)].map((match) => Number(match[1]));
 
 /**
- * The one duplicate this tree ships, registered so a **second** one fails.
+ * Empty, and it is kept empty rather than deleted.
  *
- * `D63` heads two unrelated decisions — a handback note and a `VIZ_SCHEMA_VERSION` bump — so a
- * `§ D63` citation is ambiguous. It is **not renumbered**, because `RISKS.md` R1's own rule for
- * this file is that ids are names and renumbering breaks every reference; and it is not silently
- * tolerated either, because `citations.test.ts` asserts a `§ Dnnn` **resolves** and never that it
- * is unique. Registered rather than fixed, on `honesty.test.ts`'s `OUTSTANDING` precedent.
+ * It held `63` until 2026-09-04. `D63` did head two blocks, and the second-direction assertion below
+ * is what forced the question of which one was wrong: a register whose entries are never re-examined
+ * becomes decoration. Re-examined, the first block was **not a decision at all**. It is a sub-agent's
+ * hand-back status note, lifted into `DECISIONS.md` with the Phase 4 decisions that follow it, and
+ * the preamble under it still addresses the orchestrator who was meant to lift them.
+ *
+ * So the fix was neither renumbering nor tolerating. The note was demoted out of the `## Dnnn —`
+ * heading shape it had never earned, which leaves `D63` naming one decision and breaks no citation:
+ * both substantive `§ D63` references in the tree already meant the `VIZ_SCHEMA_VERSION` entry.
+ * `RISKS.md` R1 is satisfied rather than bent, because no id changed meaning.
+ *
+ * GitHub issue #318 asked for this, and its own closing claim — that the collision survived because
+ * no check looks for it — was already false when it was written. This guard landed six days earlier
+ * and had been green over `D63` the whole time, because the register recorded it deliberately. What
+ * the issue was right about is that a registered defect with nobody scheduled to re-read it is a
+ * defect that stays. The second-direction assertion below is what forced the re-read, and it did so
+ * only because somebody ran at the entry rather than at the guard.
+ *
+ * The constant stays so that a real collision is registered here with its reason rather than
+ * argued about in a review.
  */
-const KNOWN_DUPLICATE_DECISIONS: readonly number[] = Object.freeze([63]);
+const KNOWN_DUPLICATE_DECISIONS: readonly number[] = Object.freeze([]);
 
 /**
  * Every number below the highest that heads **no** decision, with the reason it heads none.
@@ -1648,8 +1663,11 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
       unregistered,
       'a decision number heads two decisions, so a `§ Dnnn` citation to it is ambiguous. ' +
         '`citations.test.ts` asserts such a citation resolves and never that it resolves to one ' +
-        'thing. Do not renumber — ids are names here. Register it beside D63 with the reason, or ' +
-        'retitle the newer heading.',
+        'thing. Do not renumber — ids are names here. Ask first whether one of the two is a ' +
+        'decision at all: D63 was cleared in 2026-09-04 by finding that its first block was a ' +
+        'hand-back note wearing a heading it never earned, and demoting it broke no citation. ' +
+        'Retitling alone does not help, because the number still heads two blocks. Otherwise ' +
+        'register it in KNOWN_DUPLICATE_DECISIONS with the reason.',
     ).toEqual([]);
 
     // The other direction: a registered duplicate that stopped reproducing must leave the register,

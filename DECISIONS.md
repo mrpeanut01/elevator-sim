@@ -1885,7 +1885,16 @@ They must be added to `benchmark/index.ts` and `src/index.ts` **in the same comm
 
 ---
 
-## D63 — Pre-existing failure this branch did not cause — **HANDBACK**
+### Hand-back note, not a decision: a pre-existing failure this branch did not cause
+
+This block wore `## D63` until 2026-09-04, and it was never a decision. It is a sub-agent's hand-back
+status report, lifted into this file along with the Phase 4 decisions that follow it; the preamble
+below it still addresses the orchestrator who was meant to lift them. What it records is that a suite
+was already red before the branch touched anything. Nothing cites it, and both substantive `§ D63`
+citations in the tree mean the `VIZ_SCHEMA_VERSION` entry further down. Demoting the heading leaves
+`D63` naming exactly one decision, so no id changed meaning and `RISKS.md` R1 is satisfied rather
+than bent. The argument is in `validation/documentation.test.ts`'s `KNOWN_DUPLICATE_DECISIONS`
+docstring, beside the register the demotion emptied.
 
 `packages/experiments/src/validation/documentation.test.ts` *"lists every docs/*.md on disk"* fails
 on `integration` before any change on this branch: `docs/09-destination-dispatch-contract.md` landed
