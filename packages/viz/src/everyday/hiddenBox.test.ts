@@ -147,6 +147,25 @@ function inlineStyleOf(source: string, name: string): string | undefined | null 
   return text;
 }
 
+/**
+ * The `display` values an element is given through the property rather than through `cssText`.
+ *
+ * `el.style.display = 'flex'` defeats `[hidden]` exactly as `display:flex` in a `cssText` does, and
+ * it is the more likely of the two to be written next: this directory already sets it that way on
+ * five elements, none of which is `hidden`-toggled today. `'none'` and `''` are not offenders —
+ * the first hides and the second clears the inline value, which is the property's own way of
+ * handing control back to the attribute.
+ */
+function propertyDisplaysOf(source: string, name: string): readonly string[] {
+  const pattern = new RegExp(
+    String.raw`(?:^|[^.\w$])` + name + String.raw`\.style\.display\s*=\s*([^;\n]+)`,
+    'gu',
+  );
+  return [...source.matchAll(pattern)]
+    .map((match) => (match[1] ?? '').trim())
+    .filter((value) => !/^'none'$|^"none"$|^''$|^""$/u.test(value));
+}
+
 describe('an element this directory hides is actually hidden — issue #295 F29', () => {
   const files = sourceFiles();
 
@@ -169,6 +188,9 @@ describe('an element this directory hides is actually hidden — issue #295 F29'
     for (const file of files) {
       const source = readFileSync(join(DIR, file), 'utf8');
       for (const site of hiddenSites(source, file)) {
+        for (const value of propertyDisplaysOf(source, site.name)) {
+          offenders.push(`${site.file}:${String(site.line)} ${site.name} — .style.display = ${value}`);
+        }
         const style = inlineStyleOf(source, site.name);
         if (style === undefined) continue;
         if (style === null) {
