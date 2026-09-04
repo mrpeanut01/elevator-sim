@@ -247,10 +247,12 @@ import {
   LADDER_WORLD_ABSENCE,
   REFERENCE_RUN_LABEL,
   type LadderEntry,
+  DROPPED_WITHOUT_REASON,
 } from '../gauntlet/ladder.js';
 import { proofCasesOf, type ProofCase, type ProofCaseSet } from '../gauntlet/proofCases.js';
 import {
   proofCaseCountOf,
+  proofCaseScoreOf,
   ratingFigureOf,
   RATING_BASIS,
   RATING_CAVEAT,
@@ -9260,6 +9262,7 @@ const GAUNTLET: SurfaceAdapter = {
   id: 'gauntlet/ladder.ts#ladderRowsOf',
   covers: [
     'gauntlet/ladder.ts#ladderRowsOf',
+    'gauntlet/ladder.ts#DROPPED_WITHOUT_REASON',
     'gauntlet/ladder.ts#sendGateOf',
     'gauntlet/ladder.ts#whatAreTheFortyOf',
     'gauntlet/ladder.ts#caseNameOf',
@@ -9412,6 +9415,35 @@ const GAUNTLET: SurfaceAdapter = {
         fingerprint: 'as-rated',
         summary: { ...finished, rating: null, casesRated: 0, complete: false, weakest: null },
       });
+      /*
+       * A rating with one case it could not score — GitHub issue #295's F26. A fourth entry rather
+       * than a mutation of the three above, because those three are § 14's states and this is a
+       * fourth one: the row that reports the smaller denominator *and* says which case is missing
+       * from it. Without a case in this shape the reason `rating.ts` computes for every unscored
+       * case would still reach no rendered string, which is the defect itself.
+       */
+      const first = finished.cases[0];
+      /*
+       * The reason comes out of `rating.ts` on a batch shape it really handles rather than out of
+       * a literal here. A case whose batch carries no arm is `proofCaseScoreOf`'s own first branch,
+       * so what the corpus sweeps is the sentence the product would print.
+       */
+      const noScore = proofCaseScoreOf({ ...context.batch, arms: [] });
+      if (first !== undefined && noScore.reason !== null) {
+        const droppedCase = { ...first, score: null, noScoreReason: noScore.reason };
+        entries.push({
+          dispatcherId: 'partly-rated',
+          dispatcherName: '⟨partly rated dispatcher⟩',
+          isReference: false,
+          fingerprint: 'as-rated',
+          summary: {
+            ...finished,
+            casesRated: Math.max(finished.casesRated - 1, 0),
+            complete: false,
+            cases: [droppedCase, ...finished.cases.slice(1)],
+          },
+        });
+      }
     }
     const rows = ladderRowsOf(entries, {
       fingerprintOf: (id) => (id === 'edited' ? 'moved-since' : 'as-rated'),
@@ -9444,6 +9476,14 @@ const GAUNTLET: SurfaceAdapter = {
       if (row.incompleteNote !== null) {
         seeds.push({ field: `${at}.incomplete`, text: row.incompleteNote, role: 'reason' });
       }
+      /* Which cases are not in the mean, and what each said — issue #295's F26. */
+      row.dropped.forEach((dropped, index) => {
+        seeds.push({
+          field: `${at}.dropped${String(index)}`,
+          text: `${dropped.caseName}: ${dropped.reason}`,
+          role: 'reason',
+        });
+      });
     }
 
     /* The two formatters on a rating nothing produced — § 13's `—`, never a zero. */
@@ -9471,6 +9511,13 @@ const GAUNTLET: SurfaceAdapter = {
     seeds.push({ field: 'board.daily.absent', text: DAILY_BOARD_ABSENCE, role: 'reason' });
     seeds.push({ field: 'ladder.world.absent', text: LADDER_WORLD_ABSENCE, role: 'reason' });
     seeds.push({ field: 'ladder.empty', text: LADDER_EMPTY, role: 'reason' });
+    /*
+     * The branch a rated case should never be in — a `null` score with no reason beside it. It is
+     * seeded rather than driven because `ratedCaseIssue` refuses that pair on the way in and
+     * `proofCaseScoreOf` cannot emit one, so there is no run that reaches it; and it is seeded
+     * rather than left out because a sentence a player could meet is a sentence this search reads.
+     */
+    seeds.push({ field: 'ladder.dropped.mute', text: DROPPED_WITHOUT_REASON, role: 'reason' });
     seeds.push({ field: 'ladder.reference.label', text: REFERENCE_RUN_LABEL, role: 'label' });
     seeds.push({ field: 'rating.basis', text: RATING_BASIS, role: 'prose' });
     seeds.push({ field: 'rating.caveat', text: RATING_CAVEAT, role: 'reason' });

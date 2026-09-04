@@ -123,6 +123,13 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    * do — and the ranking is still the server's, which is why the row stays on the board at all.
    */
   dailyRowWithheld: 'no count',
+  /*
+   * The heading over the cases a rating could not score — GitHub issue #295's F26. It sits under
+   * the incomplete note rather than replacing it: the note says the mean is not comparable, and
+   * this says which cases are missing from it and what each of them said. `rating.ts` computes
+   * that sentence for every unscored case and, until #295, nothing rendered it.
+   */
+  droppedHeading: 'Not in this mean',
   crowdsHeading: 'THE FIVE CROWD SHAPES',
   towersHeading: 'THE EIGHT BUILDINGS',
 } as const);
@@ -330,6 +337,24 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
         const note = el(doc, 'div', row.incompleteNote);
         note.style.cssText = `font-size:12px;color:${C.warmGrey};margin-top:4px`;
         nameCell.append(note);
+      }
+      /*
+       * Which cases are missing from the mean, and what each one said — § 14 and GitHub issue
+       * #295's F26. Under the note rather than beside the `39 of 40` cell, because the cell is a
+       * count and these are sentences; a column of them would be unreadable at four cases and
+       * nonsense at forty.
+       */
+      if (row.dropped.length > 0) {
+        const heading = el(doc, 'div', BOARD_SCREEN_COPY.droppedHeading);
+        heading.className = 'everyday-ladder-dropped-heading';
+        heading.style.cssText = `font-size:12px;font-weight:600;color:${C.warmGrey};margin-top:6px`;
+        nameCell.append(heading);
+        for (const dropped of row.dropped) {
+          const line = el(doc, 'div', `${dropped.caseName}: ${dropped.reason}`);
+          line.className = 'everyday-ladder-dropped';
+          line.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.4;margin-top:2px`;
+          nameCell.append(line);
+        }
       }
       line.append(nameCell);
       /* § 14.2: the rating column is keyed moss. */
