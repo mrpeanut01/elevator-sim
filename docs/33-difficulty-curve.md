@@ -1250,12 +1250,201 @@ this building, alongside GitHub issue #270's sweep.
 | **W4** | The day-5 cliff is either flattened or declared | F5 — three contracts go from passable to unpassable between day 1 and day 5, from the bars and the growth compounding | the bar ladder in `shift/goals.ts#GOAL_BARS`, which belongs to whoever lands § 1.4. A bar ladder is not a difficulty tier and DC-R1 does not forbid changing it; what DC-R1 forbids is making it depend on the tier |
 | **W5** | The `carry` goal either binds somewhere or is described as what it is | F6 — met on every seed of every cell but two | a bar change, or a copy change. Both are legitimate; pretending it is a fourth test is not |
 
+**W3 has since acquired a third contract, and the energy bar is what put it there.** § 4.6's **F7**
+measures `mixed-use-high-rise` day 1 at 0 of 50 clean under all thirteen shipped dispatchers once the
+five-goal day is graded, against 12 of 50 on the four wait goals alone. So the list in W3 is
+`midtown-office`, `vertical-city` and now `mixed-use-high-rise`. § 4.6 argues that the threshold is
+not what makes that contract hard and that moving it buys back one run in 650, so the remedy is
+demand or fabric under DC-R1 and it belongs to **#234**.
+
 **W4 is the one that will be argued about, so its permission is stated precisely.** § D345 forbids a
 *difficulty setting* from moving the bar a run is judged against. It says nothing about the bar
 ladder itself, which every player meets identically — `goalsForDay(day)` reads the day and nothing
 else. Changing what day 5 asks of everybody is a design change to the curve; changing what day 5 asks
 of an Easy player specifically is the thing § D345 forbids. **The two are different and this document
 does not let the first hide behind the second.**
+
+### 4.6 The energy bar, derived
+
+[§ D367](../DECISIONS.md) permits one independent, unweighted energy goal and requires its threshold
+to be **derived from measured runs rather than chosen**, in the shape § 4.2 uses. This is that
+derivation. GitHub issue **#275**; the decision it produced is [§ D468](../DECISIONS.md).
+
+**Instrument.** § 4.2's, unchanged in every respect that matters. Each contract's own building at
+its own shift length, grown to day *d* by the shipped `shift/growth.ts#grownBuilding` through
+`dev/state.ts#shiftRunConfigOf`, run under the shipped default dispatcher (`collective`) on an
+ordinary day with no event, folded through
+`observationsAt(recording, recording.endedAt)` and `shift/observations.ts`. Seeds are
+`20 260 824 + 7 919 n`. What is read is `VizSummary.energy.workPerServedLegKJ`, the figure the report
+sheet already draws as WORK PER DELIVERED LEG. Every run recorded travel, so no cell is ungraded for
+want of a measurement.
+
+**What is reported is a proportion with its `n` and a median, never a mean of a mean.** Nothing below
+compares two configurations and calls one better, so no paired interval is required; § 6.5's second
+prohibition binds here exactly as it binds the sweep.
+
+**What the figure is true of, said once because the label cannot carry it.** `VizSummary.energy` is
+computed over the run's **reporting window**. Measured on the 700 runs below, that window is
+`peak-5min` on seven of the eight contracts and `full-run` on `garden-apartments`, whose contract
+authors its own hour. The other four goals grade the whole shift. That inhomogeneity is real, and it
+is named rather than papered over. What it is not is a second answer to one question: this is the
+only work-per-delivered-leg figure the product has, the goal grades exactly the figure
+`shift/report.ts#energyFigures` prints, and the rounding to the tenth happens once, in
+`live/observations.ts#energyPerServedLegAt`. The visible consequence is that the goal reads a dash at
+every playhead short of the run's end, because a window statistic on a rail drawn at an instant is
+§ D307's violation class.
+
+#### The day-1 distribution, 8 contracts × 50 seeds = 400 runs
+
+| | contract | building | median kJ | p10 | p90 | seeds over 80 kJ |
+|---|---|---|---|---|---|---|
+| c1 | Learn the ropes | `garden-apartments` | 25.6 | 20.6 | 30.6 | **0/50** |
+| c2 | The morning rush | `midtown-office` | 10.4 | 7.7 | 13.4 | **0/50** |
+| c3 | Two banks, one lobby | `secure-tower` | 60.1 | 43.4 | 75.1 | 2/50 |
+| c4 | The sky lobby | `mixed-use-high-rise` | 131.8 | 100.9 | 150.6 | **50/50** |
+| c5 | Vertical City | `vertical-city` | 82.8 | 73.9 | 94.3 | 33/50 |
+| c6 | The headline address | `chancery-house` | 57.4 | 46.4 | 77.2 | 4/50 |
+| c7 | Both ways at once | `crown-hotel` | 43.3 | 25.4 | 75.0 | 4/50 |
+| c8 | The bed and the visitor | `st-jude-hospital` | 95.1 | 63.4 | 115.1 | 35/50 |
+
+The medians span a factor of **12.6**. That is fabric rather than play: the quantity is work per
+delivered leg, and work is out-of-balance mass times distance, so a sixty-floor tower with a sky
+lobby costs an order of magnitude more per ride than six floors of flats.
+
+#### The threshold, and the two constraints that bracket it
+
+Pooled over the 400 runs the distribution has its **two-thirds point at 78.30 kJ**. That is the value
+at which exactly one day in three across the shipped catalogue misses the bar, which is DC-4's own
+lower edge read over one goal instead of over a whole day.
+
+A second, independent constraint holds it up from below. Below about 70 kJ the pooled day-1 miss rate
+over all five goals leaves DC-4's band at the top:
+
+| bar | the goal alone misses | the day misses on at least one of five | DC-4 |
+|---|---|---|---|
+| 60 kJ | 201/400 (50.2 %) | 293/400 (73.2 %) | **out** |
+| 65 kJ | 179/400 (44.8 %) | 275/400 (68.8 %) | **out** |
+| 70 kJ | 168/400 (42.0 %) | 265/400 (66.2 %) | in |
+| **80 kJ** | **128/400 (32.0 %)** | **245/400 (61.2 %)** | **in** |
+| 100 kJ | 67/400 (16.8 %) | 220/400 (55.0 %) | in |
+| 130 kJ | 28/400 (7.0 %) | 200/400 (50.0 %) | in |
+
+So the bar is bracketed on both sides, and the derived figure is **80 kJ per delivered leg**.
+
+**80 rather than 78.30, and the arithmetic is the reason rather than tidiness.** At `n = 400` the
+standard error on a one-third proportion is 2.4 points. Moving the bar from 78.30 to 80 moves the
+proportion it refuses from 33.3 % to 32.0 %, which is roughly half of one standard error. A decimal
+place here would claim a precision 400 runs do not support, which is the same refusal
+`shift/goals.ts#WORST_WAIT_WHOLE_DAY_FACTOR` makes when it declines a third decimal four buildings
+cannot supply.
+
+#### It does not harden, and that is measured
+
+Every other bar in `GOAL_BARS` moves nightly. This one does not, because the quantity itself falls
+steeply as the building fills up. Same instrument, days 1, 5, 10 and 20, 50 seeds each, median
+`workPerServedLegKJ`:
+
+| contract | day 1 | day 5 | day 10 | day 20 | fall |
+|---|---|---|---|---|---|
+| c1 `garden-apartments` | 25.6 | 22.1 | 19.4 | 16.2 | ×1.6 |
+| c8 `st-jude-hospital` | 95.1 | 19.5 | 12.2 | 6.1 | **×15.6** |
+
+More people share the same car travel, so the work per delivered leg drops. The two contracts fall by
+factors an order of magnitude apart, so no single ladder tracks both, and a ladder that *hardened*
+would tighten a bar that growth is already loosening much faster than any rung could. The bar
+therefore holds still, and the goal binds hardest on day one. That is the opposite shape from the
+other four, and it is a finding rather than a design.
+
+The other six contracts were not swept beyond day 1: § 4.2's own table puts every one of them at
+30 of 30 missing from day 5 onward, so a fifth bar cannot change whether they clear. c1 and c8 are
+the two with any headroom left, and they are the two measured.
+
+#### What the bar changes, re-measured
+
+§ D367 makes this part of the work rather than a follow-up. Clean days out of 50 at day 1, under the
+shipped default `collective`, four goals against five:
+
+| contract | four goals | five goals | what moved it |
+|---|---|---|---|
+| c1 `garden-apartments` | 49/50 | **49/50** | nothing; the bar never binds here |
+| c2 `midtown-office` | 0/50 | **0/50** | nothing; already unclearable on the wait goals |
+| c3 `secure-tower` | 26/50 | **24/50** | two seeds |
+| c4 `mixed-use-high-rise` | 8/50 | **0/50** | the bar, on every seed |
+| c6 `chancery-house` | 46/50 | **42/50** | four seeds |
+| c7 `crown-hotel` | 29/50 | **25/50** | four seeds |
+| c8 `st-jude-hospital` | 50/50 | **15/50** | the bar, on 35 seeds |
+
+Two of those are findings rather than adjustments, and neither is a reason to move the number.
+
+**F7. `mixed-use-high-rise` day 1 stops clearing at all, and no threshold rescues it.** Across all
+thirteen shipped dispatchers and 650 runs at that contract, the lowest energy figure on a run that
+also clears the four wait goals is **81.7 kJ**. So a bar of 82 would keep the contract clearable by
+exactly one run in 650, which is not clearability, and a bar high enough to make it a real
+possibility is above 120 kJ, where the goal misses 9 % of the pooled catalogue and binds on no
+contract but this one. c4 was already among the hardest day-1 cells in § 4.2, at 24 of 30 missing.
+With the bar it sits at 50 of 50, which is the state **W3** forbids. That is a rebalancing question
+and it belongs to **#234**, not to the threshold.
+
+**F8. `st-jude-hospital` moves from unfailable to just outside the band, and this is the useful
+half.** It was § 4.2's other F1-shaped cell: 0 of 30 missing at day 1, a contract whose opening day
+asked nothing. The bar takes it to 35 of 50 missing, a rate of 70 %, which is outside DC-4's band by
+3.3 points at the top rather than by 33 points at the bottom. On this one contract the energy goal is
+the **only** goal the shipped default misses, which is precisely what a second axis is supposed to
+buy.
+
+#### The check § D106 requires, and it comes back clean
+
+§ D106's measured objection to an energy score is that `nearest-car`, the weakest shipped dispatcher,
+is on the Pareto front at six of eight matrix cells purely by being worst on wait, so a grade that
+folded energy in would rank it first. § D367 answers that on arithmetic: an independent bar adds no
+term and produces no combined number. **The arithmetic answer is weaker than it looks**, because a
+bar still creates an incentive even when it creates no number, so it was measured.
+
+Thirteen shipped dispatchers × seven contracts × 50 seeds under common random numbers, day 1, the
+same instrument. c5 was left out: its day-1 four-goal miss rate is already 50 of 50, so no bar can
+change whether it clears, and it is the most expensive cell in the catalogue.
+
+**`nearest-car` does win the energy bar, everywhere.** It has the lowest median at all seven
+contracts, and on `mixed-use-high-rise` it takes the median from 131.8 kJ under `collective` to
+72.4 kJ, under the bar. So the incentive § D106 warns about is real and visible.
+
+**And it loses the day, everywhere.** Clean days out of 50 against all five goals:
+
+| contract | `nearest-car` | best shipped profile | which |
+|---|---|---|---|
+| c1 | 49/50 | 49/50 | tied |
+| c2 | 0/50 | 0/50 | tied at zero |
+| c3 | 2/50 | **37/50** | `destination-eta` |
+| c4 | 0/50 | 0/50 | tied at zero |
+| c6 | 0/50 | **48/50** | `eta` |
+| c7 | 1/50 | **47/50** | `fairness-first` |
+| c8 | 27/50 | **32/50** | `energy-aware` |
+
+`nearest-car` is never **strictly** the best arm at any contract, and it is strictly the worst at
+three of them. Switching to it to win the energy bar costs the day: `chancery-house` goes from 48 of
+50 clean under `eta` to 0 of 50, `crown-hotel` from 47 to 1, `secure-tower` from 37 to 2. What it
+misses is `minute`, `queue` and `worst-wait`, and never the energy bar, which it clears on all 50
+seeds at six of the seven contracts and on 33 of 50 at the seventh. **So the perverse ranking § D106
+measures is not reachable through this bar**, and that is now a measurement rather than an argument
+from arithmetic.
+
+The same sweep answers the standing requirement in the other direction. Best-to-worst median spans
+are ×1.36 on c1, ×1.69 on c2, ×1.58 on c3, ×1.85 on c4, ×3.50 on c6, ×1.91 on c7 and ×2.61 on c8,
+so a player moving the dispatcher moves this goal. It is not an inert bar.
+
+Every median in this section is `statistics.median` over that cell's 50 seeds, which for an even
+sample is the mean of the two middle values. Two conventions were in play in a first draft and they
+disagreed by a tenth of a kilojoule in several cells, which is small enough to publish by accident
+and is the reason the convention is named here rather than assumed.
+
+#### What this does not settle
+
+The bar is dominated by the building. It is met on every seed of c1 and c2 and missed on every seed
+of c4 under the shipped default, so on the shipped catalogue it discriminates between contracts more
+than between days. That is § 7's **O2** arriving on a fifth goal: whether a bar should move with the
+building rather than with the day. It is reported rather than fixed, because fixing it means
+authoring a bar per contract, and § 1.4 refused exactly that for the wait bars on grounds one grading
+lane may not overturn alone.
 
 ---
 
@@ -1514,7 +1703,7 @@ excluding zero at 50–200 replications under common random numbers, and it stop
 | | what | why it is open |
 |---|---|---|
 | **O1** | The `[1/3, 2/3]` band in DC-4 | a design choice with its reasoning attached, not a citation. It is the number most likely to be wrong and it is stated so it can be attacked |
-| **O2** | Whether a day's bar should move with the **building** rather than with the day (`docs/32` § 9 Q6) | § 1.4 chose the day ramp and said why the building answer is the more interesting one. It needs a per-contract measurement over eight buildings that nobody has taken |
+| **O2** | Whether a day's bar should move with the **building** rather than with the day (`docs/32` § 9 Q6) | § 1.4 chose the day ramp and said why the building answer is the more interesting one. It needs a per-contract measurement over eight buildings that nobody has taken. **§ 4.6 has now taken one, for the energy bar only**, and it lands on this question hardest: work per delivered leg spans a factor of 12.6 across the eight contracts at day 1, so a single bar is met on every seed of two contracts and missed on every seed of a third. That is one goal's evidence for the building answer and it is not authority to adopt it |
 | **O3** | The DC-3 witness vectors themselves | nine of ten stages have none. Finding them is a search per stage, and the register's `OUTSTANDING` block is where that debt is visible until it is paid |
 | **O4** | Whether stages 8, 9 and 10 should widen their `editable` lists or change their `teaches` | DC-2b says they must do one; which one is a content decision |
 | **O5** | The trip-budget row | **graded from wave J** ([§ D431](../DECISIONS.md#d431), issue #169), so the conditional this row carried has fired and it moves a verdict like the other three. § 1.4 has the correction: the breach is now four rows rather than three and is unchanged in kind, and the remedy it specifies needs a day-indexed trip ladder `goalsForDay` does not have |

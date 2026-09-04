@@ -43,6 +43,7 @@ function live(overrides: Partial<LiveObservations> = {}): LiveObservations {
     worstWaitSoFarS: 42,
     worstWaitIsCensored: false,
     loadedDepartures: 265,
+    workPerServedLegKJ: 62.4,
     ...overrides,
   };
 }
@@ -84,5 +85,33 @@ describe('the trip count crosses the projection unchanged', () => {
     expect(empty.minutePct).toBe(100);
     expect(empty.worstWaitS).toBe(0);
     expect(empty.loadedDepartures).toBeUndefined();
+  });
+});
+
+describe('the energy figure crosses the projection unchanged', () => {
+  it('carries a measured ratio straight through, rounding nothing here', () => {
+    // The rounding happens once, in `live/observations.ts#energyPerServedLegAt`, against the
+    // sheet's own `toFixed(1)`. Rounding again here would be the second answer this module exists
+    // not to give. That is § D111's lesson, on the figure the energy bar grades.
+    expect(shiftObservationsOf(live()).workPerServedLegKJ).toBe(62.4);
+    expect(shiftObservationsOf(live({ workPerServedLegKJ: 0 })).workPerServedLegKJ).toBe(0);
+  });
+
+  it('leaves the field off entirely when the fold had nothing to hand it', () => {
+    // Absent rather than present-and-`undefined`, for `loadedDepartures`' reason one suite up.
+    const projected = shiftObservationsOf(live({ workPerServedLegKJ: undefined }));
+    expect('workPerServedLegKJ' in projected).toBe(false);
+    expect(projected.workPerServedLegKJ).toBeUndefined();
+  });
+
+  it('is not defaulted the way the three ratios beside it are', () => {
+    // The energy bar is `at-most`, so a `?? 0` would grade **met** on every run nobody measured,
+    // and on every playhead short of the run's end, which is the second reason this one is absent
+    // far more often than `loadedDepartures` is.
+    const empty = shiftObservationsOf(
+      live({ arrived: 0, carried: 0, servedCount: 0, workPerServedLegKJ: undefined }),
+    );
+    expect(empty.carryPct).toBe(100);
+    expect(empty.workPerServedLegKJ).toBeUndefined();
   });
 });

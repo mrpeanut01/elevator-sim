@@ -30930,3 +30930,135 @@ the environment down on close, which is what keeps the three-preview quota a non
 **What this does not do.** It does not stop the preview deploy, which still costs runner minutes on
 every push. If the minutes are the objection rather than the noise, the change is to the job's `if:`
 and is a different decision from this one — nobody has asked for it and it is not assumed here.
+
+---
+
+## D468 — the energy bar is 80 kJ per delivered leg, derived, and it does not harden
+
+**Date: 2026-09-04 · Owner: wave P lane C · Rules on: GitHub issue #275 AC2 and AC3, under
+[§ D367](#d367) and [§ D106](#d106).**
+
+§ D367 permitted one independent, unweighted energy goal and required its threshold to be **derived
+from measured runs rather than chosen**. This is the number, the run behind it, and the three things
+the measurement found that nobody had asked about.
+
+### The goal
+
+`shift/goals.ts#goalsForDay` returns a fifth `ShiftGoal`: *"Keep the work inside 80 kJ per ride
+delivered"*, `at-most`, reading `GoalObservations.workPerServedLegKJ`. It is read alone by
+`readGoal` like the other four, carries no weight, adds no term to any other goal, and produces no
+combined number. `campaign/judge.ts`'s refusal to order two arms on energy is untouched, and raw
+`workKJ` is still ungraded: there is no observation id that names it, so a goal that wanted to grade
+the total could not be written.
+
+*Per ride delivered* is load-bearing in the label rather than decorative. The legs delivered are the
+denominator, so a day that spends less by carrying fewer people moves the number the wrong way and
+fails the bar. That is the whole of why § D106 rule 2 does not reach it.
+
+### The run that produced 80
+
+`dev/state.ts#shiftRunConfigOf` at seeds `20 260 824 + 7 919 n`, `n = 0…49`, day 1, the shipped
+default dispatcher `collective`, each of the eight contracts at its own shift length, ordinary day
+with no event, folded through `observationsAt(recording, recording.endedAt)` and
+`shift/observations.ts`. **400 runs.** Every one recorded travel. Medians run from 10.4 kJ on
+`midtown-office` to 131.8 kJ on `mixed-use-high-rise`, a factor of 12.6.
+
+Two constraints bracket the threshold, and both are stated so they can be attacked:
+
+1. Pooled over the 400, the distribution's **two-thirds point is 78.30 kJ**. That is the value at
+   which one day in three across the shipped catalogue misses the bar, which is `docs/33` DC-4's own
+   lower edge read over one goal rather than over a whole day.
+2. Below about 70 kJ the pooled day-1 miss rate over all five goals leaves DC-4's band at the top:
+   66.2 % at 70 kJ, 68.8 % at 65, 73.2 % at 60. A tighter bar does not make day one difficult, it
+   makes it unpassable.
+
+**80 rather than 78.30.** At `n = 400` the standard error on a one-third proportion is 2.4 points,
+and moving the bar from 78.30 to 80 moves the proportion it refuses from 33.3 % to 32.0 %, about
+half of one standard error. A decimal place would claim a precision 400 runs do not support. That is
+`shift/goals.ts#WORST_WAIT_WHOLE_DAY_FACTOR`'s refusal of a third decimal, on a different bar.
+
+The full tables, the percentiles and the cell-by-cell figures are `docs/33-difficulty-curve.md`
+§ 4.6, which is where a reader looking for the derivation will go.
+
+### It is a constant, and that is a measurement
+
+The other four bars harden nightly. This one does not, because the quantity falls steeply as the
+building fills up: median `workPerServedLegKJ` goes 25.6 → 22.1 → 19.4 → 16.2 over days 1, 5, 10 and
+20 on `garden-apartments`, and 95.1 → 19.5 → 12.2 → 6.1 on `st-jude-hospital`. Those are falls of
+×1.6 and ×15.6. No single ladder tracks both, and a ladder that hardened would tighten a bar that
+growth is already loosening much faster than any rung could. So the bar holds still and the goal
+binds hardest on day one, which is the opposite shape from the other four. `GOAL_BARS` carries one
+key for it and deliberately no `energyBase` or `energyPerDay`, because a key that existed and was
+always zero would read as a ladder somebody forgot to author.
+
+### The check § D106 requires, run rather than argued
+
+§ D106's measured objection is that `nearest-car` sits on the Pareto front at six of eight matrix
+cells purely by being worst on wait, so a grade folding energy in ranks the weakest dispatcher
+first. § D367 answered that on arithmetic: an independent bar adds no term and produces no combined
+number. **The arithmetic answer is weaker than it looks**, because a bar creates an incentive even
+when it creates no number, so it was measured: thirteen shipped dispatchers, seven contracts, 50
+seeds under common random numbers, day 1.
+
+`nearest-car` does win the energy bar, at every one of the seven contracts, and on
+`mixed-use-high-rise` it takes the median from 131.8 kJ to 72.4 kJ, under the bar. **And it loses
+the day at every contract where the bar binds**: clean days out of 50 against all five goals are
+49, 0, 2, 0, 0, 1 and 27, against a best shipped profile of 49, 0, 37, 0, 48, 47 and 32. It is never
+**strictly** the best arm at any contract and it is strictly the worst at three of them. So the
+perverse ranking § D106 measures is not reachable through this bar. That is now a measurement rather than an inference from
+the arithmetic, and it is the part of § D367's reasoning that most needed one.
+
+The same sweep answers the standing requirement in the other direction. Best-to-worst median spans
+per contract are ×1.36, ×1.69, ×1.58, ×1.85, ×3.50, ×1.91 and ×2.61, so a player moving the
+dispatcher moves this goal.
+
+### Two findings that are reported and not fixed
+
+**`mixed-use-high-rise` day 1 stops clearing.** Four goals, best shipped profile: 12 of 50 seeds
+clean. Five goals: **0 of 50, under all thirteen profiles.** Across 650 runs at that contract the
+lowest energy figure on a run that also clears the four wait goals is 81.7 kJ, so a bar of 82 would
+buy back exactly one run in 650 and a bar that made the contract a real possibility is above 120 kJ,
+where the goal binds on no contract but this one. The threshold is not what makes c4 hard and moving
+it does not fix c4. It is a rebalancing question and it belongs to **#234**; `docs/33` § 4.6 files it
+as **F7**, against **W3**.
+
+**The bar is dominated by the building.** It is met on every seed of `garden-apartments` and
+`midtown-office` and missed on every seed of `mixed-use-high-rise`, so on the shipped catalogue it
+discriminates between contracts more than between days. That is `docs/33` § 7's **O2** arriving on a
+fifth goal. It is not fixed here, because fixing it means authoring a bar per contract and § 1.4
+refused exactly that for the wait bars on grounds one grading lane may not overturn alone.
+
+The useful counterweight is `st-jude-hospital`, which § 4.2 measured as a second unfailable opening
+day at 0 of 30 missing. The bar takes it to 35 of 50 missing, and it is the one contract where the
+energy goal is the only goal the shipped default misses.
+
+### What the bar is true of, said once
+
+`VizSummary.energy` is computed over the run's **reporting window**, which is the five-minute peak on
+seven of the eight shipped contracts and the whole hour on `garden-apartments`. The other four goals
+grade the whole shift. That inhomogeneity is real and it is named here rather than papered over. What
+it is not is a second answer to one question: this is the only work-per-delivered-leg figure the
+product has, the goal grades exactly the figure `shift/report.ts#energyFigures` prints, and the
+rounding happens once, to the tenth, in `live/observations.ts#energyPerServedLegAt`.
+
+The consequence a reader meets first is that the energy goal reads `pending` at every playhead short
+of the run's end, because the figure is a window statistic rather than a fold and a rail drawn at an
+instant may not publish one (§ D307). Unjudged is not passed, so a day whose energy reading is
+`pending` is not a clean day. `week.ts#outcomeOf`'s rule is unchanged.
+
+### `CLAUDE.md` moved on this commit and not before
+
+§ D367 and § D106 both defer the *"Energy is an axis, never a score"* paragraph to the commit that
+ships the goal, on the ground that until then the paragraph is true as written. It ships here, so it
+moves here. `menu/screens.ts`' *What a shift is* panel moved with it, for the same reason and with
+more urgency: it is player-facing copy that said *"against four goals, all four every day"* and
+enumerated four, which the goal makes false.
+
+### What is deliberately not built
+
+**No sweep test re-derives this number.** `docs/33` § 6.4 bounds the sweep's cost at 198 s over
+7 700 simulations and § 6.1 puts the week arm in a file that does not exist yet; a 400-run derivation
+in the viz suite would be a minute on every run for a figure that is interesting once. The constant
+is pinned by `goals.test.ts` and the run is pinned here and in § 4.6, which is the discipline this
+repository asks for. If the catalogue's buildings or the growth rule move, this number goes stale
+the way every published number can, and § 4.6 names the instrument that re-derives it.

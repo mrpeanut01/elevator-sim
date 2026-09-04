@@ -41,6 +41,9 @@ function observations(overrides: Partial<GoalObservations> = {}): GoalObservatio
     abandoned: 0,
     worstWaitS: 90,
     worstWaitIsCensored: false,
+    // Under `GOAL_BARS.energyPerLegMaxKJ`, so the default fixture clears all five bars. The absent
+    // case is exercised deliberately, in the gate suite below, rather than by default here.
+    workPerServedLegKJ: 41.2,
     ...overrides,
   };
 }
@@ -61,13 +64,16 @@ function closedDay(day: number, forDay: GoalObservations): DayOutcome {
 }
 
 describe('the bars harden with the day, and then stop', () => {
-  it('asks for the handoff’s four tests every day — § 8.6, all four hold or the day misses', () => {
+  it('asks the handoff’s four tests plus the energy bar every day, per § 8.6 and § D367', () => {
+    // The fifth is § D367's independent energy bar (GitHub issue #275). Order is asserted rather
+    // than membership: the rail draws them in this order and the report sheet pairs them by index.
     for (let day = 1; day <= 30; day += 1) {
       expect(goalsForDay(day).map((goal) => goal.id)).toEqual([
         'carry',
         'minute',
         'queue',
         'worst-wait',
+        'energy',
       ]);
     }
   });
@@ -291,8 +297,8 @@ describe('an observation nobody took is not graded, in either direction', () => 
     expect(unmeasured.progressPct).toBe(0);
   });
 
-  it('leaves the four daily goals alone — none of them reads it', () => {
-    // The daily loop still asks four things and this is not one of them; the trip budget is the
+  it('leaves the five daily goals alone, because none of them reads it', () => {
+    // The daily loop asks five things and this is not one of them; the trip budget is the
     // campaign's bar. So a day with no trip count still grades every goal `goalsForDay` returns.
     for (let day = 1; day <= 20; day += 1) {
       for (const goal of goalsForDay(day)) {
@@ -319,7 +325,14 @@ describe('nothing is graded before the building wakes up', () => {
   it('is never `met` below the threshold — even on observations that would clear every bar', () => {
     // The gate is load-bearing precisely because these observations *do* clear the bars. Three
     // people arrived, three were carried, nobody queued: perfect by arithmetic, and not a shift.
-    const quiet = observations({ arrived: 3, carryPct: 100, minutePct: 100, peakQueue: 0, abandoned: 0 });
+    const quiet = observations({
+      arrived: 3,
+      carryPct: 100,
+      minutePct: 100,
+      peakQueue: 0,
+      abandoned: 0,
+      workPerServedLegKJ: 12.5,
+    });
     const woken = { ...quiet, arrived: WAKE_UP_ARRIVALS };
     for (const goal of goalsForDay(4)) {
       expect(readGoal(goal, quiet).state).toBe('pending');
@@ -482,5 +495,88 @@ describe('the "was" figures — last night’s actual result, never a constant',
     const quiet = closedDay(3, observations({ arrived: 3 }));
     const carry = goalsForDay(4).find((goal) => goal.id === 'carry');
     expect(carry && wasDisplayOf([quiet], 4, carry)).toBe(PENDING_DISPLAY);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The energy bar. § D367, § D468, GitHub issue #275
+ * -------------------------------------------------------------------------- */
+
+describe('the energy bar is one bar, read alone', () => {
+  const energyOf = (day: number): ShiftGoal => {
+    const goal = goalsForDay(day).find((entry) => entry.id === 'energy');
+    if (goal === undefined) throw new Error(`no energy goal on day ${String(day)}`);
+    return goal;
+  };
+
+  it('grades the per-delivered-leg ratio and nothing else energy-shaped', () => {
+    /*
+     * The whole of § D367's permission, in one assertion. § D106 rule 2 forbids folding energy into
+     * a figure that also carries wait; what makes an independent bar survive it is that the legs
+     * delivered are the **denominator**, so a day that spends less by carrying fewer people fails
+     * the bar rather than winning it. Grading `workKJ` would restore exactly the score § D106
+     * refuses, and the type is what stops it: there is no raw-work id to name.
+     */
+    expect(energyOf(1).reads).toBe('workPerServedLegKJ');
+    expect(GOAL_OBSERVATION_IDS).not.toContain('workKJ');
+    expect(GOAL_OBSERVATION_IDS).not.toContain('energyKJ');
+  });
+
+  it('does not harden with the day, and the constant is the one `GOAL_BARS` publishes', () => {
+    // The other four bars move nightly; this one is measured flat. § D468 carries the reason: the
+    // quantity itself falls as the building grows, by 1.6x over nineteen days on one contract and
+    // 15.6x on another, so a ladder fitted to either would be wrong about the other by an order of
+    // magnitude, and one that hardened would tighten a bar growth is already loosening.
+    for (const day of [1, 2, 5, 10, 20, 50, 500]) {
+      expect(energyOf(day).bar, `day ${String(day)}`).toBe(GOAL_BARS.energyPerLegMaxKJ);
+    }
+    expect(energyOf(1).compare).toBe('at-most');
+  });
+
+  it('meets the bar at the bar and misses a tenth above it', () => {
+    const bar = GOAL_BARS.energyPerLegMaxKJ;
+    expect(readGoal(energyOf(1), observations({ workPerServedLegKJ: bar })).state).toBe('met');
+    expect(readGoal(energyOf(1), observations({ workPerServedLegKJ: bar - 0.1 })).state).toBe('met');
+    expect(readGoal(energyOf(1), observations({ workPerServedLegKJ: bar + 0.1 })).state).toBe(
+      'missed',
+    );
+    // *Inside*, on the label, against an `at-most` comparison that meets at the bar: the same
+    // preposition question `worst-wait` answered the same way. A label promising *under 80 kJ*
+    // about a day that spent exactly 80 would claim a strictness the comparison does not have.
+    expect(energyOf(1).label).toContain(String(bar));
+    expect(energyOf(1).label).toContain('per ride delivered');
+  });
+
+  it('refuses a run that measured no energy rather than reading it as a zero', () => {
+    // The `loadedDepartures` gate, inherited whole by the second optional observation. An
+    // `at-most` bar folded to zero would grade **met** on every run nobody instrumented.
+    const { workPerServedLegKJ: _absent, ...withoutEnergy } = observations();
+    const reading = readGoal(energyOf(1), withoutEnergy);
+    expect(reading.state).toBe('pending');
+    expect(reading.observed).toBeNull();
+    expect(reading.display).toBe(PENDING_DISPLAY);
+    expect(reading.progressPct).toBe(0);
+  });
+
+  it('adds no term to any other goal, which is the property § D106 rule 2 is about', () => {
+    /*
+     * *Unweighted* is not a claim a docstring can carry on its own, so it is checked: the other
+     * four readings are byte-identical across an energy figure of 1 kJ and one of 1 000 kJ, and the
+     * energy reading itself is the only thing that moves. No combined number exists to inspect,
+     * which is the point: a weighted score would show up here as one of the four moving.
+     */
+    const cheap = readGoals(goalsForDay(4), observations({ workPerServedLegKJ: 1 }));
+    const dear = readGoals(goalsForDay(4), observations({ workPerServedLegKJ: 1000 }));
+    const others = (readings: readonly { readonly goal: ShiftGoal }[]): unknown =>
+      JSON.stringify(readings.filter((entry) => entry.goal.id !== 'energy'));
+    expect(others(dear)).toBe(others(cheap));
+    expect(cheap.find((entry) => entry.goal.id === 'energy')?.state).toBe('met');
+    expect(dear.find((entry) => entry.goal.id === 'energy')?.state).toBe('missed');
+  });
+
+  it('displays the figure in the sheet’s own unit', () => {
+    const reading = readGoal(energyOf(1), observations({ workPerServedLegKJ: 62.4 }));
+    expect(reading.display).toBe('62.4 kJ');
+    expect(energyOf(1).unit).toBe(' kJ');
   });
 });

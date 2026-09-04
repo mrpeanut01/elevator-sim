@@ -141,6 +141,10 @@ const PERFECT = Object.freeze({
   abandoned: 0,
   worstWaitS: 30,
   worstWaitIsCensored: false,
+  // Under `GOAL_BARS.energyPerLegMaxKJ`, so a perfect day clears the energy bar too. Without it the
+  // fifth reading is `pending`, and `outcomeOf` treats unjudged as not passed, so the week this
+  // builds would carry no clean run and the round trip would be asserted against a blank.
+  workPerServedLegKJ: 34.7,
 });
 
 /**

@@ -251,8 +251,24 @@ export const SESSION_KEY = 'elevator-sim.session';
  *
  * The newer direction stays a refusal for the ordinary reason — § D408 again, and this is its
  * third application rather than a third rule.
+ *
+ * ## Version 8 moves for new *values* again, and it is version 5's paragraph with one bar swapped in
+ *
+ * The energy bar ([§ D367](../../../../DECISIONS.md), [§ D468](../../../../DECISIONS.md), GitHub
+ * issue #275) gives the day a fifth goal and widens two value domains inside the week's persisted
+ * readings without adding or removing a key: `ShiftGoal.reads` gains `workPerServedLegKJ` and
+ * `ShiftGoal.unit` gains ` kJ`. A version-7 build's `validate.ts` checks both against **its** closed
+ * lists, so a session written here and met by that build would be refused as *damaged*, which is the
+ * false accusation the version-3 paragraph records, where refusing it as *newer* is true. That is
+ * § D408's rule and this is its fourth application rather than a fourth rule.
+ *
+ * Reading versions 1–7 here invents nothing, on version 5's own evidence: a history whose days carry
+ * four readings is the measured state of a week played before the energy bar existed, and
+ * `wasDisplayOf` answers the em dash for a quantity yesterday never measured. Nothing supplies a
+ * stand-in energy figure for a day nobody graded one on, which matters more here than it did for the
+ * worst wait: the bar is `at-most`, so a fabricated zero would read as a day that passed it.
  */
-export const SESSION_SCHEMA_VERSION = 7;
+export const SESSION_SCHEMA_VERSION = 8;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -262,7 +278,9 @@ export const SESSION_SCHEMA_VERSION = 7;
  * and it always writes the newest; the reader is the half that meets a player who has not reloaded
  * since the last deploy.
  */
-export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5, 6, 7]);
+export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([
+  1, 2, 3, 4, 5, 6, 7, 8,
+]);
 
 /* -------------------------------------------------------------------------- *
  * What is persisted

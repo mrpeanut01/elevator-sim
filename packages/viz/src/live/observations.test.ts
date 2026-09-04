@@ -483,3 +483,74 @@ describe('loaded departures are cut at the playhead like everything else here', 
     }
   }, 300_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * The energy bar's observation. § D367, § D468, GitHub issue #275
+ * -------------------------------------------------------------------------- */
+
+describe('work per delivered leg arrives at the end of the run and not before', () => {
+  it('is undefined at every playhead short of the end, on every shipped building', () => {
+    /*
+     * The gate the whole field exists for. `workPerServedLegKJ` is a **window statistic** `core`
+     * computes once out of load-and-distance pairs the recording does not keep, so there is no
+     * instant before the run ends at which it is honestly readable. Publishing it earlier would put
+     * a figure that can only be true of a completed window onto a rail drawn at an instant, the
+     * class § D307's temporal axis was built to find, and the reason `worstWaitS` is projected from
+     * the fold rather than copied off the summary.
+     */
+    for (const id of BUILDING_IDS) {
+      const recording = recordingOf(id);
+      for (const t of sampleTimes(recording)) {
+        if (t >= recording.endedAt) continue;
+        expect(observationsAt(recording, t).workPerServedLegKJ, `${id} at ${String(t)}`).toBeUndefined();
+      }
+    }
+  }, 300_000);
+
+  it('is the sheet’s own figure, to the tenth, once the run has ended', () => {
+    /*
+     * One rounding, not two. `shift/report.ts#energyFigures` prints this with `toFixed(1)`, so a
+     * goal graded on more precision than the sheet shows could read `missed` beside a cell showing
+     * exactly the bar. This is `worstWaitS`' rule against `worstWaitFigure`, on the second figure
+     * that has one.
+     */
+    for (const id of BUILDING_IDS) {
+      const recording = recordingOf(id);
+      const observed = observationsAt(recording, recording.endedAt).workPerServedLegKJ;
+      const { energy } = recording.summary;
+      if (!energy.measured || energy.workPerServedLegKJ === null) {
+        expect(observed, id).toBeUndefined();
+        continue;
+      }
+      expect(observed, id).toBe(Math.round(energy.workPerServedLegKJ * 10) / 10);
+      expect(String(observed ?? ''), id).toBe(
+        String(Number(energy.workPerServedLegKJ.toFixed(1))),
+      );
+    }
+  }, 300_000);
+
+  it('refuses a run that recorded no travel rather than folding it to a zero', () => {
+    /*
+     * The direction that must never be free. The bar is `at-most`, so a run nobody instrumented
+     * folded to `0 kJ` would grade **met**, a pass awarded for a measurement that was never taken.
+     * `VizEnergy.measured` false is *nobody wrote down how far the cars moved*, which is not the
+     * same fact as *the cars did not move*, and only the second of those could ever pass a bar.
+     */
+    const recording = recordingOf('garden-apartments');
+    const unmeasured: VizRecording = {
+      ...recording,
+      summary: {
+        ...recording.summary,
+        energy: {
+          ...recording.summary.energy,
+          measured: false,
+          workKJ: null,
+          workPerServedLegKJ: null,
+          distanceM: null,
+          starts: null,
+        },
+      },
+    };
+    expect(observationsAt(unmeasured, unmeasured.endedAt).workPerServedLegKJ).toBeUndefined();
+  }, 300_000);
+});

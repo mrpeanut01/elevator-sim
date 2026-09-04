@@ -1076,20 +1076,28 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
       heading: 'What a shift is',
       body: Object.freeze([
         'A shift is one day in one building. Passengers arrive, cars answer, and the day is read ' +
-          'against four goals, all four every day: carry a share of the people who turned up, ' +
+          'against five goals, all five every day: carry a share of the people who turned up, ' +
           'get a share of riders away inside a minute, hold the deepest landing queue under a ' +
-          'number, and keep the worst wait inside a ceiling. The four are in tension — a group ' +
-          'that chases the shares cannot also park a car for the landing that stacks, and the ' +
-          'worst wait is the bar that slips when you serve the average rider first. That ' +
-          'tension is the day’s actual puzzle.',
-        'The bars harden as the week goes on, and then they stop. Away-inside-a-minute tops out ' +
-          'at 84 %, carried tops out at 96 %, the queue bar bottoms out at 12 people, and the ' +
-          'worst-wait ceiling bottoms out at 150 seconds. There is no losing here. There is a ' +
-          'line you are trying to bend upward.',
+          'number, keep the worst wait inside a ceiling, and hold the work the machines did per ' +
+          'ride delivered inside a ceiling too. They are in tension: a group that chases the ' +
+          'shares cannot also park a car for the landing that stacks, and the worst wait is the ' +
+          'bar that slips when you serve the average rider first. That tension is the day’s ' +
+          'actual puzzle.',
+        'The energy goal is read on its own and is never mixed into the others. It counts work ' +
+          'per ride delivered rather than work alone, so a day that spends less by carrying ' +
+          'fewer people fails it instead of winning it. There is no combined score anywhere in ' +
+          'this product, and no two dispatchers are ever ranked on energy.',
+        'The first four bars harden as the week goes on, and then they stop. Away-inside-a-minute ' +
+          'tops out at 84 %, carried tops out at 96 %, the queue bar bottoms out at 12 people, and ' +
+          'the worst-wait ceiling bottoms out at 150 seconds. The energy ceiling is 80 kJ per ride ' +
+          'delivered and it does not move at all: work per ride falls on its own as a building ' +
+          'fills up, so a ceiling that tightened nightly would be chasing a number already going ' +
+          'the right way. There is no losing here. There is a line you are trying to bend upward.',
         'Nothing is graded before the building wakes up: under 20 arrivals every goal reads a ' +
           'dash instead of a verdict, because a carried share over three riders is arithmetic ' +
-          'rather than competence. Every goal is read from counts — never from an average — so a ' +
-          'day cannot be graded on a figure the run itself declines to publish.',
+          'rather than competence. The energy goal reads a dash until the day is over, because ' +
+          'the figure behind it is only true of a finished run. No goal is read from an average, ' +
+          'so a day cannot be graded on a figure the run itself declines to publish.',
       ]),
     }),
     Object.freeze({

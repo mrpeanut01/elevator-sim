@@ -156,7 +156,40 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
     worstWaitSoFarS,
     worstWaitIsCensored,
     loadedDepartures: loadedDeparturesBy(recording, t),
+    workPerServedLegKJ: energyPerServedLegAt(recording, t),
   };
+}
+
+/**
+ * The run's work per delivered leg, or `undefined`. The energy bar's observation
+ * ([§ D468](../../../../DECISIONS.md), GitHub issue #275).
+ *
+ * Two gates and one rounding, and the first gate is the one that matters.
+ *
+ * **Before the run has ended, `undefined`.** Every other quantity this module returns is folded
+ * from the recording at `t`. This one is copied from a summary `core` computed once over the
+ * reporting window, out of load-and-distance pairs the recording does not keep, so there is no
+ * honest way to cut it at a playhead. Handing it back early would publish a figure that can only be
+ * true of a completed window on a rail drawn at an instant, which is § D307's violation class. The
+ * gate is `recording.endedAt` rather than the window's own end for a reason worth stating: the
+ * window closes two thirds of the way through the shift on seven of the eight shipped contracts,
+ * and a goal that settled there while the other four kept moving would put a finished verdict
+ * beside four running ones on the same rail.
+ *
+ * **When nothing was recorded, or nothing alighted, `undefined`.** `VizEnergy.measured` false is
+ * *nobody wrote down how far the cars moved*, and a `null` ratio is *no leg alighted in the
+ * window*. Neither is folded to `0`: the bar is `at-most`, so a zero would grade **met** on a run
+ * nobody measured, which is the one direction that must never be free.
+ *
+ * **Rounded to the tenth**, matching `shift/report.ts#energyFigures`' own `toFixed(1)`, so the goal
+ * row and the report cell cannot round one figure two ways. That is the rule `worstWaitS` keeps
+ * against `worstWaitFigure`.
+ */
+function energyPerServedLegAt(recording: VizRecording, t: SimTime): number | undefined {
+  if (t < recording.endedAt) return undefined;
+  const { energy } = recording.summary;
+  if (!energy.measured || energy.workPerServedLegKJ === null) return undefined;
+  return Math.round(energy.workPerServedLegKJ * 10) / 10;
 }
 
 /**
