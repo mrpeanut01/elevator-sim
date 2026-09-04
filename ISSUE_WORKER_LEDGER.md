@@ -1479,3 +1479,107 @@ treat it as a habit to keep rather than a guarantee to rely on.
   would have read as *CI is done* while the current head was still running, and once the sibling job
   had been **cancelled** rather than passed. Verify with `list_workflow_jobs` against the current
   head sha before acting on one.
+
+---
+
+# Wave P — 2026-09-04: seven issues closed before a single build landed
+
+**Opened at `eb5b3b6`** (= `origin/main`, wave O merged). **Open issues at the start: 71. Open pull
+requests: 0.**
+
+## P.1 The wave's subject is that the backlog was measurably staler than the tree
+
+Wave O's hand-off named the batch in order — #332, #333, then #275 and #329 — and that batch was
+dispatched. But three verification lanes went out **before** any build, and they are what the wave
+turned out to be about. **Five issues filed on 2026-09-01 and 2026-09-02 described defects the tree
+had already fixed**, in three cases within hours of filing, and nobody had closed them.
+
+| issue | filed | fixed | gap |
+|---|---|---|---|
+| **#316** the reveal goes quiet on a mixed board | 2026-09-01 17:27 | `587dee0`, same day | **7 hours** |
+| **#321** two worktree sharp edges | 2026-09-01 21:17 | `a661238`, same day | **under 2 hours** |
+| **#318** nothing checks for a duplicate heading | 2026-09-01 17:28 | `f38823c`, 2026-08-26 | **already false when filed, by 6 days** |
+| **#320** `cli` has not been reported failing | 2026-09-01 21:13 | in `vitest.config.ts`'s own body | verified by P-V1 |
+| **#315** every `garden-apartments` run is a 422 | 2026-09-01 17:27 | `leaderboard/verify.ts:111` | verified by P-V1 |
+
+**#318 is the instructive one and it is not the fastest.** Its closing claim was that the collision
+survived *because no check looks for it*. A check had looked for it for six days, found it, and
+registered it deliberately with its reason. The register worked. What was missing was anybody
+scheduled to re-read the entry — which is #329's subject arriving on an issue that is not about a
+blocker, and is the fifth instance this project has recorded.
+
+## P.2 D63 was cleared by asking a question nobody had asked
+
+The duplicate heading is gone, and not by any of the three remedies the issue or the guard proposed.
+Renumbering is forbidden by R1. Retitling does not work at all, because the number still heads two
+blocks and only a human reading the file benefits. Registering had already been done.
+
+**The first `## D63` was never a decision.** It is a sub-agent's hand-back status note, recording
+that a suite was already red before that branch touched anything, lifted into `DECISIONS.md` with
+the Phase 4 decisions that follow it. The preamble sitting **between** the two blocks still addresses
+the orchestrator who was meant to lift them, which is the paste showing through. Demoted out of the
+`## Dnnn —` shape, `D63` names one decision, `KNOWN_DUPLICATE_DECISIONS` is empty, and no citation
+broke: `runner/types.ts:744` already disambiguated itself and `docs/10:2466` cited it bare and now
+resolves uniquely. **The one ambiguous citation in the tree was closed by the heading change rather
+than by editing the citation**, which is the better outcome, since editing it would have left the
+ambiguity for the next citation to rediscover.
+
+The guard's own advice is corrected in the same commit. It offered *retitle the newer heading*, and
+that is wrong for the reason above.
+
+## P.3 The reservation mechanism caught the integrator, for the second time in four waves
+
+Appending `## D472` while lanes A and C hold D464–D471 leaves a numbering hole, and
+`documentation.test.ts` went red on exactly that. The entry was backed out and the argument moved
+into the `KNOWN_DUPLICATE_DECISIONS` docstring, which is where § D405 puts it anyway. **The
+integrator's number is allocated at integration, after the lanes' entries land**, which is what the
+process says and what this wave had to be reminded of by a test.
+
+There is a second collision, recorded in `AGENT_STATUS.md` rather than tidied: D468–D471 was
+pencilled for lane B and then dispatched to lane C. Only lane C will spend it.
+
+## P.4 Two issues combined, one umbrella split, and one product blocker found
+
+**#162 closed as a duplicate of #227**, scope transferred verbatim first. The ruling that had kept
+them apart rested on a premise *that issue's own earlier comment had already retracted*: the body
+still claimed B2 and B5 while comment one had given B2 to #167, and #167 has since closed. Same
+disease as P.1, in an issue body rather than a docstring.
+
+**#161 split and closed.** Two of five bullets verified done, two re-homed to issues that already
+existed, two residues filed as **#337** and **#338**. Two corrections to the issue's own third
+comment fell out: the weekly challenge period is **not** a § 12.1 board-key disagreement, because
+the contract scopes *one board a day* to board keys and the daily key is now the date alone; and
+bullet 5 now has **three** refusal grounds rather than two, the third being that an `answer-incident`
+would carry the answer without the thing answered and replay to a different run the server would
+verify as honest. That is worse than a refusal, so #338 asks for a ruling rather than assuming a fix.
+
+**#332 is blocked on a product decision nobody had noticed, and the map found it before the build.**
+`CLAUDE.md` makes the design handoff canonical for the interface. **The handoff specifies no sign-in
+screen**: § 4's inventory has seventeen keys and none is an account screen, § 15.1 specifies the
+signed-in half only, and the prototype's one account line is fixture copy of an already-signed-in
+state. A builder starting today would invent a screen's worth of player copy, four failure states
+included, with nothing to check it against, in a repository whose § D460 rule is that a sentence a
+surface cannot stand behind gets withdrawn rather than reworded.
+
+Two more findings from the same map. **A mailed sign-in link is redeemed onto a surface the player
+cannot see** — filed as **#336**, a live defect in the product's only credential path, broken in the
+direction that looks like nothing happening. And **the host does not notify on an account
+transition**: `everydayHostListeners` fires in one place, the last statement of `renderAll()`, and
+all thirteen account paths call `drawMenu()` instead. A screen wired to `onChange` would render once
+and never update, across a 28.7 second cold start.
+
+## P.5 What was verified rather than accepted
+
+Every closure in this wave was re-checked by the integrator against the tree before the issue moved.
+`587dee0` and `a661238` were confirmed as ancestors of `HEAD`; `f38823c` was dated with `git log -S`;
+the `reportWindow` derivation was read at `leaderboard/verify.ts:111` rather than taken from a test's
+docstring; `boardScreen.ts` was grepped for `watch` and returns zero; `data/engineering-briefs.json`
+and `packages/viz/src/briefs/` were confirmed absent.
+
+**One agent claim did not survive.** P-V2 reported that the checkout had no `node_modules` and that
+it ran `npm ci`. Both worktrees carry 95 packages matching root and `vitest` resolves in each, so
+either the claim is wrong or the reinstall was a no-op. Nothing was harmed, and it is recorded
+because a lane's account of its own environment is evidence like any other.
+
+**One agent finding was corrected.** P-D reported #161 bullet 5's residue as ground 2 alone. The code
+names three grounds and the third is the substantive one.
