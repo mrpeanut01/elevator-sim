@@ -243,11 +243,11 @@ import {
   ladderRowsOf,
   sendGateOf,
   whatAreTheFortyOf,
+  DROPPED_WITHOUT_REASON,
   LADDER_EMPTY,
   LADDER_WORLD_ABSENCE,
   REFERENCE_RUN_LABEL,
   type LadderEntry,
-  DROPPED_WITHOUT_REASON,
 } from '../gauntlet/ladder.js';
 import { proofCasesOf, type ProofCase, type ProofCaseSet } from '../gauntlet/proofCases.js';
 import {

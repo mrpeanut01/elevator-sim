@@ -280,7 +280,6 @@ export interface DroppedCaseView {
   readonly reason: string;
 }
 
-
 /** What the ladder needs from the library to draw a row, supplied by the caller. */
 export interface LadderContext {
   /** The library's current digest for a dispatcher, or `undefined` when it is gone. */
@@ -293,16 +292,6 @@ export interface LadderContext {
 function weakestCellOf(summary: RatingSummary, context: LadderContext): string {
   return summary.weakest === null ? '—' : context.caseNameOf(summary.weakest.caseId);
 }
-
-/**
- * A case that scored nothing and said nothing about why.
- *
- * `ratedCaseIssue` refuses that pair on the way out of storage and `ratedCaseOf` cannot build one,
- * so nothing in the product should reach this. It is a sentence rather than a `continue` because
- * the defect this field closes is a case leaving a denominator without a word, and closing it with
- * a branch that drops one silently would be the same defect one level down.
- */
-export const DROPPED_WITHOUT_REASON = 'this case scored nothing and the run did not say why';
 
 /*
  * **Declared here rather than beside {@link DroppedCaseView}, and the reason is an instrument
@@ -317,6 +306,16 @@ export const DROPPED_WITHOUT_REASON = 'this case scored nothing and the run did 
  * not worth reshaping somebody else's register mid-wave, so the constant sits below the split
  * instead.
  */
+
+/**
+ * A case that scored nothing and said nothing about why.
+ *
+ * `ratedCaseIssue` refuses that pair on the way out of storage and `ratedCaseOf` cannot build one,
+ * so nothing in the product should reach this. It is a sentence rather than a `continue` because
+ * the defect this field closes is a case leaving a denominator without a word, and closing it with
+ * a branch that drops one silently would be the same defect one level down.
+ */
+export const DROPPED_WITHOUT_REASON = 'this case scored nothing and the run did not say why';
 
 /**
  * The unscored cases, in the order the gauntlet ran them, named and worded.
