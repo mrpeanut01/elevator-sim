@@ -1,5 +1,5 @@
 /**
- * The database. PostgreSQL, one schema, no ORM, no migration framework.
+ * The database. PostgreSQL, one schema, no ORM, and since § D464 a versioned migration table.
  *
  * `DECISIONS.md` § D214 § 5 gives sessions a table rather than a JWT — *revocation is a `DELETE`* —
  * and § 4 gives every leaderboard entry a digest of the `data/` it was measured against, so a
@@ -42,40 +42,49 @@
  * came from. The boolean columns are real `BOOLEAN`s rather than integers holding 0 or 1, and
  * SQLite's `COLLATE NOCASE` became an index and a predicate over `LOWER(display_name)`.
  *
- * ## What § D241 removed, and what a migration would have had to do
+ * ## Migrations, and the two this file writes down without running
  *
- * `users` lost `salt_hex`, `hash_hex` and `confirmed`, and gained `display_name_chosen`. There is
- * **no migration**, because there is nothing to migrate: the deployed database has never held an
- * account — the password path was never reachable from a viewer that could not find its own API
- * (§ D243) — and this schema is applied by `CREATE TABLE IF NOT EXISTS` against an empty one.
+ * {@link MIGRATIONS} is the versioned list and {@link applyMigrations} is the runner. It exists
+ * because one of the changes below stopped being hypothetical: `entries.legs` landed on 2026-09-02
+ * as `NOT NULL` with no default, on a table a deployed database may already hold rows in, and
+ * `CREATE TABLE IF NOT EXISTS` does not add a column to a table that exists. § D464 has the ruling.
  *
- * That is a claim about a specific database and it will stop being true, so what a migration would
- * need is written down here rather than assumed away. `salt_hex` and `hash_hex` are `NOT NULL` with
- * no default, so an existing `users` table would refuse every insert this code now writes: the
- * migration is `ALTER TABLE users DROP COLUMN salt_hex, DROP COLUMN hash_hex, DROP COLUMN
- * confirmed, ADD COLUMN display_name_chosen BOOLEAN NOT NULL DEFAULT TRUE` — `TRUE` for existing
- * rows, because a name a person actually typed at registration is a chosen one and re-prompting
- * everybody would be the migration lying about them. It does **not** belong hidden in
- * {@link Store.open}; this module's own rule is that when there is something to migrate, the honest
- * thing is a versioned migration table.
+ * The other two are **still** written down rather than run, and now they have somewhere to go.
  *
- * ## What `entries`' second identity would have had to do, on the same terms
+ * **§ D241's.** `users` lost `salt_hex`, `hash_hex` and `confirmed`, and gained
+ * `display_name_chosen`. There is no migration for it, because there is nothing to migrate: the
+ * deployed database has never held an account, the password path never having been reachable from a
+ * viewer that could not find its own API (§ D243). That is a claim about a specific database and it
+ * will stop being true, so what a migration would need is written down here rather than assumed
+ * away. `salt_hex` and `hash_hex` are `NOT NULL` with no default, so an existing `users` table
+ * would refuse every insert this code now writes: the migration is `ALTER TABLE users DROP COLUMN
+ * salt_hex, DROP COLUMN hash_hex, DROP COLUMN confirmed, ADD COLUMN display_name_chosen BOOLEAN
+ * NOT NULL DEFAULT TRUE`, with `TRUE` for existing rows, because a name a person actually typed at
+ * registration is a chosen one and re-prompting everybody would be the migration lying about them.
  *
- * `config_hash` became `board_key` **and** `data_hash`, and the two hold different things rather
- * than one being a rename of the other. An existing table would need:
+ * **`entries`' second identity, on the same terms, and this one is the open question.**
+ * `config_hash` became `board_key` **and** `data_hash` on 2026-09-01, and the two hold different
+ * things rather than one being a rename of the other. An existing table would need:
  *
  * ```sql
  * ALTER TABLE entries RENAME COLUMN config_hash TO data_hash;
  * ALTER TABLE entries ADD COLUMN board_key TEXT;
  * ```
  *
- * — and then a **backfill only the application can write**, because a board key is decided from the
+ * and then a **backfill only the application can write**, because a board key is decided from the
  * run and the day's fixture (`leaderboard/boardKey.ts#placeSubmission`) and neither is a column
  * here: every old row would be replayed through `placeSubmission` from its `run_json` and the
  * fixture for its `submitted_at_ms`, and only then could `board_key` be made `NOT NULL` and the
- * unique constraint moved. There is nothing to migrate today — the deployed database has never held
- * an entry, for the reason § D243 gives about a viewer that could not find its own API — and writing
- * the steps down is the alternative to assuming that stays true.
+ * unique constraint moved. There is nothing to migrate today, the deployed database never having
+ * held an entry for the reason § D243 gives, and writing the steps down is the alternative to
+ * assuming that stays true.
+ *
+ * **It is deliberately not migration 1.** It is the older of the two changes and would sort first,
+ * and it is left unwritten because its backfill is the one shape this runner may not take: a
+ * replay inside a migration couples schema versioning to the simulation engine and makes container
+ * startup unbounded in time. A `legs` column and a renamed identity are the same class of drift and
+ * are not the same size of problem, and saying which one is answered is worth more than answering
+ * half of the second one. § D464 records that as an open item rather than a closed one.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -153,8 +162,20 @@ export interface EntryRow {
    * Here so a board row can print `21.4 s over 312 legs` rather than a bare mean — R13 clause one,
    * which `honesty/properties.ts` states as *"`n = 5` is not a caveat on `11.3 s`; it is part of
    * what `11.3 s` means"*. The row was drawing the mean alone until the honesty corpus said so.
+   *
+   * **`undefined` is a value this carries, and it means the server has no count for that row.**
+   * The column landed on 2026-09-02, after a database was already holding rows, so migration 1
+   * ({@link MIGRATIONS}) adds it nullable and writes nothing into the rows that predate it. A count
+   * the server cannot substantiate is withheld rather than replaced by a plausible one (§ D464),
+   * which is the rule `workPerServedLegKJ` already sits under beside raw energy. Every row this
+   * code *writes* carries a number, because `recordEntry` takes one and the column is `NOT NULL`
+   * in {@link SCHEMA}. The absent case is history rather than a path.
+   *
+   * **`Number(null)` is `0`, which is why {@link entryOf} does not reach for it.** A null column
+   * read through `Number` would manufacture the backfilled zero the schema comment refuses, and it
+   * would do it silently, on a row whose mean would then read as an average over no rides at all.
    */
-  readonly legs: number;
+  readonly legs: number | undefined;
   readonly submittedAtMs: number;
 }
 
@@ -298,12 +319,22 @@ export class Store {
     this.#now = options.now;
   }
 
-  /** Connect, apply the schema, hand back a usable store. Idempotent — see {@link SCHEMA}. */
+  /**
+   * Connect, bring the database up to date, hand back a usable store.
+   *
+   * **This applies migrations rather than a schema.** It used to be one `exec(SCHEMA)`, which is
+   * the same thing for an empty database and nothing at all for a database that already has the
+   * tables: `CREATE TABLE IF NOT EXISTS` does not add a column. {@link applyMigrations} carries the
+   * argument and § D464 carries the ruling.
+   *
+   * Still idempotent, and still the only way in. A store handed back before its tables exist is a
+   * store whose first query fails, which is a worse bargain than one `await`.
+   */
   static async open(options: StoreOptions): Promise<Store> {
     // No `PRAGMA foreign_keys = ON` equivalent: SQLite left references unenforced unless asked,
     // which is why that line existed. PostgreSQL always enforces them, so the guarantee the pragma
     // bought is now a property of the database rather than a line that could be deleted.
-    await options.sql.exec(SCHEMA);
+    await applyMigrations(options.sql, options.now);
     return new Store(options);
   }
 
@@ -971,17 +1002,27 @@ function entryOf(row: Record<string, unknown>): EntryRow {
       // Only quotable runs are ever stored, so this is a fact about the table rather than a column.
       awtIsValid: true,
     }),
-    legs: Number(row['legs']),
+    // `null` and absent are the two shapes a pre-migration row reaches here in, and neither may go
+    // through `Number`: it turns the first into `0` and the second into `NaN`, and `0` is the more
+    // dangerous of those because it looks like an answer. Measured against this driver rather than
+    // assumed — a column the table does not have comes back with the key missing, not as `null`.
+    legs: row['legs'] === null || row['legs'] === undefined ? undefined : Number(row['legs']),
     submittedAtMs: Number(row['submitted_at_ms']),
   });
 }
 
 /**
- * The schema, as one statement.
+ * The schema, as one statement, and **migration 0**.
  *
  * `IF NOT EXISTS` throughout, so opening an existing database is the same code path as creating
- * one. There is no migration framework because there is nothing to migrate yet; when there is, the
- * honest thing is a versioned migration table and not an `ALTER` hidden in a constructor.
+ * one. That was the whole mechanism until § D464; it is now the first entry of {@link MIGRATIONS},
+ * referenced rather than copied, so an empty database gets exactly the treatment it got before and
+ * a database that already has these tables gets the later entries it is missing.
+ *
+ * **What this block cannot do is the reason the list exists.** `CREATE TABLE IF NOT EXISTS` adds no
+ * column to a table that is already there, so every column added here after a database was created
+ * is a column that database does not have, and every `INSERT` naming it fails with `42703`. Adding
+ * a column below without adding a migration for it reintroduces exactly that.
  *
  * **Every `_ms` column is `BIGINT`, and that is not a style choice.** These hold epoch
  * milliseconds — around 1.77e12 today — and PostgreSQL's `INTEGER` tops out at 2.1e9. Declaring
@@ -1074,3 +1115,204 @@ CREATE TABLE IF NOT EXISTS challenge_entries (
 CREATE INDEX IF NOT EXISTS challenge_entries_board
   ON challenge_entries (challenge_id, data_hash, mean_awt_s);
 `;
+
+/* -------------------------------------------------------------------------- *
+ * Migrations
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The register of what has already run.
+ *
+ * Created outside the migration list and before anything reads it, because a runner whose own
+ * bookkeeping table were migration 0 could not record migration 0. `CREATE TABLE IF NOT EXISTS`
+ * makes that safe to repeat; {@link ensureRegister} says what it does about two containers doing it
+ * at the same instant.
+ *
+ * `version` is the primary key, and that is the whole of the concurrency design. See {@link
+ * applyMigrations}.
+ *
+ * **Declared after {@link SCHEMA} on purpose.** `concurrency.test-helper.ts#schemaFacts` finds the
+ * shipped schema as *the first string literal in this file containing `CREATE TABLE`*, so a second
+ * such literal placed above it would leave the whole concurrency audit reading this four-line table
+ * as the product's schema and reporting no risk anywhere. Moving this constant upwards breaks that
+ * audit silently, which is the one direction it may never fail in.
+ */
+const MIGRATIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version        INTEGER PRIMARY KEY,
+  applied_at_ms  BIGINT NOT NULL
+);
+`;
+
+/** One step, and the version that records it. */
+interface Migration {
+  /** Ascending, contiguous, and never reused. An id here is a name. */
+  readonly version: number;
+  /**
+   * What it is, so a failure names something a reader can find rather than a number.
+   *
+   * Read by {@link recordOf}'s guard rather than only by a reader of this list, which is the
+   * difference between a field and a comment. It is deliberately not in the SQL: a name in a
+   * column would be a second place the identity of a migration is written down, and the version is
+   * already the identity.
+   */
+  readonly name: string;
+  /**
+   * The SQL, with no `$1` placeholders and no parameters.
+   *
+   * Neither is an oversight. {@link applyMigrations} sends each migration through `Sql.exec`, whose
+   * whole value here is that PostgreSQL runs a multi-statement simple query as one implicit
+   * transaction. Parameters would force the extended protocol, which carries exactly one statement,
+   * and the atomicity would be gone with them.
+   */
+  readonly sql: string;
+}
+
+/**
+ * Every migration, in the order they are applied.
+ *
+ * **Migration 0 is {@link SCHEMA} itself, by reference rather than by copy.** An empty database
+ * therefore gets byte-identical treatment to the one `exec(SCHEMA)` this runner replaced, and a
+ * change to the schema cannot drift away from a transcription of it, because there is none.
+ *
+ * **Migration 1 is `entries.legs`, and it is nullable.** The column landed on 2026-09-02 as
+ * `INTEGER NOT NULL` with no default, on a table a deployed database may already have held rows in,
+ * and `CREATE TABLE IF NOT EXISTS` adds nothing to a table that exists. So on such a database every
+ * `INSERT` fails with `42703` (measured: *column "legs" of relation "entries" does not exist*) and
+ * every read maps `Number(undefined)`, which is `NaN`.
+ *
+ * What a row written before the column gets is **nothing**, and that is § D464's ruling rather than
+ * a shortcut. `BoardEntry.legs` is already `number | undefined` on the client and
+ * `everyday/boardScreen.ts` withholds the figure for a row that carries no count, so a null row
+ * keeps its rank and its name and loses a number the server cannot substantiate. The two
+ * alternatives were both refused: a zero is the backfill {@link SCHEMA}'s own comment on the column
+ * rules out, and a replay would couple schema versioning to the simulation engine and make
+ * container startup unbounded in time. This module already refuses that shape by name for
+ * `board_key`, calling it a backfill only the application can write.
+ *
+ * **`IF NOT EXISTS` on the `ALTER`, because both databases run the same list.** A database created
+ * today gets `legs` from migration 0 with its `NOT NULL` intact and migration 1 does nothing; a
+ * database created before 2026-09-02 gets it here, nullable. That difference in the *constraint* is
+ * real and survives, and `migrations.test.ts` measures it rather than leaving a reader to find it:
+ * the older database is the one that can hold a row with no count, and it is the only one that
+ * ever could.
+ */
+const MIGRATIONS: readonly Migration[] = Object.freeze([
+  Object.freeze({ version: 0, name: 'the schema as it stood', sql: SCHEMA }),
+  Object.freeze({
+    version: 1,
+    name: 'entries.legs, nullable for the rows that predate it',
+    sql: 'ALTER TABLE entries ADD COLUMN IF NOT EXISTS legs INTEGER;',
+  }),
+]);
+
+/**
+ * Bring a database up to the current version, applying exactly the migrations it is missing.
+ *
+ * ## Why the version row is written first
+ *
+ * Each migration is one `Sql.exec` whose text is the row that records it followed by the migration
+ * itself. That ordering looks backwards and is the load-bearing part.
+ *
+ * PostgreSQL executes a multi-statement simple query as a **single implicit transaction**, so the
+ * two commit together or neither does. Measured here rather than trusted: an `exec` of
+ * `INSERT …; SELECT 1/0;` against the in-process PostgreSQL leaves the table empty. That is
+ * acceptance criterion six for free, and it is the reason no explicit `BEGIN` appears. An explicit
+ * one would be worse than useless: `PgSql.query` takes a connection from a pool per call, so a
+ * `BEGIN` and its `COMMIT` would land on different connections and the transaction would silently
+ * not exist. § D361 recorded that as the trigger for giving `Sql` a real transaction seam, and this
+ * runner does not reach it, because one `exec` is one statement batch on one connection.
+ *
+ * Writing the version row first then makes `schema_migrations.version` the lock. Two containers
+ * starting at once both read the same set of applied versions and both build the same batch;
+ * PostgreSQL serialises them; the winner commits; the loser's very first statement hits the primary
+ * key, raises `23505`, and the batch rolls back **before the migration itself has run**. No
+ * advisory lock, no lease, no timeout, and nothing to leak if a container is killed mid-flight.
+ *
+ * The loser then asks whether the version is recorded now, and continues if it is. It asks rather
+ * than assuming, because a `23505` can also come out of a migration that inserts data, and
+ * swallowing that one would skip a migration that had failed. Only the SQLSTATE is read, never the
+ * constraint name: {@link isUniqueViolation} carries that rule.
+ *
+ * **What this is not tested against.** `pglite.test-helper.ts` is one session, so two openers in a
+ * test are two calls on one connection rather than two connections. That is enough to exercise the
+ * interleaving and the recovery, and it is not enough to exercise PostgreSQL's own locking. An
+ * advisory lock would have been worse on exactly this point: `pg_try_advisory_lock` returns true
+ * for a lock the same session already holds (measured), so a lock-based runner would have been
+ * untestable in this harness rather than merely partly tested.
+ *
+ * Every migration is also idempotent on its own, which is what makes a retry after a crash between
+ * the commit and the next statement harmless.
+ *
+ * **Returns nothing, deliberately.** A report of what it applied would be a second account of the
+ * same fact, and `schema_migrations` is the first one. `migrations.test.ts` reads the register,
+ * which is the state a restarting container will read too.
+ */
+async function applyMigrations(sql: Sql, now: () => number): Promise<void> {
+  await ensureRegister(sql);
+  const found = await sql.query('SELECT version FROM schema_migrations');
+  const applied = new Set(found.rows.map((row) => Number(row['version'])));
+  for (const migration of [...MIGRATIONS].sort((a, b) => a.version - b.version)) {
+    if (applied.has(migration.version)) continue;
+    try {
+      await sql.exec(`${recordOf(migration, now())}\n${migration.sql}`);
+    } catch (error) {
+      // The one error that means somebody else did this. Anything else, including a `23505` from
+      // the migration's own statements, is a migration that failed and must stay unrecorded.
+      if (isUniqueViolation(error) && (await isRecorded(sql, migration.version))) continue;
+      throw error;
+    }
+  }
+}
+
+/**
+ * The statement that claims a version.
+ *
+ * Both values are interpolated rather than bound, for {@link Migration.sql}'s reason: a parameter
+ * would move this off the simple query protocol and take the batch's atomicity with it. Both are
+ * numbers this module owns, and both are checked to be safe integers before they are printed, so
+ * the interpolation cannot become an injection and a fractional clock cannot become a `BIGINT` the
+ * database refuses.
+ */
+function recordOf(migration: Migration, atMs: number): string {
+  const applied = Math.trunc(atMs);
+  if (!Number.isSafeInteger(migration.version) || !Number.isSafeInteger(applied)) {
+    throw new Error(
+      `migrations: ${migration.name} (version ${String(migration.version)}) has a version or a clock ` +
+        `reading ${String(atMs)} that is not a safe integer. These are printed into SQL rather than ` +
+        'bound to it, so they have to be numbers.',
+    );
+  }
+  return `INSERT INTO schema_migrations (version, applied_at_ms) VALUES (${String(migration.version)}, ${String(applied)});`;
+}
+
+/**
+ * Make sure the register exists, tolerating a concurrent creator.
+ *
+ * `CREATE TABLE IF NOT EXISTS` is not atomic against another session doing the same thing:
+ * PostgreSQL checks the catalog and then inserts into it, and two containers starting together can
+ * leave one holding a unique violation on a catalog index rather than a quiet no-op. The question
+ * this call is asking is only *is the table there*, so it is asked again on failure and the error is
+ * rethrown when the answer is no.
+ *
+ * **Both branches are covered, and what is not covered is said rather than implied.**
+ * `migrations.test.ts` reaches them through the {@link Sql} seam by making this one `exec` raise,
+ * once with the table already there and once without, so neither the recovery nor the rethrow is
+ * argued for in prose alone. What no test here reproduces is PostgreSQL actually racing itself:
+ * `pglite.test-helper.ts` is one session, so the collision is injected rather than provoked.
+ */
+async function ensureRegister(sql: Sql): Promise<void> {
+  try {
+    await sql.exec(MIGRATIONS_TABLE);
+  } catch (error) {
+    const present = await sql.query(`SELECT to_regclass('schema_migrations') AS present`);
+    const value = present.rows[0]?.['present'];
+    if (value === null || value === undefined) throw error;
+  }
+}
+
+/** Whether a version is in the register. Asked after a collision, never instead of one. */
+async function isRecorded(sql: Sql, version: number): Promise<boolean> {
+  const found = await sql.query('SELECT version FROM schema_migrations WHERE version = $1', [version]);
+  return found.rows.length > 0;
+}
