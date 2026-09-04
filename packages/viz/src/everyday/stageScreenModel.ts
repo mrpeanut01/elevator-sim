@@ -559,8 +559,18 @@ function secondsWord(seconds: number): string {
  * obliged to read is not a retraction, so the words carry it and not the colour.
  */
 export const STAGE_GOALS_COPY = Object.freeze({
-  /** The strip's eyebrow. The brief and the report use the same phrase for the same five bars. */
-  heading: 'what today asks',
+  /**
+   * The strip's eyebrow, and **the brief's own phrase rather than a third one**.
+   * `everyday/briefView.ts` heads the same five bars `WHAT TODAY ASKS` before the run and
+   * `everyday/campaignModel.ts` does it again on the tower card, so a stage that invented a
+   * synonym would give one thing three names on three screens a player walks between.
+   *
+   * It is a third **literal** all the same, and that is worth saying rather than glossing: neither
+   * of the other two is an exported constant, so there is nothing here to import. Extracting one
+   * means editing both of those files, which is a wider change than this issue owns. Named here so
+   * the next lane in `everyday/` can take it rather than discovering it.
+   */
+  heading: 'WHAT TODAY ASKS',
   /** Under the rows while the playhead is short of the run's end. */
   reading:
     'these are readings at the clock above, not results · no goal is judged until the day ends',
@@ -576,7 +586,11 @@ export interface StageGoalRow {
   readonly label: string;
   /** The figure at the playhead, or the em dash when the reading is ungraded. */
   readonly value: string;
-  /** Last night's figure for the same quantity, or the bare em dash. `goalRowsOf`'s slot. */
+  /**
+   * `goalRowsOf`'s own slot: `was 78%` for the building's previous day, or the **bare** em dash
+   * when there is no previous day to quote. The word is printed only when there is a figure to
+   * attribute to it, because `was —` would dress an absence as a measurement.
+   */
   readonly was: string;
   /** `✓`, `×` or `·`. Always `·` while the run is unfinished — see {@link stageGoalsOf}. */
   readonly glyph: string;

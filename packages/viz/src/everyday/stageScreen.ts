@@ -1248,7 +1248,7 @@ function mountStage(
     nextPhase.style.display = head.next === undefined ? 'none' : '';
     drivingName.textContent = watching?.dispatcherName ?? head.driverName;
     drawFigures(head.figures);
-    drawGoals(recording, simTimeS);
+    drawGoals(recording, simTimeS, watching);
     drawWatching(watching);
 
     const alarmLine = stageAlarmOf(observations, labelOf);
@@ -1383,7 +1383,24 @@ function mountStage(
    * either way — the glyph and the value both say what the colour says, and a run short of its end
    * draws `·` on every row.
    */
-  function drawGoals(recording: VizRecording, simTimeS: number): void {
+  function drawGoals(
+    recording: VizRecording,
+    simTimeS: number,
+    watching: WatchingView | undefined,
+  ): void {
+    /*
+     * **Down while watching**, on § 14.1's own ground: *"a spectator who could intervene would be
+     * playing, not watching"*, and a spectator whose screen graded the record against **their** day
+     * would be doing the reading half of the same thing. The bars are the player's week — they
+     * harden with `WeekState.day` — and the run on the stage belongs to somebody else, so a strip
+     * headed *what today asks* over it is a claim about a day that is not the one being watched.
+     * The record's own posted result is drawn instead, by {@link drawWatching}, with the note that
+     * says which figures are which.
+     */
+    if (watching !== undefined) {
+      goals.style.display = 'none';
+      return;
+    }
     const week = host.week();
     const strip = stageGoalsOf({
       readings: host.goalsAt(simTimeS),

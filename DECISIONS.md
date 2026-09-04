@@ -31256,6 +31256,13 @@ wants the verdict later.
 header: an empty strip of five ungraded rows before the first press is a control saying nothing, and
 the brief is where the bars are read before a run.
 
+**And down on a watched stage**, which is § 14.1's rule rather than a second one. The bars are the
+player's week and harden with `WeekState.day`; the run on a watched stage is a record somebody else
+made. A strip headed *what today asks* over it grades another player's run against this player's
+ladder, which is the reading half of the thing § 14.1 already refuses on the intervention rows
+(*"a spectator who could intervene would be playing, not watching"*). The record's own posted result
+is what that screen draws instead, with `watch/view.ts`'s note saying which figures are which.
+
 **AC5 is not discharged here.** `docs/22-charter.md` § 2's P3 sentence and `MULTI_AGENT_PLAN.md` § 1
 goal 4 both cite the closed #212 and both need re-adjudicating against what has landed. Those are
 coordination documents this lane may not write, so the re-adjudication is owed and is named here

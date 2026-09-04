@@ -8996,9 +8996,15 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         });
         seeds.push({
           field: `stage(@${stamp}s).goals.note`,
-          /* The panel's own retraction while the shift is unfinished — § D293's shape. */
           text: strip.note,
-          role: 'reason',
+          /*
+           * A `reason` only while it *is* one. The ungraded arm is the panel's own retraction —
+           * § D293's shape, and the role R3 and the temporal property exempt for that reason. The
+           * graded arm is not a refusal and is not declared as one: it says the day has run out
+           * and the rows above it are what the report grades, which is ordinary prose and is
+           * checked as such.
+           */
+          role: strip.judged ? 'prose' : 'reason',
           playhead: atPlayhead(recording, at),
         });
         for (const row of strip.rows) {

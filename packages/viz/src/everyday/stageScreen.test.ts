@@ -214,6 +214,19 @@ describe('what the goal strip is read at', () => {
   });
 
   /**
+   * **Not over somebody else's day** — § 14.1.
+   *
+   * The bars are the player's week and harden with `WeekState.day`; the run on a watched stage is
+   * a record somebody else made. A strip headed *what today asks* over it grades another player's
+   * run against this player's ladder, which is the reading half of the thing § 14.1 already refuses
+   * on the intervention rows. The record's own posted result is what that screen draws instead.
+   */
+  it('is down while the stage is showing somebody else’s run', () => {
+    expect(source).toContain('if (watching !== undefined) {');
+    expect(source).toContain('drawGoals(recording, simTimeS, watching);');
+  });
+
+  /**
    * The run's own last instant, never a constant and never the reporting window's end.
    *
    * § D371's gate is *the playhead reaches `endedAt`*, and `live/observations.ts#energyPerServedLegAt`
