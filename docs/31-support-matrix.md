@@ -452,25 +452,35 @@ with an exemption.** `ci.yml` refused a per-leg exemption for exactly this reaso
 
 ## 5. The accessibility intersection
 
-Issue **#204** writes the accessibility standard. **This section does not write it**, and a reader
-looking for the standard should stop here and read that document when it exists. What belongs in a
-*support matrix* is narrower: which assistive configurations are part of the supported set, on which
-tier, and with which instrument — because a screen reader and an OS zoom level are as much a platform
-as an operating system is.
+Issue **#204** wrote the accessibility standard, and it is
+[`36-accessibility-standard.md`](36-accessibility-standard.md), adopted 2026-09-04. **This section
+does not write it**, and a reader looking for the standard should stop here and read that document.
+What belongs in a *support matrix* is narrower: which assistive configurations are part of the
+supported set, on which tier, and with which instrument — because a screen reader and an OS zoom
+level are as much a platform as an operating system is.
+
+`docs/36` adopts this section's tiering vocabulary unamended and its § 7 applies it to all seventeen
+clauses of the standard, which is where a reader wanting *how strong is this claim* should go. The
+table below is kept as the platform-side view, and the two rows this section could not settle now
+name the clause that settles them.
 
 **The matrix commits to four rows and defers the fifth entirely.**
 
 | | Commitment | Tier | Instrument today |
 |---|---|---|---|
-| **OS / browser zoom** | The product lays out without horizontal overflow and without clipped text at **200 % browser zoom** at the 1280 px tier-1 viewport | Supported, tested — **once #240's viewport gates exist** | None yet. This is nearly free once they do: 200 % zoom at 1280 is geometrically the 640 px layout, so it rides on the same gates rather than needing its own device |
+| **OS / browser zoom** | The product lays out without horizontal overflow and without clipped text at **200 % browser zoom** at the 1280 px tier-1 viewport | Supported, tested — **once #240's viewport gates exist** | **The gates now exist and drive no zoom level.** `everyday/viewportGates.browser.test.ts` drives 360 × 800 and 1280 × 800 and contains neither `zoom` nor `deviceScaleFactor`, so this row's precondition is met and its instrument is still missing. `docs/36` § 6.3 calls it the cheapest row in the standard to close, on this row's own reasoning: 200 % zoom at 1280 is geometrically the 640 px layout, so it rides the gates rather than needing a device |
 | **`prefers-reduced-motion`** | Already honoured, and already tested | **Tier 1 today** | `packages/viz/UX.md` `KB-14`, `packages/viz/src/dev/motion.ts`, `motion.test.ts` — the decision was moved out of `main.ts` specifically so it could be asserted without an OS that has the preference set. **This is the model for every row in this table** |
 | **Keyboard-only operation** | Every control reachable and operable without a pointer | **Best effort** — asserted in places, never swept | `keyboard.browser.test.ts` and `UX.md`'s `KB-` rows cover named journeys. Nothing enumerates the surface, so this is a claim about the parts somebody checked |
-| **Screen readers** (VoiceOver, NVDA, JAWS, Orca) | **Best effort, and named as untested.** No screen reader has ever been pointed at this product, on any platform | Best effort | **None**, and none is cheap: a screen reader is a real assistive stack, not an emulation. Playwright can assert the *accessibility tree* — roles, names, states — which is a genuine and affordable instrument, and it is not the same claim as *a screen-reader user can complete a journey*. #204 decides which of the two the project promises |
-| **`prefers-contrast`, forced-colors, high-contrast modes** | Deferred to #204 entirely | Unspecified | `noteContrast.browser.test.ts` measures contrast ratios of drawn notes; nothing reads a contrast preference |
+| **Screen readers** (VoiceOver, NVDA, JAWS, Orca) | **Best effort, and named as untested.** No screen reader has ever been pointed at this product, on any platform | Best effort | **None**, and none is cheap: a screen reader is a real assistive stack, not an emulation. Playwright can assert the *accessibility tree* — roles, names, states — which is a genuine and affordable instrument, and it is not the same claim as *a screen-reader user can complete a journey*. **`docs/36` § 6.7 decides it: the project commits to the first and treats the second as a tier-3 claim** until a walkthrough is recorded with its date, its reader and its platform. This row's *no record exists* is repeated there and nothing is added to it, because absence of a record is not evidence of absence |
+| **`prefers-contrast`, forced-colors, high-contrast modes** | **`docs/36` `AX-14`**: honoured, or declared unread in the tree. Undeclared today, which is the state the clause refuses | Tier 3, **undeclared** | `noteContrast.browser.test.ts` measures contrast ratios of drawn notes; nothing reads a contrast preference. `docs/36` § 6.4 adds the finding this row could not have: two docstrings already reason about `prefers-contrast` and both cite *"this project's own accessibility ledger"*, which has never existed |
 
 **The one thing this document asserts about accessibility that #204 may not weaken:** whatever
 standard #204 writes, **a row in it that no instrument checks is a tier-3 claim and must be labelled
-one.** That is not this document colonising #204's scope — it is the same rule §§ 1 and 4 apply to
+one.** `docs/36` § 0.1 adopts that sentence without amendment and § 7 applies it, which produces the
+uncomfortable result the rule exists to produce: **no clause of the standard is wholly tier 1**, and
+every clause that has an instrument has it on the Engineer shell alone.
+
+That is not this document colonising #204's scope — it is the same rule §§ 1 and 4 apply to
 browsers, applied to the same table, and it is [`../CLAUDE.md`](../CLAUDE.md)'s standing requirement
 in its accessibility form: name the non-test caller, or say there isn't one.
 
