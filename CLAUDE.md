@@ -84,29 +84,41 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **582 957** | **606** | **56** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **727 153** | **4 710** | **57** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **583 006** | **606** | **56** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **727 213** | **4 710** | **57** | **0** | **green**, and the register is empty |
 
-  **Wave R's move is nineteen strings a case in both tiers, and it is the first time two lanes have
-  each forecast their own contribution and both been exactly right** ([§ D487](DECISIONS.md)).
-  Measured on the integrated tree after wave R, both tiers in one sitting, with the base at
-  `3bad770` re-measured first in a detached worktree — where it reproduced its published row
-  **exactly in both tiers**, the **eighth** consecutive wave that has held.
+  **Wave R's move is twenty strings a case in both tiers, three lanes each forecast their own share,
+  and all three were exact** ([§ D487](DECISIONS.md)). Measured on the integrated tree after wave R,
+  both tiers in one sitting, with the base at `3bad770` re-measured first in a detached worktree —
+  where it reproduced its published row **exactly in both tiers**, the **eighth** consecutive wave
+  that has held.
 
   | | base `3bad770` | wave R | move | per case |
   |---|---|---|---|---|
-  | always-on strings | 582 026 | **582 957** | **+931** | **19.0** |
-  | deep strings | 726 013 | **727 153** | **+1 140** | **19.0** |
+  | always-on strings | 582 026 | **583 006** | **+980** | **20.0** |
+  | deep strings | 726 013 | **727 213** | **+1 200** | **20.0** |
   | surfaces | 55 / 56 | **56 / 57** | **+1 / +1** | — |
   | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
 
-  **The nineteen decomposes into two lane forecasts published before the measurement, and both were
-  exact.** Lane A forecast **7 a case** in both tiers for a new sign-in notice surface — a label over
-  three stages, a pointer and a dismiss over two settled states — and lane D forecast **12 a case**
-  for the race strip's six arms × (verdict + note), net of one string it deleted. 7 + 12 = 19, and
-  the tree reads 19.0 in both tiers. § D454 recorded four forecasts short by one string a case and
-  § D457 recorded one that predicted motion where the answer was zero; this is the second wave to
-  score a forecast exactly, and the first where **two independent lanes** did.
+  **The twenty decomposes into three lane forecasts published before the measurement, and every one
+  was exact.** Lane A forecast **7 a case** in both tiers for a new sign-in notice surface — a label
+  over three stages, a pointer and a dismiss over two settled states. Lane D forecast **12 a case**
+  for the race strip's six arms × (verdict + note), net of one string it deleted. The fix lane
+  forecast **1 a case**: a constant moving between two adapters that both already speak, plus a new
+  seventh arm whose verdict is `''` and is filtered. 7 + 12 + 1 = 20, and the tree reads 20.0 in both
+  tiers. § D454 recorded four forecasts short by one string a case and § D457 recorded one that
+  predicted motion where the answer was zero; this is the first wave in which **every** lane that
+  forecast was right.
+
+  **This row was published at nineteen first, and the correction is the more useful half.** § D487's
+  measurement was taken on a tree that was green in four projects and **red in the browser tier**,
+  which the integrator had not yet run. A fifth lane then landed to fix it, moved one string a case,
+  and the row had to be re-measured. Nothing about 582 957 was wrong — it was correct for the tree it
+  was taken on, which is this file's oldest lesson about this row arriving on the integrator instead
+  of a lane. What was wrong was the judgement that **integration was complete**. § D343 says the
+  measurement is taken once, after integration; it does not say who decides when integration has
+  happened, and the honest rule is now written down: **not until the full suite is green in every
+  project.**
 
   **A coincidence worth naming so nobody reads it as a copied row.** Wave O's move was *also* +931
   and +1 140, also 19.0 a case in both tiers ([§ D461](DECISIONS.md)). Different lanes, different

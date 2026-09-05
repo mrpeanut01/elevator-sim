@@ -32467,7 +32467,7 @@ to the same id with different rows is a different board is a question for whoeve
 
 ---
 
-## D487 — wave R's corpus move is nineteen a case, and two lanes forecast it exactly
+## D487 — wave R's corpus move is twenty a case, and three lanes forecast it exactly
 
 **Date: 2026-09-05 · Owner: the integrator, wave R · Discharges § D343's measurement obligation for
 this wave.**
@@ -32479,26 +32479,49 @@ consecutive wave the base has been confirmed rather than trusted.
 
 | | base `3bad770` | wave R | move | per case |
 |---|---|---|---|---|
-| always-on strings | 582 026 | **582 957** | **+931** | **19.0** |
-| deep strings | 726 013 | **727 153** | **+1 140** | **19.0** |
+| always-on strings | 582 026 | **583 006** | **+980** | **20.0** |
+| deep strings | 726 013 | **727 213** | **+1 200** | **20.0** |
 | surfaces | 55 / 56 | **56 / 57** | **+1 / +1** | — |
 | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
 
-**Two lanes each published a decomposed per-case forecast before the measurement and both were
+**CORRECTED IN PLACE. This entry first published +931 / +1 140 and nineteen a case, and the
+correction is worth more than the figure.** Those numbers were measured on a tree that was green in
+four vitest projects and **red in the browser tier**, which the integrator had not yet run. A fifth
+lane then landed to fix four failures — three of them one real defect, a spectator being offered a
+race against somebody else's crowd — moved one string a case, and this row had to be re-taken.
+
+Nothing about 582 957 was wrong. It was correct for the tree it was measured on, which is this
+column's oldest lesson (§ D334: three lanes, three bases, three correct answers, none of them
+correct after integration) **arriving on the integrator rather than on a lane**. What was wrong was
+the judgement that *integration was complete*.
+
+§ D343 says the measurement is taken once, after integration, never per branch. It does not say who
+decides when integration has happened. **It does now: not until the full suite is green in every
+project.** A wave is not integrated because its lanes have merged; it is integrated when the tree
+they produce passes.
+
+**Three lanes each published a decomposed per-case forecast before the measurement and every one was
 exact.** Lane A forecast **7 a case** in both tiers — a label over three stages, a pointer and a
 dismiss over two settled states, with the outcome sentence deliberately unseeded because it is the
 server's or the client's. Lane D forecast **12 a case** — the race strip's six arms × (verdict +
-note), net of one deleted string. 7 + 12 = 19, and the tree reads 19.0 in both tiers.
+note), net of one deleted string. The fix lane forecast **1 a case** — a constant moving between two
+adapters that both already speak, minus one seed and plus two, with the new arm's `verdict` at `''`
+and filtered by `surfaces.ts`'s empty-text rule. 7 + 12 + 1 = 20, and the tree reads 20.0 in both
+tiers.
 
-This column has now scored three forecasts. § D454's four lanes summed short by exactly one string a
+This column has now scored five forecasts, three of them in this wave. § D454's four lanes summed short by exactly one string a
 case, in both tiers, and the lane responsible was never localised. § D457's predicted motion where
 the answer was zero, which is the worse direction because a forecast expecting movement reads a
-correct zero as a failed measurement. **This is the first time two independent lanes were each right
-about their own contribution**, and it is worth more than one lane being right, because it says the
-per-case decomposition is a real instrument rather than a lucky total.
+correct zero as a failed measurement. **This is the first wave in which every lane that forecast was
+right**, and it is worth more than one lane being right, because it says the per-case decomposition
+is a real instrument rather than a lucky total. It also survived a correction: the three forecasts
+were made against three different trees and still sum to the figure measured on the last one.
 
-**A coincidence, named so the next reader does not take it for a copied row.** Wave O's move
-([§ D461](DECISIONS.md)) was *also* +931 and +1 140, also 19.0 a case in both tiers. Different lanes,
+**A coincidence, named so the next reader does not take it for a copied row — and it is now a
+coincidence with the *superseded* figure, which is stranger.** Wave O's move
+([§ D461](DECISIONS.md)) was +931 and +1 140, 19.0 a case in both tiers: exactly what this entry
+published before the correction above, and exactly what wave R would have moved had its browser tier
+not been red. Different lanes,
 different surfaces, different causes: wave O's nineteen was fourteen board-screen states plus five
 `BOARD_SCREEN_COPY` keys; wave R's is seven notice strings plus twelve race-strip ones. Two waves
 landing on the same integer is arithmetic. Recording it is cheaper than the investigation the
