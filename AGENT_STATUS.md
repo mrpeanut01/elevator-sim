@@ -1319,11 +1319,24 @@ of another issue's item), and two stale symbol citations. **Every one was found 
 GitHub issue.** None by CI.
 
 **3. The guards caught the integrator twice, and the second time in the sentence explaining the
-guard.** `citations.test.ts` went red on a `§ D387` written into the comment that says the charter
-row must be reconciled. D387 is a registered hole; a hole heads nothing. **Wave R's ledger records
-that its own paragraph explaining this rule made the identical mistake**, and this integrator had
-read that note. Fourth consecutive wave, same slip, same place — which is the argument for the guard
-rather than an embarrassment.
+guard.** `citations.test.ts` went red on a section-form reference to D387 written into the comment
+that says the charter row must be reconciled. D387 is a **registered hole**; a hole heads nothing.
+**Wave R's ledger records that its own paragraph explaining this rule made the identical mistake**,
+and this integrator had read that note.
+
+**And then this paragraph made it a fifth time, which is the finding rather than the anecdote.** The
+sentence above originally quoted the offending token in the very form it warns against, and CI caught
+it on `c0a1bba` — so the same slip happened **twice inside one wave**, the second time in the
+sentence recording the first. It cannot be written safely even to be described, which is why the
+reference here is spelled out in words instead.
+
+The lesson is not *be careful*. Four consecutive waves and two authors have now been careful and
+failed, so care is measurably not the mechanism: **the guard is.** What actually went wrong on the
+second instance is smaller and fixable — a documentation-only commit was pushed **without re-running
+the two validation files that read documentation**, which `CLAUDE.md`'s own note about `paths-ignore`
+warns is exactly the case where a markdown change can legitimately fail a suite. Re-run
+`validation/citations.test.ts` and `validation/documentation.test.ts` after **any** commit that
+touches a root register, including the one that closes the wave.
 
 **4. The reservation was opened four lanes late**, which is wave Q's error repeated by the wave that
 quotes it. Nothing was lost, and that was luck rather than process.
