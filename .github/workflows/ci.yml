@@ -239,15 +239,27 @@ jobs:
       # `Failed to resolve import` and draws nothing — measured while reproducing #142, where it
       # turned 8 real failures into 14 misleading ones.
       - name: Install the Chromium the browser tier drives
-        # Only the browser leg needs it, and only that leg pays the 20 s. The tier's rule is
-        # unchanged and unconditional WITHIN its leg: a gated tier that would skip is a red run,
-        # held by `packages/viz/src/dev/browserTier.test.ts`. What moved is which job runs it, not
-        # whether anything does.
-        if: matrix.browser
+        # **Every leg, not only the browser one, and the first version of this file got that wrong.**
+        #
+        # `packages/viz/src/dev/browserTier.test.ts` lives in the `viz` project and its whole purpose
+        # is to fail a CI run in which the browser tier WOULD skip. Gating this step on
+        # `matrix.browser` left the `viz` leg running that assertion with no Chromium on the machine,
+        # and it fired exactly as written: *"this is CI and the browser tier would skip: viz-browser
+        # (36 files)"*. 217 files passed and that one turned the leg red.
+        #
+        # The guard says what to do about it in its own failure text — *"if that step was removed,
+        # restore it rather than relaxing this check"* — so the step is restored on every leg rather
+        # than the check being scoped to the leg that happens to select the tier. Twenty seconds a
+        # leg, about eighty seconds of runner time in total, to keep a guard that has already earned
+        # its keep once: GitHub issue #142 is thirty-eight cases that skipped in both places they
+        # could have run, and a skip is indistinguishable from a pass in the summary line.
+        #
+        # Recorded rather than quietly patched, because it is the split's first real finding: cutting
+        # one job into five cut a precondition the single job satisfied for everything at once.
         run: npx playwright-core install --with-deps chromium
 
       - name: Point the browser tier at it
-        if: matrix.browser
+        # Also every leg, for the reason above: the variable is what `browserTier.test.ts` reads.
         run: |
           shell="$(node --input-type=module -e "import { chromium } from 'playwright-core'; process.stdout.write(chromium.executablePath());")"
           if [ ! -x "$shell" ]; then
