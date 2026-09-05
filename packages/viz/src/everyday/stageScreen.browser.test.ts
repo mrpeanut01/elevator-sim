@@ -1311,12 +1311,32 @@ describe.skipIf(!HAS_BROWSER)('the § 7.4 race — issue #226', () => {
     const verdict = (await page.textContent('.everyday-stage-verdict')) ?? '';
     expect(verdict).not.toMatch(/better|worse|wins|beat|proof/iu);
 
-    /* And back: *nobody* takes the second line off, or the strip keeps a rival nobody asked for. */
+    /*
+     * And back: *nobody* takes the second line off, or the strip keeps a rival nobody asked for.
+     *
+     * **All three clauses are in the predicate rather than asserted off the snapshot**, and that is
+     * a strengthening rather than a convenience. `untilRace` returns the first snapshot on which
+     * its predicate holds; waiting on `rivalId === null` alone and then reading `ghostPoints` off
+     * that snapshot asserts a property of a frame chosen by a *different* condition. The rival id
+     * and the drawn points are cleared by the same redraw, so under load the id can be observed
+     * cleared a frame before the points are — which is exactly what happened on the integrated
+     * tree, where this case failed beside two corpus measurements and passed alone. Requiring the
+     * three to hold **together on one frame** is the real product property and it is the stronger
+     * claim: before, only the id had to be observed at all.
+     */
     await page.selectOption('.everyday-stage-ghost', 'none');
-    const cleared = await untilRace(page, (facts) => facts.rivalId === null, 30_000);
-    expect(cleared.held, `the rival outlived the pick: ${JSON.stringify(cleared.last)}`).toBe(true);
-    expect(cleared.last?.ghostPoints.every((points) => points === '')).toBe(true);
-    expect(cleared.last?.keyText).toBe('');
+    const cleared = await untilRace(
+      page,
+      (facts) =>
+        facts.rivalId === null &&
+        facts.ghostPoints.every((points) => points === '') &&
+        facts.keyText === '',
+      30_000,
+    );
+    expect(
+      cleared.held,
+      `the rival outlived the pick, or its line and key did not clear with it: ${JSON.stringify(cleared.last)}`,
+    ).toBe(true);
     await page.close();
   }, 300_000);
 
