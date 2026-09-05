@@ -338,6 +338,13 @@ function hostBindingsFor(view: AgreementView): EverydayHostBindings {
     openRunTab: refuse('open a tab'),
     applyPatch: refuse('patch the state'),
     /*
+     * § 7.4's rival splits the same way the six above do: the **read** answers the true state of a
+     * harness that has raced nobody, and the **press** refuses, because commissioning a second
+     * simulation is exactly the *quietly ran the day* this stub exists to make impossible.
+     */
+    ghostRace: () => ({ pick: 'none', rival: undefined, refusal: undefined, pending: false }),
+    raceAgainst: refuse('race a rival'),
+    /*
      * § 14.1's five presses refuse on the same ground as the four above — GitHub issue #182. The
      * sixth is a **read** and answers `undefined`: this harness renders one state, and no state it
      * is given is a spectator's, so *nobody is being watched* is the true answer rather than a stub.

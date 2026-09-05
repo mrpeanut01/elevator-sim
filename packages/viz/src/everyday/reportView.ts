@@ -39,10 +39,16 @@
  * The report's fixed order is head and lede · four figures · three beats · three levers · the
  * closing honesty block · what changed overnight · one button into tomorrow. Every one of those is
  * here. What is not is § 6.5's *"You finished level with the world's middle run on the same
- * crowd"* — the comparison is against a **ghost**, and this build runs no ghost
- * (`briefView.ts#GHOST_REFUSAL` carries the evidence). So the closing block keeps the half that is
- * about this run — the sheet's own small print, which says in more words what *inside the noise*
- * means — and does not manufacture an opponent to be level with.
+ * crowd"*, and the reason has narrowed rather than gone away. This build **does** run a ghost now
+ * (GitHub issue #226, § D482) — § 7's stage races the plain baseline or your latest saved over the
+ * same crowd, live, on two lines. What it has never had is *the world's middle*: no run in this
+ * build is posted anywhere, so there is no distribution to take a middle of, and the arm is omitted
+ * from the picker rather than stubbed (`live/raceStrip.ts#GHOST_OPTIONS`; the missing capability is
+ * GitHub issue #327). A sheet is also the wrong place for the race even where one ran — it is a
+ * **filed** account of one day, and the ghost's verdict is a live reading at a playhead that the
+ * strip refuses to state as proof. So the closing block keeps the half that is about this run — the
+ * sheet's own small print, which says in more words what *inside the noise* means — and does not
+ * manufacture an opponent to be level with.
  *
  * ## That closing block is layered rather than cut — GitHub issue #211
  *

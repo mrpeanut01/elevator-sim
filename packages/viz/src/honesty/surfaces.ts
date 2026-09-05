@@ -106,7 +106,7 @@ import {
   workshopLeversOf,
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
-import { briefBarModel, briefScreenViewOf, GHOST_REFUSAL, lockedForScore } from '../everyday/briefView.js';
+import { briefBarModel, briefScreenViewOf, lockedForScore, raceAgainstCard } from '../everyday/briefView.js';
 import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import {
@@ -173,10 +173,11 @@ import {
   STAGE_AWAITING_RUN,
   STAGE_GOALS_COPY,
   STAGE_INTERVENTIONS,
-  STAGE_NO_GHOST,
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  STAGE_RACE_PICKER_LABEL,
+  STAGE_RACE_WATCHING,
   STAGE_SWITCH_PICKER_LABEL,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
@@ -276,8 +277,10 @@ import {
   GHOST_OPTIONS,
   RACE_NOT_RUN,
   RACE_PENDING,
+  raceSlotsOf,
   raceStripViewOf,
   raceVerdictOf,
+  type RaceSlots,
 } from '../live/raceStrip.js';
 import { DAY_HAS_NO_RECORD, refusalForDay } from '../watch/library.js';
 import { recordUnreadableReason } from '../watch/record.js';
@@ -299,7 +302,7 @@ import { overlayViewOf } from '../render/overlay.js';
 import { describePreview, drawPreview } from '../render/preview.js';
 import { NO_SHEET_YET, reportCardOf, type CardRecipe } from '../render/reportCard.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
-import { ghostPlanOf } from '../dev/ghostRun.js';
+import { ghostPlanOf, NO_SAVED_DISPATCHER } from '../dev/ghostRun.js';
 import { initialState, shiftRunConfigOf, tomorrowFactsOf } from '../dev/state.js';
 import { tomorrowBriefingOf } from '../shift/tomorrow.js';
 import { describeQueue, planQueueRow } from '../render/riderQueue.js';
@@ -6909,10 +6912,12 @@ const RACE_STRIP: SurfaceAdapter = {
     'live/raceStrip.ts#GHOST_OPTIONS',
     'live/raceStrip.ts#RACE_FOOTER',
     'live/raceStrip.ts#SAME_CROWD_NOTE',
+    'live/raceStrip.ts#SAME_RUN_NOTE',
     'live/raceStrip.ts#RACE_PENDING',
     'live/raceStrip.ts#RACE_NOT_RUN',
     'live/raceStrip.ts#raceVerdictOf',
     'live/raceStrip.ts#raceStripViewOf',
+    'live/raceStrip.ts#raceSlotsOf',
     'dev/ghostRun.ts#NO_SAVED_DISPATCHER',
     'dev/ghostRun.ts#ghostPlanOf',
   ],
@@ -6946,6 +6951,102 @@ const RACE_STRIP: SurfaceAdapter = {
         playhead: atPlayhead(recording, at),
       });
     }
+
+    /*
+     * **The slots, driven through the shipped composition** — GitHub issue #226, § D482.
+     *
+     * `raceSlotsOf` decides three cells for both shells, in an order that is a claim rather than a
+     * formatting choice, and three of its arms are reachable through no other seed here: a refused
+     * pick, a pick whose rival is still in the worker, and a pick whose rival came back **identical
+     * to the primary's own day**. That last one is the state a corpus would otherwise never see —
+     * it needs two recordings that agree, and the honest way to produce one is to hand the same
+     * recording in twice, which is exactly what the state describes.
+     *
+     * **Seeded once each, at the run's end, and deliberately not per sample.** Four of the six arms
+     * carry a verdict that does not move with the playhead at all (a refusal, two states and a
+     * constant note), and the two that do move are already on the temporal axis above through
+     * `race(@Xs).verdict` — `raceSlotsOf`'s drawn arm returns that very string. Repeating them per
+     * sample would multiply rows without adding a state anything reads differently.
+     */
+    const endS = recording.endedAt;
+    const ended = raceStripViewOf({ recording, ghost: comparisonRecording, simTimeS: endS });
+    const alone = raceStripViewOf({ recording, ghost: undefined, simTimeS: endS });
+    const sameRun = raceStripViewOf({ recording, ghost: recording, simTimeS: endS });
+    const armSeeds: readonly (readonly [string, RaceSlots])[] = [
+      [
+        'drawn',
+        raceSlotsOf(
+          ended,
+          {
+            pick: 'plain-baseline',
+            recording: comparisonRecording,
+            refusal: undefined,
+            pending: false,
+          },
+          recording,
+        ),
+      ],
+      [
+        'sameRun',
+        raceSlotsOf(
+          sameRun,
+          { pick: 'plain-baseline', recording, refusal: undefined, pending: false },
+          recording,
+        ),
+      ],
+      [
+        'nobody',
+        raceSlotsOf(
+          alone,
+          { pick: 'none', recording: undefined, refusal: undefined, pending: false },
+          recording,
+        ),
+      ],
+      [
+        'pending',
+        raceSlotsOf(
+          alone,
+          { pick: 'plain-baseline', recording: undefined, refusal: undefined, pending: true },
+          recording,
+        ),
+      ],
+      [
+        'notRun',
+        raceSlotsOf(
+          alone,
+          { pick: 'plain-baseline', recording: undefined, refusal: undefined, pending: false },
+          recording,
+        ),
+      ],
+      [
+        'refused',
+        raceSlotsOf(
+          alone,
+          {
+            pick: 'latest-saved',
+            recording: undefined,
+            refusal: NO_SAVED_DISPATCHER,
+            pending: false,
+          },
+          recording,
+        ),
+      ],
+    ];
+    for (const [arm, slots] of armSeeds) {
+      seeds.push({
+        field: `race(${arm}).verdict`,
+        text: slots.verdict,
+        role: 'observation',
+        playhead: atPlayhead(recording, endS),
+      });
+      seeds.push({ field: `race(${arm}).note`, text: slots.note, role: 'prose' });
+    }
+    /* The grey line's name, from the one arm that draws a line to attribute. */
+    seeds.push({
+      field: 'race(drawn).rivalName',
+      text: armSeeds[0]?.[1].rivalName ?? '',
+      role: 'label',
+    });
 
     // The wordings the sampled pair may not produce, at shares a player can hold.
     seeds.push({ field: 'race.verdict(ahead)', text: raceVerdictOf(61.4, 52.2), role: 'observation' });
@@ -8681,16 +8782,19 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_BAND_INK',
     /*
      * `#STAGE_ABSENCES` is {@link EVERYDAY_BUILD_NOTES}'s since GitHub issue #207 took the stage's
-     * register off the stage. `#STAGE_NO_GHOST` stays here and is the reason the split is a rule
-     * rather than a tidy-up: it is the ghost lane's own refusal, drawn on the ghost lane's card,
-     * and a refusal that belongs to a control is read where the control is.
+     * register off the stage. `#STAGE_NO_GHOST` stood here and was the reason the split is a rule
+     * rather than a tidy-up — it was the ghost lane's own refusal, drawn on the ghost lane's card,
+     * and a refusal that belongs to a control is read where the control is. The lane has a rival to
+     * draw now (GitHub issue **#226**, § D482) so the refusal is gone; the rule it illustrated is
+     * not, and `#STAGE_RACE_PICKER_LABEL` and `#STAGE_RACE_WATCHING` are here on the same ground.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
     /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
-    'everyday/stageScreenModel.ts#STAGE_NO_GHOST',
+    'everyday/stageScreenModel.ts#STAGE_RACE_PICKER_LABEL',
+    'everyday/stageScreenModel.ts#STAGE_RACE_WATCHING',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
     /*
@@ -8803,7 +8907,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       text: STAGE_SWITCH_PICKER_LABEL,
       role: 'label',
     });
-    seeds.push({ field: 'stage.race.noGhost', text: STAGE_NO_GHOST, role: 'reason' });
+    seeds.push({
+      field: 'stage.race.pickerLabel',
+      text: STAGE_RACE_PICKER_LABEL,
+      role: 'label',
+    });
+    seeds.push({ field: 'stage.race.watching', text: STAGE_RACE_WATCHING, role: 'reason' });
 
     /*
      * **Pillar 3's goal strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -9761,7 +9870,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/briefView.ts#briefScreenViewOf',
     'everyday/briefView.ts#briefBarModel',
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
-    'everyday/briefView.ts#GHOST_REFUSAL',
+    'everyday/briefView.ts#raceAgainstCard',
     'everyday/briefView.ts#lockedForScore',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
@@ -10005,7 +10114,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     /*
      * The two constants no rendered view reaches on its own: `DOOR_STEPS`' and `SAME_FOR_EVERYONE`
      * are seeded through the door view above, and `percentileLine`'s two arms through Your week.
-     * `GHOST_REFUSAL` and `lockedForScore` likewise. What is left is the world band's own three,
+     * `raceAgainstCard` and `lockedForScore` likewise. What is left is the world band's own three,
      * asserted here as well so the exclusion list never has to claim they are unchecked.
      */
     seeds.push({ field: 'world.label', text: WORLD_FIGURES_LABEL, role: 'label' });
@@ -10036,7 +10145,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       text: briefBarModel(actionBarFor({ screen: 'brief', ctx: 'daily' }), undefined).note ?? '',
       role: 'label',
     });
-    seeds.push({ field: 'brief.ghost.why', text: GHOST_REFUSAL.why, role: 'reason' });
+    seeds.push({ field: 'brief.ghost.why', text: raceAgainstCard().why, role: 'reason' });
     seeds.push({ field: 'brief.locked.why', text: lockedForScore().why, role: 'reason' });
 
     return singleRun(this.id, seeds);

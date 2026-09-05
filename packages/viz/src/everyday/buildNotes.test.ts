@@ -168,7 +168,6 @@ interface TriagedAbsence {
 const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /* The shell — the front door, the week strip, the boards, the report's levers. */
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Replaying a past day', issue: 177 },
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Racing a second dispatcher', issue: 226 },
   /*
    * **This row's fragment and its owner both moved, and neither moved on its own.** It read
    * `'The daily board'` against #161 — the umbrella issue for everything that needed a server,
@@ -191,9 +190,17 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   { register: 'STAGE_ABSENCES', fragment: 'no campaign dock', issue: 181 },
   { register: 'STAGE_ABSENCES', fragment: 'no camera', issue: 324 },
   { register: 'STAGE_ABSENCES', fragment: 'no answer to a live incident', issue: 171 },
-  /* The same missing second recording the shell's *Racing a second dispatcher* entry is about,
-     said from the stage's side. One mechanism, one issue, two registers that both meet it. */
-  { register: 'STAGE_ABSENCES', fragment: 'no rival lane', issue: 226 },
+  /*
+   * **Two rows left together here, and that they were a pair is the whole reason to say so.**
+   * `STAGE_ABSENCES`' *no rival lane* and `EVERYDAY_SHELL_ABSENCES`' *Racing a second dispatcher*
+   * were one missing mechanism said from two sides — this table's own comment called them *"one
+   * mechanism, one issue, two registers that both meet it"* — and GitHub issue **#226**
+   * ([§ D482](../../../../DECISIONS.md)) built it. Both entries and both rows went on that commit.
+   *
+   * Retiring one and leaving the other would have been the product saying two things about one
+   * mechanism, which is the incoherence `honesty/properties.ts` cannot see: each of those sentences
+   * was internally honest, and only the pair was wrong.
+   */
 
   /* The rush. Three of the four are one issue, because they are one missing engine. */
   { register: 'RUSH_ABSENCES', fragment: 'the climbing stream', issue: 220 },

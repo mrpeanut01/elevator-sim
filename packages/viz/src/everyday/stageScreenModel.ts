@@ -72,10 +72,10 @@
  *
  * ## What the stage does not have, and why the absences are named rather than mimed
  *
- * {@link STAGE_ABSENCES}. Two are structural — the § 7.4 ghost lane needs a second recording the
- * data host does not offer, and § 7.5's campaign dock needs a `ctx` no route in this build can
- * produce — and one is a control that exists behind a screen nobody has built. Each is a sentence a
- * player reads on the build-information panel (`everyday/buildNotes.ts`), which is the shell
+ * {@link STAGE_ABSENCES}. One is structural — § 7.5's campaign dock needs a `ctx` no route in this
+ * build can produce — and one is a control that exists behind a screen nobody has built. (The § 7.4
+ * ghost lane was a third until GitHub issue #226 gave this screen a second recording to draw.) Each
+ * is a sentence a player reads on the build-information panel (`everyday/buildNotes.ts`), which is the shell
  * register's own precedent applied one screen down: a register nothing renders is read by nobody.
  */
 
@@ -947,25 +947,41 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
 }
 
 /* -------------------------------------------------------------------------- *
- * § 7.4 — the race strip's one-line arm
+ * § 7.4 — the race strip's picker
  * -------------------------------------------------------------------------- */
 
 /**
- * Why the strip has one lane per row rather than two.
+ * The ghost picker's label — GitHub issue **#226**, [§ D482](../../../../DECISIONS.md).
  *
- * § 7.4's ghost is *a second recording of the same crowd*, and the data host offers no way to reach
- * one: `EverydayHost` hands back the run on the stage and nothing else, and `dev/ghostRun.ts` — the
- * module that builds a rival — is inside the Engineer shell's closure, on the far side of the façade
- * this screen may not reach through. So the strip draws `raceStripViewOf`'s **nobody** arm, which is
- * a shipped state rather than a degradation (*"The strip never invents a rival"*), and this sentence
- * is drawn beside it.
+ * ## What this replaced, and why the sentence went rather than being reworded
  *
- * The alternative — running a second simulation from here — is the one thing that would make the
- * strip a lie the moment it worked: a rival raced on a different crowd is not § 7.4's ghost, and
- * *"same crowd both runs"* is the note that would then be false.
+ * `STAGE_NO_GHOST` stood here and read *"no rival lane — a ghost is a second run of the same crowd,
+ * and this screen cannot ask for one yet"*. This screen can ask for one now
+ * (`everyday/host.ts#raceAgainst`), so the sentence is **deleted on the commit that made it false**
+ * rather than trimmed: [§ D227](../../../../DECISIONS.md)'s direction, and the same move
+ * `STAGE_ABSENCES`' handover entry made one wave earlier. A refusal that has stopped being true is
+ * worse than a missing one — it tells a reader not to touch a control that works.
+ *
+ * The two arms § 7.4 describes and this build still does not offer — the world's middle, and a board
+ * row — are absent **from the picker itself**, which is where `live/raceStrip.ts#GHOST_OPTIONS`
+ * declines them in its own docstring: *"omitted, not stubbed"*. A player meets that limit as three
+ * honest options rather than as a sentence about a fourth.
+ *
+ * Authored here rather than in the mount for `STAGE_SWITCH_PICKER_LABEL`'s stated reason: a
+ * player-facing string in `stageScreen.ts` reaches the static sweep and none of the ten honesty
+ * properties.
  */
-export const STAGE_NO_GHOST =
-  'no rival lane — a ghost is a second run of the same crowd, and this screen cannot ask for one yet';
+export const STAGE_RACE_PICKER_LABEL = 'Race against';
+
+/**
+ * Why the picker is off while you are watching somebody else's day.
+ *
+ * § 14.1's own rule, the same one that disables the Engineer strip's `<select>`: a spectator who
+ * could commission a second run would be playing, not watching, and the run they commissioned would
+ * be raced against a crowd that is not theirs. The transport is deliberately untouched — pause and
+ * the speed chips are not interventions.
+ */
+export const STAGE_RACE_WATCHING = 'not while you are watching somebody else’s day';
 
 /* -------------------------------------------------------------------------- *
  * The screen's own register of absences
@@ -981,13 +997,17 @@ export const STAGE_NO_GHOST =
  * specifically. What changed is that a reader meets both in one place instead of meeting each on
  * the screen it is about.
  *
- * `STAGE_NO_GHOST` is the exception and the reason the exception is a rule: it is a **control's**
- * refusal, drawn on the ghost lane's own card as well as being in this register, because a control
- * that cannot act says so where the control is.
+ * ## Two entries have been **deleted** here rather than reworded, and the distinction is § D227's
  *
- * ## One entry was **deleted** here rather than reworded, and the distinction is § D227's
+ * The second is `STAGE_NO_GHOST` (GitHub issue **#226**, [§ D482](../../../../DECISIONS.md)), which
+ * read *"no rival lane — a ghost is a second run of the same crowd, and this screen cannot ask for
+ * one yet"*. It was this register's one **control's** refusal — drawn on the ghost lane's own card
+ * as well as listed here, because a control that cannot act says so where the control is — and the
+ * control acts now, so both copies went on the commit that gave it a rival. What stands in its place
+ * on the card is the picker, and nothing stands in its place here: an absence that is no longer one
+ * is not a shorter absence.
  *
- * It read *"no decisions during a run — a day can carry a handover to another dispatcher and an
+ * The first read *"no decisions during a run — a day can carry a handover to another dispatcher and an
  * answered incident, and this screen offers neither"*, and half of it stopped being true on the
  * commit that put § 7.6's handover on this stage (GitHub issue **#171**). A refusal that has stopped
  * being true is worse than a missing one: it tells a reader not to look for a control that is there.
@@ -1000,7 +1020,6 @@ export const STAGE_NO_GHOST =
  * entry rather than re-taking it, is [§ D451](../../../../DECISIONS.md).
  */
 export const STAGE_ABSENCES: readonly string[] = Object.freeze([
-  STAGE_NO_GHOST,
   'no campaign dock — a campaign day reaches this stage, and the money-and-incident panel that belongs beside it is not drawn',
   'no camera — the cutaway draws the whole building at once, so there is nothing to pan and nothing to follow',
   'no answer to a live incident — a day can carry one, stamped with the moment it was given, and this screen offers none: the answer comes from the money-and-incident panel above, which is not drawn, over an incident this build does not raise while a day is running',

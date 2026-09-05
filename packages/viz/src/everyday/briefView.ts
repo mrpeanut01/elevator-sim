@@ -68,11 +68,13 @@ export interface BriefDispatcherOption {
  * A card § 6.2 states rather than draws as a live control — what it would be, and either why it is
  * not here or where it is carried out.
  *
- * Two of them, and they are no longer the same shape. {@link GHOST_REFUSAL} refuses: nothing in
- * this tree runs two dispatchers over one crowd, so the card has no {@link door} and `why` says why.
- * {@link lockedForScore} is a **statement with a door**: the three fixed things are real, and the
- * screen that unfixes them exists, so the card carries the route to it. The type covers both
- * because § 6.2 draws them identically and the difference is whether there is somewhere to go.
+ * Two of them, and **both are statements now** — {@link raceAgainstCard} stopped refusing when § 7's
+ * stage grew a ghost picker (GitHub issue #226). {@link lockedForScore} is a statement **with a
+ * door**: the three fixed things are real, the screen that unfixes them exists, and the card carries
+ * the route to it. {@link raceAgainstCard} is a statement **without** one, because the control it
+ * names is on the screen this screen's own primary row already opens. The type covers all three
+ * shapes because § 6.2 draws them identically and the difference is only whether there is somewhere
+ * else to go.
  */
 export interface BriefRefusalCard {
   readonly heading: string;
@@ -177,23 +179,60 @@ function firstSentence(text: string | undefined): string {
 }
 
 /**
- * § 6.2's *Race against*, refused — see the module docstring for the evidence.
+ * § 6.2's *Race against* — **a statement now, not a refusal** (GitHub issue **#226**,
+ * [§ D482](../../../../DECISIONS.md)).
  *
- * The caveat is the guide's own sentence and is kept verbatim, because it is the sentence that
- * makes a race honest and it will be needed unchanged the day one exists.
+ * ## What it said, and why it is rewritten rather than deleted
+ *
+ * It read *"Not built: this build simulates one run at a time, so there is no second line to
+ * draw"*, and every clause of that has stopped being true: § 7's stage carries a picker, and the
+ * rival's day is a second recording of this day's crowd. A stated refusal that has gone stale is
+ * [§ D227](../../../../DECISIONS.md)'s more dangerous half — it tells a reader not to reach for a
+ * control that works — so it goes on the commit that made it false. It is **rewritten** and not
+ * deleted because the card is § 6.2's own row: what a player needs here is *where the race is*, and
+ * a missing card says neither that nor the old sentence.
+ *
+ * ## The `what` is narrowed to the arms that exist, which is the same rule pointed the other way
+ *
+ * It used to offer *"the world's middle, your best, the plain baseline, or nobody"*. Two of those
+ * four are still not on offer, and promising them from a card that now claims to work would be the
+ * defect this rewrite is closing, with its polarity reversed. `live/raceStrip.ts#GHOST_OPTIONS`
+ * carries the three that ship and declines the others in writing; this card names the same three.
+ *
+ * ## The caveat is unchanged, verbatim, and that is the point of it
+ *
+ * *"One day each is a race, not proof. The test bench settles it properly."* It was kept verbatim
+ * through the refusing years precisely so it would be here unchanged the day a race existed — and
+ * this is that day. It is CLAUDE.md's statistical discipline wearing copy: one day each is n = 1,
+ * and nothing on this screen or the stage may read as a verdict about a dispatcher.
+ *
+ * ## No door, deliberately
+ *
+ * The race is on the stage and the stage is where § 3.3's own primary row already goes — *Start the
+ * day*, one control away, on this screen. A second button to the same screen would be a second
+ * route into the day's own next beat, and `refusalCard`'s docstring is emphatic that *which* screen
+ * a card opens is decided here rather than in the mount. What the `why` does instead is name the
+ * control by the words a player will read on it.
+ *
+ * A function rather than a frozen constant, on {@link lockedForScore}'s ground: the sentence is
+ * true only while the stage is registered, and asking the registry is what keeps a card from
+ * quietly promising a screen that has been withdrawn.
  */
-export const GHOST_REFUSAL: BriefRefusalCard = Object.freeze({
-  heading: 'RACE AGAINST',
-  what:
-    'A second dispatcher driving a second copy of today’s crowd beside yours — the world’s ' +
-    'middle, your best, the plain baseline, or nobody.',
-  why:
-    'Not built: this build simulates one run at a time, so there is no second line to draw. The ' +
-    'test bench runs two dispatchers against matched crowds fifty times, which is the question a ' +
-    'race only gestures at.',
-  caveat: 'One day each is a race, not proof. The test bench settles it properly.',
-  door: undefined,
-});
+export function raceAgainstCard(): BriefRefusalCard {
+  const built = isScreenBuilt('stage');
+  return {
+    heading: 'RACE AGAINST',
+    what:
+      'A second dispatcher driving a second copy of today’s crowd beside yours — the plain ' +
+      'baseline, your latest saved, or nobody.',
+    why: built
+      ? 'Pick one on the stage, under THE DAY SO FAR: the rival drives the same crowd from the ' +
+        'same seed, so the gap between the two lines is your change and not the morning.'
+      : `Not here yet: ${unbuiltReasonFor('stage')}.`,
+    caveat: 'One day each is a race, not proof. The test bench settles it properly.',
+    door: undefined,
+  };
+}
 
 /**
  * § 6.2's *Locked for score* — the statement, and the door § 3.2 names.
@@ -284,7 +323,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
        */
       count: `${String(options.length)} to choose from · ${String(mine)} of yours`,
     },
-    ghost: GHOST_REFUSAL,
+    ghost: raceAgainstCard(),
     locked: lockedForScore(),
     barNote: `${BRIEF_NOTE_LEAD}${today.driver}`,
   };
