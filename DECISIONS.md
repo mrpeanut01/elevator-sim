@@ -32833,3 +32833,107 @@ vector that would bear on it.
 the producer is `costFunctionLine` — and two documents still name the old symbol:
 `DECISIONS.md:22912` and `ISSUE_WORKER_LEDGER.md:202`. `dev/rightRail.ts:242` was already corrected.
 A grepping reader lands on nothing today.
+
+---
+
+## D496 — Sandbox is a state and not a place, the handoff's mode ships split across two mechanisms, and the deviation is recorded rather than left in neither document
+
+**Date: 2026-09-05 · Owner: the integrator, as a product-owner call · Rules on: GitHub issue #225,
+`shift/week.ts#SANDBOX_CONTRACT_ID`, `everyday/briefView.ts:271-275`, `docs/12-design-handoff.md`
+§ 4.7 and § 4.8.**
+
+#225 asks the project to decide what Sandbox is or remove the label. Wave S's lane S-V2 verified it
+and returned *needs information* with three questions rather than one, because the 2026-09-04 triage
+that reduced the residue to *"whether it should also have a screen"* was missing a fact: **the design
+handoff specifies Sandbox as a play mode, and `docs/12` records that deviation nowhere.**
+
+### What the label does is coherent, and that is measured
+
+One id (`shift/week.ts:104`), one non-test writer (`dev/state.ts:846`), one scoring gate
+(`shift/week.ts:431`, gating `streak`, `bestMinutePct` and `cleanRun` at `:445-458`), one label case
+(`shift/weekLabel.ts:116`), recorded in § D382. The gate is keyed on the sandbox and not on the other
+two sentinels for a stated reason (`week.ts:410-417`): endless and free play are **chosen** and each
+has its own door, while the sandbox is **arrived at** and is the only one of the three with a screen
+promising in as many words that nothing counts.
+
+The coherence goes one level further than expected, and it is the thing that would have broken first.
+The tuner's *Sandbox — nothing counts* strip derives from `movedKeys` rather than from the contract
+id, which looks as though it could disagree with the gate. It cannot: `everyday/tunerModel.ts:174-187`
+records that the narrower guard — *the building moved* — was the tempting one and was rejected
+precisely because a press that skipped the building when only *How busy* had moved would run a
+re-timed crowd against a scored assignment, with the strip saying *nothing counts* while `closeDay`
+banked against Scenario 1. One predicate drives the strip, the stamp, § 3.3's note and the presses,
+so **the label agrees with itself across four surfaces by construction.**
+
+### The handoff's Sandbox is shipped, split across two mechanisms, and neither is a mode
+
+`docs/design/elevator-sim-reimagined.dc.html` makes Sandbox one of two play modes (`:1597`), behind a
+Scenarios | Sandbox segmented toggle (`:2772-2773`), with a building select and a pattern select in
+the coach ribbon (`:203-209`), no growth (`:1568`), and `coachLabel: this.sandbox ? 'Sandbox' : …`
+(`:3430`).
+
+**Answer to the lane's first question: it is shipped, and it is shipped in halves.** The *selection*
+half is Free Play, whose door offers a fuller six-axis choice than the handoff's two selects. The
+*unscored* half is the sandbox contract, arrived at by moving the building outside a scenario —
+`dev/state.ts:848-850` documents the coach building select in the handoff's own terms,
+`everyday/tunerScreen.ts:17` records that `applyBuildingSpec` stands the week on the sandbox
+contract, and `weekLabel.ts:116` reproduces `coachLabel` exactly.
+
+**What is genuinely unshipped is the explicit choice**, and that is the deviation. `scope/types.ts:68-77`
+holds eight `PLAY_MODES` and `sandbox` is not among them; `free-play` is.
+
+**Ruling: ratify the state reading. Sandbox is a week on no assignment, arrived at and never chosen.
+No ninth `PlayMode`, no Scenarios | Sandbox toggle, no screen.**
+
+**Why not build the mode**, since it is what the handoff draws and `CLAUDE.md` makes the handoff
+canonical for the interface. Because building it **contradicts § D382 rather than extending it**: the
+gate's whole argument is that the sandbox is the one sentinel that is not chosen, so a toggle that
+lets a player choose it would require re-taking that decision, not adding to it. And it would
+**substantially duplicate Free Play**, which already ships a door with a wider selection. The cost is
+not small either — a ninth `PlayMode` reaches every exhaustive switch over it, where
+`dev/state.ts:682`'s `advancesTheWeek` is a compile error by design (`:665`), plus `scope/permits.ts`
+and `scope/surface.ts` per-mode declarations, an `everyday/screens.ts` registry row on a table whose
+`UNBUILT_REASONS` is currently empty and must stay checked in both directions, and new honesty
+surfaces.
+
+**Why not delete the label**, the other cheap answer. It is refuted in the code already:
+`week.ts:118-144` and `:410-417` argue in two places that collapsing the sentinel into endless tells
+a reader who opened the editor that they started an endless run — a claim about an intention they did
+not have — and that reuse **re-opens #125's defect**, since a player entering free play from a
+sandbox week meets `switchWeek`'s same-id line and has their drawn building's day 6 overwritten.
+
+### Three consequences, and the first is the only shipped string that must change
+
+1. **`everyday/briefView.ts:271-275` says `{ label: 'Take it to the sandbox', screen: 'tuner' }`.**
+   That is a button whose word names a **destination**, which is the mode reading, on a build whose
+   answer is that Sandbox is a state. Four other surfaces say *state* — `weekLabel.ts:116`,
+   `tunerModel.ts:506`, `tunerModel.ts:517`/`:520`, `actionBar.ts:400`. The card is not dishonest
+   about what it opens, so this is a vocabulary correction rather than a defect: the door names the
+   screen it opens, and the state is what the strip on that screen says. **No honesty property can
+   see this class** — the ten are predicates over strings and `surfaces-disagree` compares figures,
+   not vocabulary — so it is fixed at the site and asserted there.
+2. **`docs/12-design-handoff.md` gains the deviation record it does not have.** The word *sandbox*
+   appears in it zero times, as it does in `docs/21` and `docs/16`. § 4.7's own rule is that a
+   deviation is recorded rather than left in neither document, and this is a deviation on a surface
+   the handoff **does** draw, which makes it a sharper case than the § 4.8 rows already there. The
+   Casual handoff's separate per-run *Unlock everything* toggle
+   (`elevator-sim-casual.dc.html:6628-6638`) is a second deviation, argued in
+   `tunerModel.ts:489-496` — *a switch beside the derived strip would be a second, disagreeing source
+   for the same fact* — and also absent from `docs/12`. Both are recorded.
+3. **`docs/12` § 4.8's Free play row is wrong and is corrected.** Its stated reason is *"The prototype
+   has no configuration a player chooses"*, and the reimagined handoff draws two selects and a
+   two-mode toggle. Answering the lane's third question: yes, it needs correcting, and the correction
+   is the row's *reason* rather than its verdict.
+
+**`GAPS.md:117` is deleted whole rather than trimmed**, on § D451's rule that an absence which has
+become half-untrue is deleted and re-taken rather than edited. That is #225's AC4, and it closes by
+deletion. #178's item 3 re-points here rather than carrying its own copy of the stale quote.
+
+### What this does not decide, and it is the interesting half
+
+**Whether Free Play should be scored.** A free-play week **is** posted — `week.ts:431` gates only on
+`SANDBOX_CONTRACT_ID`, so `closeDay` moves `streak`, `bestMinutePct` and `cleanRun` on a free-play
+week, deliberately and by § D382's own argument — while the handoff's Sandbox is explicitly unscored
+(`:1568`, growth 1). That is a product judgement about what Free Play is **for**, it is not what #225
+asks, and answering it here would be settling a second question inside the first. It is named so the
+next reader finds it named rather than discovering it.
