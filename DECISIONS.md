@@ -31888,3 +31888,64 @@ footing abandonment sits on beside AWT. Publish the deviation next to the figure
 an out-of-band rate remains a defect. And `traffic/generator.ts` treating `arrivalRatePctPop5min` as
 an override that *"overrides every profile"* is unchanged: the override is the mechanism an authored
 case uses, and it remains available to nothing else.
+
+---
+
+## D479 — an outcome is written to the world that holds the page, not to the surface that produced it
+
+**Date: 2026-09-05 · Owner: lane R-A, wave R · Rules on: GitHub issue #336,
+`packages/viz/src/dev/main.ts#redeemLinkFromHash`, `packages/viz/src/everyday/signInLink.ts`,
+`packages/viz/src/everyday/shell.ts`. Extends [§ D383](#d383).**
+
+§ D383 drew a boundary about **acting**: the Engineer end-of-day close is armed only while the
+Engineer surface has the page, because a day filed behind Everyday Mode's cover is the Engineer
+product scoring somebody else's play. This extends the same boundary to **saying**, which is a
+second class and needed its own decision because the failure looks like nothing at all.
+
+**The defect it is taken from.** `dev/main.ts#redeemLinkFromHash` has, since it was written,
+navigated the Engineer menu to its account screen and written the redemption's outcome there, under
+a docstring stating the intent plainly: *"Opening a link is a request to sign in, so the screen that
+shows the outcome is the one the player is put on. A result written to a panel nobody navigates to
+is a result nobody reads."* [§ D335](#d335) then shipped the Everyday shell over that panel, and the
+sentence stopped being true of the page without a word of it changing. Measured on the built
+artifact before this change — a cold load of `/#sign-in=<token>` at 1280 × 720 — the Everyday shell
+carried **no acknowledgement of any kind** while the covered menu sat on its account screen with the
+answer on it, `.shell` `inert` and the Everyday root holding the page. The link worked, the session
+existed, and the confirmation was invisible.
+
+**The ruling, in one sentence.** A surface may write a result a player is expected to read only
+while it is the surface being read; otherwise it publishes the result to the world that holds the
+page. `dev/main.ts#engineerHasThePage` is the one expression both classes ask through, and it now has
+three callers rather than two.
+
+**The covered navigation is withdrawn rather than kept beside the new banner, and that half is a
+measurement.** `dispatchMenu`'s `reopen` arm — the only control that puts the Engineer menu back up,
+and the same intent `?screen=` uses — runs `navigate(menuState, 'main')`. So a navigation performed
+under the cover is discarded by the one route back into that menu and no player can ever observe it.
+What it *could* do is cause harm, and did: `everyday/boot.ts#closeEngineerMenuWhenReady` dismisses
+the Engineer menu by pressing its **Resume** row, which exists on the `main` screen and nowhere else,
+so navigating away before that observer saw a row left it waiting for a row that never arrives, and
+the covered overlay stayed open for the whole visit. Driven on the artifact: with a link in the
+fragment `.menu-overlay` reported `hidden: false` over 3 rows; without one, `hidden: true` over 9.
+A write nobody can observe, whose only observable effect is a defect, is deleted rather than gated
+around.
+
+**What the other world may say, and what it may not.** The outcome sentence is the server's own
+refusal, `menu/client.ts`'s unavailability sentence, or one line naming the session — carried
+verbatim, never recomposed, because a second wording of a refusal already worded around *whether
+asking again will help* is [§ D227](#d227)'s class. What Everyday Mode authors is what the outcome
+cannot carry: an eyebrow saying what the banner is about, and the route to the screen accounts live
+on. The token never travels; the fragment is still cleared before the request, for the reason that
+ordering already had.
+
+**The seam is a provided value, on `everyday/engineerBridge.ts`'s precedent** —
+`everyday/signInLink.ts` imports nothing, `dev/main.ts` publishes into it, and the shell reads it.
+`everyday/host.ts` was the obvious channel and is the wrong one: it is the *run* host, its
+subscribers are drained at the end of `renderAll`, and no account path calls `renderAll` — all of
+them call `drawMenu`. Widening that drain would notify every Everyday screen on every keystroke in
+the Engineer account form, which is redraws in the direction GitHub issue #106 documents, to serve a
+host that exposes no account state at all.
+
+**What this does not settle.** Everyday Mode still has no sign-in surface — no address field, no way
+to ask for a link — and the banner points at the Engineer account screen rather than replacing it.
+That is GitHub issue #332, and this decision is the prerequisite it names rather than a part of it.

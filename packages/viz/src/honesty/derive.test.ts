@@ -855,6 +855,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'campaign/types.ts#FAIL_STATES',
         'controls/render.ts#helpIdOf',
         'controls/render.ts#inputIdOf',
+        /*
+         * The three stages a mailed sign-in link's outcome can be in — GitHub issue #336 — derived
+         * only because `signed-in` reads as two adjacent words, which is `menu/types.ts#MENU_SCREENS`
+         * below and its `free-play` exactly. No stage id is drawn anywhere: what a player reads is
+         * `signInNoticeViewOf`'s eyebrow, route and dismissal, which the `EVERYDAY_SIGN_IN_LINK`
+         * adapter drives over all three stages, plus the outcome sentence, which the server or
+         * `menu/client.ts` authors and this module only carries.
+         */
+        'everyday/signInLink.ts#SIGN_IN_LINK_STAGES',
         'render/runSummary.ts#FIGURE_ORDER',
         'render/runSummary.ts#LONG_WAITS_ID',
         'render/runSummary.ts#SERVICE_LEVEL_ID',
