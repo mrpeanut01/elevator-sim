@@ -32860,6 +32860,20 @@ already. `everyday/signInLink.ts#SIGN_IN_NOTICE_POINTER` was substituted rather 
 pointed across § 3.2's door at the Engineer menu, and sending a reader through a whole other product
 to reach a control two rows under the banner is the same defect with a friendlier face.
 
+**The corpus forecast, published before the integrator measures and decomposed to the string.** The
+move is **+16 a case** from `everyday/settingsView.ts#settingsScreenViewOf` — twenty-two sign-in
+seeds over the six arms the adapter's six cases now carry, less the deleted `you.home` on each —
+**−1 a case** from `everyday/buildNotes.ts` as the `Sign out` absence leaves, and **6 or 12 a case**
+from the `display-name` pair, which is two sides over three arms and doubles on a case whose building
+has an authored whole day. Everything else is **0**: the sign-in banner's pointer and the daily-board
+absence row are substitutions, one string in and one out. Taken on this branch — which is a figure
+about a branch and not the row, § D343 — that predicts **+1 233** always-on and **+1 530** deep, with
+cases, simulations, surfaces, suppressed runs and failing cases all unmoved and the surface **sets**
+identical in both tiers. The pair's variable term resolves to **15 cases at 6** in each tier, which
+is `garden-apartments` alone in the always-on corpus and `garden-apartments` + `st-jude-hospital` +
+`crown-hotel` in the deep one: three buildings, which is the number `CLAUDE.md` says have no authored
+day, arrived at by arithmetic from two tiers rather than read off a file.
+
 **One thing is knowingly weaker than it should be, and it is a file boundary rather than a design
 call.** `EverydayHostBindings.accountActions` is **optional** where `dailyBoard` is required, because
 two binding literals that a required field would break (`campaign/wearClock.test.ts`,
