@@ -155,6 +155,7 @@ import {
   tuneStateFrom,
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
+import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
 import { everydayReportViewOf } from '../everyday/reportView.js';
 import { SETTINGS_ABSENCES, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
@@ -10209,6 +10210,63 @@ const ENGINEER_DOOR: SurfaceAdapter = {
 };
 
 /* -------------------------------------------------------------------------- *
+ * The mailed sign-in link's banner — GitHub issue #336
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **What Everyday Mode says when a mailed sign-in link is redeemed under it.**
+ *
+ * The banner exists because § D335's shell covers the surface `dev/main.ts#redeemLinkFromHash` was
+ * written to write its outcome onto, so a mailed link worked, minted a session, and acknowledged
+ * nothing where the player could see it. `everyday/signInLink.ts` carries the report and the pure
+ * view; `everyday/shell.ts` draws it, and that mount is excluded in `derive.test.ts` on the DOM
+ * mounts' shared ground — it needs a document, and the pure/DOM split in `everyday/` exists so the
+ * words are drivable without one.
+ *
+ * ## What is driven, and the one field that deliberately is not
+ *
+ * The **outcome sentence is not seeded**, and that is a statement about who authors it rather than
+ * an omission. It is the server's own refusal, `menu/client.ts`'s unavailability sentence, or
+ * `dev/main.ts`'s one-line confirmation of a session — none of them declared in this module, none
+ * of them reachable from it, and a placeholder standing in for them would put a string into this
+ * corpus that no player will ever read. What this module authors is the eyebrow, the route to the
+ * account screen and the dismissal, and those are what is swept.
+ *
+ * The three stages are driven rather than one, because the view is not the same shape in each: a
+ * request in flight carries neither the route nor the dismissal, on the ground that there is
+ * nothing settled to point anywhere about and nothing finished to dismiss. Seeding only the settled
+ * arm would leave that difference unswept.
+ *
+ * Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`. It costs nothing to obey
+ * here: this adapter seeds no figure, no band and no verdict, so there is no wording it could take
+ * a fault off another surface for.
+ */
+const EVERYDAY_SIGN_IN_LINK: SurfaceAdapter = {
+  id: 'everyday/signInLink.ts#signInNoticeViewOf',
+  covers: [
+    'everyday/signInLink.ts#signInNoticeViewOf',
+    'everyday/signInLink.ts#SIGN_IN_NOTICE_LABEL',
+    'everyday/signInLink.ts#SIGN_IN_NOTICE_POINTER',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+    for (const stage of SIGN_IN_LINK_STAGES) {
+      const view = signInNoticeViewOf({ stage, text: '' });
+      if (view === undefined) continue;
+      seeds.push({ field: `signIn.${stage}.label`, text: view.label, role: 'label' });
+      if (view.pointer !== undefined) {
+        seeds.push({ field: `signIn.${stage}.pointer`, text: view.pointer, role: 'prose' });
+      }
+      if (view.dismiss !== undefined) {
+        seeds.push({ field: `signIn.${stage}.dismiss`, text: view.dismiss, role: 'label' });
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
  * The dispatcher workshop — GAMEPLAY § 11 over `everyday/workshopModel.ts`
  * -------------------------------------------------------------------------- */
 
@@ -11016,6 +11074,14 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * spectator-shaped fault off the surface that exists to carry them.
    */
   EVERYDAY_WATCHING,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT: GitHub issue #336's sign-in
+   * banner. Obeying the rule costs nothing here and the reason is worth stating rather than
+   * inheriting — this adapter seeds an eyebrow, a route and a dismissal, with no figure, no band
+   * and no verdict among them, so there is no wording whose fault it could take off another
+   * surface wherever it sat. The end of the array is where a new adapter goes anyway.
+   */
+  EVERYDAY_SIGN_IN_LINK,
 ]);
 
 /* -------------------------------------------------------------------------- *

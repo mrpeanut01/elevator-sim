@@ -657,9 +657,14 @@ export function rushDrivingLine(name: string): string {
  * measured, and at every viewport the support matrix actually supports.
  *
  * The bar is the one element that cannot go below a fold: § 3.1 pins it, and `shell.ts` gives
- * `.everyday-main` a `minmax(0,1fr) auto` grid whose second row is the bar. Putting the reason
- * there is what makes the refusal readable **by construction** rather than by a viewport being
- * tall enough, which is why the fix is not a margin.
+ * `.everyday-main` an `auto minmax(0,1fr) auto` grid whose **last** row is the bar. Putting the
+ * reason there is what makes the refusal readable **by construction** rather than by a viewport
+ * being tall enough, which is why the fix is not a margin.
+ *
+ * (It read *"a `minmax(0,1fr) auto` grid whose second row"* until GitHub issue #336 put a notice
+ * track in front of the region. The property this paragraph depends on is unchanged — the bar is
+ * the row `1fr` cannot push off — and the ordinal is corrected rather than the sentence being left
+ * to describe a grid that no longer exists.)
  *
  * ## The note was not neutral either
  *

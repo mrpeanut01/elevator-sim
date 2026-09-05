@@ -56,6 +56,7 @@ import {
   EVERYDAY_HOST,
   type EverydayHostBindings,
 } from '../everyday/host.js';
+import { reportSignInLink } from '../everyday/signInLink.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -1249,6 +1250,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     'This site has no leaderboard server behind it, so this run cannot be posted. It is still on ' +
     'screen and still in the report — nothing about it is lost.';
   /**
+   * What a redemption in flight says, on **both** surfaces — GitHub issue #336.
+   *
+   * A constant rather than a literal because it is now written twice: once into this menu's own
+   * waiting state, and once into `everyday/signInLink.ts` for the shell that has the page. Two
+   * copies of one sentence is the drift this repository keeps finding, and the two are the same
+   * claim about the same request.
+   */
+  const SIGNING_IN = 'Signing you in…';
+  /**
    * What is said while a request is in flight, and what is said once it has been a while.
    *
    * § D243 § 4 and § D247: the Container App runs at `minReplicas: 0`, and a request to a sleeping
@@ -2321,25 +2331,70 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The token is never put into a notice, a log or a URL this build constructs. The three refusals
    * that can come back — expired, spent, invalid — are the server's own sentences, and each is
    * worded around whether asking again will help.
+   *
+   * ## The outcome goes to whichever world holds the page — GitHub issue **#336**
+   *
+   * The two lines above the navigation stated an intent — *the screen that shows the outcome is the
+   * one the player is put on* — and § D335 shipped a shell over that screen five months later
+   * without a word of them changing. This module's boot runs under `everyday/boot.ts`, which mounts
+   * the Everyday shell over `div.shell` with `visibility:hidden` plus `inert`, so on the page this
+   * repository ships **every** mailed link was redeemed onto a surface the player could neither see
+   * nor reach. Measured on the built artifact before the fix: a cold load of `/#sign-in=<token>`
+   * left the Everyday shell with no acknowledgement of any kind while the covered menu sat on its
+   * account screen with the answer on it.
+   *
+   * So the intent is kept and the *screen* is decided by {@link engineerHasThePage}, on § D383's
+   * boundary: this surface's own behaviour is armed only while this surface has the page, and the
+   * outcome is otherwise published to `everyday/signInLink.ts`, which the Everyday shell draws as a
+   * banner over whatever screen the player has walked to.
+   *
+   * **The navigation is withdrawn on the covered arm rather than kept beside the banner**, and that
+   * is a measurement rather than a preference. {@link dispatchMenu}'s `reopen` arm — the one control
+   * that puts this menu back up — runs `navigate(menuState, 'main')`, so a covered navigation to
+   * `account` is discarded by the only route back into the menu and no player can ever observe it.
+   * What it *did* achieve is a second defect: `everyday/boot.ts#closeEngineerMenuWhenReady` dismisses
+   * this menu by pressing its **Resume** row, which exists on `main` and nowhere else, so navigating
+   * away here left that observer waiting for a row that never arrives and the covered overlay stayed
+   * open for the whole visit. Driven on the artifact: with a link in the fragment `.menu-overlay`
+   * reported `hidden: false` over 3 rows; without one, `hidden: true` over 9.
+   *
+   * Both publishes are `everydayHasThePage`-gated on one read taken **before** the request, so a
+   * player who crosses § 3.2's door mid-flight still finds the answer waiting in the world the link
+   * was opened in. Nothing about the ordering above moves: the fragment is still cleared first, and
+   * the token reaches this module's own request and nothing else.
    */
   async function redeemLinkFromHash(): Promise<void> {
     const linkToken = new URLSearchParams(window.location.hash.replace(/^#/u, '')).get('sign-in');
     if (linkToken === null || linkToken === '') return;
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-    // Opening a link is a request to sign in, so the screen that shows the outcome is the one the
-    // player is put on. A result written to a panel nobody navigates to is a result nobody reads.
-    menuState = navigate(menuState, 'account');
+    const everydayHasThePage = !engineerHasThePage();
+    /*
+     * Opening a link is a request to sign in, so the screen that shows the outcome is the one the
+     * player is put on. A result written to a panel nobody navigates to is a result nobody reads —
+     * which is why the navigation happens only where this surface is the one being read, and why
+     * the covered case publishes to the other world rather than writing here.
+     */
+    if (!everydayHasThePage) menuState = navigate(menuState, 'account');
     if (client === undefined) {
       accountState = withNotice(accountState, NO_SERVER_SIGN_IN);
+      if (everydayHasThePage) reportSignInLink({ stage: 'refused', text: NO_SERVER_SIGN_IN });
       drawMenu();
       return;
     }
-    const done = startWaiting('Signing you in…');
+    if (everydayHasThePage) reportSignInLink({ stage: 'working', text: SIGNING_IN });
+    const done = startWaiting(SIGNING_IN);
     const result = await client.redeem(linkToken);
     done();
     accountState = result.ok
       ? signedIn(accountState, result.value.token, result.value.user)
       : signedOut(result.detail);
+    if (everydayHasThePage) {
+      reportSignInLink(
+        result.ok
+          ? { stage: 'signed-in', text: `Signed in as ${result.value.user.displayName}.` }
+          : { stage: 'refused', text: result.detail },
+      );
+    }
     drawMenu();
   }
 
@@ -4313,11 +4368,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /**
    * Whether **this** surface is the one the player is looking at — GitHub issue **#287**.
    *
-   * One expression for a question two sites ask, because the two are the same question and a second
-   * spelling of it is how they come to disagree. Both are ways to file a day that are *this*
+   * One expression for a question **three** sites ask, because they are the same question and a
+   * second spelling of it is how they come to disagree. Two are ways to file a day that are *this*
    * surface's and not the Everyday product's: {@link tick}'s end-of-day close, and the
    * `Ctrl`/`Cmd`+`Enter` arm of the `window` key handler. § 6.4 gives the other product exactly one
    * way to set `dayClosed` — its own *Close the day* — and neither of these is it.
+   *
+   * **The third asks it for a different reason and is deliberately not a second predicate** —
+   * {@link redeemLinkFromHash}, GitHub issue #336. There the question is not *may this surface act*
+   * but *which surface will the player read the answer on*, and it is the same fact: a screen behind
+   * `visibility:hidden` and `inert` is one nobody is looking at, whether the thing written to it is
+   * a filed day or a sign-in outcome. Two spellings of *who has the page* is exactly what this
+   * function exists to prevent, and a third site is a reason to reuse it rather than to fork it.
    *
    * **`!== true` rather than `=== false`, and that is the load-bearing half.** `everydaySwap()`
    * answers `undefined` on a build that loaded this module with no Everyday shell over it, and
