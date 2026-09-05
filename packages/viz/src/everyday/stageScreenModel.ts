@@ -676,15 +676,21 @@ function unjudged(reading: GoalReading): GoalReading {
  * `shift/goals.ts#goalsForDay` returns `[carry, minute, queue, worst, energy]`; the fifth is
  * § D468's energy bar and it landed after #277 was filed, so the issue's own title and its first
  * acceptance criterion still say *four*. Nothing here counts: {@link StageGoalsInput.readings} is
- * whatever `host.goalsToday()` returns and the map below is generic over it, exactly as
- * `goalRowsOf` is. A sixth bar draws itself.
+ * whatever the host hands over and the map below is generic over it, exactly as `goalRowsOf` is.
+ * A sixth bar draws itself.
  *
  * ## The fold is the rail's, and this function is a caller
  *
- * § D371 authorises the stage to read `host.goalsToday()` *"through the same fold
+ * § D371 authorises the stage to read the host's goals *"through the same fold
  * `dev/leftRail.ts#goalRowsOf` uses — never a second implementation"*, and that is met literally:
  * the values, the glyphs, the *was* slot and the progress are `goalRowsOf`'s, unmodified. What
  * this function adds is {@link unjudged} on the way in and the note under the rows.
+ *
+ * § D371 names `goalsToday()` and the caller is `EverydayHost.goalsAt`, which is that method with
+ * the instant passed in rather than taken from `EverydayHostBindings.playheadS`. The distinction is
+ * § D470's and is not a departure from this one: `goalsToday()` folds at the **Engineer**
+ * transport's position, which is not moving while the Everyday shell has the page, so a stage that
+ * called it would have drawn five constants. One fold, two entry points.
  *
  * **Two of `goalRowsOf`'s seven fields are deliberately dropped.** `color` and `fill` are
  * `var(--faint)` and friends — the Engineer rail's custom properties, from a stylesheet that is not
