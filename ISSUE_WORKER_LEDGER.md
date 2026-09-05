@@ -2070,3 +2070,74 @@ and is still exact. `:55` states *"`analytics` is still 0 files"* — the publis
 files**, both prose by the document's own test. **The claims are intact and the counts are not**, and
 § 0's own rule is the one to apply: *"a measurement whose command is retuned until it gives the old
 answer is the defect this table exists to prevent."*
+
+## S.5 Lane S-B — #344 closed, and the issue's own premise is what it refuted
+
+**The `viz` leg is a head, not a tail.** #344 was filed on the belief that *"the leg's duration is
+governed by a tail nobody has measured"*, and the tail is not the subject at all: on a quiet run of
+223 files and 5 065 cases, **three files hold 50 % of the serial cost** and
+`campaign/campaign.test.ts` alone holds **33.34 %**.
+
+**That converts a cost into a ceiling.** Vitest schedules *files* and runs the cases inside one file
+in series, so the leg cannot finish before its largest file does, and the reciprocal of that share is
+the most concurrency the leg can ever use — **3.0**. A four-core runner is therefore **already
+saturated**, and nothing but splitting that file moves the number. Filed as **#356**.
+
+### S.5.1 The 93 annotations are confirmed and their frame is corrected three ways
+
+Re-derived on `13e7b93`, the tree #344 was filed against, the scanner **reproduces 555 / 182 / 93
+exactly** — so the counts are confirmed rather than doubted, which is the outcome this column most
+often cannot report. What is corrected is what they *mean*:
+
+1. **Four of the 93 are `*.browser.test.ts`**, which the `viz` project excludes and the browser tier
+   runs at its own 120 000 ms. The leg's population is **89**.
+2. **Counting *above 300 000 ms* rather than *above each project's own ceiling* hides 63**
+   `viz-browser` annotations above the ceiling that actually binds them.
+3. **The issue comment's 146-across-five-packages is low by 123**, because it counts numeric literals
+   and misses a file-local `const TIMEOUT_MS = 900_000`. The real figure is **269**, and the whole gap
+   is `experiments`.
+
+**None was brought down, and that is a measurement rather than a preference.** Median measured cost
+of an annotated case: **0.00 s**. Fifty of 64 under 100 ms. **Fifty-five annotated at ≥ 600 s while
+measuring under one second.** None exceeds its own annotation at 1×, 1.82×, 4.5× or 9×; tightest
+headroom **10.7×**.
+
+### S.5.2 The hard criterion, and the tidy model it refuted
+
+AC3 asked for a guard robust to a 1.8× machine swing **or** an honest declaration of what it cannot
+catch. Measured across a **2.79×** contention swing — harsher than the 1.82× § D483 diagnosed:
+
+| statistic | move |
+|---|---|
+| critical-path share | 33.34 % → 33.05 % (**−0.29 pp**) |
+| worst single file's share | **2.83 pp** |
+| rank moves in the top ten | **one adjacent swap** |
+| a same-run cohort ratio | 17.45 → **20.12, a false +15 %** |
+
+**§ D483's uniform swing does not describe a contention swing**, which is the finding: per-file ratios
+run **1.46× to 11.25×** (median 2.08 against an aggregate 2.79). So a share is exact in the model and
+resolves about 3 pp on one file in practice — and the same-run baseline #344's own comment proposed is
+the **weakest** of the three options, published beside the guard rather than left to be discovered.
+The blindness to uniform growth is asserted as a test rather than stated as a sentence.
+
+### S.5.3 What the lane refused, and one scope stretch it declared
+
+It lowered none of the 87 decorative annotations (it recovers no wall clock, measured, and those files
+belong to other lanes), raised no timeout, published **no wall-clock budget as a constant** — § D483
+and its own 2.79× say that number would be wrong — and took no number but D492.
+
+**The declared stretch**: an env-gated entry in `deepTiers.test.ts`, because that audit derives from
+disk and would have gone red without one. Registered `scheduled: false` with the reason (nothing
+produces the report it reads) and the workflow change that would flip it.
+
+**Residue: nothing runs the deriver in CI.** `.github/` was outside the lane's writable set, so the
+pull-request gate is the static ratchet alone. Named on the issue rather than left to be found.
+
+### S.5.4 The lane predicted the integrator's red, and was right
+
+It reported `documentation.test.ts` failing two cases on its branch — the charter's next-free row and
+three holes at D489–D491 — diagnosed both as **wave-level bookkeeping that every wave-S lane would
+hit**, and named the fix as the integrator opening `OPEN_RESERVATION`. That was already done, and the
+integrated tree is green: **24 files, 236 passed, 6 skipped, exit 0**. A lane that predicts the
+integrator's failure and declines to fix it from inside its own branch is the division of labour
+§ D343 asks for, arriving on a lane rather than being imposed on one.
