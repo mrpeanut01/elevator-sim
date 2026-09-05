@@ -1278,3 +1278,77 @@ four of four, with the briefs being the integrator's both times.
 | `.github/` | **nobody** | no lane may touch CI this wave |
 | **`honesty/surfaces.ts`, `honesty/agreement.ts`** | **S-A** | sole owner this wave, unlike wave Q where two lanes shared it |
 | **`DECISIONS.md`** | **shared, all three builders** | all append; conflicts resolved in numeric order |
+
+## Wave S closed
+
+**61 open at the start, 64 at the end. Four issues closed, ten filed, eight decisions taken, five
+registers corrected.** The count going up is the wave's honest shape rather than its failure: nine of
+the ten filed are work that was already specified somewhere and mapped to nothing.
+
+| task | issue | outcome |
+|---|---|---|
+| **S-V1** | #146, #171, #177, #178 | reported; **#146 ruled** (§ D495), #171 and #178 **retitled**, all four dispositioned |
+| **S-V2** | #158, #159, #169, #174, #225 | **#158 closed as duplicate of #232**, **#225 ruled** (§ D496), **#346 filed**, `docs/14` corrected |
+| **S-V3** | #201, #202, #236, #250, #340 | reported; **nothing closable and nothing a duplicate**, and the cluster's direction inverted |
+| **S-V4** | #219, #231, #241, #247, #93, #237, ten programme issues | reported; **#355 filed**, `RISKS.md` R42 and `CHARTER_PROGRAMME.md` corrected |
+| **S-A** | #332 | **merged and closed** — § D494 |
+| **S-B** | #344 | **merged and closed** — § D492, **#356 filed** |
+| **S-C** | #342 | **merged and closed** — § D493, **#348–#354 filed** |
+
+**Verified by the integrator rather than accepted**, on the integrated tree: `tsc -b` exit 0, the
+validation suite **24 files / 236 passed / 6 skipped**, and the corpus measured once in both tiers.
+Lane S-A additionally ran the full `viz` (221 files / 5 082), `viz-browser` (37 / 221) and `server`
+(16 / 367) projects green on its own branch; lane S-B ran the full `viz` leg green on its.
+
+### S.6 What this wave learned that the next one should not re-learn
+
+**1. A hand-off can name the right issue and still be wrong about it.** Wave R said *"#332 is next,
+#336 was its prerequisite and is closed."* True, and not sufficient: two product decisions gated the
+screen and a third gated an acceptance criterion, all recorded in a **comment** rather than in the
+issue's own state. That is #329's subject arriving on the process that filed #329. The wave's first
+act was therefore three rulings rather than a lane, and the build lane then discharged all seven
+criteria without re-litigating one of them.
+
+**2. Every register in this repository drifts, and no test reads any of them.** Five corrected this
+wave: `RISKS.md` R42 (an implementation reported open that had closed **54 minutes** after the
+sentence was written), `CHARTER_PROGRAMME.md`'s journey-row claim (wrong by seventeen rows, and it
+survived because the guard that re-derives those counts compares them against a *different* file),
+`docs/14`'s status table (`designed` for the whole time the step was built and measured), `GAPS.md`'s
+fourth stale row (which a deliberate sweep of that register walked past, and which is the **source**
+of another issue's item), and two stale symbol citations. **Every one was found by a lane reading a
+GitHub issue.** None by CI.
+
+**3. The guards caught the integrator twice, and the second time in the sentence explaining the
+guard.** `citations.test.ts` went red on a `§ D387` written into the comment that says the charter
+row must be reconciled. D387 is a registered hole; a hole heads nothing. **Wave R's ledger records
+that its own paragraph explaining this rule made the identical mistake**, and this integrator had
+read that note. Fourth consecutive wave, same slip, same place — which is the argument for the guard
+rather than an embarrassment.
+
+**4. The reservation was opened four lanes late**, which is wave Q's error repeated by the wave that
+quotes it. Nothing was lost, and that was luck rather than process.
+
+**5. A lane predicted the integrator's red and correctly refused to fix it.** S-B found
+`documentation.test.ts` failing two decision-number cases on its branch, diagnosed them as wave-level
+bookkeeping every sibling lane would hit, named the fix as the integrator's, and did not reach outside
+its writable set. Right on all three counts.
+
+**6. Six of seven lanes refuted something in their brief.** #342's headline (*"no issue references
+it"* — false three minutes before it was filed), #344's premise (a tail that is a head), #178's items
+2/3/4, #177's item 6, #174's day variation, #159's *one hard-coded wrinkle*, #225 as worded. Wave R
+had four of four; this wave had six of seven, and the briefs were the integrator's both times.
+
+### S.7 Owed to the next wave
+
+- **#329 is the next build**, and it is ruled (§ D485). It needs `.github/`, which no lane could touch
+  this wave. Its backfill input is ready: **§ S.4's verified edge list** for the telemetry cluster.
+- **#202 is a root, not a leaf.** The backlog reads the telemetry cluster the wrong way round, and
+  #340 cannot start before it.
+- **23 of the open issues carry no milestone**, so under every epic's own stated closure condition
+  they are the children of no epic. That includes #340, which two M4 children are blocked by.
+- **Two genuinely startable items nobody has scheduled**: #246 and #251. **#252 is a third**, and its
+  AC2 has been violated for every player who has run the gauntlet since 2026-08-08.
+- **Six pushes for one wave**, against the *one push per wave* agreement, each cancelling a run. The
+  cause was a stop hook requiring committed work to be pushed while lanes were still in flight. It
+  cost six spurious CI envelopes and no correctness, and the run went green the moment pushing
+  stopped — which is the agreement's arithmetic demonstrated rather than argued.
