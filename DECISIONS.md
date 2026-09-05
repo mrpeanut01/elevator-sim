@@ -32400,3 +32400,67 @@ cover it, which is § D256's rule pointed at a mechanism instead of a sentence.
 **What this does not decide.** Whether this account permits granting `issues: read` to a workflow,
 and what `GITHUB_TOKEN`'s default permissions are here. Both are unchecked settings facts, and the
 lane finds out rather than assuming.
+
+---
+
+## D486 — a submission carries causes and the server derives effects, so ground 2 is not structural and ground 3 is
+
+**Date: 2026-09-05 · Owner: the integrator, on the verification discipline · Rules on: GitHub issue
+#338, `scope/runIdentity.ts#interventions`, `packages/server/src/leaderboard/submission.ts`.**
+
+#338 asks for a ruling on whether its two remaining refusals are permanent. **They are not the same
+kind of thing, and one of them is the wire's own solved problem restated as unsolvable one field
+over.**
+
+**Ground 2 — the `switch-dispatcher` inline weight vector — is NOT structural. Overturned.**
+
+Its stated reason is that *"the viewer's driving profile is routinely a derived object no id
+resolves"*, so a switch could only travel as a shipped profile id, which is *"a different field from
+the one the arm needs locally"*.
+
+**Every clause of that is equally true of the run's base profile, and the base profile posts.**
+`submission.ts` carries `dispatcherProfileId` plus `ruleRows`, and applies the rows to *the profile
+this server resolved from the id, never to a profile the submission carried*. The derived object is
+never on the wire in either case; what travels is the **cause** — an id and the rows — and the server
+re-derives the vector through `profileWithRules`. A switch travels the same way: `{ atS, toProfileId,
+ruleRows? }`.
+
+**The precedent is in that same file and it is exact.** Before `ruleRows` existed, `runIdentity.ts`
+refused every state carrying a rule, so *"the whole of § 11's workshop produced dispatchers that were
+unpostable by construction"* — and the file's own verdict on it is the rule for this entry: *"That
+refusal was correct and is gone because the fact it rested on is."* Ground 2 rests on the same fact,
+and it went away the same day.
+
+What stays refused is **narrower and consistent rather than blanket**: a handover whose target is
+expressible neither as a shipped id nor as an id plus rows — a hand-tuned vector off the workshop
+shelf. That is the identical bound the base profile already lives under, applied to the switch arm
+instead of a category refusal over it.
+
+**Ground 3 — `answer-incident` — IS permanent, and should stop being tracked as a defect.**
+
+It is not a missing field. `viz`'s `shift/incidents.ts` writes the incident onto the *building* as
+`serviceEvents` from the week's day and the calendar, so a replay built from ids has **the answer and
+not the thing answered**: the option's own service events would be the only mode changes in the run
+and the legs would differ. A submission carrying the answer alone replays to a different run, and the
+server would verify *that* run as honest. **A refusal that prevents a verified-but-wrong replay is a
+feature**, and #338 is right to ask for it to be said plainly.
+
+**The route out is named and is not recommended today.** The incident would have to be derivable
+server-side from causes that travel — `packages/server` references `core` and `experiments`, not
+`viz`, so the chooser would have to move, which is § D481's shape. And the alternative, carrying the
+incident as submitted data, is **§ D481's cheat lever exactly**: a player who picks their own incident
+picks their own difficulty. So the refusal stands until somebody moves the chooser, and moving it is
+not this issue's business.
+
+**Both grounds owe the player the same thing, and it lands regardless of either.** A player who hands
+a day over learns it is unpostable **before** they finish playing it rather than at the moment they
+try to post — #338's third bullet, independent of both rulings and the only part a player can feel.
+
+**`ENGINE_CONTRACT.md` § 1.4 is met rather than amended.** *The record, log included, is the unit of
+verification* is satisfied by ground 2's fix, and ground 3 is not an exception to it: an
+`answer-incident` run has no verifiable record to be the unit of, which is why it is refused rather
+than exempted.
+
+**What this does not decide.** Whether the switch arm's `ruleRows` need their own board-key
+contribution. `boardKey.ts#runDataHashOf` already drops an empty rule list; whether a mid-run switch
+to the same id with different rows is a different board is a question for whoever builds it.
