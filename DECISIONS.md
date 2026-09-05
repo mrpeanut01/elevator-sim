@@ -31894,6 +31894,91 @@ case uses, and it remains available to nothing else.
 
 ---
 
+## D481 — the challenge client derives the report window too, and the rotation stops being restricted for it
+
+**Date: 2026-09-05 · Owner: wave R lane C · Rules on: GitHub issue #315's second half,
+`packages/viz/src/menu/challenge.ts`, `packages/viz/src/menu/challenge.test.ts`,
+`packages/server/src/challenge/challenge.test.ts`.**
+
+**The issue this lane was dispatched on was already closed, and re-measuring it is what found what
+was not.** Wave L closed #315's leaderboard half in `3e2d8f3` and the placement decision it took —
+the rule lives in `@elevator-sim/experiments`'s `benchmark/matrixCells.ts#reportWindowForBuilding`,
+beside the `MATRIX_CELLS` it is a conclusion about, rather than in `core` as that brief suggested —
+is recorded in that module's own docstring under § D405 and is **not disturbed here**. It is the
+right placement and this lane re-derived the argument rather than re-taking it: `core` would have
+had to acquire the cells to host the rule, which was the brief's own stop condition.
+
+**The six filed figures reproduce exactly.** `garden-apartments` / `collective` / `rise-and-fall` /
+window `null` / 3 600 s / seed 20260901, on this tree, with the window omitted the way the pre-fix
+server omitted it and present the way the client sets it: server `awtS 18.233 / wt95S 29.310 /
+ttdMeanS 50.829`, client `13.462 / 28.119 / 40.348`. Swept over **all eight** shipped buildings at
+that cell, `garden-apartments` is the **only** one that disagreed, and all eight agree now — so the
+issue neither overstated nor understated itself, which is worth saying because five of seven
+recently filed issues have described defects the tree had already fixed.
+
+### The ruling
+
+**The challenge client derives the window from the building id, from the same function, and the
+server's rotation restriction is withdrawn.**
+
+`viz`'s challenge client is a **third** consumer of that rule, not a second.
+`menu/challenge.ts#challengeRunConfigs` promises in its own docstring to mirror
+`leaderboard/verify.ts#configFor` *"term for term"*, and it did not set this term. A challenge on a
+building the rule moves would have been measured in the browser over one window and replayed by the
+server over another, and every honest entry on it refused as `metrics-do-not-reproduce` — #315
+exactly, one surface over, and the wave-L lane said so where it stood.
+
+**No shipped rotation was affected**, which is why this arrived as a latent hazard rather than a bug
+report: `garden-apartments` is the only building whose matrix cells are unanimously `full-run`, and
+the rotation is `midtown-office`, `chancery-house` and `crown-hotel`. All three derive `undefined`,
+both sides omit the key, and the two configurations were identical **by luck rather than by
+construction**.
+
+### What is withdrawn, and why withdrawing it is the decision rather than a tidy-up
+
+The wave-L lane left a tripwire in `challenge/challenge.test.ts` asserting that **no rotation entry
+names a building the window rule moves**. That was the honest thing to leave at the time and it is
+recorded as such. With the client fixed it becomes a **stale refusal**: it constrains the *rotation*
+because the *client* was wrong, so the next author of a `garden-apartments` challenge would meet a
+red test instructing them to fix something already fixed. `CLAUDE.md` calls that class worse than a
+dead seam — a dead seam merely does nothing, while a stale refusal tells the reader not to touch a
+control that works — so the constraint is removed rather than reworded, and the behaviour it stood
+in for is driven instead: a claim measured **with** the derived window reproduces, and the same claim
+measured **without** it is refused. The building is chosen **by the rule** rather than named.
+
+### The gap that hid it, which is the more important half
+
+The issue's own diagnosis was that *"the present suite only ever drives `midtown-office`, the one
+building that agrees"*. **The guard that existed to catch exactly this had the same blind spot
+twice over**, and both are closed here rather than worked around.
+
+- **It could not see the term.** `menu/challenge.test.ts` derives `configFor`'s key set out of the
+  server's source text and its own docstring names *"a `reportWindow`"* as its worked example of
+  what it exists to catch. It extracted keys from the spread arms with a pattern requiring a colon,
+  and `configFor` writes `...(reportWindow === undefined ? {} : { reportWindow })` — `shiftRunConfigOf`'s
+  own spelling for spread-or-omit, with **no colon in it**. Measured on the tree that closed the
+  leaderboard half: 13 keys extracted, `reportWindow` not among them. Arms are now split on their
+  top-level commas and read both ways, keyed and shorthand.
+- **It could not see the value.** Having found the key, it compared against a single config built on
+  `viewOf()` — the `midtown-morning` rotation entry, and therefore Midtown. A key that is
+  *conditional on the building* is absent from that config whenever Midtown is on the omitting side,
+  so the comparison would have reported the same three names with the client correct **or** broken.
+  The client's key set is now the union over every building the fixture ships, split **by the rule**.
+
+Both directions are asserted over a derived split with a non-vacuity premise, so a ninth building
+answering the rule a third way widens the loops rather than escaping them, and a matrix edit that
+emptied a side lands as a failed premise rather than a silent pass. The repair was verified as a
+positive control: with the product fix reverted the guard goes red naming `reportWindow`, and green
+with it restored.
+
+### What this does not license
+
+The window is still **derived, never submitted**. A report window on the wire is a player-settable
+parameter inside a board key (`ENGINE_CONTRACT.md` § 12.1) and the divisor of every mean on the
+sheet, so a player who picked their own window would pick their own average. Nothing here weakens
+the replay: the server still recomputes rather than trusts, and what was made to agree is the
+**configuration**, not the comparison. No published figure moved, no statistical rule was touched,
+and `awtIsValid` is unchanged.
 ## D483 — a test-cost figure is a claim about a machine, and this repository was publishing them as properties of the code
 
 **Date: 2026-09-05 · Owner: the integrator, wave R · Binds: `.github/workflows/ci.yml`'s

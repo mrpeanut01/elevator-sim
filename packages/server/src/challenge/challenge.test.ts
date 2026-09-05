@@ -475,48 +475,98 @@ describe('every shipped challenge is playable with every shipped dispatcher', ()
     expect(unquotable).toEqual([]);
   }, 300_000);
 
-  it('names no building whose report window the client’s own challenge path does not set', () => {
+  it('replays a challenge on a building the window rule moves, and refuses one measured without it', () => {
     /*
-     * **A tripwire for a gap this change opened and could not close** — GitHub issue #315.
+     * **The challenge half of GitHub issue #315**, which the leaderboard half left open.
      *
-     * `configFor` now derives a `reportWindow` from the building id, because the leaderboard's
-     * client does and an honest submission has to reproduce. `viz`'s **challenge** client is a
-     * second mirror of `configFor` — `menu/challenge.ts#challengeRunConfigs`, whose own docstring
-     * says it *"mirrors `leaderboard/verify.ts#configFor` term for term"* — and it does **not** set
-     * that term. So a rotation entry naming a building the rule moves would be replayed by this
-     * server over a different window from the one the player's browser measured, and every honest
-     * challenge entry on it would be refused as unreproducible. That is issue #315 exactly, one
-     * surface over.
+     * `configFor` derives a `reportWindow` from the building id. `viz`'s challenge client is a
+     * second mirror of it — `menu/challenge.ts#challengeRunConfigs`, whose own docstring says it
+     * *"mirrors `leaderboard/verify.ts#configFor` term for term"* — and for one wave it did **not**
+     * set that term. A rotation entry naming a building the rule moves would have been measured by
+     * the browser over one window and replayed here over another, and every honest entry on it
+     * refused as unreproducible. That is #315 exactly, one surface over.
      *
-     * **No shipped challenge is affected today**, which is why this is a tripwire rather than a
-     * failure: `garden-apartments` is the only building whose matrix cells are unanimously
-     * `full-run`, and the rotation is `midtown-office`, `chancery-house` and `crown-hotel` — the
-     * first not unanimous, the other two not in the matrix at all. All three get `undefined`, both
-     * sides omit the key, and the two configs are identical.
+     * **This case replaced a tripwire, and the replacement is the point.** What stood here asserted
+     * that no rotation entry names a building the rule moves — true of the shipped three, and a
+     * workaround rather than a check: it constrained the *rotation* because the *client* was wrong.
+     * With the client fixed that assertion becomes a refusal nobody can satisfy their way past — the
+     * next author of a `garden-apartments` challenge would meet a red test telling them to go and
+     * fix something already fixed, which is the stale-refusal class `CLAUDE.md` calls worse than a
+     * dead seam. So the constraint is gone and the behaviour it was standing in for is driven
+     * instead, on a building chosen **by the rule** rather than named.
      *
-     * The fix belongs in `viz` and is one line in `challengeRunConfigs`; this case is what stops the
-     * hazard arriving silently in the meantime. `menu/challenge.test.ts`'s key-parity guard names
-     * *"a `reportWindow`"* as its own worked example of what it exists to catch and did not catch
-     * this one: it extracts keys from `configFor`'s spread arms with a pattern that requires a
-     * colon, and a shorthand property (`{ reportWindow }` — `shiftRunConfigOf`'s own spelling for
-     * spread-or-omit) has none.
+     * The client is not imported and cannot be — `viz` is a browser bundle and this package opens a
+     * socket. What is checkable here is that the window is load-bearing on this path at all: a claim
+     * measured **with** the derived window reproduces, and the same claim measured **without** it —
+     * which is precisely what the old client produced — is refused. `viz`'s own
+     * `menu/challenge.test.ts` key-parity guard holds the other end, and #315 is also why it can:
+     * it extracted keys from `configFor`'s spread arms with a pattern that required a colon, so the
+     * shorthand `{ reportWindow }` was the one term it could not see, and it built its comparison
+     * config on `midtown-office` alone — the same one-building blind spot the issue was filed about.
      */
-    // The instrument first: a rule that moved nothing would make the filter below vacuous and this
-    // case would pass on a tree where the hazard had already shipped.
-    expect(
-      [...config.buildingsById.keys()].filter((id) => reportWindowForBuilding(id) !== undefined),
-      'the window rule moves no shipped building; this case would assert nothing',
-    ).not.toEqual([]);
+    const moved = [...config.buildingsById.keys()].filter(
+      (id) => reportWindowForBuilding(id) !== undefined,
+    );
+    // The instrument first: a rule that moved nothing would make this case vacuous.
+    expect(moved, 'the window rule moves no shipped building; this case would assert nothing').not.toEqual(
+      [],
+    );
 
-    const moved = CHALLENGE_ROTATION.filter(
-      (definition) => reportWindowForBuilding(definition.config.buildingId) !== undefined,
-    ).map((definition) => `${definition.slug} (${definition.config.buildingId})`);
-    expect(
-      moved,
-      'this rotation entry needs `viz`’s `menu/challenge.ts#challengeRunConfigs` to set ' +
-        '`reportWindow` from the building id first, or every honest entry on it is refused',
-    ).toEqual([]);
-  });
+    for (const buildingId of moved) {
+      const challenge = {
+        ...issuedChallengeFor(0),
+        config: { buildingId, demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: null, durationS: 3600 },
+        seeds: ['20260901'],
+      };
+      const run = {
+        buildingId,
+        dispatcherProfileId: 'collective',
+        demandTemplateId: 'rise-and-fall',
+        arrivalRatePctPop5min: null,
+        durationS: 3600,
+        windowStartS: null,
+        seed: '20260901',
+      };
+
+      const derived = configFor(run, resources);
+      if (typeof derived === 'string') throw new Error(`fixture does not resolve: ${derived}`);
+      expect(derived.reportWindow, `${buildingId}: the server did not derive a window`).toBe(
+        reportWindowForBuilding(buildingId),
+      );
+
+      const withWindow = runSimulation(derived).summary;
+      // A run whose own mean is not quotable is refused before the comparison this case is about.
+      expect(withWindow.awtIsValid, `${buildingId}: fixture is not quotable`).toBe(true);
+
+      const honestClaim = { seed: '20260901', legs: withWindow.waiting.count, ...metricsOf(withWindow) };
+      expect(
+        verifyChallengeSubmission(
+          { challengeId: challenge.id, dispatcherProfileId: 'collective', claimed: [honestClaim] },
+          challenge,
+          resources,
+        ).ok,
+        `${buildingId}: an honest challenge entry did not verify`,
+      ).toBe(true);
+
+      // The old client's configuration, term for term, minus the one term it omitted.
+      const { reportWindow: _omitted, ...asTheOldClientBuiltIt } = derived;
+      const withoutWindow = runSimulation(asTheOldClientBuiltIt).summary;
+      const staleClaim = {
+        seed: '20260901',
+        legs: withoutWindow.waiting.count,
+        ...metricsOf(withoutWindow),
+      };
+      const refused = verifyChallengeSubmission(
+        { challengeId: challenge.id, dispatcherProfileId: 'collective', claimed: [staleClaim] },
+        challenge,
+        resources,
+      );
+      expect(refused.ok, `${buildingId}: the omitted window changed nothing, so this case tests nothing`).toBe(
+        false,
+      );
+      if (!refused.ok) expect(refused.code).toBe('metrics-do-not-reproduce');
+    }
+  }, 300_000);
 
   it('has enough legs behind each run for the mean to mean something', () => {
     // R13 again, one level down. `garden-apartments` at 6 %/900 s produces a legitimately quotable

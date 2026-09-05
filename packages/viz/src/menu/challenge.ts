@@ -50,6 +50,9 @@
 // that the bare entry point pulls in `node:` types that the bundle does not have — so a type checked
 // against one and shipped against the other agrees on nothing that matters.
 import type { SimulationConfig } from '@elevator-sim/core/browser';
+// The same rule the leaderboard's two sides read, reached through the same browser-safe module —
+// GitHub issue #315, and `challengeRunConfigs` says below why this is an import and not a copy.
+import { reportWindowForBuilding } from '@elevator-sim/experiments/browser';
 
 import type { BrowserResources } from '../dev/data.js';
 
@@ -414,6 +417,9 @@ export function challengeRunConfigs(
     };
   }
 
+  // Derived from the id, never read off the wire — the argument is at the spread below.
+  const reportWindow = reportWindowForBuilding(config.buildingId);
+
   const runs = seeds.map((seed) => ({
     seed,
     config: {
@@ -436,6 +442,39 @@ export function challengeRunConfigs(
       ...(config.arrivalRatePctPop5min === null
         ? {}
         : { demand: { arrivalRatePctPop5min: config.arrivalRatePctPop5min } }),
+      /*
+       * **Which window the figures are read over** — GitHub issue #315, arriving here one surface
+       * after it was closed on the leaderboard's.
+       *
+       * `configFor` derives this term from the building id. This function did not, and the term for
+       * term promise above is what makes that a defect rather than a difference: a challenge on a
+       * building the rule moves would have been measured by the browser over one window and
+       * replayed by the server over another, so every honest entry on it would come back
+       * `metrics-do-not-reproduce`. That is this product's one accusation, spent on a player who did
+       * nothing wrong — and it is exactly what shipped on `garden-apartments`'s leaderboard until
+       * #315, where the server read `awtS 18.233` against the browser's `13.462`.
+       *
+       * **No shipped rotation was affected**, which is why this arrived as a latent hazard rather
+       * than as a bug report: `garden-apartments` is the only building whose matrix cells are
+       * unanimously `full-run`, and the rotation is `midtown-office`, `chancery-house` and
+       * `crown-hotel` — the first not unanimous, the other two not in the matrix at all. All three
+       * derive `undefined`, both sides omit the key, and the two configurations were identical by
+       * luck rather than by construction.
+       *
+       * **The same function as the server's, not the same rule written twice.**
+       * `@elevator-sim/experiments`'s `reportWindowForBuilding` is what `leaderboard/verify.ts`
+       * calls and what `shift/reportWindow.ts#shiftReportWindowFor` names on this side; a third copy
+       * would be free to disagree, and the first symptom of the disagreement is the defect above.
+       * Keyed on the building id, which a challenge already fixes — **never** on the wire, because a
+       * submitted window is a player-settable parameter inside a board key and the window is the
+       * divisor of every mean on the sheet.
+       *
+       * Spread-or-omit rather than `reportWindow: …`, because an absent key and a present
+       * `undefined` are different claims to `core` and only the first means *the template's own*.
+       * `challenge.test.ts`'s key-parity guard is what holds this in place, and it could not see
+       * this shorthand until #315 taught it to.
+       */
+      ...(reportWindow === undefined ? {} : { reportWindow }),
     } as SimulationConfig,
   }));
 
