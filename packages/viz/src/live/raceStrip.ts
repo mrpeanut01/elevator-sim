@@ -167,6 +167,37 @@ export const RACE_PENDING = 'waiting for the rival’s day to finish simulating'
  */
 export const RACE_NOT_RUN = 'no rival run yet — the next Run this shift races them';
 
+/**
+ * Why the strip offers no race while somebody else's day is on screen — GAMEPLAY § 14.1.
+ *
+ * ## It is the reason, and it is *visible*, which is the whole of what changed
+ *
+ * Both shells used to say this in a `title` attribute on a **disabled** `<select>`, which failed
+ * twice over. A `title` is not read on a touch device and rarely anywhere else, so the reason was
+ * invisible to the player; and a disabled `<select>` still renders its option list, so what the
+ * player *did* read was `your latest saved` and *"just your day"* printed over a stranger's run —
+ * § 14.1's own defect condition, on the two surfaces the rule is about. Measured on the rendered
+ * screen rather than argued: `dev/watch.browser.test.ts` and `everyday/watchStage.browser.test.ts`
+ * sweep `innerText` for `you`, and both found it.
+ *
+ * So the sentence moved out of the attribute and into {@link RaceSlots.note}, which is drawn text on
+ * both strips — and it moved **here**, beside {@link RACE_PENDING} and {@link RACE_NOT_RUN}, because
+ * it is the same kind of thing they are: a state only the shell can know, said once for both shells.
+ * It stood in `everyday/stageScreenModel.ts#STAGE_RACE_WATCHING`, where the Engineer strip could not
+ * reach it and had nothing to say at all.
+ *
+ * ## The wording carries no second person, and that is a constraint rather than a style
+ *
+ * The sentence it replaces read *"not while you are watching somebody else's day"*. Rendering that
+ * visibly would have traded an invisible defect for a loud one: `you` is the very word § 14.1
+ * forbids on a watched run, so a reason that could not be shown was not a reason. This one states
+ * the same rule about *the day* and *a spectator* rather than about the reader, which is also how
+ * `everyday/watchStage.ts#SPECTATOR_MAKES_NO_CHANGES` says § 14.1's other half three centimetres
+ * away on the same screen.
+ */
+export const RACE_WATCHING =
+  'no rival while this is somebody else’s day — a spectator who commissioned a second run would be playing, not watching';
+
 /* -------------------------------------------------------------------------- *
  * The samples
  * -------------------------------------------------------------------------- */
@@ -333,6 +364,15 @@ export interface RaceRival {
   readonly refusal: string | undefined;
   /** Whether the rival's day is still in the worker. */
   readonly pending: boolean;
+  /**
+   * Whether the run on screen belongs to somebody else — GAMEPLAY § 14.1. Outranks **everything**,
+   * the refusal included; see {@link raceSlotsOf}.
+   *
+   * Required rather than optional on purpose. A third shell that grew a strip and forgot this field
+   * would compile, draw a spectator the *nobody* pick's *"just your day"* over a stranger's run, and
+   * reproduce exactly the defect that put this field here.
+   */
+  readonly watching: boolean;
 }
 
 /** The three cells a shell writes that are not a polyline. */
@@ -350,7 +390,16 @@ export interface RaceSlots {
  *
  * ## Honesty order, and it is the reason this is not three ternaries at each call site
  *
- * A **refusal** outranks everything: it says why there is no rival, and a state ("waiting for…")
+ * **Watching somebody else's day** outranks everything, the refusal included — GAMEPLAY § 14.1,
+ * and it is above the refusal rather than beside it because a refusal explains why *this player's*
+ * pick produced no run, which is a sentence about a race a spectator is not in. `enterWatch` already
+ * drops the rival's recording, so what is left to decide is what the three cells say over a run that
+ * is not the reader's: no verdict (§ 14.1's *"no verdict — you are not in this comparison"* — the
+ * cell is emptied, and each shell fills it with its own § 14.1 identity treatment), no name, and
+ * {@link RACE_WATCHING} as the note. The note is the reason, drawn, and that is the point of it:
+ * both shells previously hid it in a `title`.
+ *
+ * Then a **refusal** outranks the rest: it says why there is no rival, and a state ("waiting for…")
  * printed over it would describe a request that was never made. Then a picked-but-absent rival says
  * whether one is coming. Only a **drawn** rival — or the *nobody* pick, whose slot carries the
  * plain figure — speaks through the view itself. Getting that order wrong is not a cosmetic bug: it
@@ -381,6 +430,7 @@ export function raceSlotsOf(
   rival: RaceRival,
   yours: VizRecording | undefined,
 ): RaceSlots {
+  if (rival.watching) return { verdict: '', note: RACE_WATCHING, rivalName: '' };
   const drawn = view.ghost !== undefined;
   const pickNote = GHOST_OPTIONS.find((option) => option.id === rival.pick)?.note ?? '';
   const verdict =

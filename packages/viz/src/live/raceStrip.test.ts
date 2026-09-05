@@ -24,6 +24,7 @@ import {
   RACE_NOT_RUN,
   RACE_PENDING,
   RACE_SAMPLE_INTERVAL_S,
+  RACE_WATCHING,
   SAME_CROWD_NOTE,
   SAME_RUN_NOTE,
   raceLaneOf,
@@ -137,7 +138,63 @@ describe('raceStripViewOf', () => {
  * already declined to run would be describing a request that was never made.
  */
 describe('raceSlotsOf — the honesty order, once, for both shells', () => {
-  const noRival = { pick: 'plain-baseline' as const, recording: undefined, refusal: undefined };
+  const noRival = {
+    pick: 'plain-baseline' as const,
+    recording: undefined,
+    refusal: undefined,
+    watching: false,
+  };
+
+  /**
+   * **GAMEPLAY § 14.1, and it outranks the refusal rather than sitting beside it.**
+   *
+   * This is the state the browser tier caught on two surfaces at once: the *nobody* pick's own note
+   * reads *"no second run, no rival line, no score — just your day"*, and printed under somebody
+   * else's lanes that is § 14.1's stated defect condition — *"the word `you` on a watched run is a
+   * defect"*. The rank matters and is driven here with a refusal **and** a rival in flight beneath
+   * it: both of those are sentences about a race this reader is not in, so either winning would put
+   * the wrong words on a spectator's card.
+   *
+   * The verdict is emptied rather than filled, which is § 14.1's *"no verdict — you are not in this
+   * comparison"* read literally. Each shell fills that cell with its own identity treatment — the
+   * Everyday stage writes the record's eyebrow into it — and a slot function that guessed which
+   * would be answering a question only the shell can.
+   */
+  it('lets a watched run outrank every state, including a refusal, and says why in the note', () => {
+    const view = raceStripViewOf({ recording: recordingOf(), ghost: undefined, simTimeS: 480 });
+    const slots = raceSlotsOf(
+      view,
+      { ...noRival, refusal: 'nothing saved yet', pending: true, watching: true },
+      recordingOf(),
+    );
+    expect(slots.note).toBe(RACE_WATCHING);
+    expect(slots.verdict).toBe('');
+    expect(slots.rivalName).toBe('');
+    /* The reason is a reason: it says why, not only no. */
+    expect(RACE_WATCHING.length).toBeGreaterThan('no rival'.length);
+    /*
+     * And it may not address the reader, which is the constraint that forced the rewording rather
+     * than a preference. The sentence it replaced said *"not while **you** are watching…"*, so
+     * drawing it would have traded an unread `title` for a loud violation of the very rule it
+     * explains. Asserted here rather than only in the browser sweep because this is where the
+     * sentence lives, and a lane rewording it will run this file first.
+     */
+    const words = RACE_WATCHING.toLowerCase().match(/[a-z']+/gu) ?? [];
+    expect(words.filter((word) => ['you', 'your', 'yours'].includes(word))).toEqual([]);
+  });
+
+  /* A drawn rival is still drawn when nobody is watching — the negative control for the arm above. */
+  it('does not withhold the note when the run on screen is the reader’s own', () => {
+    const recording = recordingOf();
+    const view = raceStripViewOf({ recording, ghost: recording, simTimeS: 480 });
+    expect(
+      raceSlotsOf(
+        view,
+        { pick: 'plain-baseline', recording, refusal: undefined, pending: false, watching: false },
+        recording,
+      ).note,
+    ).not.toBe(RACE_WATCHING);
+  });
 
   it('lets a refusal outrank every state below it, including one still in flight', () => {
     const view = raceStripViewOf({ recording: recordingOf(), ghost: undefined, simTimeS: 480 });
@@ -165,7 +222,7 @@ describe('raceSlotsOf — the honesty order, once, for both shells', () => {
     const view = raceStripViewOf({ recording: recordingOf(), ghost: undefined, simTimeS: 480 });
     const slots = raceSlotsOf(
       view,
-      { pick: 'none', recording: undefined, refusal: undefined, pending: false },
+      { pick: 'none', recording: undefined, refusal: undefined, pending: false, watching: false },
       recordingOf(),
     );
     expect(slots.verdict).toBe('1 standing now');
@@ -183,7 +240,7 @@ describe('raceSlotsOf — the honesty order, once, for both shells', () => {
     const view = raceStripViewOf({ recording, ghost: recording, simTimeS: 480 });
     const slots = raceSlotsOf(
       view,
-      { pick: 'plain-baseline', recording, refusal: undefined, pending: false },
+      { pick: 'plain-baseline', recording, refusal: undefined, pending: false, watching: false },
       recording,
     );
     expect(slots.rivalName).toBe(
@@ -223,7 +280,7 @@ describe('servedIdentically — telling a vacuous race from an inert control', (
     const view = raceStripViewOf({ recording, ghost: recording, simTimeS: 480 });
     const slots = raceSlotsOf(
       view,
-      { pick: 'plain-baseline', recording, refusal: undefined, pending: false },
+      { pick: 'plain-baseline', recording, refusal: undefined, pending: false, watching: false },
       recording,
     );
     expect(slots.note).toBe(SAME_RUN_NOTE);
@@ -243,7 +300,7 @@ describe('servedIdentically — telling a vacuous race from an inert control', (
     const view = raceStripViewOf({ recording: yours, ghost: rival, simTimeS: 480 });
     const slots = raceSlotsOf(
       view,
-      { pick: 'plain-baseline', recording: rival, refusal: undefined, pending: false },
+      { pick: 'plain-baseline', recording: rival, refusal: undefined, pending: false, watching: false },
       yours,
     );
     expect(slots.note).toBe(SAME_CROWD_NOTE);

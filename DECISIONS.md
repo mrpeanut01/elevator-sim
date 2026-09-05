@@ -32520,3 +32520,79 @@ D479–D482 one per issue to the four lanes, and D483–D487 the integrator's fi
 block to spend everything, and the sizing that produced it is recorded in `documentation.test.ts` —
 a lane's allocation is one number per issue, and an integrator's is a **stream** rather than a batch,
 because it is spent per finding and a wave's findings are not enumerable at dispatch.
+
+## D488 — a reason a player cannot see is not a reason, and a disabled control still speaks
+
+**Date: 2026-09-05 · Owner: wave R lane R-FIX · GAMEPLAY § 14.1 · Rules on:
+`live/raceStrip.ts`, `everyday/stageScreen.ts`, `everyday/stageScreenModel.ts`, `dev/main.ts`'s race
+strip, `honesty/surfaces.ts`.**
+
+[§ D482](DECISIONS.md) gave both shells a ghost picker and guarded it on a watched run by
+**disabling** it and writing the reason into the control's `title`. Both halves of that guard were
+wrong, in opposite directions, and the browser tier found them the moment the two lanes were
+integrated — never on either branch, because the § 14.1 sweep and the picker landed in different
+lanes of one wave.
+
+**A disabled `<select>` still renders its option list.** `innerText` reads it, and so does a player:
+while a stranger's day was on the stage the picker went on offering *your latest saved*, and
+`raceSlotsOf`'s note — the *nobody* pick's own sentence — printed *"no second run, no rival line, no
+score — just your day"* under somebody else's lanes. § 14.1 states the defect condition in exactly
+those words: *"the word `you` on a watched run is a defect."* Greying a control does not un-say what
+the control says. Measured on the rendered screen rather than argued:
+`everyday/watchStage.browser.test.ts` read `your` twice on `.everyday-screen`, and
+`dev/watch.browser.test.ts` read it once on `#race-strip` — once rather than twice there because the
+Engineer picker is already hidden, so **the note was the whole of that failure**. The note was the
+half a lane looking at the picker would not have found.
+
+**And a `title` is not a declaration.** A touch device never shows one and a pointer rarely does, so
+the explanation § D482 wrote for the player was invisible to the player *and* invisible to the sweep
+that then found the copy underneath it. `docs/16` S1's rule — an absence indistinguishable from an
+oversight is not a declaration — applies to a stated reason as much as to a missing one.
+
+**So the reason becomes drawn text, and it moves to where both shells can read it.** The sentence
+stood in `everyday/stageScreenModel.ts#STAGE_RACE_WATCHING`, which is one screen's model; the
+Engineer strip could not reach it and said nothing at all. It is now
+`live/raceStrip.ts#RACE_WATCHING`, beside `RACE_PENDING` and `RACE_NOT_RUN`, which are the same kind
+of thing — a state only the shell can know — and it is delivered through `raceSlotsOf`, the one
+derivation both strips already fill their cells from. § D482's own reason for extracting that
+function is this one: *two sites answering one question is how one of them goes stale unread*.
+
+**`RaceRival.watching` outranks the refusal, and the field is required rather than optional.** A
+refusal explains why *this player's* pick produced no run, which is a sentence about a race a
+spectator is not in; so is *waiting for the rival's day*, and so is *the next Run this shift races
+them*. All three are wrong over somebody else's day, so the spectator arm is above them all. The
+three cells become: no verdict — § 14.1's *"no verdict — you are not in this comparison"* read
+literally, with the cell emptied so each shell fills it with its own identity treatment — no rival
+name, and `RACE_WATCHING` as the note. A third shell that grows a strip and omits the field will not
+compile, which is the point of not defaulting it.
+
+**The wording lost its second person, and that is a constraint rather than a preference.** The
+sentence read *"not while you are watching somebody else's day"*. Drawing that would have traded an
+unread attribute for a loud violation of the very rule it explains — `you` is the forbidden word — so
+a reason that could not be shown was not a reason. It now reads *"no rival while this is somebody
+else's day — a spectator who commissioned a second run would be playing, not watching"*, which
+states § 14.1's rule about the day and about a spectator rather than about the reader, the same shape
+`everyday/watchStage.ts#SPECTATOR_MAKES_NO_CHANGES` uses for § 14.1's other half three centimetres
+away on the same screen. `live/raceStrip.test.ts` asserts the sentence carries none of the three
+forbidden words, at the file where the sentence lives, so a lane rewording it meets the constraint
+before the browser tier does.
+
+**The Everyday picker is rebuilt rather than hidden, and the distinction cost lane A a control row
+this same wave.** An element removed from a laid-out flow stops being *placed*, and the tracks around
+it re-fit; `viewportGates.browser.test.ts` caught that when a `hidden` grid item clipped a whole
+control row off the page. So the `<select>` stays mounted and stays where it is, and what changes is
+what it presents: `GHOST_OPTIONS`' own *nobody*, which is no new string and is the true one — while a
+record is on the stage there is no rival and none can be commissioned. It is still disabled.
+Disabled was **necessary and never sufficient**, which is the whole finding.
+
+**The corpus gains the arm whose absence hid this.** `honesty/surfaces.ts` drove six `raceSlotsOf`
+arms and not the spectator's, so the ten properties read the option list and the note in every state
+except the one where they were wrong. The seventh arm is driven with a refusal *and* a rival in
+flight underneath it, so an inverted order shows up as the wrong sentence rather than as nothing.
+
+**What is not changed, and is worth naming rather than leaving for a reader to find.** The Engineer
+strip's verdict cell now renders empty on a watched run where it used to read the plain standing
+figure; that is § 14.1's rule and the Everyday stage had already applied it on its own side. The
+Engineer strip does **not** put the record's identity in that cell the way § 14.1's table asks and
+the Everyday stage does. That is a real gap in § 14.1's treatment of the Engineer surface, it is
+older than this fix, no forbidden word is involved, and it is left alone here rather than folded in.

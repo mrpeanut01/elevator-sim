@@ -4216,6 +4216,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ghostInFlight ? 'in-flight' : '',
       String(bucket),
       view.simTimeS >= recording.endedAt ? 'end' : '',
+      /*
+       * § 14.1 — `raceSlotsOf` reads the spectator state now, so it belongs in the key that decides
+       * whether the cells are re-derived. `enterWatch` and `stopWatching` both clear `lastRaceKey`
+       * as well; this is the half that does not depend on remembering to.
+       */
+      watching === undefined ? '' : 'watching',
     ].join('|');
     if (key === lastRaceKey) return;
     lastRaceKey = key;
@@ -4228,7 +4234,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     const slots = raceSlotsOf(
       stripView,
-      { pick: ghostPick, recording: ghost, refusal: ghostRefusal, pending: ghostInFlight },
+      {
+        pick: ghostPick,
+        recording: ghost,
+        refusal: ghostRefusal,
+        pending: ghostInFlight,
+        /*
+         * § 14.1, and this is the cell the sweep actually caught. The picker above is hidden while
+         * watching, so the forbidden word was never the option list here — it was the **note**,
+         * which carried the *nobody* pick's *"no second run, no rival line, no score — just your
+         * day"* under somebody else's lanes. `raceSlotsOf` answers that for both strips.
+         */
+        watching: watching !== undefined,
+      },
       recording,
     );
     setText(ui.race.verdict, slots.verdict);

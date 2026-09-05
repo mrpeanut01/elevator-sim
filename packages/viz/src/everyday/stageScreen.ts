@@ -104,7 +104,6 @@ import {
   STAGE_INTERVENTIONS,
   STAGE_OUT_OF_SERVICE,
   STAGE_RACE_PICKER_LABEL,
-  STAGE_RACE_WATCHING,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
@@ -952,12 +951,48 @@ function mountStage(
     'font-size:12px',
     'max-width:100%',
   ].join(';');
-  for (const option of GHOST_OPTIONS) {
-    const entry = el(doc, 'option', undefined, option.label);
-    entry.value = option.id;
-    entry.title = option.note;
-    racePicker.append(entry);
+  /**
+   * Write the picker's face for the run on screen — GAMEPLAY § 14.1, GitHub issue #226.
+   *
+   * ## Why the options are rewritten rather than the control merely disabled
+   *
+   * A disabled `<select>` still renders its option list, and `innerText` reads it: while a record
+   * was on the stage the three offers stayed on the screen, one of them called `your latest saved`,
+   * over somebody else's day. That is § 14.1's stated defect condition — *"the word `you` on a
+   * watched run is a defect"* — and `watchStage.browser.test.ts` found it by sweeping the rendered
+   * screen. Greying a control does not un-say what the control says.
+   *
+   * ## Kept in the layout, and rebuilt rather than hidden
+   *
+   * The `<select>` itself stays mounted and stays where it is. Hiding it would be the trap lane A
+   * hit one lane over: an element removed from a laid-out flow is not merely invisible, it stops
+   * being *placed*, and the tracks around it re-fit. What changes is what it presents.
+   *
+   * The spectator's face is `GHOST_OPTIONS`' own *nobody* — no new string, and the true one: while
+   * a record is on the stage there is no rival and none can be commissioned. The reason is not on
+   * this control at all any more; it is drawn under the lanes, from `raceSlotsOf`'s note, which is
+   * how the Engineer strip says it too. A `title` said it before, where nobody read it.
+   */
+  let raceOffers: 'all' | 'spectator' | '' = '';
+  function writeRaceOptions(watching: boolean): void {
+    const wanted = watching ? 'spectator' : 'all';
+    if (raceOffers === wanted) return;
+    raceOffers = wanted;
+    racePicker.replaceChildren();
+    for (const option of GHOST_OPTIONS) {
+      if (watching && option.id !== 'none') continue;
+      const entry = el(doc, 'option', undefined, option.label);
+      entry.value = option.id;
+      /*
+       * No `title` on a spectator's entry. `nobody`'s own note says *"just your day"*, which is a
+       * true sentence about the player's run and a false one about the record on the stage — and an
+       * attribute is exactly where a wrong sentence survives unread.
+       */
+      if (!watching) entry.title = option.note;
+      racePicker.append(entry);
+    }
   }
+  writeRaceOptions(false);
   racePicker.value = 'none';
   raceHead.append(raceTitle, raceVerdict, racePickLabel, racePicker, raceKey);
   const laneWait = laneBlock(doc, 'how long people are waiting');
@@ -1529,6 +1564,14 @@ function mountStage(
    */
   function drawRace(recording: VizRecording, simTimeS: number): void {
     const race = host.ghostRace();
+    /*
+     * **§ 14.1, and in the key rather than only after it.** `raceSlotsOf` reads this now — a
+     * spectator's three cells are not the player's — so a key that watched only the clock and the
+     * rival would leave the *nobody* pick's *"just your day"* under a stranger's lanes until the
+     * playhead next crossed a four-minute boundary. It is the same lesson `drawWatching` records one
+     * screen over, arriving through the redraw key instead of through a missed clause.
+     */
+    const watching = watchingNow() !== undefined;
     const grid = Math.floor((simTimeS - recording.startedAt) / RACE_SAMPLE_INTERVAL_S);
     /*
      * The rival is part of the key, not only the grid line — GitHub issue #226, § D482. A second
@@ -1543,6 +1586,7 @@ function mountStage(
       race.rival?.runId ?? '',
       race.refusal ?? '',
       race.pending ? 'pending' : '',
+      watching ? 'watching' : '',
     ].join('|');
     if (key !== raceKeyDrawn || raceView === undefined) {
       raceKeyDrawn = key;
@@ -1589,31 +1633,47 @@ function mountStage(
        */
       const slots = raceSlotsOf(
         raceView,
-        { pick: race.pick, recording: race.rival, refusal: race.refusal, pending: race.pending },
+        {
+          pick: race.pick,
+          recording: race.rival,
+          refusal: race.refusal,
+          pending: race.pending,
+          watching,
+        },
         recording,
       );
       raceNote.textContent = slots.note;
       raceKey.textContent = slots.rivalName === '' ? '' : `— — ${slots.rivalName}`;
       raceSlotVerdict = slots.verdict;
-      if (racePicker.value !== race.pick) racePicker.value = race.pick;
     }
     /*
-     * **§ 14.1, and outside the key on purpose.** *"§ 7.6's intervention machinery is disabled while
+     * **§ 14.1's picker, all of it in one place.** *"§ 7.6's intervention machinery is disabled while
      * watching. A spectator who could intervene would be playing, not watching"* — and a spectator
      * who could commission a second run would be commissioning it against somebody else's crowd.
-     * The Engineer strip disables its own `<select>` on the same ground.
+     *
+     * **Disabled is necessary and was never sufficient**, which is the finding rather than a detail:
+     * a disabled `<select>` still renders its options, so greying this control left `your latest
+     * saved` on screen beside a stranger's day and the browser tier's § 14.1 sweep caught it. What
+     * the control *presents* is `writeRaceOptions`' job; this is what it *does*.
+     *
+     * The `title` is gone in the spectator arm rather than rewritten. It held the reason, where a
+     * touch device never shows it and a pointer rarely does; the reason is drawn text now, under the
+     * lanes, from the note both strips share. An attribute nobody reads is not a declaration.
      *
      * It is outside the keyed block because entering and leaving a watch moves neither the grid line
      * nor the rival, so a key-gated write would leave the control enabled over a watch that had just
      * started. That is `drawWatching`'s own lesson one screen over: a treatment applied by six
-     * independently-guarded clauses is six chances for one of them to stay behind.
+     * independently-guarded clauses is six chances for one of them to stay behind. (The *note* is
+     * key-gated and correct, because `watching` is now part of the key above.)
      *
      * The transport is deliberately untouched: pause and the speed chips are not interventions.
      */
-    const watching = watchingNow() !== undefined;
+    writeRaceOptions(watching);
+    const shows = watching ? 'none' : race.pick;
+    if (racePicker.value !== shows) racePicker.value = shows;
     racePicker.disabled = watching;
     racePicker.title = watching
-      ? STAGE_RACE_WATCHING
+      ? ''
       : (GHOST_OPTIONS.find((option) => option.id === race.pick)?.note ?? '');
     /*
      * § 14.1's race-strip cell: *"**their name** vs the world's middle, and **no verdict** — you are

@@ -178,7 +178,6 @@ import {
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_RACE_PICKER_LABEL,
-  STAGE_RACE_WATCHING,
   STAGE_SWITCH_PICKER_LABEL,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
@@ -278,6 +277,7 @@ import {
   GHOST_OPTIONS,
   RACE_NOT_RUN,
   RACE_PENDING,
+  RACE_WATCHING,
   raceSlotsOf,
   raceStripViewOf,
   raceVerdictOf,
@@ -6918,6 +6918,7 @@ const RACE_STRIP: SurfaceAdapter = {
     'live/raceStrip.ts#SAME_RUN_NOTE',
     'live/raceStrip.ts#RACE_PENDING',
     'live/raceStrip.ts#RACE_NOT_RUN',
+    'live/raceStrip.ts#RACE_WATCHING',
     'live/raceStrip.ts#raceVerdictOf',
     'live/raceStrip.ts#raceStripViewOf',
     'live/raceStrip.ts#raceSlotsOf',
@@ -6934,6 +6935,7 @@ const RACE_STRIP: SurfaceAdapter = {
     }
     seeds.push({ field: 'race.pending', text: RACE_PENDING, role: 'prose' });
     seeds.push({ field: 'race.notRun', text: RACE_NOT_RUN, role: 'prose' });
+    seeds.push({ field: 'race.watching', text: RACE_WATCHING, role: 'reason' });
 
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
@@ -6985,6 +6987,7 @@ const RACE_STRIP: SurfaceAdapter = {
             recording: comparisonRecording,
             refusal: undefined,
             pending: false,
+            watching: false,
           },
           recording,
         ),
@@ -6993,7 +6996,7 @@ const RACE_STRIP: SurfaceAdapter = {
         'sameRun',
         raceSlotsOf(
           sameRun,
-          { pick: 'plain-baseline', recording, refusal: undefined, pending: false },
+          { pick: 'plain-baseline', recording, refusal: undefined, pending: false, watching: false },
           recording,
         ),
       ],
@@ -7001,7 +7004,7 @@ const RACE_STRIP: SurfaceAdapter = {
         'nobody',
         raceSlotsOf(
           alone,
-          { pick: 'none', recording: undefined, refusal: undefined, pending: false },
+          { pick: 'none', recording: undefined, refusal: undefined, pending: false, watching: false },
           recording,
         ),
       ],
@@ -7009,7 +7012,13 @@ const RACE_STRIP: SurfaceAdapter = {
         'pending',
         raceSlotsOf(
           alone,
-          { pick: 'plain-baseline', recording: undefined, refusal: undefined, pending: true },
+          {
+            pick: 'plain-baseline',
+            recording: undefined,
+            refusal: undefined,
+            pending: true,
+            watching: false,
+          },
           recording,
         ),
       ],
@@ -7017,7 +7026,34 @@ const RACE_STRIP: SurfaceAdapter = {
         'notRun',
         raceSlotsOf(
           alone,
-          { pick: 'plain-baseline', recording: undefined, refusal: undefined, pending: false },
+          {
+            pick: 'plain-baseline',
+            recording: undefined,
+            refusal: undefined,
+            pending: false,
+            watching: false,
+          },
+          recording,
+        ),
+      ],
+      /*
+       * **The spectator's three cells** — GAMEPLAY § 14.1. Reachable through no other arm here: it
+       * is the one state that outranks a refusal, and it is deliberately driven with a refusal *and*
+       * a rival in flight underneath it, so the seed would carry the wrong sentence if the order
+       * ever inverted. This is the arm whose absence let `RACE_WATCHING`'s predecessor sit in a
+       * `title` attribute for a wave while the corpus read the option list underneath it.
+       */
+      [
+        'watching',
+        raceSlotsOf(
+          ended,
+          {
+            pick: 'latest-saved',
+            recording: comparisonRecording,
+            refusal: NO_SAVED_DISPATCHER,
+            pending: true,
+            watching: true,
+          },
           recording,
         ),
       ],
@@ -7030,6 +7066,7 @@ const RACE_STRIP: SurfaceAdapter = {
             recording: undefined,
             refusal: NO_SAVED_DISPATCHER,
             pending: false,
+            watching: false,
           },
           recording,
         ),
@@ -8789,7 +8826,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * rather than a tidy-up — it was the ghost lane's own refusal, drawn on the ghost lane's card,
      * and a refusal that belongs to a control is read where the control is. The lane has a rival to
      * draw now (GitHub issue **#226**, § D482) so the refusal is gone; the rule it illustrated is
-     * not, and `#STAGE_RACE_PICKER_LABEL` and `#STAGE_RACE_WATCHING` are here on the same ground.
+     * not, and `#STAGE_RACE_PICKER_LABEL` is here on the same ground. `#STAGE_RACE_WATCHING` was
+     * too and has **moved** to `live/raceStrip.ts#RACE_WATCHING` with the sentence itself: the
+     * Engineer strip needs it as well, and one screen's model is not where both shells can read it.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
     /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
@@ -8797,7 +8836,6 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_RACE_PICKER_LABEL',
-    'everyday/stageScreenModel.ts#STAGE_RACE_WATCHING',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
     /*
@@ -8915,7 +8953,6 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       text: STAGE_RACE_PICKER_LABEL,
       role: 'label',
     });
-    seeds.push({ field: 'stage.race.watching', text: STAGE_RACE_WATCHING, role: 'reason' });
 
     /*
      * **Pillar 3's goal strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).

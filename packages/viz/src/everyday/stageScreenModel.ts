@@ -973,15 +973,18 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
  */
 export const STAGE_RACE_PICKER_LABEL = 'Race against';
 
-/**
- * Why the picker is off while you are watching somebody else's day.
+/*
+ * `STAGE_RACE_WATCHING` stood here and has **moved** to `live/raceStrip.ts#RACE_WATCHING`, reworded
+ * — GAMEPLAY § 14.1.
  *
- * § 14.1's own rule, the same one that disables the Engineer strip's `<select>`: a spectator who
- * could commission a second run would be playing, not watching, and the run they commissioned would
- * be raced against a crowd that is not theirs. The transport is deliberately untouched — pause and
- * the speed chips are not interventions.
+ * It read *"not while you are watching somebody else's day"* and was written into the picker's
+ * `title` attribute, where a player never met it and where the option list underneath went on
+ * saying `your latest saved` over a stranger's run. It is drawn text now, in
+ * `live/raceStrip.ts#raceSlotsOf`'s note, so the **Engineer** strip says it too — this file is one
+ * screen's model and that strip cannot reach it. The wording lost its `you` in the move, because a
+ * reason that cannot be shown on the surface it is about is not a reason; see the constant's own
+ * docstring.
  */
-export const STAGE_RACE_WATCHING = 'not while you are watching somebody else’s day';
 
 /* -------------------------------------------------------------------------- *
  * The screen's own register of absences
