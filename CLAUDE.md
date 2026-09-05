@@ -84,8 +84,44 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **576 930** | **606** | **55** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **719 773** | **4 710** | **56** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **582 026** | **606** | **55** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **726 013** | **4 710** | **56** | **0** | **green**, and the register is empty |
+
+  **Waves P and Q moved this row by exactly 104 strings a case, in both tiers, and the 104 splits
+  into two waves rather than decomposing into parts of one.** Measured on the integrated tree after
+  wave Q, both tiers in one sitting, with **two** bases re-measured in a detached worktree rather
+  than one: wave O's published row at `eb5b3b6`, and wave P integrated at `771e65f`.
+
+  | | wave O `eb5b3b6` | wave P `771e65f` | wave Q | wave P's move | wave Q's move |
+  |---|---|---|---|---|---|
+  | always-on strings | 576 930 | **578 302** | **582 026** | +1 372 = **28.0**/case | +3 724 = **76.0**/case |
+  | deep strings | 719 773 | **721 453** | **726 013** | +1 680 = **28.0**/case | +4 560 = **76.0**/case |
+  | surfaces, both tiers | 55 / 56 | 55 / 56 | **55 / 56** | **0** | **0** |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | unmoved | **unmoved** | **0** | **0** |
+
+  **The second base is the whole reason this row can say anything.** Wave P closed without taking its
+  corpus measurement, and that debt was recorded and left standing. So the move from wave O's row to
+  today spans **two** waves, and the integrator's first reading of it was that wave Q's two lane
+  forecasts summed to 76 a case against 104 measured and were therefore short by 28. **They were not
+  short by anything.** Measuring `771e65f` rather than reasoning about it splits the 104 exactly: 28
+  a case is wave P's energy goal, and 76 a case is wave Q's.
+
+  **76 is what the two lanes forecast, to the string.** Lane Q-B published *roughly 68 a case* before
+  the measurement and lane Q-D published *+8 a case in both tiers*; 68 + 8 = 76, and the tree reads
+  76.0 in both tiers. This is the first time this column has scored a forecast exactly and had it come
+  out right. § D454 recorded four forecasts short by one string a case, and § D457 recorded one that
+  predicted motion where the answer was zero.
+
+  **The lesson is a correct figure with a misleading denominator**, which is a new shape for this
+  column. Nothing about 582 026 was wrong. What was wrong was the wave it would have been attributed
+  to, and the fix was a ninety-second run rather than a paragraph of caveat. Publishing the caveat
+  instead would have left the record saying two lanes forecast short by 28 when they were exact.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers and against both
+  bases: identical, nothing added, nothing removed, across two waves that added a screen's worth of
+  goal rows, an accessibility standard, three defect fixes and a membership allowlist. The deep tier's
+  one-surface lead survives and the diff names it — `campaign/judge.ts#judgeStage`, the only surface in
+  deep and not in always-on, with nothing in always-on and not in deep.
 
   **Wave O's move is exactly nineteen strings a case, in both tiers, and the nineteen decompose
   without remainder** ([§ D461](DECISIONS.md)). Measured once on the integrated tree, both tiers in
