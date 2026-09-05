@@ -32772,6 +32772,62 @@ did not happen.
 
 ---
 
+## D493 — a specification routes its own registers, and the routing lives beside it rather than in a file of its own
+
+**Date: 2026-09-05 · Owner: wave S lane S-C · Rules on: GitHub issue #342,
+`docs/35-problem-per-mode.md` § 13,
+`packages/experiments/src/validation/documentRouting.test.ts`.**
+
+#342 found `docs/35-problem-per-mode.md` fresh, good and **unrouted**: fourteen specified code
+changes, nine flagged unverified claims and five open questions, and not one open issue citing any of
+them. `RISKS.md` **R42** is *a decision recorded and never implemented*; this is one level earlier —
+**a specification recorded and never routed** — and it breaks no test, produces no dead export and
+contradicts no shipped sentence.
+
+**The routing is § 13 of the document itself, and the ground is a guard rather than a preference.** A
+separate routing file under `docs/` was the first choice and is refused: a new `docs/*.md` owes a row in
+`README.md`'s documentation table, asserted by `validation/documentation.test.ts` § *README.md
+§ Documentation*, and a routing register shipping as an orphan document would be #342's own defect
+manufactured by the fix for it. Two arguments follow it rather than lead it — a spec and its routing
+go stale at different rates, and one file is what lets the guard couple them without maintaining the
+coupling in two places.
+
+**The guard is narrow on purpose, and the reason is the shape of the general problem.**
+`citations.test.ts` checks that every reference **points at** something real. Nothing checks that
+something real **is pointed at**, and that direction is not writable in general: an orphan is
+detectable only against a definition of what should have adopted it, and no test here can read
+GitHub. What *is* writable is the narrow form — **a document that declares its own registers can be
+required to route them** — because § 10, § 11 and § 12 are closed sets the document publishes about
+itself. So the check reads those three and requires every member to carry a disposition in § 13, with
+the change dispositions drawn from a closed vocabulary and every *checked* claim citing a
+`path:line` that resolves on disk with at least that many lines.
+
+**What it does not check is written into its own docstring rather than left to be discovered**: not
+that any GitHub issue exists, not the next `docs/3x`, and not that an owner is a person. A general
+rule — *every governing document has a routing section* — needs a definition of *governing* that
+nothing can derive, and a guard whose predicate is a hand-maintained list is a convention wearing a
+test. `contentPlan.test.ts` earns its place because its subject is a **count**; a routing table's
+subject is a **judgement**, so the convention is written where it will be read and the mechanism is
+kept to the part that is mechanical.
+
+**Two findings the routing produced, recorded here because they outlive the appendix.**
+
+**Four of the five questions were already ruled and nothing said so.** [§ D475](#d475)–[§ D478](#d478)
+(2026-09-05) answer Q4, Q2, Q3 and Q1; Q5 is answered in the tree by
+`packages/viz/src/render/carRest.ts`. § 12's table, the three issues those questions gate, and the
+three issue comments posted on 2026-09-04 all still describe them as open. **That is #342's own
+failure mode recurring one turn later, and in the harder direction**: an unrouted question costs a
+reader a search, while a question ruled and unrouted costs a lane the work it does against the
+superseded answer. The appendix carries the rulings to the issues rather than restating them.
+
+**#342's headline premise is refuted and its substance is not.** *"Not one open issue cites it"* was
+true of the sweep that found it and false three minutes before it was filed — #208, #210 and #220
+each acquired a citing comment at 2026-09-04 22:53 UTC against the issue's 22:56. The document was
+never invisible to the repository either: `docs/28`, `docs/33`, `docs/36`, `docs/37`, `README.md`,
+this file and eight sites under `packages/viz/src` cite it. **What was invisible was the backlog, and
+only the backlog** — which is the finding worth keeping, because it says the missing direction is
+document → issue and not document → tree.
+
 ## D495 — the Engineer shell's Basic register is bound by the promise its own toggle makes, so the cost line grows a plain arm rather than the promise being narrowed
 
 **Date: 2026-09-05 · Owner: the integrator · Rules on: GitHub issue #146,
