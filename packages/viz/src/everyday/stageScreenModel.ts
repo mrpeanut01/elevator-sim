@@ -21,6 +21,15 @@
  * The one figure that is an estimate rather than a count — *away inside a minute* — carries its
  * own denominator (R13) and refuses outright before anybody has boarded, because
  * {@link LiveObservations.servedUnderThresholdPct} is `undefined` there rather than `100`.
+
+ * **The goal strip is the newest thing that rule had to hold** — GitHub issue **#277**, Pillar 3.
+ * The day asks five things and the report grades all five, so a strip drawn at a part-way playhead
+ * is the most tempting place in this file to publish a result the run has not produced.
+ * [§ D371](../../../../DECISIONS.md) settles it in the conservative direction: {@link stageGoalsOf}
+ * draws the **reading** and no verdict at all until the playhead reaches `endedAt`, so there is
+ * nothing to retract and `docs/10` R6's provisional-verdict-with-retraction stays unbuilt. The one
+ * goal whose quantity really is whole-run — the energy bar — refuses for the whole day in
+ * `live/observations.ts`, one layer below this file.
  *
  * ## The wait ramp is `live/bands.ts`', and the boundaries are a stated deviation from § 7.2
  *
@@ -83,6 +92,16 @@ import {
 } from '../live/interventions.js';
 import { clockAt, phaseAt, timelineOf } from '../live/timeline.js';
 import type { LiveObservations, WaitBandId } from '../live/types.js';
+/*
+ * The rail's goal fold, imported rather than reimplemented — [§ D371](../../../../DECISIONS.md)'s
+ * *"never a second implementation"*. `goalRowsOf` is one of the pure functions `dev/leftRail.ts`
+ * exports precisely so that the words can be decided without a document, and `everyday/` already
+ * reaches into `dev/` for that class of thing (`briefScreen.ts` takes `dispatcherCardOf`,
+ * `reportView.ts` takes `reportViewOf`). Nothing DOM-shaped crosses with it.
+ */
+import { goalRowsOf } from '../dev/leftRail.js';
+import { GOAL_GLYPHS } from '../shift/goals.js';
+import type { DayOutcome, GoalReading, GoalState } from '../shift/types.js';
 // AD-S17's length rule, shared with the Engineer stage. The *derivation* — what counts as standing
 // still, and why the word is not *parked* — is that module's docstring and is deliberately one home.
 import { REST_BAR_THICKNESS_PX, restBarWidthPx } from '../render/carRest.js';
@@ -520,6 +539,203 @@ function longestSoFarOf(o: LiveObservations): StageFigure {
 /** `60 s` as *a minute* and anything else as its own figure — § 13's plain-words rule, narrowly. */
 function secondsWord(seconds: number): string {
   return seconds === 60 ? 'a minute' : `${String(Math.round(seconds))} s`;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Pillar 3 — what today asks, read at the playhead
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The goals panel's own chrome — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
+ *
+ * One frozen record rather than three loose constants, because `honesty/surfaces.ts` iterates it
+ * with `Object.entries` the way it iterates `everyday/boardScreen.ts#BOARD_SCREEN_COPY` and
+ * `everyday/designerModel.ts#DESIGNER_COPY`. A sixth key added here is swept the day it is added;
+ * a loose constant is swept the day somebody remembers to list it.
+ *
+ * {@link StageGoalsView.note} picks between `reading` and `graded`, and the pair is the whole of
+ * how this panel keeps § D371. *No goal is judged yet* is a refusal in the reader's own words, on
+ * the surface, beside the figures it is about; § D293's finding is that a signal no renderer is
+ * obliged to read is not a retraction, so the words carry it and not the colour.
+ */
+export const STAGE_GOALS_COPY = Object.freeze({
+  /**
+   * The strip's eyebrow, and **the brief's own phrase rather than a third one**.
+   * `everyday/briefView.ts` heads the same five bars `WHAT TODAY ASKS` before the run and
+   * `everyday/campaignModel.ts` does it again on the tower card, so a stage that invented a
+   * synonym would give one thing three names on three screens a player walks between.
+   *
+   * It is a third **literal** all the same, and that is worth saying rather than glossing: neither
+   * of the other two is an exported constant, so there is nothing here to import. Extracting one
+   * means editing both of those files, which is a wider change than this issue owns. Named here so
+   * the next lane in `everyday/` can take it rather than discovering it.
+   */
+  heading: 'WHAT TODAY ASKS',
+  /** Under the rows while the playhead is short of the run's end. */
+  reading:
+    'these are readings at the clock above, not results · no goal is judged until the day ends',
+  /** Under the rows once the playhead has reached it. */
+  graded: 'the day has run out · these are the readings the report grades',
+});
+
+/** One goal on the strip — {@link stageGoalsOf}'s row, projected from the rail's own. */
+export interface StageGoalRow {
+  /** The goal's id, so a caller can key a row without matching on its words. */
+  readonly id: string;
+  /** The bar, in the goal's own words: *Carry 85% of the people who turn up*. */
+  readonly label: string;
+  /** The figure at the playhead, or the em dash when the reading is ungraded. */
+  readonly value: string;
+  /**
+   * `goalRowsOf`'s own slot: `was 78%` for the building's previous day, or the **bare** em dash
+   * when there is no previous day to quote. The word is printed only when there is a figure to
+   * attribute to it, because `was —` would dress an absence as a measurement.
+   */
+  readonly was: string;
+  /** `✓`, `×` or `·`. Always `·` while the run is unfinished — see {@link stageGoalsOf}. */
+  readonly glyph: string;
+  /** `met`, `missed` or `pending`. Always `pending` while the run is unfinished. */
+  readonly state: GoalState;
+  /** `0`–`100`. Always `0` while the run is unfinished — a bar is a verdict too. */
+  readonly barPct: number;
+}
+
+/** § 7.1's goal strip, resolved at one playhead. */
+export interface StageGoalsView {
+  readonly heading: string;
+  /** {@link STAGE_GOALS_COPY}'s `reading` or `graded`, whichever the playhead earns. */
+  readonly note: string;
+  /** Whether any verdict is being drawn — `false` at every playhead short of `endedAt`. */
+  readonly judged: boolean;
+  readonly rows: readonly StageGoalRow[];
+}
+
+/** What {@link stageGoalsOf} needs. Plain data; the caller has already read the goals. */
+export interface StageGoalsInput {
+  /** `host.goalsToday()` — read at the playhead, the same derivation the Engineer rail draws. */
+  readonly readings: readonly GoalReading[];
+  readonly simTimeS: number;
+  /** `recording.endedAt`. The run's own last instant, never a constant. */
+  readonly endedAt: number;
+  /** `WeekState.history`, for the *was* slot. */
+  readonly history: readonly DayOutcome[];
+  /** `WeekState.day`, for the same slot. */
+  readonly day: number;
+}
+
+/**
+ * A reading with its verdict taken off, and its figure left on.
+ *
+ * This is the whole of [§ D371](../../../../DECISIONS.md) in one function, and it is a projection
+ * of the **input** rather than an edit of the output on purpose. `dev/leftRail.ts#goalRowsOf`
+ * already knows how to draw an ungraded row — flat track, faint ink, `GOAL_GLYPHS.pending` — and
+ * feeding it a pending reading is what makes the stage's unjudged row and the rail's the same
+ * object. Erasing three fields of the row afterwards would be a second implementation of
+ * *ungraded*, drawn a screen away from the first, which is the shape this repository keeps paying
+ * for.
+ *
+ * **{@link GoalReading.display} survives and everything else is stood down.** The display is the
+ * reading; the state, the glyph and the progress are the verdict. § D371: *"it draws the reading
+ * only — the figure, moving as the run goes — and no met/not-met verdict until the playhead reaches
+ * `endedAt`."*
+ *
+ * **`progressPct` goes to zero, and that is the clause worth reading twice.** A progress bar is not
+ * decoration on an `at-most` goal: `progressOf` fills it to 100 when the observed value is under
+ * the ceiling, so *Never let a landing stack past 20 people* draws a **full** bar at 00:00 on an
+ * empty building, before a single rider has arrived to test it. A full bar is a verdict with no
+ * word in it, and `campaign/judge.ts`'s rule is the one that settles it: unjudged is not passed.
+ * The bar therefore stands flat until the run ends, and what moves during the day is the figure.
+ *
+ * `observed` goes to `null` for {@link GoalReading}'s own stated rule — *the observed value, or
+ * `null` while the state is pending. Never a stand-in zero* — and because `goalRowsOf` reads it to
+ * decide whether an amber sliver is warranted, which is a verdict by another name.
+ */
+function unjudged(reading: GoalReading): GoalReading {
+  return {
+    goal: reading.goal,
+    state: 'pending',
+    observed: null,
+    display: reading.display,
+    progressPct: 0,
+    glyph: GOAL_GLYPHS.pending,
+  };
+}
+
+/**
+ * § 7.1's goal strip at a playhead — GitHub issue **#277**, the charter's Pillar 3.
+ *
+ * ## What was wrong, in one line
+ *
+ * The day asks five things, the brief lists them before the run, the report grades them after it,
+ * and the stage the player actually watches mentioned none of them. `grep -ni "goal"` over this
+ * file and its mount returned nothing at all. P3's refusal test — *where on the stage would a
+ * player have seen this?* — had no answer on the one surface the pillar is about.
+ *
+ * ## Five, not four, and the count is read rather than written
+ *
+ * `shift/goals.ts#goalsForDay` returns `[carry, minute, queue, worst, energy]`; the fifth is
+ * § D468's energy bar and it landed after #277 was filed, so the issue's own title and its first
+ * acceptance criterion still say *four*. Nothing here counts: {@link StageGoalsInput.readings} is
+ * whatever the host hands over and the map below is generic over it, exactly as `goalRowsOf` is.
+ * A sixth bar draws itself.
+ *
+ * ## The fold is the rail's, and this function is a caller
+ *
+ * § D371 authorises the stage to read the host's goals *"through the same fold
+ * `dev/leftRail.ts#goalRowsOf` uses — never a second implementation"*, and that is met literally:
+ * the values, the glyphs, the *was* slot and the progress are `goalRowsOf`'s, unmodified. What
+ * this function adds is {@link unjudged} on the way in and the note under the rows.
+ *
+ * § D371 names `goalsToday()` and the caller is `EverydayHost.goalsAt`, which is that method with
+ * the instant passed in rather than taken from `EverydayHostBindings.playheadS`. The distinction is
+ * § D470's and is not a departure from this one: `goalsToday()` folds at the **Engineer**
+ * transport's position, which is not moving while the Everyday shell has the page, so a stage that
+ * called it would have drawn five constants. One fold, two entry points.
+ *
+ * **Two of `goalRowsOf`'s seven fields are deliberately dropped.** `color` and `fill` are
+ * `var(--faint)` and friends — the Engineer rail's custom properties, from a stylesheet that is not
+ * the Everyday shell's palette. The stage carries {@link StageGoalRow.state} across instead and
+ * lets its own mount choose ink out of `everyday/tokens.ts`, which is this repository's own split:
+ * the decision is a pure function returning a descriptor and the DOM is the dumb instantiator.
+ * KB-15 is unharmed either way, because the glyph and the value both carry what the colour would
+ * say.
+ *
+ * ## Why this cannot publish a whole-run figure early
+ *
+ * Three gates, none of them added here, which is the point. Every reading arrives from
+ * `readGoals` over `shiftObservationsOf(observationsAt(recording, t))` — counts of what had
+ * happened by `t`, never a field of `summary`. The energy bar's own observation refuses outright
+ * before the end (`live/observations.ts#energyPerServedLegAt` returns `undefined` at any `t` short
+ * of `recording.endedAt`, and `readGoal`'s third gate reads that as `pending`), so the one goal
+ * whose quantity *is* whole-run draws the em dash for the whole day rather than a preview of it.
+ * And {@link unjudged} stands the verdict down at every playhead short of the end. The corpus's
+ * `whole-run-figure-early` property is satisfied by construction rather than by care, which is
+ * § D371's stated reason for choosing a reading over `docs/10` R6's provisional verdict.
+ *
+ * ## What is deliberately **not** built
+ *
+ * R6's provisional-verdict-with-retraction. § D371 refused it and did not retire it: a labelled
+ * provisional verdict can lie in the interval before it retracts, and a reading claims nothing so
+ * nothing needs withdrawing. Building the reading first forecloses none of it.
+ */
+export function stageGoalsOf(input: StageGoalsInput): StageGoalsView {
+  const judged = input.simTimeS >= input.endedAt;
+  const readings = judged ? input.readings : input.readings.map(unjudged);
+  return {
+    heading: STAGE_GOALS_COPY.heading,
+    note: judged ? STAGE_GOALS_COPY.graded : STAGE_GOALS_COPY.reading,
+    judged,
+    rows: goalRowsOf(readings, input.history, input.day).map((row, index) => ({
+      /* The reading's own goal, never the row's label — an id is not a sentence. */
+      id: readings[index]?.goal.id ?? '',
+      label: row.label,
+      value: row.value,
+      was: row.was,
+      glyph: row.glyph,
+      state: row.state,
+      barPct: row.barPct,
+    })),
+  };
 }
 
 /* -------------------------------------------------------------------------- *

@@ -1462,22 +1462,23 @@ type DecisionReservation = {
  * however many modules it touches. The charter row is reconciled to D455 on this same commit.
  */
 /**
- * Wave Q, open at the time of writing: D469 to D473, one number per lane rather than a block per
- * lane. That sizing is wave P's lesson applied. It reserved four per lane, spent one each, and
- * returned six unspent numbers, the most any block has produced. The unit that consumes a number is
- * an issue and not a lane, because one issue closed end to end is one decision however many modules
- * it touches, and four consecutive waves have now returned a lane's spare numbers for that reason.
+ * **Wave Q's block is closed, and it returned no holes at all, which is the first time.**
  *
- * Set while the wave is still open, and set for a reason the case below states better than this
- * comment can: mid-wave, `highest + 1` is not a claim any single branch can make. Lane Q-C landed
- * D471 before Q-A's D469 and Q-B's D470 existed, so a tree carrying only Q-C reads as though two
- * numbers below the highest were holes. They are not; they are unlanded.
+ * It reserved D469 to D473, one number per lane rather than four, and every one of the five was
+ * spent: D469 the preview allowlist, D470 the stage's five readings, D471 the CSP gate, D472 the
+ * shared inflection helper, D473 the accessibility standard. Wave P reserved four per lane, spent
+ * one each and returned six unspent, so the change was to size the block to the unit that actually
+ * consumes a number. That unit is an issue. One issue closed end to end is one decision however
+ * many modules it touches, which is what four consecutive waves had been saying by returning their
+ * spare numbers.
  *
- * The case closes itself. Once every number in the block heads a decision or is a registered hole,
- * its last assertion goes red and says to null this and reconcile the charter on the same commit.
- * That is the step D387 records nobody performing when nothing asks for it.
+ * **The reservation was opened mid-wave rather than at dispatch, and that is the part worth
+ * keeping.** Lane Q-C landed D471 before Q-A's D469 and Q-B's D470 existed, so the tree read as
+ * though two numbers below the highest were holes. They were unlanded. Three separate lanes
+ * reported the resulting red as an integrator action, each computing it from this file's own
+ * arithmetic rather than running it, and each was right.
  */
-const OPEN_RESERVATION = { wave: 'Q', from: 469, to: 473 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
  *

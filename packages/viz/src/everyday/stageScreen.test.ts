@@ -175,3 +175,66 @@ describe('what the cutaway paints', () => {
     expect(source).toContain("the hour is the run's own");
   });
 });
+
+/**
+ * **Pillar 3's strip, pinned at its call site** — GitHub issue **#277**,
+ * [§ D470](../../../../DECISIONS.md).
+ *
+ * The strip's words and its ungraded projection are `stageScreenModel.ts`' and are driven hard in
+ * `stageScreenModel.test.ts`. What that tier cannot see is **which instant the mount asks about**,
+ * and on this screen that is the whole feature rather than a detail of it.
+ *
+ * `EverydayHost.goalsToday()` reads at `EverydayHostBindings.playheadS`, which `dev/main.ts` binds
+ * to the **Engineer** transport's playback. That transport is not the one moving while the Everyday
+ * shell has the page, so a mount that called `goalsToday()` would draw five figures that never
+ * changed — a control that moves and a run that does not, which is the defect this repository's
+ * standing requirement exists to catch. Both halves are asserted, because either alone passes over
+ * a file that does both.
+ */
+describe('what the goal strip is read at', () => {
+  const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+
+  it('asks the host for the goals at this screen’s own playhead', () => {
+    expect(source).toContain('readings: host.goalsAt(simTimeS),');
+    /* The Engineer transport's instant, by its own text. */
+    expect(source).not.toContain('host.goalsToday()');
+  });
+
+  it('asks the model for every word the strip says, and composes none of them', () => {
+    expect(source).toContain('stageGoalsOf({');
+    expect(source).toContain('goalHeading.textContent = strip.heading;');
+    expect(source).toContain('goalNote.textContent = strip.note;');
+    /*
+     * And the verdict is the model's too. A mount that read `row.state` to *decide* met or missed,
+     * rather than to pick ink, would be § D371's verdict reintroduced one layer down where no
+     * honesty property can reach it — the mount needs a document and is outside the corpus.
+     */
+    expect(source).not.toContain("=== 'met' ?");
+    expect(source).toContain('const ink = GOAL_INK[row.state];');
+  });
+
+  /**
+   * **Not over somebody else's day** — § 14.1.
+   *
+   * The bars are the player's week and harden with `WeekState.day`; the run on a watched stage is
+   * a record somebody else made. A strip headed *what today asks* over it grades another player's
+   * run against this player's ladder, which is the reading half of the thing § 14.1 already refuses
+   * on the intervention rows. The record's own posted result is what that screen draws instead.
+   */
+  it('is down while the stage is showing somebody else’s run', () => {
+    expect(source).toContain('if (watching !== undefined) {');
+    expect(source).toContain('drawGoals(recording, simTimeS, watching);');
+  });
+
+  /**
+   * The run's own last instant, never a constant and never the reporting window's end.
+   *
+   * § D371's gate is *the playhead reaches `endedAt`*, and `live/observations.ts#energyPerServedLegAt`
+   * spells out why it is the recording's end rather than the window's: the window closes two thirds
+   * of the way through the shift on seven of the eight shipped contracts, and a strip that graded
+   * there would put a finished verdict beside four running ones.
+   */
+  it('takes the end of the run from the recording', () => {
+    expect(source).toContain('endedAt: recording.endedAt,');
+  });
+});

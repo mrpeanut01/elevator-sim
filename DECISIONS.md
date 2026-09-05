@@ -31282,6 +31282,102 @@ rules, so it never distinguished them. It is kept, with the reason written into 
 survives the change it was believed to pin is worth a sentence, because the next reader will
 otherwise conclude the rule did not move.
 
+## D470 — the stage draws five goals, the reading only, and asks its own transport for them
+
+**Date: 2026-09-04 · Owner: wave Q lane B · Rules on: GitHub issue #277, under
+[§ D371](#d371) and [§ D468](#d468).**
+
+§ D371 ruled the hard half of #277 before any code existed: when the Everyday stage draws the day's
+goals at the playhead it draws **the reading only**, and no met/not-met verdict until the playhead
+reaches `endedAt`. This entry is what building that found, and it is owed a number because two of
+the three findings reach past `everyday/stageScreenModel.ts`.
+
+### The strip
+
+`everyday/stageScreenModel.ts#stageGoalsOf` folds `host.goalsAt(playhead)` through
+`dev/leftRail.ts#goalRowsOf` and returns a heading, a note, a `judged` flag and one row per goal.
+`everyday/stageScreen.ts` mounts it under the § 7.1 header and chooses ink; it decides no word and
+no verdict. That closes the charter's P3 refusal test on the one surface the pillar is about: the
+day asks, the stage shows, the report grades, and all three now use one vocabulary.
+
+**Five rows and never a literal five.** #277's title and its first acceptance criterion both say
+*four*, and they were correct when it was filed: § D468's energy bar landed eight days later. The
+map is generic over whatever `goalsForDay` returns, exactly as `goalRowsOf` is, and
+`stageScreenModel.test.ts` asserts the drawn ids **against `goalsForDay`'s own** rather than against
+a list. A lane taking AC1 literally would have dropped the goal the report grades fifth while
+fixing the defect that the stage grades none.
+
+### The verdict is stood down on the way in, not erased on the way out
+
+`unjudged` projects each `GoalReading` to `state: 'pending'`, `glyph: GOAL_GLYPHS.pending`,
+`progressPct: 0` and `observed: null`, keeping `display`. `goalRowsOf` then draws its own ungraded
+row from it. The alternative — call the fold and blank three fields of the row — is a second
+implementation of *ungraded* drawn a screen away from the first, which is what § D371's *"never a
+second implementation"* is about.
+
+**`progressPct` goes to zero, and that is the clause worth arguing.** A progress bar is not
+decoration on an `at-most` goal: `progressOf` fills it to 100 while the observed value is under the
+ceiling, so *never let a landing stack past 34 people* draws a **full** track at 00:00 on a building
+nobody has arrived at. A full track is a verdict with no word in it, and `campaign/judge.ts`'s rule
+settles it: unjudged is not passed. What moves during the day is the figure, which is what § D371
+says moves.
+
+### `EverydayHost.goalsAt` — the port, and the defect that made it necessary
+
+**`goalsToday()` on the Everyday stage is a constant, not a reading.** It folds at
+`EverydayHostBindings.playheadS`, which `dev/main.ts` binds to the **Engineer** transport's
+`Playback`; the Everyday stage runs a `Playback` of its own and the Engineer one is not moving while
+that shell has the page. Every caller `goalsToday` had before this — the brief, the door, the tile,
+the campaign screens — is a surface shown before a run or after one, so that instant was right for
+all four and wrong for the first mid-run caller.
+
+`goalsAt(simTimeS)` takes the instant; `goalsToday()` is now `goalsAt(b.playheadS())`, one local
+expression with two entry points rather than two folds. This is the standing requirement finding a
+defect **before** the surface shipped rather than after: a five-row strip fed from another screen's
+clock passes every check this repository runs, looks right, and shows the player a run that does not
+move. `host.test.ts` asserts both halves, because a port that answered the binding's instant
+whatever it was handed would pass a test of the first alone.
+
+### What the honesty corpus gained, and the one thing it deliberately did not
+
+`honesty/surfaces.ts`' `EVERYDAY_STAGE` adapter drives the strip at every sample time, so the
+ungraded arm and the graded one are both read, and iterates `STAGE_GOALS_COPY` with
+`Object.entries` so a key added to that record is swept the day it is added.
+
+**The label and the value are separate seeds, and the split is not cosmetic.** A goal's label is a
+caption carrying a *threshold* — *Keep the work inside 80 kJ per ride delivered* — which is
+`role: 'label'`'s own definition and the reason `whole-run-figure-early` exempts that role from its
+textual half. Seeding the composed row instead would put the bar's `80` in one clause with the word
+`delivered`, and a case whose `summary.delivered` happened to be 80 would report a violation about a
+threshold nobody folded. The *was* slot carries **no** playhead, because `wasDisplayOf` reads
+another day's `DayOutcome` and folds nothing from this recording; declaring this run's clock over it
+would be a false declaration of the kind `TextPlayhead`'s docstring refuses.
+
+Nothing in `honesty/properties.ts` moved, no scope constant moved, and `OUTSTANDING` is unmoved.
+
+### What is deliberately not built
+
+**`docs/10` R6's provisional-verdict-with-retraction.** § D371 refused it and did not retire it, and
+this entry does not revive it: a labelled provisional verdict can lie in the interval before it
+retracts, and a reading claims nothing so nothing needs withdrawing. R6 stays available to whoever
+wants the verdict later.
+
+**The strip is down before the first recording lands**, which is `nextPhase`'s rule on the same
+header: an empty strip of five ungraded rows before the first press is a control saying nothing, and
+the brief is where the bars are read before a run.
+
+**And down on a watched stage**, which is § 14.1's rule rather than a second one. The bars are the
+player's week and harden with `WeekState.day`; the run on a watched stage is a record somebody else
+made. A strip headed *what today asks* over it grades another player's run against this player's
+ladder, which is the reading half of the thing § 14.1 already refuses on the intervention rows
+(*"a spectator who could intervene would be playing, not watching"*). The record's own posted result
+is what that screen draws instead, with `watch/view.ts`'s note saying which figures are which.
+
+**AC5 is not discharged here.** `docs/22-charter.md` § 2's P3 sentence and `MULTI_AGENT_PLAN.md` § 1
+goal 4 both cite the closed #212 and both need re-adjudicating against what has landed. Those are
+coordination documents this lane may not write, so the re-adjudication is owed and is named here
+rather than done.
+
 ## D471 — the deploy CSP gate names its permitted origins, and two live rules stop naming a goal count
 
 **Date: 2026-09-04 · Owner: wave Q lane C · Rules on: GitHub issue #341, and the documentation debt
