@@ -1902,3 +1902,94 @@ count**. Three `echo` lines now fix that. Which hardware difference it was stays
   `scenariosPanel.ts` had *"The eight swatches"* nine lines below a header saying *"Five cards"* —
   half-corrected is how a claim outlives its correction.
 - **#332 is next.** #336 was its named prerequisite and is closed.
+
+---
+
+# Wave S — 2026-09-05: three rulings before the first lane, and a verification half that struck four items and refuted three more
+
+**61 open at the start.** Base `8ff0215`, integrated on `claude/github-issue-worker-kv9ju5`. Five
+lanes: two read-only verification, three builders in their own worktrees.
+
+## S.1 The wave's shape, and why the first act was a ruling rather than a lane
+
+Wave R's hand-off named **#332** as next and said its prerequisite #336 was closed, which was true
+and not sufficient. Wave P's implementation map had found **two product decisions gating the screen**
+and a third gating one of its acceptance criteria, and the hand-off could not see them because they
+were in a comment rather than in the issue's own state — which is #329's subject arriving on the
+process that filed #329.
+
+So the wave opened with three rulings, dated before any code:
+
+| ruling | what it settles | the thing to read |
+|---|---|---|
+| **§ D489** | sign-in is the signed-out **state** of `settings`' YOU section, not an eighteenth screen | The map's blocker — *the handoff specifies no sign-in screen* — is true and one step short. The handoff is silent about a **screen** and explicit about a **state** (§ 15.1), and `everyday/settingsView.ts` withheld that state deliberately, in writing, because drawing it over an empty session would have been a fabrication. Building sign-in **discharges a withholding**; it does not override a specification |
+| **§ D490** | one display name; first sign-in adopts the device-local one | The shipped YOU note already claims the device-local name is the board name. That claim is unfalsifiable today and **false the moment a signed-in player posts** under a `player-<hex>` mint. The adoption is legal because `everyday/profile.ts:361` already validates that name with the server's own `displayNameIssueOf` |
+| **§ D491** | the server grows a distinct mail-not-sent refusal | `api.ts` already awaits the send deliberately and says why in its own comment. What is missing is the code letting a client act on it — § D486's rule failing in the direction that costs the player |
+
+## S.2 The reservation was opened four lanes late, by the person who wrote the rule down
+
+`documentation.test.ts#OPEN_RESERVATION`'s own comment says the block is drawn **before any lane
+starts** and names that as the half wave Q got wrong. This wave drew it after two read-only lanes and
+two build lanes were dispatched and three numbers were spent. Nothing was lost — the read-only lanes
+allocate nothing, and the two builders hold numbers inside the block later drawn around them — but
+that is luck rather than process, and it is recorded in the guard's own comment rather than tidied
+out of it.
+
+## S.3 The verification half: nine issues, four items struck, one duplicate closed, one issue filed
+
+**Lane S-V1** (#146, #171, #177, #178) and **lane S-V2** (#158, #159, #169, #174, #225). Every finding
+landed as an issue comment on the issue it concerns, which is wave R's own R.5 lesson applied — that
+wave had a lane rediscover residue because the previous wave's verifier had written it somewhere
+nobody could find.
+
+| issue | premise | outcome |
+|---|---|---|
+| **#146** | holds; two supporting clauses refuted | **ruled** — § D495, now a build |
+| **#171** | partly refuted — the second intervention landed | **retitled**, blocked on #169 → #181 |
+| **#177** | partly refuted — item 6 has zero instances | schedulable, rewritten to six |
+| **#178** | partly refuted — items 2, 3, 4 built | **retitled**, schedulable, rewritten to six |
+| **#158** | holds in every clause | **closed as duplicate of #232**, after its unique item moved |
+| **#159** | partly refuted — five templates ship where the body says one | schedulable after a three-way split; **#346 filed** |
+| **#169** | partly refuted — item 2 closed | items 1 and 3 schedulable; item 4 blocked on item 3 |
+| **#174** | partly refuted — day variation is built | `docs/14` corrected on this wave's own commit |
+| **#225** | refuted as worded | **ruled** — § D496 |
+
+### S.3.1 The four findings worth more than the verdicts
+
+**A status table nothing reads had said `designed` for the whole time the step was built.**
+`docs/14-building-behaviour-contract.md:16` read `| 4 | designed |` while `random/streams.ts:97`
+declared the stream, `traffic/generator.ts:1405` drew it, `runner/crn.ts:204-210` put it in the CRN
+cohort key and `sim/dayVariationSeam.test.ts:14-45` measured § 5 criterion 3 with variance ratios
+8.30 / 3.51 / 3.68 / 3.33 and an exact shared-day assertion beneath them. § D227's shape pointed at a
+**status row** rather than at a refusal, and **no test reads that table** — it was found by a lane
+reading a GitHub issue.
+
+**A fourth stale `GAPS.md` § 3 row, and it is the one that survived a deliberate sweep.**
+`GAPS.md:123` claims the campaign judges on tuning seeds only and that nothing in the shipped surface
+says so. Both halves are refuted four ways (`campaign/judge.ts:252`, `:348-356`,
+`campaign/parse.ts:294-301`, `campaign/brief.ts:90-91`). Rows 115 and 117 were annotated CLOSED on
+2026-09-02 and **row 123 was missed by that same pass**, which makes it the right mutation fixture
+for #325 — a guard that catches rows nobody swept proves less than one catching the row a human
+sweep walked past. And it compounds: row 123 is the **source** of #178's item 4.
+
+**Two verified statements about the same capability looked contradictory and were not.** The
+2026-09-02 comment on #159 says `EventEffect` cannot express four of § 17's six wrinkle kinds;
+`docs/37` § 5.1 says four of six pass. Both are correct and the subjects differ — one measures
+`shift/types.ts#EventEffect`, the other the engine's own configuration. **The engine can already
+express four kinds that `EventEffect` cannot**, which is a decision about where the wrinkle library
+lives before it is an implementation detail: twenty rows against `EventEffect`'s five fields would
+leave roughly fifteen that parse, draw a caption and change nothing.
+
+**A branch no player and no sweep reaches.** #169's item 4 (`complexity —` for two towers) is
+unreachable today: `freshTower`'s only non-test, non-corpus caller is `openingCareer`, which opens on
+`garden-apartments`, and the honesty corpus drives only two towers, both of which publish a
+complexity. It becomes reachable the moment item 3's offer surface lands, which is the order to build
+them in.
+
+### S.3.2 A comment that contradicted itself, and what it would have cost
+
+#178's 2026-09-04 comment strikes items 2 and 4 with evidence and then lists both under **"What
+stays"**, calling item 4 *"the one I would not let sit"*. A reader reaching only that comment
+schedules two built things, one at P1. The issue is retitled and the comment superseded rather than
+left to be read — which is the same failure mode as #329's third instance, a record correct in one
+paragraph and wrong in the next.
