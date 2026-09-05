@@ -1478,7 +1478,7 @@ type DecisionReservation = {
  * reported the resulting red as an integrator action, each computing it from this file's own
  * arithmetic rather than running it, and each was right.
  */
-const OPEN_RESERVATION = { wave: 'R', from: 479, to: 487 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave R reserved D479–D483 at dispatch: one number per issue, plus one for the integrator.**
  *

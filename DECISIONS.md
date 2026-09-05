@@ -32464,3 +32464,59 @@ than exempted.
 **What this does not decide.** Whether the switch arm's `ruleRows` need their own board-key
 contribution. `boardKey.ts#runDataHashOf` already drops an empty rule list; whether a mid-run switch
 to the same id with different rows is a different board is a question for whoever builds it.
+
+---
+
+## D487 — wave R's corpus move is nineteen a case, and two lanes forecast it exactly
+
+**Date: 2026-09-05 · Owner: the integrator, wave R · Discharges § D343's measurement obligation for
+this wave.**
+
+Measured once on the integrated tree, both tiers in one sitting, never on a branch. The base at
+`3bad770` was re-measured first in a detached worktree and **reproduced its published row exactly in
+both tiers** — 49 / 582 026 / 606 / 55 / 0 and 60 / 726 013 / 4 710 / 56 / 0. That is the **eighth**
+consecutive wave the base has been confirmed rather than trusted.
+
+| | base `3bad770` | wave R | move | per case |
+|---|---|---|---|---|
+| always-on strings | 582 026 | **582 957** | **+931** | **19.0** |
+| deep strings | 726 013 | **727 153** | **+1 140** | **19.0** |
+| surfaces | 55 / 56 | **56 / 57** | **+1 / +1** | — |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+**Two lanes each published a decomposed per-case forecast before the measurement and both were
+exact.** Lane A forecast **7 a case** in both tiers — a label over three stages, a pointer and a
+dismiss over two settled states, with the outcome sentence deliberately unseeded because it is the
+server's or the client's. Lane D forecast **12 a case** — the race strip's six arms × (verdict +
+note), net of one deleted string. 7 + 12 = 19, and the tree reads 19.0 in both tiers.
+
+This column has now scored three forecasts. § D454's four lanes summed short by exactly one string a
+case, in both tiers, and the lane responsible was never localised. § D457's predicted motion where
+the answer was zero, which is the worse direction because a forecast expecting movement reads a
+correct zero as a failed measurement. **This is the first time two independent lanes were each right
+about their own contribution**, and it is worth more than one lane being right, because it says the
+per-case decomposition is a real instrument rather than a lucky total.
+
+**A coincidence, named so the next reader does not take it for a copied row.** Wave O's move
+([§ D461](DECISIONS.md)) was *also* +931 and +1 140, also 19.0 a case in both tiers. Different lanes,
+different surfaces, different causes: wave O's nineteen was fourteen board-screen states plus five
+`BOARD_SCREEN_COPY` keys; wave R's is seven notice strings plus twelve race-strip ones. Two waves
+landing on the same integer is arithmetic. Recording it is cheaper than the investigation the
+identical numbers would otherwise provoke.
+
+**The surface sets were diffed rather than the counts compared**, in both tiers and against both. One
+added per tier — `everyday/signInLink.ts#signInNoticeViewOf`, lane A's — nothing removed. Lane D's
+forecast that its work would add **no** surface was also right, and it is the more interesting half:
+a race strip that already existed gained a second recording rather than a screen, which is what
+closing a port rather than building a surface looks like from here. The deep tier's one-surface lead
+survives and the diff names it — `campaign/judge.ts#judgeStage`, the only surface in deep and not in
+always-on, with nothing in always-on and not in deep.
+
+**Both registers are empty and both tiers are green**, with `suppressed runs` unmoved at 12 of 49 and
+21 of 60, and the fit-out draw unmoved in both tiers.
+
+**Wave R's block returned no holes.** D479–D487 was reserved and every number heads a decision:
+D479–D482 one per issue to the four lanes, and D483–D487 the integrator's five. It is the second
+block to spend everything, and the sizing that produced it is recorded in `documentation.test.ts` —
+a lane's allocation is one number per issue, and an integrator's is a **stream** rather than a batch,
+because it is spent per finding and a wave's findings are not enumerable at dispatch.

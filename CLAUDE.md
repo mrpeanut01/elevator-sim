@@ -84,8 +84,43 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **582 026** | **606** | **55** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **726 013** | **4 710** | **56** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **582 957** | **606** | **56** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **727 153** | **4 710** | **57** | **0** | **green**, and the register is empty |
+
+  **Wave R's move is nineteen strings a case in both tiers, and it is the first time two lanes have
+  each forecast their own contribution and both been exactly right** ([§ D487](DECISIONS.md)).
+  Measured on the integrated tree after wave R, both tiers in one sitting, with the base at
+  `3bad770` re-measured first in a detached worktree — where it reproduced its published row
+  **exactly in both tiers**, the **eighth** consecutive wave that has held.
+
+  | | base `3bad770` | wave R | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 582 026 | **582 957** | **+931** | **19.0** |
+  | deep strings | 726 013 | **727 153** | **+1 140** | **19.0** |
+  | surfaces | 55 / 56 | **56 / 57** | **+1 / +1** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **The nineteen decomposes into two lane forecasts published before the measurement, and both were
+  exact.** Lane A forecast **7 a case** in both tiers for a new sign-in notice surface — a label over
+  three stages, a pointer and a dismiss over two settled states — and lane D forecast **12 a case**
+  for the race strip's six arms × (verdict + note), net of one string it deleted. 7 + 12 = 19, and
+  the tree reads 19.0 in both tiers. § D454 recorded four forecasts short by one string a case and
+  § D457 recorded one that predicted motion where the answer was zero; this is the second wave to
+  score a forecast exactly, and the first where **two independent lanes** did.
+
+  **A coincidence worth naming so nobody reads it as a copied row.** Wave O's move was *also* +931
+  and +1 140, also 19.0 a case in both tiers ([§ D461](DECISIONS.md)). Different lanes, different
+  surfaces, different causes — wave O's nineteen was fourteen board-screen states plus five copy
+  keys, and wave R's is seven notice strings plus twelve race-strip ones. Two waves landing on the
+  same integer is arithmetic, not a transcription error, and the sentence exists because the next
+  reader will otherwise assume it is one.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers. Exactly one added
+  in each — `everyday/signInLink.ts#signInNoticeViewOf`, lane A's — nothing removed, and lane D's
+  forecast that its work would add no surface was right: a race strip that already existed gained a
+  second recording rather than a screen. The deep tier's one-surface lead survives and the diff names
+  it: `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is
+  in always-on and not in deep.
 
   **Waves P and Q moved this row by exactly 104 strings a case, in both tiers, and the 104 splits
   into two waves rather than decomposing into parts of one.** Measured on the integrated tree after
