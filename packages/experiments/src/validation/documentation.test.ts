@@ -1478,7 +1478,28 @@ type DecisionReservation = {
  * reported the resulting red as an integrator action, each computing it from this file's own
  * arithmetic rather than running it, and each was right.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'S', from: 489, to: 498 } as DecisionReservation | null;
+/*
+ * **Wave S reserved D489–D498, and it was opened four lanes late — which is wave Q's error
+ * repeated by the person who wrote it down.**
+ *
+ * The block: D489–D491 are the integrator's three product rulings taken *before* the build lane, so
+ * that #332 was specified rather than decided at commit four; D492 issue #344, D493 issue #342,
+ * D494 issue #332; D495–D498 are the integrator's stream. The lane numbers follow wave Q's sizing
+ * rule — one per issue, not one per lane — and the integrator's tail follows § D485's, a stream
+ * rather than a batch, because an integrator's numbers are spent per finding and a wave's findings
+ * are not enumerable at dispatch.
+ *
+ * **The slip, recorded rather than tidied.** The paragraph above this one says the reservation is
+ * opened on the wave branch *before any lane starts*, and names that as the half wave Q got wrong.
+ * This wave opened it after two read-only lanes and two build lanes were already dispatched, and
+ * after three numbers had been spent. Nothing was lost — the read-only lanes allocate nothing, and
+ * the two build lanes hold numbers inside the block that was later drawn around them — but that is
+ * luck rather than process, and the window between the first spend and this line is a window in
+ * which a second lane reading the charter row would have computed D489 for itself. Written down
+ * because § D404 exists because two lanes both computed § D336, and a rule broken quietly by its
+ * own author is how a rule stops being one.
+ */
 /*
  * **Wave R reserved D479–D483 at dispatch: one number per issue, plus one for the integrator.**
  *
