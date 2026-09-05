@@ -1200,3 +1200,81 @@ three lanes.
 its own title and there are **five** since § D468 landed yesterday. A lane building four would drop
 the goal the report grades, which is the defect that issue exists to fix, committed while fixing it.
 The brief says so in those terms.
+
+---
+
+# Wave S — dispatched 2026-09-05 at `8ff0215`
+
+**Opened at `origin/main`, wave R merged, working tree clean, zero open pull requests. Open issues at
+the start: 61.** Wave R's hand-off named the next batch in one line — *"#332 is next. #336 was its
+named prerequisite and is closed"* — and left one issue it had filed unowned, #344.
+
+## The wave opens on three rulings rather than on a lane
+
+**#332 was not schedulable when the hand-off named it, and the hand-off did not know that.** Wave P's
+implementation map found two product decisions gating the screen, and a third gating one of its
+acceptance criteria. Every one of them is the shape § D458 records: a call that costs nothing taken
+before the build and costs a rewrite taken at commit four. So the wave's first act is the integrator
+taking all three, dated before the code, and dispatching the lane against them as a specification:
+
+- **§ D489** — sign-in is the **signed-out state of `settings`' YOU section**, not an eighteenth
+  screen. The map's blocker was *the handoff specifies no sign-in screen*, which is true and one step
+  short: the handoff is silent about a screen and **explicit about a state**, and
+  `everyday/settingsView.ts` withheld that state deliberately, in writing, because drawing it over an
+  empty session would have been a fabrication. Building sign-in discharges a withholding rather than
+  overriding a specification.
+- **§ D490** — **one display name.** The shipped YOU note already claims the device-local name is the
+  board name; that claim is unfalsifiable today and false the moment a signed-in player posts under a
+  `player-<hex>` mint. First sign-in adopts the device-local name rather than replacing it, which is
+  legal because `everyday/profile.ts:361` already validates that name with the server's own
+  `displayNameIssueOf`.
+- **§ D491** — the **server grows a distinct mail-not-sent refusal**, bounded to one `try`/`catch`,
+  one code, one sentence, one test, with *report and stop* if it is not that small.
+
+## Decision block allocation
+
+`CHARTER_PROGRAMME.md`'s next-free row read **D489**. Reserved **D489–D498**, opened in
+`documentation.test.ts#OPEN_RESERVATION`.
+
+| lane | issue | number |
+|---|---|---|
+| integrator, pre-dispatch rulings | #332 | **D489–D491** |
+| **S-B** | #344 | **D492** |
+| **S-C** | #342 | **D493** |
+| **S-A** | #332 | **D494** |
+| integrator stream | — | **D495–D498** |
+
+**The reservation was opened four lanes late, and that is recorded in the guard's own comment rather
+than tidied.** The rule says the block is drawn before any lane starts; this wave drew it after two
+read-only lanes and two build lanes were dispatched and three numbers were spent. Nothing was lost,
+because the read-only lanes allocate nothing and the two build lanes hold numbers inside the block
+later drawn around them. That is luck rather than process, and § D404 exists because two lanes both
+computed § D336.
+
+## Lanes
+
+| task | issue | kind | branch | worktree | status |
+|---|---|---|---|---|---|
+| **S-V1** | #146, #171, #177, #178 | read-only verification | — | main checkout | dispatched |
+| **S-V2** | #158, #159, #169, #174, #225 | read-only verification | — | main checkout | dispatched |
+| **S-A** | #332 | build | `feat/issue-332-everyday-sign-in` | `.worktrees/s-a` | dispatched |
+| **S-B** | #344 | build | `fix/issue-344-viz-wall-clock` | `.worktrees/s-b` | dispatched |
+| **S-C** | #342 | docs + guard | `docs/issue-342-route-docs35` | `.worktrees/s-c` | dispatched |
+
+Two read-only lanes share the main checkout, which is safe because neither writes. Three worktrees,
+each provisioned by `.worktree-setup.sh`. Every brief carries the `pkill -f` prohibition and the
+*read the real exit code* rule, and every brief opens with **verify the premise first, and a refuted
+premise is a successful outcome** — wave Q had four of five lanes refute their briefs and wave R had
+four of four, with the briefs being the integrator's both times.
+
+## The conflict map, declared before dispatch
+
+| file | owner | note |
+|---|---|---|
+| `packages/viz/src/everyday/**`, `menu/account.ts`, `dev/main.ts` | S-A | nobody else may touch `everyday/` or `menu/` |
+| `packages/server/src/http/api.ts` | S-A | § D491's bounded change only |
+| `vitest.config.ts`, test-cost derivations | S-B | nobody else may touch `vitest.config.ts` |
+| `docs/`, `validation/*.test.ts` | S-C | S-B and S-A forbidden in `docs/` |
+| `.github/` | **nobody** | no lane may touch CI this wave |
+| **`honesty/surfaces.ts`, `honesty/agreement.ts`** | **S-A** | sole owner this wave, unlike wave Q where two lanes shared it |
+| **`DECISIONS.md`** | **shared, all three builders** | all append; conflicts resolved in numeric order |
