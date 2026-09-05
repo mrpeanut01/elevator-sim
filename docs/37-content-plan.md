@@ -315,6 +315,15 @@ its fix judged across five days, where the harness runs one seed at one horizon.
 widening in `fixit/`, not an engine issue**: the cheapest item in this whole plan, worth four cases,
 and the one #233 should do first.
 
+**And it is cheap for a reason worth stating, because the neighbouring path is not.** A campaign
+stage's `traffic` block carries the same single field, and `campaign/types.ts` says why: *"every
+other demand field would change the passenger trace without `traceKeyOf` being able to say so"*, so
+widening it means widening `BatchRequest` first and reasoning about common random numbers.
+**`fixit/run.ts` builds a `SimulationConfig` directly**, one seed, one horizon, two arms that share
+the trace by construction — so the fix-case widening does not touch `BatchRequest` and inherits none
+of that. Two schemas that look identical from outside cost very different amounts to widen, and CR-4
+is what makes anybody look.
+
 **The remaining 16 are authorable now**, and two are worth naming because they look blocked and are
 not: *The evacuation drill that never ended* is `serviceEvents` holding cars in `fire-recall`
 indefinitely, and *Levelling that misses by 40 mm* is `CarConfig.levelingSettleS` — the engine does
