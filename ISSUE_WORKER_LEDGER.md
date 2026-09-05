@@ -1808,3 +1808,94 @@ building. A full track is a verdict with no word in it.
   interface and picks up a member name. That, and nothing the module authors, is why `derive.test.ts`
   classifies `gauntlet/ladder.ts` as a text producer while the exclusion's own reason says it authors
   nothing.
+
+---
+
+# Wave R — 2026-09-05: four build lanes, two read-only lanes, and three rulings that turned out to be one rule
+
+**66 open at the start. Six closed, one filed, four decision-blocked issues turned into schedulable
+work.** Base `13e7b93`, integrated on `claude/github-issue-worker-j9csrb`.
+
+| lane | issue | outcome |
+|---|---|---|
+| **R-A** | #336 | **closed** — the mailed link reports to the world holding the page |
+| **R-B** | #199 | **closed** — `docs/37-content-plan.md`, and the substitution runs far deeper than #158 |
+| **R-C** | #315 | **closed** — the residue was in the challenge path, and the guard was blind twice |
+| **R-D** | #226 | **closed** — the ghost port, and a race that was vacuous at the shipped defaults |
+| **R-V** | #317 #320 #324 #325 | **two closed as already fixed**, two dispositioned with evidence |
+| **R-X** | — | the `experiments` leg's 1.82× variance diagnosed to the machine |
+
+## R.1 The wave's own finding: three rulings that are the same rule
+
+D481, D484 and D486 were taken independently, on three unrelated issues, and they say one thing:
+**the wire carries causes and the receiver derives effects.**
+
+- **§ D481** — a report window is derived server-side from the building id, never carried, because a
+  player who picks their own window picks their own average.
+- **§ D484** — a world distribution publishes a quantile ladder per axis and **no typical run**,
+  because a median vector assembles three different submissions into a run nobody played; the ghost
+  takes a real entry at the median of a named axis instead.
+- **§ D486** — a `switch-dispatcher` travels as `{ atS, toProfileId, ruleRows? }` and the server
+  re-derives the vector, because that is already how the **base** profile travels.
+
+D486 is the one to read. Its ground 2 had been called structural twice, on the reasoning that *"the
+viewer's driving profile is routinely a derived object no id resolves"* — **which is equally true of
+the base profile, and the base profile posts.** The precedent sits in the same file: before
+`ruleRows` existed the whole of § 11's workshop was unpostable by construction, and that file's own
+verdict is the rule — *"That refusal was correct and is gone because the fact it rested on is."*
+
+## R.2 Four lanes, four refutations, and one of them was mine
+
+Wave Q had four of five lanes refute their briefs. This wave had four of four, and the briefs were
+mine.
+
+- **R-C** was told to move the report-window rule into `core`, my recommendation and the issue's. It
+  found the rule already lives in `experiments` and that moving it down would force `core` to acquire
+  `MATRIX_CELLS` — **the direction inverts.** It moved nothing.
+- **R-A** was passed wave P's claim that the account-notification fix is *"wrong for the reason
+  issue #106 records"*. The listener claim is true; it is **not a defect**, because `EverydayHost`
+  exposes no account member so nothing can subscribe. And #106 is **misattributed** — that is
+  `replaceChildren` destroying mousedown-node memory, which cannot fire while the Everyday root is
+  `inert` throughout. The real cost is § D388's family.
+- **R-B** was told the tree ships five contracts. It ships **eight**, and only the issue was stale.
+- **R-V** was sent at four issues assumed open. **Two were already fixed**, both by `0f5124b`, one
+  day after each was filed and before either was triaged.
+
+## R.3 The measurement that had to be re-derived twice
+
+R-X diagnosed the `experiments` leg running **35m25s and 19m27s on the same tree**. The verdict is
+the machine — CPU and wall moved by the same factor so concurrency was unchanged, 102 of 103 files
+were slower, and `Typecheck and build` moved with them while the network-bound step moved the other
+way.
+
+**Two obvious readings were wrong and one was the integrator's.** Four stable legs do not rule out a
+slow runner, because the five legs are five separate VMs. And the expensive study does not explain
+it: `selectionSweep` moved 1.71×, *less* than the leg.
+
+The step written to record the environment — citing § D201's *a run is a machine and not only a
+commit* — recorded name, arch, kernel, node and npm, byte-identical across both jobs, **and no core
+count**. Three `echo` lines now fix that. Which hardware difference it was stays undetermined, per
+§ D256.
+
+## R.4 What the guards caught, and every one caught the integrator
+
+- **`documentation.test.ts`** went red when `OPEN_RESERVATION` was closed without reconciling the
+  charter row — § D387's exact step, on the third consecutive wave it has caught the process's own
+  author.
+- **`citations.test.ts`** and the reservation ceiling both held while the block was widened twice.
+- **A backgrounded run reported `exit 0` for a command that never ran**, because the redirect
+  targeted a directory that did not exist and `|| true` plus a misplaced `$?` swallowed it. The
+  measurement was re-taken. `.worktree-setup.sh`'s header says exactly this: a run is evidence only
+  if you read its real exit code.
+
+## R.5 Owed to the next wave
+
+- **A verify lane's residue goes on the issue, not into a report.** Wave P's lane verified #315 as
+  fixed and recorded *"residue past the code fix"* somewhere nobody could find, so R-C opened against
+  a stale brief and had to rediscover it. Every read-only lane's findings land as an issue comment.
+- **#344 is filed and unowned** — 146 cases across five packages annotated above the 300 s project
+  ceiling, and a wall-clock watch that must survive a 1.82× machine swing.
+- **The three stale "five scenarios" docstrings turned out to be ten sentences**, and are fixed.
+  `scenariosPanel.ts` had *"The eight swatches"* nine lines below a header saying *"Five cards"* —
+  half-corrected is how a claim outlives its correction.
+- **#332 is next.** #336 was its named prerequisite and is closed.
