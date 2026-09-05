@@ -32766,3 +32766,67 @@ exists for.
 run is not lost — it can be posted when the connection is back."* A player who has just typed an
 email address has no run in flight, so carrying it verbatim would be a sentence about something that
 did not happen.
+
+---
+
+## D495 — the Engineer shell's Basic register is bound by the promise its own toggle makes, so the cost line grows a plain arm rather than the promise being narrowed
+
+**Date: 2026-09-05 · Owner: the integrator · Rules on: GitHub issue #146,
+`authoring/dispatcherSpec.ts#costFunctionLine`, `packages/viz/index.html:1850`. Dated before the
+code.**
+
+Wave S's lane S-V1 verified #146 and returned *needs information* with three questions, the first of
+which gates the other two: **is the Engineer shell's Basic register bound by the two-register
+rule?** Everything else follows from the answer, and the lane was right to stop rather than pick one
+— threading `state.mode` through widens what the toggle promises, and widening a promise to make an
+issue closable is the move `CLAUDE.md`'s working agreement forbids.
+
+**Ruling: yes, it is bound. `costFunctionLine` grows a Basic arm; the promise is not narrowed.**
+
+**The promise is shipped and it is broader than the test that guards it.** `index.html:1850` reads
+*"Casual states every figure in plain language and leaves out the interval spread, the energy proxy
+and the measurement window's exact bounds"*, and the `#view-mode` option is labelled *"Casual —
+plain language"*. `dev/chromeLabels.test.ts:280-300` enumerates five clauses with
+`expect(title).toContain(clause)` — **a containment check, not an exhaustiveness one** — so the
+sentence's first half is asserted by nothing. `cost = 1.00·wait + 0.30·starvation` is notation, and
+the surface says it will not draw notation in this register.
+
+**Why narrowing the sentence is the wrong half to move**, since it is the cheaper edit and would
+close the issue in one line. The two registers are not a labelling convention; they are the product
+saying which audience each surface serves. Narrowing *states every figure in plain language* to
+exclude the cost function would make the exception the most notation-dense line on the screen, which
+is the register promising least exactly where it is worth most. § D460's rule is that a refusal a
+surface cannot stand behind is withdrawn rather than reworded; the mirror binds here — a **promise**
+a surface can keep is kept, and this one can be kept because the shape already exists.
+
+**It already exists, and that is what makes this cheap.** `everyday/workshopModel.ts:446-478`
+(`mathsDisclosureOf`) draws the same content for the Everyday audience — plain sentence, symbols
+named, then the line, then what the signs mean — with the symbols drawn from `core`'s own player
+words. The Basic arm is that shape at the four Engineer sites, not a new vocabulary.
+
+**Three constraints on the build, each of which the obvious implementation gets wrong.**
+
+1. **There are four print sites, not one**: `dev/dispatcherEditor.ts:1790` and `:2058` through
+   `vectorLineOf` (`:457-461`), `:1828`, and `:1904`. A fix at `:1828` alone leaves three registers
+   disagreeing on one screen, which is `surfaces-disagree`'s shape inside a single file.
+2. **The cycle runs one way.** `everyday/workshopModel.ts:114` imports `dev/dispatcherEditor.js`, so
+   the plain arm may **not** be imported back the other way. Either keep it module-private in
+   `dev/`, or push it into `authoring/` as an optional parameter defaulting to today's output —
+   preferred, because it puts both arms beside the producer and leaves every existing caller
+   byte-identical.
+3. **No honesty property covers this and none can be made to.** `honesty/properties.ts:1417` skips
+   any surface outside `PLAYER_FACING_SURFACES`, which `properties.ts:1373-1375` derives from
+   `everyday/` and `campaign/` declarations only. The Engineer editor is out of scope regardless of
+   whether `internal-notation`'s regexes would have matched. **So the guard for this is a test at
+   the site**, and saying so is better than assuming the corpus has it covered — a briefing in wave
+   G claimed exactly that about a different string and was wrong.
+
+**What this does not decide.** Whether the *rail card* should print the cost line at all. It never
+has (`dev/rightRail.ts` composes `dispatcherBlurbOf` and calls `costFunctionLine` nowhere), the
+issue does not ask for it, and #178's item 5 has an open ruling about authored prose beside a weight
+vector that would bear on it.
+
+**One documentation correction owed on the same commit.** `weightSummaryOf` does not exist —
+the producer is `costFunctionLine` — and two documents still name the old symbol:
+`DECISIONS.md:22912` and `ISSUE_WORKER_LEDGER.md:202`. `dev/rightRail.ts:242` was already corrected.
+A grepping reader lands on nothing today.
