@@ -1,0 +1,15 @@
+{
+  "enabledPlugins": {
+    "sanctum@claude-night-market": true,
+    "leyline@claude-night-market": true,
+    "abstract@claude-night-market": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-night-market": {
+      "source": {
+        "source": "github",
+        "repo": "athola/claude-night-market"
+      }
+    }
+  }
+}
