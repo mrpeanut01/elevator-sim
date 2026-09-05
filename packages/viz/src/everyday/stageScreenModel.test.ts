@@ -918,9 +918,8 @@ describe('the cutaway’s geometry', () => {
  * -------------------------------------------------------------------------- */
 
 describe('the stage’s own register of absences', () => {
-  it('names the ghost lane, the campaign dock and the one unbuilt intervention arm', () => {
+  it('names the campaign dock and the one unbuilt intervention arm, and no longer the ghost', () => {
     const joined = STAGE_ABSENCES.join('\n');
-    expect(joined).toMatch(/ghost/);
     /*
      * **Keyed on subjects rather than on section numbers** — GitHub issue #207 took the numbers off
      * every player-facing string, so `/§ 7\.5/` and `/§ 7\.6/` had nothing left to match. The two
@@ -936,6 +935,21 @@ describe('the stage’s own register of absences', () => {
      */
     expect(joined).not.toMatch(/no decisions during a run/);
     expect(joined).not.toMatch(/handover/);
+    /*
+     * **And the second entry that came out** — GitHub issue #226, [§ D482](../../../../DECISIONS.md).
+     *
+     * `STAGE_NO_GHOST` read *"no rival lane — a ghost is a second run of the same crowd, and this
+     * screen cannot ask for one yet"*. The screen can ask for one now, through
+     * `everyday/host.ts#raceAgainst`, and a lane that shipped the picker without deleting the
+     * sentence would have left a refusal telling a player not to touch a control that works. The
+     * assertion is `not.toMatch` rather than an absent case for the same reason the pair above is:
+     * a revert has to face it, and the case's own name says what changed.
+     *
+     * The **caution** is unaffected and lives where it always did — `live/raceStrip.ts#RACE_FOOTER`,
+     * *"One day each on the same crowd. That is a race, not proof."*, which is never conditional.
+     * A race arriving is exactly when that sentence starts mattering, so nothing here relaxes it.
+     */
+    expect(joined).not.toMatch(/ghost|rival/);
     for (const absence of STAGE_ABSENCES) expect(absence.length).toBeGreaterThan(20);
   });
 });

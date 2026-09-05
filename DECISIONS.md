@@ -31892,6 +31892,77 @@ an out-of-band rate remains a defect. And `traffic/generator.ts` treating `arriv
 an override that *"overrides every profile"* is unchanged: the override is the mechanism an authored
 case uses, and it remains available to nothing else.
 
+## D482 — the ghost is exposed as a port, and a rival that drove the same way says so
+
+**Date: 2026-09-05 · Owner: wave R lane D · GitHub issue #226 (which #168 folded into) · Rules on:
+`everyday/host.ts`, `everyday/stageScreen.ts`, `everyday/stageScreenModel.ts`, `everyday/briefView.ts`,
+`everyday/buildNotes.ts`, `live/raceStrip.ts`, `dev/main.ts`'s ghost seam.**
+
+`everyday/host.ts` declined a ghost method for two waves with the reason in its own docstring:
+*"a ghost method with no rival behind it would be worse than none."* That caution is **honoured
+rather than deleted**. `EverydayHost.raceAgainst` does not record a preference; it presses
+`dev/main.ts#setGhostPick`, the same function the Engineer strip's `<select>` presses, which issues
+the second request through the same worker and adopts the recording read-only beside the primary.
+The method and its rival arrived together.
+
+**Three refusals retract on this commit and none survives it.** `stageScreenModel.ts#STAGE_NO_GHOST`
+(*"this screen cannot ask for one yet"*), `buildNotes.ts#EVERYDAY_SHELL_ABSENCES`' *Racing a second
+dispatcher*, and `briefView.ts#GHOST_REFUSAL` (*"Not built: this build simulates one run at a
+time"*). § D227's direction, and #168 was explicit that retracting one and leaving two would be the
+product saying two things about one mechanism — the incoherence no honesty property can see, because
+each of those sentences was internally honest and only the set was wrong.
+
+The brief's card is **rewritten, not deleted**: § 6.2 asks for a row there, and it now names the
+three arms that exist rather than the four it used to promise. `GHOST_REFUSAL` is renamed
+`raceAgainstCard()` because a constant called a refusal that no longer refuses is the same defect
+wearing an identifier.
+
+**The caveat is carried through unchanged and that is the substantive half of the ruling.** *"One
+day each is a race, not proof. The test bench settles it properly."* — kept verbatim through the
+refusing years so it would be here on the day a race existed. `RACE_FOOTER` is unconditional, and
+`raceVerdictOf` names no dispatcher and carries no ordering verb: it reports two observed
+percentages. One day each on one crowd is n = 1, and CLAUDE.md forbids calling one dispatcher better
+than another without a paired-t interval excluding zero. A race that shipped and quietly relaxed its
+caution would be the acceptance criterion met and the discipline lost.
+
+### The ruling that is not in the issue: a vacuous race is stated, never refused
+
+Measured on `garden-apartments` at the shipped defaults: a fresh shift opens on `collective`, *the
+plain baseline* resolves to `collective`, and the rival's recording comes back **identical on the
+legs**. The grey line lands exactly under the terracotta one and the verdict reads *level with* — of
+one run compared with itself. That picture is indistinguishable from a picker bound to nothing, which
+is the § D177 shape wearing the costume of a working control.
+
+**The obvious fix was written, measured, and thrown away.** Declining a pick that names the
+dispatcher already driving does not work: `dev/state.ts#drivingProfileOf` runs the primary's profile
+through the lever/selector/rules chain and the engine fills its defaults, so the driving profile
+carries `engine` and `answer` keys the raw `data/` profile does not. The objects differ; the runs do
+not. Every predicate over the *configs* is guessing which differences are behavioural, and guessing
+wrong in the refusing direction declines a race that was real — the worse error, since a player who
+has moved the plain levers is driving a different vector under the same name.
+
+So it is decided **on the recordings**, after the fact, by
+`live/raceStrip.ts#servedIdentically`: same crowd, same service, leg for leg. Exact, and it cannot be
+wrong. The rival is still drawn and still named — this is a statement about the day, not a refusal —
+and the note becomes `SAME_RUN_NOTE` instead of `SAME_CROWD_NOTE`, because *"the gap is your change"*
+beside no gap is a true sentence that misleads. The only cost of learning it late is a second
+simulation that had to run to be compared anyway.
+
+### What stays absent, and where a player meets it
+
+Two of § 7.4's four arms. **The world's middle** needs a reference median vector no route returns
+(GitHub issue #327); **a board row** needs posting (#332). `live/raceStrip.ts#GHOST_OPTIONS` omits
+both rather than stubbing them — an option that ran nothing would be the inert control this whole
+entry is about — so a player meets that limit as three honest picks rather than as a fourth that
+does nothing. No register entry replaces the two that closed: an absence stated in the picker's own
+vocabulary does not also need a sentence about a screen.
+
+**One thing the retired shell entry got wrong, recorded because the register keeps producing it.**
+It read *"no run in **this build** sends two dispatchers at the same crowd"*, and that was already
+too broad when it was written: the Engineer strip has raced two dispatchers over one crowd since
+slice 4d. What was actually absent was the **reach** — `EverydayHost` exposed no second recording. An
+absence stated wider than it is survives longer than it should, because the thing that would falsify
+it is not the thing it names.
 ---
 
 ## D480 — the content plan sets targets from arithmetic, the capability rule binds new content, and the two proof-case towers are authored rather than accepted

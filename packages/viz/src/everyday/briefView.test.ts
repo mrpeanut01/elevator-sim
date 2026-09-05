@@ -11,7 +11,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { briefScreenViewOf, GHOST_REFUSAL, lockedForScore, RECOMMENDED_CARDS } from './briefView.js';
+import { briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS } from './briefView.js';
+import { GHOST_OPTIONS } from '../live/raceStrip.js';
 import { isScreenBuilt } from './screens.js';
 import type { TodayRecord } from './today.js';
 
@@ -101,13 +102,53 @@ describe('who drives today', () => {
   });
 });
 
-describe('the two cards this build states rather than offers', () => {
-  it('says what the ghost would be, why it is not here, and keeps § 6.2’s caveat', () => {
-    expect(GHOST_REFUSAL.what).toMatch(/second dispatcher/);
-    expect(GHOST_REFUSAL.why).toMatch(/one run at a time/);
-    // The caveat is the sentence that makes a race honest, and it is needed unchanged the day
-    // one exists — so it is kept rather than dropped with the control.
-    expect(GHOST_REFUSAL.caveat).toBe('One day each is a race, not proof. The test bench settles it properly.');
+describe('the two cards this build states rather than draws as a live control', () => {
+  /**
+   * **This case used to assert the refusal, and the refusal is what changed** — GitHub issue #226,
+   * § D482.
+   *
+   * It read `expect(GHOST_REFUSAL.why).toMatch(/one run at a time/)`, which was true copy over a
+   * build that ran one simulation at a time and became § D227's stale refusal the moment § 7's
+   * stage grew a ghost picker. So the assertions are turned round and pinned to the **registry**,
+   * the way the card beside it already is: the stage is built ⇒ the card says where the control is
+   * and carries no *not built* clause. Neither half of that is a sentence compared against another
+   * sentence.
+   *
+   * The caveat is asserted **unchanged**, and that is the substantive claim here. It was kept
+   * verbatim through the refusing years for exactly this day, and CLAUDE.md's own rule is why: one
+   * day each on the same crowd is n = 1, and nothing this product draws may read as a verdict about
+   * a dispatcher. A race that shipped and quietly dropped its caveat would be the acceptance
+   * criterion met and the discipline lost.
+   */
+  it('says where the race is now that there is one, and keeps § 6.2’s caveat verbatim', () => {
+    const card = raceAgainstCard();
+    expect(isScreenBuilt('stage')).toBe(true);
+    expect(card.what).toMatch(/second dispatcher/);
+    expect(card.why).toMatch(/on the stage/);
+    expect(card.why).not.toMatch(/one run at a time/);
+    expect(card.why).not.toMatch(/[Nn]ot (built|here)/);
+    expect(card.caveat).toBe('One day each is a race, not proof. The test bench settles it properly.');
+  });
+
+  /**
+   * And the `what` names only the arms that exist — § D227 with its polarity reversed.
+   *
+   * The card used to offer *"the world's middle, your best, the plain baseline, or nobody"*. Two of
+   * those are still not on offer (the world's middle needs a distribution nothing posts to —
+   * GitHub issue #327), and a card that had started working while still promising them would be the
+   * same defect this rewrite closes, pointed the other way. Pinned against `GHOST_OPTIONS` rather
+   * than against a literal, so an arm that lands is an arm this case makes somebody mention.
+   */
+  it('promises exactly the arms the picker offers, and not the two it does not', () => {
+    const card = raceAgainstCard();
+    expect(card.what).toContain('plain baseline');
+    expect(card.what).toContain('latest saved');
+    expect(card.what).toContain('nobody');
+    expect(card.what).not.toMatch(/world’s middle|world's middle/);
+    for (const option of GHOST_OPTIONS) {
+      const noun = option.id === 'none' ? 'nobody' : option.label.replace(/^(the|your) /u, '');
+      expect(card.what.toLowerCase()).toContain(noun.toLowerCase());
+    }
   });
 
   it('opens the sandbox rather than refusing it, because § 3.3’s tuner is built', () => {
@@ -142,8 +183,15 @@ describe('the two cards this build states rather than offers', () => {
     expect(lockedForScore().why).not.toContain('undefined');
     expect(viewOf().locked.why).not.toContain('undefined');
     expect(viewOf().locked.door?.screen).toBe('tuner');
-    // The ghost is the other shape and stays it: a refusal with nowhere to send anybody.
-    expect(GHOST_REFUSAL.door).toBeUndefined();
+    /*
+     * The ghost card is the other shape and stays it — a statement with nowhere to send anybody.
+     * Deliberately, and not because the screen is missing: the race is on the stage, and § 3.3's
+     * own primary row on this very screen already goes there. `raceAgainstCard`'s docstring is the
+     * argument; this is the pin, and it is asserted beside `isScreenBuilt('stage')` so that *no
+     * door* can never again be read as *no screen*.
+     */
+    expect(isScreenBuilt('stage')).toBe(true);
+    expect(raceAgainstCard().door).toBeUndefined();
   });
 });
 

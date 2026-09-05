@@ -25,10 +25,13 @@ import {
   RACE_PENDING,
   RACE_SAMPLE_INTERVAL_S,
   SAME_CROWD_NOTE,
+  SAME_RUN_NOTE,
   raceLaneOf,
   raceSamplesOf,
+  raceSlotsOf,
   raceStripViewOf,
   raceVerdictOf,
+  servedIdentically,
 } from './raceStrip.js';
 import { servedLeg, syntheticRecording, waitingLeg } from './synthetic.test-helper.js';
 
@@ -121,6 +124,144 @@ describe('raceStripViewOf', () => {
 
   it('sampling interval is §7.4’s four simulated minutes', () => {
     expect(RACE_SAMPLE_INTERVAL_S).toBe(240);
+  });
+});
+
+/**
+ * **The three cells a shell writes that are not a polyline** — GitHub issue **#226**,
+ * [§ D482](../../../../DECISIONS.md).
+ *
+ * `raceSlotsOf` exists because there are two strips now — `dev/main.ts`'s and
+ * `everyday/stageScreen.ts`'s — and the order these states are decided in is a claim rather than a
+ * formatting choice. A strip that printed *waiting for the rival's day* over a pick the picker had
+ * already declined to run would be describing a request that was never made.
+ */
+describe('raceSlotsOf — the honesty order, once, for both shells', () => {
+  const noRival = { pick: 'plain-baseline' as const, recording: undefined, refusal: undefined };
+
+  it('lets a refusal outrank every state below it, including one still in flight', () => {
+    const view = raceStripViewOf({ recording: recordingOf(), ghost: undefined, simTimeS: 480 });
+    const slots = raceSlotsOf(
+      view,
+      { ...noRival, refusal: 'nothing saved yet', pending: true },
+      recordingOf(),
+    );
+    expect(slots.verdict).toBe('nothing saved yet');
+    // …and names nobody, because a refused pick drew no line to attribute.
+    expect(slots.rivalName).toBe('');
+  });
+
+  it('says a rival is coming while one is in the worker, and says none has run when one is not', () => {
+    const view = raceStripViewOf({ recording: recordingOf(), ghost: undefined, simTimeS: 480 });
+    expect(raceSlotsOf(view, { ...noRival, pending: true }, recordingOf()).verdict).toBe(
+      RACE_PENDING,
+    );
+    expect(raceSlotsOf(view, { ...noRival, pending: false }, recordingOf()).verdict).toBe(
+      RACE_NOT_RUN,
+    );
+  });
+
+  it('carries the plain figure under *nobody*, and the pick’s own note rather than nothing', () => {
+    const view = raceStripViewOf({ recording: recordingOf(), ghost: undefined, simTimeS: 480 });
+    const slots = raceSlotsOf(
+      view,
+      { pick: 'none', recording: undefined, refusal: undefined, pending: false },
+      recordingOf(),
+    );
+    expect(slots.verdict).toBe('1 standing now');
+    expect(slots.rivalName).toBe('');
+    /*
+     * The note used to be `''` here, which was defensible beside the Engineer picker and is not on a
+     * card whose only other words are a figure. It is the option's own sentence, from `GHOST_OPTIONS`
+     * rather than authored twice — no new string, and the corpus already sweeps it.
+     */
+    expect(slots.note).toBe(GHOST_OPTIONS.find((option) => option.id === 'none')?.note);
+  });
+
+  it('names the drawn line by the picked option’s own label, and only when one is drawn', () => {
+    const recording = recordingOf();
+    const view = raceStripViewOf({ recording, ghost: recording, simTimeS: 480 });
+    const slots = raceSlotsOf(
+      view,
+      { pick: 'plain-baseline', recording, refusal: undefined, pending: false },
+      recording,
+    );
+    expect(slots.rivalName).toBe(
+      GHOST_OPTIONS.find((option) => option.id === 'plain-baseline')?.label,
+    );
+  });
+});
+
+/**
+ * **A rival that drove the same way says so** — GitHub issue #226, § D482.
+ *
+ * ## The state this is about is measured rather than hypothetical
+ *
+ * A fresh shift opens on `collective` and *the plain baseline* resolves to `collective`, so at the
+ * shipped defaults the rival's recording comes back **identical on the legs** — measured on
+ * `garden-apartments`, not argued. The lines coincide exactly and the verdict reads *level with*,
+ * which is true and is a comparison of one run with itself.
+ *
+ * That picture is indistinguishable from a picker bound to nothing, which is why it needs a
+ * sentence: without one, the shape § D177 exists to catch and a correct, honest state look the same
+ * on screen. `SAME_RUN_NOTE` is what tells them apart, and the assertions below are what keep it
+ * attached to the right one.
+ *
+ * ## And the predicate is exact, which the alternative was not
+ *
+ * The first draft refused the pick **in front** — decline a rival naming the dispatcher already
+ * driving — and it was measured and thrown away: `dev/state.ts#drivingProfileOf` runs the primary's
+ * profile through the lever/selector/rules chain and the engine fills its own defaults, so the
+ * driving profile carries `engine` and `answer` keys the raw `data/` profile does not. The objects
+ * differ; the runs do not. Every predicate over the configs is guessing which differences are
+ * behavioural, and guessing wrong in the refusing direction declines a race that was real.
+ */
+describe('servedIdentically — telling a vacuous race from an inert control', () => {
+  it('is true of a recording against itself, and drives the note that says so', () => {
+    const recording = recordingOf();
+    expect(servedIdentically(recording, recording)).toBe(true);
+    const view = raceStripViewOf({ recording, ghost: recording, simTimeS: 480 });
+    const slots = raceSlotsOf(
+      view,
+      { pick: 'plain-baseline', recording, refusal: undefined, pending: false },
+      recording,
+    );
+    expect(slots.note).toBe(SAME_RUN_NOTE);
+    /* The rival is still drawn and still named: this is a statement about the day, not a refusal. */
+    expect(slots.rivalName).toBe(
+      GHOST_OPTIONS.find((option) => option.id === 'plain-baseline')?.label,
+    );
+  });
+
+  it('is false when the service differs, even though the crowd is the same crowd', () => {
+    const yours = recordingOf();
+    /* The same two arrivals — same ids, same seconds, same floors — served four seconds later. */
+    const rival = syntheticRecording({
+      legs: [servedLeg('p-served', 50, 114, 204), waitingLeg('p-standing', 100)],
+    });
+    expect(servedIdentically(yours, rival)).toBe(false);
+    const view = raceStripViewOf({ recording: yours, ghost: rival, simTimeS: 480 });
+    const slots = raceSlotsOf(
+      view,
+      { pick: 'plain-baseline', recording: rival, refusal: undefined, pending: false },
+      yours,
+    );
+    expect(slots.note).toBe(SAME_CROWD_NOTE);
+  });
+
+  it('is false when one side served somebody the other never did', () => {
+    const yours = recordingOf();
+    const rival = syntheticRecording({
+      legs: [servedLeg('p-served', 50, 110, 200), servedLeg('p-standing', 100, 300, 400)],
+    });
+    expect(servedIdentically(yours, rival)).toBe(false);
+  });
+
+  it('is false on a different-length record without walking off the end of the shorter one', () => {
+    const yours = recordingOf();
+    const rival = syntheticRecording({ legs: [servedLeg('p-served', 50, 110, 200)] });
+    expect(servedIdentically(yours, rival)).toBe(false);
+    expect(servedIdentically(rival, yours)).toBe(false);
   });
 });
 

@@ -89,6 +89,9 @@ function harness(): { readonly host: EverydayHost; state: () => ViewerState } {
     intervene: () => {},
     closeDay: () => {},
     openRunTab: () => {},
+    /* § 7.4's rival: this fixture races nobody, and pressing for one is not its subject. */
+    ghostRace: () => ({ pick: 'none' as const, rival: undefined, refusal: undefined, pending: false }),
+    raceAgainst: () => {},
     applyPatch: (patch) => {
       state = { ...state, ...patch };
     },

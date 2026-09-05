@@ -220,8 +220,11 @@ mechanisms**, and each is portable:
 
 > **PM7 — A mode that cannot yet draw its symptom says so where the symptom would be.** Not in a
 > release note, not in a shell register: on the surface, in the player's register, in the shape
-> `everyday/stageScreenModel.ts#STAGE_NO_GHOST` already uses — *"no rival lane — a ghost is a second
-> run of the same crowd, and this screen cannot ask for one yet."* This is `charter` non-goal 5 and
+> `everyday/stageScreenModel.ts#STAGE_NO_GHOST` used — *"no rival lane — a ghost is a second run of
+> the same crowd, and this screen cannot ask for one yet."* **That constant is gone**, deleted on the
+> commit that gave the lane a rival (§ 4.5, GitHub issue #226, [§ D482](../DECISIONS.md)), and it is
+> quoted here as the *shape* rather than as a live example — which is the rule working in the
+> direction it is usually not tested in. This is `charter` non-goal 5 and
 > [§ D227](../DECISIONS.md) both ways: an absent symptom may not be papered over with a figure, and a
 > drawn symptom may not claim to be absent.
 
@@ -411,7 +414,24 @@ Three clauses make that honest rather than merely cautious:
    up afterwards — § D310's own rule, for its own reason: the latest filed sheet is not always a
    sheet of the latest run.
 
-### 4.5 The one thing this mode needs and does not have
+### 4.5 The one thing this mode needed and did not have — **built, 2026-09-05**
+
+**`PM-TT5` is closed** (GitHub issue **#226**, [§ D482](../DECISIONS.md)). `EverydayHost` carries the
+port — `ghostRace()` and `raceAgainst(pick)` — the stage carries the picker, and `STAGE_NO_GHOST` was
+deleted on that commit with the two register entries it was half of. What this section said is kept
+below, unedited, because the argument for the shape is what the port was built to and is still the
+reason it is a *provided* port rather than an import.
+
+**One thing it did not anticipate, recorded here because the section claimed the drawing was free.**
+*"The drawing is two SVG polylines that already exist"* is true, and the lines are **not always
+distinguishable**: measured on `garden-apartments` at its shift demand, nobody is standing when any
+four-minute grid point falls, so both runs plot flat and identical whatever the dispatchers did. And
+at the shipped defaults the plain baseline **is** the dispatcher already driving, so the rival's
+recording comes back byte-identical — which the strip now says in words rather than drawing twice and
+calling it a race. Neither is a defect in the port; both are the difference between *a lane exists*
+and *a lane shows something*.
+
+**What it said, unedited:**
 
 **A rival lane on the Casual stage.** `live/raceStrip.ts` draws two lanes; the Casual stage draws
 one, and says why out loud (`STAGE_NO_GHOST`): *"a ghost is a second run of the same crowd, and this
@@ -1039,7 +1059,7 @@ of work rather than by section. Every row names the rule that asks for it.
 |---|---|---|---|---|
 | 1 | `PM-FB1` | Mount a stage over `session.asBuilt.recording` on the fix-case screen, above the four figures | `everyday/fixitScreen.ts` | **Small.** The recording already exists at `:343`; this is a renderer mount and a transport, not a simulation |
 | 2 | `PM-TT1` | Move the *How hard this looks* plate off the pre-run position, or reword it as configuration | `everyday/today.ts` and its caller | **Small**, and it is a copy-and-ordering change rather than a deletion |
-| 3 | `PM-TT5` | A **provided ghost port** on `EverydayHost`, in `everyday/swap.ts`'s shape, so the Casual stage can reach `dev/ghostRun.ts#ghostPlanOf` without importing across the façade. `STAGE_NO_GHOST` is deleted on the same commit and not before | `everyday/`, `dev/ghostRun.ts` | **Small–medium.** Both halves exist; only the wire is missing |
+| 3 | `PM-TT5` | ~~A **provided ghost port** on `EverydayHost`~~ — **built 2026-09-05**, GitHub issue #226, [§ D482](../DECISIONS.md). `EverydayHost.ghostRace`/`raceAgainst`, the stage's picker, and `STAGE_NO_GHOST` deleted on the same commit with both register entries it was half of | `everyday/`, `live/raceStrip.ts`, `dev/main.ts` | Was **small–medium**; the wire was the work, and `dev/ghostRun.ts` is unchanged |
 | 4 | `PM-FB3` | `fixit/parse.ts` refuses a repair patch carrying `floorPopulations`, with the reason attached | `fixit/parse.ts` | **Small.** One check; it protects the whole mode's basis |
 | 5 | `PM5` | One shared **legs-identity assertion** — two runs agree on `(passengerId, arrivedAt, originFloorId, destinationFloorId)` and differ only on `boardedAt`, `alightedAt`, `carId` — used by the fixit pair, the intervention pair and the campaign works-night pair | a test helper under `packages/viz/src/` | **Small**, and it is the one row that makes three separate honesty claims checkable instead of argued |
 | 6 | `PM-FB2` | `fixit/parse.ts` requires a `symptom` to name a sight rather than carry a raw figure, in the shape it already refuses probability words and engine identifiers. **Two `data/` corrections follow and belong to a content lane, not this rule** | `fixit/parse.ts`, then `data/fixit-cases.json` | **Small** code, **small** content |

@@ -133,8 +133,23 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * player-facing statement of the same absence on the control that would otherwise promise it.
    */
   'Replaying a past day as the day it was — Your week opens a closed day and watches its record play, but nothing hands one back to be played again. A tower grows through a week, so the same building and the same seed on a later day meet a different crowd, and Play this crowd yourself says so on any row that is not the day standing now.',
-  'Racing a second dispatcher — no run in this build sends two dispatchers at the same crowd, so the brief’s *Race against* card says what that would show you instead of offering it.',
   /*
+   * **A sixth row left on the commit that made it false, and it was half of a pair.** It read
+   * *"Racing a second dispatcher — no run in this build sends two dispatchers at the same crowd, so
+   * the brief's *Race against* card says what that would show you instead of offering it"*, and
+   * GitHub issue **#226** ([§ D482](../../../../DECISIONS.md)) put a picker on § 7's stage that does
+   * exactly that. Its other half was `stageScreenModel.ts#STAGE_NO_GHOST`, the same absence said
+   * from the stage's side, and both went together: retiring one would have left the product saying
+   * two things about one mechanism.
+   *
+   * Worth recording that the sentence had a second, older problem, because it is the shape this
+   * register keeps producing. *"No run in **this build**"* was already too broad when it was
+   * written — the Engineer strip has raced two dispatchers over one crowd since slice 4d — so the
+   * entry was over-claiming about a product it was describing from one shell's point of view. What
+   * was actually absent was the **reach**: `EverydayHost` exposed no second recording. An absence
+   * stated wider than it is survives longer than it should, because the thing that would falsify it
+   * is not the thing it names.
+   *
    * **A fifth row left on the very next merge, and it is the one this register existed to make
    * findable.** It read: *"the Engineer surface still boots and runs behind this shell, and nothing
    * here opens it — the rail's Switch to Engineer row is that door and it is not built"*. That row

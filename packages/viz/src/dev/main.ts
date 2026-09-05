@@ -144,10 +144,9 @@ import {
 import { patternReadoutAt } from '../live/patternReadout.js';
 import {
   GHOST_OPTIONS,
-  RACE_NOT_RUN,
-  RACE_PENDING,
   RACE_SAMPLE_INTERVAL_S,
   raceLaneOf,
+  raceSlotsOf,
   raceStripViewOf,
   type GhostPick,
 } from '../live/raceStrip.js';
@@ -3763,6 +3762,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       context.update(patch);
     },
     /*
+     * § 7.4's rival — GitHub issue #226, § D482. Both halves are the seams this closure already
+     * runs the Engineer strip on: the read is the four ghost fields together (see
+     * `everyday/host.ts#EverydayGhostRace` for why together), and the press is
+     * {@link setGhostPick}, which is the *same* function the strip's own `<select>` calls. A
+     * binding that recorded a pick without issuing the request would be the ghost method with no
+     * rival behind it that `everyday/host.ts` spent two waves declining to add.
+     */
+    ghostRace: () => ({
+      pick: ghostPick,
+      rival: ghostRecording,
+      refusal: ghostRefusal,
+      pending: ghostInFlight,
+    }),
+    raceAgainst: (pick) => {
+      setGhostPick(pick);
+    },
+    /*
      * § 14.1's six bindings, and every one of them is the *same* seam the Engineer picker presses —
      * GitHub issue #182, § D436. `mountWatchPanel` above is handed `loadReferenceRuns`,
      * `recordRun`, `enterWatch`, `stopWatching` and `playThisCrowd`; these are those five plus a
@@ -4088,7 +4104,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (ghost.kind === 'refused') {
       ghostRefusal = ghost.reason;
       lastRaceKey = '';
-      drawRaceStrip(viewAt());
+      // `renderAll`, not `drawRaceStrip`: the Everyday stage draws this strip too and hears the
+      // host's notification. See {@link setGhostPick}.
+      renderAll();
       return;
     }
     ghostInFlight = true;
@@ -4107,7 +4125,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         if (state.recording !== primaryRecording) return; // a later day superseded this race
         ghostRecording = recording;
         lastRaceKey = '';
-        drawRaceStrip(viewAt());
+        renderAll();
       },
     });
   }
@@ -4148,24 +4166,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
     lastRaceKey = key;
 
     const stripView = raceStripViewOf({ recording, ghost, simTimeS: view.simTimeS });
-    const option = GHOST_OPTIONS.find((entry) => entry.id === ghostPick);
     /*
-     * The verdict slot, in honesty order: a refusal outranks everything (it says why there is no
-     * rival); a picked-but-absent rival says whether one is coming; and only a drawn rival — or
-     * the *nobody* pick, whose slot carries the plain figure — speaks through the view itself.
+     * The verdict slot, the note and the key's name — `live/raceStrip.ts#raceSlotsOf`, which owns
+     * the honesty order (a refusal outranks a state, a state outranks a figure) for **both** shells
+     * since the § 7 stage grew a strip of its own (issue #226, § D482). It was three ternaries here.
      */
-    const verdict =
-      ghostRefusal ??
-      (stripView.ghost !== undefined || ghostPick === 'none'
-        ? stripView.verdict
-        : ghostInFlight
-          ? RACE_PENDING
-          : RACE_NOT_RUN);
-    setText(ui.race.verdict, verdict);
-    setText(ui.race.note, stripView.note);
+    const slots = raceSlotsOf(
+      stripView,
+      { pick: ghostPick, recording: ghost, refusal: ghostRefusal, pending: ghostInFlight },
+      recording,
+    );
+    setText(ui.race.verdict, slots.verdict);
+    setText(ui.race.note, slots.note);
     setText(ui.race.footer, stripView.footer);
     setHidden(ui.race.ghostKey, stripView.ghost === undefined);
-    setText(ui.race.ghostName, stripView.ghost === undefined ? '' : (option?.label ?? ''));
+    setText(ui.race.ghostName, slots.rivalName);
 
     // One clock, one x-axis: the longer of the two spans, so the lines align instant for
     // instant. `endedAt` is an outcome, so two runs of one crowd may legitimately differ.
@@ -4212,37 +4227,60 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.race.ghost.value = ghostPick;
     ui.race.ghost.addEventListener('change', () => {
       const value = ui.race.ghost.value;
-      ghostPick = GHOST_OPTIONS.some((option) => option.id === value)
-        ? (value as GhostPick)
-        : 'none';
-      ui.race.ghost.title = GHOST_OPTIONS.find((option) => option.id === ghostPick)?.note ?? '';
-      ghostRecording = undefined;
-      ghostRefusal = undefined;
-      lastRaceKey = '';
-      if (ghostPick === 'none') {
-        // A rival in flight is cancelled — its result would be dropped unread anyway. A primary
-        // in flight is not ours to stop.
-        if (ghostInFlight) shiftRunner.cancel();
-        drawRaceStrip(viewAt());
-        return;
-      }
-      const primary = state.recording;
-      if (
-        lastShiftPlan !== undefined &&
-        primary !== undefined &&
-        /*
-         * Identity, not configuration — `shift/banking.ts`'s own move. A recording loaded from
-         * a file has no plan behind it, and racing `lastShiftPlan` under it would draw a rival
-         * of a *different* day beside it; the strip waits for a run this shell simulated.
-         */
-        primary === simulatedRecording &&
-        // A primary in flight will race this pick when it lands; only a rival may be superseded.
-        (!shiftRunner.isRunning() || ghostInFlight)
-      ) {
-        scheduleGhost(lastShiftPlan, primary);
-      }
-      drawRaceStrip(viewAt());
+      setGhostPick(
+        GHOST_OPTIONS.some((option) => option.id === value) ? (value as GhostPick) : 'none',
+      );
     });
+  }
+
+  /**
+   * Take a pick and issue the rival's day — **the one seam, pressed by both shells.**
+   *
+   * GitHub issue **#226**, [§ D482](../../../../DECISIONS.md). It was the body of the `<select>`'s own
+   * listener while the Engineer strip was the only surface with a picker; the § 7 Everyday stage has
+   * one now and reaches this through `everyday/host.ts#raceAgainst`. Extracted rather than copied,
+   * because *two sites answering one question is how one of them goes stale unread* — and the
+   * question here is `who is the rival`, which the strip on the other side of the cover is drawing
+   * from the very fields this function writes.
+   *
+   * The Engineer `<select>` is written from here too, so a pick made on the Everyday stage is the
+   * pick the Engineer picker shows when the player walks back through § 3.2's door. Setting
+   * `.value` fires no `change` event, so this cannot recurse.
+   *
+   * `renderAll` rather than {@link drawRaceStrip}: the Everyday host publishes on that notification
+   * and its stage has its own strip to redraw. A private notify beside it would be the second path
+   * this function exists to avoid.
+   */
+  function setGhostPick(pick: GhostPick): void {
+    ghostPick = pick;
+    ui.race.ghost.value = ghostPick;
+    ui.race.ghost.title = GHOST_OPTIONS.find((option) => option.id === ghostPick)?.note ?? '';
+    ghostRecording = undefined;
+    ghostRefusal = undefined;
+    lastRaceKey = '';
+    if (ghostPick === 'none') {
+      // A rival in flight is cancelled — its result would be dropped unread anyway. A primary
+      // in flight is not ours to stop.
+      if (ghostInFlight) shiftRunner.cancel();
+      renderAll();
+      return;
+    }
+    const primary = state.recording;
+    if (
+      lastShiftPlan !== undefined &&
+      primary !== undefined &&
+      /*
+       * Identity, not configuration — `shift/banking.ts`'s own move. A recording loaded from
+       * a file has no plan behind it, and racing `lastShiftPlan` under it would draw a rival
+       * of a *different* day beside it; the strip waits for a run this shell simulated.
+       */
+      primary === simulatedRecording &&
+      // A primary in flight will race this pick when it lands; only a rival may be superseded.
+      (!shiftRunner.isRunning() || ghostInFlight)
+    ) {
+      scheduleGhost(lastShiftPlan, primary);
+    }
+    renderAll();
   }
 
   /** Only what the playhead moves. Runs at 60 Hz. */
