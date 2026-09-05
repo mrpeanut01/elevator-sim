@@ -3938,6 +3938,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
   };
   EVERYDAY_HOST.publish(createEverydayHost(everydayHostBindings));
+  /*
+   * **The account, once, on every load — and this line is not belt.** GitHub issue #332.
+   *
+   * {@link drawMenu} is the channel's choke point and it is a **menu** draw: boot's own sequence
+   * (`restoreSession(); applyTheme(); renderAll(); runShift();`) does not call it, and neither does
+   * anything else until the player opens the Engineer menu or a mailed link is redeemed. So on an
+   * ordinary load — the one the shipped page is — nothing published the account at all, and
+   * `everyday/settingsView.ts`'s YOU section sat on its *the simulator is still loading* arm for
+   * the whole visit while the simulator had long since loaded.
+   *
+   * Here rather than earlier because this is the line the Everyday shell's screens become mountable
+   * from: `everyday/shell.ts` refuses to mount a screen until a data host exists, so a screen can
+   * read {@link accountActions} and the published account in the same paint. Re-publishing costs
+   * nothing — the channel is a no-op when the state is the same object — so a redemption that has
+   * already published from `drawMenu` is not disturbed.
+   */
+  publishEverydayAccount(accountState);
 
   /* ====================================================================== *
    * Rendering

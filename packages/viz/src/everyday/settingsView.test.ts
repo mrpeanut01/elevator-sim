@@ -521,4 +521,33 @@ describe('the account block — § D489’s asking half, drawn as six states', (
       expect(card.initial).toBe(settings.you.initial);
     }
   });
+
+  /**
+   * **Negative control: the defect the pair exists to catch, built and shown to disagree.**
+   *
+   * *A property that has never failed is a property that cannot fail.* The reading above holds on
+   * this tree, and on its own it would hold just as well over two sides that could never differ —
+   * which is the tautology `honesty/agreement.test.ts#NOT_AGREED` classifies and rejects. So this
+   * builds the wrong derivation, the obvious one a later reader will write, and requires it to part
+   * from the shipped one on the arm where the account is carrying the server's mint.
+   */
+  it('negative control: a side that took the mint would disagree, and only on the naming arm', () => {
+    const device = { name: 'Nadia R.', avatarColor: '#4F8A5B' };
+    /* The plausible wrong answer: *signed in, use the account's name*, with no adoption gate. */
+    const mintWins = (account: AccountState | undefined): string =>
+      account?.user?.displayName ?? device.name;
+    const shipped = (account: AccountState | undefined): string =>
+      settingsScreenViewOf({
+        ...BASE,
+        profile: device,
+        ...(account === undefined ? {} : live(account)),
+      }).you.nameValue;
+
+    expect(mintWins(undefined)).toBe(shipped(undefined));
+    expect(mintWins(named('Somebody Else'))).toBe(shipped(named('Somebody Else')));
+    /* And on the mint it publishes `player-…` where the product publishes the player's own name. */
+    expect(mintWins(minted)).toBe('player-a1b2c3d4e5f6');
+    expect(shipped(minted)).toBe('Nadia R.');
+    expect(mintWins(minted)).not.toBe(shipped(minted));
+  });
 });

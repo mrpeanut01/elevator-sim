@@ -32803,6 +32803,19 @@ move*, and a menu navigation, a slider and the same address arriving three times
 no listener. `everyday/accountPort.test.ts` drives that through the shipped reducers rather than
 asserting it about a hand-built pair.
 
+**The choke point is necessary and was not sufficient, and that half was found by reading rather
+than by a red test.** `drawMenu()` catches every account *transition* — thirteen call sites of
+`accountState = …; drawMenu();` — and boot's own sequence
+(`restoreSession(); applyTheme(); renderAll(); runShift();`) **does not call it**, nor does anything
+else until the player opens the Engineer menu or a mailed link is redeemed. So on an ordinary load
+nothing published an account at all and the settings screen sat on its *the simulator is still
+loading* arm for the whole visit while the simulator had long since loaded. The two publishes answer
+two different questions — *it moved* and *there is one* — and either alone is a screen that is wrong
+half the time. The second is beside `EVERYDAY_HOST.publish`, which is the line Everyday screens
+become mountable from, and `everyday/accountPort.test.ts` reads both out of the source with the
+limitation `everyday/signInLink.test.ts` states: strong evidence that a line was written, none at all
+about what the product does.
+
 The **effects** are on `everyday/host.ts` in `dailyBoard`'s shape, per the brief and for
 `dailyBoardOf`'s own stated reason. `undefined` means *no account server*, which is what lets the
 screen say there is nowhere to sign in **before** it draws a field — GitHub issue #30's own fix

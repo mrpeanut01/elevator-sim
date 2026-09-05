@@ -12,6 +12,9 @@
  * would have felt.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { SIGNED_OUT, signedIn, signedOut, updateForm, withNotice } from '../menu/account.js';
@@ -104,5 +107,53 @@ describe('the account channel — GitHub issue #332', () => {
     /* Twice is once: there is nothing further to withdraw. */
     publishEverydayAccount(undefined);
     expect(heard).toBe(1);
+  });
+});
+
+/**
+ * **The two publishes `dev/main.ts` owes, read as source** — which is weak evidence and is the only
+ * evidence available, on `everyday/signInLink.test.ts`'s own precedent and with its own limitation:
+ * this says a line has been written and nothing at all about what the product does.
+ *
+ * It is here because the defect it watches for was in this lane's first draft and no test in the
+ * tree could see it. {@link publishEverydayAccount} was called from `drawMenu()` only — the choke
+ * point every account **write** passes through — and boot's own sequence
+ * (`restoreSession(); applyTheme(); renderAll(); runShift();`) never calls it. So on an ordinary
+ * load nothing published an account at all, and the settings screen sat on its *the simulator is
+ * still loading* arm for the whole visit while the simulator had long since loaded. The two calls
+ * answer two different questions — *it moved* and *there is one* — and either alone is a screen
+ * that is wrong half the time.
+ */
+describe('what only the source can say — the two publishes', () => {
+  const source = (): string =>
+    readFileSync(fileURLToPath(new URL('../dev/main.ts', import.meta.url)), 'utf8');
+
+  it('publishes on every menu draw, so no account transition is missed', () => {
+    const body = source();
+    const at = body.indexOf('function drawMenu()');
+    expect(at, '`drawMenu` is not in `dev/main.ts` under that name').toBeGreaterThan(0);
+    const to = body.indexOf('\n  }\n', at);
+    expect(
+      body.slice(at, to),
+      'the account is no longer published from `drawMenu`, which is the one choke point every ' +
+        'account write passes through — thirteen call sites of `accountState = …; drawMenu();`. ' +
+        'A publish moved out of it is a transition a screen never hears about.',
+    ).toContain('publishEverydayAccount(accountState)');
+  });
+
+  it('publishes once at boot as well, so an untouched load has an account to draw', () => {
+    const body = source();
+    const publishes = [...body.matchAll(/publishEverydayAccount\(/gu)];
+    expect(
+      publishes.length,
+      'there is only one publish, and it is `drawMenu`’s. Nothing in boot calls `drawMenu`, so on ' +
+        'a load where the player never opens the Engineer menu the Everyday settings screen would ' +
+        'draw its booting arm for the whole visit.',
+    ).toBeGreaterThan(1);
+    /* And the second one is boot's, beside the line that makes Everyday screens mountable. */
+    const host = body.indexOf('EVERYDAY_HOST.publish(');
+    const boot = body.indexOf('publishEverydayAccount(accountState);', host);
+    expect(host, 'the Everyday host is no longer published under that name').toBeGreaterThan(0);
+    expect(boot, 'boot does not publish the account after publishing the host').toBeGreaterThan(host);
   });
 });
