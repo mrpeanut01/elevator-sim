@@ -1,6 +1,6 @@
 # Building behaviour — the contract
 
-**Status: designed; steps 0, 1, 2, 3, 5 and 6 built. Criteria written before the implementation,
+**Status: designed; every step 0–6 built. Criteria written before the implementation,
 which is the point — step 2's criterion is the first one measurement sent back for correction, and
 step 6's is the first one measurement sent back with an answer nobody wanted to publish and a gate
 that had to be raised before it could be.**
@@ -13,7 +13,7 @@ that had to be raised before it could be.**
 | **3 — mass control, group-size curve (§§ 2.1–2.2)** | **built** — three group-size families and a schema-bearing mass block with required truncation bounds, all five samplers one-draw-per-call so none is gated to `v2`; `traffic/varianceControls.test.ts` drives each on the legs |
 | **5 — patience, lobby crowding, stairs (§ 3)** | **built, and the gaps are part of the verdict** — abandonment with a fifth `awtIsValid` ground above censoring, a crowding term that **destabilises four of nine measured cells** (a finding, not a bug), and stairs with both asymmetries. **§ 3.3's condition 2 is withdrawn**, below. Criterion 4 is met inside `core` and **not** at the renderer the way [§ D106](../DECISIONS.md)'s rule is — `viz/shift/goals.ts`'s horizon goal is still improved by abandonment with no figure beside it, bridged by a run-record disclaimer and not closed. **That is the clause to distrust first.** |
 | **6 — the teaching surface (§ 4)** | **built, and § 5 criterion 5 answers with a fourth refusal** — a declared `TeachingSpec` whose four rules are refusals, `tune --teaching` as its named non-test caller, and a pre-registered spec measured at n = 200 on held-out traffic. **The gate was raised while it ran**: the first run cleared all four of the criterion's clauses at both cells, and § D200's static-hybrid control — promoted here from a follow-up to a gate clause — refuses both. Say it in the same breath as the intervals, below |
-| 4 | designed |
+| **4 — inter-day variability (§ 2.3)** | **built, and § 5 criterion 3 met by a measurement** — `dayVariation` is a named stream (`core/src/random/streams.ts:97`), drawn at `traffic/generator.ts:1405`, with a partial declaration refused at `:583`/`:589`; `peakShiftS` is implemented in `traffic/demandTemplate.ts:301-349`; and `runner/crn.ts:204-210` puts the block in the CRN cohort key, which is the clause criterion 3 exists to force. `sim/dayVariationSeam.test.ts:14-45` is the measurement — variance ratios **8.30, 3.51, 3.68, 3.33** with Pitman–Morgan t from **18.83** down to **7.08**, and beneath the statistics an exact assertion that both shared-day arms report the identical drawn day and structural trace digest, because a variance ratio alone cannot tell *shared* from *lucky*. [§ D208](../DECISIONS.md) is the recorded judgement. **This row said `designed` for the whole time the step was built**, which is [§ D227](../DECISIONS.md)'s shape pointed at a status table rather than at a refusal, and it was found by a verification lane reading GitHub issue #174 rather than by anything in the suite — no test reads this table |
 
 **Step 0's criterion is met by a run, not an argument.** Three banks, both lobby levels marked
 transfer, and the escalator the only difference between the arms: `servedFloorIds` byte-identical,

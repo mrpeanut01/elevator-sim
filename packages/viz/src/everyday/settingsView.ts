@@ -57,7 +57,7 @@
  *   has none of"*, which was false on every served build — the server injects the API tag into the
  *   page it serves — and became visibly false when GitHub issue #221 made the board read. What is
  *   actually absent is the posting path, so that is what it says now.
- * - **This device's two statements shipped; its two actions did not.** *Where progress lives* and
+ * - **This device's two statements shipped; one of its two actions now does too.** *Where progress lives* and
  *   *Replay verification* are statements of fact with real seams (`persist/session.ts` and this
  *   screen's own `profileStore.ts`; the server's replay-before-board, which `dev/main.ts` reports
  *   as *"The server replayed your seed and it reproduced."*). *Clear saved progress* is refused
@@ -65,26 +65,54 @@
  *   cleared slot is rewritten moments later and the button's claim does not survive its own
  *   click. *Switch to Engineer* used to be refused here in the rail's own words, and is now not
  *   named at all: the rail's § 3.2 footer row opens the Engineer surface, so the entry went with
- *   the refusal rather than being reworded — see the note where it stood. *Sign out* is refused
- *   because nothing on this surface is
- *   signed in — `menu/account.ts`'s session is the Engineer screen's, token in memory, and a
- *   button ending a session this screen never shows would be § 20.12's lie in reverse.
+ *   the refusal rather than being reworded — see the note where it stood. **A *Sign out* refusal
+ *   stood beside it and is deleted on this commit rather than reworded** (GitHub issue #332,
+ *   [§ D489](../../../../DECISIONS.md)). It read: *"Sign out is refused because nothing on this
+ *   surface is signed in — `menu/account.ts`'s session is the Engineer screen's, token in memory,
+ *   and a button ending a session this screen never shows would be § 20.12's lie in reverse."*
+ *   Every clause of it is false now: this screen shows that session ({@link SIGN_IN_COPY}), the
+ *   session is reached through `everyday/accountPort.ts`, and *Sign out* is one of its controls. A
+ *   refusal standing over a control that works is § D227's defect in the direction that costs the
+ *   player — it tells them not to press something that does something.
+ *
+ * ## The account is a **state** of the *You* section, not a row of this roster
+ *
+ * GitHub issue #332, [§ D489](../../../../DECISIONS.md). § 4's screen inventory lists seventeen keys
+ * and none of them is a sign-in, so an eighteenth would have been a deviation from the one part of
+ * this that *is* specified, taken in order to build something the inventory does not contain. What
+ * § 15.1 does specify is the signed-in line and *Sign out*, which this file withheld — see the
+ * second deviation below — and that withholding is discharged here rather than overridden: the
+ * session is drawn from a real one ({@link SettingsSignInView}), and the *asking* half in front of
+ * it is the six states {@link SIGN_IN_COPY} words. The roster above is untouched by it, because a
+ * state is not a row.
  *
  * ## Two copy deviations from the prototype, each with its constraint
  *
- * - The progress row's note drops *"campaign purses"* (no campaign purse exists in this tree) and
- *   says *playing* rather than *signing in* elsewhere starts a separate career (Everyday Mode has
- *   no sign-in). § 16 rule 5: derive, never assert — a stored-things list is a claim.
- * - The prototype's signed-in line (`Nadia R.` / `signed in · progress saved on this device`) and
- *   its no-op Sign out button are replaced by one honest sentence ({@link SettingsYouView.home}):
- *   an authored fixture presented as a player is § 20.11's own example.
+ * - The progress row's note drops *"campaign purses"* (no campaign purse exists in this tree).
+ *   **Its second half was a deviation and is not one any more**: it read *"says *playing* rather
+ *   than *signing in* elsewhere starts a separate career (Everyday Mode has no sign-in)"*, and the
+ *   parenthetical is false on this commit. The row's own sentence is unchanged and still true —
+ *   progress is this device's and an account carries identity, not a career — so what is deleted
+ *   is the *reason given for wording it that way*, and what is added is the clause a signed-in
+ *   reader now needs: signing in on another device does not bring it. § 16 rule 5: derive, never
+ *   assert — a stored-things list is a claim.
+ * - **The prototype's signed-in line is drawn for real, and the sentence that stood in for it is
+ *   deleted** — GitHub issue #332, [§ D489](../../../../DECISIONS.md). `SettingsYouView.home` read:
+ *   *"Nothing on this screen is signed in — your name and picture live on this device."* It was
+ *   put there because § 15.1's `Nadia R.` / `signed in · progress saved on this device` is an
+ *   authored fixture and *"an authored fixture presented as a player is § 20.11's own example"*.
+ *   That is discharged rather than overridden: the field is gone and {@link SettingsYouView.signIn}
+ *   stands where it stood, drawing a real session or asking for one. § D489's own reading of the
+ *   handoff is that the signed-in half was never missing from § 15.1 — it was missing from the
+ *   build, deliberately, and this is the commit that stops it being missing.
  */
 
-import { displayNameIssueOf } from '../menu/account.js';
+import { displayNameIssueOf, namingStage, type AccountState } from '../menu/account.js';
 import {
   AVATAR_SWATCHES,
   avatarInitialOf,
   DEFAULT_EVERYDAY_PROFILE,
+  effectiveNameOf,
   type EverydayProfile,
 } from './profile.js';
 /*
@@ -121,12 +149,239 @@ export interface SettingsYouView {
   readonly initial: string;
   readonly avatarColor: string;
   readonly swatches: readonly SettingsSwatchView[];
-  /** The prototype's `nameNote` — where the name shows up. */
+  /**
+   * The prototype's `nameNote` — where the name shows up, and it says a **different** thing
+   * signed in from signed out.
+   *
+   * [§ D490](../../../../DECISIONS.md) is why it had to split rather than stay one sentence. It
+   * read *"This is the name on the daily board, on the ladder, and on any run somebody else
+   * watches"* in both states, which was a claim about the device-local name that nothing could
+   * falsify while nothing on this side had an account — § D227's shape, aimed at the one parameter
+   * § 15.1 makes load-bearing. Measured against this tree, the device-local name is read by exactly
+   * one surface: `everyday/shell.ts#drawRail`'s `PLAYING AS` card. Nothing else. So the signed-out
+   * arm says that and stops, and the signed-in arm is about the account, which is the thing a board
+   * row genuinely carries.
+   */
   readonly note: string;
-  /** The honest replacement for the prototype's signed-in line — see the module docstring. */
-  readonly home: string;
+  /**
+   * § 15.1's account state, drawn for real — GitHub issue #332,
+   * [§ D489](../../../../DECISIONS.md).
+   *
+   * A `home` field stood here and held one sentence saying nothing on this screen was signed in.
+   * It is deleted rather than reworded; the module docstring quotes it where it stood and says why.
+   */
+  readonly signIn: SettingsSignInView;
   /** Said when a write did not survive the tab — a memory-only store or a refusing one. */
   readonly saveNotice: string | undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * § 15.1's account state — the asking half, GitHub issue #332 and § D489
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Which of the six states the YOU section's account block is in.
+ *
+ * A value rather than six booleans, on `everyday/signInLink.ts#SIGN_IN_LINK_STAGES`' own precedent
+ * and for its reason: *"a hand-written list of contexts in `honesty/surfaces.ts` went quietly stale
+ * the day a fourth one landed, and the fix was to make the loop read the constant."*
+ *
+ * - `booting` — the Engineer surface has not published an account yet. A real window: this shell
+ *   mounts immediately and `dev/main.ts` boots asynchronously.
+ * - `no-server` — the page was served with no API origin, so there is nowhere to sign in. Said
+ *   **before anything is typed**, which is GitHub issue #30's own stated fix ordering: a form with
+ *   no stated destination is a privacy problem rather than a layout one.
+ * - `signed-out` — the address, and the press that mails a link.
+ * - `link-sent` — the server took it. Its own 202 is the sentence, carried.
+ * - `naming` — signed in and still carrying the server's mint (`menu/account.ts#namingStage`).
+ * - `signed-in` — signed in and named.
+ */
+/*
+ * **Module-private, and the type is what is exported** — which is a departure from
+ * `SIGN_IN_LINK_STAGES` next door and is worth the sentence.
+ *
+ * That constant is exported and is registered in `honesty/derive.test.ts#NOT_PLAYER_FACING` as *an
+ * id, key or glyph table*, because the scanner admits any two adjacent words and `signed-in` reads
+ * as two. This one would need the same entry, in a file this lane may not write. Keeping the value
+ * here and exporting only the union costs nothing a reader can see and buys something stronger than
+ * the register would have: `settingsView.test.ts` builds a `Record<SettingsSignInStage, …>`, so a
+ * seventh stage that nothing drives fails to **compile** rather than failing a scan.
+ */
+const SIGN_IN_STAGES = [
+  'booting',
+  'no-server',
+  'signed-out',
+  'link-sent',
+  'naming',
+  'signed-in',
+] as const;
+
+export type SettingsSignInStage = (typeof SIGN_IN_STAGES)[number];
+
+/**
+ * The account block, as data.
+ *
+ * ## Every failure is a state here, and every sentence in one is somebody else's
+ *
+ * #332's third criterion is that each failure is *designed, labelled, and carries the server's own
+ * sentence rather than a paraphrase*. {@link notice} is that field and it is never composed: it is
+ * the server's 202, its `link-expired` / `link-spent` / `too-many-link-requests` refusal, its new
+ * mail-not-sent refusal ([§ D491](../../../../DECISIONS.md)), or `menu/client.ts`'s own transport
+ * sentence when the request never arrived. `menu/client.ts` states the rule this obeys — *"a
+ * rejection is not an accusation and the server is the one place that decides how one is worded"* —
+ * and `CLIENT_FAILURES.unreachable` is deliberately **not** reached for here, because it says
+ * *"Your run is not lost"* and a player who has just typed an address has no run in flight.
+ *
+ * ## Nothing is greyed without a sentence beside it
+ *
+ * [§ D488](../../../../DECISIONS.md): *a reason a player cannot see is not a reason*, and a
+ * `title` is not a declaration. So {@link actionOffered} is false in exactly two situations, and
+ * both of them already have the words: a request in flight, where {@link notice} is
+ * `dev/main.ts`'s escalating wait rung, and § D242's 429 gate, where it is the server's own
+ * refusal naming the wait. Everything a *form* can get wrong — an empty address, a shape that is
+ * not an address — leaves the press offered, and `menu/account.ts#formIssues`' sentences come back
+ * as the notice, which is what the Engineer panel has always done. A button that greys before the
+ * reader has typed anything would be § D488's defect manufactured on purpose.
+ */
+export interface SettingsSignInView {
+  readonly stage: SettingsSignInStage;
+  /** Always {@link SIGN_IN_COPY.heading} — the block's own eyebrow, so the section is findable. */
+  readonly heading: string;
+  /** What this state **is**, in the product's own words. Always present. */
+  readonly note: string;
+  /** The address field's label, on the one arm that asks for one. */
+  readonly fieldLabel?: string | undefined;
+  /**
+   * What is in the box — `menu/account.ts`'s shared form, never a second copy.
+   *
+   * Deliberately **not** seeded by the honesty corpus, unlike {@link SettingsYouView.nameValue}: a
+   * display name can be a default the product chose (`'you'`) and is therefore the product's
+   * string, and an address never is.
+   */
+  readonly fieldValue?: string | undefined;
+  /** The press, where there is one. */
+  readonly action?: string | undefined;
+  /** Whether pressing it will do anything — see the interface docstring's second section. */
+  readonly actionOffered?: boolean | undefined;
+  /** The last thing the server or the client said, carried verbatim. */
+  readonly notice?: string | undefined;
+  /** Offered on both signed-in arms, including the unnamed one — `menu/account.ts` argues why. */
+  readonly signOut?: string | undefined;
+}
+
+/**
+ * Every word the account block authors, in one table.
+ *
+ * **Twelve strings is the whole of what GitHub issue #332 writes**, and § D489 is why it is that
+ * small: sign-in is the *signed-out state of an already-specified surface* rather than an
+ * eighteenth screen, so what a builder authors is an address field, a link-sent state and the
+ * refusals, and everything after the redemption is § 15.1's, drawn from a real session. A screen's
+ * worth of invented copy against a handoff that specifies no sign-in screen is what the ruling
+ * exists to prevent.
+ *
+ * A table rather than literals inside {@link signInViewOf}, for `menu/client.ts#CLIENT_FAILURES`'
+ * reason: *"a sentence buried in a `catch` is a sentence no property ever looks at"*. It is swept
+ * through this module's own surface — `honesty/surfaces.ts#EVERYDAY_SETTINGS` drives all six arms.
+ */
+export const SIGN_IN_COPY = Object.freeze({
+  heading: 'ACCOUNT',
+  /*
+   * The booting window, worded like the Motion row's own — same shape, same cause, one screen. A
+   * second wording for one window is how two sentences about one fact start disagreeing.
+   */
+  booting:
+    'Signing in is the simulator’s own, and the simulator is still loading — this appears when it has.',
+  /*
+   * Said in this screen's words rather than carried from `dev/main.ts`'s `NO_SERVER_SIGN_IN`,
+   * which is the Engineer menu's sentence about the same fact. `everyday/world.ts` already sets
+   * that precedent — it states the absent-server case for the Everyday screens in its own words —
+   * and the alternative is worse: the Engineer sentence is cleared from the shared state by any
+   * commit in that panel's form, so carrying it would give this arm a blank half the time.
+   */
+  noServer:
+    'This page has no account server behind it, so there is nowhere to sign in. Nothing typed here would be sent anywhere, and every other part of the game is unaffected.',
+  signedOut:
+    'An account is only for putting a run on a board. The day, the week, the towers, the fix-it cases and the ladder all work signed out, and stay on this device. There is no password: a link is emailed to you, and opening it signs you in.',
+  emailLabel: 'EMAIL ADDRESS',
+  request: 'Email me a link',
+  linkSent:
+    'Open the link on this device and it signs you in here. Nothing else has to happen on this screen.',
+  otherAddress: 'Use a different address',
+  /*
+   * § D241 § 7's *why now*, said where the question is asked. The Engineer panel's `NAMING_NOTE`
+   * says the same thing at length on a screen whose whole subject is the account; this screen has
+   * a name field two centimetres above, so what it owes the reader is the *offer* — § D490's
+   * adoption — rather than the argument.
+   */
+  naming:
+    'The name above is this device’s own, offered as it stands rather than the one the server minted for you. Change it if you would rather, then save it to your account.',
+  saveName: 'Save this name',
+  signedIn: 'Signed in. Your progress is still kept on this device, and only a run you post leaves it.',
+  signOut: 'Sign out',
+} as const);
+
+/**
+ * What the DISPLAY NAME field's note says, and it is two sentences because it is about two
+ * different names — [§ D490](../../../../DECISIONS.md). See {@link SettingsYouView.note}.
+ */
+export const NAME_NOTE = Object.freeze({
+  device:
+    'This name is kept on this device and drawn on the rail beside you. It reaches no board, and nothing sends it anywhere.',
+  account:
+    'This is your account’s name. It is what a board row carries, and changing it here changes it everywhere you are signed in.',
+} as const);
+
+/**
+ * The account block for a state — total, and every arm is reachable from a page a player can load.
+ *
+ * The order of the tests is the order the states nest, and the first two are ahead of the session
+ * on purpose: a build with no account server must say so before it draws a field, which is issue
+ * #30's ordering, and a shell that has not been handed an account yet must not draw *signed out*,
+ * because that is a claim it cannot support.
+ */
+function signInViewOf(input: SettingsScreenInput): SettingsSignInView {
+  const heading = SIGN_IN_COPY.heading;
+  const account = input.account;
+  if (account === undefined) return { stage: 'booting', heading, note: SIGN_IN_COPY.booting };
+  if (input.accountServer !== true) {
+    return { stage: 'no-server', heading, note: SIGN_IN_COPY.noServer };
+  }
+  /*
+   * `busy` and the 429 gate are the only two states in which the press does nothing, and both
+   * carry their own sentence in `notice` already — see {@link SettingsSignInView}'s second section.
+   */
+  const offered = !account.busy && account.retryInMs === undefined;
+  if (account.token !== undefined && account.user !== undefined) {
+    return {
+      stage: namingStage(account) ? 'naming' : 'signed-in',
+      heading,
+      note: namingStage(account) ? SIGN_IN_COPY.naming : SIGN_IN_COPY.signedIn,
+      action: SIGN_IN_COPY.saveName,
+      actionOffered: offered,
+      notice: account.notice,
+      signOut: SIGN_IN_COPY.signOut,
+    };
+  }
+  if (account.linkSent) {
+    return {
+      stage: 'link-sent',
+      heading,
+      note: SIGN_IN_COPY.linkSent,
+      action: SIGN_IN_COPY.otherAddress,
+      actionOffered: offered,
+      notice: account.notice,
+    };
+  }
+  return {
+    stage: 'signed-out',
+    heading,
+    note: SIGN_IN_COPY.signedOut,
+    fieldLabel: SIGN_IN_COPY.emailLabel,
+    fieldValue: account.form.email,
+    action: SIGN_IN_COPY.request,
+    actionOffered: offered,
+    notice: account.notice,
+  };
 }
 
 /** One shipped toggle row — label, one-clause effect, and the pill's two faces. */
@@ -205,7 +460,23 @@ export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
    * for.
    */
   'Post runs to the board — nothing in this build posts a run yet, so there is no path for a switch to turn off',
-  'Sign out — nothing on this surface is signed in; the name and picture above live on this device',
+  /*
+   * **`Sign out` was the fourth entry and it is deleted, not reworded** — GitHub issue #332,
+   * [§ D489](../../../../DECISIONS.md).
+   *
+   * It read *"Sign out — nothing on this surface is signed in; the name and picture above live on
+   * this device"*. Both halves are false on this commit: the YOU section holds the session
+   * ({@link SettingsSignInView}) and *Sign out* is a control on it. A register still refusing a row
+   * that is drawn two centimetres above is § D227's stale refusal in the more dangerous direction —
+   * a sentence telling a player not to press something that works — and it is the direction
+   * `everyday/buildNotes.ts` has now recorded three times. The triage row that owned it
+   * (`buildNotes.test.ts#ABSENCE_TRIAGE`) goes on the same commit, which is what that table's
+   * second assertion is for.
+   *
+   * **The `Post runs to the board` row above deliberately does not move with it.** It refuses a
+   * *switch* over a capability that still does not exist, sign-in does not make it false, and
+   * § D460 corrected that exact confusion once already. Posting is GitHub issue #221's.
+   */
   'Clear saved progress — not offered yet: the running session would write itself straight back on its next save',
   /*
    * **`Switch to Engineer` was the seventh entry and it is deleted, not reworded.**
@@ -242,12 +513,46 @@ export interface SettingsScreenInput {
    * drawn as one, while a missing preference is not, so this row never has an absent arm.
    */
   readonly units?: EverydayUnits | undefined;
+  /**
+   * `everyday/accountPort.ts#everydayAccount()` — `undefined` while the Engineer surface is
+   * booting, which is a state a player can reach and is drawn as one.
+   *
+   * The state itself rather than a projection of it, because `menu/account.ts` is the state machine
+   * both shells render and a second projection is a second machine. `boundaries.test.ts` permits
+   * this: it forbids `everyday/` a **value** import of `menu/client.js` and names nothing else, and
+   * `menu/account.ts` imports client types only.
+   */
+  readonly account?: AccountState | undefined;
+  /**
+   * Whether there is an account server behind this page — `everyday/host.ts#accountActions()`.
+   *
+   * Separate from {@link account} because the two absences are different states with different
+   * sentences, exactly as `EverydayDailyBoard` separates *no API origin* from *the server did not
+   * answer*: one is a property of the page decided once at boot, and the other is a moment.
+   * `undefined` is read as *not yet*, so a caller that forgets it draws the booting arm rather than
+   * a form pointed at nothing.
+   */
+  readonly accountServer?: boolean | undefined;
 }
 
 /** § 15.1's screen for this state. Total; every sentence a player can meet starts here. */
 export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreenView {
   const committed = input.profile ?? DEFAULT_EVERYDAY_PROFILE;
-  const nameValue = input.draftName ?? committed.name;
+  /*
+   * **One display name** — [§ D490](../../../../DECISIONS.md). Signed in, the field edits the
+   * account's; signed out, this device's. `effectiveNameOf` is the one expression, and
+   * `everyday/rail.ts#railFooter` asks it too — `honesty/agreement.ts`'s `display-name` pair is
+   * what catches the next reader that stops asking.
+   */
+  /*
+   * **Named** rather than merely signed in, because {@link effectiveNameOf} offers the device-local
+   * name while the account is still carrying the mint — so on the naming arm the field is showing
+   * *this device's* name and {@link NAME_NOTE.account} would be a claim about the wrong one.
+   */
+  const account = input.account;
+  const signedIn =
+    account?.user !== undefined && !namingStage(account);
+  const nameValue = input.draftName ?? effectiveNameOf(input.profile, input.account);
   const bridgeAbsent = input.reduceMotion === undefined;
   const units = input.units ?? DEFAULT_EVERYDAY_UNITS;
   return {
@@ -262,16 +567,19 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
       nameValue,
       nameIssue: displayNameIssueOf(nameValue),
       pictureLabel: 'PICTURE',
-      initial: avatarInitialOf(committed.name),
+      /*
+       * The disc follows the **committed** identity, so a refused draft never changes the letter on
+       * it — and it follows the same one the field shows, which signed in is the account's.
+       */
+      initial: avatarInitialOf(effectiveNameOf(input.profile, input.account)),
       avatarColor: committed.avatarColor,
       swatches: AVATAR_SWATCHES.map((swatch) => ({
         id: swatch.id,
         color: swatch.color,
         selected: swatch.color === committed.avatarColor,
       })),
-      note:
-        'This is the name on the daily board, on the ladder, and on any run somebody else watches.',
-      home: 'Nothing on this screen is signed in — your name and picture live on this device.',
+      note: signedIn ? NAME_NOTE.account : NAME_NOTE.device,
+      signIn: signInViewOf(input),
       saveNotice:
         input.durable === false
           ? 'This device is not keeping storage, so the name, the picture and the Units choice ' +
@@ -323,7 +631,8 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
           value: 'this device',
           note:
             'Days, dispatchers, saved buildings and this screen’s name and picture are stored ' +
-            'locally. Playing on another device starts a separate career.',
+            'locally. Playing on another device starts a separate career, and signing in does not ' +
+            'bring this one with you — an account carries who you are, not what you have done.',
         },
         {
           label: 'Replay verification',

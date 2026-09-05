@@ -1480,6 +1480,38 @@ type DecisionReservation = {
  */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
+ * **Wave S reserved D489–D498, and it was opened four lanes late — which is wave Q's error
+ * repeated by the person who wrote it down.**
+ *
+ * The block: D489–D491 are the integrator's three product rulings taken *before* the build lane, so
+ * that #332 was specified rather than decided at commit four; D492 issue #344, D493 issue #342,
+ * D494 issue #332; D495–D498 are the integrator's stream. The lane numbers follow wave Q's sizing
+ * rule — one per issue, not one per lane — and the integrator's tail follows § D485's, a stream
+ * rather than a batch, because an integrator's numbers are spent per finding and a wave's findings
+ * are not enumerable at dispatch.
+ *
+ * **Closed at integration with D497 and D498 unreached, which makes them free rather than holes** — only a
+ * number written below a higher one is a hole, and nothing was. Eight of ten spent, and the charter row was
+ * reconciled on this same commit, which is the step D387 records that nobody performs when nothing asks.
+ *
+ * **That bare `D387` is bare deliberately, and this paragraph is the fourth consecutive wave to learn it the
+ * same way.** D387 is a registered hole; a hole heads nothing; and `citations.test.ts` resolves every `§ Dnnn`
+ * to a heading. Wave R's ledger records that *its* paragraph explaining this rule was first written in the
+ * section form and went red for it. This one was too — by the integrator, in the sentence describing the rule,
+ * having read wave R's note about doing exactly that. The guard caught it in both waves, which is the argument
+ * for the guard: a convention that four consecutive authors break while explaining it is not held by care.
+ *
+ * **The slip, recorded rather than tidied.** The paragraph above this one says the reservation is
+ * opened on the wave branch *before any lane starts*, and names that as the half wave Q got wrong.
+ * This wave opened it after two read-only lanes and two build lanes were already dispatched, and
+ * after three numbers had been spent. Nothing was lost — the read-only lanes allocate nothing, and
+ * the two build lanes hold numbers inside the block that was later drawn around them — but that is
+ * luck rather than process, and the window between the first spend and this line is a window in
+ * which a second lane reading the charter row would have computed D489 for itself. Written down
+ * because § D404 exists because two lanes both computed § D336, and a rule broken quietly by its
+ * own author is how a rule stops being one.
+ */
+/*
  * **Wave R reserved D479–D483 at dispatch: one number per issue, plus one for the integrator.**
  *
  * Two lessons applied at once. Wave Q's sizing rule — a block belongs to the issues it will close

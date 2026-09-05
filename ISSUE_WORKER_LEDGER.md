@@ -199,7 +199,7 @@ of these would have caused wasted or harmful work**, and three would have shippe
 | issue | claim | finding |
 |---|---|---|
 | **#100** | The live-metrics header still prints `SATURATED` / `AWT suppressed` in Casual | **Half wrong, and the half matters.** That panel has been Casual since `21a0c17`. The surface still printing it is `render/canvas.ts#drawHeader`'s **header band** — a different function, drawn into the bitmap. Fixing "the panel" would have changed a surface that was already correct |
-| **#100** | The dispatcher cards show `cost = 1.00 times wait` | **Not reproduced on the rail, in either mode, on any of 13 profiles.** The string is real and lives in the dispatcher **editor** (`authoring/dispatcherSpec.ts#weightSummaryOf`). Misattributed, not false — filed as **#146** |
+| **#100** | The dispatcher cards show `cost = 1.00 times wait` | **Not reproduced on the rail, in either mode, on any of 13 profiles.** The string is real and lives in the dispatcher **editor** (`authoring/dispatcherSpec.ts#weightSummaryOf`, **renamed since to `costFunctionLine`** — annotated rather than rewritten, since the finding is unchanged and only the symbol moved; wave S lane S-V1, § D495). Misattributed, not false — filed as **#146** |
 | **#100** | (implied by § D319) the panels cannot see the mode, so the gap is structural | **False here.** `mountRightRail` has had `state.mode` for waves and `SceneInput.mode` reached `drawOverlay`. Nobody had written the other register. The § D319 precedent did not transfer |
 | **#124** | A document-tier test has no stylesheet to resolve, so this needs a browser | **False.** Joining a static stylesheet parse to a mount-driven run of the shipped panels produces real ratios with no browser. The browser was worth having as *confirmation*, not as the only option |
 | **#124** | The nine change-scope notes are unverified and may fail contrast | **Unfounded for both classes.** `.advice` 7.21 dark / 8.25 light, `.rail-prose` 6.35 / 5.92 — § D235 had already raised the ink ladder past AA. Nothing in the product changed. What was missing was anything that would *notice* if one of them stopped |
@@ -1898,7 +1898,246 @@ count**. Three `echo` lines now fix that. Which hardware difference it was stays
   a stale brief and had to rediscover it. Every read-only lane's findings land as an issue comment.
 - **#344 is filed and unowned** — 146 cases across five packages annotated above the 300 s project
   ceiling, and a wall-clock watch that must survive a 1.82× machine swing.
+  **Corrected 2026-09-05 by wave S's lane B, and the figure is low by 123** ([§ D492](DECISIONS.md)).
+  *"146 cases across five packages"* counts trailing arguments written as **numeric literals**; a
+  scan that also resolves a file-local `const TIMEOUT_MS = 900_000` finds **269**, because
+  `experiments` writes 123 of its 168 that way and a literal scan sees only 45 of them. The other
+  four packages reproduce the original exactly (`viz` 93, `core` 5, `cli` 2, `server` 1), which is
+  what says this is a method gap rather than tree drift. Two further corrections to the frame rather
+  than the count: 4 of `viz`'s 93 are `*.browser.test.ts`, which the `viz` project does not run and
+  the browser tier runs at its own 120 000 ms ceiling — so the `viz` **leg**'s population is **89** —
+  and counting *above 300 000 ms* misses the **63** browser-tier annotations above the ceiling that
+  actually applies to them. Left standing rather than rewritten: the count was correct for the
+  method it used, and the method is the finding.
 - **The three stale "five scenarios" docstrings turned out to be ten sentences**, and are fixed.
   `scenariosPanel.ts` had *"The eight swatches"* nine lines below a header saying *"Five cards"* —
   half-corrected is how a claim outlives its correction.
 - **#332 is next.** #336 was its named prerequisite and is closed.
+
+---
+
+# Wave S — 2026-09-05: three rulings before the first lane, and a verification half that struck four items and refuted three more
+
+**61 open at the start.** Base `8ff0215`, integrated on `claude/github-issue-worker-kv9ju5`. Five
+lanes: two read-only verification, three builders in their own worktrees.
+
+## S.1 The wave's shape, and why the first act was a ruling rather than a lane
+
+Wave R's hand-off named **#332** as next and said its prerequisite #336 was closed, which was true
+and not sufficient. Wave P's implementation map had found **two product decisions gating the screen**
+and a third gating one of its acceptance criteria, and the hand-off could not see them because they
+were in a comment rather than in the issue's own state — which is #329's subject arriving on the
+process that filed #329.
+
+So the wave opened with three rulings, dated before any code:
+
+| ruling | what it settles | the thing to read |
+|---|---|---|
+| **§ D489** | sign-in is the signed-out **state** of `settings`' YOU section, not an eighteenth screen | The map's blocker — *the handoff specifies no sign-in screen* — is true and one step short. The handoff is silent about a **screen** and explicit about a **state** (§ 15.1), and `everyday/settingsView.ts` withheld that state deliberately, in writing, because drawing it over an empty session would have been a fabrication. Building sign-in **discharges a withholding**; it does not override a specification |
+| **§ D490** | one display name; first sign-in adopts the device-local one | The shipped YOU note already claims the device-local name is the board name. That claim is unfalsifiable today and **false the moment a signed-in player posts** under a `player-<hex>` mint. The adoption is legal because `everyday/profile.ts:361` already validates that name with the server's own `displayNameIssueOf` |
+| **§ D491** | the server grows a distinct mail-not-sent refusal | `api.ts` already awaits the send deliberately and says why in its own comment. What is missing is the code letting a client act on it — § D486's rule failing in the direction that costs the player |
+
+## S.2 The reservation was opened four lanes late, by the person who wrote the rule down
+
+`documentation.test.ts#OPEN_RESERVATION`'s own comment says the block is drawn **before any lane
+starts** and names that as the half wave Q got wrong. This wave drew it after two read-only lanes and
+two build lanes were dispatched and three numbers were spent. Nothing was lost — the read-only lanes
+allocate nothing, and the two builders hold numbers inside the block later drawn around them — but
+that is luck rather than process, and it is recorded in the guard's own comment rather than tidied
+out of it.
+
+## S.3 The verification half: nine issues, four items struck, one duplicate closed, one issue filed
+
+**Lane S-V1** (#146, #171, #177, #178) and **lane S-V2** (#158, #159, #169, #174, #225). Every finding
+landed as an issue comment on the issue it concerns, which is wave R's own R.5 lesson applied — that
+wave had a lane rediscover residue because the previous wave's verifier had written it somewhere
+nobody could find.
+
+| issue | premise | outcome |
+|---|---|---|
+| **#146** | holds; two supporting clauses refuted | **ruled** — § D495, now a build |
+| **#171** | partly refuted — the second intervention landed | **retitled**, blocked on #169 → #181 |
+| **#177** | partly refuted — item 6 has zero instances | schedulable, rewritten to six |
+| **#178** | partly refuted — items 2, 3, 4 built | **retitled**, schedulable, rewritten to six |
+| **#158** | holds in every clause | **closed as duplicate of #232**, after its unique item moved |
+| **#159** | partly refuted — five templates ship where the body says one | schedulable after a three-way split; **#346 filed** |
+| **#169** | partly refuted — item 2 closed | items 1 and 3 schedulable; item 4 blocked on item 3 |
+| **#174** | partly refuted — day variation is built | `docs/14` corrected on this wave's own commit |
+| **#225** | refuted as worded | **ruled** — § D496 |
+
+### S.3.1 The four findings worth more than the verdicts
+
+**A status table nothing reads had said `designed` for the whole time the step was built.**
+`docs/14-building-behaviour-contract.md:16` read `| 4 | designed |` while `random/streams.ts:97`
+declared the stream, `traffic/generator.ts:1405` drew it, `runner/crn.ts:204-210` put it in the CRN
+cohort key and `sim/dayVariationSeam.test.ts:14-45` measured § 5 criterion 3 with variance ratios
+8.30 / 3.51 / 3.68 / 3.33 and an exact shared-day assertion beneath them. § D227's shape pointed at a
+**status row** rather than at a refusal, and **no test reads that table** — it was found by a lane
+reading a GitHub issue.
+
+**A fourth stale `GAPS.md` § 3 row, and it is the one that survived a deliberate sweep.**
+`GAPS.md:123` claims the campaign judges on tuning seeds only and that nothing in the shipped surface
+says so. Both halves are refuted four ways (`campaign/judge.ts:252`, `:348-356`,
+`campaign/parse.ts:294-301`, `campaign/brief.ts:90-91`). Rows 115 and 117 were annotated CLOSED on
+2026-09-02 and **row 123 was missed by that same pass**, which makes it the right mutation fixture
+for #325 — a guard that catches rows nobody swept proves less than one catching the row a human
+sweep walked past. And it compounds: row 123 is the **source** of #178's item 4.
+
+**Two verified statements about the same capability looked contradictory and were not.** The
+2026-09-02 comment on #159 says `EventEffect` cannot express four of § 17's six wrinkle kinds;
+`docs/37` § 5.1 says four of six pass. Both are correct and the subjects differ — one measures
+`shift/types.ts#EventEffect`, the other the engine's own configuration. **The engine can already
+express four kinds that `EventEffect` cannot**, which is a decision about where the wrinkle library
+lives before it is an implementation detail: twenty rows against `EventEffect`'s five fields would
+leave roughly fifteen that parse, draw a caption and change nothing.
+
+**A branch no player and no sweep reaches.** #169's item 4 (`complexity —` for two towers) is
+unreachable today: `freshTower`'s only non-test, non-corpus caller is `openingCareer`, which opens on
+`garden-apartments`, and the honesty corpus drives only two towers, both of which publish a
+complexity. It becomes reachable the moment item 3's offer surface lands, which is the order to build
+them in.
+
+### S.3.2 A comment that contradicted itself, and what it would have cost
+
+#178's 2026-09-04 comment strikes items 2 and 4 with evidence and then lists both under **"What
+stays"**, calling item 4 *"the one I would not let sit"*. A reader reaching only that comment
+schedules two built things, one at P1. The issue is retitled and the comment superseded rather than
+left to be read — which is the same failure mode as #329's third instance, a record correct in one
+paragraph and wrong in the next.
+
+## S.4 The telemetry cluster's dependency graph, verified rather than asserted
+
+Lane S-V3 adjudicated **#201, #202, #236, #250, #340** read-only at `8e3c2ea`. **Nothing in the
+cluster is closable and nothing is a duplicate** — five issues, five distinct scopes. The edges below
+are in § D485's form (a line in the issue body, written once, never edited, whose going stale is the
+detection mechanism), and they are recorded here because **#329's build owes a backfill of "the
+blocked set it can verify"** and this is that set for this cluster.
+
+| edge | the fact that justifies it |
+|---|---|
+| **#340 `Blocked by #202`** | `CHARTER_PROGRAMME.md:172` — *"#202 lands **before** any telemetry ships … shipping in the other order is not recoverable"*; `RISKS.md` R31 lists it as a trigger. Concretely: #340's AC4 needs consent copy `docs/26` § 4.1 does not draft and #202's AC5 owes |
+| **#250 `Blocked by #340`** | No emitter, no route, no store. `grep -rni telemetry packages/viz/src` → 0, mechanised by `documentation.test.ts:1136` |
+| **#250 `Blocked by #201`** | `docs/26` § 8 — *"Two routes, and no third"*. A dashboard reads; #340 **excludes** the dashboard; § 8 is #201's section |
+| **#236 `Blocked by #340`** | AC1 is *"against telemetry"*; AC2's abandonment points are § 6.3's beat-drop diagnostic over E8 |
+| **#236 `Blocked by #234`** | AC5 names S1–S5. `docs/22-charter.md:183` assigns **S5** to a paired CRN sweep, not to telemetry, and `docs/26` § 9.5 records the charter gate as *"assigning a criterion to the wrong instrument"* |
+| **#201 (AC3's baseline clause only) `Blocked by #340`** | `grep -c -i baseline docs/26` → 0, and § 11: *"Nothing in this document has been built."* **This edge does not cover AC5**, which is schedulable today |
+
+**The edges deliberately not drawn are the more useful half**, because a wrong `Blocked by` line never
+goes stale and is therefore worse than a missing one:
+
+- **#201 `Blocked by #340` as a whole issue** — false for AC5, which is a specification and needs no
+  instrument.
+- **#202 `Blocked by` anything** — all three of its residues are documentation and design. **#202 is a
+  root of this graph and the backlog reads it as a leaf.** That inversion is the cluster's sharpest
+  finding: #340 looks like the thing that unblocks everything and is itself blocked by an explicitly
+  non-recoverable ordering rule recorded in two places.
+- **#236 `Blocked by #205`** — #205 closed as completed and its deliverable landed. What is missing is
+  **recruitment**, and `docs/30:4` says the programme *"recruits nobody"* while `:51` scores it *0 of
+  4*. **No open issue owns it.**
+
+### S.4.1 Four unowned prerequisites the cluster will meet
+
+Collected rather than left to be rediscovered, because every one of them is the shape #340 was filed
+about:
+
+1. **Cohort recruitment** (#236 AC1) — no issue.
+2. **The visible-trouble threshold and dwell, and the `controlKey` registry** (#340 AC1) — both *"owed
+   by M2"* per `docs/26` § 11, and **#212, the M2 issue that owed them, is closed**. Without them E3
+   and E4 cannot be emitted to spec, and § 6.2 forbids the telemetry client restating the threshold,
+   because two definitions of *visible trouble* would be two sets of statistics.
+3. **The § 8 read-route question** (#250, settled on #201).
+4. **The lawful basis, the published privacy notice, and whether an age statement is needed**
+   (`docs/26` § 1.3 and § 11) — a repository-wide search returns only #202.
+
+### S.4.2 What the lane refused, and it is the right refusal
+
+Two closures a reader would plausibly propose — **#201 as a duplicate of #250**, **#202 as a duplicate
+of #340** — are refused on the register-partition test rather than on titles. **In both pairs the
+older issue's deliverable is a specification the newer one consumes as an unstated input**, so closing
+it would push a design decision into a build lane with no criterion requiring it be reviewed. That is
+`ISSUE_WORKER_LEDGER.md` § D's #170 ↔ #229 lesson with the polarity that applies here.
+
+**And #202's AC6 has a near-neighbour that is also not a duplicate: #229's AC3.** #229 builds the
+*control* (*Clear saved progress works*); #202 AC6 wants the *posture* to carry the category, its
+period and its deletion path. Closing either against the other drops half. That this lands on #229 for
+the second time is a coincidence, and the lane named it as one so that nobody reads it as a pattern.
+
+### S.4.3 Two figures in `docs/26` § 0 have gone stale, in the class § 0 documents
+
+`:37` records `telemetry` as *"2 files / 6 lines"* — it is **3 files** today, `documentation.test.ts`
+having joined when the guard was written, while the 6-line figure describes the narrower server grep
+and is still exact. `:55` states *"`analytics` is still 0 files"* — the published command returns **2
+files**, both prose by the document's own test. **The claims are intact and the counts are not**, and
+§ 0's own rule is the one to apply: *"a measurement whose command is retuned until it gives the old
+answer is the defect this table exists to prevent."*
+
+## S.5 Lane S-B — #344 closed, and the issue's own premise is what it refuted
+
+**The `viz` leg is a head, not a tail.** #344 was filed on the belief that *"the leg's duration is
+governed by a tail nobody has measured"*, and the tail is not the subject at all: on a quiet run of
+223 files and 5 065 cases, **three files hold 50 % of the serial cost** and
+`campaign/campaign.test.ts` alone holds **33.34 %**.
+
+**That converts a cost into a ceiling.** Vitest schedules *files* and runs the cases inside one file
+in series, so the leg cannot finish before its largest file does, and the reciprocal of that share is
+the most concurrency the leg can ever use — **3.0**. A four-core runner is therefore **already
+saturated**, and nothing but splitting that file moves the number. Filed as **#356**.
+
+### S.5.1 The 93 annotations are confirmed and their frame is corrected three ways
+
+Re-derived on `13e7b93`, the tree #344 was filed against, the scanner **reproduces 555 / 182 / 93
+exactly** — so the counts are confirmed rather than doubted, which is the outcome this column most
+often cannot report. What is corrected is what they *mean*:
+
+1. **Four of the 93 are `*.browser.test.ts`**, which the `viz` project excludes and the browser tier
+   runs at its own 120 000 ms. The leg's population is **89**.
+2. **Counting *above 300 000 ms* rather than *above each project's own ceiling* hides 63**
+   `viz-browser` annotations above the ceiling that actually binds them.
+3. **The issue comment's 146-across-five-packages is low by 123**, because it counts numeric literals
+   and misses a file-local `const TIMEOUT_MS = 900_000`. The real figure is **269**, and the whole gap
+   is `experiments`.
+
+**None was brought down, and that is a measurement rather than a preference.** Median measured cost
+of an annotated case: **0.00 s**. Fifty of 64 under 100 ms. **Fifty-five annotated at ≥ 600 s while
+measuring under one second.** None exceeds its own annotation at 1×, 1.82×, 4.5× or 9×; tightest
+headroom **10.7×**.
+
+### S.5.2 The hard criterion, and the tidy model it refuted
+
+AC3 asked for a guard robust to a 1.8× machine swing **or** an honest declaration of what it cannot
+catch. Measured across a **2.79×** contention swing — harsher than the 1.82× § D483 diagnosed:
+
+| statistic | move |
+|---|---|
+| critical-path share | 33.34 % → 33.05 % (**−0.29 pp**) |
+| worst single file's share | **2.83 pp** |
+| rank moves in the top ten | **one adjacent swap** |
+| a same-run cohort ratio | 17.45 → **20.12, a false +15 %** |
+
+**§ D483's uniform swing does not describe a contention swing**, which is the finding: per-file ratios
+run **1.46× to 11.25×** (median 2.08 against an aggregate 2.79). So a share is exact in the model and
+resolves about 3 pp on one file in practice — and the same-run baseline #344's own comment proposed is
+the **weakest** of the three options, published beside the guard rather than left to be discovered.
+The blindness to uniform growth is asserted as a test rather than stated as a sentence.
+
+### S.5.3 What the lane refused, and one scope stretch it declared
+
+It lowered none of the 87 decorative annotations (it recovers no wall clock, measured, and those files
+belong to other lanes), raised no timeout, published **no wall-clock budget as a constant** — § D483
+and its own 2.79× say that number would be wrong — and took no number but D492.
+
+**The declared stretch**: an env-gated entry in `deepTiers.test.ts`, because that audit derives from
+disk and would have gone red without one. Registered `scheduled: false` with the reason (nothing
+produces the report it reads) and the workflow change that would flip it.
+
+**Residue: nothing runs the deriver in CI.** `.github/` was outside the lane's writable set, so the
+pull-request gate is the static ratchet alone. Named on the issue rather than left to be found.
+
+### S.5.4 The lane predicted the integrator's red, and was right
+
+It reported `documentation.test.ts` failing two cases on its branch — the charter's next-free row and
+three holes at D489–D491 — diagnosed both as **wave-level bookkeeping that every wave-S lane would
+hit**, and named the fix as the integrator opening `OPEN_RESERVATION`. That was already done, and the
+integrated tree is green: **24 files, 236 passed, 6 skipped, exit 0**. A lane that predicts the
+integrator's failure and declines to fix it from inside its own branch is the division of labour
+§ D343 asks for, arriving on a lane rather than being imposed on one.

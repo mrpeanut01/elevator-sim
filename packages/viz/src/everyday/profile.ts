@@ -51,7 +51,7 @@
  * screen and the ladder draw — and the empty value travels with it rather than instead of it.
  */
 
-import { displayNameIssueOf } from '../menu/account.js';
+import { displayNameIssueOf, type AccountState } from '../menu/account.js';
 import { savedRatingIssue, type SavedRating } from '../gauntlet/ladder.js';
 import type { SessionStore } from '../persist/types.js';
 import {
@@ -107,6 +107,69 @@ export const DEFAULT_EVERYDAY_PROFILE: EverydayProfile = Object.freeze({
  */
 export function avatarInitialOf(name: string): string {
   return (name.replace(/[^a-z0-9]/gi, '')[0] ?? 'Y').toUpperCase();
+}
+
+/**
+ * **The one display name** — [§ D490](../../../../DECISIONS.md), and the reason it is a function
+ * rather than a field.
+ *
+ * Two names exist in this build and § 15.1 asserts there is one. Everyday draws a **device-local**
+ * one — {@link EverydayProfile.name}, defaulting to `'you'`, sent nowhere. The account holds a
+ * **server** one, `menu/client.ts#AccountSummary.displayName`, minted as `player-<12 hex>`, and it
+ * is what a board row shows. While nothing on this side posted they never met, and
+ * `everyday/settingsView.ts`'s own note — *"This is the name on the daily board, on the ladder, and
+ * on any run somebody else watches"* — was unfalsifiable rather than true. GitHub issue #332 ends
+ * that, so the ruling picks one: **signed in, the account's name is the name.**
+ *
+ * ## Why the device-local value is read rather than overwritten
+ *
+ * Signing in must not cost a player something they had. A `player-<hex>` replacing a name somebody
+ * typed and watched the rail draw is the sign-in *taking* the game away, which is § D456's second
+ * refusal test pointed at identity; and a sign-out that renamed them `'you'` would be the same
+ * theft facing the other way. So the two values stay in two slots, this function chooses between
+ * them, and the device-local one answers again the moment the session ends.
+ *
+ * ## Why both readers call this instead of one of them holding the answer
+ *
+ * `everyday/rail.ts#railFooter` and `everyday/settingsView.ts#settingsScreenViewOf` are one click
+ * apart and both publish this string. Either could read `profile.name` directly and be internally
+ * honest while the product said two things about who the player is — § D359's exact signature, and
+ * the one `honesty/properties.ts` cannot see. One expression is the fix; `honesty/agreement.ts`'s
+ * `display-name` pair is what keeps it, because a pair is what catches the *next* reader that
+ * forgets to ask.
+ *
+ * The account is taken whole rather than as a pre-resolved name, deliberately: a caller handed
+ * `signedInName: string | undefined` would be the caller deciding what *signed in* means, and that
+ * decision belongs to `menu/account.ts` — which is where {@link AccountState.user} comes from and
+ * why `user !== undefined` is the whole of the test here.
+ */
+export function effectiveNameOf(
+  /*
+   * `{ name }` rather than {@link EverydayProfile}, because `everyday/rail.ts#RailOptions.profile`
+   * is the narrower shape and is one of the two readers. Widening the parameter is cheaper than
+   * widening that option, which carries an optional colour on purpose.
+   */
+  profile: { readonly name: string } | undefined,
+  account: AccountState | undefined,
+): string {
+  const user = account?.user;
+  /*
+   * **The mint never wins, and this is where § D490's adoption is implemented.**
+   *
+   * A brand-new account carries `player-<12 hex>` because the server must return *something*, and
+   * `displayNameChosen` is `false` on the wire for exactly that account and no other. So while it
+   * is false the device-local name is what the field offers and what the rail draws, and the press
+   * beside it is what adopts it. A player who typed a name and watched the rail draw it does not
+   * sign in and find a hex string in its place — which would be the sign-in *costing* them
+   * something, and § D456's second refusal test aimed at identity.
+   *
+   * The flag rather than the shape, `menu/account.ts#namingStage`'s own rule: a client that
+   * recognised `player-…` would be a second place deciding what a generated name looks like, and it
+   * stops being right the first time the generator changes.
+   */
+  return user === undefined || !user.displayNameChosen
+    ? (profile ?? DEFAULT_EVERYDAY_PROFILE).name
+    : user.displayName;
 }
 
 /* -------------------------------------------------------------------------- *

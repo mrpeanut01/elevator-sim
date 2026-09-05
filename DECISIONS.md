@@ -22910,6 +22910,9 @@ area.** The live-metrics *panel* has been Casual since `21a0c17`; what still pri
 suppressed` is `render/canvas.ts#drawHeader`'s **header band**, drawn into the bitmap. And
 `cost = 1.00 times wait` appears on **no rail card**, in either mode, on any of thirteen profiles —
 it is the dispatcher **editor** (`weightSummaryOf`), now issue #146. Misattributed, not false.
+*(Symbol renamed since: the producer is `authoring/dispatcherSpec.ts#costFunctionLine`. The
+finding is unchanged and the name is annotated rather than rewritten, because a reader
+grepping the old one lands on nothing — found by wave S's lane S-V1, [§ D495](DECISIONS.md).)*
 
 § D319's structural finding did **not** transfer: `mountRightRail` has had `state.mode` for waves.
 Nobody had written the other register.
@@ -32619,3 +32622,650 @@ figure; that is § 14.1's rule and the Everyday stage had already applied it on 
 Engineer strip does **not** put the record's identity in that cell the way § 14.1's table asks and
 the Everyday stage does. That is a real gap in § 14.1's treatment of the Engineer surface, it is
 older than this fix, no forbidden word is involved, and it is left alone here rather than folded in.
+
+---
+
+## D489 — sign-in is the missing state of an already-specified surface, not an eighteenth screen
+
+**Date: 2026-09-05 · Owner: the integrator, as the product-owner call § D458's precedent puts here ·
+Rules on: GitHub issue #332, `everyday/settingsView.ts`, `everyday/types.ts#EVERYDAY_SCREENS`.
+Dated before the code.**
+
+#332's implementation map found a blocker and stated it correctly: `CLAUDE.md` makes the design
+handoff canonical for the interface, and **for a sign-in screen there is nothing to be canonical
+about.** § 4's inventory lists seventeen screen keys and none of them is a sign-in, an account, or a
+login. A builder starting from that would author a screen's worth of player copy against nothing.
+
+**The map's framing is right and its conclusion is one step too far, and the step is worth naming.**
+The handoff is not silent about this surface. It is silent about a *screen*, and it is explicit
+about a **state**: § 15.1 specifies the signed-in line and Sign out, and the prototype carries the
+copy (`elevator-sim-casual.dc.html:4525`, `accountName` / `accountLine`). What this repository did
+with that specification is recorded in `everyday/settingsView.ts`'s own docstring — it **withheld**
+it, and said why: *"an authored fixture presented as a player is § 20.11's own example."* The
+signed-in half is not missing from the handoff. It is missing from the build, deliberately, because
+drawing it would have been a fabrication.
+
+**Ruling: sign-in lands as the signed-out state of `settings`' YOU section. No new screen key, and
+`EVERYDAY_SCREENS` stays at seventeen.**
+
+Three consequences, each of which the screen-shaped implementation gets wrong:
+
+1. **The handoff wins, because there is no longer a disagreement to win.** Adding an eighteenth key
+   would be a deviation from § 4's inventory — the one part of this that *is* specified — taken in
+   order to build something the inventory does not contain. Extending a surface the handoff already
+   specifies with the state it already specifies is not a deviation at all.
+2. **What is genuinely authored shrinks to the asking half**, and it is small enough to hold to
+   § D460's standard: an address field, a link-sent state, and the refusals. Everything after the
+   redemption is § 15.1's, drawn for real rather than from a fixture, which is the withholding
+   above being discharged rather than overridden.
+3. **The withheld sentences are retracted on the commit that makes them false**, in this
+   repository's own form — deleted whole rather than reworded, with the original quoted where it
+   stood, because § D227 rates a stale refusal worse than a stale claim. The map counted the sites
+   and its count is adopted as the acceptance bar: `settingsView.ts:208`, `:274`, `:326`, `:68-70`,
+   `:76-79`, and `buildNotes.ts:159`, plus the two triage rows at `buildNotes.test.ts:231` and
+   `:181`. **One row must not move** — `{ register: 'SETTINGS_ABSENCES', fragment: 'Post runs to
+   the board', issue: 161 }` refuses a *switch* over a capability that still does not exist, and
+   § D460 already corrected that confusion once. Sign-in does not make it false; posting does, and
+   posting is #221's.
+
+**What this does not decide.** Where the *entry point* to that state sits on surfaces that offer
+posting. #332's fourth criterion asks for signed-out to be first-class wherever posting is offered
+and to say what to do rather than greying a control; that is a routing question per surface, and the
+lane answers it surface by surface against § D488's rule that a reason a player cannot see is not a
+reason.
+
+---
+
+## D490 — there is one display name, the account holds it, and signing in adopts the device-local one rather than discarding it
+
+**Date: 2026-09-05 · Owner: the integrator, as a product-owner call · Rules on: GitHub issue #332,
+`everyday/profile.ts#EverydayProfile.name`, `menu/client.ts#AccountSummary.displayName`,
+`honesty/agreement.ts#AGREED_FIGURES`. Dated before the code.**
+
+Two names exist. Everyday draws a **device-local** one, `EverydayProfile.name`, defaulting to
+`'you'` and sent nowhere. The account holds a **server** one, `AccountSummary.displayName`, minted
+as `player-<12 hex>`, and it is what a board row shows. § 15.1 asserts they are one thing.
+
+**Today that is harmless only because nothing on the Everyday side posts, and #332 is what ends
+that.** The map called this out and it is the sharper of its two decisions, because the defect it
+predicts is already written into shipped copy: `settingsView.ts`'s YOU note reads *"This is the name
+on the daily board, on the ladder, and on any run somebody else watches."* That sentence is
+**currently unfalsifiable and becomes false the moment a signed-in player posts under a
+`player-<hex>` the server minted.** A claim that survives only because the mechanism it describes is
+absent is § D227's shape, and it is aimed at the parameter § 15.1 makes load-bearing.
+
+**Ruling: one name. When signed in, `AccountSummary.displayName` is the name — the field edits it,
+the rail draws it, and the board row matches it. When signed out, `EverydayProfile.name` is the
+name, and it says what it actually is. Signing in for the first time offers the device-local name as
+the display name rather than replacing it with a mint.**
+
+Why each half, since the cheap answers are all wrong in a specific way:
+
+- **Not "two names, clearly labelled."** That is the product telling a player it has two answers to
+  *what are you called*, on a surface whose whole job is identity, and it makes `surfaces-disagree`'s
+  exact failure mode a shipped feature rather than a bug.
+- **Not "the mint wins."** The server mints `player-<12 hex>` because it must return something. A
+  player who has already typed a name and watched the rail draw it would sign in and find it
+  replaced by a hex string, which is the sign-in *costing* them something — and the whole of § D456's
+  second refusal test is that the social layer may not take the game away.
+- **The adoption is legal, and that is measured rather than assumed.** `everyday/profile.ts:361`
+  already validates the device-local name with `displayNameIssueOf` imported from `menu/account.js`
+  — **the server's own rule** — and refuses a stored name that fails it. So the value being offered
+  has already passed the gate it is being offered into. This was true before this ruling and is the
+  reason the ruling is cheap.
+- **The device-local value is kept, not overwritten.** It lives in its own slot and answers again
+  when the player signs out. Deleting it would lose a value nothing else holds, and a sign-out that
+  renames you `'you'` is the same theft as the mint.
+- **An account that already has a chosen display name keeps it.** Adoption is an offer on first
+  sign-in only, gated on `displayName` still being the mint. A second device does not get to rename
+  the player.
+
+**The pair is declared rather than left to be noticed.** `AGREED_FIGURES` is a *declared* register,
+so a pair nobody declares is never compared, and § D359's original defect had exactly this signature
+— each screen internally honest, the product incoherent. The name is registered there on the same
+commit, so `surfaces-disagree` compares the rail's name, the Settings field and the board row rather
+than three surfaces each being separately truthful.
+
+---
+
+## D491 — a state the product must show and the wire cannot carry is a wire defect, so the server grows the refusal
+
+**Date: 2026-09-05 · Owner: the integrator · Rules on: GitHub issue #332's third acceptance
+criterion, `packages/server/src/http/api.ts`, `packages/server/src/http/serve.ts`. Dated before the
+code.**
+
+#332 asks for four labelled failure states carrying the server's own sentence. Three are available
+and precise — `link-expired`, `link-spent`, `too-many-link-requests`. **The fourth is not
+distinguishable on the wire.** `api.ts` awaits `deps.mailer.send(...)` with nothing catching it, so
+a dropped send throws, propagates, and `serve.ts:277` answers `internal-error` /
+*"The server failed to handle that request."* — byte-identical to every other unhandled fault.
+
+The map framed this as a choice: ship three labelled states and say so, or the server grows a
+distinct refusal first, which is another package and outside the issue as written.
+
+**Ruling: the server grows the refusal.**
+
+The awaiting is already deliberate and `api.ts` says why in its own comment — *"a send that was
+dropped silently would be a player staring at 'check your email' forever."* The intent is on the
+file; what is missing is the code that lets a client act on it. **A cause the server knows and does
+not put on the wire is § D486's rule failing in the direction that costs the player**: the receiver
+cannot derive *the mail did not go* from a generic fault, and the two want opposite things from the
+reader — one says try again in a moment, the other says something is wrong with us.
+
+Shipping three and declaring the fourth undeliverable was the alternative and is refused, because
+the declaration would be honest about a limit this repository can lift in one handler. § D460's rule
+is that a refusal a surface cannot stand behind is withdrawn; this is the case where the surface
+*could* stand behind it if the wire were fixed, and fixing the wire is smaller than the paragraph
+explaining why it was not.
+
+**Bounds, so this does not become a server lane.** One `try`/`catch` around the send, one new error
+code, one sentence, and its test. If the lane finds it is not that — that the mailer's failure modes
+do not separate cleanly, or that answering non-`internal-error` reveals whether the address is known
+— it **reports and stops**, and the fallback is the three states with the fourth named as
+undeliverable on the issue. Deciding that mid-lane by widening the change is the failure this bound
+exists for.
+
+**One trap named, because the obvious reuse is wrong.** `CLIENT_FAILURES.unreachable` reads *"Your
+run is not lost — it can be posted when the connection is back."* A player who has just typed an
+email address has no run in flight, so carrying it verbatim would be a sentence about something that
+did not happen.
+
+---
+
+## D492 — the `viz` leg's cost is a head rather than a tail, and what watches it is a share rather than a second
+
+**Date: 2026-09-05 · Owner: wave S, lane B · Binds: `vitest.config.ts`'s `SIMULATING_TIMEOUT_MS`
+docstring, `packages/viz/src/deepTiers.test.ts`'s tier table, `ISSUE_WORKER_LEDGER.md`'s wave-R
+entry, and every timeout annotation in the two `viz` projects through a ratchet. Discharges GitHub
+issue #344's four acceptance criteria. Rests on § D483.**
+
+Every figure below is derived by `packages/viz/src/testCost.test-helper.ts`, and the static half is
+re-derived on every run of `packages/viz/src/testCost.test.ts`. That is `RISKS.md` R38's remedy
+applied to the file whose three retractions are what R38 looks like when nothing re-derives a
+number.
+
+### 1. The census reproduces #344's figures exactly, and then corrects their frame
+
+Re-derived on `13e7b93` — the tree the issue's own census was taken on, since #344 was filed at
+04:53 UTC and wave R merged at 09:24 — this scanner reads **555** annotations, **182** at exactly
+300 000 ms and **93** above it. All three to the unit. So the issue's counts are confirmed rather
+than trusted, and what follows is about what they mean rather than about drift. On today's tree the
+same scanner reads 558, 183 and 93; resolving file-local constants as well as literals takes the
+first two to **560** and **185**.
+
+**The 93 is right about a directory and wrong about a ceiling.** Four of them are
+`*.browser.test.ts`, which `vitest.config.ts`'s `project()` helper excludes from the `viz` project
+and which the browser tier runs at its own **120 000 ms**. The `viz` **leg**'s above-ceiling
+population is **89**, and those four are above a ceiling by 5× rather than by 2×.
+
+**Counting against a number rather than against each project's own budget hides a larger
+population.** Asked per project, `viz-browser` carries **63** annotations above its own ceiling,
+twenty of them at exactly 300 000 ms — 2.5× what that project allows. #344's frame cannot see one of
+them.
+
+**And a numeric-literal scan cannot see an annotation written as a constant.** #344's comment counts
+146 cases across five packages; resolving a file-local `const TIMEOUT_MS = 900_000` finds **269**.
+The gap is entirely `experiments`, which writes **123** of its **168** that way — the other four
+packages reproduce the comment exactly (`viz` 93, `core` 5, `cli` 2, `server` 1), which is what says
+this is a method gap rather than tree drift. `ISSUE_WORKER_LEDGER.md` is corrected in place, with
+the original quoted.
+
+**Did they move? For the population the issue is about, no — and that is measured rather than
+assumed.** `TEST_COST_ROOT` exists so the same scanner can be pointed at an extracted base commit
+from one command:
+
+```
+git archive 13e7b93 packages | tar -x -C /tmp/base
+TEST_COST_ROOT=/tmp/base TEST_COST_OUT=/tmp/base-census.txt \
+  npx vitest run --project viz packages/viz/src/testCost.test.ts
+```
+
+Base against this tree: `viz` reads **425 / 89 above / 165 at** on both. What moved is the browser
+tier — 132 → 135 annotations, 62 → 63 above its own ceiling — and one at-ceiling annotation in
+`server`. `experiments`, `core` and `cli` are unmoved.
+
+### 2. What the leg actually costs: three files are half of it
+
+Two full `--project viz --reporter=json` runs of the same 223 files and 5 065 cases, 2026-09-05, on
+this four-core container. Run A on a quiet box; run B beside four CPU spinners, which is this
+repository's own way of measuring under load.
+
+| | run A | run B |
+|---|---|---|
+| run wall | **397.0 s** | 1 037.6 s |
+| Σ file wall (serial cost) | **838.4 s** | 2 341.4 s |
+| concurrency (Σ file wall ÷ run wall) | 2.11 | 2.26 |
+| critical path — `campaign/campaign.test.ts` | **33.34 %** of serial | **33.05 %** |
+| files holding 50 / 80 / 90 % | **3 / 11 / 23** | 3 / 8 / 19 |
+
+`campaign/campaign.test.ts` is 279.5 s of run A, `campaign/judgeCleared.test.ts` 122.0 s and
+`campaign/stageSequence.test.ts` 84.1 s. Of case time, **two cases hold 26.8 %** and the 5 020 cases
+under 2.4 s hold 22.3 % between them. Cases account for **96.0 %** of file wall, so collection and
+imports are 4 % — and one file holds 28.7 s of the 33.5 s that sits outside a case at all, which is
+`campaign/campaign.test.ts` again.
+
+**The leg is a head, not a tail**, which inverts the issue's *"a tail nobody has measured"*. Vitest
+schedules **files** and runs the cases inside one file in series, so the leg cannot finish before
+its longest file — 279.5 s of a 397 s run. The reciprocal of the critical-path share is the most
+concurrency this leg can ever use, **3.0**, so a four-core runner is already saturated and more
+workers buy nothing. What buys something is splitting one file, which is #317's own principle —
+*make the unit vitest schedules smaller than the budget* — pointed at wall clock instead of at a
+timeout.
+
+### 3. The position on the 89: they are not the wall clock, and none is brought down
+
+Each of the 89 joined to what it governs in run A: **64** to a case by title, **23** to a
+`beforeAll`, **2** unmatched because an `it.each` title carries a `%s`.
+
+| | |
+|---|---|
+| median measured cost of an annotated case | **0.00 s** |
+| under 100 ms | 50 of 64 |
+| annotated ≥ 600 s while measuring < 1 s | **55** |
+| past 300 s at 1× and at 1.82× | **0** |
+| past 300 s at 4.5× | 2 |
+| past **its own annotation** at 1×, 1.82×, 4.5× or 9× | **0** |
+| tightest headroom | **10.7×** (`campaign/stageSequence.test.ts:187`, 83.8 s against 900 s) |
+| the 18 files carrying an above-ceiling `beforeAll` | **4.5 s** outside their cases, in total |
+
+**The annotations are not what costs this leg its wall clock, and lowering them would recover none
+of it.** The only thing an over-annotation costs is *failure latency on a hang* — a hung case at
+600 s takes ten minutes to go red instead of five — which is the same trade `SIMULATING_TIMEOUT_MS`'s
+docstring already makes in the paragraph beginning *"What it costs, stated rather than glossed"*.
+The two annotations doing real work are `campaign/campaign.test.ts:866` and
+`campaign/stageSequence.test.ts:187`, which are the two the retraction that produced this issue
+names.
+
+**None is brought down here, on two grounds and not one.** It would move no wall clock, which is
+measured above rather than assumed; and this lane's writable set was the deriver and its test, so
+editing 87 sites across other modules would have been work whose scope nobody had reviewed. What
+ships instead is a ratchet: the **count** and the **summed milliseconds** of each `viz` project's
+above-ceiling population may only fall. That is #344's fourth criterion — *no case may be annotated
+upward* — mechanised rather than promised, and it survives any machine swing because it reads no
+clock.
+
+### 4. The instrument, and the two things it cannot catch
+
+A wall-clock budget stated as a constant is wrong on § D483's evidence, so none is published. What
+the deriver publishes instead is shares, ranks and a ratio against a same-run baseline, every one of
+which is *exactly* invariant under the model § D483 measured — every duration multiplied by one
+factor, CPU 1.8196× against wall 1.8205× with concurrency unmoved.
+
+**Runs A and B are that claim measured rather than argued, and they are harsher than CI's own
+swing**: the serial cost moved **×2.79**, and
+
+| statistic | run A | run B | move |
+|---|---|---|---|
+| critical-path share | 33.34 % | 33.05 % | **−0.29 pp** |
+| Σ\|Δshare\| over 223 files | — | — | 0.224, median per file **0.0017 pp** |
+| worst single file's share | — | — | **2.83 pp** (`batch/remedyLadder.test.ts`) |
+| rank moves inside the top ten | — | — | **one adjacent swap**, 6↔7 |
+
+**And the same measurement refutes the tidy model it was taken to confirm, which is the more useful
+half.** § D483's swing was near-uniform — 102 of 103 files moving at a median 1.84 against a leg at
+1.82. Contention on a shared box is **not**: over the 71 files above 200 ms, the per-file ratio runs
+from **1.46× to 11.25×** with a median of 2.08 against an aggregate of 2.79. So a share is exactly
+invariant in the model and empirically resolves about **3 pp on a single file** under a swing this
+severe. The critical-path share holds far better, because the file that dominates the numerator
+dominates the denominator too.
+
+**`cohortRatio` is the answer to the one thing shares cannot see, and it is the weakest of the three
+— measured, not assumed.** Shares are blind to uniform growth by construction: a suite where every
+file got 20 % more expensive is arithmetically identical, in shares, to a machine 20 % slower.
+`testCost.test.ts` asserts that blindness rather than only stating it, so it cannot quietly stop
+being true. The cohort — the leg's cost in units of 32 pinned files — does see absolute growth, and
+between runs A and B it moved **17.45 → 20.12, a false +15 % with no code change**, because the
+cheap pinned files slowed by 2.42× while the leg slowed by 2.79×. Its resolution is therefore no
+better than about 15 % at this severity, and that figure is published beside it rather than left for
+somebody to discover.
+
+### 5. What this does not do
+
+**Nothing runs the deriver.** `.github/` was outside this lane's scope, so no workflow produces the
+JSON report it reads; the tier table registers it `scheduled: false` and names the job that would
+change that. Until then the attribution is a thing a person runs, and the guard that runs on every
+pull request is the static ratchet alone.
+
+**Two classes are uncaught and named rather than implied.** A case getting slower without its
+annotation changing — no static check can see it, and no test inside the leg can time the leg. And
+the suite growing uniformly — shares are blind, and the cohort ratio's own resolution is the 15 %
+above.
+
+**`experiments` is counted and not gated**, which is scope rather than judgement: this lane measured
+the `viz` leg. Its 168 above-ceiling annotations, and the fact that 123 of them are invisible to the
+method #344 used, are published by the census and gated by nothing.
+
+## D493 — a specification routes its own registers, and the routing lives beside it rather than in a file of its own
+
+**Date: 2026-09-05 · Owner: wave S lane S-C · Rules on: GitHub issue #342,
+`docs/35-problem-per-mode.md` § 13,
+`packages/experiments/src/validation/documentRouting.test.ts`.**
+
+#342 found `docs/35-problem-per-mode.md` fresh, good and **unrouted**: fourteen specified code
+changes, nine flagged unverified claims and five open questions, and not one open issue citing any of
+them. `RISKS.md` **R42** is *a decision recorded and never implemented*; this is one level earlier —
+**a specification recorded and never routed** — and it breaks no test, produces no dead export and
+contradicts no shipped sentence.
+
+**The routing is § 13 of the document itself, and the ground is a guard rather than a preference.** A
+separate routing file under `docs/` was the first choice and is refused: a new `docs/*.md` owes a row in
+`README.md`'s documentation table, asserted by `validation/documentation.test.ts` § *README.md
+§ Documentation*, and a routing register shipping as an orphan document would be #342's own defect
+manufactured by the fix for it. Two arguments follow it rather than lead it — a spec and its routing
+go stale at different rates, and one file is what lets the guard couple them without maintaining the
+coupling in two places.
+
+**The guard is narrow on purpose, and the reason is the shape of the general problem.**
+`citations.test.ts` checks that every reference **points at** something real. Nothing checks that
+something real **is pointed at**, and that direction is not writable in general: an orphan is
+detectable only against a definition of what should have adopted it, and no test here can read
+GitHub. What *is* writable is the narrow form — **a document that declares its own registers can be
+required to route them** — because § 10, § 11 and § 12 are closed sets the document publishes about
+itself. So the check reads those three and requires every member to carry a disposition in § 13, with
+the change dispositions drawn from a closed vocabulary and every *checked* claim citing a
+`path:line` that resolves on disk with at least that many lines.
+
+**What it does not check is written into its own docstring rather than left to be discovered**: not
+that any GitHub issue exists, not the next `docs/3x`, and not that an owner is a person. A general
+rule — *every governing document has a routing section* — needs a definition of *governing* that
+nothing can derive, and a guard whose predicate is a hand-maintained list is a convention wearing a
+test. `contentPlan.test.ts` earns its place because its subject is a **count**; a routing table's
+subject is a **judgement**, so the convention is written where it will be read and the mechanism is
+kept to the part that is mechanical.
+
+**Two findings the routing produced, recorded here because they outlive the appendix.**
+
+**Four of the five questions were already ruled and nothing said so.** [§ D475](#d475)–[§ D478](#d478)
+(2026-09-05) answer Q4, Q2, Q3 and Q1; Q5 is answered in the tree by
+`packages/viz/src/render/carRest.ts`. § 12's table, the three issues those questions gate, and the
+three issue comments posted on 2026-09-04 all still describe them as open. **That is #342's own
+failure mode recurring one turn later, and in the harder direction**: an unrouted question costs a
+reader a search, while a question ruled and unrouted costs a lane the work it does against the
+superseded answer. The appendix carries the rulings to the issues rather than restating them.
+
+**#342's headline premise is refuted and its substance is not.** *"Not one open issue cites it"* was
+true of the sweep that found it and false three minutes before it was filed — #208, #210 and #220
+each acquired a citing comment at 2026-09-04 22:53 UTC against the issue's 22:56. The document was
+never invisible to the repository either: `docs/28`, `docs/33`, `docs/36`, `docs/37`, `README.md`,
+this file and eight sites under `packages/viz/src` cite it. **What was invisible was the backlog, and
+only the backlog** — which is the finding worth keeping, because it says the missing direction is
+document → issue and not document → tree.
+
+## D494 — sign-in lands as a state, the account name wins where it exists, and the repaint is a channel rather than a rebuild
+
+**Date: 2026-09-05 · Owner: wave S lane S-A · GitHub issue #332 · Rules on: `everyday/accountPort.ts`,
+`everyday/host.ts#EverydayAccountActions`, `everyday/settingsView.ts`, `everyday/profile.ts#effectiveNameOf`,
+`everyday/rail.ts#RailOptions.account`, `honesty/agreement.ts#AGREED_FIGURES`,
+`packages/server/src/http/api.ts`.**
+
+[§ D489](DECISIONS.md), [§ D490](DECISIONS.md) and [§ D491](DECISIONS.md) are the specification and
+this entry does not re-litigate them. It records the three things the build had to decide that they
+left open, each of which reaches past the module that took it.
+
+**1. The repaint is a third channel, because both of the two obvious ones are refused by a
+measurement already in the tree.** `EverydayHost.onChange` is drained by `dev/main.ts#renderAll()`
+and **no account path calls it** — thirteen call sites, every one of them `drawMenu()` — so a screen
+wired to the data host would render once and never move across a § D243 § 4 cold start measured at
+**28.7 s**, which is exactly long enough for a screen that does not repaint to read as a hang.
+Widening that drain to `drawMenu` is the other obvious repair and `everyday/signInLink.ts` refused it
+one wave earlier in writing: it would notify every Everyday screen on every commit in the Engineer
+account form, *"a redraw storm in the direction GitHub issue #106 documents"*. And calling
+`renderAll()` from the account paths is the tempting one-liner `dev/main.ts:3676-3681` already
+answers — rebuilding on every state change is *"issue #106 with a new trigger: a press swallowed
+mid-`mousedown`, and focus taken off whatever the reader was on"*, which on a form with a focused
+email field is the defect itself.
+
+So `everyday/accountPort.ts` is a channel of its own, published from `drawMenu()` — the one choke
+point every account write already passes through — and **it publishes nothing when the state is the
+same object**. That de-duplication is not a new rule: `menu/account.ts`'s reducers return a fresh
+frozen state for a real transition and hand back *the state they were given* for a commit that
+changes nothing, which is that module's own first paragraph and is issue #106's answer to the
+identical question one layer down. Reference identity is therefore an exact test for *did the account
+move*, and a menu navigation, a slider and the same address arriving three times from one blur reach
+no listener. `everyday/accountPort.test.ts` drives that through the shipped reducers rather than
+asserting it about a hand-built pair.
+
+**The choke point is necessary and was not sufficient, and that half was found by reading rather
+than by a red test.** `drawMenu()` catches every account *transition* — thirteen call sites of
+`accountState = …; drawMenu();` — and boot's own sequence
+(`restoreSession(); applyTheme(); renderAll(); runShift();`) **does not call it**, nor does anything
+else until the player opens the Engineer menu or a mailed link is redeemed. So on an ordinary load
+nothing published an account at all and the settings screen sat on its *the simulator is still
+loading* arm for the whole visit while the simulator had long since loaded. The two publishes answer
+two different questions — *it moved* and *there is one* — and either alone is a screen that is wrong
+half the time. The second is beside `EVERYDAY_HOST.publish`, which is the line Everyday screens
+become mountable from, and `everyday/accountPort.test.ts` reads both out of the source with the
+limitation `everyday/signInLink.test.ts` states: strong evidence that a line was written, none at all
+about what the product does.
+
+The **effects** are on `everyday/host.ts` in `dailyBoard`'s shape, per the brief and for
+`dailyBoardOf`'s own stated reason. `undefined` means *no account server*, which is what lets the
+screen say there is nowhere to sign in **before** it draws a field — GitHub issue #30's own fix
+ordering, and a privacy rule rather than a layout one. There is deliberately **no redeem port**: a
+mailed link is redeemed by `dev/main.ts` at boot and its outcome already reaches this world through
+`everyday/signInLink.ts` (#336), so a port for it would have no caller, which is the dead seam this
+repository has shipped eleven times in code and once in `data/`.
+
+**2. § D490's adoption is implemented on the server's own flag, in one expression, and the mint arm
+is what makes the declared pair non-vacuous.** `everyday/profile.ts#effectiveNameOf` answers the
+device-local name while `AccountSummary.displayNameChosen` is `false` — the flag rather than the
+`player-<12 hex>` shape, which `menu/account.ts#namingStage` refuses by name because a client that
+recognised the pattern would be a second place deciding what a generated name looks like. Both
+readers ask it: `everyday/rail.ts#railFooter` and `everyday/settingsView.ts#settingsScreenViewOf`.
+`AGREED_FIGURES` gains `display-name` over those two, and the account rides on
+`AGREEMENT_ARMS`' existing three arms — signed out, holding the mint, named — rather than on a fourth
+axis, because a fourth axis would double every *other* pair's readings to reach three states of one.
+The mint arm is the half that stops the pair being a tautology: a side that took `displayName`
+unconditionally publishes `player-…` there while the other publishes the device-local name, which is
+precisely the sign-in-costs-you-something defect § D490 refuses.
+
+**3. § D491's bound held, and the enumeration check was run rather than argued.** One `try`/`catch`,
+one code (`sign-in-mail-not-sent`), one sentence, one test — and **502 rather than 500**, because the
+failure is a dependency this server called and did not get an answer from, so a client grouping by
+status stops grouping it with the faults it is not. It cannot be an account-enumeration oracle
+structurally: by the time the send is attempted the account **exists either way**, since asking for a
+link on an unknown address is what creates one. `api.test.ts` drives both halves anyway and requires
+the status and the body to be byte-identical for a known and an unknown address, because *cannot be*
+is what a test is for. What it can still reveal is **deliverability**, which is not a fact about this
+product's accounts and is already disclaimed in the 202's own wording — *"If that address **can
+receive mail**"*.
+
+**Four sentences were retracted, and one moved rather than went.** `SETTINGS_ABSENCES`' *Sign out*
+entry, `SettingsYouView.home`, and the two docstring passages behind them are deleted whole with the
+originals quoted where they stood, on § D227's rule that a refusal standing over a control that works
+is the more dangerous half. `everyday/buildNotes.ts`' *Putting your run on the daily board* row
+**narrowed** for the second time and its triage row moves from #332 to #221: the sign-in clause is
+false now and *nothing posts* is what is left, which is the issue that will build the press.
+`SETTINGS_ABSENCES`' *Post runs to the board* row deliberately did **not** move — it refuses a
+*switch* over a capability that still does not exist, and § D460 corrected that confusion once
+already. `everyday/signInLink.ts#SIGN_IN_NOTICE_POINTER` was substituted rather than added to: it
+pointed across § 3.2's door at the Engineer menu, and sending a reader through a whole other product
+to reach a control two rows under the banner is the same defect with a friendlier face.
+
+**The corpus forecast, published before the integrator measures and decomposed to the string.** The
+move is **+16 a case** from `everyday/settingsView.ts#settingsScreenViewOf` — twenty-two sign-in
+seeds over the six arms the adapter's six cases now carry, less the deleted `you.home` on each —
+**−1 a case** from `everyday/buildNotes.ts` as the `Sign out` absence leaves, and **6 or 12 a case**
+from the `display-name` pair, which is two sides over three arms and doubles on a case whose building
+has an authored whole day. Everything else is **0**: the sign-in banner's pointer and the daily-board
+absence row are substitutions, one string in and one out. Taken on this branch — which is a figure
+about a branch and not the row, § D343 — that predicts **+1 233** always-on and **+1 530** deep, with
+cases, simulations, surfaces, suppressed runs and failing cases all unmoved and the surface **sets**
+identical in both tiers. The pair's variable term resolves to **15 cases at 6** in each tier, which
+is `garden-apartments` alone in the always-on corpus and `garden-apartments` + `st-jude-hospital` +
+`crown-hotel` in the deep one: three buildings, which is the number `CLAUDE.md` says have no authored
+day, arrived at by arithmetic from two tiers rather than read off a file.
+
+**One thing is knowingly weaker than it should be, and it is a file boundary rather than a design
+call.** `EverydayHostBindings.accountActions` is **optional** where `dailyBoard` is required, because
+two binding literals that a required field would break (`campaign/wearClock.test.ts`,
+`campaign/buildStandingOrder.test.ts`) are outside this lane's writable set. What is lost is the
+compile-time forcing: a future shell that composes bindings and omits it gets `undefined`, reads that
+as *no account server*, and draws that arm honestly rather than failing to build. Worth making
+required the next time either of those files is open.
+
+## D495 — the Engineer shell's Basic register is bound by the promise its own toggle makes, so the cost line grows a plain arm rather than the promise being narrowed
+
+**Date: 2026-09-05 · Owner: the integrator · Rules on: GitHub issue #146,
+`authoring/dispatcherSpec.ts#costFunctionLine`, `packages/viz/index.html:1850`. Dated before the
+code.**
+
+Wave S's lane S-V1 verified #146 and returned *needs information* with three questions, the first of
+which gates the other two: **is the Engineer shell's Basic register bound by the two-register
+rule?** Everything else follows from the answer, and the lane was right to stop rather than pick one
+— threading `state.mode` through widens what the toggle promises, and widening a promise to make an
+issue closable is the move `CLAUDE.md`'s working agreement forbids.
+
+**Ruling: yes, it is bound. `costFunctionLine` grows a Basic arm; the promise is not narrowed.**
+
+**The promise is shipped and it is broader than the test that guards it.** `index.html:1850` reads
+*"Casual states every figure in plain language and leaves out the interval spread, the energy proxy
+and the measurement window's exact bounds"*, and the `#view-mode` option is labelled *"Casual —
+plain language"*. `dev/chromeLabels.test.ts:280-300` enumerates five clauses with
+`expect(title).toContain(clause)` — **a containment check, not an exhaustiveness one** — so the
+sentence's first half is asserted by nothing. `cost = 1.00·wait + 0.30·starvation` is notation, and
+the surface says it will not draw notation in this register.
+
+**Why narrowing the sentence is the wrong half to move**, since it is the cheaper edit and would
+close the issue in one line. The two registers are not a labelling convention; they are the product
+saying which audience each surface serves. Narrowing *states every figure in plain language* to
+exclude the cost function would make the exception the most notation-dense line on the screen, which
+is the register promising least exactly where it is worth most. § D460's rule is that a refusal a
+surface cannot stand behind is withdrawn rather than reworded; the mirror binds here — a **promise**
+a surface can keep is kept, and this one can be kept because the shape already exists.
+
+**It already exists, and that is what makes this cheap.** `everyday/workshopModel.ts:446-478`
+(`mathsDisclosureOf`) draws the same content for the Everyday audience — plain sentence, symbols
+named, then the line, then what the signs mean — with the symbols drawn from `core`'s own player
+words. The Basic arm is that shape at the four Engineer sites, not a new vocabulary.
+
+**Three constraints on the build, each of which the obvious implementation gets wrong.**
+
+1. **There are four print sites, not one**: `dev/dispatcherEditor.ts:1790` and `:2058` through
+   `vectorLineOf` (`:457-461`), `:1828`, and `:1904`. A fix at `:1828` alone leaves three registers
+   disagreeing on one screen, which is `surfaces-disagree`'s shape inside a single file.
+2. **The cycle runs one way.** `everyday/workshopModel.ts:114` imports `dev/dispatcherEditor.js`, so
+   the plain arm may **not** be imported back the other way. Either keep it module-private in
+   `dev/`, or push it into `authoring/` as an optional parameter defaulting to today's output —
+   preferred, because it puts both arms beside the producer and leaves every existing caller
+   byte-identical.
+3. **No honesty property covers this and none can be made to.** `honesty/properties.ts:1417` skips
+   any surface outside `PLAYER_FACING_SURFACES`, which `properties.ts:1373-1375` derives from
+   `everyday/` and `campaign/` declarations only. The Engineer editor is out of scope regardless of
+   whether `internal-notation`'s regexes would have matched. **So the guard for this is a test at
+   the site**, and saying so is better than assuming the corpus has it covered — a briefing in wave
+   G claimed exactly that about a different string and was wrong.
+
+**What this does not decide.** Whether the *rail card* should print the cost line at all. It never
+has (`dev/rightRail.ts` composes `dispatcherBlurbOf` and calls `costFunctionLine` nowhere), the
+issue does not ask for it, and #178's item 5 has an open ruling about authored prose beside a weight
+vector that would bear on it.
+
+**One documentation correction owed on the same commit.** `weightSummaryOf` does not exist —
+the producer is `costFunctionLine` — and two documents still name the old symbol:
+`DECISIONS.md:22912` and `ISSUE_WORKER_LEDGER.md:202`. `dev/rightRail.ts:242` was already corrected.
+A grepping reader lands on nothing today.
+
+---
+
+## D496 — Sandbox is a state and not a place, the handoff's mode ships split across two mechanisms, and the deviation is recorded rather than left in neither document
+
+**Date: 2026-09-05 · Owner: the integrator, as a product-owner call · Rules on: GitHub issue #225,
+`shift/week.ts#SANDBOX_CONTRACT_ID`, `everyday/briefView.ts:271-275`, `docs/12-design-handoff.md`
+§ 4.7 and § 4.8.**
+
+#225 asks the project to decide what Sandbox is or remove the label. Wave S's lane S-V2 verified it
+and returned *needs information* with three questions rather than one, because the 2026-09-04 triage
+that reduced the residue to *"whether it should also have a screen"* was missing a fact: **the design
+handoff specifies Sandbox as a play mode, and `docs/12` records that deviation nowhere.**
+
+### What the label does is coherent, and that is measured
+
+One id (`shift/week.ts:104`), one non-test writer (`dev/state.ts:846`), one scoring gate
+(`shift/week.ts:431`, gating `streak`, `bestMinutePct` and `cleanRun` at `:445-458`), one label case
+(`shift/weekLabel.ts:116`), recorded in § D382. The gate is keyed on the sandbox and not on the other
+two sentinels for a stated reason (`week.ts:410-417`): endless and free play are **chosen** and each
+has its own door, while the sandbox is **arrived at** and is the only one of the three with a screen
+promising in as many words that nothing counts.
+
+The coherence goes one level further than expected, and it is the thing that would have broken first.
+The tuner's *Sandbox — nothing counts* strip derives from `movedKeys` rather than from the contract
+id, which looks as though it could disagree with the gate. It cannot: `everyday/tunerModel.ts:174-187`
+records that the narrower guard — *the building moved* — was the tempting one and was rejected
+precisely because a press that skipped the building when only *How busy* had moved would run a
+re-timed crowd against a scored assignment, with the strip saying *nothing counts* while `closeDay`
+banked against Scenario 1. One predicate drives the strip, the stamp, § 3.3's note and the presses,
+so **the label agrees with itself across four surfaces by construction.**
+
+### The handoff's Sandbox is shipped, split across two mechanisms, and neither is a mode
+
+`docs/design/elevator-sim-reimagined.dc.html` makes Sandbox one of two play modes (`:1597`), behind a
+Scenarios | Sandbox segmented toggle (`:2772-2773`), with a building select and a pattern select in
+the coach ribbon (`:203-209`), no growth (`:1568`), and `coachLabel: this.sandbox ? 'Sandbox' : …`
+(`:3430`).
+
+**Answer to the lane's first question: it is shipped, and it is shipped in halves.** The *selection*
+half is Free Play, whose door offers a fuller six-axis choice than the handoff's two selects. The
+*unscored* half is the sandbox contract, arrived at by moving the building outside a scenario —
+`dev/state.ts:848-850` documents the coach building select in the handoff's own terms,
+`everyday/tunerScreen.ts:17` records that `applyBuildingSpec` stands the week on the sandbox
+contract, and `weekLabel.ts:116` reproduces `coachLabel` exactly.
+
+**What is genuinely unshipped is the explicit choice**, and that is the deviation. `scope/types.ts:68-77`
+holds eight `PLAY_MODES` and `sandbox` is not among them; `free-play` is.
+
+**Ruling: ratify the state reading. Sandbox is a week on no assignment, arrived at and never chosen.
+No ninth `PlayMode`, no Scenarios | Sandbox toggle, no screen.**
+
+**Why not build the mode**, since it is what the handoff draws and `CLAUDE.md` makes the handoff
+canonical for the interface. Because building it **contradicts § D382 rather than extending it**: the
+gate's whole argument is that the sandbox is the one sentinel that is not chosen, so a toggle that
+lets a player choose it would require re-taking that decision, not adding to it. And it would
+**substantially duplicate Free Play**, which already ships a door with a wider selection. The cost is
+not small either — a ninth `PlayMode` reaches every exhaustive switch over it, where
+`dev/state.ts:682`'s `advancesTheWeek` is a compile error by design (`:665`), plus `scope/permits.ts`
+and `scope/surface.ts` per-mode declarations, an `everyday/screens.ts` registry row on a table whose
+`UNBUILT_REASONS` is currently empty and must stay checked in both directions, and new honesty
+surfaces.
+
+**Why not delete the label**, the other cheap answer. It is refuted in the code already:
+`week.ts:118-144` and `:410-417` argue in two places that collapsing the sentinel into endless tells
+a reader who opened the editor that they started an endless run — a claim about an intention they did
+not have — and that reuse **re-opens #125's defect**, since a player entering free play from a
+sandbox week meets `switchWeek`'s same-id line and has their drawn building's day 6 overwritten.
+
+### Three consequences, and the first is the only shipped string that must change
+
+1. **`everyday/briefView.ts:271-275` says `{ label: 'Take it to the sandbox', screen: 'tuner' }`.**
+   That is a button whose word names a **destination**, which is the mode reading, on a build whose
+   answer is that Sandbox is a state. Four other surfaces say *state* — `weekLabel.ts:116`,
+   `tunerModel.ts:506`, `tunerModel.ts:517`/`:520`, `actionBar.ts:400`. The card is not dishonest
+   about what it opens, so this is a vocabulary correction rather than a defect: the door names the
+   screen it opens, and the state is what the strip on that screen says. **No honesty property can
+   see this class** — the ten are predicates over strings and `surfaces-disagree` compares figures,
+   not vocabulary — so it is fixed at the site and asserted there.
+2. **`docs/12-design-handoff.md` gains the deviation record it does not have.** The word *sandbox*
+   appears in it zero times, as it does in `docs/21` and `docs/16`. § 4.7's own rule is that a
+   deviation is recorded rather than left in neither document, and this is a deviation on a surface
+   the handoff **does** draw, which makes it a sharper case than the § 4.8 rows already there. The
+   Casual handoff's separate per-run *Unlock everything* toggle
+   (`elevator-sim-casual.dc.html:6628-6638`) is a second deviation, argued in
+   `tunerModel.ts:489-496` — *a switch beside the derived strip would be a second, disagreeing source
+   for the same fact* — and also absent from `docs/12`. Both are recorded.
+3. **`docs/12` § 4.8's Free play row is wrong and is corrected.** Its stated reason is *"The prototype
+   has no configuration a player chooses"*, and the reimagined handoff draws two selects and a
+   two-mode toggle. Answering the lane's third question: yes, it needs correcting, and the correction
+   is the row's *reason* rather than its verdict.
+
+**`GAPS.md:117` is deleted whole rather than trimmed**, on § D451's rule that an absence which has
+become half-untrue is deleted and re-taken rather than edited. That is #225's AC4, and it closes by
+deletion. #178's item 3 re-points here rather than carrying its own copy of the stale quote.
+
+### What this does not decide, and it is the interesting half
+
+**Whether Free Play should be scored.** A free-play week **is** posted — `week.ts:431` gates only on
+`SANDBOX_CONTRACT_ID`, so `closeDay` moves `streak`, `bestMinutePct` and `cleanRun` on a free-play
+week, deliberately and by § D382's own argument — while the handoff's Sandbox is explicitly unscored
+(`:1568`, growth 1). That is a product judgement about what Free Play is **for**, it is not what #225
+asks, and answering it here would be settling a second question inside the first. It is named so the
+next reader finds it named rather than discovering it.

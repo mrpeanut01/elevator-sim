@@ -129,17 +129,22 @@ describe('the banner, as a value', () => {
   /**
    * The pointer names a route, and every step of it has to exist.
    *
-   * `everyday/shell.ts` draws the swap row at the foot of the rail; `dev/main.ts#dispatchMenu`'s
-   * `reopen` arm navigates to `main`; `menu/screens.ts` puts `main.account` on that screen labelled
-   * *Account*. The sentence is checked against the last of those three here rather than being
-   * trusted, because a route sentence that has gone stale is § D227's more dangerous half — it tells
-   * a player to press something that is not there.
+   * **It used to point across § 3.2's door and does not any more** — GitHub issue #332,
+   * [§ D489](../../../../DECISIONS.md). It read *"Switch to Engineer at the foot of this rail, then
+   * open the menu and choose Account"*, and the account is on § 15.1's own screen now, so that
+   * sentence was sending a reader through a whole other product to reach a control two rows under
+   * the banner. What it is checked against moves with it: the destination is a **registered Everyday
+   * screen**, and a route sentence that has gone stale is § D227's more dangerous half — it tells a
+   * player to press something that is not there.
    */
-  it('names a row the Engineer main menu actually carries', async () => {
-    const { MENU_SCREENS } = await import('../menu/types.js');
-    expect(SIGN_IN_NOTICE_POINTER).toContain('Switch to Engineer');
-    expect(SIGN_IN_NOTICE_POINTER).toContain('Account');
-    expect(MENU_SCREENS).toContain('account');
+  it('names a screen the Everyday rail actually carries', async () => {
+    const { EVERYDAY_SCREENS } = await import('./types.js');
+    const { isScreenBuilt } = await import('./screens.js');
+    expect(SIGN_IN_NOTICE_POINTER).toContain('Settings');
+    expect(EVERYDAY_SCREENS).toContain('settings');
+    expect(isScreenBuilt('settings')).toBe(true);
+    /* And it no longer sends the reader across the door it used to. */
+    expect(SIGN_IN_NOTICE_POINTER).not.toContain('Switch to Engineer');
   });
 });
 
@@ -226,5 +231,44 @@ describe('what only the source can say — issue #336’s clauses 3 and 4', () =
         'start would re-send a token the first attempt is spending, and the second attempt would ' +
         'come back `link-spent` to an honest player',
     ).toBeLessThan(awaited);
+  });
+
+  /**
+   * **The token never leaves the fragment** — GitHub issue #332's second acceptance clause,
+   * *asserted, not assumed*.
+   *
+   * § D241 § 4's property is about the **link**: a fragment is never transmitted, so a mail client,
+   * a scanner or a link-rewriting appliance cannot carry the token anywhere, and it stays out of
+   * access logs, ingress traces and `Referer`. Clearing the fragment (above) is one half of keeping
+   * that true after the click. This is the other half: the value read out of it must reach the
+   * redemption request and **nothing else** — not a notice a player can screenshot, not a log, not
+   * a query string this build constructs, not storage, and not `everyday/`, whose banner carries a
+   * `stage` and a sentence and has no field to put one in.
+   *
+   * Asserted as *every mention of the identifier is one of three known sites* rather than by
+   * listing forbidden functions, because a list of forbidden functions is a list somebody adds to.
+   * A rewrite that keeps the property keeps passing; one that puts the token anywhere new fails
+   * with the offending line in the message.
+   */
+  it('lets the token reach the redemption request and nowhere else', async () => {
+    const body = await redemptionSource();
+    const lines = body.split('\n').filter((line) => line.includes('linkToken'));
+    expect(lines.length, 'the token is never read out of the fragment').toBeGreaterThan(0);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const allowed =
+        /^const linkToken = new URLSearchParams\(window\.location\.hash/u.test(trimmed) ||
+        /^if \(linkToken === null \|\| linkToken === ''\) return;$/u.test(trimmed) ||
+        /^const result = await client\.redeem\(linkToken\);$/u.test(trimmed);
+      expect(
+        allowed,
+        `the sign-in token reaches a fourth place: ${trimmed}. It may be read out of the ` +
+          'fragment, guarded, and handed to `client.redeem`. Anywhere else — a notice, a log, a ' +
+          'query string, storage, or the Everyday banner — is a credential outside the one ' +
+          'channel § D241 § 4 makes safe.',
+      ).toBe(true);
+    }
+    /* The clearing writes the path and the query back, never a hash carrying anything. */
+    expect(body).toContain('`${window.location.pathname}${window.location.search}`');
   });
 });

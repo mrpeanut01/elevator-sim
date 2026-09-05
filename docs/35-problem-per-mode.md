@@ -66,6 +66,12 @@ difficulty number: `docs/33` `DC-4`'s band is the bar and this document does not
 visual encoding: [`28-art-direction.md`](28-art-direction.md) § 5 owns the stage's pixels and this
 document cites it rather than competing with it.
 
+**Where the backlog meets this document.** [§ 13](#13-routing--where-every-open-item-of-this-document-lives-in-the-backlog)
+is the routing appendix (GitHub issue #342, [§ D493](../DECISIONS.md)): every open question's
+disposition, every one of § 10's fourteen code changes mapped to an issue, every one of § 11's nine
+unverified claims marked checked or open, and **§ 13.5, which records what has gone stale in the
+sections above** — read it before acting on § 3.2, § 7.2, § 8.3's table or § 12.
+
 ### 0.4 The register this document is read against
 
 Stated here rather than in a footnote, because a specification whose evidence class is invisible is
@@ -1171,6 +1177,434 @@ absence of `abandonedAt` · the two of eighteen `symptom` strings carrying a raw
 | **Q3** | Is Endless rush cut, demoted to the bench (`docs/32` `GD4`), or placed at minute one (`PM-RU1`)? Three arguments now exist and none is a decision | product owner |
 | **Q4** | Which building carries the first session, given that `garden-apartments` cannot (#270, § 9.3)? #270's route 1, `dev/defaults.ts`' already-measured preference for `chancery-house`, and `PM-DOOR` are the three candidates | product owner |
 | **Q5** | Is `PM-PARK` a `viz` change or a `core` one? § 11's unverified item 4 decides it, and the answer changes § 10 row 12's size | whoever picks up row 12 |
+
+**Four of these five are ruled and this table has not caught up — [§ 13.1](#131-the-five-open-questions-are-four-rulings-and-one-remainder) is where the
+dispositions are.** [§ D475](../DECISIONS.md) replaced `Q4` with a set rather than a building,
+[§ D476](../DECISIONS.md) permits `Q2`'s cover, [§ D477](../DECISIONS.md) keeps the rush and leaves
+only `Q3`'s *placement* open, and [§ D478](../DECISIONS.md) settles `Q1`. `Q5` is answered in the
+tree by `packages/viz/src/render/carRest.ts`. The rows above are left as written because the
+candidates they list are what the rulings ruled **on**, and deleting them would lose the record of
+what was on the table.
+
+---
+
+---
+
+## 13. Routing — where every open item of this document lives in the backlog
+
+**This appendix is [§ D493](../DECISIONS.md)** (2026-09-05), built for GitHub issue **#342**. It adds
+no design and changes no rule above it. What it carries is the wiring: which issue each open question
+is taken on, which issue each of § 10's fourteen code changes belongs to, which of § 11's nine
+unverified claims have since been checked, and what has gone stale in this document in the four days
+since it landed.
+
+### 13.0 Why this is § 13 rather than a routing file of its own, and the ground is a guard rather than a preference
+
+A separate file was the first choice and it is refused, for a reason worth stating because it is the
+kind this repository files under *a stated mechanism goes stale*: **a new `docs/*.md` owes a row in
+`README.md`'s documentation table**, asserted by
+`packages/experiments/src/validation/documentation.test.ts` § *README.md § Documentation* — *"lists
+every docs/\*.md on disk"*. A routing register that shipped without that row would be an orphan
+document, which is #342's own defect manufactured by the fix for it. **The check confirmed itself on
+the way past**: this section's first draft named the rejected filename in backticks, and
+`citations.test.ts` reported it as a document path that is not on disk — the guard catching a
+reference to the very file the argument declines to create.
+
+Two arguments beyond the guard. The routing table and the specification go stale at **different
+rates** — a spec is stale when the design changes, a routing table is stale when an issue closes —
+and § 0.2's own argument for a separate file was that `docs/32` is a declaration and this is a
+specification, which is an argument about *kind*, not about *cadence*. Keeping both in one file is
+what lets § 13.6's guard couple them: the check below reads § 10, § 11 and § 12 and requires each row
+to appear here, and a coupling across two files would have had to be maintained in two places.
+
+### 13.1 The five open questions are four rulings and one remainder
+
+**§ 12's table is stale, and this is the finding #342 was filed to prevent, arriving one turn later.**
+#342 (2026-09-04 22:56 UTC) says three of this document's open questions are *unowned product-owner
+decisions*. **Four of the five were ruled on 2026-09-05**, in `DECISIONS.md`, and neither this
+document nor any of the issues they gate says so. § 12's rows are left standing above, because the
+candidates they list are what the rulings ruled *on*; the dispositions are here.
+
+| | question | ruling | owner, as the record names them | date | what remains |
+|---|---|---|---|---|---|
+| **Q1** | does the rate band bind player-facing content? | [§ D478](../DECISIONS.md) — **it binds the `demandLevel` selector and not authored content**; `gym-on-the-top-floor` is not out of compliance | product owner, delegated to the integrator | 2026-09-05 | the attached obligation: a case running outside its profile's band **says so on its own face**. Unbuilt; see § 13.3 row 6's note |
+| **Q2** | does a derived-state cover satisfy `charter` non-goal 10? | [§ D476](../DECISIONS.md) — **yes**. `PM-DOOR` stores nothing; a rule against memory does not reach a function of game state | product owner, delegated to the integrator | 2026-09-05 | one **playability condition**: skipping must advance the derived state, or a player who skips and reloads meets the screen they dismissed |
+| **Q3** | is the rush cut, demoted, or placed at minute one? | [§ D477](../DECISIONS.md) — **kept**; the fail state is the lobby overfilling; the ramp is traffic and/or breakdowns | product owner | 2026-09-05 | **the half Q3 actually asked.** Placement — bench or minute one — is *not* settled. #220 can build the mode without it |
+| **Q4** | which building carries the first session? | [§ D475](../DECISIONS.md) — **none of the three candidates.** *"Allow all eligible buildings to be 1st session, but rotate them randomly for players"* | product owner | 2026-09-05 | the eligibility **measurement**, per building, against #208's AC1–AC3; and a draw on a named stream with its seed recorded |
+| **Q5** | is `PM-PARK` a `viz` change or a `core` one? | **answered in the tree, not by a decision** — `packages/viz/src/render/carRest.ts`, which cites § 3.2 and § 9.4 by name. *Standing still* is an observable and is `viz`-only; *parked* is a claim about the dispatcher's intent and would be `core` | whoever picked up row 12, as § 12 assigns it | 2026-08-25 | nothing. See § 13.3 row 12 and § 13.4 claim 4 |
+
+**The remainder is Q3's placement, and it is the only product-owner call this document still owes.**
+Recorded in the honest form rather than with an invented name:
+
+> **Owner: the product-owner role. No individual is named, and naming one would be a fabrication** —
+> this repository has no human roster a lane can read, and [§ D349](../DECISIONS.md) already records
+> that an agent lane cannot produce a human. An owner column filled with a plausible name is
+> [§ D227](../DECISIONS.md)'s defect moved into the ownership column.
+>
+> **Forcing event, not a date: the moment #220 is scheduled.** A date this lane wrote would be a date
+> nobody agreed to. The event is real and is already coupled — #220's own 2026-09-04 comment records
+> that if the placement is *minute one*, the rush stops being an M3 nice-to-have and becomes a
+> prerequisite for two P0 issues in M2, so the placement is forced at the earlier of *#220 being
+> scheduled* and *the M2 gate*. If the product owner wants a date, they set one; nothing here can.
+
+### 13.2 The three comments, ready to post
+
+**Read this first.** #208, #210 and #220 each already carry a 2026-09-04 comment citing this
+document — posted **three minutes before #342 was filed**, which is why #342's *"not one open issue
+cites it"* was true of the sweep that found it and false by the time it was written. Those three
+comments raise Q2, Q3 and Q4 as **open**. The rulings landed the next day. So the comments below are
+**not** the wiring #342 asked for arriving late; they are the correction to wiring that was right for
+one day. Each one says so in its first line, so that a reader who has already read the 2026-09-04
+comment is told what changed rather than reading the same table twice.
+
+#### 13.2a — for #208 (Q4 → § D475)
+
+```markdown
+**Q4 is answered, and the answer is not one of its three candidates. Both of this issue's last two
+recommended next actions are overtaken.**
+
+`docs/35-problem-per-mode.md` § 12 Q4 asked which building carries the first session. The ruling is
+[§ D475](../blob/main/DECISIONS.md) (2026-09-05, product owner): *"allow all eligible buildings to be
+1st session, but rotate them randomly for players."* **There is no first building; the first session
+draws from a set.**
+
+| candidate, carried from docs/35 § 12 | disposition under § D475 |
+|---|---|
+| #270's route 1 — author a new tutorial building (§ D372's pre-commitment) | not the answer. A new building may still be **one member** of the eligible set |
+| `dev/defaults.ts`'s already-measured preference for `chancery-house` | not the answer, for the same reason |
+| `PM-DOOR` — the first session is a sequence rather than a tile | a different question, ruled separately by [§ D476](../blob/main/DECISIONS.md) |
+
+**Three consequences § D475 records, and the third is the work.**
+
+1. **`eligible` is not a synonym for `shipped`.** #270 established `garden-apartments` cannot carry a
+   first session — one car makes two of stage 1's three dials inert and breaks 78 tests in 32 files.
+   Eligibility has been measured for exactly one building, in the negative.
+2. **The draw is a named stream or it is a defect.** Invariant 2 admits no global RNG, and a first
+   session whose building nobody can reproduce is a first session no report can be about. The draw
+   belongs on the injected `StreamSet` with its seed recorded.
+3. **Every building in the set must independently satisfy AC1–AC3.** Under a fixed first building
+   that is one measurement. Under a random draw it is a measurement **per building**, and any
+   building that fails it hands some fraction of new players a first session presenting no problem to
+   solve — this issue's defect, delivered by the mechanism meant to fix it. § D475's own words.
+
+## Both prior next actions are overtaken, in different directions
+
+- **2026-09-02** — *"the next action is authoring the tutorial building § D372 chose, not recruiting
+  testers."* Overtaken twice. First by `PM-DOOR` (the 2026-09-04 comment). Now by § D475: authoring
+  one building does not answer a question whose answer is a set, and authoring before the eligibility
+  measurement exists risks authoring a member that fails AC1–AC3. Content is the expensive kind of
+  work to discard.
+- **2026-09-04** — *"the next action is an answer to Q4, not an authoring lane."* Correct when
+  written, discharged the next day.
+
+## The next action is the eligibility measurement, and it needs no decision
+
+It is agent-closable, blocked on nothing, and is the precondition for every route. For each shipped
+building: does its day 1 present a problem visible on the stage inside ninety seconds? **The
+instrument already exists and has already been run against one building** — docs/35 § 9.3 measures
+landing occupancy by exact interval union, cross-checked against `overlayAt(...).waitingNow` and
+`sum(queueAt(...).riders)` at 4 001 instants with a maximum discrepancy of 0. On `garden-apartments`
+at the shipped day-one configuration over 20 consecutive seeds: landings empty about **91 %** of the
+hour, and on **16 of 20 seeds no instant exists** at which anybody has been waiting sixty seconds.
+Run that across the set and the set is defined by measurement rather than by preference.
+
+## Two of docs/35's fourteen specified code changes land here, with their sizes
+
+| row | rule | change | size |
+|---|---|---|---|
+| 2 | `PM-TT1` | Move the *How hard this looks* plate off the pre-run position, or reword it as configuration. `everyday/today.ts:63,254` computes 120 ÷ 2 = 60 against `COMFORTABLE_PER_CAR = 400`, and the 400 is a citation to the design prototype rather than a measurement — that module's own docstring says so. It is a whole-day verdict at `t = 0`, which is `PM2` inverted twice over | **Small**, copy-and-ordering — **and it is the only one of the fourteen blocked by no product decision at all** |
+| 14 | `PM-DOOR` | The first-run sequence as a **cover** over the Everyday menu, conditioned on derived state rather than a stored flag, skippable | **Large**, and **no longer blocked**: § D476 rules the cover satisfies `charter` non-goal 10, with one playability condition — skipping must advance the derived state |
+
+AC4 is unchanged as the tester gate ([§ D349](../blob/main/DECISIONS.md)).
+
+_Posted by lane S-C of wave S for #342, which asked that docs/35's questions be raised on the issues
+they gate. The routing register is `docs/35-problem-per-mode.md` § 13._
+```
+
+#### 13.2b — for #210 (Q2 → § D476)
+
+```markdown
+**Q2 is answered: the derived-state cover is permitted. The 2026-09-04 comment's *"settle Q2 and Q4
+before any copy is written"* is discharged — both are ruled, and one of them changed shape.**
+
+## Q2, carried with its candidates and its cost
+
+`docs/35-problem-per-mode.md` § 12 Q2 asked whether `PM-DOOR`'s first-run cover, conditioned on
+derived state rather than a stored flag, satisfies `charter` non-goal 10.
+
+| candidate, carried from docs/35 § 8.3 | disposition |
+|---|---|
+| a stored *seen the intro* flag | **refused** by the document itself — non-goal 10 wearing `localStorage`, and [§ D335](../blob/main/DECISIONS.md)/[§ D338](../blob/main/DECISIONS.md) are explicit that a reload lands on the Everyday main menu whichever world the player was in |
+| a destination **instead of** the menu | refused for the same reason: it is an entry-screen override |
+| **a cover over the menu**, in `menuPanel.ts#coverShell`'s existing shape, conditioned on state the player produced (an empty week, no filed day) | **ruled permitted** — [§ D476](../blob/main/DECISIONS.md), 2026-09-05 |
+
+**The ruling's reasoning, because it is what a build has to hold to.** Non-goal 10 forbids *an
+entry-screen override that survives a reload*, and its mischief is a **remembered world**. `PM-DOOR`
+stores nothing: conditioned on derived state, the cover is recomputed from the player's own progress
+on every load, so nothing *survives* a reload — it is re-derived, which is what every screen that
+depends on progress already does. *"A rule against memory does not reach a function of game state,
+and reading it as though it did would forbid the product from behaving differently for a player who
+has never finished a day, which is most of what a first run is."*
+
+**One condition, and it is a playability condition rather than a letter-of-the-rule one.** *Skipping
+must advance the derived state.* Otherwise a player who skips the cover, reloads and meets it again
+has been handed a screen they already dismissed, and [§ D456](../blob/main/DECISIONS.md)'s second
+test asks whether the player can still play. The cheapest form § D476 names: **the skip starts the
+day**, so the state conditioning the cover has moved before anything could reload.
+
+**Cost, carried rather than summarised:** docs/35 § 10 row 14 — `everyday/`, `menuPanel.ts#coverShell`'s
+shape — sized **Large**. It was marked *blocked on a product-owner decision*; it is not blocked now.
+
+## What that does to this issue's criteria
+
+- **AC3** (skippable, and skipping does not break later state) is what a derived-state cover **is** —
+  and § D476's condition makes it sharper than the criterion: skipping must not merely avoid breaking
+  state, it must *advance* it.
+- **AC4** (every figure is the real figure) holds by construction: both halves of `PM-DOOR` are real
+  runs, not scripted mocks, which is `docs/10` § 5.5's requirement met rather than argued.
+- **AC1** still needs the wording ruling the 2026-09-02 comment asked for, and § D476 makes it more
+  urgent rather than less: a cover the player can skip has a journey test with two arms, and which
+  arm AC1 is about is the thing to write down.
+
+## Q4 changed shape, and it changes what this issue is built against
+
+The 2026-09-04 comment sequenced this issue behind *"which building a first session opens on"*.
+[§ D475](../blob/main/DECISIONS.md) answers that there is no such building: *"allow all eligible
+buildings to be 1st session, but rotate them randomly for players."* A guided first turn authored
+against one named tower and a guided first turn that must read whichever eligible building was drawn
+are different builds. **Worth settling before any copy is written** — the same warning the
+2026-08-26 comment gave about `garden-apartments` and the 2026-09-04 comment gave about the fork,
+pointed now at the copy's assumptions about which building the player is looking at.
+
+_Posted by lane S-C of wave S for #342. The routing register is `docs/35-problem-per-mode.md` § 13._
+```
+
+#### 13.2c — for #220 (Q3 → § D477, plus a measured correction to docs/35's own pricing)
+
+```markdown
+**AC1's decision is taken: Endless rush is kept. Two things follow that this issue does not carry —
+the mode's mechanics are now specified, and docs/35's pricing of the demand template is wrong in a
+way that has been measured.**
+
+## Q3, carried with its three candidates and the ruling
+
+`docs/35-problem-per-mode.md` § 12 Q3 asked whether the rush is cut, demoted to the bench
+(`docs/32` `GD4`), or placed at minute one (`PM-RU1`).
+
+| candidate | disposition under [§ D477](../blob/main/DECISIONS.md), 2026-09-05, product owner |
+|---|---|
+| **cut** — this issue's own AC1 alternative, and AC4's *"the tile is removed and the shell absence register entry is closed"* | **unavailable.** The mode is kept |
+| **demoted to the bench** (`GD4`) | still open — see below |
+| **placed at minute one** (`PM-RU1`, and `PM-DOOR`'s first ninety seconds) | still open — see below |
+
+**The ruling answers a different question than Q3 asked, and it answers a better one.** Given
+directly: *"Endless Rush should run until the lobby overfills, ramping up traffic and/or breakdowns
+until the user can't fix them fast enough or route around them."* Two things a lane must not
+conflate, in § D477's own words:
+
+- **The fail state is the lobby overfilling.** Not a timer, not a score threshold. The run ends when
+  the player can no longer clear or route around what is arriving. *(Read this against the detail
+  transferred from #156: § 20.5's hold line ends the run when* forty people have been standing over
+  two minutes at once*, not when forty are standing. `RUSH_HOLD_LINE` already encodes both halves.
+  Whether the lobby-overfill fail state is that line or replaces it is a design question the ruling
+  does not settle, and it should be settled explicitly rather than by whichever a lane reads first.)*
+- **The ramp is traffic and/or breakdowns**, escalating until that happens. Both levers permitted;
+  the mixture is left open.
+
+**What remains open is the half Q3 asked.** Where the mode sits in the player's path — the bench, or
+minute one — is not settled. This issue can build the mode without it; the placement gates how a
+player *reaches* the mode rather than what the mode is. **Owner: the product-owner role, and no
+individual is named because this repository has no roster a lane can read. Forcing event: the earlier
+of this issue being scheduled and the M2 gate** — because if the placement is *minute one*, this
+stops being an M3 nice-to-have and becomes a prerequisite for #208 and #210, both P0 in M2.
+
+One measurement obligation § D477 carries over: *until the player cannot keep up* is a claim about
+difficulty, and a ramp tuned by choosing numbers rather than by measuring them is what `docs/33`
+exists to prevent.
+
+## A correction to docs/35's pricing of AC2's demand template, measured rather than argued
+
+docs/35 § 10 row 10 prices the climbing stream as *"**Medium**, and it is `CLAUDE.md` invariant 7
+work rather than engine work"* — data, not code — **conditional on its own § 11 unverified item 3**:
+*whether `DemandTemplate.phases` alone expresses a monotone ramp of arbitrary length, or whether
+intensity is renormalised over `durationMin` in a way that caps it.* docs/35 named the check as
+reading `traffic/generator.ts` and `config/demandPhases.ts`. **Checked, and the answer splits.**
+
+- **Monotonicity and length: yes.** `packages/core/src/traffic/demandTemplate.ts:1586` —
+  `intensityAt` is piecewise-linear over the authored phases, `startIntensity + fraction ×
+  (endIntensity − startIntensity)`, with **no renormalisation over `durationMin`**. A monotone ramp
+  of arbitrary length is expressible.
+- **Without a ceiling: no, and this is the finding.**
+  `packages/core/src/config/demandPhases.ts:161-170` requires both intensities to lie in **[0, 1]**,
+  and says why in the validator's own message: *"It is a multiplier on the building's own arrival
+  rate, where 1 is that rate — a period busier than the profile is a higher rate, not an intensity
+  above 1."* And a template record **carries no rate field at all**: the level comes from the
+  building's `arrivalRatePctPop5min` and the declared `demandLevel`
+  (`packages/core/src/traffic/generator.ts:757`; `data/traffic-profiles.json` says it in the
+  `office-down-peak` record's own comment, marked STRUCTURAL *"so a reader does not go hunting"*).
+
+**So the ceiling this issue's refusal string names is not in the template layer at all.** The shipped
+refusal — *"no demand pattern this build ships ramps upward without a ceiling"* — is exactly right,
+and the reason is that the ceiling is the **profile's rate**, which a template cannot raise. A
+climbing stream that goes past it needs `config.arrivalRatePctPop5min`, the override
+`traffic/generator.ts:757` treats as overriding every profile.
+
+**That lands row 10 on [§ D478](../blob/main/DECISIONS.md) rather than on invariant 7 alone.** § D478
+(2026-09-05) rules that the declared band **binds the `demandLevel` selector and not authored
+content**, so an authored rush template may run outside it — **with the obligation § D478 attaches:
+a run outside its profile's declared band says so on its own face**, on the footing
+`workPerServedLegKJ` sits on beside raw energy. Row 10 is still Medium and still mostly `data/`; what
+changes is that its uncited-assumption note is now a **required disclosure with a ruling behind it**
+rather than a convention docs/35 recommended.
+
+## The rest of docs/35's costing, unchanged and carried
+
+| row | rule | scope | size |
+|---|---|---|---|
+| 11 | `PM-RU1`, `PM-RU3` | the held-time stage, the `Call it` press, and a result screen publishing the divergence point **from `summary.saturation`, never from a second definition**, with its across-seed spread measured first (`docs/10` R12: a single-run goal whose across-seed variance has not been measured is on the never-build list) | **Large.** docs/35 names it *"GitHub issue #220's whole scope"* |
+
+The `summary.saturation` clause is still the load-bearing one and is still not in this issue's
+acceptance: a result screen computing its own divergence point would be a second definition of
+saturation beside the one `awtIsValid` already uses.
+
+_Posted by lane S-C of wave S for #342. The routing register is `docs/35-problem-per-mode.md` § 13._
+```
+
+### 13.3 The fourteen specified code changes, reconciled against the open backlog
+
+**The lane that produced this table created, closed, labelled and commented on nothing** — #342 asks
+for the mapping and the lane's brief forbade the creation. **The integrator then opened the seven,
+and the rows point at them**: #348, #349, #350, #351, #352, #353 and #354, each carrying the title
+and the body this table had offered. The `new issue —` disposition is kept in the vocabulary below
+because it is the state a row is in between being reconciled and being opened, and a wave that
+reconciles without opening will need it again.
+
+The dispositions are a closed vocabulary, because an open one is how a reconciliation turns into
+prose: `issue #N` · `new issue —` · `out of scope —` · `built —`.
+
+| row | rule | disposition | ground |
+|---|---|---|---|
+| 1 | `PM-FB1` | **issue #348** — *Fix a building: play the as-built run before the four figures* | Searched: nothing open covers it. #233 is case authoring and content scale; #177 item 7 is § 10.3's fuller **editor**. Neither is a stage mount. **Body:** the fix-case screen already runs the as-built configuration when a case opens — `packages/viz/src/everyday/fixitScreen.ts:315` `measureAsBuilt`, called at `:533` — and a full recording lands on `sessionOf(entry).asBuilt`, from which `fixit/run.ts#figureValuesOf` reads the four opening figures. Mount a stage over that recording above the figures, per `PM-FB1`. Constraint 2 for this mode costs a renderer mount and a transport, not a simulation |
+| 2 | `PM-TT1` | **issue #208** | Its body already quotes the copy — *"The brief grades it before the player starts"* — and docs/35 § 8.2 is the verdict on it. **The only one of the fourteen blocked by no product decision at all**, which is worth knowing while Q3's placement is open |
+| 3 | `PM-TT5` | **built —** GitHub issue #226, [§ D482](../DECISIONS.md) | Verified: `packages/viz/src/everyday/host.ts:670` `ghostRace()` and `:694` `raceAgainst(pick)`; `STAGE_NO_GHOST` is gone, quoted in `stageScreenModel.ts:958,1005` as history |
+| 4 | `PM-FB3` | **issue #349** — *`fixit/parse.ts` refuses a repair that patches `floorPopulations`* | Verified unbuilt: `packages/viz/src/fixit/parse.ts:449-455,498` decodes `floorPopulations` into a patch and refuses it nowhere. **Body:** the fixit basis is that both runs meet the same crowd; `fixitRunPlanOf` holds because no shipped repair touches population, which is luck rather than construction. One check in the file that already refuses probability words and engine identifiers, with the reason attached |
+| 5 | `PM5` | **issue #350** — *One shared legs-identity assertion for every paired-run claim* | Verified absent: no helper in `packages/viz/src` asserts two runs agree on `(passengerId, arrivedAt, originFloorId, destinationFloorId)`. **Body:** the fixit pair, the intervention pair and the campaign works-night pair each claim the same crowd and none asserts it. One helper, three call sites. It is the row that makes three separate honesty claims checkable instead of argued, and it is what would catch a future intervention arm that reached demand |
+| 6 | `PM-FB2` | **issue #351** — *A `symptom` names a sight, not a figure* · content half to **issue #233** | Verified: `packages/viz/src/fixit/parse.ts:75` sweeps `entry.symptom` through the copy rules and none of them is this one. The two failing cases are confirmed in `data/fixit-cases.json`: `zoning-starves-the-top` (*"a 341 s mean wait to board"*) and `car-park-nobody-serves` (*"a 322 s worst wait beside an empty hoistway"*). docs/35 § 10 row 6 already says the two `data/` corrections *"belong to a content lane, not this rule"*, and #233 is that lane. **§ D478 adds a second content rule to the same file**: a case running outside its profile's declared band declares it on its own face, which `gym-on-the-top-floor` (9.5 against residential `max: 7`) and `three-cars-one-cars-work` (exactly 7) are the cases for |
+| 7 | `PM-TT4` | **issue #352** — *`INTERVENTION_KINDS` gains a `spread-cars` arm* | Verified unbuilt: `packages/core/src/sim/types.ts:391` still declares three arms. **Not #171**, which is about offering the two *existing* unofferable arms on the Everyday stage rather than adding a fourth kind — cross-reference it, do not fold into it. **Body:** `park-cars-lobby` is the wrong verb for two of the three shipped parking faults; `sleeping-sky-lobby` and `gym-on-the-top-floor` are both cured by parking cars **away from** the lobby. One union member and one branch in `repositionDecisionFor`, on the `park-cars-lobby` precedent. The words already exist one level up — `RULE_ACTION_WORDS` ships `spread-out` |
+| 8 | `PM-CA1`, `PM-CA3` | **issue #353** — *The campaign day opens on the building with today's event visible in it* | Searched: #169 is incidents, offers and complexity; #277 is the four goals on the stage. Neither is this. **Body:** `shift/events.ts` ships five events writing real engine fields, and one of them — a car out of service — is the most legible mark either renderer draws. The day should open on the building with the hole in it and the brief should confirm what the player has already seen; today the order is reversed. The works-**night** half is the other clause: a booking under works is still a purse falling and a calendar cell filling, and nothing on the stage. #181's wiring ([§ D427](../DECISIONS.md)) is the precondition and has landed |
+| 9 | `PM-CA4` | **built —** [§ D427](../DECISIONS.md) | `packages/viz/src/campaign/fitOut.test.ts` sweeps all sixteen tiers against a no-purchase control on the same seed at the campaign's own cell, and `:290` `EMPTY_AT_THE_CONTRACT_CELL` names the three that move no leg there — `cars L1`, `cars L2`, `control L2` — each with the cell where it *does* move. This also discharges § 11 claim 8; see § 13.4 |
+| 10 | `PM-RU2` | **issue #220** (AC2) | And **re-priced**: see § 13.2c. The template layer cannot ramp past the profile's rate, so row 10 depends on [§ D478](../DECISIONS.md) as well as on § 11 item 3, which is now checked |
+| 11 | `PM-RU1`, `PM-RU3` | **issue #220** | docs/35 names it *"GitHub issue #220's whole scope"*. Unblocked for the build by [§ D477](../DECISIONS.md); the placement half stays open |
+| 12 | `PM-PARK` | **built —** in the only form that is honest; residue **out of scope —** | `packages/viz/src/render/carRest.ts` derives *standing still* and both renderers draw it: `render/canvas.ts:1463` and `everyday/stageScreen.ts:386`. It deliberately does **not** add a `FrameCar` field, and its own docstring is the argument: *parked* claims the dispatcher decided and only `core` can check that; *standing still* is an observable. The residue — a mark that says *parked* — is out of scope on that ground, and reviving it would need a `core` change nobody has asked for. **§ 3.2's row and § 9.2's third bullet are stale**; see § 13.5 |
+| 13 | `PM-TT2` | **issue #354** — *A legibility arm on the difficulty sweep* | Verified absent: nothing in `packages/` measures a contiguous third-band window. **Body:** `docs/33` `DC-4` requires a contract's day 1 to miss a goal on a third to two thirds of seeds; a day can miss *worst wait inside 230 s* on one rider at minute 41 and be invisible for the other fifty-nine minutes. Add an arm to `docs/33` § 6's instrument: for each contract's day 1, the fraction of seeds holding a landing with somebody in the third wait band for **120 contiguous simulated seconds**. It is the only way `PM-TT2` stops being an assertion — and under [§ D475](../DECISIONS.md) it is also the shape of #208's per-building eligibility measurement, so the two should be built once |
+| 14 | `PM-DOOR` | **issue #210** (the build) and **issue #208** (AC1, AC2) | Unblocked by [§ D476](../DECISIONS.md) with one playability condition. Sized **Large** |
+
+**Nine of the fourteen are unbuilt and eight of those nine are blocked by nothing.** Rows 2, 10 and
+11 sit on issues that already existed; rows 1, 4, 5, 6, 7, 8 and 13 now sit on issues opened for
+them. **Every one of the fourteen maps to something a person can pick up**, which is what
+*"a specification whose items map to nothing is a plan nobody is executing"* asks for.
+
+**This paragraph originally ended differently and the difference is the point.** It read *"seven
+items map to a title and a body that nobody has opened yet, which is a smaller failure than mapping
+to nothing and is not zero"* — correct when the lane wrote it, and the lane was right to write it
+rather than round it up. Leaving it there would have closed #342 with seven of its own fourteen rows
+routed to nothing, which is this issue's defect committed in the act of closing it. The seven were
+opened instead.
+
+### 13.4 The nine unverified claims — four checked, five open
+
+**The rule this section is held to is [§ D227](../DECISIONS.md)'s.** A claim recorded as open is a
+good outcome. A claim asserted without its check is the failure. Every *checked* row cites
+`file:line`; every *open* row names the check that would settle it and says why this lane did not run
+it.
+
+| # | claim | verdict | evidence, or the check still owed |
+|---|---|---|---|
+| 1 | whether the simulation removes an abandoning rider while the viewer keeps drawing them | **checked — the document's guess is confirmed, and it is a viewer-contract gap rather than an engine one** | `core` **does** remove them: `packages/core/src/metrics/types.ts:270` declares `abandonedAt` on the passenger record, `packages/core/src/metrics/recorder.ts:557` sets it, and `packages/core/src/metrics/summarize.ts:732` ends the wait at `boardedAt ?? abandonedAt ?? refusedAt ?? censoredAtS`. The viewer **cannot see it**: `VizLeg` (`packages/viz/src/contract/types.ts:269`) carries no `abandonedAt`, and `packages/viz/src/frame/overlay.ts:137-152` `isWaitingAt` removes a rider on `boardedAt` and `refusedAt` and on nothing else. Four viz docstrings already say so — `live/observations.ts:119`, `live/bands.ts:443-446`, `shift/observations.ts:40`, `live/types.ts:151`. **What is checked is the mechanism, by reading; what is not is the player-visible instance.** docs/35's own check — run a building with `sim.patience.distribution` set and assert `queueAt` past the horizon holds no leg the report counts as abandoned — was not run here, and it is the one that turns this into a filed defect. **Note before filing: no shipped Everyday path sets `sim.patience`; the Engineer Parameters tab does** (`packages/viz/src/dev/parameterForm.ts:158`), so the defect is reachable rather than latent |
+| 2 | whether the lit window band is legible at Casual row pitches | **open** | *Check:* `docs/28` § 5.1's geometry against `garden-apartments` and `vertical-city`. Not run: it is a judgement about drawn pixels at a row pitch, which this lane cannot settle by reading, and docs/35 § 12 already lists *not one comprehension claim has been tested on a human* as a limitation |
+| 3 | whether `phases` alone expresses a monotone ramp of arbitrary length | **checked — and it splits, which re-prices § 10 row 10** | Monotonicity and length: **yes**, `packages/core/src/traffic/demandTemplate.ts:1586` interpolates linearly over the authored phases with no renormalisation over `durationMin`. Unbounded: **no** — `packages/core/src/config/demandPhases.ts:161-170` bounds both intensities to `[0, 1]`, *"a multiplier on the building's own arrival rate, where 1 is that rate"*, and a template record carries no rate field (`packages/core/src/traffic/generator.ts:757`). The ceiling is the profile's rate, so a climbing stream past it is `config.arrivalRatePctPop5min`, which [§ D478](../DECISIONS.md) now governs. Carried to #220 in § 13.2c |
+| 4 | whether `Simulation` can publish an unambiguous *idle* state into the frame | **checked — and it is already answered in the tree, by a module that cites this document** | The distinguishing fields exist in `core`: `packages/core/src/sim/simulation.ts:2701` `#isIdle(car)` is `!car.isMoving && car.doorState === 'closed'` — *"the only state in which a car takes an instruction"* — which resolves the doors-open ambiguity outright; `Car.committedStops()` (`packages/core/src/model/car/car.ts:1334`) is the third field. **None of the three reaches the viewer**: `frameAt` builds `FrameCar` from `motions`, `doorMarks`, `occupants` and `loadFactor` alone (`packages/viz/src/contract/types.ts:907`). So `PM-PARK`'s *frame field* is a `core`-plus-contract change — **and it is not needed**, because `packages/viz/src/render/carRest.ts` already draws the fact from what the recording holds, and refuses the word *parked* on exactly this ground. **Q5 is answered: `viz` for the observable, `core` only for the intent** |
+| 5 | whether 120 contiguous seconds is the right legibility window | **open, and it is a design choice rather than a fact** | *Check:* § 10 row 13's sweep arm, and a playtest. docs/35 offers the number to be attacked and does not cite it; § 13.3 row 13 routes the instrument |
+| 6 | whether the sixteen sight-shaped `symptom` strings are legible at the sizes the stage draws | **open** | *Check:* `docs/28` `AD-S7` and `AD-S8` landing first, then a playtest. Neither has landed; both are outside this lane |
+| 7 | whether a pressed and an unpressed day preserve the passenger trace | **open on its own terms, and the mechanism is corroborated** | The mechanism reads clean: `packages/core/src/sim/types.ts:391` declares three intervention arms and none writes demand; `packages/core/src/sim/simulation.ts:739` freezes `config.interventions` and applies them at `:1619` as scheduled changes to weights, service events and the idle override, while the passenger trace is built before any of it. **That is an argument, and an argument is what the claim already had.** § 11 item 7 asks for an *assertion*, which is § 10 row 5, and it is still unwritten — so this stays open by design rather than by omission |
+| 8 | whether every campaign shop item would move a leg once #181's wiring lands | **checked — discharged by the tree** | `packages/viz/src/campaign/fitOut.test.ts:290` — `EMPTY_AT_THE_CONTRACT_CELL` — names the three that move no leg at the campaign's own cell, and the file sweeps all sixteen tiers against a no-purchase control on the same seed, naming the cell where each of the three does move. `#181`'s wiring landed as [§ D427](../DECISIONS.md). **§ 11's own text is internally stale here**: § 5.3's `PM-CA4` paragraph already describes this sweep as shipped while § 11 item 8 still lists it unverified |
+| 9 | whether the declared rate band binds player-facing content | **ruled, not measured — [§ D478](../DECISIONS.md)** | docs/35 correctly classified this as *a decision owed rather than a measurement owed*. It binds the `demandLevel` selector and not authored content; `gym-on-the-top-floor` is not out of compliance. The code facts are re-confirmed here: `data/traffic-profiles.json` residential `{ min: 3, max: 7, typical: 5 }`; `gym-on-the-top-floor` runs `garden-apartments` at **9.5** and `three-cars-one-cars-work` at exactly **7**; `packages/core/src/traffic/generator.ts:757` treats the field as an override. **The obligation § D478 attaches is unbuilt** — see § 13.3 row 6 |
+
+### 13.5 What has gone stale in this document since 2026-09-01, and it is four days
+
+Recorded rather than edited into the sections above, because #342 asks for wiring and not a rewrite,
+and because a correction that replaces the original sentence loses the evidence that it moved.
+
+| where | the sentence | what is true now |
+|---|---|---|
+| § 3.2, the *parked car* row; § 9.2's third bullet | *"`grep` for `park`/`idle` across `render/` and both stage screens returns nothing"* | **False against the shipped tree.** `packages/viz/src/render/carRest.ts` was added 2026-08-25 and cites this document by name; `render/canvas.ts:1463` and `everyday/stageScreen.ts:386` both draw the mark. The claim was already stale on the day this document merged |
+| § 7.2 | *"`everyday/fixitScreen.ts:335-343` runs the as-built configuration when the case opens — `session.asBuilt = recordRun(plan.asBuilt, …)`, **synchronously**"* | The recording still exists on the screen, so § 10 row 1's sizing survives. The **code does not**: it is `measureAsBuilt` at `:315`, called at `:533`, and it is **asynchronous** (`runner.start({ … onDone })`). This is § 4.1's own lesson — *cited by name rather than by the line number this sentence carried, which moved the first time the file did* — applied to a sentence three sections later |
+| § 8.3's `PM-DOOR` table, the **#217** row | *"#217 AC2 — Fix a building is the first thing the player actually plays"* | **#217 was closed 2026-08-25**, six days before this document landed, by [§ D373](../DECISIONS.md): Fix a building's position is the main menu, it does **not** become the default entry, and *"AC2 is conditional, the condition is not met"*. A closed issue's untriggered criterion cannot be discharged by anything |
+| § 11 item 8 | listed unverified | § 5.3 of this same document already describes the sweep as shipped. See § 13.4 |
+| § 12's table | five open questions, all *product owner* | Four are ruled — [§ D475](../DECISIONS.md)–[§ D478](../DECISIONS.md), 2026-09-05 — and Q5 is answered in the tree. See § 13.1 |
+
+**And one correction to #342 itself, because a refuted premise is worth more than a discharged one.**
+#342's title says *"no issue references it"* and its body says `search_issues` returns nothing. That
+was true of the sweep that found it. **It was false three minutes before the issue was filed**:
+#208, #210 and #220 each acquired a comment citing this document at 2026-09-04 22:53 UTC, and #342
+was created at 22:56. The issue's *substance* survives intact — those comments raise the questions as
+open, the rulings landed the next day, and nothing routed them — but the headline is the failure mode
+it names, running in the opposite direction. **This document was never invisible to the repository
+either**: it is cited by `docs/28`, `docs/33`, `docs/36`, `docs/37`, `README.md`, `DECISIONS.md` and
+eight sites under `packages/viz/src`. What was invisible was the **backlog**, and only the backlog.
+
+### 13.6 Making a governing document visible to the backlog — the convention, and what nothing checks
+
+#342 asks for *something that makes a governing document visible to the backlog by default*, and says
+plainly that this *"may be a convention rather than a mechanism, and saying so honestly is better
+than a guard that pretends to check it."* Both halves are here, and the boundary between them is
+stated rather than blurred.
+
+**The mechanism, and it is real.**
+`packages/experiments/src/validation/documentRouting.test.ts` couples this document's three registers
+to § 13:
+
+1. every row of § 10's fourteen-change table appears in § 13.3 exactly once, with a disposition drawn
+   from the closed vocabulary `issue #N` / `new issue —` / `out of scope —` / `built —`;
+2. every one of § 11's nine unverified claims appears in § 13.4, marked `checked` or `open`;
+3. every `checked` row cites at least one `path:line` that **exists on disk with at least that many
+   lines** — a citation that rots is caught, which is the failure `citations.test.ts` was written for
+   in the other direction;
+4. every question in § 12's table appears in § 13.1 with a disposition;
+5. each parser asserts it found what it expected, so a reformatted table makes the guard **red**
+   rather than vacuous — `RISKS.md` **R40**.
+
+So a rule added to § 10, a claim added to § 11 or a question added to § 12 **cannot land unrouted**.
+That is the specific hole #342 found, closed for this document.
+
+**What nothing checks, said plainly.**
+
+- **Nothing checks that a GitHub issue exists.** No test in this repository can read the backlog. A
+  § 13.3 row reading `issue #208` is a claim about a number, not about an issue, and if #208 is
+  closed tomorrow this table is stale and green.
+- **Nothing generalises this to the next `docs/3x`.** The guard names this document. A document-shaped
+  guard — *every governing document has a routing section* — was considered and refused: it would
+  require a definition of *governing* that nothing can derive, and a guard whose predicate is a list
+  somebody maintains by hand is a convention wearing a test. `contentPlan.test.ts` earns its place
+  because its subject is a **count**; a routing table's subject is a **judgement**.
+- **Nothing checks that an owner is a person or that a review happened.** § 13.1 names roles and
+  events because that is what is true. A date column would be a fabrication and an owner column with
+  a name in it would be worse.
+
+**The convention, therefore, written where the next author will read it rather than asserted where a
+test could pretend to check it:**
+
+> **A `docs/` document that routes an open question, specifies a code change, or flags an unverified
+> claim owes a routing section, and the routing section is where the backlog meets it.** Cite the
+> issue from the document; the document cannot cite itself into an issue. The check that a decision
+> reached the backlog is a human one, and the cheapest form of it is that the wave which lands the
+> document also posts its comments.
+
+**One observation the guard cannot make and this paragraph can.** `citations.test.ts` checks that
+every reference **points at** something real. Nothing checks that something real **is pointed at**.
+Those are different guards, and the second one is not writable in general — an orphan is only
+detectable against a definition of what should have adopted it. What *is* writable is the narrow
+form above: a document that declares its own registers can be required to route them.
 
 ---
 

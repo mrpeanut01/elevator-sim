@@ -269,9 +269,23 @@ describe('asking for a sign-in link', () => {
     expect(JSON.stringify(limited.body)).not.toMatch(/address budget|per-email|per-ip|this address has/iu);
   });
 
-  it('fails the request when the mail cannot be sent, rather than pretending', async () => {
-    // Since § D241 the mail is the only door. A send that was dropped silently would leave a player
-    // waiting for a message that is never coming, with a 202 on screen saying it is on its way.
+  /**
+   * **The refusal a client can act on** — [`DECISIONS.md` § D491](../../../../DECISIONS.md), GitHub
+   * issue #332.
+   *
+   * This case used to assert `rejects.toThrow()`, and that was the whole defect: the rejection
+   * propagated to `http/serve.ts`, which answers `internal-error` / *"The server failed to handle
+   * that request"* for **every** unhandled fault. So *the mail did not go* was byte-identical on
+   * the wire to a database outage, and a viewer could only ever say *something went wrong*. Since
+   * § D241 the mail is the only door, so that is the one fault a player most needs told apart.
+   *
+   * Two assertions, and the second is the bound the ruling put on this change: the refusal must not
+   * become an account-enumeration oracle. It cannot be one, structurally — by the time the send is
+   * attempted the account exists either way, because asking for a link on an unknown address is
+   * what creates one — and this drives both halves anyway, because *cannot be* is what a test is
+   * for.
+   */
+  it('answers a distinct refusal when the mail cannot be sent, identically for a known and an unknown address', async () => {
     const broken = await bootstrap({
       dataDir: DATA_DIR,
       sql: new PgliteSql(),
@@ -282,16 +296,33 @@ describe('asking for a sign-in link', () => {
         send: () => Promise.reject(new Error('the mail service refused it')),
       },
     });
-    await expect(
+    const ask = (email: string, ip: string): Promise<{ status: number; body: unknown }> =>
       broken.api({
         method: 'POST',
         path: '/api/auth/request-link',
         query: new Map(),
-        body: { email: 'undeliverable@example.test' },
+        body: { email },
         token: undefined,
-        clientIp: '203.0.113.10',
-      }),
-    ).rejects.toThrow();
+        clientIp: ip,
+      });
+
+    const first = await ask('undeliverable@example.test', '203.0.113.10');
+    expect(first.status).toBe(502);
+    expect(first.body).toMatchObject({ error: 'sign-in-mail-not-sent' });
+    // The sentence is the server's own and a client shows it unrewritten, so it has to be one.
+    expect(String((first.body as { detail?: unknown }).detail)).toContain('could not be sent');
+    // Not the generic fault it used to be indistinguishable from.
+    expect(first.body).not.toMatchObject({ error: 'internal-error' });
+
+    /*
+     * The same address again — its account now exists, created by the attempt above — against one
+     * nothing has ever asked about. Different caller IPs, because § D242's per-caller budget is
+     * three and this is the fourth and fifth request from `203.0.113.10` otherwise.
+     */
+    const known = await ask('undeliverable@example.test', '203.0.113.11');
+    const unknown = await ask('never-mailed@example.test', '203.0.113.12');
+    expect(known.status).toBe(unknown.status);
+    expect(JSON.stringify(known.body)).toBe(JSON.stringify(unknown.body));
     await broken.close();
   }, 120_000);
 });

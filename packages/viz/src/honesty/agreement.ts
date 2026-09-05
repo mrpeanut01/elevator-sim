@@ -88,10 +88,12 @@
  */
 
 import type { BrowserResources } from '../dev/data.js';
+import { SIGNED_OUT, signedIn, type AccountState } from '../menu/account.js';
 import { shiftGoalsOf } from '../dev/leftRail.js';
 import { buildingConfigOf, initialState, type ViewerState } from '../dev/state.js';
 import { createEverydayHost, type EverydayHostBindings } from '../everyday/host.js';
 import { railFooter } from '../everyday/rail.js';
+import { settingsScreenViewOf } from '../everyday/settingsView.js';
 import { weekScreenViewOf } from '../everyday/weekView.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
@@ -141,7 +143,26 @@ export interface AgreementView {
    * so a harness that guessed it would be choosing the answer.
    */
   readonly dayClosed: boolean;
+  /**
+   * The session, or `undefined` — `everyday/accountPort.ts#everydayAccount()`, as a fact about this
+   * state.
+   *
+   * On the view rather than a constant inside a side, because both sides must be handed the **same**
+   * account or the pair would be comparing two states and calling the difference a disagreement.
+   * The three arms carry three different ones, which is what makes the `display-name` pair
+   * discriminating rather than a claim about one fixture — see {@link AGREEMENT_ARMS}.
+   */
+  readonly account: AccountState | undefined;
 }
+
+/**
+ * The device-local identity every view carries — [§ D490](../../../../DECISIONS.md)'s other name.
+ *
+ * A real one rather than `undefined`, and that is the whole of what makes the mint arm a test: with
+ * nothing stored both names would fall back to `DEFAULT_EVERYDAY_PROFILE`'s `you` and a side that
+ * had adopted the server's mint would be indistinguishable from one that had not.
+ */
+const DEVICE_IDENTITY = Object.freeze({ name: 'A player', avatarColor: '#4F8A5B' });
 
 /* -------------------------------------------------------------------------- *
  * The register
@@ -266,6 +287,45 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
               sheetStanding: view.dayClosed,
             }).streakLine
           : undefined,
+    },
+  },
+  {
+    id: 'display-name',
+    figure: 'what the player is called — the name § 3.2’s rail card and § 15.1’s field publish',
+    why:
+      '[§ D490](../../../../DECISIONS.md) is this pair, written down before the code. Two names ' +
+      'exist in this build — `everyday/profile.ts#EverydayProfile.name`, device-local and sent ' +
+      'nowhere, and `menu/client.ts#AccountSummary.displayName`, minted `player-<12 hex>` and what ' +
+      'a board row shows — and § 15.1 asserts they are one thing. While nothing on the Everyday ' +
+      'side posted they never met, so the settings screen’s own note about where the name appears ' +
+      'was **unfalsifiable rather than true**, which is § D227’s shape aimed at the one parameter ' +
+      '§ 15.1 makes load-bearing. GitHub issue #332 ends that. The two sides are one click apart in ' +
+      'one rail and both publish this string, and either could read `profile.name` directly and be ' +
+      'internally honest while the product said two things about who the player is — § D359’s exact ' +
+      'signature and the one `properties.ts` cannot see. What the pair catches is not this commit ' +
+      'being wrong: it is a later reader dropping the ask to ' +
+      '`everyday/profile.ts#effectiveNameOf`, which compiles, draws, and is wrong only on the ' +
+      'arms where a session exists. The **mint** arm is why it is not a tautology — a side that ' +
+      'took `displayName` unconditionally publishes `player-…` there while the other publishes the ' +
+      'device-local name, which is precisely the sign-in-costs-you-something defect § D490 refuses.',
+    left: {
+      surfaceId: 'everyday/rail.ts#railFooter',
+      read: (view) =>
+        railFooter(
+          { screen: 'settings', ctx: 'daily' },
+          { profile: DEVICE_IDENTITY, account: view.account },
+        ).identity.name,
+    },
+    right: {
+      surfaceId: 'everyday/settingsView.ts#settingsScreenViewOf',
+      read: (view) =>
+        settingsScreenViewOf({
+          profile: DEVICE_IDENTITY,
+          account: view.account,
+          // The account block's arm does not move this figure; it is named from the state anyway,
+          // because a harness passing a placeholder would be building a screen no player is on.
+          accountServer: view.account !== undefined,
+        }).you.nameValue,
     },
   },
 ]);
@@ -451,6 +511,20 @@ export function withTodayFiled(week: WeekState): WeekState {
  * | `day4` | today filed | `false` | both publish, and both must **withhold** today's figure |
  * | `day4-filed` | today filed | `true` | both publish, and both must **release** it |
  *
+ * **The account moves with the arm too, and it is a second dimension carried without a second axis**
+ * — [§ D490](../../../../DECISIONS.md), GitHub issue #332. The three arms carry signed out, signed
+ * in and still holding the server's mint, and signed in and named, which is every state
+ * `everyday/profile.ts#effectiveNameOf` distinguishes. It rides on the existing arms rather than
+ * multiplying them because a fourth axis would double every **other** pair's readings to reach three
+ * states of one, and the `display-name` pair is in scope on all three where `career-line` is in
+ * scope on two — so nothing is lost by sharing the table and a whole dimension of cost is.
+ *
+ * | arm | account | what the `display-name` pair sees |
+ * |---|---|---|
+ * | `day1` | none | both publish this device's name |
+ * | `day4` | the mint, `displayNameChosen: false` | both must **still** publish this device's name |
+ * | `day4-filed` | named | both publish the account's |
+ *
  * The last two are one week with the axis flipped, which is what makes them a test of the *gate*
  * rather than of the arithmetic: the rail asks `history.some(day => day.day < week.day ||
  * dayClosed)` and Your week counts cards whose `show` is `!isToday || dayClosed`, and those are two
@@ -464,11 +538,40 @@ const AGREEMENT_ARMS: readonly {
   readonly id: string;
   readonly day: number;
   readonly dayClosed: boolean;
+  readonly account: AccountState | undefined;
   week(base: WeekState): WeekState;
 }[] = Object.freeze([
-  { id: 'day1', day: 1, dayClosed: false, week: (base) => base },
-  { id: 'day4', day: 4, dayClosed: false, week: withTodayFiled },
-  { id: 'day4-filed', day: 4, dayClosed: true, week: withTodayFiled },
+  { id: 'day1', day: 1, dayClosed: false, account: undefined, week: (base) => base },
+  /*
+   * The mint. Built through `menu/account.ts#signedIn` rather than as a literal, so the state this
+   * corpus drives is one that module can actually produce — and `displayNameChosen: false` is the
+   * server's own flag rather than this harness recognising `player-…` by its shape, which
+   * `namingStage` refuses by name.
+   */
+  {
+    id: 'day4',
+    day: 4,
+    dayClosed: false,
+    account: signedIn(SIGNED_OUT, 'session-token', {
+      id: 'u1',
+      email: 'someone@example.test',
+      displayName: 'player-a1b2c3d4e5f6',
+      displayNameChosen: false,
+    }),
+    week: withTodayFiled,
+  },
+  {
+    id: 'day4-filed',
+    day: 4,
+    dayClosed: true,
+    account: signedIn(SIGNED_OUT, 'session-token', {
+      id: 'u1',
+      email: 'someone@example.test',
+      displayName: 'Somebody Else',
+      displayNameChosen: true,
+    }),
+    week: withTodayFiled,
+  },
 ]);
 
 /**
@@ -507,13 +610,20 @@ export function agreementViews(
      */
     const week = arm.week({ ...base.week, day: arm.day, dayIdx: arm.day - 1 });
     const state: ViewerState = { ...base, buildingId, week };
-    views.push({ id: `${arm.id}/period`, state, resources, dayClosed: arm.dayClosed });
+    views.push({
+      id: `${arm.id}/period`,
+      state,
+      resources,
+      dayClosed: arm.dayClosed,
+      account: arm.account,
+    });
     if (day === undefined) continue;
     views.push({
       id: `${arm.id}/whole-day`,
       state: { ...state, ...wholeDayRun(day) },
       resources,
       dayClosed: arm.dayClosed,
+      account: arm.account,
     });
   }
   return views;

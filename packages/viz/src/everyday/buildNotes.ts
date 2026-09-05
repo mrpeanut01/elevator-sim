@@ -170,8 +170,18 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * you can read today's board and you cannot put a run on it, because posting needs a signed-in
    * account and this shell has no sign-in surface (issue #332). Narrowed on the commit that
    * narrowed it, on the same rule that takes a closed entry out.
+   *
+   * **Narrowed a second time, and the half that went is the half that named this row's owner** —
+   * GitHub issue #332, [§ D489](../../../../DECISIONS.md). It read *"Posting to it needs an
+   * account, and the only sign-in in this build is on the Engineer surface, so from here the board
+   * is something you read rather than something you enter."* The second clause is false on this
+   * commit: Settings' YOU section signs a player in without the Engineer menu being opened. What
+   * remains is what was always the larger absence and is now the whole of it — **nothing posts**.
+   * So the row keeps its subject and loses its reason, and its triage row moves from #332 to #221,
+   * which is the issue that will build the press. A register that had kept the old sentence would
+   * be telling a signed-in player to go and find a door they are already through.
    */
-  'Putting your run on the daily board — the board reads, and today’s rows are other people’s runs replayed and re-measured before they appeared. Posting to it needs an account, and the only sign-in in this build is on the Engineer surface, so from here the board is something you read rather than something you enter.',
+  'Putting your run on the daily board — the board reads, and today’s rows are other people’s runs replayed and re-measured before they appeared. You can sign in from Settings, and nothing in this build puts a run on the board once you have, so from here it is something you read rather than something you enter.',
   /*
    * **A sixth row left on the merge that registered the rush setup, the drawing board and the
    * tuner — and it left because that merge closed it, which is the one case this register has not
