@@ -168,9 +168,25 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   }
   root.append(topRow);
 
-  /* the warning card — § 13.1's, drawn only when there is something in it */
+  /*
+   * the warning card — § 13.1's, drawn only when there is something in it
+   *
+   * **It carries no inline `display`, and that is the fix rather than a style preference** — GitHub
+   * issue #295's F29. This card is emptied and hidden by `warningCard.hidden = …` below, and an
+   * inline `display:grid` outranks the user agent's `[hidden] { display: none }`, so the card kept
+   * its border, its wash and its padding while claiming to be hidden: an empty amber banner on the
+   * Design a building screen with nothing in it to read.
+   *
+   * The repository already knew this. `dev/surfaces.test.ts` states the same mechanism about the
+   * tab gate note, and `index.html` guards it seventeen times with a paired
+   * `.x[hidden] { display: none; }` rule. Every one of those guards is Engineer-side, and this
+   * directory has no stylesheet to put such a rule in, so the row spacing a single-column grid was
+   * providing is now on the rows themselves and the container is left as an ordinary block. A
+   * hidden block with no inline `display` is hidden. `hiddenBox.test.ts` holds that for every
+   * `.hidden` site in this directory rather than for this one card.
+   */
   const warningCard = el(doc, 'div', 'everyday-designer-warnings');
-  warningCard.style.cssText = `border:1px solid ${C.amberEdge};border-radius:${String(R.tile)}px;background:${C.amberWash};padding:12px 15px;font-size:13px;line-height:1.5;color:${C.inkSoft};display:grid;gap:5px`;
+  warningCard.style.cssText = `border:1px solid ${C.amberEdge};border-radius:${String(R.tile)}px;background:${C.amberWash};padding:12px 15px;font-size:13px;line-height:1.5;color:${C.inkSoft}`;
   root.append(warningCard);
 
   /* --------------------------------------------------------------- panels */
@@ -614,11 +630,13 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     const warnings = designerWarnings(spec, machineClass, analysis);
     warningCard.replaceChildren();
     warningCard.hidden = warnings.length === 0;
-    for (const warning of warnings) {
+    warnings.forEach((warning, index) => {
       const line = el(doc, 'div', `everyday-designer-warning-${warning.severity}`, warning.text);
-      line.style.cssText = `color:${warning.severity === 'class' ? C.alarm : C.inkSoft}`;
+      /* The 5 px the container's `gap` used to open, moved onto the rows — see the card's own note. */
+      const gap = index === 0 ? '' : ';margin-top:5px';
+      line.style.cssText = `color:${warning.severity === 'class' ? C.alarm : C.inkSoft}${gap}`;
       warningCard.append(line);
-    }
+    });
 
     drawBuildingPanel();
     drawMachinePanel(machineClass);

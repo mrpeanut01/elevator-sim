@@ -3,6 +3,10 @@
  * the button says why*), § 14's row states, and § 20.11's reference-run label.
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,6 +18,7 @@ import {
   savedRatingOf,
   sendGateOf,
   whatAreTheFortyOf,
+  DROPPED_WITHOUT_REASON,
   LADDER_CAVEAT,
   LADDER_WORLD_ABSENCE,
   REFERENCE_RUN_LABEL,
@@ -342,5 +347,104 @@ describe('a saved rating is refused when this build cannot vouch for it', () => 
     expect(savedRatingIssue({ ...good, cases: 'forty' })).toContain('no list of cases');
     expect(savedRatingIssue({ ...good, isReference: 'yes' })).toContain('reference run');
     expect(savedRatingIssue('a rating')).toContain('not an object');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The reason a case scored nothing reaches a surface — GitHub issue #295's F26
+ * -------------------------------------------------------------------------- */
+
+/**
+ * `39 of 40` used to be the whole of what the ladder said about a case it could not score.
+ *
+ * `rating.ts#proofCaseScoreOf` writes a sentence for every such case and puts it on
+ * `RatedCase.noScoreReason`. Before this, **every reference to that field outside `rating.ts` was a
+ * test** — so the product computed the answer, stored it, validated it in both directions, and
+ * rendered it nowhere. That is this repository's standing requirement with no caller to name, and
+ * the last case below is the mechanical form of it: it reads the tree rather than trusting that
+ * the wiring below stays wired.
+ */
+describe('a case that scored nothing says which one and why — issue #295 F26', () => {
+  const context = { fingerprintOf: () => 'waitTime=1', caseNameOf: (id: string) => `⟨${id}⟩` };
+
+  it('names the dropped case and carries the run’s own words for it', () => {
+    const [row] = ladderRowsOf([liveEntry()], context);
+    expect(row).toBeDefined();
+    if (row === undefined) return;
+    /* The denominator that used to be the whole story is still there, and now says which one. */
+    expect(row.proofCases).toBe('3 of 4');
+    expect(row.dropped).toHaveLength(1);
+    expect(row.dropped[0]?.caseName).toBe('⟨tower-a/case-2⟩');
+    expect(row.dropped[0]?.reason).toBe('nobody was carried in this case');
+  });
+
+  it('is empty on a complete rating, so a whole rating says nothing about dropped cases', () => {
+    const complete: LadderEntry = {
+      ...liveEntry(),
+      summary: ratingOf([rated(0, 91), rated(1, 74), rated(2, 66), rated(3, 88)], 4),
+    };
+    const [row] = ladderRowsOf([complete], context);
+    expect(row?.dropped).toEqual([]);
+    expect(row?.incompleteNote).toBeNull();
+  });
+
+  it('says something rather than nothing when the two nulls disagree', () => {
+    /*
+     * `ratedCaseIssue` refuses this pair on the way out of storage and `proofCaseScoreOf` cannot
+     * build one, so this is the branch nothing should reach. It is asserted because the defect being
+     * closed is a case leaving a denominator without a word, and a silent `continue` here would be
+     * that same defect one level down.
+     */
+    const mute: RatedCase = { ...rated(2, null), noScoreReason: null };
+    const entry: LadderEntry = { ...liveEntry(), summary: ratingOf([rated(0, 91), mute], 2) };
+    const [row] = ladderRowsOf([entry], context);
+    expect(row?.dropped).toHaveLength(1);
+    expect(row?.dropped[0]?.reason).toBe(DROPPED_WITHOUT_REASON);
+  });
+
+  it('has a non-test caller for `noScoreReason`, which is the whole finding', () => {
+    /*
+     * Derived from the tree rather than pinned to `boardScreen.ts`, because the claim is *some
+     * shipped path reads this field*, not *this particular file does*. A reader who moves the
+     * rendering somewhere else should keep this passing; a reader who deletes it should not.
+     */
+    const src = fileURLToPath(new URL('..', import.meta.url));
+    const shipped: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const at = join(dir, entry.name);
+        if (entry.isDirectory()) walk(at);
+        else if (
+          entry.name.endsWith('.ts') &&
+          !entry.name.includes('.test.') &&
+          !entry.name.includes('.test-helper.') &&
+          at !== fileURLToPath(new URL('./rating.ts', import.meta.url))
+        ) {
+          if (readFileSync(at, 'utf8').includes('noScoreReason')) shipped.push(at);
+        }
+      }
+    };
+    walk(src);
+    expect(
+      shipped,
+      '`RatedCase.noScoreReason` is computed for every unscored case and read by nothing outside ' +
+        'its own module and its tests. Render it, or delete it — see issue #295 F26.',
+    ).not.toEqual([]);
+  });
+
+  it('is drawn by the screen that draws the score', () => {
+    /*
+     * There is no jsdom in this repository, so the drawing half is asserted at the source in the
+     * idiom `dev/reportPanel.test.ts` uses for the same reason. Three things, because any one of
+     * them alone would pass while the row stayed blank: the field is read, the heading is the
+     * screen's own copy constant rather than a literal, and the case is named beside its reason.
+     */
+    const board = readFileSync(
+      fileURLToPath(new URL('../everyday/boardScreen.ts', import.meta.url)),
+      'utf8',
+    );
+    expect(board).toContain('row.dropped');
+    expect(board).toContain('BOARD_SCREEN_COPY.droppedHeading');
+    expect(board).toContain('${dropped.caseName}: ${dropped.reason}');
   });
 });

@@ -31393,6 +31393,88 @@ member that reads `pending` when absent, which is a gate the original four do no
 five grade on that saturated day is a measurement, and this lane did not take it. A plausible sentence
 in place of one is what [§ D256](#d256) refuses.
 
+## D472 — a shared inflection helper, and a guard `everyday/` did not have
+
+**Date: 2026-09-04 · Owner: wave Q lane D · Rules on: GitHub issue #295 rows F37 and F29, under
+[§ D405](#d405).**
+
+Two decisions in one entry because this lane holds one number, and both reach past the module that
+took them. The lane's third row, F26, is deliberately **not** here: `LadderRowView.dropped` binds
+`gauntlet/ladder.ts`, which owns the view model, and `everyday/boardScreen.ts`, which is its one
+reader, so under § D405 the docstrings on those two are the record and no number is owed.
+
+### `mode/disclosure.ts#plural` is exported, and a recorded sentence moves with it
+
+`(n, one, many) => string` shipped **three** times as a module-private lambda, in
+`render/runSummary.ts`, `menu/catalogue.ts` and `mode/disclosure.ts`, plus two `'' : 's'` ternaries
+in `dev/` and an inline one in `batch/report.ts#runs`. `shift/report.ts` closed GitHub issue #134
+against the same defect and wrote down why it did not import one: doing so would add a
+`shift/` → `mode/` edge to spend two words.
+
+That reasoning is sound and it is left standing. What it did not say is that a helper nobody can
+import is a helper nobody reaches for, and the consequence is measured rather than argued:
+`campaign/judge.ts` shipped `all 1 goals reached` on the campaign's opening verdict, because
+`data/campaign.json`'s first stage declares exactly one goal. So the lambda is exported, and the
+three sites this lane fixed import it rather than copying it: `campaign/`, `batch/` and `dev/` all
+already depend on `mode/`, so no directory edge is created anywhere.
+
+**The sentence in `shift/report.ts` is corrected on this commit rather than left to rot.** It said
+`plural` *"is module-private"*; it is not any more. The edge argument it makes is untouched and that
+file still writes its own form. This is the stale-refusal class § D227 records, created by this
+change and closed in the same breath.
+
+**What is deliberately not done.** The two remaining private copies in `render/` and `menu/` are
+left alone. Converging them is a change in files this lane does not own, it fixes no string a player
+reads, and quietly rewriting another lane's helper is how a guard's meaning erodes without its
+assertions changing.
+
+### `everyday/` gets a guard that binds every screen in it
+
+`el.hidden = true` is honoured by a **user agent** rule, so any author `display` outranks it and the
+element keeps its box while claiming to be hidden. `packages/viz/index.html` guards that seventeen
+times with a paired `.x[hidden] { display: none; }` rule, `dev/surfaces.test.ts` states the mechanism
+in prose, and **every one of those guards is Engineer-side**: that file contains no `everyday-`
+string. This directory builds its DOM in TypeScript with inline `style.cssText`, so none of the
+seventeen reach it, and one of its six `.hidden` sites was tripping — the Design a building screen's
+advisory banner, drawn empty with a border and an amber wash.
+
+`everyday/hiddenBox.test.ts` reads the site list off the directory rather than naming the six, so a
+seventh screen is covered the day it lands. That is what makes it an entry: it binds every file in
+`everyday/`, including files this lane does not own, and a lane that adds a hideable element with an
+inline `display` will be failed by a test it did not write.
+
+Three limits are in the file rather than implied, because a guard whose blind spots are unstated is
+worse than none. There is no jsdom in this repository, so it reads source and never layout. It
+follows one level of `const` indirection and **fails** on a style it cannot read through rather than
+skipping it. And it cannot see a class rule, which this directory has none of today; if `everyday/`
+ever grows a stylesheet, this guard needs a second half.
+
+`display:none` is not flagged. It hides the element the same way the attribute does, and a guard
+that refused it would force a workaround to satisfy a rule about a defect that is not present.
+
+### Two sweep results, one of them a null
+
+F37's brief asked whether any other uninflected count is reachable on a player-facing surface. A
+scan of every non-test module under `packages/viz/src` for a numeral interpolated in front of a
+plural word returns **253** candidate sites, the great majority of which are counts that cannot be
+one (`replications` is floored at 50 by `campaign/parse.ts`, the proof set is forty, `BATCH_METRICS`
+is a constant list) or are already inflected (`campaignModel.ts:552`, `rail.ts:366`,
+`designerScreen.ts:462` all carry an explicit singular branch).
+
+Two more were reachable and are fixed here: `batch/report.ts#summarise`'s `1 are energy axes`, which
+is the second string issue #295 quotes for F37 and lives in a different module from the first, and
+`dev/campaignPanel.ts`'s mirror of the same goal tally on the same stage. The rest of the residue is
+reported to the wave rather than fixed, because fixing it means editing files five other lanes are
+holding.
+
+**The residue's shape is the finding, and it is one word.** `everyday/campaignModel.ts` inflects
+`night`/`nights` explicitly at three sites and leaves the same word bare at two others in the same
+file, with `everyday/campaignScreens.ts` leaving it bare at a third. It also carries an explicit
+singular for `miss` and for `month`. So this is not a directory that never learned the rule; it is
+the rule applied by hand, one site at a time, by whoever happened to be thinking about it. That is
+exactly the shape a shared helper exists to replace, and it is why F37's fix is the export rather
+than a seventh repair.
+
 ## D473 — the accessibility standard is adopted; the conformance target is not
 
 **Date: 2026-09-04 · Owner: wave Q lane E · Rules on: GitHub issue #204, and binds

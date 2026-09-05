@@ -38,6 +38,7 @@
  * two controls are now made over all thirteen verdicts instead of over one.
  */
 
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -46,6 +47,7 @@ import { collectSearchSpace } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { restrictedFloorIds } from '../access/zoning.js';
+import { plural } from '../mode/disclosure.js';
 import { batchReport } from '../batch/report.js';
 import type { BatchResult } from '../batch/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
@@ -197,6 +199,96 @@ describe('the headline is a tally of verdicts, not a goal claim', () => {
     }
     // R13's half of the same string: the count the tally is over is always in it.
     expect(uncleared.headline).toContain(`over ${String(uncleared.replications)} runs`);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Every numeral in the headline is inflected — GitHub issue #295's F37
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The singular, which is the case that shipped wrong and the case a player meets first.
+ *
+ * `data/campaign.json`'s first stage carries exactly **one** goal, so `all 1 goals reached` and
+ * `1 of 1 goals reached` were not corners; they were the campaign's opening verdict. The cases
+ * below are driven over the **shipped** campaign and derive which stages are singular rather than
+ * naming stage 1, so a stage that gains or loses a goal moves the coverage with it.
+ *
+ * The class is issue #134's, closed once in `shift/report.ts` and never generalised, so the guard
+ * is written as a sweep over every shipped stage rather than as an assertion about one of them.
+ */
+describe('the headline inflects every count it prints — issue #295 F37, issue #134’s class', () => {
+  it('says `1 goal` and never `1 goals` on a stage that declares one', () => {
+    const singular = campaign.stages.filter((stage) => stage.goals.length === 1);
+    /*
+     * Non-vacuity, and it is the assertion that keeps this case honest: if the shipped campaign
+     * ever stops carrying a one-goal stage this fails loudly rather than passing over nothing.
+     */
+    expect(singular.length, 'no shipped stage declares exactly one goal').toBeGreaterThan(0);
+
+    for (const stage of singular) {
+      const result = emptyResult(stage);
+      const verdict = judgeStage({
+        stage,
+        published: publishedFor(stage),
+        result,
+        report: batchReport(result),
+      });
+      expect(verdict.headline, stage.id).toContain('0 of 1 goal reached');
+      expect(verdict.headline, stage.id).not.toContain('1 goals');
+    }
+  });
+
+  it('prints no `1 <plural>` anywhere in any shipped stage’s headline', () => {
+    /*
+     * Derived from `data/campaign.json` rather than from a list here, so a stage authored tomorrow
+     * with one goal is covered the day it lands. The pattern is deliberately the whole shape of the
+     * defect — a bare `1` followed by a word ending in `s` — rather than the two nouns this
+     * headline happens to use today.
+     */
+    expect(campaign.stages.length).toBeGreaterThan(0);
+    for (const stage of campaign.stages) {
+      const result = emptyResult(stage);
+      const verdict = judgeStage({
+        stage,
+        published: publishedFor(stage),
+        result,
+        report: batchReport(result),
+      });
+      const uninflected = /\b1 [a-z]+s\b/u.exec(verdict.headline);
+      expect(uninflected?.[0], `${stage.id}: "${verdict.headline}"`).toBeUndefined();
+    }
+  });
+
+  it('reaches for the shipped helper rather than a seventh private copy', () => {
+    /*
+     * The point of F37 is not the string; it is that a helper existed and nobody imported it. So
+     * the import is asserted, and the two forms are asserted through the helper itself — a local
+     * ternary would satisfy every case above and leave the eighth site to be written by hand.
+     */
+    expect(plural(1, 'goal', 'goals')).toBe('goal');
+    expect(plural(0, 'goal', 'goals')).toBe('goals');
+    expect(plural(2, 'goal', 'goals')).toBe('goals');
+    const source = readFileSync(new URL('./judge.ts', import.meta.url), 'utf8');
+    expect(source).toContain("from '../mode/disclosure.js'");
+  });
+
+  it('inflects the Engineer panel’s mirror of the same tally', () => {
+    /*
+     * `dev/campaignPanel.ts` prints the same goal count on the Engineer side, off the same
+     * `verdict.goals`, so it reads `1 goals` on the same stage 1 for the same reason. It is
+     * DOM-bound, there is no jsdom here, and it has no test file of its own — so this is a source
+     * assertion, which is weaker than driving it and is the strongest thing available. It is here
+     * rather than in a new file because the class is this describe block's subject, and a guard
+     * filed away from the finding is a guard nobody reads.
+     */
+    const panel = readFileSync(
+      new URL('../dev/campaignPanel.ts', import.meta.url),
+      'utf8',
+    );
+    expect(panel).toContain("plural, rowClassesOf } from '../mode/disclosure.js'");
+    expect(panel).toContain("plural(verdict.goals.length, 'goal', 'goals')");
+    expect(panel).not.toContain('${String(verdict.goals.length)} goals');
   });
 });
 

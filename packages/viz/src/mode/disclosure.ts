@@ -245,7 +245,23 @@ export function rowClassesOf(
  * Building the items
  * -------------------------------------------------------------------------- */
 
-const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
+/**
+ * `n === 1 ? one : many`, exported so the next surface that needs it reaches for this rather than
+ * writing a seventh copy.
+ *
+ * **Exported because a private copy is what produced GitHub issue #295's F37.** Three modules held
+ * this exact lambda privately (`render/runSummary.ts`, `menu/catalogue.ts`, and this one) and
+ * `shift/report.ts` records, in prose, that it appended the letter by hand rather than import one,
+ * because importing this one would have added a `shift/` → `mode/` edge for two words. That reasoning is sound for `shift/`; what it did not say is that a helper nobody can
+ * import is a helper nobody reaches for, and `campaign/judge.ts` then shipped `all 1 goals reached`
+ * to a player on the campaign's own first stage. So this is the export that closes it for every
+ * directory that already depends on `mode/`.
+ *
+ * **Both forms rather than an appended `s`.** The plurals this product needs include `person` /
+ * `people`, so a helper that only knew how to add a letter would be wrong on the first word a
+ * reader meets.
+ */
+export const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
 function rendering(
   value: string,
