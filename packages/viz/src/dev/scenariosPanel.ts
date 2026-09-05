@@ -1,7 +1,7 @@
 /**
  * The Scenarios surface — `docs/12-design-handoff.md` § 1.3 **M7**.
  *
- * ## Five cards, and not one authored number on them
+ * ## A card per contract, and not one authored number on them
  *
  * The handoff draws five scenario cards over a re-authored `PRESETS` table: each entry restates its
  * building's floors, cars, rated speed and population inline, with rounded heights and populations,
@@ -20,10 +20,11 @@
  * moves with it.
  *
  * What **is** taken from the handoff, because it is the deliverable, is the prose (which lives on
- * {@link ScenarioContract} and is byte-for-byte the design's) and the art swatch — the five CSS
- * gradients from `design.html`'s `PRESETS[*].art`, which are decoration and carry no claim.
+ * {@link ScenarioContract} and is byte-for-byte the design's) and the art swatch — the CSS
+ * gradients from `design.html`'s `PRESETS[*].art`, which are decoration and carry no claim. The
+ * design drew five; three buildings have shipped since and carry a swatch authored here.
  *
- * ## All five are open, and there is no state in which they are not
+ * ## Every card is open, and there is no state in which it is not
  *
  * `contractStatus` has three answers and none of them is `locked`; the design's own unlock ladder is
  * disabled at its head with the comment *"scenarios teach, they do not gate"*, and § 1.5 B4 restates
@@ -59,7 +60,7 @@ import { shiftLengthForContract } from './state.js';
  * Keyed on an id, which `dev/dom.ts` forbids its *helpers* from doing — and this is not one of
  * those. The rule there is that no shared component may key on a metric or a goal kind, because a
  * metric list in the UI is a list that goes stale. This is per-building decoration authored by the
- * design for these five buildings, it makes no claim about any of them, and a building the design
+ * design, it makes no claim about any of them, and a building the design
  * never drew — one the reader built — falls through to {@link FALLBACK_ART} rather than to nothing.
  *
  * ## Tokens, not literals — § D251, and `docs/21` § 2.2 (3)
@@ -147,7 +148,7 @@ export interface ScenarioCardView {
   /**
    * `false` when the contract's `buildingId` resolves to nothing loaded.
    *
-   * `contracts.test.ts` asserts all five resolve against `data/buildings/`, so this is unreachable
+   * `contracts.test.ts` asserts every one resolves against `data/buildings/`, so this is unreachable
    * from the shipped set — but a reader who has deleted a building file, or a stale id in restored
    * state, must get a card that says so rather than a card that invents a spec for it. An
    * unresolved card is drawn and refuses the click; it is not silently dropped.
@@ -188,7 +189,7 @@ function objectiveOf(
 }
 
 /**
- * The five cards, in the handoff's order.
+ * One card per contract, in the handoff's order.
  *
  * `buildings` is whatever the page has loaded — `BrowserResources.buildings`, or a
  * `LoadedConfig`'s. Looked up by id rather than by index, so the curriculum's order (zoning before
@@ -253,7 +254,7 @@ function statusWord(status: ContractStatus): string {
  * The mount
  * -------------------------------------------------------------------------- */
 
-/** The dashed sixth card's copy, verbatim from `design.html` :787–794. */
+/** The trailing dashed card's copy, verbatim from `design.html` :787–794, where it was sixth. */
 const OWN_CARD = Object.freeze({
   eyebrow: 'YOUR OWN',
   title: 'Build your own scenario',
@@ -264,7 +265,7 @@ const OWN_CARD = Object.freeze({
 });
 
 /**
- * Mount the five cards and the dashed sixth.
+ * Mount a card per contract, and the trailing dashed one.
  *
  * `list` is `Elements.scenarioList` — the one element this surface owns.
  */

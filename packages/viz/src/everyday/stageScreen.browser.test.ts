@@ -117,9 +117,15 @@ afterAll(async () => {
  * `docs/28-art-direction.md` § 5.2 names as the one where the door has to be checked. Every case
  * that does not care takes the default, which is what they all took before it was a parameter.
  */
-async function coldLoad(buildingId = 'garden-apartments'): Promise<Page> {
+async function coldLoad(buildingId = 'garden-apartments', dispatcherId?: string): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
-  await page.goto(`${origin}?building=${buildingId}&seed=424242`, { waitUntil: 'load' });
+  /*
+   * The dispatcher is a parameter for the ghost case below and for nothing else, and it is a
+   * parameter rather than a constant because *which* dispatcher drives decides whether the race
+   * that case runs is a race at all — see `RACE` for the measurement that made it necessary.
+   */
+  const driver = dispatcherId === undefined ? '' : `&dispatcher=${dispatcherId}`;
+  await page.goto(`${origin}?building=${buildingId}&seed=424242${driver}`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
     undefined,
@@ -977,6 +983,394 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     expect(await page.textContent('.everyday-bar-primary')).toBe(`Back to ${building ?? ''}`);
     await page.close();
   }, 240_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * § 7.4's race — GitHub issue #226, § D482
+ * -------------------------------------------------------------------------- */
+
+/** One reading of the race, taken off the product's own façade and its own drawn lanes. */
+interface RaceFacts {
+  readonly pick: string;
+  readonly pending: boolean;
+  readonly refusal: string | null;
+  /** The dispatcher each recording says served it — the attribution, from the record. */
+  readonly mineId: string | null;
+  /** The **player's** run id, so a rival can be told from a re-run — see the case's own note. */
+  readonly mineRunId: string | null;
+  /** `runState().open` — the player's own, chosen, unclosed day is the one on the stage. */
+  readonly runOpen: boolean;
+  readonly rivalId: string | null;
+  /** Whether every arrival matches, leg for leg: who, when, from where, to where. */
+  readonly crowdMatches: boolean | null;
+  /** Whether the *service* of that crowd differs: boarded, alighted, in which car. */
+  readonly serviceDiffers: boolean | null;
+  /** The two lanes' `points`, as drawn. `''` is a line that is not there. */
+  readonly youPoints: readonly string[];
+  readonly ghostPoints: readonly string[];
+  readonly keyText: string;
+  readonly noteText: string;
+  readonly footerText: string;
+}
+
+/**
+ * Read the race off the page — the façade's own `ghostRace()`, and the polylines it produced.
+ *
+ * The fingerprints are computed **in the page** rather than shipped out, because a `VizRecording`
+ * is megabytes and two of them would cross the CDP boundary on every poll. What crosses is two
+ * booleans, and the strings they were computed from never leave the browser.
+ *
+ * `hostFacts`' idiom, including its `try`: a reading taken while the dev server reloads the page is
+ * a **missing** reading rather than a false one, and the caller polls again.
+ */
+async function raceFacts(page: Page): Promise<RaceFacts | null> {
+  try {
+    await page.evaluate(
+      "window.__everydayHost ? true : import('/src/everyday/host.ts').then((module) => { window.__everydayHost = module.EVERYDAY_HOST; return true; })",
+    );
+    return await page.evaluate(() => {
+      interface Leg {
+        readonly passengerId: string;
+        readonly arrivedAt: number;
+        readonly originFloorId: string;
+        readonly destinationFloorId: string;
+        readonly boardedAt?: number | undefined;
+        readonly alightedAt?: number | undefined;
+        readonly carId?: string | undefined;
+      }
+      interface Rec {
+        readonly runId: string;
+        readonly dispatcherProfileId: string;
+        readonly legs: readonly Leg[];
+      }
+      const host = (
+        window as unknown as {
+          __everydayHost?: {
+            current():
+              | {
+                  runState(): { readonly open: boolean };
+                  recording(): Rec | undefined;
+                  ghostRace(): {
+                    pick: string;
+                    rival: Rec | undefined;
+                    refusal: string | undefined;
+                    pending: boolean;
+                  };
+                }
+              | undefined;
+          };
+        }
+      ).__everydayHost?.current();
+      if (host === undefined) return null;
+      const race = host.ghostRace();
+      const mine = host.recording();
+      const rival = race.rival;
+      /* The crowd: who arrived, when, and where they were going. Equal ⇒ common random numbers. */
+      const crowd = (rec: Rec): string =>
+        rec.legs
+          .map(
+            (leg) =>
+              `${leg.passengerId}|${String(leg.arrivedAt)}|${leg.originFloorId}|${leg.destinationFloorId}`,
+          )
+          .join(';');
+      /* The service of it: what the dispatcher did. Different ⇒ the race is a real comparison. */
+      const service = (rec: Rec): string =>
+        rec.legs
+          .map(
+            (leg) =>
+              `${leg.passengerId}|${String(leg.boardedAt ?? -1)}|${String(leg.alightedAt ?? -1)}|${leg.carId ?? ''}`,
+          )
+          .join(';');
+      const points = (selector: string): readonly string[] =>
+        [...document.querySelectorAll(selector)].map((node) => node.getAttribute('points') ?? '');
+      return {
+        pick: race.pick,
+        pending: race.pending,
+        refusal: race.refusal ?? null,
+        mineId: mine?.dispatcherProfileId ?? null,
+        mineRunId: mine?.runId ?? null,
+        runOpen: host.runState().open,
+        rivalId: rival?.dispatcherProfileId ?? null,
+        crowdMatches:
+          mine === undefined || rival === undefined ? null : crowd(mine) === crowd(rival),
+        serviceDiffers:
+          mine === undefined || rival === undefined ? null : service(mine) !== service(rival),
+        youPoints: points('.everyday-stage-lane-you'),
+        ghostPoints: points('.everyday-stage-lane-ghost'),
+        keyText: document.querySelector('.everyday-stage-race-key')?.textContent ?? '',
+        noteText: document.querySelector('.everyday-stage-race-note')?.textContent ?? '',
+        footerText: document.querySelector('.everyday-stage-race-footer')?.textContent ?? '',
+      };
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** {@link untilHost}'s shape for the race: poll, and hand back the last reading either way. */
+async function untilRace(
+  page: Page,
+  wanted: (facts: RaceFacts) => boolean,
+  timeoutMs: number,
+): Promise<{ readonly held: boolean; readonly last: RaceFacts | null }> {
+  const deadline = Date.now() + timeoutMs;
+  let last: RaceFacts | null = null;
+  for (;;) {
+    last = await raceFacts(page);
+    if (last !== null && wanted(last)) return { held: true, last };
+    if (Date.now() >= deadline) return { held: false, last };
+    await new Promise((resolve) => {
+      setTimeout(resolve, 500);
+    });
+  }
+}
+
+/**
+ * **The moved-control case for the ghost picker, and it is the case that decides GitHub issue
+ * #226** — [§ D482](../../../../DECISIONS.md).
+ *
+ * ## Why it is here and not in a node tier
+ *
+ * `CLAUDE.md`'s standing requirement is *move the control and require the run to change, compared on
+ * the legs rather than on a window statistic*, and the eleven dead seams it was written from all
+ * passed every isolated check they had. `dev/ghostRun.ts#ghostPlanOf` is unit-tested on the legs
+ * already and has been since slice 4d — it was never the part that was missing. What was missing was
+ * the **wire**: the shell's façade exposed no second recording, so a picker on this screen could
+ * have been drawn, styled, wired to a listener and bound to nothing, and every node test in this
+ * repository would have stayed green. So the control is pressed on the shipped page, through the
+ * player's own `<select>`, and what is asserted is the recording that came back.
+ *
+ * ## The comparison, in the two halves the issue actually turns on
+ *
+ * - **The same crowd** — `crowdMatches`. Asserted on the *legs* and not on the seed: every arrival
+ *   in the rival's day is the same passenger, at the same second, from the same floor, to the same
+ *   floor. Two runs can share a seed and meet different crowds if anything upstream of the demand
+ *   stream differs, so a seed comparison would be assuming exactly what CLAUDE.md's common-random-
+ *   numbers rule wants proved.
+ * - **A different service of it** — `serviceDiffers`. Who boarded when, in which car, and when they
+ *   got out. This is the half an inert control cannot fake: with no rival there is nothing to
+ *   compare, and with a rival that is secretly your own configuration the strings are equal.
+ *
+ * ## Why the day is driven by `eta` rather than by the default
+ *
+ * Measured, not assumed: a fresh shift opens on `collective` and *the plain baseline* **is**
+ * `collective`, so at the defaults the rival's recording comes back byte-identical to the primary's
+ * — one day drawn twice. That is a real state and the product now says so in words
+ * (`live/raceStrip.ts#SAME_RUN_NOTE`), and it is useless for this case, because identical lines are
+ * exactly what an inert control also produces. So the primary is deep-linked onto a different
+ * dispatcher, which makes the two runs genuinely different and makes the assertion mean something.
+ *
+ * The `none` leg at the end is the other half of § D177's rule: moving the control **back** must take
+ * the second line off the lanes, or the strip is drawing a rival nobody asked for.
+ */
+describe.skipIf(!HAS_BROWSER)('the § 7.4 race — issue #226', () => {
+  it('races a second dispatcher over the same crowd, and the legs say it is a real comparison', async () => {
+    const page = await coldLoad('midtown-office', 'eta');
+    await enterEverydayStage(page);
+
+    /*
+     * **Wait for the player's *own* day before touching anything, and this is not tidiness.**
+     *
+     * `enterEverydayStage` returns when a canvas has a box and a clock reads — which boot's demo run
+     * satisfies (§ D232: a full demo shift runs before anybody chooses anything). The player's own
+     * run is started on the way in and lands later. Pressing the picker in that window produces a
+     * rival, honestly, but of a **different primary**: `setGhostPick` declines to schedule while a
+     * primary is in flight, and `runShift`'s own delivery callback then races the pick when the new
+     * run arrives. The rival is real and the press did not cause it, which is precisely the
+     * distinction the `mineRunId` assertion below exists to draw — so the wait has to happen first
+     * or that assertion is a coin toss. `runState().open` is the product's own answer to *is the
+     * player's chosen, unclosed day the one on this stage*.
+     */
+    const settled = await untilRace(page, (facts) => facts.runOpen, 120_000);
+    expect(settled.held, `the player’s own day never opened: ${JSON.stringify(settled.last)}`).toBe(
+      true,
+    );
+
+    /* The picker opens on *nobody*, which is the free pick: no second request is ever issued. */
+    expect(await page.inputValue('.everyday-stage-ghost')).toBe('none');
+    const before = await raceFacts(page);
+    expect(before?.pick).toBe('none');
+    expect(before?.rivalId).toBeNull();
+    /* No rival, no line. A strip that drew one here would be inventing one. */
+    expect(before?.ghostPoints.every((points) => points === '')).toBe(true);
+    expect(before?.youPoints.some((points) => points !== '')).toBe(true);
+    /* §7.4's footer is permanent and is already up before any race — it is not a result banner. */
+    expect(before?.footerText).toBe('One day each on the same crowd. That is a race, not proof.');
+
+    /* The press: the player's own control, and nothing else. */
+    await page.selectOption('.everyday-stage-ghost', 'plain-baseline');
+    const raced = await untilRace(page, (facts) => facts.rivalId !== null, 180_000);
+    expect(
+      raced.held,
+      `no rival recording reached the shell: ${JSON.stringify(raced.last)}`,
+    ).toBe(true);
+    const after = raced.last;
+    if (after === null) throw new Error('unreachable: held implies a reading');
+
+    /* Correctly attributed, from each record rather than from the control that asked for it. */
+    expect(after.mineId).toBe('eta');
+    expect(after.rivalId).toBe('collective');
+    expect(after.refusal).toBeNull();
+
+    /*
+     * **The rival came from the press, and not from a run that happened to land afterwards.**
+     *
+     * This clause was added because the inert-control rehearsal below found the hole. Replacing the
+     * binding's body with a bare `ghostPick = pick` — the dead-seam shape, typed and called and
+     * commissioning nothing — still produced a rival here, because `runShift`'s own delivery callback
+     * races whatever `ghostPick` says when the **primary** lands, and on this walk a primary can land
+     * after the press. The first half of the case went green over a port that did nothing.
+     *
+     * So the player's own run is pinned by id across the press. Same run before and after ⇒ nothing
+     * re-ran, and the only thing that changed was the control.
+     */
+    expect(
+      after.mineRunId,
+      'the player’s own day was re-run across the press, so this rival is not attributable to it',
+    ).toBe(before?.mineRunId);
+
+    /* Common random numbers, proved on the legs: the same people, at the same seconds. */
+    expect(after.crowdMatches, 'the rival met a different crowd — this is not a race').toBe(true);
+    /* …and the dispatchers did different things with them, which is the run having changed. */
+    expect(after.serviceDiffers, 'the rival served the crowd identically — the control is inert').toBe(
+      true,
+    );
+
+    /*
+     * **Then the drawn state, waited for separately — and the separation is not fussiness.**
+     *
+     * The façade reports the rival the instant the worker result lands; the lanes are drawn on the
+     * notification that follows. A single poll on `rivalId !== null` therefore catches the page
+     * mid-way often enough to matter — it did, on the second run of this case, with the host
+     * holding a rival and the polylines still empty. So the two readings are taken separately, and
+     * each wait is for *the page to catch up*, never for the property being asserted.
+     */
+    const shown = await untilRace(
+      page,
+      (facts) => facts.ghostPoints.every((points) => points !== ''),
+      30_000,
+    );
+    expect(shown.held, `the rival never reached the lanes: ${JSON.stringify(shown.last)}`).toBe(true);
+    const lanes = shown.last;
+    if (lanes === null) throw new Error('unreachable: held implies a reading');
+    /* Two lanes, both carrying the rival, named by the option the player picked. */
+    expect(lanes.ghostPoints.length).toBe(2);
+    expect(lanes.keyText).toContain('the plain baseline');
+    expect(lanes.noteText).toBe('same crowd both runs — the gap is your change, not the morning');
+
+    /*
+     * **Distinguishable — but only once the day has actually been watched, and the first draft of
+     * this case got that wrong in an instructive way.**
+     *
+     * § 7.3 opens the stage **paused at the day's own start hour**, and `raceSamplesOf` plots only
+     * up to the playhead, so at the opening frame both lines are the single point `0.0,46.0`:
+     * nobody has arrived, in either run. Asserting the lines differ there failed against a correct
+     * product — two runs of one crowd genuinely are identical before the crowd exists.
+     *
+     * **And a line is not enough either, which is why this case races `midtown-office`.** The second
+     * draft ran the default building and played the whole day: sixteen samples, every one of them
+     * flat on the floor, in *both* runs. `garden-apartments` at its shift demand simply has nobody
+     * mid-wait when the four-minute grid falls, so the strip draws two flat lines whatever the
+     * dispatchers did — measured, and a fact about the building rather than about the race. Two
+     * dispatchers can only draw different lines about a crowd once there is one on screen.
+     *
+     * So the day is played at the top of the speed ladder until the player's own waiting lane has
+     * **shape**: more than one distinct height, which is somebody standing at a sample.
+     *
+     * The wait is on **the player's** series alone, never on the two differing. Waiting for the
+     * difference would be waiting for the assertion to come true, and an inert control would then
+     * report a timeout rather than a failure — which is the least useful way for this case to fail.
+     */
+    const hasShape = (points: string | undefined): boolean =>
+      new Set((points ?? '').split(' ').map((pair) => pair.split(',')[1])).size > 1;
+    await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
+    await page.click('.everyday-stage-play');
+    const played = await untilRace(page, (facts) => hasShape(facts.youPoints[0]), 180_000);
+    expect(
+      played.held,
+      `no crowd ever stood in the player’s own day: ${String(played.last?.youPoints[0])}`,
+    ).toBe(true);
+    const drawn = played.last;
+    if (drawn === null) throw new Error('unreachable: held implies a reading');
+    expect(drawn.rivalId).toBe('collective');
+    for (const [lane, points] of drawn.ghostPoints.entries()) {
+      expect(points, `lane ${String(lane)} drew the rival exactly over the player`).not.toBe(
+        drawn.youPoints[lane],
+      );
+    }
+
+    /*
+     * **The caution survives the race arriving**, which is this issue's third acceptance bullet and
+     * is a statistics rule wearing a copy hat: one day each is n = 1, and CLAUDE.md forbids calling
+     * one dispatcher better than another without a paired-t interval that excludes zero. So the
+     * footer is unchanged and unconditional, and the verdict slot may not carry an ordering verb
+     * about a *dispatcher* — `live/raceStrip.ts#raceVerdictOf` says *ahead by N points* about two
+     * observed percentages and names neither driver, which is what keeps it a reading.
+     */
+    expect(drawn.footerText).toBe('One day each on the same crowd. That is a race, not proof.');
+    const verdict = (await page.textContent('.everyday-stage-verdict')) ?? '';
+    expect(verdict).not.toMatch(/better|worse|wins|beat|proof/iu);
+
+    /*
+     * And back: *nobody* takes the second line off, or the strip keeps a rival nobody asked for.
+     *
+     * **All three clauses are in the predicate rather than asserted off the snapshot**, and that is
+     * a strengthening rather than a convenience. `untilRace` returns the first snapshot on which
+     * its predicate holds; waiting on `rivalId === null` alone and then reading `ghostPoints` off
+     * that snapshot asserts a property of a frame chosen by a *different* condition. The rival id
+     * and the drawn points are cleared by the same redraw, so under load the id can be observed
+     * cleared a frame before the points are — which is exactly what happened on the integrated
+     * tree, where this case failed beside two corpus measurements and passed alone. Requiring the
+     * three to hold **together on one frame** is the real product property and it is the stronger
+     * claim: before, only the id had to be observed at all.
+     */
+    await page.selectOption('.everyday-stage-ghost', 'none');
+    const cleared = await untilRace(
+      page,
+      (facts) =>
+        facts.rivalId === null &&
+        facts.ghostPoints.every((points) => points === '') &&
+        facts.keyText === '',
+      30_000,
+    );
+    expect(
+      cleared.held,
+      `the rival outlived the pick, or its line and key did not clear with it: ${JSON.stringify(cleared.last)}`,
+    ).toBe(true);
+    await page.close();
+  }, 300_000);
+
+  /**
+   * **The refusing arm, on the product** — a pick this state cannot honestly produce says why, on
+   * the control, and issues no run.
+   *
+   * *Your latest saved* has nothing behind it on a fresh page: nothing has been saved in the
+   * workshop. The strip refuses **in words** rather than falling back to another rival, because a
+   * rival the player did not pick would be the strip inventing one — and it is drawn where the
+   * player pressed rather than only in a register, which is what the deleted `STAGE_NO_GHOST` used
+   * to be the one example of on this screen.
+   */
+  it('refuses a pick it cannot honestly run, in words, without inventing a rival', async () => {
+    const page = await coldLoad('garden-apartments', 'eta');
+    await enterEverydayStage(page);
+    /* The same wait, for the same reason — see the case above. */
+    const settled = await untilRace(page, (facts) => facts.runOpen, 120_000);
+    expect(settled.held, `the player’s own day never opened: ${JSON.stringify(settled.last)}`).toBe(
+      true,
+    );
+    await page.selectOption('.everyday-stage-ghost', 'latest-saved');
+    const refused = await untilRace(page, (facts) => facts.refusal !== null, 60_000);
+    expect(refused.held, `no refusal arrived: ${JSON.stringify(refused.last)}`).toBe(true);
+    expect(refused.last?.refusal).toContain('save a dispatcher in the workshop');
+    expect(await page.textContent('.everyday-stage-verdict')).toContain(
+      'save a dispatcher in the workshop',
+    );
+    /* Refused means no rival, and no rival means no second line and no name beside one. */
+    expect(refused.last?.rivalId).toBeNull();
+    expect(refused.last?.ghostPoints.every((points) => points === '')).toBe(true);
+    expect(refused.last?.keyText).toBe('');
+    await page.close();
+  }, 120_000);
 });
 
 /* -------------------------------------------------------------------------- *

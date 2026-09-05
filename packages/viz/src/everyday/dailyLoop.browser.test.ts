@@ -342,7 +342,25 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       expect(brief.wrinkle.length).toBeGreaterThan(3);
       // Derived from the rendered list — § 16 rule 5.
       expect(brief.count).toMatch(/^\d+ to choose from · \d+ of yours$/);
-      expect(brief.ghost).toMatch(/one run at a time/);
+      /*
+       * **§ 6.2's *Race against* card is a statement now, not a refusal** — GitHub issue #226,
+       * [§ D482](../../../../DECISIONS.md). This line asserted the withdrawn sentence, *"this build
+       * simulates one run at a time, so there is no second line to draw"*, for a wave after § 7's
+       * stage grew a picker and `briefView.ts#raceAgainstCard` retracted it — the stale-refusal
+       * shape § D227 calls the more dangerous half, arriving through the test that was supposed to
+       * hold the card honest.
+       *
+       * Pinned to the **claim** rather than to the wording, so a reword passes and a retreat does
+       * not. The card owes a player two things and this asserts both: *where* the control is, named
+       * by the eyebrow they will read on the stage itself (`THE DAY SO FAR`), and *what* a race is —
+       * one crowd driven twice, which is the premise the caveat's *"a race, not proof"* rests on and
+       * the reason the gap between the lines can be read as the player's own change. The negative
+       * keeps the withdrawal itself: a card that goes back to refusing a control that works fails
+       * here rather than silently, which is the whole of § D227.
+       */
+      expect(brief.ghost).toMatch(/THE DAY SO FAR/);
+      expect(brief.ghost).toMatch(/same crowd/);
+      expect(brief.ghost).not.toMatch(/one run at a time/);
       expect(brief.locked).toMatch(/tuner|sandbox/i);
 
       /*

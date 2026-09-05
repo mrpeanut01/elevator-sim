@@ -68,9 +68,12 @@ import { observationsAt } from '../live/observations.js';
 // AD-S17 — one derivation of *standing still* for both stages; see `render/carRest.ts`.
 import { carRestsAt } from '../render/carRest.js';
 import {
+  GHOST_OPTIONS,
   RACE_SAMPLE_INTERVAL_S,
   raceLaneOf,
+  raceSlotsOf,
   raceStripViewOf,
+  type GhostPick,
   type RaceStripView,
 } from '../live/raceStrip.js';
 import type { LiveObservations } from '../live/types.js';
@@ -99,8 +102,8 @@ import {
   STAGE_AWAITING_RUN,
   STAGE_DRIVING_LABEL,
   STAGE_INTERVENTIONS,
-  STAGE_NO_GHOST,
   STAGE_OUT_OF_SERVICE,
+  STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
@@ -500,9 +503,19 @@ function mountStage(
   let speedIndex = DEFAULT_STAGE_SPEED_INDEX;
   let started = false;
   let pendingFrame: number | undefined;
-  /** The grid line the race strip was last sampled on — see {@link drawRace}. */
-  let raceGrid = -1;
+  /**
+   * The whole state {@link drawRace} last drew — the four-minute grid line **and** the rival.
+   *
+   * It was `raceGrid`, a bare grid index, while there was nothing but the playhead to key on. A
+   * second recording lands on a worker result rather than on a clock tick, so the index alone left
+   * the rival off the lanes until the playhead next crossed a boundary (GitHub issue #226, § D482).
+   * The index is gone rather than kept beside this: written and never read is the shape this
+   * repository has a standing rule about, at the smallest scale it occurs at.
+   */
+  let raceKeyDrawn = '';
   let raceView: RaceStripView | undefined;
+  /** {@link raceSlotsOf}'s verdict for the drawn state — see the last lines of {@link drawRace}. */
+  let raceSlotVerdict = '';
   /**
    * The recording an intervention was pressed over. § 7.6 asks for a `recomputing` beat rather than
    * a silent freeze; the beat ends when the host notifies with a *different* recording, which is the
@@ -914,10 +927,77 @@ function mountStage(
   raceTitle.style.cssText = EYEBROW;
   const raceVerdict = el(doc, 'span', 'everyday-stage-verdict');
   raceVerdict.style.cssText = `font:500 12px ${TYPE.mono};color:${C.ink}`;
-  raceHead.append(raceTitle, raceVerdict);
+  /*
+   * § 7.4's picker — GitHub issue #226, § D482. The options are `GHOST_OPTIONS`, the model's own
+   * honest three, never markup: an option authored here would be a fourth arm of a list whose
+   * docstring argues at length that the missing two are *omitted, not stubbed*.
+   *
+   * `id`/`htmlFor` rather than a wrapping `<label>`, matching the handover picker two blocks up.
+   */
+  const raceKey = el(doc, 'span', 'everyday-stage-race-key');
+  raceKey.style.cssText = `font:500 10.5px ${TYPE.mono};color:${C.warmGrey}`;
+  const racePickLabel = el(doc, 'label', undefined, STAGE_RACE_PICKER_LABEL);
+  racePickLabel.style.cssText = EYEBROW;
+  racePickLabel.htmlFor = 'everyday-stage-ghost';
+  const racePicker = el(doc, 'select', 'everyday-stage-ghost');
+  racePicker.id = 'everyday-stage-ghost';
+  racePicker.style.cssText = [
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    `background:${C.paper}`,
+    `color:${C.ink}`,
+    'padding:3px 6px',
+    `font-family:${TYPE.body}`,
+    'font-size:12px',
+    'max-width:100%',
+  ].join(';');
+  /**
+   * Write the picker's face for the run on screen — GAMEPLAY § 14.1, GitHub issue #226.
+   *
+   * ## Why the options are rewritten rather than the control merely disabled
+   *
+   * A disabled `<select>` still renders its option list, and `innerText` reads it: while a record
+   * was on the stage the three offers stayed on the screen, one of them called `your latest saved`,
+   * over somebody else's day. That is § 14.1's stated defect condition — *"the word `you` on a
+   * watched run is a defect"* — and `watchStage.browser.test.ts` found it by sweeping the rendered
+   * screen. Greying a control does not un-say what the control says.
+   *
+   * ## Kept in the layout, and rebuilt rather than hidden
+   *
+   * The `<select>` itself stays mounted and stays where it is. Hiding it would be the trap lane A
+   * hit one lane over: an element removed from a laid-out flow is not merely invisible, it stops
+   * being *placed*, and the tracks around it re-fit. What changes is what it presents.
+   *
+   * The spectator's face is `GHOST_OPTIONS`' own *nobody* — no new string, and the true one: while
+   * a record is on the stage there is no rival and none can be commissioned. The reason is not on
+   * this control at all any more; it is drawn under the lanes, from `raceSlotsOf`'s note, which is
+   * how the Engineer strip says it too. A `title` said it before, where nobody read it.
+   */
+  let raceOffers: 'all' | 'spectator' | '' = '';
+  function writeRaceOptions(watching: boolean): void {
+    const wanted = watching ? 'spectator' : 'all';
+    if (raceOffers === wanted) return;
+    raceOffers = wanted;
+    racePicker.replaceChildren();
+    for (const option of GHOST_OPTIONS) {
+      if (watching && option.id !== 'none') continue;
+      const entry = el(doc, 'option', undefined, option.label);
+      entry.value = option.id;
+      /*
+       * No `title` on a spectator's entry. `nobody`'s own note says *"just your day"*, which is a
+       * true sentence about the player's run and a false one about the record on the stage — and an
+       * attribute is exactly where a wrong sentence survives unread.
+       */
+      if (!watching) entry.title = option.note;
+      racePicker.append(entry);
+    }
+  }
+  writeRaceOptions(false);
+  racePicker.value = 'none';
+  raceHead.append(raceTitle, raceVerdict, racePickLabel, racePicker, raceKey);
   const laneWait = laneBlock(doc, 'how long people are waiting');
   const laneStanding = laneBlock(doc, 'still standing');
-  const raceNote = el(doc, 'p', 'everyday-stage-race-note', STAGE_NO_GHOST);
+  const raceNote = el(doc, 'p', 'everyday-stage-race-note');
   raceNote.style.cssText = `margin:0;font-size:11.5px;color:${C.label}`;
   const raceFooter = el(doc, 'p', 'everyday-stage-race-footer');
   raceFooter.style.cssText = `margin:0;font-size:11.5px;color:${C.warmGrey}`;
@@ -926,10 +1006,14 @@ function mountStage(
   /*
    * **The stage's register of absences is not drawn here any more** — it is on the settings
    * screen with the other five (`everyday/buildNotes.ts`), which is GitHub issue #207. The array
-   * has not moved and neither has any absence it names; three of its four rows were re-worded out
-   * of the design document's vocabulary and say the same thing they said. The
-   * one refusal a player still meets *here* is the ghost lane's, on the ghost lane's own card
-   * (`STAGE_NO_GHOST`, three blocks up) — a control that cannot act says so where the control is.
+   * has not moved and neither has any absence it names; the rows that remain were re-worded out
+   * of the design document's vocabulary and say the same thing they said.
+   *
+   * The ghost lane's refusal used to be the one a player still met *here*, on the lane's own card —
+   * `STAGE_NO_GHOST`, the register's one **control's** refusal. It is gone with the absence it named
+   * (GitHub issue #226, § D482): the lane has a picker now, and what that card carries instead is the
+   * picked option's own note — or, when a pick cannot honestly be run, the reason. Still on the
+   * control rather than only in a register, which is the rule that entry was the example of.
    */
   root.append(header, goals, watchBand, alarm, stageWrap, legend, interventions, race);
   region.append(root);
@@ -1027,7 +1111,7 @@ function mountStage(
       ...(resumeAtS === undefined ? {} : { startAtS: resumeAtS }),
     });
     if (wasPlaying) playback.play();
-    raceGrid = -1;
+    raceKeyDrawn = '';
     raceView = undefined;
     syncTransport();
     requestFrame();
@@ -1479,16 +1563,48 @@ function mountStage(
    * genuinely costs a frame. Everything else here is a single pass at the playhead.
    */
   function drawRace(recording: VizRecording, simTimeS: number): void {
+    const race = host.ghostRace();
+    /*
+     * **§ 14.1, and in the key rather than only after it.** `raceSlotsOf` reads this now — a
+     * spectator's three cells are not the player's — so a key that watched only the clock and the
+     * rival would leave the *nobody* pick's *"just your day"* under a stranger's lanes until the
+     * playhead next crossed a four-minute boundary. It is the same lesson `drawWatching` records one
+     * screen over, arriving through the redraw key instead of through a missed clause.
+     */
+    const watching = watchingNow() !== undefined;
     const grid = Math.floor((simTimeS - recording.startedAt) / RACE_SAMPLE_INTERVAL_S);
-    if (grid !== raceGrid || raceView === undefined) {
-      raceGrid = grid;
-      raceView = raceStripViewOf({ recording, ghost: undefined, simTimeS });
+    /*
+     * The rival is part of the key, not only the grid line — GitHub issue #226, § D482. A second
+     * recording lands between grid crossings (it is a worker result, not a playhead event), and a
+     * key that watched only the clock would leave the grey line off the lanes until the playhead
+     * next crossed a four-minute boundary. `runId` is not enough on its own either: the *nobody*
+     * pick and a refusal both have none, and the two say different things in the verdict slot.
+     */
+    const key = [
+      String(grid),
+      race.pick,
+      race.rival?.runId ?? '',
+      race.refusal ?? '',
+      race.pending ? 'pending' : '',
+      watching ? 'watching' : '',
+    ].join('|');
+    if (key !== raceKeyDrawn || raceView === undefined) {
+      raceKeyDrawn = key;
+      raceView = raceStripViewOf({ recording, ghost: race.rival, simTimeS });
+      /*
+       * **One x-axis for both lines**, so they align instant for instant: the longer of the two
+       * spans. `endedAt` is an outcome rather than a schedule, so two runs of one crowd may
+       * legitimately end at different moments — `dev/main.ts`'s strip takes the same maximum, and
+       * scaling each line to its own end would draw a rival that finished sooner as if it had been
+       * slower everywhere.
+       */
+      const spanEndS = Math.max(recording.endedAt, race.rival?.endedAt ?? recording.endedAt);
       const wait = raceLaneOf(
         raceView.yours,
         raceView.ghost,
         (sample) => sample.standingWaitS,
         LANE_BOX,
-        recording.endedAt,
+        spanEndS,
         LANE_MARK_S,
       );
       const standing = raceLaneOf(
@@ -1496,17 +1612,69 @@ function mountStage(
         raceView.ghost,
         (sample) => sample.standing,
         LANE_BOX,
-        recording.endedAt,
+        spanEndS,
         Math.max(1, ...raceView.yours.map((sample) => sample.standing)),
       );
       laneWait.line.setAttribute('points', wait.you);
+      laneWait.ghost.setAttribute('points', wait.ghost);
       laneWait.mark.setAttribute('y1', String(wait.markY));
       laneWait.mark.setAttribute('y2', String(wait.markY));
       laneStanding.line.setAttribute('points', standing.you);
+      laneStanding.ghost.setAttribute('points', standing.ghost);
       laneStanding.mark.setAttribute('y1', String(standing.markY));
       laneStanding.mark.setAttribute('y2', String(standing.markY));
       raceFooter.textContent = raceView.footer;
+      /*
+       * The note and the key's name, from `raceSlotsOf` — the same derivation the Engineer strip
+       * fills its slots from, so the two surfaces cannot disagree about whether a rival is drawn.
+       * `slots.rivalName` is `''` unless a line is actually on the lanes, which is what makes the
+       * key an attribution rather than a label: a name beside no line, or beside the wrong one, is
+       * the incoherence issue #269 is about.
+       */
+      const slots = raceSlotsOf(
+        raceView,
+        {
+          pick: race.pick,
+          recording: race.rival,
+          refusal: race.refusal,
+          pending: race.pending,
+          watching,
+        },
+        recording,
+      );
+      raceNote.textContent = slots.note;
+      raceKey.textContent = slots.rivalName === '' ? '' : `— — ${slots.rivalName}`;
+      raceSlotVerdict = slots.verdict;
     }
+    /*
+     * **§ 14.1's picker, all of it in one place.** *"§ 7.6's intervention machinery is disabled while
+     * watching. A spectator who could intervene would be playing, not watching"* — and a spectator
+     * who could commission a second run would be commissioning it against somebody else's crowd.
+     *
+     * **Disabled is necessary and was never sufficient**, which is the finding rather than a detail:
+     * a disabled `<select>` still renders its options, so greying this control left `your latest
+     * saved` on screen beside a stranger's day and the browser tier's § 14.1 sweep caught it. What
+     * the control *presents* is `writeRaceOptions`' job; this is what it *does*.
+     *
+     * The `title` is gone in the spectator arm rather than rewritten. It held the reason, where a
+     * touch device never shows it and a pointer rarely does; the reason is drawn text now, under the
+     * lanes, from the note both strips share. An attribute nobody reads is not a declaration.
+     *
+     * It is outside the keyed block because entering and leaving a watch moves neither the grid line
+     * nor the rival, so a key-gated write would leave the control enabled over a watch that had just
+     * started. That is `drawWatching`'s own lesson one screen over: a treatment applied by six
+     * independently-guarded clauses is six chances for one of them to stay behind. (The *note* is
+     * key-gated and correct, because `watching` is now part of the key above.)
+     *
+     * The transport is deliberately untouched: pause and the speed chips are not interventions.
+     */
+    writeRaceOptions(watching);
+    const shows = watching ? 'none' : race.pick;
+    if (racePicker.value !== shows) racePicker.value = shows;
+    racePicker.disabled = watching;
+    racePicker.title = watching
+      ? ''
+      : (GHOST_OPTIONS.find((option) => option.id === race.pick)?.note ?? '');
     /*
      * § 14.1's race-strip cell: *"**their name** vs the world's middle, and **no verdict** — you are
      * not in this comparison."* The verdict cell carries the view's eyebrow instead — which is
@@ -1519,10 +1687,28 @@ function mountStage(
      * is the spectator's reading of somebody else's run in the cell § 14.1 reserves for identity,
      * and the same figure is already in the header two rows up.
      */
-    raceVerdict.textContent = watchingNow()?.eyebrow ?? raceView.verdict;
+    raceVerdict.textContent = watchingNow()?.eyebrow ?? raceSlotVerdict;
   }
 
   /* ------------------------------------------------------------------ wire */
+
+  /*
+   * § 7.4's picker, pressed — GitHub issue #226, § D482.
+   *
+   * **This is the whole of the wire, and it is deliberately one call.** The pick is validated
+   * against `GHOST_OPTIONS` and handed to the host, which presses `dev/main.ts#setGhostPick` — the
+   * same function the Engineer strip's own `<select>` calls, which issues the second request through
+   * the same worker. Nothing about *who the rival is* or *whether that rival can honestly be run* is
+   * decided here; a screen that answered either would be the second answer this façade exists to
+   * prevent. The lanes redraw on the host's notification, not from this handler, so a request that
+   * refuses and one that lands arrive by the same route.
+   */
+  racePicker.addEventListener('change', () => {
+    const value = racePicker.value;
+    host.raceAgainst(
+      GHOST_OPTIONS.some((option) => option.id === value) ? (value as GhostPick) : 'none',
+    );
+  });
 
   const unsubscribe = host.subscribe(onHostChange);
   const onResize = (): void => {
@@ -1679,6 +1865,8 @@ function laneBlock(
 ): {
   readonly block: HTMLElement;
   readonly line: SVGPolylineElement;
+  /** The rival's line — `''` whenever no rival is drawn. */
+  readonly ghost: SVGPolylineElement;
   readonly mark: SVGLineElement;
 } {
   const block = el(doc, 'div', 'everyday-stage-lane');
@@ -1698,15 +1886,29 @@ function laneBlock(
   mark.setAttribute('stroke', C.rule);
   mark.setAttribute('stroke-dasharray', '4 4');
   mark.setAttribute('stroke-width', '1');
+  /*
+   * The rival, **under** the player's line and in a quieter ink — § 7.4's grey line. Appended first
+   * so yours is never occluded where the two cross, which is the frame in which the race is at its
+   * most interesting and the one an equal `z` would draw arbitrarily.
+   */
+  const ghost = doc.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  ghost.setAttribute('class', 'everyday-stage-lane-ghost');
+  ghost.setAttribute('fill', 'none');
+  ghost.setAttribute('stroke', C.warmGrey);
+  ghost.setAttribute('stroke-width', '1.5');
+  ghost.setAttribute('stroke-dasharray', '3 3');
+  ghost.setAttribute('vector-effect', 'non-scaling-stroke');
+  ghost.setAttribute('points', '');
   const line = doc.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('class', 'everyday-stage-lane-you');
   line.setAttribute('fill', 'none');
   line.setAttribute('stroke', C.terracotta);
   line.setAttribute('stroke-width', '2');
   line.setAttribute('vector-effect', 'non-scaling-stroke');
   line.setAttribute('points', '');
-  svg.append(mark, line);
+  svg.append(mark, ghost, line);
   block.append(label, svg);
-  return { block, line, mark };
+  return { block, line, ghost, mark };
 }
 
 /** § 7.2's breathing dot beside the alarm sentence. */

@@ -71,6 +71,12 @@ import { railFooter, railModel } from './rail.js';
 import type { RailModel } from './rail.js';
 import { routeFor, SCREEN_NAMES, screenModuleFor, unbuiltReasonFor } from './screens.js';
 import type { EverydayScreenContext, EverydayScreenHandle } from './screens.js';
+import {
+  onSignInLinkReport,
+  reportSignInLink,
+  signInLinkReport,
+  signInNoticeViewOf,
+} from './signInLink.js';
 import { provideEverydaySwap } from './swap.js';
 import {
   EVERYDAY_COLORS as C,
@@ -348,8 +354,35 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
 
   /* --- Main: the screen region above, the pinned bar below (§ 3.1). --- */
   const main = el(doc, 'div', 'everyday-main');
+  /*
+   * Three rows, and the first holds an **empty element** rather than no element, on every load that
+   * did not come from a mailed link.
+   *
+   * § 3.1's geometry is *screen region, then pinned bar*, and it is unchanged: an empty `div` with
+   * no padding and no border has no line box, so its `auto` track measures **zero**.
+   * `minmax(0,1fr)` still absorbs, and the bar is still the row that cannot go below a fold, which
+   * is the property `everyday/rushScreenModel.ts` depends on and names.
+   *
+   * **`hidden` was the first attempt and it broke that property**, which is recorded here because
+   * the mistake is invisible in the markup. A `display:none` grid item is not laid out *and is not
+   * placed*, so with the notice hidden the grid had three tracks and two items: auto placement put
+   * the screen region in `auto` and the bar in `minmax(0,1fr)`, the region took its whole content
+   * height, and `main`'s `overflow:hidden` clipped the pinned bar off the bottom.
+   * `everyday/viewportGates.browser.test.ts` caught it at all three viewports — the bar's five
+   * controls unreachable at 1280×800, where that register had been empty — which is the clause that
+   * file exists for, firing on the first commit that broke it.
+   */
   main.style.cssText =
-    'display:grid;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;min-width:0';
+    'display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;min-width:0';
+
+  /*
+   * GitHub issue #336's banner: always in the document, empty when there is nothing to say.
+   *
+   * Which is what `role="status"` needs anyway — a live region has to be present *before* the change
+   * it announces, so one created already carrying its text announces nothing.
+   */
+  const signInNotice = el(doc, 'div', 'everyday-signin');
+  signInNotice.setAttribute('role', 'status');
 
   const screenRegion = el(doc, 'div', 'everyday-screen');
   screenRegion.style.cssText = [
@@ -371,7 +404,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     'min-height:52px',
   ].join(';');
 
-  main.append(screenRegion, bar);
+  main.append(signInNotice, screenRegion, bar);
   root.append(rail, main);
 
   doc.body.append(root);
@@ -1543,6 +1576,102 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     confirmShowing = true;
   }
 
+  /* ---------------------------------------------------------------- *
+   * The mailed sign-in link's outcome — GitHub issue #336
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Draw what `everyday/signInLink.ts` has been told, or nothing.
+   *
+   * ## Why the shell owns it rather than a screen
+   *
+   * A link is redeemed by `dev/main.ts`'s boot, before the player has pressed anything, and the
+   * screen they are on when the answer lands is *whichever one they walked to in the meantime* —
+   * the front door on a fast answer, three screens deep on a cold start the server measured at
+   * 28.7 s. A banner owned by a screen would be a banner that vanishes when they navigate, which is
+   * the defect this fixes wearing a different hat. § 3.1 gives the shell the region and the bar for
+   * the same reason `keepScrollAcrossRerender` is here: a property that has to hold across every
+   * screen is held once, including for screens nobody has written yet.
+   *
+   * ## What it may and may not say
+   *
+   * Nothing here composes an outcome. The sentence is the one the client or the server produced and
+   * is drawn verbatim; the two words this shell adds — the eyebrow and the route to the account
+   * screen — are `everyday/signInLink.ts`'s, beside the view that shapes them.
+   *
+   * `role="status"` is set on the element at construction rather than here, and the element stays
+   * in the document empty, because a live region has to be present *before* the change it is meant
+   * to announce; one created already carrying its text announces nothing.
+   */
+  function drawSignInNotice(): void {
+    const view = signInNoticeViewOf(signInLinkReport());
+    /*
+     * Emptied rather than hidden, and it stays in the grid either way — the mount's own note has the
+     * measurement. An empty element with no padding, border or inline style of its own has no line
+     * box, so the track it sits in is zero and nothing below it moves.
+     */
+    signInNotice.replaceChildren();
+    if (view === undefined) return;
+
+    /*
+     * **Every style is on the row and none on the element that empties** — issue #295's F29 and
+     * `everyday/hiddenBox.test.ts`'s subject, kept even though this element no longer toggles
+     * `hidden`. A `display` or a border left standing on the outer element is what turns *nothing to
+     * say* into an empty bordered banner across the top of every screen; putting the whole treatment
+     * on a child that is created and destroyed with the content makes that unreachable rather than
+     * remembered.
+     */
+    const row = el(doc, 'div', 'everyday-signin-row');
+    row.style.cssText = [
+      'display:flex',
+      'align-items:flex-start',
+      `gap:${String(GAP.row)}px`,
+      'padding:11px 16px 11px 13px',
+      `border-bottom:1px solid ${C.rule}`,
+      `border-left:3px solid ${C.sun}`,
+      `background:${C.card}`,
+      'min-width:0',
+    ].join(';');
+    signInNotice.append(row);
+
+    const said = el(doc, 'div');
+    said.style.cssText = 'min-width:0;flex:1';
+    const label = el(doc, 'div', 'everyday-signin-label', view.label);
+    label.style.cssText = `font:500 9px ${TYPE.mono};letter-spacing:.12em;color:${C.label}`;
+    const text = el(doc, 'div', 'everyday-signin-text', view.text);
+    text.style.cssText = `margin-top:2px;font-size:13px;line-height:1.45;color:${C.ink};max-width:78ch`;
+    said.append(label, text);
+    if (view.pointer !== undefined) {
+      const pointer = el(doc, 'div', 'everyday-signin-pointer', view.pointer);
+      pointer.style.cssText = `margin-top:4px;font-size:11.5px;line-height:1.45;color:${C.warmGrey};max-width:78ch`;
+      said.append(pointer);
+    }
+    row.append(said);
+
+    if (view.dismiss === undefined) return;
+    const dismiss = el(doc, 'button', 'everyday-signin-dismiss', view.dismiss);
+    dismiss.type = 'button';
+    dismiss.style.cssText = [
+      'flex:none',
+      'background:transparent',
+      `border:1px solid ${C.rule}`,
+      `border-radius:${String(R.control)}px`,
+      'padding:5px 11px',
+      `color:${C.warmGrey}`,
+      'cursor:pointer',
+      'font-size:12px',
+      'font-weight:600',
+    ].join(';');
+    /*
+     * It withdraws the report and nothing else. A sign-in that happened stays happened — a control
+     * that read as *undo* while only clearing a banner would be the worse half of § D227's rule.
+     */
+    dismiss.addEventListener('click', () => {
+      reportSignInLink(undefined);
+    });
+    row.append(dismiss);
+  }
+
   function drawMenu(): void {
     screenRegion.replaceChildren();
     const h = el(doc, 'h1', undefined, 'Elevator Sim');
@@ -1791,6 +1920,15 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   const stopProfileWatch = profileStore.subscribe(drawRail);
 
   /*
+   * GitHub issue #336. Drawn once here and again on every report, because both orders happen: the
+   * no-server arm publishes synchronously inside `dev/main.ts`'s boot, which on a slow mount has
+   * already run by the time this shell exists, and a real redemption answers seconds later. A
+   * subscription alone would miss the first; a draw alone would miss the second.
+   */
+  drawSignInNotice();
+  const stopSignInWatch = onSignInLinkReport(drawSignInNotice);
+
+  /*
    * The return half of § 3.2's door — `everyday/swap.ts` has the argument for why it is a provided
    * port rather than an import. Published after the first `draw()`, so the header control cannot be
    * revealed over a shell that has not covered the page yet.
@@ -1815,6 +1953,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     world: () => world,
     destroy: () => {
       stopProfileWatch();
+      stopSignInWatch();
       scrollKeeper.disconnect();
       unmountCurrent();
       // The host wiring goes first: a destroyed shell must not hear another notification and

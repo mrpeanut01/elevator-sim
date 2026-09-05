@@ -56,6 +56,7 @@ import {
   EVERYDAY_HOST,
   type EverydayHostBindings,
 } from '../everyday/host.js';
+import { reportSignInLink } from '../everyday/signInLink.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -144,10 +145,9 @@ import {
 import { patternReadoutAt } from '../live/patternReadout.js';
 import {
   GHOST_OPTIONS,
-  RACE_NOT_RUN,
-  RACE_PENDING,
   RACE_SAMPLE_INTERVAL_S,
   raceLaneOf,
+  raceSlotsOf,
   raceStripViewOf,
   type GhostPick,
 } from '../live/raceStrip.js';
@@ -1250,6 +1250,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     'This site has no leaderboard server behind it, so this run cannot be posted. It is still on ' +
     'screen and still in the report — nothing about it is lost.';
   /**
+   * What a redemption in flight says, on **both** surfaces — GitHub issue #336.
+   *
+   * A constant rather than a literal because it is now written twice: once into this menu's own
+   * waiting state, and once into `everyday/signInLink.ts` for the shell that has the page. Two
+   * copies of one sentence is the drift this repository keeps finding, and the two are the same
+   * claim about the same request.
+   */
+  const SIGNING_IN = 'Signing you in…';
+  /**
    * What is said while a request is in flight, and what is said once it has been a while.
    *
    * § D243 § 4 and § D247: the Container App runs at `minReplicas: 0`, and a request to a sleeping
@@ -2322,25 +2331,70 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The token is never put into a notice, a log or a URL this build constructs. The three refusals
    * that can come back — expired, spent, invalid — are the server's own sentences, and each is
    * worded around whether asking again will help.
+   *
+   * ## The outcome goes to whichever world holds the page — GitHub issue **#336**
+   *
+   * The two lines above the navigation stated an intent — *the screen that shows the outcome is the
+   * one the player is put on* — and § D335 shipped a shell over that screen five months later
+   * without a word of them changing. This module's boot runs under `everyday/boot.ts`, which mounts
+   * the Everyday shell over `div.shell` with `visibility:hidden` plus `inert`, so on the page this
+   * repository ships **every** mailed link was redeemed onto a surface the player could neither see
+   * nor reach. Measured on the built artifact before the fix: a cold load of `/#sign-in=<token>`
+   * left the Everyday shell with no acknowledgement of any kind while the covered menu sat on its
+   * account screen with the answer on it.
+   *
+   * So the intent is kept and the *screen* is decided by {@link engineerHasThePage}, on § D383's
+   * boundary: this surface's own behaviour is armed only while this surface has the page, and the
+   * outcome is otherwise published to `everyday/signInLink.ts`, which the Everyday shell draws as a
+   * banner over whatever screen the player has walked to.
+   *
+   * **The navigation is withdrawn on the covered arm rather than kept beside the banner**, and that
+   * is a measurement rather than a preference. {@link dispatchMenu}'s `reopen` arm — the one control
+   * that puts this menu back up — runs `navigate(menuState, 'main')`, so a covered navigation to
+   * `account` is discarded by the only route back into the menu and no player can ever observe it.
+   * What it *did* achieve is a second defect: `everyday/boot.ts#closeEngineerMenuWhenReady` dismisses
+   * this menu by pressing its **Resume** row, which exists on `main` and nowhere else, so navigating
+   * away here left that observer waiting for a row that never arrives and the covered overlay stayed
+   * open for the whole visit. Driven on the artifact: with a link in the fragment `.menu-overlay`
+   * reported `hidden: false` over 3 rows; without one, `hidden: true` over 9.
+   *
+   * Both publishes are `everydayHasThePage`-gated on one read taken **before** the request, so a
+   * player who crosses § 3.2's door mid-flight still finds the answer waiting in the world the link
+   * was opened in. Nothing about the ordering above moves: the fragment is still cleared first, and
+   * the token reaches this module's own request and nothing else.
    */
   async function redeemLinkFromHash(): Promise<void> {
     const linkToken = new URLSearchParams(window.location.hash.replace(/^#/u, '')).get('sign-in');
     if (linkToken === null || linkToken === '') return;
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-    // Opening a link is a request to sign in, so the screen that shows the outcome is the one the
-    // player is put on. A result written to a panel nobody navigates to is a result nobody reads.
-    menuState = navigate(menuState, 'account');
+    const everydayHasThePage = !engineerHasThePage();
+    /*
+     * Opening a link is a request to sign in, so the screen that shows the outcome is the one the
+     * player is put on. A result written to a panel nobody navigates to is a result nobody reads —
+     * which is why the navigation happens only where this surface is the one being read, and why
+     * the covered case publishes to the other world rather than writing here.
+     */
+    if (!everydayHasThePage) menuState = navigate(menuState, 'account');
     if (client === undefined) {
       accountState = withNotice(accountState, NO_SERVER_SIGN_IN);
+      if (everydayHasThePage) reportSignInLink({ stage: 'refused', text: NO_SERVER_SIGN_IN });
       drawMenu();
       return;
     }
-    const done = startWaiting('Signing you in…');
+    if (everydayHasThePage) reportSignInLink({ stage: 'working', text: SIGNING_IN });
+    const done = startWaiting(SIGNING_IN);
     const result = await client.redeem(linkToken);
     done();
     accountState = result.ok
       ? signedIn(accountState, result.value.token, result.value.user)
       : signedOut(result.detail);
+    if (everydayHasThePage) {
+      reportSignInLink(
+        result.ok
+          ? { stage: 'signed-in', text: `Signed in as ${result.value.user.displayName}.` }
+          : { stage: 'refused', text: result.detail },
+      );
+    }
     drawMenu();
   }
 
@@ -3763,6 +3817,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       context.update(patch);
     },
     /*
+     * § 7.4's rival — GitHub issue #226, § D482. Both halves are the seams this closure already
+     * runs the Engineer strip on: the read is the four ghost fields together (see
+     * `everyday/host.ts#EverydayGhostRace` for why together), and the press is
+     * {@link setGhostPick}, which is the *same* function the strip's own `<select>` calls. A
+     * binding that recorded a pick without issuing the request would be the ghost method with no
+     * rival behind it that `everyday/host.ts` spent two waves declining to add.
+     */
+    ghostRace: () => ({
+      pick: ghostPick,
+      rival: ghostRecording,
+      refusal: ghostRefusal,
+      pending: ghostInFlight,
+    }),
+    raceAgainst: (pick) => {
+      setGhostPick(pick);
+    },
+    /*
      * § 14.1's six bindings, and every one of them is the *same* seam the Engineer picker presses —
      * GitHub issue #182, § D436. `mountWatchPanel` above is handed `loadReferenceRuns`,
      * `recordRun`, `enterWatch`, `stopWatching` and `playThisCrowd`; these are those five plus a
@@ -4088,7 +4159,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (ghost.kind === 'refused') {
       ghostRefusal = ghost.reason;
       lastRaceKey = '';
-      drawRaceStrip(viewAt());
+      // `renderAll`, not `drawRaceStrip`: the Everyday stage draws this strip too and hears the
+      // host's notification. See {@link setGhostPick}.
+      renderAll();
       return;
     }
     ghostInFlight = true;
@@ -4107,7 +4180,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         if (state.recording !== primaryRecording) return; // a later day superseded this race
         ghostRecording = recording;
         lastRaceKey = '';
-        drawRaceStrip(viewAt());
+        renderAll();
       },
     });
   }
@@ -4143,29 +4216,44 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ghostInFlight ? 'in-flight' : '',
       String(bucket),
       view.simTimeS >= recording.endedAt ? 'end' : '',
+      /*
+       * § 14.1 — `raceSlotsOf` reads the spectator state now, so it belongs in the key that decides
+       * whether the cells are re-derived. `enterWatch` and `stopWatching` both clear `lastRaceKey`
+       * as well; this is the half that does not depend on remembering to.
+       */
+      watching === undefined ? '' : 'watching',
     ].join('|');
     if (key === lastRaceKey) return;
     lastRaceKey = key;
 
     const stripView = raceStripViewOf({ recording, ghost, simTimeS: view.simTimeS });
-    const option = GHOST_OPTIONS.find((entry) => entry.id === ghostPick);
     /*
-     * The verdict slot, in honesty order: a refusal outranks everything (it says why there is no
-     * rival); a picked-but-absent rival says whether one is coming; and only a drawn rival — or
-     * the *nobody* pick, whose slot carries the plain figure — speaks through the view itself.
+     * The verdict slot, the note and the key's name — `live/raceStrip.ts#raceSlotsOf`, which owns
+     * the honesty order (a refusal outranks a state, a state outranks a figure) for **both** shells
+     * since the § 7 stage grew a strip of its own (issue #226, § D482). It was three ternaries here.
      */
-    const verdict =
-      ghostRefusal ??
-      (stripView.ghost !== undefined || ghostPick === 'none'
-        ? stripView.verdict
-        : ghostInFlight
-          ? RACE_PENDING
-          : RACE_NOT_RUN);
-    setText(ui.race.verdict, verdict);
-    setText(ui.race.note, stripView.note);
+    const slots = raceSlotsOf(
+      stripView,
+      {
+        pick: ghostPick,
+        recording: ghost,
+        refusal: ghostRefusal,
+        pending: ghostInFlight,
+        /*
+         * § 14.1, and this is the cell the sweep actually caught. The picker above is hidden while
+         * watching, so the forbidden word was never the option list here — it was the **note**,
+         * which carried the *nobody* pick's *"no second run, no rival line, no score — just your
+         * day"* under somebody else's lanes. `raceSlotsOf` answers that for both strips.
+         */
+        watching: watching !== undefined,
+      },
+      recording,
+    );
+    setText(ui.race.verdict, slots.verdict);
+    setText(ui.race.note, slots.note);
     setText(ui.race.footer, stripView.footer);
     setHidden(ui.race.ghostKey, stripView.ghost === undefined);
-    setText(ui.race.ghostName, stripView.ghost === undefined ? '' : (option?.label ?? ''));
+    setText(ui.race.ghostName, slots.rivalName);
 
     // One clock, one x-axis: the longer of the two spans, so the lines align instant for
     // instant. `endedAt` is an outcome, so two runs of one crowd may legitimately differ.
@@ -4212,37 +4300,60 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.race.ghost.value = ghostPick;
     ui.race.ghost.addEventListener('change', () => {
       const value = ui.race.ghost.value;
-      ghostPick = GHOST_OPTIONS.some((option) => option.id === value)
-        ? (value as GhostPick)
-        : 'none';
-      ui.race.ghost.title = GHOST_OPTIONS.find((option) => option.id === ghostPick)?.note ?? '';
-      ghostRecording = undefined;
-      ghostRefusal = undefined;
-      lastRaceKey = '';
-      if (ghostPick === 'none') {
-        // A rival in flight is cancelled — its result would be dropped unread anyway. A primary
-        // in flight is not ours to stop.
-        if (ghostInFlight) shiftRunner.cancel();
-        drawRaceStrip(viewAt());
-        return;
-      }
-      const primary = state.recording;
-      if (
-        lastShiftPlan !== undefined &&
-        primary !== undefined &&
-        /*
-         * Identity, not configuration — `shift/banking.ts`'s own move. A recording loaded from
-         * a file has no plan behind it, and racing `lastShiftPlan` under it would draw a rival
-         * of a *different* day beside it; the strip waits for a run this shell simulated.
-         */
-        primary === simulatedRecording &&
-        // A primary in flight will race this pick when it lands; only a rival may be superseded.
-        (!shiftRunner.isRunning() || ghostInFlight)
-      ) {
-        scheduleGhost(lastShiftPlan, primary);
-      }
-      drawRaceStrip(viewAt());
+      setGhostPick(
+        GHOST_OPTIONS.some((option) => option.id === value) ? (value as GhostPick) : 'none',
+      );
     });
+  }
+
+  /**
+   * Take a pick and issue the rival's day — **the one seam, pressed by both shells.**
+   *
+   * GitHub issue **#226**, [§ D482](../../../../DECISIONS.md). It was the body of the `<select>`'s own
+   * listener while the Engineer strip was the only surface with a picker; the § 7 Everyday stage has
+   * one now and reaches this through `everyday/host.ts#raceAgainst`. Extracted rather than copied,
+   * because *two sites answering one question is how one of them goes stale unread* — and the
+   * question here is `who is the rival`, which the strip on the other side of the cover is drawing
+   * from the very fields this function writes.
+   *
+   * The Engineer `<select>` is written from here too, so a pick made on the Everyday stage is the
+   * pick the Engineer picker shows when the player walks back through § 3.2's door. Setting
+   * `.value` fires no `change` event, so this cannot recurse.
+   *
+   * `renderAll` rather than {@link drawRaceStrip}: the Everyday host publishes on that notification
+   * and its stage has its own strip to redraw. A private notify beside it would be the second path
+   * this function exists to avoid.
+   */
+  function setGhostPick(pick: GhostPick): void {
+    ghostPick = pick;
+    ui.race.ghost.value = ghostPick;
+    ui.race.ghost.title = GHOST_OPTIONS.find((option) => option.id === ghostPick)?.note ?? '';
+    ghostRecording = undefined;
+    ghostRefusal = undefined;
+    lastRaceKey = '';
+    if (ghostPick === 'none') {
+      // A rival in flight is cancelled — its result would be dropped unread anyway. A primary
+      // in flight is not ours to stop.
+      if (ghostInFlight) shiftRunner.cancel();
+      renderAll();
+      return;
+    }
+    const primary = state.recording;
+    if (
+      lastShiftPlan !== undefined &&
+      primary !== undefined &&
+      /*
+       * Identity, not configuration — `shift/banking.ts`'s own move. A recording loaded from
+       * a file has no plan behind it, and racing `lastShiftPlan` under it would draw a rival
+       * of a *different* day beside it; the strip waits for a run this shell simulated.
+       */
+      primary === simulatedRecording &&
+      // A primary in flight will race this pick when it lands; only a rival may be superseded.
+      (!shiftRunner.isRunning() || ghostInFlight)
+    ) {
+      scheduleGhost(lastShiftPlan, primary);
+    }
+    renderAll();
   }
 
   /** Only what the playhead moves. Runs at 60 Hz. */
@@ -4275,11 +4386,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /**
    * Whether **this** surface is the one the player is looking at — GitHub issue **#287**.
    *
-   * One expression for a question two sites ask, because the two are the same question and a second
-   * spelling of it is how they come to disagree. Both are ways to file a day that are *this*
+   * One expression for a question **three** sites ask, because they are the same question and a
+   * second spelling of it is how they come to disagree. Two are ways to file a day that are *this*
    * surface's and not the Everyday product's: {@link tick}'s end-of-day close, and the
    * `Ctrl`/`Cmd`+`Enter` arm of the `window` key handler. § 6.4 gives the other product exactly one
    * way to set `dayClosed` — its own *Close the day* — and neither of these is it.
+   *
+   * **The third asks it for a different reason and is deliberately not a second predicate** —
+   * {@link redeemLinkFromHash}, GitHub issue #336. There the question is not *may this surface act*
+   * but *which surface will the player read the answer on*, and it is the same fact: a screen behind
+   * `visibility:hidden` and `inert` is one nobody is looking at, whether the thing written to it is
+   * a filed day or a sign-in outcome. Two spellings of *who has the page* is exactly what this
+   * function exists to prevent, and a third site is a reason to reuse it rather than to fork it.
    *
    * **`!== true` rather than `=== false`, and that is the load-bearing half.** `everydaySwap()`
    * answers `undefined` on a build that loaded this module with no Everyday shell over it, and

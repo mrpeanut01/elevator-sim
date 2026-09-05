@@ -53,6 +53,20 @@
  * No second request is ever issued (`dev/ghostRun.ts` returns `kind: 'none'` — *nobody* is free
  * by construction), so the view has one line per lane, no note, and the verdict slot carries the
  * plain figure instead. The strip never invents a rival; `raceStrip.test.ts` asserts all three.
+ *
+ * ## Two shells draw this now, which is why {@link raceSlotsOf} exists
+ *
+ * `dev/main.ts`'s strip was the only one until § 7's Everyday stage grew a picker of its own
+ * (GitHub issue **#226**, [§ D482](../../../../DECISIONS.md)). {@link raceStripViewOf} is a fold of
+ * two recordings and a playhead and cannot see what the *shell* knows — whether a pick was refused,
+ * whether a rival is still in the worker, which option's label names the grey line. That order is a
+ * claim rather than a formatting choice (a refusal outranks a state; a state outranks a figure), so
+ * it is decided once here for both, over {@link RaceRival}, rather than as ternaries at each mount.
+ *
+ * The one thing {@link raceSlotsOf} says that the view does not is {@link SAME_RUN_NOTE}: a rival
+ * that served the crowd exactly as you did draws a line under yours and reads *level with*, which
+ * is a true comparison of one run with itself and is indistinguishable, on screen, from a picker
+ * bound to nothing. Its docstring carries the measurement.
  */
 
 import type { SimTime } from '@elevator-sim/core/browser';
@@ -113,6 +127,36 @@ export const RACE_FOOTER = 'One day each on the same crowd. That is a race, not 
 /** §7.4's replay-band meaning — the one that is true of a same-seed ghost. See the header. */
 export const SAME_CROWD_NOTE = 'same crowd both runs — the gap is your change, not the morning';
 
+/**
+ * The note when the rival's day came back **identical to yours** — GitHub issue **#226**,
+ * [§ D482](../../../../DECISIONS.md).
+ *
+ * ## This is a measured state, not a hypothetical one
+ *
+ * Measured on `garden-apartments` at the shipped defaults: a fresh shift opens on `collective`
+ * (`dev/defaults.ts`), *the plain baseline* resolves to `collective`, and the two recordings come
+ * back **byte-identical on the legs**. So on the commonest day in the product, picking the plain
+ * baseline draws the grey line exactly under the terracotta one and the verdict reads *level with*
+ * — true, and true of one run compared with itself.
+ *
+ * Without this sentence that picture is indistinguishable from a picker that does nothing, which is
+ * the defect § D177 exists to catch wearing the costume of a working control. With it, the strip
+ * says which of the two it is.
+ *
+ * ## Why it is said afterwards rather than refused in front
+ *
+ * The obvious fix — decline the pick when it names the dispatcher already driving — was written,
+ * measured, and **thrown away**, because it does not work: `dev/state.ts#drivingProfileOf` builds
+ * the primary's profile through the lever/selector/rules chain and the engine fills its defaults, so
+ * the driving profile carries `engine` and `answer` fields the raw `data/` profile does not. The two
+ * objects differ; the two runs do not. Any predicate over the *configs* is therefore guessing at
+ * which differences are behavioural, and guessing wrong in the refusing direction would decline a
+ * race that was real. Comparing the **recordings** is exact and cannot be wrong, and the only cost
+ * of learning it late is a second simulation that had to run to be compared anyway.
+ */
+export const SAME_RUN_NOTE =
+  'the rival drove the same way you did — one day, drawn twice, so the two lines are one line';
+
 /** The strip while the rival's day is still in the worker. A state, not an error. */
 export const RACE_PENDING = 'waiting for the rival’s day to finish simulating';
 
@@ -122,6 +166,37 @@ export const RACE_PENDING = 'waiting for the rival’s day to finish simulating'
  * declining (`docs/16` S1: an absence indistinguishable from an oversight is not a declaration).
  */
 export const RACE_NOT_RUN = 'no rival run yet — the next Run this shift races them';
+
+/**
+ * Why the strip offers no race while somebody else's day is on screen — GAMEPLAY § 14.1.
+ *
+ * ## It is the reason, and it is *visible*, which is the whole of what changed
+ *
+ * Both shells used to say this in a `title` attribute on a **disabled** `<select>`, which failed
+ * twice over. A `title` is not read on a touch device and rarely anywhere else, so the reason was
+ * invisible to the player; and a disabled `<select>` still renders its option list, so what the
+ * player *did* read was `your latest saved` and *"just your day"* printed over a stranger's run —
+ * § 14.1's own defect condition, on the two surfaces the rule is about. Measured on the rendered
+ * screen rather than argued: `dev/watch.browser.test.ts` and `everyday/watchStage.browser.test.ts`
+ * sweep `innerText` for `you`, and both found it.
+ *
+ * So the sentence moved out of the attribute and into {@link RaceSlots.note}, which is drawn text on
+ * both strips — and it moved **here**, beside {@link RACE_PENDING} and {@link RACE_NOT_RUN}, because
+ * it is the same kind of thing they are: a state only the shell can know, said once for both shells.
+ * It stood in `everyday/stageScreenModel.ts#STAGE_RACE_WATCHING`, where the Engineer strip could not
+ * reach it and had nothing to say at all.
+ *
+ * ## The wording carries no second person, and that is a constraint rather than a style
+ *
+ * The sentence it replaces read *"not while you are watching somebody else's day"*. Rendering that
+ * visibly would have traded an invisible defect for a loud one: `you` is the very word § 14.1
+ * forbids on a watched run, so a reason that could not be shown was not a reason. This one states
+ * the same rule about *the day* and *a spectator* rather than about the reader, which is also how
+ * `everyday/watchStage.ts#SPECTATOR_MAKES_NO_CHANGES` says § 14.1's other half three centimetres
+ * away on the same screen.
+ */
+export const RACE_WATCHING =
+  'no rival while this is somebody else’s day — a spectator who commissioned a second run would be playing, not watching';
 
 /* -------------------------------------------------------------------------- *
  * The samples
@@ -266,6 +341,155 @@ export function raceStripViewOf(input: RaceStripInput): RaceStripView {
     note: SAME_CROWD_NOTE,
     footer: RACE_FOOTER,
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The three slots the shell fills, decided once for both shells
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What the *shell* knows about the rival, beside the two recordings {@link raceStripViewOf} folds.
+ *
+ * The view above is a function of two recordings and a playhead and cannot see any of this: whether
+ * a second request was refused, whether one is still in the worker, or which option's label names
+ * the grey line. Those live in whichever shell issued the request — and there are **two** of them
+ * now (`dev/main.ts`'s strip and `everyday/stageScreen.ts`'s), which is the whole reason this is a
+ * type rather than four arguments.
+ */
+export interface RaceRival {
+  readonly pick: GhostPick;
+  /** The rival's finished recording, or `undefined` — no rival is ever invented. */
+  readonly recording: VizRecording | undefined;
+  /** `dev/ghostRun.ts#GhostPlan`'s refused arm, or `undefined`. Outranks everything below. */
+  readonly refusal: string | undefined;
+  /** Whether the rival's day is still in the worker. */
+  readonly pending: boolean;
+  /**
+   * Whether the run on screen belongs to somebody else — GAMEPLAY § 14.1. Outranks **everything**,
+   * the refusal included; see {@link raceSlotsOf}.
+   *
+   * Required rather than optional on purpose. A third shell that grew a strip and forgot this field
+   * would compile, draw a spectator the *nobody* pick's *"just your day"* over a stranger's run, and
+   * reproduce exactly the defect that put this field here.
+   */
+  readonly watching: boolean;
+}
+
+/** The three cells a shell writes that are not a polyline. */
+export interface RaceSlots {
+  /** The header's live line — a refusal, a state, or {@link RaceStripView.verdict}. */
+  readonly verdict: string;
+  /** The one-line note under the lanes. Never empty: with no rival it is the pick's own note. */
+  readonly note: string;
+  /** The picked option's label, for the grey line's key. `''` when no rival lane is drawn. */
+  readonly rivalName: string;
+}
+
+/**
+ * The verdict slot, the note and the key's name — one derivation, both shells.
+ *
+ * ## Honesty order, and it is the reason this is not three ternaries at each call site
+ *
+ * **Watching somebody else's day** outranks everything, the refusal included — GAMEPLAY § 14.1,
+ * and it is above the refusal rather than beside it because a refusal explains why *this player's*
+ * pick produced no run, which is a sentence about a race a spectator is not in. `enterWatch` already
+ * drops the rival's recording, so what is left to decide is what the three cells say over a run that
+ * is not the reader's: no verdict (§ 14.1's *"no verdict — you are not in this comparison"* — the
+ * cell is emptied, and each shell fills it with its own § 14.1 identity treatment), no name, and
+ * {@link RACE_WATCHING} as the note. The note is the reason, drawn, and that is the point of it:
+ * both shells previously hid it in a `title`.
+ *
+ * Then a **refusal** outranks the rest: it says why there is no rival, and a state ("waiting for…")
+ * printed over it would describe a request that was never made. Then a picked-but-absent rival says
+ * whether one is coming. Only a **drawn** rival — or the *nobody* pick, whose slot carries the
+ * plain figure — speaks through the view itself. Getting that order wrong is not a cosmetic bug: it
+ * is a strip claiming a race is in flight when the picker has already declined to run one.
+ *
+ * `dev/main.ts` composed this inline while it was the only shell with a strip. It is not any more
+ * (GitHub issue **#226**, [§ D482](../../../../DECISIONS.md)), and *two sites answering one question
+ * is how one of them goes stale unread* is this package's most-repeated finding.
+ *
+ * ## The note is never empty, which is a change from the one-shell version
+ *
+ * With no rival drawn the note is the **picked option's own** sentence — `nobody`'s
+ * *"no second run, no rival line, no score — just your day"*. It used to be `''`, which was
+ * defensible on a strip whose picker sat two inches away and is not on a card whose only other
+ * words are a verdict. No new string: {@link GHOST_OPTIONS} already carries one per pick, and the
+ * honesty corpus already sweeps them.
+ *
+ * ## Why it takes the player's recording as well as the view
+ *
+ * Only to tell {@link SAME_CROWD_NOTE} from {@link SAME_RUN_NOTE}, through
+ * {@link servedIdentically} — a rival that served the crowd exactly as the player did draws its
+ * line under theirs, and *"the gap is your change"* beside no gap is a true sentence that misleads.
+ * `undefined` is accepted so a caller with no run on screen is not forced to invent one; it simply
+ * cannot be the same run as anything.
+ */
+export function raceSlotsOf(
+  view: RaceStripView,
+  rival: RaceRival,
+  yours: VizRecording | undefined,
+): RaceSlots {
+  if (rival.watching) return { verdict: '', note: RACE_WATCHING, rivalName: '' };
+  const drawn = view.ghost !== undefined;
+  const pickNote = GHOST_OPTIONS.find((option) => option.id === rival.pick)?.note ?? '';
+  const verdict =
+    rival.refusal ??
+    (drawn || rival.pick === 'none'
+      ? view.verdict
+      : rival.pending
+        ? RACE_PENDING
+        : RACE_NOT_RUN);
+  const sameRun =
+    drawn &&
+    yours !== undefined &&
+    rival.recording !== undefined &&
+    servedIdentically(yours, rival.recording);
+  return {
+    verdict,
+    note: drawn ? (sameRun ? SAME_RUN_NOTE : view.note) : pickNote,
+    rivalName: drawn
+      ? (GHOST_OPTIONS.find((option) => option.id === rival.pick)?.label ?? '')
+      : '',
+  };
+}
+
+/**
+ * Whether two recordings served one crowd in exactly the same way — {@link SAME_RUN_NOTE}'s test.
+ *
+ * ## What is compared, and why it is the service and not the arrivals
+ *
+ * The **arrivals** are equal by construction: `dev/ghostRun.ts` swaps one field of the primary's own
+ * config, so both runs draw the same crowd from the same seed, and comparing them would be asking a
+ * question whose answer is *yes* on every honest race. What decides the picture is what the
+ * dispatchers **did** with that crowd — who boarded when, in which car, and when they got out — and
+ * those are the four fields below. `isWaitingAt` reads `boardedAt` and `refusedAt`, so two
+ * recordings that agree here plot the same two lines at every sample by construction.
+ *
+ * ## The walk bails on the first difference, which is what makes it cheap enough to draw with
+ *
+ * Two different dispatchers diverge within the first handful of legs on any real day, so the common
+ * case costs a few comparisons. The expensive case — a full pass — is exactly the case where the
+ * answer is *yes*, and one pass of numeric comparisons over a 20 000-leg recording is not a frame.
+ * There is deliberately no serialisation anywhere in here: `JSON.stringify` of two recordings is the
+ * obvious way to write this and would allocate megabytes on a render path.
+ */
+export function servedIdentically(yours: VizRecording, rival: VizRecording): boolean {
+  if (yours.legs.length !== rival.legs.length) return false;
+  for (const [index, leg] of yours.legs.entries()) {
+    const other = rival.legs[index];
+    if (other === undefined) return false;
+    if (
+      leg.passengerId !== other.passengerId ||
+      leg.boardedAt !== other.boardedAt ||
+      leg.alightedAt !== other.alightedAt ||
+      leg.carId !== other.carId ||
+      leg.refusedAt !== other.refusedAt
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /* -------------------------------------------------------------------------- *

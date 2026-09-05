@@ -59,10 +59,19 @@
  *   the one place they must agree: {@link EverydayHost.intervene} takes the caller's playhead
  *   explicitly, and `dev/main.ts` seeks its own transport to it, so an intervention stamped on the
  *   Everyday stage lands at the instant the Everyday stage was showing;
- * - **no second recording, so no § 7.4 ghost** — `dev/ghostRun.ts` builds a rival inside the
- *   Engineer closure, and nothing here reaches it. The stage draws `raceStripViewOf`'s *nobody* arm
- *   and names the absence (`everyday/stageScreenModel.ts#STAGE_NO_GHOST`); a ghost method with no
- *   rival behind it would be worse than none;
+ * - ~~no second recording, so no § 7.4 ghost~~ — **built, with its rival behind it, and the absence
+ *   is corrected here rather than left standing** (GitHub issue **#226**,
+ *   [§ D482](../../../../DECISIONS.md)). It read *"`dev/ghostRun.ts` builds a rival inside the
+ *   Engineer closure, and nothing here reaches it … a ghost method with no rival behind it would be
+ *   worse than none"*, and the caution in that last clause is the one this pair was built to honour:
+ *   {@link EverydayHost.raceAgainst} does not merely record a pick, it presses the **same**
+ *   `dev/main.ts` seam the Engineer picker presses, which issues the second request through the same
+ *   worker and adopts the recording read-only beside the primary. So the method arrived **with** its
+ *   rival, which is the rule these absences exist to keep. {@link EverydayHost.ghostRace} is the read
+ *   half. Two arms of § 7.4's picker are still absent and are absent *from the picker* rather than
+ *   from this façade — the world's middle needs a reference median vector no route returns (#327),
+ *   and a board row needs posting (#332) — so `live/raceStrip.ts#GHOST_OPTIONS` offers three honest
+ *   picks and no stub, which is where a reader meets that limit;
  * - ~~no watch entry~~ — **built, and the absence is deleted rather than left standing** (GitHub
  *   issue **#182**, [§ D436](../../../../DECISIONS.md)). It said *"§ 14's spectator flow has no
  *   Everyday surface yet"*, and by the time it was deleted every other part of that flow was here:
@@ -150,6 +159,7 @@ import {
   type ViewerState,
 } from '../dev/state.js';
 import { observationsAt } from '../live/observations.js';
+import type { GhostPick } from '../live/raceStrip.js';
 import {
   applyPlainLever,
   plainLeversOf,
@@ -249,6 +259,34 @@ export async function dailyBoardOf(
 
 /** What the daily board is ranked on. The Engineer board list asks for the same one. */
 export const DAILY_BOARD_METRIC = 'awtS';
+
+/**
+ * § 7.4's race, as the shell knows it — GitHub issue **#226**, [§ D482](../../../../DECISIONS.md).
+ *
+ * **Read as one value, on `EverydayWatchSession`'s own rule.** Four independent reads of four
+ * closure fields is four chances for a screen to draw a rival's line beside another rival's name,
+ * or to print *waiting for the rival's day* over a request the picker refused to make. They move
+ * together in `dev/main.ts` and they are handed over together.
+ *
+ * It is deliberately **not** the strip's view: `live/raceStrip.ts#raceStripViewOf` folds two
+ * recordings and a playhead, and `#raceSlotsOf` turns this plus that into the three cells a shell
+ * writes. This is the half only the shell that issued the request can know.
+ */
+export interface EverydayGhostRace {
+  /** Who is being raced. `'none'` is the *nobody* pick — no request, no lines, no verdict. */
+  readonly pick: GhostPick;
+  /**
+   * The rival's finished recording, or `undefined`.
+   *
+   * Replaced wholesale when a second request lands, so a screen knows a new rival has arrived by
+   * `!==` — the same signal `EverydayHost.recording` carries, for the same reason.
+   */
+  readonly rival: VizRecording | undefined;
+  /** Why this pick produced no run, or `undefined` — `dev/ghostRun.ts#GhostPlan`'s refused arm. */
+  readonly refusal: string | undefined;
+  /** Whether the rival's day is still in the worker. */
+  readonly pending: boolean;
+}
 
 /**
  * A watch in progress — the row and the § 14.1 view drawn from it, together.
@@ -617,6 +655,45 @@ export interface EverydayHost {
   recording(): VizRecording | undefined;
 
   /**
+   * § 7.4's **second** recording — who the player is racing, and the rival's finished day.
+   *
+   * Read-only beside {@link recording} and never instead of it. The rival is adopted by
+   * `dev/main.ts#scheduleGhost` without ever being written to `state.recording` or to its
+   * `simulatedRecording`, so `shift/banking.ts#bankingRefusalFor`'s object-identity gate refuses it
+   * by construction: a rival can touch neither `dayClosed`, the week, nor the board.
+   * `dev/ghostRun.test.ts` asserts that refusal on a real pair of recordings.
+   *
+   * Every field moves on the host's own {@link subscribe} notification, and
+   * {@link EverydayGhostRace.rival} is the field a screen watches by `!==` — a second request that
+   * lands replaces the object, exactly as {@link recording} does.
+   */
+  ghostRace(): EverydayGhostRace;
+
+  /**
+   * Pick a rival, and issue their day — GitHub issue **#226**, [§ D482](../../../../DECISIONS.md).
+   *
+   * **The press, not a preference.** `'none'` cancels a rival in flight and issues nothing;
+   * anything else runs a second day of *this* day's crowd through the same worker the player's own
+   * run went through, and the config is the primary's own with exactly one field swapped
+   * (`dev/ghostRun.ts#ghostPlanOf`) — same building, same demand, **same seed**, which is common
+   * random numbers and the only thing that entitles two lines to be drawn on one scale.
+   *
+   * It is the same `dev/main.ts` seam the Engineer strip's `<select>` presses, deliberately: two
+   * entry points to *who is the rival* is how one of them gets to disagree with the strip drawing
+   * it, which is the failure `dev/watchPanel.ts` is one file for.
+   *
+   * A pick this state cannot honestly produce refuses **in words** rather than falling back to
+   * another rival — a rival the player did not pick would be the strip inventing one. The sentence
+   * arrives on {@link EverydayGhostRace.refusal}; *nothing saved yet* is the one this build can
+   * produce.
+   *
+   * A pick that turns out to have driven **the same way** is a different thing and is not refused:
+   * it cannot be predicted from the configuration (`live/raceStrip.ts#SAME_RUN_NOTE` has the
+   * measurement), so the rival runs, the lines are drawn, and the strip says which state it is.
+   */
+  raceAgainst(pick: GhostPick): void;
+
+  /**
    * Where the run on the stage starts on the clock, seconds since midnight, or `undefined` when
    * its template declares no hour.
    *
@@ -935,6 +1012,14 @@ export interface EverydayHostBindings {
    * imported one would be the third.
    */
   readonly dailyBoard: (() => Promise<EverydayDailyBoard>) | undefined;
+  /** § 7.4's rival — `dev/main.ts`'s own ghost fields, read together so they cannot disagree. */
+  ghostRace(): EverydayGhostRace;
+  /**
+   * Set the pick and issue the rival's day — `dev/main.ts#setGhostPick`, which is the **same**
+   * function the Engineer strip's `<select>` calls. Not re-implemented here: see
+   * {@link EverydayHost.raceAgainst}.
+   */
+  raceAgainst(pick: GhostPick): void;
   /** Register a listener on `renderAll`'s notification list. Returns the unsubscribe. */
   onChange(listener: () => void): () => void;
 }
@@ -1179,6 +1264,16 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     campaign: () => career,
     savedDispatchers: () => b.state().savedDispatchers,
     recording: () => b.state().recording,
+    /*
+     * Straight through, both of them. The whole of § 7.4's decision — which profile, whether it can
+     * honestly be run, whether the request is even made — is `dev/ghostRun.ts#ghostPlanOf`'s, and a
+     * derivation here would be a second answer to it. This façade's job is that the Casual stage can
+     * reach that decision without importing across it.
+     */
+    ghostRace: () => b.ghostRace(),
+    raceAgainst: (pick) => {
+      b.raceAgainst(pick);
+    },
     dayStartS: () => b.dayStartS(),
     interventions: () => b.state().interventions,
     editedDispatcher: () => {

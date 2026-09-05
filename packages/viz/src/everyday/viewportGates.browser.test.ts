@@ -596,6 +596,22 @@ function failuresOf(cell: Cell): readonly string[] {
  * layout having changed — which is the one way this list can go red that means *the product grew*
  * rather than *the product regressed*. The lines are #240's like every other entry: the same row, at
  * the same two viewports, for the same reason.
+ *
+ * **And one more line joined at both viewports for the same reason** — GitHub issue **#226**,
+ * [§ D482](../../../../DECISIONS.md), which put § 7.4's ghost picker on the stage's race card.
+ * `everyday-stage-ghost ×1` is a control that is genuinely under § 2 clause 3's minimum on a phone,
+ * so it is registered rather than argued away; it is **not** a new defect class, and the register
+ * says which is which by the company it keeps. `everyday-stage-switch-pick ×1` — the *other* picker
+ * on this stage, added by #171 — is already here at both widths with the same count, on the same
+ * card, for the same reason. A `<select>` this build puts on the stage does not meet the target size
+ * at 360 or 375 px, twice over now.
+ *
+ * **Registered rather than fixed, deliberately.** #240 owns the small-screen layout, and a lane that
+ * resized this one control in passing would take a row out of #240's inventory without taking the
+ * row's *cause* out of the product — the issue would then close against a smaller problem than the
+ * one it was opened for. The register's own rule cuts the other way too and is why this is two lines
+ * and not a paragraph: only what reproduces goes in, because a line the product does not produce is
+ * a ghost and a register of ghosts is a suppression list.
  */
 const OUTSTANDING: readonly string[] = Object.freeze([
   '360×800 · main menu · clause 1 · content clipped horizontally',
@@ -604,6 +620,7 @@ const OUTSTANDING: readonly string[] = Object.freeze([
   '360×800 · stage · clause 1 · content clipped horizontally',
   '360×800 · stage · clause 3 · everyday-bar-primary ×1',
   '360×800 · stage · clause 3 · everyday-bar-timeline > button ×2',
+  '360×800 · stage · clause 3 · everyday-stage-ghost ×1',
   '360×800 · stage · clause 3 · everyday-stage-intervene ×2',
   '360×800 · stage · clause 3 · everyday-stage-speed ×7',
   '360×800 · stage · clause 3 · everyday-stage-start ×1',
@@ -614,6 +631,7 @@ const OUTSTANDING: readonly string[] = Object.freeze([
   '375×667 · stage · clause 1 · content clipped horizontally',
   '375×667 · stage · clause 3 · everyday-bar-primary ×1',
   '375×667 · stage · clause 3 · everyday-bar-timeline > button ×2',
+  '375×667 · stage · clause 3 · everyday-stage-ghost ×1',
   '375×667 · stage · clause 3 · everyday-stage-intervene ×2',
   '375×667 · stage · clause 3 · everyday-stage-speed ×6',
   '375×667 · stage · clause 3 · everyday-stage-start ×1',

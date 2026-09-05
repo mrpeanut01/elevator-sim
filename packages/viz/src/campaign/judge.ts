@@ -688,8 +688,11 @@ function suppressionClause(
  * change to `honesty/surfaces.ts`. What it can no longer catch: a headline **rewritten** to assert
  * a per-goal outcome — *"nobody-abandoned was met"* — with no rate beside it. That risk is bounded
  * here rather than left implicit: this function's inputs are a stage name, four integers and two
- * fixed clauses, and `judge.test.ts` asserts the produced headline names **no goal kind and no
- * goal label**, on both branches, over the shipped campaign.
+ * fixed clauses, and the produced headline names **no goal kind and no goal label** over the
+ * shipped campaign — `judge.test.ts` asserts it on the uncleared branch and
+ * `judgeCleared.test.ts` on the cleared one, one case per dispatcher. Both files, because issue
+ * #317's split moved the cleared half out; the claim itself is unchanged and is now made over
+ * thirteen verdicts rather than the first one that cleared.
  *
  * ## The holdout clause, and why it is on the tally rather than beside it
  *

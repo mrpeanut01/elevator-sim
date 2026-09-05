@@ -973,3 +973,79 @@ is a different failure from the one this file usually tracks and probably a more
 Anything needing the API redeployed. Unchanged from snapshot G, and #333 sharpens it further: the
 image is deployed by hand from `scripts/deploy-azure.sh`, invoked by nothing in CI, so a migration
 runner landing in the repository does not mean a migration has run anywhere.
+
+---
+
+# Snapshot I — wave R, 2026-09-05, integrated at `d8a86a3` from base `13e7b93`
+
+**66 open at the start. Six closed, one filed, four decision-blocked issues ruled.** 61 open.
+
+Per § D485, this snapshot carries its date and its commit sha, and **a reader may not treat it as
+current state.** That is the agreement standing in for #329's third instance, which is not
+mechanised and says so.
+
+## I.1 The sorting principle, and it was not the one that paid
+
+Snapshot H ranked the batch by prerequisite chain and put #336 first. That was right. What was *not*
+anticipated is where the wave's value came from: **four of four build lanes refuted the brief they
+were given, and the briefs were the integrator's.** Wave Q had four of five. Two waves running, the
+most valuable thing a lane did was disagree with its instructions.
+
+The rule that follows is narrow and worth keeping: **a brief that names a mechanism is a hypothesis,
+exactly like an issue that names a defect.** Snapshot H's rule was *verify before scheduling*. This
+wave adds: *and verify the brief, not only the issue.*
+
+## I.2 Dispositions moved
+
+| issue | before | after |
+|---|---|---|
+| **#336** | next in the queue, P1 | **closed** — and the same line was blocking the browser tier's door between worlds |
+| **#199** | open, M1, four issues waiting on it | **closed** — `docs/37-content-plan.md`; contracts was 8, not 5 |
+| **#315** | open, needs a boundary decision | **closed** — the decision inverts, and the residue was in `menu/challenge.ts` |
+| **#226** | open, P2 | **closed** — and the race is vacuous at the shipped defaults, measured |
+| **#317** | open, untriaged | **closed** — already fixed by `0f5124b`, one day after filing |
+| **#320** | open, untriaged | **closed** — already fixed by the same commit |
+| **#327** | needs a statistical ruling | **schedulable** — § D484; and its two consumers want different things |
+| **#329** | needs a shape decision | **schedulable** — § D485; two of three shapes store maintainable state |
+| **#338** | needs a ruling on two refusals | **schedulable** — § D486; ground 2 falls, ground 3 is permanent |
+| **#158** | open, blocked on a ruling | **ruled** — author, not accept; and the finding is bigger than the issue |
+| **#324** | open, P3 | open — the absence entry's reason is **false for `vertical-city`**, measured; correction is separable from the build |
+| **#325** | open, P2 | open — **the preferred fix would build a gate that cannot go red**, demonstrated |
+| **#344** | — | **filed** — 146 cases across five packages annotated above the project ceiling |
+
+## I.3 The finding that outranks the dispositions
+
+**Two of the four issues sent to a verification lane were already fixed, by the same commit, one day
+after each was filed and before either was triaged.** That is wave P's headline recurring at
+one-third the rate — five of seven then, two of four now — and it is now the third consecutive wave
+where reading the code beat reading the titles.
+
+`0f5124b` closed both. Neither issue carried a single comment. **Nothing in this process watches a
+commit for the issues it silently resolves**, which is #329's subject arriving from the other
+direction: #329 is about a blocker clearing unwatched, and this is a *defect* clearing unwatched.
+Worth noting that § D485's mechanism does not catch it — `Blocked by #N` indexes dependency, not
+resolution.
+
+## I.4 What the next batch should be
+
+1. **#332 — the Everyday sign-in surface.** Its named prerequisite (#336) closed this wave. Still
+   carries two product questions the design handoff cannot answer, and those should be ruled before
+   the lane opens rather than during it.
+2. **#327 — the distribution endpoint.** Now fully specified by § D484, and #226's world arm plus
+   #161's world figures both wait on it. Note it has **two** consumers wanting different shapes.
+3. **#338's ground 2.** Ruled fixable, and the shape is written: `{ atS, toProfileId, ruleRows? }`.
+   Small, and it makes a playable day postable.
+4. **#324's entry correction**, separated from the camera. A live false claim on a player-facing
+   surface, small, and blocked on nothing. The camera itself stays blocked on what § 7.3 means.
+5. **#329's build.** Ruled, small, and it is this process's own instrumentation.
+
+## I.5 What is still blocked on a decision rather than on work
+
+Down from five to **two**: **#328** (where a scheduled job runs — infrastructure cost, the product
+owner's) and **#332** (the screen has no design, and there are two display names where § 15.1 asserts
+one). #327, #329 and #338 were ruled this wave.
+
+## I.6 Still not in a batch
+
+Anything needing the API redeployed. Unchanged since snapshot G. #333's migration runner has landed
+in the repository, which does not mean a migration has run anywhere.

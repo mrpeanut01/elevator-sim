@@ -1480,6 +1480,39 @@ type DecisionReservation = {
  */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
+ * **Wave R reserved D479–D483 at dispatch: one number per issue, plus one for the integrator.**
+ *
+ * Two lessons applied at once. Wave Q's sizing rule — a block belongs to the issues it will close
+ * rather than to the lanes that close them — gives four: D479 issue #336, D480 issue #199, D481
+ * issue #315, D482 issue #226. The fifth, D483, is wave H's lesson from § D418, recorded above:
+ * an integrator who works during a wave needs a number too, and dispatching a block fitted to the
+ * lanes alone is what pushed § D418 one past its ceiling.
+ *
+ * The reservation is opened on the wave branch **before** any lane starts, which is the half wave Q
+ * got wrong by opening it mid-wave. Reconcile it and the charter row on the same commit as the last
+ * lane merge; a number no lane reaches is free rather than holed, and only a number written below
+ * a higher one is a hole.
+ *
+ * **Widened to D485 mid-wave, and the widening is the finding.** One integrator number was
+ * dispatched, on wave H's lesson that an integrator who works during a wave needs one — and it was
+ * spent on the first integrator decision of the wave (D483), with more integrator work still open.
+ * **That is the second consecutive wave where the integrator's own allocation was wrong**, wave H
+ * having had none at all and § D418 landing one past its ceiling as a result. The sizing rule that
+ * works for lanes — one number per issue — does not transfer, because an integrator's numbers are
+ * not per issue: they are per finding, and a wave's findings are not enumerable at dispatch.
+ * Recorded here rather than silently taken, because taking the number above a block is exactly what
+ * § D404 forbids and the guard below is what would have caught it.
+ *
+ * **Widened a second time, to D487, and this one is the lesson applied rather than re-learned.**
+ * The first widening was reactive: a number was needed and the block did not hold it. Widening
+ * again the moment that happened, before needing it, is what the paragraph above says to do — an
+ * integrator's allocation is a **stream** rather than a batch, because it is spent per finding and
+ * a wave's findings are not enumerable at dispatch. Over-reserving costs nothing: the ceiling check
+ * below requires at least one number in the block to be unwritten while the wave is open, and a
+ * number the wave never reaches is free rather than holed. Under-reserving costs a mid-wave edit to
+ * this file every time.
+ */
+/*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
  *
  * The block was D396–D417: lanes A–D held D396–D403, and lane E's was dispatched open-ended

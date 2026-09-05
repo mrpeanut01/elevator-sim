@@ -34,6 +34,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { reportWindowForBuilding } from '@elevator-sim/experiments/browser';
+
 import type { VizRecording } from '../contract/types.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
 
@@ -185,20 +187,80 @@ describe('the run configuration is the one the server will replay', () => {
      *
      * Nested literals are flattened to a placeholder first, so `{ demand: { rate: … } }` yields
      * `demand` and not the inner key, which is not a config term.
+     *
+     * **Shorthand properties count, and missing them is how this guard failed once** — GitHub
+     * issue #315. `configFor` writes the report window as
+     * `...(reportWindow === undefined ? {} : { reportWindow })`, which is `shiftRunConfigOf`'s own
+     * spelling for spread-or-omit and has **no colon in it**. The arm scanner below required one,
+     * so the term this docstring names three paragraphs up as its worked example — *"a
+     * `reportWindow`"* — was the one term it could not see, and `challengeRunConfigs` shipped
+     * without it for a wave. Measured on the tree that closed #315's leaderboard half: this
+     * extraction found **13** keys and `reportWindow` was not among them.
+     *
+     * So each arm is split on its top-level commas and every part is read two ways: `key:` … for a
+     * keyed property, and a bare identifier for a shorthand one. A part that is neither — the tail
+     * of a value that itself contained a comma — contributes nothing, which is why the shorthand
+     * arm is anchored to the whole part rather than matched loose.
      */
     for (const spread of text.matchAll(/\.\.\.\(([\s\S]*?)\),\n/gu)) {
       for (const arm of (spread[1] ?? '').matchAll(/\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/gu)) {
         const flat = (arm[1] ?? '').replace(/\{[^{}]*\}/gu, 'Ø');
-        for (const key of flat.matchAll(/(\w+)\s*:/gu)) keys.add(key[1] ?? '');
+        for (const part of flat.split(',')) {
+          const keyed = /^\s*(\w+)\s*:/u.exec(part);
+          if (keyed !== null) {
+            keys.add(keyed[1] ?? '');
+            continue;
+          }
+          const shorthand = /^\s*(\w+)\s*$/u.exec(part);
+          if (shorthand !== null) keys.add(shorthand[1] ?? '');
+        }
       }
     }
 
     // A regex that stopped matching would otherwise produce an empty set and a silent pass.
     expect(keys.size).toBeGreaterThanOrEqual(8);
 
-    const built = challengeRunConfigs(viewOf(), RESOURCES, 'collective');
-    if (!built.ok) throw new Error(built.detail);
-    const builtKeys = Object.keys(built.runs[0]?.config ?? {});
+    /*
+     * **The client's key set, taken over every side of the window rule rather than over one
+     * building** — GitHub issue #315, and this is the half of that issue that bit twice.
+     *
+     * The issue's own diagnosis was that *"the present suite only ever drives `midtown-office`, the
+     * one building that agrees"*. This guard had that flaw as well, one level up: it built a single
+     * config on `viewOf()`, which is the `midtown-morning` rotation entry and therefore Midtown. A
+     * term that is **conditional on the building** is absent from that config whenever Midtown is on
+     * the omitting side of the condition — so `reportWindow` was missing from `builtKeys` for the
+     * same reason it was missing from `keys`, and the exact-set assertion below would have gone on
+     * reporting the same three names with the client correct *or* broken.
+     *
+     * So the config is built once per building this fixture ships and the keys are unioned. The
+     * split is **derived from the rule** rather than listed: `probes.test-helper.ts` ships
+     * `garden-apartments` and `midtown-office`, which are one building from each side of it today,
+     * and the premise below fails rather than passing vacuously if that ever stops being true —
+     * a ninth building that answered the rule a third way would widen the union rather than escape
+     * it, and one that emptied a side would land here as a failed premise.
+     */
+    const windowsDriven = new Set(
+      RESOURCES.buildings.map((entry) => String(reportWindowForBuilding(entry.id))),
+    );
+    expect(
+      [...windowsDriven].sort(),
+      'this fixture drives one answer to the window rule, so a building-conditional key cannot be seen',
+    ).toEqual(['full-run', 'undefined']);
+
+    const builtKeys = [
+      ...new Set(
+        RESOURCES.buildings.flatMap((entry) => {
+          const view = viewOf();
+          const built = challengeRunConfigs(
+            { ...view, challenge: { ...view.challenge, config: { ...view.challenge.config, buildingId: entry.id } } },
+            RESOURCES,
+            'collective',
+          );
+          if (!built.ok) throw new Error(`${entry.id}: ${built.detail}`);
+          return Object.keys(built.runs[0]?.config ?? {});
+        }),
+      ),
+    ];
 
     // Nothing the client assigns is absent from the server's own source.
     expect(builtKeys.filter((key) => !keys.has(key))).toEqual([]);
@@ -232,6 +294,58 @@ describe('the run configuration is the one the server will replay', () => {
       'windowEndS',
       'windowStartS',
     ]);
+  });
+
+  it('derives the report window from the building id, on each side of the rule', () => {
+    /*
+     * **GitHub issue #315, on the challenge path.** The leaderboard's two sides were made to derive
+     * this term from one shipped rule; this client is the third consumer of it and was omitting it,
+     * so a challenge on a building the rule moves would have been measured here over one window and
+     * replayed by the server over another — every honest entry on it refused as unreproducible, for
+     * a run the player genuinely played.
+     *
+     * **Driven over both sides of the rule rather than over one building**, which is the clause the
+     * issue itself asks for: *"a test drives at least one building whose window is `'full-run'` and
+     * one whose window is not — the present suite only ever drives the latter, which is the gap that
+     * hid this"*. The split is derived from the rule, so a ninth building answering it a third way
+     * widens the loop rather than escaping it, and the count assertion fails rather than passing
+     * vacuously if a matrix edit ever empties a side.
+     *
+     * Present-and-`undefined` is **not** the same claim as absent: `core` reads an absent key as
+     * *the demand template's own band* and would read a present `undefined` as a selection, so the
+     * building the rule does not move is asserted to carry no key at all rather than to carry an
+     * empty one.
+     */
+    const bySide = new Map<string, string[]>();
+    for (const entry of RESOURCES.buildings) {
+      const side = String(reportWindowForBuilding(entry.id));
+      bySide.set(side, [...(bySide.get(side) ?? []), entry.id]);
+    }
+    expect(
+      [...bySide.keys()].sort(),
+      'this fixture drives one answer to the window rule, so the pair below would be vacuous',
+    ).toEqual(['full-run', 'undefined']);
+
+    for (const [side, ids] of bySide) {
+      for (const id of ids) {
+        const view = viewOf();
+        const built = challengeRunConfigs(
+          { ...view, challenge: { ...view.challenge, config: { ...view.challenge.config, buildingId: id } } },
+          RESOURCES,
+          'collective',
+        );
+        if (!built.ok) throw new Error(`${id}: ${built.detail}`);
+        for (const run of built.runs) {
+          if (side === 'undefined') {
+            expect(Object.keys(run.config), `${id}: an absent window is not a present undefined`).not.toContain(
+              'reportWindow',
+            );
+          } else {
+            expect(run.config.reportWindow, id).toBe(reportWindowForBuilding(id));
+          }
+        }
+      }
+    }
   });
 
   it('treats a null rate as the building’s own profile, by omitting the key rather than zeroing it', () => {

@@ -106,7 +106,7 @@ import {
   workshopLeversOf,
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
-import { briefBarModel, briefScreenViewOf, GHOST_REFUSAL, lockedForScore } from '../everyday/briefView.js';
+import { briefBarModel, briefScreenViewOf, lockedForScore, raceAgainstCard } from '../everyday/briefView.js';
 import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import {
@@ -155,6 +155,7 @@ import {
   tuneStateFrom,
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
+import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
 import { everydayReportViewOf } from '../everyday/reportView.js';
 import { SETTINGS_ABSENCES, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
@@ -173,10 +174,10 @@ import {
   STAGE_AWAITING_RUN,
   STAGE_GOALS_COPY,
   STAGE_INTERVENTIONS,
-  STAGE_NO_GHOST,
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  STAGE_RACE_PICKER_LABEL,
   STAGE_SWITCH_PICKER_LABEL,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
@@ -276,8 +277,11 @@ import {
   GHOST_OPTIONS,
   RACE_NOT_RUN,
   RACE_PENDING,
+  RACE_WATCHING,
+  raceSlotsOf,
   raceStripViewOf,
   raceVerdictOf,
+  type RaceSlots,
 } from '../live/raceStrip.js';
 import { DAY_HAS_NO_RECORD, refusalForDay } from '../watch/library.js';
 import { recordUnreadableReason } from '../watch/record.js';
@@ -299,7 +303,7 @@ import { overlayViewOf } from '../render/overlay.js';
 import { describePreview, drawPreview } from '../render/preview.js';
 import { NO_SHEET_YET, reportCardOf, type CardRecipe } from '../render/reportCard.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
-import { ghostPlanOf } from '../dev/ghostRun.js';
+import { ghostPlanOf, NO_SAVED_DISPATCHER } from '../dev/ghostRun.js';
 import { initialState, shiftRunConfigOf, tomorrowFactsOf } from '../dev/state.js';
 import { tomorrowBriefingOf } from '../shift/tomorrow.js';
 import { describeQueue, planQueueRow } from '../render/riderQueue.js';
@@ -2647,8 +2651,10 @@ const CAMPAIGN: SurfaceAdapter = {
      *
      * **What this gives up:** the search can no longer catch a headline *rewritten* to assert a
      * per-goal outcome without a rate. That is bounded rather than left implicit — `judge.test.ts`
-     * asserts the produced headline names no goal kind and no goal label, on both branches, with the
-     * cleared one driven through a real 50-replication batch.
+     * asserts it on the uncleared branch, and `judgeCleared.test.ts` on the cleared one, thirteen
+     * cases each driven through a real 50-replication batch. The claim is unchanged and is now made
+     * over every shipped dispatcher; what moved is the file, when issue #317's split took the sweep
+     * out of one `it()`.
      */
     const headlineSeeds = context.batch.arms[0]?.replications.length ?? 0;
     seeds.push({
@@ -6909,10 +6915,13 @@ const RACE_STRIP: SurfaceAdapter = {
     'live/raceStrip.ts#GHOST_OPTIONS',
     'live/raceStrip.ts#RACE_FOOTER',
     'live/raceStrip.ts#SAME_CROWD_NOTE',
+    'live/raceStrip.ts#SAME_RUN_NOTE',
     'live/raceStrip.ts#RACE_PENDING',
     'live/raceStrip.ts#RACE_NOT_RUN',
+    'live/raceStrip.ts#RACE_WATCHING',
     'live/raceStrip.ts#raceVerdictOf',
     'live/raceStrip.ts#raceStripViewOf',
+    'live/raceStrip.ts#raceSlotsOf',
     'dev/ghostRun.ts#NO_SAVED_DISPATCHER',
     'dev/ghostRun.ts#ghostPlanOf',
   ],
@@ -6926,6 +6935,7 @@ const RACE_STRIP: SurfaceAdapter = {
     }
     seeds.push({ field: 'race.pending', text: RACE_PENDING, role: 'prose' });
     seeds.push({ field: 'race.notRun', text: RACE_NOT_RUN, role: 'prose' });
+    seeds.push({ field: 'race.watching', text: RACE_WATCHING, role: 'reason' });
 
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
@@ -6946,6 +6956,137 @@ const RACE_STRIP: SurfaceAdapter = {
         playhead: atPlayhead(recording, at),
       });
     }
+
+    /*
+     * **The slots, driven through the shipped composition** — GitHub issue #226, § D482.
+     *
+     * `raceSlotsOf` decides three cells for both shells, in an order that is a claim rather than a
+     * formatting choice, and three of its arms are reachable through no other seed here: a refused
+     * pick, a pick whose rival is still in the worker, and a pick whose rival came back **identical
+     * to the primary's own day**. That last one is the state a corpus would otherwise never see —
+     * it needs two recordings that agree, and the honest way to produce one is to hand the same
+     * recording in twice, which is exactly what the state describes.
+     *
+     * **Seeded once each, at the run's end, and deliberately not per sample.** Four of the six arms
+     * carry a verdict that does not move with the playhead at all (a refusal, two states and a
+     * constant note), and the two that do move are already on the temporal axis above through
+     * `race(@Xs).verdict` — `raceSlotsOf`'s drawn arm returns that very string. Repeating them per
+     * sample would multiply rows without adding a state anything reads differently.
+     */
+    const endS = recording.endedAt;
+    const ended = raceStripViewOf({ recording, ghost: comparisonRecording, simTimeS: endS });
+    const alone = raceStripViewOf({ recording, ghost: undefined, simTimeS: endS });
+    const sameRun = raceStripViewOf({ recording, ghost: recording, simTimeS: endS });
+    const armSeeds: readonly (readonly [string, RaceSlots])[] = [
+      [
+        'drawn',
+        raceSlotsOf(
+          ended,
+          {
+            pick: 'plain-baseline',
+            recording: comparisonRecording,
+            refusal: undefined,
+            pending: false,
+            watching: false,
+          },
+          recording,
+        ),
+      ],
+      [
+        'sameRun',
+        raceSlotsOf(
+          sameRun,
+          { pick: 'plain-baseline', recording, refusal: undefined, pending: false, watching: false },
+          recording,
+        ),
+      ],
+      [
+        'nobody',
+        raceSlotsOf(
+          alone,
+          { pick: 'none', recording: undefined, refusal: undefined, pending: false, watching: false },
+          recording,
+        ),
+      ],
+      [
+        'pending',
+        raceSlotsOf(
+          alone,
+          {
+            pick: 'plain-baseline',
+            recording: undefined,
+            refusal: undefined,
+            pending: true,
+            watching: false,
+          },
+          recording,
+        ),
+      ],
+      [
+        'notRun',
+        raceSlotsOf(
+          alone,
+          {
+            pick: 'plain-baseline',
+            recording: undefined,
+            refusal: undefined,
+            pending: false,
+            watching: false,
+          },
+          recording,
+        ),
+      ],
+      /*
+       * **The spectator's three cells** — GAMEPLAY § 14.1. Reachable through no other arm here: it
+       * is the one state that outranks a refusal, and it is deliberately driven with a refusal *and*
+       * a rival in flight underneath it, so the seed would carry the wrong sentence if the order
+       * ever inverted. This is the arm whose absence let `RACE_WATCHING`'s predecessor sit in a
+       * `title` attribute for a wave while the corpus read the option list underneath it.
+       */
+      [
+        'watching',
+        raceSlotsOf(
+          ended,
+          {
+            pick: 'latest-saved',
+            recording: comparisonRecording,
+            refusal: NO_SAVED_DISPATCHER,
+            pending: true,
+            watching: true,
+          },
+          recording,
+        ),
+      ],
+      [
+        'refused',
+        raceSlotsOf(
+          alone,
+          {
+            pick: 'latest-saved',
+            recording: undefined,
+            refusal: NO_SAVED_DISPATCHER,
+            pending: false,
+            watching: false,
+          },
+          recording,
+        ),
+      ],
+    ];
+    for (const [arm, slots] of armSeeds) {
+      seeds.push({
+        field: `race(${arm}).verdict`,
+        text: slots.verdict,
+        role: 'observation',
+        playhead: atPlayhead(recording, endS),
+      });
+      seeds.push({ field: `race(${arm}).note`, text: slots.note, role: 'prose' });
+    }
+    /* The grey line's name, from the one arm that draws a line to attribute. */
+    seeds.push({
+      field: 'race(drawn).rivalName',
+      text: armSeeds[0]?.[1].rivalName ?? '',
+      role: 'label',
+    });
 
     // The wordings the sampled pair may not produce, at shares a player can hold.
     seeds.push({ field: 'race.verdict(ahead)', text: raceVerdictOf(61.4, 52.2), role: 'observation' });
@@ -8681,16 +8822,20 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_BAND_INK',
     /*
      * `#STAGE_ABSENCES` is {@link EVERYDAY_BUILD_NOTES}'s since GitHub issue #207 took the stage's
-     * register off the stage. `#STAGE_NO_GHOST` stays here and is the reason the split is a rule
-     * rather than a tidy-up: it is the ghost lane's own refusal, drawn on the ghost lane's card,
-     * and a refusal that belongs to a control is read where the control is.
+     * register off the stage. `#STAGE_NO_GHOST` stood here and was the reason the split is a rule
+     * rather than a tidy-up — it was the ghost lane's own refusal, drawn on the ghost lane's card,
+     * and a refusal that belongs to a control is read where the control is. The lane has a rival to
+     * draw now (GitHub issue **#226**, § D482) so the refusal is gone; the rule it illustrated is
+     * not, and `#STAGE_RACE_PICKER_LABEL` is here on the same ground. `#STAGE_RACE_WATCHING` was
+     * too and has **moved** to `live/raceStrip.ts#RACE_WATCHING` with the sentence itself: the
+     * Engineer strip needs it as well, and one screen's model is not where both shells can read it.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
     /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
-    'everyday/stageScreenModel.ts#STAGE_NO_GHOST',
+    'everyday/stageScreenModel.ts#STAGE_RACE_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
     /*
@@ -8803,7 +8948,11 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       text: STAGE_SWITCH_PICKER_LABEL,
       role: 'label',
     });
-    seeds.push({ field: 'stage.race.noGhost', text: STAGE_NO_GHOST, role: 'reason' });
+    seeds.push({
+      field: 'stage.race.pickerLabel',
+      text: STAGE_RACE_PICKER_LABEL,
+      role: 'label',
+    });
 
     /*
      * **Pillar 3's goal strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -9761,7 +9910,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/briefView.ts#briefScreenViewOf',
     'everyday/briefView.ts#briefBarModel',
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
-    'everyday/briefView.ts#GHOST_REFUSAL',
+    'everyday/briefView.ts#raceAgainstCard',
     'everyday/briefView.ts#lockedForScore',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
@@ -10005,7 +10154,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     /*
      * The two constants no rendered view reaches on its own: `DOOR_STEPS`' and `SAME_FOR_EVERYONE`
      * are seeded through the door view above, and `percentileLine`'s two arms through Your week.
-     * `GHOST_REFUSAL` and `lockedForScore` likewise. What is left is the world band's own three,
+     * `raceAgainstCard` and `lockedForScore` likewise. What is left is the world band's own three,
      * asserted here as well so the exclusion list never has to claim they are unchecked.
      */
     seeds.push({ field: 'world.label', text: WORLD_FIGURES_LABEL, role: 'label' });
@@ -10036,7 +10185,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       text: briefBarModel(actionBarFor({ screen: 'brief', ctx: 'daily' }), undefined).note ?? '',
       role: 'label',
     });
-    seeds.push({ field: 'brief.ghost.why', text: GHOST_REFUSAL.why, role: 'reason' });
+    seeds.push({ field: 'brief.ghost.why', text: raceAgainstCard().why, role: 'reason' });
     seeds.push({ field: 'brief.locked.why', text: lockedForScore().why, role: 'reason' });
 
     return singleRun(this.id, seeds);
@@ -10094,6 +10243,63 @@ const ENGINEER_DOOR: SurfaceAdapter = {
       { field: 'engineer.header.back.label', text: ENGINEER_RETURN_LABEL, role: 'label' },
       { field: 'engineer.header.back.title', text: ENGINEER_RETURN_TITLE, role: 'prose' },
     ]);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
+ * The mailed sign-in link's banner — GitHub issue #336
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **What Everyday Mode says when a mailed sign-in link is redeemed under it.**
+ *
+ * The banner exists because § D335's shell covers the surface `dev/main.ts#redeemLinkFromHash` was
+ * written to write its outcome onto, so a mailed link worked, minted a session, and acknowledged
+ * nothing where the player could see it. `everyday/signInLink.ts` carries the report and the pure
+ * view; `everyday/shell.ts` draws it, and that mount is excluded in `derive.test.ts` on the DOM
+ * mounts' shared ground — it needs a document, and the pure/DOM split in `everyday/` exists so the
+ * words are drivable without one.
+ *
+ * ## What is driven, and the one field that deliberately is not
+ *
+ * The **outcome sentence is not seeded**, and that is a statement about who authors it rather than
+ * an omission. It is the server's own refusal, `menu/client.ts`'s unavailability sentence, or
+ * `dev/main.ts`'s one-line confirmation of a session — none of them declared in this module, none
+ * of them reachable from it, and a placeholder standing in for them would put a string into this
+ * corpus that no player will ever read. What this module authors is the eyebrow, the route to the
+ * account screen and the dismissal, and those are what is swept.
+ *
+ * The three stages are driven rather than one, because the view is not the same shape in each: a
+ * request in flight carries neither the route nor the dismissal, on the ground that there is
+ * nothing settled to point anywhere about and nothing finished to dismiss. Seeding only the settled
+ * arm would leave that difference unswept.
+ *
+ * Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`. It costs nothing to obey
+ * here: this adapter seeds no figure, no band and no verdict, so there is no wording it could take
+ * a fault off another surface for.
+ */
+const EVERYDAY_SIGN_IN_LINK: SurfaceAdapter = {
+  id: 'everyday/signInLink.ts#signInNoticeViewOf',
+  covers: [
+    'everyday/signInLink.ts#signInNoticeViewOf',
+    'everyday/signInLink.ts#SIGN_IN_NOTICE_LABEL',
+    'everyday/signInLink.ts#SIGN_IN_NOTICE_POINTER',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+    for (const stage of SIGN_IN_LINK_STAGES) {
+      const view = signInNoticeViewOf({ stage, text: '' });
+      if (view === undefined) continue;
+      seeds.push({ field: `signIn.${stage}.label`, text: view.label, role: 'label' });
+      if (view.pointer !== undefined) {
+        seeds.push({ field: `signIn.${stage}.pointer`, text: view.pointer, role: 'prose' });
+      }
+      if (view.dismiss !== undefined) {
+        seeds.push({ field: `signIn.${stage}.dismiss`, text: view.dismiss, role: 'label' });
+      }
+    }
+    return singleRun(this.id, seeds);
   },
 };
 
@@ -10905,6 +11111,14 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * spectator-shaped fault off the surface that exists to carry them.
    */
   EVERYDAY_WATCHING,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT: GitHub issue #336's sign-in
+   * banner. Obeying the rule costs nothing here and the reason is worth stating rather than
+   * inheriting — this adapter seeds an eyebrow, a route and a dismissal, with no figure, no band
+   * and no verdict among them, so there is no wording whose fault it could take off another
+   * surface wherever it sat. The end of the array is where a new adapter goes anyway.
+   */
+  EVERYDAY_SIGN_IN_LINK,
 ]);
 
 /* -------------------------------------------------------------------------- *

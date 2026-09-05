@@ -1924,8 +1924,9 @@ named in the verdict**.
 **Status: ✅ ACCEPTED WITH NAMED GAPS (2026-07-30) — the two load-bearing clauses are met by a run
 rather than by an argument, and the gaps below are part of the verdict rather than a footnote to
 it.** The gate suites are `packages/viz/src/honesty/honesty.test.ts`,
-`packages/viz/src/mode/parity.test.ts`, `packages/viz/src/scenario/goalRates.test.ts` and
-`packages/viz/src/campaign/judge.test.ts`.
+`packages/viz/src/mode/parity.test.ts`, `packages/viz/src/scenario/goalRates.test.ts`,
+`packages/viz/src/campaign/judge.test.ts` and `packages/viz/src/campaign/judgeCleared.test.ts` —
+five, not four, since issue #317's split took the cleared branch into its own file.
 
 | clause | finding |
 |---|---|

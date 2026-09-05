@@ -68,22 +68,46 @@ const alias = {
  * 4.5× amplification measured on this container under 16 spinners (see the `cli` section below),
  * a 109 s case is a **490 s** case, and the ceiling is 300 s.
  *
- * **So the slowest case in `viz` is already past this ceiling under load, and it is named rather
- * than left to be rediscovered**: `campaign/campaign.test.ts`'s *"clears from the dropdown, on the
- * holdout seeds"*, at 109 041 ms, with `campaign/stageSequence.test.ts`'s *"clears a stage on two
- * batches"* behind it at 77 363 ms. Both are the shape issue #317 fixed one file over — a shipped
- * dispatcher sweep inside a single `it()` — and neither is fixed here. **The constant is not moved
- * to cover them.** A budget raised to fit the thing it measures stops being a budget; what the
- * `judge.test.ts` split did instead was make the unit vitest schedules smaller than the budget.
+ * **RETRACTED 2026-09-05, and this is the third stale refusal on the file written to record them.**
+ * The paragraph that stood here read:
+ *
+ * > *"So the slowest case in `viz` is already past this ceiling under load, and it is named rather
+ * > than left to be rediscovered: `campaign/campaign.test.ts`'s "clears from the dropdown, on the
+ * > holdout seeds", at 109 041 ms, with `campaign/stageSequence.test.ts`'s "clears a stage on two
+ * > batches" behind it at 77 363 ms. […] The constant is not moved to cover them."*
+ *
+ * **Neither case is subject to this ceiling.** Both carry an explicit per-test timeout that
+ * overrides the project default, and the argument above never checked:
+ *
+ * | case | annotation | at 4.5× | headroom |
+ * |---|---|---|---|
+ * | `campaign/campaign.test.ts:866` | `}, 3_000_000);` | 490 s | **6.1×** |
+ * | `campaign/stageSequence.test.ts:187` | `}, 900_000);` | 348 s | **2.6×** |
+ *
+ * So neither can produce the red the paragraph predicts, and *"the ceiling is 300 s"* is false of
+ * both. The two sentences above this one — the `experiments` retraction and the `cli` retraction —
+ * are § D227's stale refusal telling a reader **not to look**. This one is the same defect
+ * inverted: it tells them to look at something that is not there, on the file whose subject is
+ * exactly that. `ISSUE_WORKER_LEDGER.md` inherited the claim and is corrected on the same commit.
+ *
+ * **What survives the retraction is a different problem, and it is a real one.** A 109 s case and a
+ * 77 s case are a **wall-clock** cost on the `viz` leg rather than a timeout risk, and the
+ * population that can outrun that leg is far larger than two: **93 cases in `packages/viz` carry an
+ * annotation above this ceiling** (81 at 600 s, 7 at 900 s, 3 at 3 000 s, 2 at 3 600 s). That is
+ * GitHub issue #344's subject, not this constant's.
  *
  * **What it costs, stated rather than glossed.** A genuinely hung pure-function test now takes five
  * minutes to fail instead of five seconds. That is the real price and it is worth paying: a hang is
  * a bug you find once and fix, while a 5 s ceiling under load is a false red that recurs forever and
  * trains people to re-run the suite instead of reading it.
  *
- * **The 113 explicit annotations are deliberately left in place.** They are now redundant, and
- * removing them would be 113 edits whose only effect is to make those sites depend silently on a
- * line in another file. A site that knows it runs a simulation is allowed to say so.
+ * **The explicit annotations are deliberately left in place, and there are 182 of them now, not
+ * 113.** The 113 above is a dated figure — what this suite had converged on when the constant was
+ * chosen — and it is correct as history. This sentence was in the present tense and had drifted:
+ * derived 2026-09-05, `packages/viz` carries **555** timeout annotations in all, of which **182**
+ * sit exactly at 300 000 ms. Removing them would be 182 edits whose only effect is to make those
+ * sites depend silently on a line in another file. A site that knows it runs a simulation is
+ * allowed to say so.
  *
  * A per-test static check was **considered and rejected as the mechanism** — see § D331. A
  * name-level call graph produced 1 881 false positives, and even a correct one cannot tell a test

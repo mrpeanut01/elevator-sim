@@ -1,11 +1,11 @@
 /**
- * The five scenarios, and the stat line that is generated rather than authored.
+ * The scenarios, and the stat line that is generated rather than authored.
  *
- * ## Five scenarios, five shipped buildings, nothing re-authored
+ * ## One scenario per shipped building, nothing re-authored
  *
  * The handoff re-authors each building inline as a `PRESETS` entry with rounded floor heights and
  * populations. `docs/12-design-handoff.md` § 4.4 refuses that: the implementation uses
- * `data/buildings/*.json` verbatim — same five ids, same order, same teaching point, same
+ * `data/buildings/*.json` verbatim — same ids, same order, same teaching point, same
  * `needClean` — and where a handoff stat line disagrees with the file, **the file wins**. So
  * {@link CONTRACTS} carries the handoff's *prose* (which is the deliverable) and none of its
  * *numbers* (which are a prototype's), and {@link statLineOf} derives the numbers from the
@@ -21,7 +21,7 @@
  * `contracts.test.ts` asserts the prose against the vendored copy is not attempted — the vendored
  * file is a record, not a fixture — so these strings are pinned here and reviewed against it.
  *
- * ## All five are open, and there is no state in which they are not
+ * ## Every contract is open, and there is no state in which one is not
  *
  * `design.html` :1616 returns `true` unconditionally from `algoUnlocked` and says why in the same
  * breath: *"Every dispatcher is available from the start — scenarios teach, they do not gate."*
@@ -39,7 +39,7 @@
  * A contract is a *pinned list*, and pinning a `ResolvedBuilding` would mean this module loaded
  * `data/`. It does not, and cannot: `boundaries.test.ts` confines `node:` imports to `dev/` and the
  * test helpers. The caller resolves the id against the `LoadedConfig` it already has, and
- * `contracts.test.ts` asserts all five resolve — which is the check that a renamed building file
+ * `contracts.test.ts` asserts every one resolves — which is the check that a renamed building file
  * cannot silently orphan a scenario.
  */
 

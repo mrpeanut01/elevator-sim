@@ -51,6 +51,7 @@ import {
   createEverydayHost,
   dailyBoardOf,
   EVERYDAY_HOST,
+  type EverydayGhostRace,
   type EverydayHostBindings,
 } from './host.js';
 
@@ -106,6 +107,8 @@ interface Harness {
   simulate: (config: SimulationConfig) => VizRecording;
   /** The session `enterWatch` opened, read back by `watching()`. */
   watching: { readonly run: WatchableRun; readonly view: WatchingView } | undefined;
+  /** § 7.4's race, as the shell would report it — GitHub issue #226. */
+  ghostRace: EverydayGhostRace;
 }
 
 function harnessOf(
@@ -129,6 +132,7 @@ function harnessOf(
       throw new Error('this harness was not given a simulator');
     },
     watching: undefined,
+    ghostRace: { pick: 'none', rival: undefined, refusal: undefined, pending: false },
     bindings: {
       resources,
       state: () => harness.state,
@@ -152,6 +156,16 @@ function harnessOf(
       applyPatch: (patch) => {
         calls.push('applyPatch');
         patches.push(patch);
+      },
+      /*
+       * § 7.4's rival — GitHub issue #226. The read hands back whatever the harness was set to, and
+       * the press is **recorded**, because what this file asserts about the pair is that the façade
+       * passes both straight through: the decision is `dev/ghostRun.ts`'s and the request is
+       * `dev/main.ts`'s, and a host that quietly answered either would be a second one.
+       */
+      ghostRace: () => harness.ghostRace,
+      raceAgainst: (pick) => {
+        calls.push(`raceAgainst:${pick}`);
       },
       /*
        * § 14.1's six, recorded rather than refused — GitHub issue #182. `watchRun`'s composition is
@@ -554,6 +568,79 @@ describe('the run actions', () => {
   });
 });
 
+/**
+ * **§ 7.4's rival, across the façade** — GitHub issue **#226**,
+ * [§ D482](../../../../DECISIONS.md).
+ *
+ * This façade spent two waves declining to grow a ghost method, with the reason written into its own
+ * docstring: *"a ghost method with no rival behind it would be worse than none."* The pair is here
+ * now, and what this describe pins is the half that makes the caution honoured rather than deleted —
+ * **both methods pass straight through**. Nothing about *who the rival is*, *whether that rival can
+ * be run*, or *when the request is made* is decided in `createEverydayHost`. Those are
+ * `dev/ghostRun.ts#ghostPlanOf`'s and `dev/main.ts#setGhostPick`'s, and a derivation here would be
+ * the second answer this repository's most-repeated finding is about.
+ *
+ * The end-to-end claim — press the control, get a second recording of the same crowd served
+ * differently — is `stageScreen.browser.test.ts`'s, on the shipped page, compared on the legs. It has
+ * to be there: this tier can mock a rival into existence and cannot commission one.
+ */
+describe('§ 7.4’s rival — the port, and nothing decided on it', () => {
+  it('hands back the shell’s own reading, field for field, without composing one', () => {
+    const h = harnessOf({ ...base(), recording: A_RECORDING });
+    const host = createEverydayHost(h.bindings);
+    expect(host.ghostRace()).toEqual({
+      pick: 'none',
+      rival: undefined,
+      refusal: undefined,
+      pending: false,
+    });
+
+    /* Every field the shell can report, including the two that are not a recording. */
+    h.ghostRace = { pick: 'latest-saved', rival: undefined, refusal: 'nothing saved yet', pending: false };
+    expect(host.ghostRace()).toEqual(h.ghostRace);
+    h.ghostRace = { pick: 'plain-baseline', rival: undefined, refusal: undefined, pending: true };
+    expect(host.ghostRace().pending).toBe(true);
+  });
+
+  /**
+   * And the rival is handed over **by reference**, which is the signal a screen watches.
+   *
+   * `EverydayHost.recording`'s own rule, applied to the second recording: a screen keeps the last
+   * object and knows a fresh rival has landed by `!==`. A façade that copied or re-wrapped the
+   * recording would break that, silently, and the stage would redraw the old lanes for ever.
+   */
+  it('hands the rival over by reference, so a screen can tell a new one by identity', () => {
+    const h = harnessOf({ ...base(), recording: A_RECORDING });
+    const host = createEverydayHost(h.bindings);
+    const rival = h.state.recording;
+    expect(rival).toBeDefined();
+    h.ghostRace = { pick: 'plain-baseline', rival, refusal: undefined, pending: false };
+    expect(host.ghostRace().rival).toBe(rival);
+  });
+
+  /**
+   * **The press reaches the shell, with the pick the caller gave it.**
+   *
+   * The failure this rules out is the one the issue is sitting in: a `raceAgainst` that recorded a
+   * preference and issued nothing would leave the player moving a control while the run does not
+   * change, and every isolated test in this repository would stay green. Here it is the *call* that
+   * is asserted; that the call commissions a run is `dev/main.ts`'s, pinned at the seam in
+   * `ghostPort.test.ts` and driven for real in the browser tier.
+   */
+  it('presses the shell’s seam with the pick it was given, and invents no fallback', () => {
+    const h = harnessOf({ ...base(), recording: A_RECORDING });
+    const host = createEverydayHost(h.bindings);
+    host.raceAgainst('plain-baseline');
+    host.raceAgainst('latest-saved');
+    host.raceAgainst('none');
+    expect(h.calls.filter((call) => call.startsWith('raceAgainst'))).toEqual([
+      'raceAgainst:plain-baseline',
+      'raceAgainst:latest-saved',
+      'raceAgainst:none',
+    ]);
+  });
+});
+
 describe('one run, one set of bars — both shells', () => {
   /**
    * The defect this file's neighbour lane shipped, and the reason it is asserted from **both call
@@ -766,6 +853,9 @@ describe('filing the campaign day — issue #223', () => {
           h.filed = h.state.recording.runId;
         },
         openRunTab: () => {},
+        /* § 7.4's rival is not this harness's subject; the campaign cases press none of it. */
+        ghostRace: () => ({ pick: 'none' as const, rival: undefined, refusal: undefined, pending: false }),
+        raceAgainst: () => {},
         applyPatch: (patch) => {
           patches.push(patch);
           h.state = { ...h.state, ...patch };
