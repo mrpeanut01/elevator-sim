@@ -58,15 +58,57 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A merge queue batches several approved pull requests and tests the tree they WOULD produce
+  # together. That is the only mechanism here that makes the full suite cheaper per pull request
+  # rather than merely faster, because N branches cost one run instead of N. Nothing is required to
+  # use it; the trigger existing is what lets the repository turn one on without another edit here.
+  merge_group:
   workflow_dispatch:
 
+# **Cancelling is right for one of these three event kinds and wrong for the other two**, and this
+# file used to treat them the same.
+#
+# A pull request's own iterations supersede each other: push again and the older run is answering a
+# question nobody is asking, while holding a runner other branches want. Cancelling there protects
+# the shared pool, which is what lets several branches make progress at once.
+#
+# `main` and `merge_group` are the opposite. Those runs ARE the record, and a cancelled run is not a
+# result at all: it is neither a pass nor a failure, and filing it as either is the mistake. Measured
+# on 2026-09-04, when this group cancelled ten of twelve runs on one branch and the only green suite
+# in the whole session was on a documentation-only commit. `RISKS.md` R46 carries that, together with
+# the notification shape that reports a cancelled head as clear.
+#
+# The group keys on the pull request NUMBER rather than `github.ref`, because `refs/pull/N/merge` and
+# a later `refs/heads/...` push for the same branch would otherwise land in different groups.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  suite:
-    name: suite (${{ matrix.platform }})
+  # **One leg per vitest project, run concurrently.** This was a single job running `npm test`, which
+  # is every project in series: 49 minutes on the one run that completed on 2026-09-04.
+  #
+  # The arithmetic that decides it was measured on that run rather than estimated. Setup is
+  # **35 seconds** end to end (checkout 3 s, setup-node 7 s, `npm ci` 2 s, `npm run build` 4 s,
+  # Chromium 20 s) against a suite of ~49 minutes. So paying setup five times costs about three
+  # extra runner-minutes and returns the wall clock of the longest single project instead of the sum
+  # of all of them. Roughly a fifth more runner time for something between a two and a threefold
+  # improvement in how long a branch waits.
+  #
+  # **Nothing is skipped and no change-detection is involved**, which is deliberate. A mapping from
+  # changed paths to affected projects is the obvious next lever and it is NOT taken here: a wrong
+  # mapping skips a project silently, and a gate that does not gate is this repository's
+  # most-repeated defect (`RISKS.md` R40). Splitting buys most of the same wall clock and cannot lie
+  # about coverage. If path filtering is wanted later it belongs behind the merge queue, where a
+  # wrong mapping costs a late red rather than a shipped defect.
+  #
+  # **`experiments` gets its own leg for a reason beyond speed.** Its long simulations are documented
+  # as needing to run sequentially and never beside another suite; that constraint is about sharing
+  # one machine, and separate legs are separate runners. So the split satisfies it rather than
+  # straining it, and the integrator who ran `experiments` next to `viz` on one container and got
+  # nothing back in fifty minutes is why this sentence is here.
+  legs:
+    name: ${{ matrix.leg }}
     runs-on: ${{ matrix.runner }}
     # Stated rather than inherited. The suite reads the tree and writes nothing, so the token this
     # job hands to whatever a pull request contains is the smallest one that still checks out.
@@ -83,7 +125,26 @@ jobs:
         # with one entry as with two: every leg is named in one place. A free axis multiplies legs
         # out of its sight, which is how a Node axis would come back.
         include:
-          - platform: linux
+          - leg: core
+            projects: --project core
+            platform: linux
+            runner: ubuntu-latest
+          - leg: viz
+            projects: --project viz
+            platform: linux
+            runner: ubuntu-latest
+          - leg: experiments
+            projects: --project experiments
+            platform: linux
+            runner: ubuntu-latest
+          - leg: service
+            projects: --project server --project cli
+            platform: linux
+            runner: ubuntu-latest
+          - leg: browser
+            projects: --project viz-browser
+            browser: true
+            platform: linux
             runner: ubuntu-latest
 
     steps:
@@ -178,9 +239,27 @@ jobs:
       # `Failed to resolve import` and draws nothing — measured while reproducing #142, where it
       # turned 8 real failures into 14 misleading ones.
       - name: Install the Chromium the browser tier drives
+        # **Every leg, not only the browser one, and the first version of this file got that wrong.**
+        #
+        # `packages/viz/src/dev/browserTier.test.ts` lives in the `viz` project and its whole purpose
+        # is to fail a CI run in which the browser tier WOULD skip. Gating this step on
+        # `matrix.browser` left the `viz` leg running that assertion with no Chromium on the machine,
+        # and it fired exactly as written: *"this is CI and the browser tier would skip: viz-browser
+        # (36 files)"*. 217 files passed and that one turned the leg red.
+        #
+        # The guard says what to do about it in its own failure text — *"if that step was removed,
+        # restore it rather than relaxing this check"* — so the step is restored on every leg rather
+        # than the check being scoped to the leg that happens to select the tier. Twenty seconds a
+        # leg, about eighty seconds of runner time in total, to keep a guard that has already earned
+        # its keep once: GitHub issue #142 is thirty-eight cases that skipped in both places they
+        # could have run, and a skip is indistinguishable from a pass in the summary line.
+        #
+        # Recorded rather than quietly patched, because it is the split's first real finding: cutting
+        # one job into five cut a precondition the single job satisfied for everything at once.
         run: npx playwright-core install --with-deps chromium
 
       - name: Point the browser tier at it
+        # Also every leg, for the reason above: the variable is what `browserTier.test.ts` reads.
         run: |
           shell="$(node --input-type=module -e "import { chromium } from 'playwright-core'; process.stdout.write(chromium.executablePath());")"
           if [ ! -x "$shell" ]; then
@@ -191,7 +270,39 @@ jobs:
           echo "ELEVATOR_SIM_CHROMIUM=$shell" >> "$GITHUB_ENV"
 
       - name: Test suite
-        # Every registered project, `viz-browser` included — it is registered in `vitest.config.ts`
-        # and gated on the variable the step above exported, so no extra invocation is needed and
-        # none should be added: a second command is a second place for the tier to be dropped from.
-        run: npm test
+        # This leg's projects, named by the matrix. `viz-browser` is registered in `vitest.config.ts`
+        # and gated on the variable the browser leg exports, so it runs on that leg and skips
+        # nowhere else by construction rather than by a flag.
+        #
+        # **`--passWithNoTests=false` is load-bearing and not decoration.** Every project in
+        # `vitest.config.ts` sets `passWithNoTests: true`, which is right for a package whose phase
+        # has not landed and wrong for a command that selects by name: a typo in `projects` above
+        # would otherwise exit 0 having executed nothing, and in the Actions tab that is
+        # indistinguishable from a job whose tests passed. That is `RISKS.md` R40's second half, and
+        # splitting one command into five is exactly the change that makes it reachable.
+        run: npx vitest run ${{ matrix.projects }} --passWithNoTests=false
+
+  # The single check a branch protection rule can point at, and the reason the leg names above are
+  # free to change. `suite (linux)` was one job and is now five, so a required status check naming it
+  # would have gone looking for a job that no longer exists. This job keeps that name, depends on
+  # every leg, and fails unless all of them succeeded.
+  #
+  # `if: always()` so that a cancelled or failed leg still produces a verdict here rather than
+  # leaving the check pending forever, and the body treats anything other than `success` as a
+  # failure — a cancelled leg included, because a cancelled run is not a pass.
+  suite:
+    name: suite (linux)
+    needs: legs
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Every leg is green, or this check is not
+        run: |
+          result='${{ needs.legs.result }}'
+          echo "legs: $result"
+          if [ "$result" != "success" ]; then
+            echo "::error title=A suite leg did not pass::the legs job reports '$result'. A cancelled leg counts as a failure here on purpose: a cancelled run is neither a pass nor a failure, and this check may only be green on a run that finished."
+            exit 1
+          fi
