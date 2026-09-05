@@ -1760,7 +1760,11 @@ Q-C landed D471 before Q-A's D469 and Q-B's D470 existed, so the tree read as th
 the highest were holes. They were unlanded. **Three separate lanes reported the resulting red as an
 integrator action**, each computing it from `documentation.test.ts`'s own arithmetic rather than
 running it, and each was right. `OPEN_RESERVATION` and the charter row were reconciled on the same
-commit as the last merge, which is the step § D387 records nobody performing when nothing asks.
+commit as the last merge, which is the step nobody performs when nothing asks for it. **D387 is
+the registered hole that shows it**, and this paragraph originally cited that number in the
+section form. `citations.test.ts` resolves every such reference to a heading, a hole heads
+nothing, and the guard went red naming this file. A hole is written as a bare number for
+exactly that reason, which the code around it already did and the prose did not.
 
 ## Q.3 Two predictions the integrator made that were wrong, in the harmless direction
 
