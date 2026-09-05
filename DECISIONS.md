@@ -22910,6 +22910,9 @@ area.** The live-metrics *panel* has been Casual since `21a0c17`; what still pri
 suppressed` is `render/canvas.ts#drawHeader`'s **header band**, drawn into the bitmap. And
 `cost = 1.00 times wait` appears on **no rail card**, in either mode, on any of thirteen profiles —
 it is the dispatcher **editor** (`weightSummaryOf`), now issue #146. Misattributed, not false.
+*(Symbol renamed since: the producer is `authoring/dispatcherSpec.ts#costFunctionLine`. The
+finding is unchanged and the name is annotated rather than rewritten, because a reader
+grepping the old one lands on nothing — found by wave S's lane S-V1, [§ D495](DECISIONS.md).)*
 
 § D319's structural finding did **not** transfer: `mountRightRail` has had `state.mode` for waves.
 Nobody had written the other register.
