@@ -1880,8 +1880,11 @@ count**. Three `echo` lines now fix that. Which hardware difference it was stays
 ## R.4 What the guards caught, and every one caught the integrator
 
 - **`documentation.test.ts`** went red when `OPEN_RESERVATION` was closed without reconciling the
-  charter row — § D387's exact step, on the third consecutive wave it has caught the process's own
-  author.
+  charter row — D387's exact step, on the third consecutive wave it has caught the process's own
+  author. (Written as a bare number: D387 is a registered hole, a hole heads nothing, and
+  `citations.test.ts` resolves every `§ Dnnn` to a heading. **This paragraph originally cited it in
+  the section form and went red for it** — the same slip wave Q recorded, in the sentence explaining
+  the rule, on the person who wrote the sentence.)
 - **`citations.test.ts`** and the reservation ceiling both held while the block was widened twice.
 - **A backgrounded run reported `exit 0` for a command that never ran**, because the redirect
   targeted a directory that did not exist and `|| true` plus a misplaced `$?` swallowed it. The
