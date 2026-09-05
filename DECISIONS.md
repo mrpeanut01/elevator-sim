@@ -31684,3 +31684,175 @@ counts reproduce only when **test files are counted**, and the fourth reproduces
 Excluding tests, on `771e65f`, the counts are **41 / 29 / 20 / 13**. Published as a correction and
 then deliberately unused: a census of ARIA measures effort rather than coverage, a wrong label counts
 the same as a right one, and no clause in the standard is satisfied by adding an attribute.
+
+---
+
+## D474 — CI splits by project, and cancelling becomes a property of the event rather than the file
+
+**Date: 2026-09-05 · Owner: product owner, on a request to support parallel development · Rules on:
+`.github/workflows/ci.yml`, and binds `packages/viz/src/ciLegs.test.ts`.**
+
+Three changes, and the third is the one that was actually costing time.
+
+**One leg per vitest project, run concurrently.** `npm test` is every registered project in series,
+which was ~49 minutes on the one run that completed on 2026-09-04. The arithmetic was measured on
+that run rather than estimated: setup is **35 seconds** end to end, so paying it five times costs
+about three extra runner-minutes and returns the wall clock of the longest project instead of the
+sum of all of them. Roughly a fifth more runner time for between a two and a threefold improvement
+in how long a branch waits. § D462 established that runner minutes are this owner's currency, so the
+cost is stated rather than buried.
+
+**Cancelling is now conditional on the event.** A pull request's own iterations supersede each
+other, and cancelling there protects the shared pool, which is what lets several branches progress
+at once. `main` and `merge_group` are the opposite: those runs are the record, and a cancelled run is
+neither a pass nor a failure. Measured on 2026-09-04, when the old unconditional group cancelled
+**ten of twelve** runs on one branch and the only green suite in the session was on a
+documentation-only commit.
+
+**Read the correction in that carefully, because the obvious reading is wrong.** `cancel-in-progress`
+was not the villain and removing it would have been a mistake. The group keys on the ref, so it never
+cancelled across branches; it only ever cancelled a branch's own supersessions, which is correct
+behaviour that a per-commit push rhythm turned pathological. What changed is which events are allowed
+to cancel, not whether cancelling happens.
+
+**A `merge_group` trigger, unused until somebody turns a queue on.** It is the only mechanism here
+that makes the suite cheaper *per pull request* rather than merely faster, because a queue tests the
+tree several branches would produce together and N branches cost one run. Nothing depends on it.
+
+**What was deliberately not done.** A mapping from changed paths to affected projects is the obvious
+next lever and it is refused here. A wrong mapping skips a project silently, and `RISKS.md` R40 is
+that defect. Splitting buys most of the same wall clock and cannot lie about coverage. `paths:` and
+`paths-ignore:` were already refused for a different reason this file records: GitHub evaluates them
+against the whole pull-request diff, and the document tests read the documents.
+
+**The split's cost is a hand-written set, so it is guarded.** `ciLegs.test.ts` derives the projects
+from `vitest.config.ts` and from the workflow's matrix and compares them **both ways**, and asserts
+`--passWithNoTests=false` on the command, without which a mistyped project exits 0 having run
+nothing. All three clauses were mutation-tested, **and the third failed its first mutation**: written
+as a search over the whole file it matched the step's own comment explaining why the flag matters, so
+deleting the flag left the guard green. Scoped to the `run:` line it catches. A guard that reads its
+own documentation cannot fail, and reproducing that inside the instrument built to prevent it is
+worth the sentence.
+
+**`suite (linux)` survives as a job name.** It is now an aggregate depending on every leg, so a
+branch-protection rule naming it keeps working and the leg names stay free to change. It treats a
+cancelled leg as a failure, on the same ground as above.
+
+---
+
+## D475 — every eligible building can carry the first session, drawn at random, and *eligible* is a measurement
+
+**Date: 2026-09-05 · Owner: product owner · Rules on: `docs/35` Q4, GitHub issues #208, #210, #270.**
+
+The ruling, given directly: *allow all eligible buildings to be 1st session, but rotate them randomly
+for players.*
+
+This replaces the question `docs/35` asked. Q4 offered three candidates for **the** first building;
+the answer is that there is no such building, and the first session draws from a set.
+
+**Three consequences follow, and the third is the work.**
+
+**`eligible` is not a synonym for `shipped`.** #270 established that `garden-apartments` cannot carry
+a first session: one car makes two of its three dials inert. So eligibility is a property each
+building either has or does not, and it has been measured for exactly one of them, in the negative.
+
+**The draw is a named stream or it is a defect.** Invariant 2 admits no global RNG, and a first
+session whose building nobody can reproduce is a first session no report can be about. The draw
+belongs on the injected `StreamSet` with its seed recorded, the same as every other draw in this
+product.
+
+**Every building in the set must independently satisfy #208.** This is the half that turns a
+one-line ruling into a lane. #208's criteria are properties of the run: a building visibly failing
+within ninety seconds, legible on the stage, with one change that measurably helps. Under a fixed
+first building that is one measurement. Under a random draw it is a measurement **per building**, and
+any building that fails it hands some fraction of new players a first session presenting no problem
+to solve, which is #208's defect delivered by the mechanism meant to fix it.
+
+So the ruling is recorded as given and its cost is recorded with it: the set is defined by that
+measurement rather than by preference, and it may turn out to be small.
+
+---
+
+## D476 — a first-run cover conditioned on derived state is not the override non-goal 10 forbids
+
+**Date: 2026-09-05 · Owner: delegated to the integrator by the product owner, *"use your best
+judgement that will benefit game playability"* · Rules on: `docs/35` Q2, `charter` non-goal 10,
+[§ D335](#d335).**
+
+**Ruling: it satisfies non-goal 10.**
+
+Non-goal 10 forbids *an entry-screen override that survives a reload*, and its own sentence names
+the mischief: **a remembered world**. § D335's § 3.5 applies it to the Everyday and Engineer swap,
+where the thing forbidden is `localStorage` deciding which world the player lands in.
+
+`PM-DOOR` stores nothing. Conditioned on derived state, the cover is recomputed from the player's
+own progress on every load, so nothing *survives* a reload; it is re-derived, which is what every
+screen that depends on progress already does. A rule against memory does not reach a function of
+game state, and reading it as though it did would forbid the product from behaving differently for a
+player who has never finished a day, which is most of what a first run is.
+
+**One condition, and it is a playability condition rather than a letter-of-the-rule one.** Skipping
+must advance the derived state. Otherwise a player who skips the cover, reloads, and meets it again
+has been handed a screen they already dismissed, and § D456's second test asks whether the player can
+still play. The cheapest form is that the skip starts the day, so the state that conditions the cover
+has moved by the time anything could reload.
+
+---
+
+## D477 — Endless rush is kept, and its shape is a ramp against a fail state
+
+**Date: 2026-09-05 · Owner: product owner · Rules on: `docs/35` Q3, GitHub issue #220.**
+
+Given directly: *Endless Rush should run until the lobby overfills, ramping up traffic and/or
+breakdowns until the user can't fix them fast enough or route around them.*
+
+**That answers a different question than Q3 asked, and it answers a better one.** Q3 offered cut,
+demote to the bench, or place at minute one. The ruling makes *cut* unavailable and specifies the
+mode's mechanics, which Q3 did not ask about and #220 needs.
+
+Recorded as two things a lane must not conflate:
+
+- **The fail state is the lobby overfilling.** Not a timer, not a score threshold. The run ends when
+  the player can no longer clear or route around what is arriving.
+- **The ramp is traffic and/or breakdowns**, escalating until that happens. Both levers are
+  permitted; which is used, and in what mixture, is a design question this ruling leaves open.
+
+**What remains unanswered, and it is the half Q3 actually asked.** Where the mode sits in the
+player's path — the bench, or minute one — is not settled by this. #220 can build the mode without
+it; the placement decision gates how a player reaches the mode rather than what the mode is.
+
+One measurement obligation carries over from this repository's standing discipline: *until the
+player cannot keep up* is a claim about difficulty, and a ramp tuned by choosing numbers rather than
+by measuring them is the thing `docs/33` exists to prevent.
+
+---
+
+## D478 — the arrival-rate band binds the demand selector, and an authored case outside it declares itself
+
+**Date: 2026-09-05 · Owner: delegated to the integrator by the product owner, *"use your best
+judgement that will benefit game playability"* · Rules on: `docs/35` Q1, `docs/33` W1, the fixit case
+`gym-on-the-top-floor`.**
+
+**Ruling: the band is guidance for the `demandLevel` selector and does not bind authored
+player-facing content. `gym-on-the-top-floor` is therefore not out of compliance.**
+
+The band's purpose is that a figure this product publishes *about a building type at a demand level*
+is defensible against the reference literature. That purpose is served by constraining what the
+selector can generate. It is not served by forbidding an authored case from posing a problem, and an
+authored fixit case is a deliberate stress scenario whose whole premise is that this building is
+atypical: a gym on the top floor **is** the claim that the traffic is not residential-normal.
+
+The strict reading would make the fixit content unable to present a problem, which is the defect
+#208 names outright.
+
+**One obligation attaches, and without it this ruling would be the loose reading rather than a
+decision.** A case that runs outside its profile's declared band **says so on its own face**. The
+reason is this repository's oldest rule rather than a new one: a figure taken from an out-of-band run
+is not representative of the building type, and a reader who takes it as such has been misled by a
+number that was correct. This is the footing `workPerServedLegKJ` sits on beside raw energy, and the
+footing abandonment sits on beside AWT. Publish the deviation next to the figure.
+
+**What this does not license.** The band still binds the selector, so a `demandLevel` that generates
+an out-of-band rate remains a defect. And `traffic/generator.ts` treating `arrivalRatePctPop5min` as
+an override that *"overrides every profile"* is unchanged: the override is the mechanism an authored
+case uses, and it remains available to nothing else.
