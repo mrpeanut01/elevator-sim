@@ -254,6 +254,31 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'so a scheduled run must never set it',
     scheduled: false,
   },
+  /*
+   * The second `scheduled: false`, and it is a **third** polarity rather than a copy of the one
+   * above — recorded here because the next reader will otherwise assume this table has only two.
+   *
+   * `goalRates` must never be scheduled because setting its variable deletes a check.
+   * `testCost.test.ts`'s deriver must not be scheduled **yet**, for a reason about inputs rather
+   * than about polarity: the half worth scheduling reads a vitest `--reporter=json` file through
+   * `TEST_COST_REPORT`, and no workflow in this repository produces one. A scheduled run would
+   * write a census nobody asked for and no attribution at all, which is a job reporting green about
+   * nothing.
+   *
+   * What would make it `true` is named rather than left as an intention: a job that runs the `viz`
+   * leg with `--reporter=json --outputFile=…`, then runs this file with `TEST_COST_REPORT` and
+   * `TEST_COST_OUT` pointed at it, in the corpus-figures job's shape and for R38's reason. That is
+   * a `.github/` change, which was outside the scope of the lane that wrote the deriver, and it is
+   * GitHub issue #344's remaining piece of work.
+   */
+  'packages/viz/src/testCost.test.ts': {
+    gates: ['TEST_COST_OUT'],
+    reason:
+      '\u00a7 D492\u2019s deriver \u2014 which files and which cases hold the viz leg\u2019s wall clock, ' +
+      'attributed from a JSON report rather than transcribed. Not scheduled because nothing ' +
+      'produces the report it reads; see the note above for what wiring it needs',
+    scheduled: false,
+  },
 });
 
 const walk = (dir: string, out: string[] = []): string[] => {

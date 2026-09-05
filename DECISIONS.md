@@ -32772,6 +32772,169 @@ did not happen.
 
 ---
 
+## D492 — the `viz` leg's cost is a head rather than a tail, and what watches it is a share rather than a second
+
+**Date: 2026-09-05 · Owner: wave S, lane B · Binds: `vitest.config.ts`'s `SIMULATING_TIMEOUT_MS`
+docstring, `packages/viz/src/deepTiers.test.ts`'s tier table, `ISSUE_WORKER_LEDGER.md`'s wave-R
+entry, and every timeout annotation in the two `viz` projects through a ratchet. Discharges GitHub
+issue #344's four acceptance criteria. Rests on § D483.**
+
+Every figure below is derived by `packages/viz/src/testCost.test-helper.ts`, and the static half is
+re-derived on every run of `packages/viz/src/testCost.test.ts`. That is `RISKS.md` R38's remedy
+applied to the file whose three retractions are what R38 looks like when nothing re-derives a
+number.
+
+### 1. The census reproduces #344's figures exactly, and then corrects their frame
+
+Re-derived on `13e7b93` — the tree the issue's own census was taken on, since #344 was filed at
+04:53 UTC and wave R merged at 09:24 — this scanner reads **555** annotations, **182** at exactly
+300 000 ms and **93** above it. All three to the unit. So the issue's counts are confirmed rather
+than trusted, and what follows is about what they mean rather than about drift. On today's tree the
+same scanner reads 558, 183 and 93; resolving file-local constants as well as literals takes the
+first two to **560** and **185**.
+
+**The 93 is right about a directory and wrong about a ceiling.** Four of them are
+`*.browser.test.ts`, which `vitest.config.ts`'s `project()` helper excludes from the `viz` project
+and which the browser tier runs at its own **120 000 ms**. The `viz` **leg**'s above-ceiling
+population is **89**, and those four are above a ceiling by 5× rather than by 2×.
+
+**Counting against a number rather than against each project's own budget hides a larger
+population.** Asked per project, `viz-browser` carries **63** annotations above its own ceiling,
+twenty of them at exactly 300 000 ms — 2.5× what that project allows. #344's frame cannot see one of
+them.
+
+**And a numeric-literal scan cannot see an annotation written as a constant.** #344's comment counts
+146 cases across five packages; resolving a file-local `const TIMEOUT_MS = 900_000` finds **269**.
+The gap is entirely `experiments`, which writes **123** of its **168** that way — the other four
+packages reproduce the comment exactly (`viz` 93, `core` 5, `cli` 2, `server` 1), which is what says
+this is a method gap rather than tree drift. `ISSUE_WORKER_LEDGER.md` is corrected in place, with
+the original quoted.
+
+**Did they move? For the population the issue is about, no — and that is measured rather than
+assumed.** `TEST_COST_ROOT` exists so the same scanner can be pointed at an extracted base commit
+from one command:
+
+```
+git archive 13e7b93 packages | tar -x -C /tmp/base
+TEST_COST_ROOT=/tmp/base TEST_COST_OUT=/tmp/base-census.txt \
+  npx vitest run --project viz packages/viz/src/testCost.test.ts
+```
+
+Base against this tree: `viz` reads **425 / 89 above / 165 at** on both. What moved is the browser
+tier — 132 → 135 annotations, 62 → 63 above its own ceiling — and one at-ceiling annotation in
+`server`. `experiments`, `core` and `cli` are unmoved.
+
+### 2. What the leg actually costs: three files are half of it
+
+Two full `--project viz --reporter=json` runs of the same 223 files and 5 065 cases, 2026-09-05, on
+this four-core container. Run A on a quiet box; run B beside four CPU spinners, which is this
+repository's own way of measuring under load.
+
+| | run A | run B |
+|---|---|---|
+| run wall | **397.0 s** | 1 037.6 s |
+| Σ file wall (serial cost) | **838.4 s** | 2 341.4 s |
+| concurrency (Σ file wall ÷ run wall) | 2.11 | 2.26 |
+| critical path — `campaign/campaign.test.ts` | **33.34 %** of serial | **33.05 %** |
+| files holding 50 / 80 / 90 % | **3 / 11 / 23** | 3 / 8 / 19 |
+
+`campaign/campaign.test.ts` is 279.5 s of run A, `campaign/judgeCleared.test.ts` 122.0 s and
+`campaign/stageSequence.test.ts` 84.1 s. Of case time, **two cases hold 26.8 %** and the 5 020 cases
+under 2.4 s hold 22.3 % between them. Cases account for **96.0 %** of file wall, so collection and
+imports are 4 % — and one file holds 28.7 s of the 33.5 s that sits outside a case at all, which is
+`campaign/campaign.test.ts` again.
+
+**The leg is a head, not a tail**, which inverts the issue's *"a tail nobody has measured"*. Vitest
+schedules **files** and runs the cases inside one file in series, so the leg cannot finish before
+its longest file — 279.5 s of a 397 s run. The reciprocal of the critical-path share is the most
+concurrency this leg can ever use, **3.0**, so a four-core runner is already saturated and more
+workers buy nothing. What buys something is splitting one file, which is #317's own principle —
+*make the unit vitest schedules smaller than the budget* — pointed at wall clock instead of at a
+timeout.
+
+### 3. The position on the 89: they are not the wall clock, and none is brought down
+
+Each of the 89 joined to what it governs in run A: **64** to a case by title, **23** to a
+`beforeAll`, **2** unmatched because an `it.each` title carries a `%s`.
+
+| | |
+|---|---|
+| median measured cost of an annotated case | **0.00 s** |
+| under 100 ms | 50 of 64 |
+| annotated ≥ 600 s while measuring < 1 s | **55** |
+| past 300 s at 1× and at 1.82× | **0** |
+| past 300 s at 4.5× | 2 |
+| past **its own annotation** at 1×, 1.82×, 4.5× or 9× | **0** |
+| tightest headroom | **10.7×** (`campaign/stageSequence.test.ts:187`, 83.8 s against 900 s) |
+| the 18 files carrying an above-ceiling `beforeAll` | **4.5 s** outside their cases, in total |
+
+**The annotations are not what costs this leg its wall clock, and lowering them would recover none
+of it.** The only thing an over-annotation costs is *failure latency on a hang* — a hung case at
+600 s takes ten minutes to go red instead of five — which is the same trade `SIMULATING_TIMEOUT_MS`'s
+docstring already makes in the paragraph beginning *"What it costs, stated rather than glossed"*.
+The two annotations doing real work are `campaign/campaign.test.ts:866` and
+`campaign/stageSequence.test.ts:187`, which are the two the retraction that produced this issue
+names.
+
+**None is brought down here, on two grounds and not one.** It would move no wall clock, which is
+measured above rather than assumed; and this lane's writable set was the deriver and its test, so
+editing 87 sites across other modules would have been work whose scope nobody had reviewed. What
+ships instead is a ratchet: the **count** and the **summed milliseconds** of each `viz` project's
+above-ceiling population may only fall. That is #344's fourth criterion — *no case may be annotated
+upward* — mechanised rather than promised, and it survives any machine swing because it reads no
+clock.
+
+### 4. The instrument, and the two things it cannot catch
+
+A wall-clock budget stated as a constant is wrong on § D483's evidence, so none is published. What
+the deriver publishes instead is shares, ranks and a ratio against a same-run baseline, every one of
+which is *exactly* invariant under the model § D483 measured — every duration multiplied by one
+factor, CPU 1.8196× against wall 1.8205× with concurrency unmoved.
+
+**Runs A and B are that claim measured rather than argued, and they are harsher than CI's own
+swing**: the serial cost moved **×2.79**, and
+
+| statistic | run A | run B | move |
+|---|---|---|---|
+| critical-path share | 33.34 % | 33.05 % | **−0.29 pp** |
+| Σ\|Δshare\| over 223 files | — | — | 0.224, median per file **0.0017 pp** |
+| worst single file's share | — | — | **2.83 pp** (`batch/remedyLadder.test.ts`) |
+| rank moves inside the top ten | — | — | **one adjacent swap**, 6↔7 |
+
+**And the same measurement refutes the tidy model it was taken to confirm, which is the more useful
+half.** § D483's swing was near-uniform — 102 of 103 files moving at a median 1.84 against a leg at
+1.82. Contention on a shared box is **not**: over the 71 files above 200 ms, the per-file ratio runs
+from **1.46× to 11.25×** with a median of 2.08 against an aggregate of 2.79. So a share is exactly
+invariant in the model and empirically resolves about **3 pp on a single file** under a swing this
+severe. The critical-path share holds far better, because the file that dominates the numerator
+dominates the denominator too.
+
+**`cohortRatio` is the answer to the one thing shares cannot see, and it is the weakest of the three
+— measured, not assumed.** Shares are blind to uniform growth by construction: a suite where every
+file got 20 % more expensive is arithmetically identical, in shares, to a machine 20 % slower.
+`testCost.test.ts` asserts that blindness rather than only stating it, so it cannot quietly stop
+being true. The cohort — the leg's cost in units of 32 pinned files — does see absolute growth, and
+between runs A and B it moved **17.45 → 20.12, a false +15 % with no code change**, because the
+cheap pinned files slowed by 2.42× while the leg slowed by 2.79×. Its resolution is therefore no
+better than about 15 % at this severity, and that figure is published beside it rather than left for
+somebody to discover.
+
+### 5. What this does not do
+
+**Nothing runs the deriver.** `.github/` was outside this lane's scope, so no workflow produces the
+JSON report it reads; the tier table registers it `scheduled: false` and names the job that would
+change that. Until then the attribution is a thing a person runs, and the guard that runs on every
+pull request is the static ratchet alone.
+
+**Two classes are uncaught and named rather than implied.** A case getting slower without its
+annotation changing — no static check can see it, and no test inside the leg can time the leg. And
+the suite growing uniformly — shares are blind, and the cohort ratio's own resolution is the 15 %
+above.
+
+**`experiments` is counted and not gated**, which is scope rather than judgement: this lane measured
+the `viz` leg. Its 168 above-ceiling annotations, and the fact that 123 of them are invisible to the
+method #344 used, are published by the census and gated by nothing.
+
 ## D493 — a specification routes its own registers, and the routing lives beside it rather than in a file of its own
 
 **Date: 2026-09-05 · Owner: wave S lane S-C · Rules on: GitHub issue #342,
