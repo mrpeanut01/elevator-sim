@@ -162,12 +162,28 @@ jobs:
         # first thing a reader needs and the last thing a failed run would otherwise show. § D201's
         # standing rule is that a run is a machine and not only a commit, so the runner's own name
         # and architecture are recorded here rather than assumed.
+        #
+        # **The cores, the CPU model and the memory were added after the field this step omitted
+        # cost an investigation.** On 2026-09-05 the `experiments` leg ran 35m25s on a pull request
+        # and 19m27s on the squash-merge of it — the same tree, a factor of 1.82 — and settling why
+        # took reading both jobs' whole logs. The answer was the machine: test CPU moved 1.8196x and
+        # wall moved 1.8205x, so effective concurrency was 2.6885 against 2.6898 and did not move at
+        # all; 102 of the 103 files were slower, flat across the run; and `Typecheck and build`,
+        # outside vitest entirely, moved the same way while the network-bound Chromium install moved
+        # the other. Every one of those is indirect evidence for a fact one `nproc` would have
+        # stated. Which hardware difference it was — a different SKU in the pool, a noisy neighbour,
+        # throttling — is still undetermined, because none of the three lines below existed to
+        # record it. They cost nothing and they are the difference between reading the next
+        # excursion off a log and investigating it from scratch.
         run: |
           echo "platform    : ${{ matrix.platform }}"
           echo "runner label: ${{ matrix.runner }}"
           echo "runner name : ${{ runner.name }}"
           echo "runner arch : $(uname -m)"
           echo "kernel      : $(uname -sr)"
+          echo "cores       : $(nproc)"
+          echo "cpu model   : $(awk -F': ' '/^model name/{print $2; exit}' /proc/cpuinfo)"
+          echo "memory      : $(awk '/^MemTotal/{printf "%.1f GiB", $2/1048576}' /proc/meminfo)"
           echo "node        : $(node --version)"
           echo "npm         : $(npm --version)"
 

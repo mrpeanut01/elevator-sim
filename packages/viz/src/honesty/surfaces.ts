@@ -2647,8 +2647,10 @@ const CAMPAIGN: SurfaceAdapter = {
      *
      * **What this gives up:** the search can no longer catch a headline *rewritten* to assert a
      * per-goal outcome without a rate. That is bounded rather than left implicit — `judge.test.ts`
-     * asserts the produced headline names no goal kind and no goal label, on both branches, with the
-     * cleared one driven through a real 50-replication batch.
+     * asserts it on the uncleared branch, and `judgeCleared.test.ts` on the cleared one, thirteen
+     * cases each driven through a real 50-replication batch. The claim is unchanged and is now made
+     * over every shipped dispatcher; what moved is the file, when issue #317's split took the sweep
+     * out of one `it()`.
      */
     const headlineSeeds = context.batch.arms[0]?.replications.length ?? 0;
     seeds.push({

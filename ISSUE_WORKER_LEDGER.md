@@ -1055,6 +1055,14 @@ was**.
 - **Lane C found the next #317, already worse.** `campaign/campaign.test.ts` at **109 041 ms**, the
   same shape one file over; at the measured 4.5× amplification that is **490 s against a 300 s
   ceiling**. `campaign/stageSequence.test.ts` behind it at 77 363 ms. Neither fixed.
+  **Corrected 2026-09-05 — the ceiling in that sentence is the wrong ceiling.** Both cases carry an
+  explicit per-test timeout overriding the project default: `campaign.test.ts:866` closes
+  `}, 3_000_000);` and `stageSequence.test.ts:187` closes `}, 900_000);`. At the same 4.5×, that is
+  490 s against 3 000 s and 348 s against 900 s, so neither can time out. The claim was inherited
+  verbatim from `vitest.config.ts`, where it has been retracted in place; what survives is a
+  **wall-clock** cost on the `viz` leg rather than a timeout risk, and it is GitHub issue #344.
+  Left standing rather than rewritten, because a ledger entry is a dated record of what a lane
+  believed and the correction is worth more beside it than in place of it.
 
 ### The measurement that could not be taken, said plainly
 
@@ -1070,7 +1078,9 @@ cases where the brief and `vitest.config.ts` both said roughly 3 200.
 ### Owed to the next session
 
 - **The next #317 needs an issue**: `campaign/campaign.test.ts` and `campaign/stageSequence.test.ts`,
-  both a dispatcher sweep inside one `it()`.
+  both a dispatcher sweep inside one `it()`. **Filed as #344 on 2026-09-05, on a corrected premise:**
+  the timeout risk this bullet assumed does not exist, and what the issue carries instead is the
+  `viz` leg's wall clock and the 93 `packages/viz` cases annotated above the project ceiling.
 - **Four cross-references the split makes stale**: `honesty/surfaces.ts` and § D186 name
   `judge.test.ts` for a claim that survives but moved file; `docs/05-roadmap.md` lists the Phase 9
   gate suites; `ISSUE_VERIFICATION_FINDINGS.md` cites `judge.test.ts:165`.

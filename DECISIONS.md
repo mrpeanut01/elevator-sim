@@ -11417,7 +11417,10 @@ check with a number that is not the quantity, which is worse than widening an ex
 **What the narrowing gives up, bounded rather than implied:** the search can no longer catch a headline
 *rewritten* to assert a per-goal outcome without a rate. `campaign/judge.test.ts` is the control — the
 produced headline names no goal kind and no goal label, on both branches, with the cleared one driven
-through a real 50-replication batch.
+through a real 50-replication batch. *(Pointer corrected 2026-09-05: issue #317's split moved the
+cleared branch to `campaign/judgeCleared.test.ts`, one case per dispatcher. The control survives and
+is now stronger — the old sweep stopped at the first profile that cleared, so every profile after it
+went unread.)*
 
 ### Left open, named rather than absorbed
 
@@ -31888,3 +31891,81 @@ footing abandonment sits on beside AWT. Publish the deviation next to the figure
 an out-of-band rate remains a defect. And `traffic/generator.ts` treating `arrivalRatePctPop5min` as
 an override that *"overrides every profile"* is unchanged: the override is the mechanism an authored
 case uses, and it remains available to nothing else.
+
+---
+
+## D483 — a test-cost figure is a claim about a machine, and this repository was publishing them as properties of the code
+
+**Date: 2026-09-05 · Owner: the integrator, wave R · Binds: `.github/workflows/ci.yml`'s
+environment step, `vitest.config.ts`'s `SIMULATING_TIMEOUT_MS` docstring,
+`ISSUE_WORKER_LEDGER.md`'s wave-Q entry. Files GitHub issue #344.**
+
+Two findings that looked unrelated and are the same one.
+
+**The `experiments` leg ran 35m25s and 19m27s on the same tree.** Pull request run 33941618231 at
+`b92cbea` against push run 33943302871 at `13e7b932`, which is the squash-merge of it: identical
+content, 103 files, 1 374 passing and 11 skipped on both sides. The diagnosis is the machine, and it
+is worth stating how that was established rather than only what it concluded, because the obvious
+reading was wrong twice.
+
+The first wrong reading was mine: four other legs were stable, so I took a slow runner to be ruled
+out. **The five legs are five separate VMs**, so a slow VM shows up in exactly one leg — which is
+what a stable neighbour predicts rather than refutes. The second wrong reading was that one long
+study explains it. `benchmark/selectionSweep.test.ts` is the single most expensive file and it moved
+**1.71×**, *less* than the leg's 1.82×; **102 of the 103 files moved**, with a median ratio of 1.84
+across the 22 files over ten seconds, flat from the run's first file to its last.
+
+What settles it is the two numbers agreeing:
+
+| | PR (slow) | main (fast) | ratio |
+|---|---|---|---|
+| `tests` CPU | 5 711.54 s | 3 138.84 s | **1.8196** |
+| wall | 2 124.44 s | 1 166.96 s | **1.8205** |
+| effective concurrency | 2.6885 | 2.6898 | **0.9995** |
+
+Parallelism did not move. Fewer cores at the same clock would inflate the wall and leave each file
+alone, dropping the quotient; the same cores running slower multiplies both by one k and leaves it
+invariant. The second is what the logs show. `Typecheck and build`, outside vitest entirely, moved
+the same way, while the network-bound Chromium install moved the other. `transform` and `import`
+together are 42 s of a 2 124 s leg, so this is not a cache or resolution diagnosis.
+
+**Which hardware difference it was is undetermined and is left that way.** A different SKU in the
+pool, a noisy neighbour, and throttling all produce this signature. Naming one would be a plausible
+sentence in place of a measurement, which § D256 refuses.
+
+**The step written to prevent exactly this did not record the field that would have settled it.** Its
+own docstring cites § D201's rule that *a run is a machine and not only a commit*, and it records the
+runner's name, architecture, kernel, Node and npm — byte-identical across both jobs — and no core
+count, no CPU model and no memory. Three `echo` lines are added. They cost nothing and they are the
+difference between reading the next excursion off a log and re-deriving it from 200 MB of logs.
+
+**The second finding is the same error committed in prose.** `vitest.config.ts` named two cases as
+*"already past this ceiling under load"* at 490 s and 348 s against 300 s. Both carry an explicit
+per-test timeout overriding the project default — `campaign/campaign.test.ts:866` closes
+`}, 3_000_000);` and `campaign/stageSequence.test.ts:187` closes `}, 900_000);` — so the headroom is
+6.1× and 2.6× and neither can produce the red the paragraph predicts. **It is the third stale
+refusal in that one docstring**, after the `experiments` sentence and the `cli` sentence, and it is
+§ D227 inverted: rather than telling a reader not to look, it tells them to look at something that is
+not there. Retracted in place with the original quoted, on this file's own established convention;
+`ISSUE_WORKER_LEDGER.md` inherited it verbatim and is corrected beside rather than rewritten, because
+a ledger entry is a dated record of what a lane believed.
+
+**The ruling.** A duration is not a property of the code, and this repository already knows that
+about statistical pins and does not know it about test costs. So: the environment step records the
+machine's cores, model and memory; a published cost figure names the run it was taken on, as
+§ D280 already requires of a statistical one; and a wall-clock budget may not be stated as a constant
+without saying what machine it is a constant on. Nothing here moves `SIMULATING_TIMEOUT_MS`, and
+#317's principle stands — make the unit vitest schedules smaller than the budget, never the budget
+larger than the unit.
+
+**What survives the retraction is a real problem and is filed rather than dropped.** A 109 s case and
+a 77 s case are a wall-clock cost on the `viz` leg, and the population that can drive it is larger
+than two: derived over `packages/viz/src/**/*.test.ts`, **93 cases are annotated above the 300 s
+project ceiling** — 81 at 600 s, 7 at 900 s, 3 at 3 000 s, 2 at 3 600 s — out of 555 annotations, 182
+of which sit exactly at the ceiling. GitHub issue #344, whose hard part is the finding above: a gate
+on a quantity that swings 1.8× with the host is a gate that has to say what it cannot catch.
+
+**One figure deliberately not corrected.** `vitest.config.ts` pins `selectionSweep.test.ts` at
+**1 017 s**; these two runs measured it at 782.8 s and 1 335.3 s, which bracket it. The pin is not
+called stale, because the machine it was taken on is not recorded — which is this entry's subject
+arriving on its own evidence.
