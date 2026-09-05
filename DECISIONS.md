@@ -32619,3 +32619,150 @@ figure; that is § 14.1's rule and the Everyday stage had already applied it on 
 Engineer strip does **not** put the record's identity in that cell the way § 14.1's table asks and
 the Everyday stage does. That is a real gap in § 14.1's treatment of the Engineer surface, it is
 older than this fix, no forbidden word is involved, and it is left alone here rather than folded in.
+
+---
+
+## D489 — sign-in is the missing state of an already-specified surface, not an eighteenth screen
+
+**Date: 2026-09-05 · Owner: the integrator, as the product-owner call § D458's precedent puts here ·
+Rules on: GitHub issue #332, `everyday/settingsView.ts`, `everyday/types.ts#EVERYDAY_SCREENS`.
+Dated before the code.**
+
+#332's implementation map found a blocker and stated it correctly: `CLAUDE.md` makes the design
+handoff canonical for the interface, and **for a sign-in screen there is nothing to be canonical
+about.** § 4's inventory lists seventeen screen keys and none of them is a sign-in, an account, or a
+login. A builder starting from that would author a screen's worth of player copy against nothing.
+
+**The map's framing is right and its conclusion is one step too far, and the step is worth naming.**
+The handoff is not silent about this surface. It is silent about a *screen*, and it is explicit
+about a **state**: § 15.1 specifies the signed-in line and Sign out, and the prototype carries the
+copy (`elevator-sim-casual.dc.html:4525`, `accountName` / `accountLine`). What this repository did
+with that specification is recorded in `everyday/settingsView.ts`'s own docstring — it **withheld**
+it, and said why: *"an authored fixture presented as a player is § 20.11's own example."* The
+signed-in half is not missing from the handoff. It is missing from the build, deliberately, because
+drawing it would have been a fabrication.
+
+**Ruling: sign-in lands as the signed-out state of `settings`' YOU section. No new screen key, and
+`EVERYDAY_SCREENS` stays at seventeen.**
+
+Three consequences, each of which the screen-shaped implementation gets wrong:
+
+1. **The handoff wins, because there is no longer a disagreement to win.** Adding an eighteenth key
+   would be a deviation from § 4's inventory — the one part of this that *is* specified — taken in
+   order to build something the inventory does not contain. Extending a surface the handoff already
+   specifies with the state it already specifies is not a deviation at all.
+2. **What is genuinely authored shrinks to the asking half**, and it is small enough to hold to
+   § D460's standard: an address field, a link-sent state, and the refusals. Everything after the
+   redemption is § 15.1's, drawn for real rather than from a fixture, which is the withholding
+   above being discharged rather than overridden.
+3. **The withheld sentences are retracted on the commit that makes them false**, in this
+   repository's own form — deleted whole rather than reworded, with the original quoted where it
+   stood, because § D227 rates a stale refusal worse than a stale claim. The map counted the sites
+   and its count is adopted as the acceptance bar: `settingsView.ts:208`, `:274`, `:326`, `:68-70`,
+   `:76-79`, and `buildNotes.ts:159`, plus the two triage rows at `buildNotes.test.ts:231` and
+   `:181`. **One row must not move** — `{ register: 'SETTINGS_ABSENCES', fragment: 'Post runs to
+   the board', issue: 161 }` refuses a *switch* over a capability that still does not exist, and
+   § D460 already corrected that confusion once. Sign-in does not make it false; posting does, and
+   posting is #221's.
+
+**What this does not decide.** Where the *entry point* to that state sits on surfaces that offer
+posting. #332's fourth criterion asks for signed-out to be first-class wherever posting is offered
+and to say what to do rather than greying a control; that is a routing question per surface, and the
+lane answers it surface by surface against § D488's rule that a reason a player cannot see is not a
+reason.
+
+---
+
+## D490 — there is one display name, the account holds it, and signing in adopts the device-local one rather than discarding it
+
+**Date: 2026-09-05 · Owner: the integrator, as a product-owner call · Rules on: GitHub issue #332,
+`everyday/profile.ts#EverydayProfile.name`, `menu/client.ts#AccountSummary.displayName`,
+`honesty/agreement.ts#AGREED_FIGURES`. Dated before the code.**
+
+Two names exist. Everyday draws a **device-local** one, `EverydayProfile.name`, defaulting to
+`'you'` and sent nowhere. The account holds a **server** one, `AccountSummary.displayName`, minted
+as `player-<12 hex>`, and it is what a board row shows. § 15.1 asserts they are one thing.
+
+**Today that is harmless only because nothing on the Everyday side posts, and #332 is what ends
+that.** The map called this out and it is the sharper of its two decisions, because the defect it
+predicts is already written into shipped copy: `settingsView.ts`'s YOU note reads *"This is the name
+on the daily board, on the ladder, and on any run somebody else watches."* That sentence is
+**currently unfalsifiable and becomes false the moment a signed-in player posts under a
+`player-<hex>` the server minted.** A claim that survives only because the mechanism it describes is
+absent is § D227's shape, and it is aimed at the parameter § 15.1 makes load-bearing.
+
+**Ruling: one name. When signed in, `AccountSummary.displayName` is the name — the field edits it,
+the rail draws it, and the board row matches it. When signed out, `EverydayProfile.name` is the
+name, and it says what it actually is. Signing in for the first time offers the device-local name as
+the display name rather than replacing it with a mint.**
+
+Why each half, since the cheap answers are all wrong in a specific way:
+
+- **Not "two names, clearly labelled."** That is the product telling a player it has two answers to
+  *what are you called*, on a surface whose whole job is identity, and it makes `surfaces-disagree`'s
+  exact failure mode a shipped feature rather than a bug.
+- **Not "the mint wins."** The server mints `player-<12 hex>` because it must return something. A
+  player who has already typed a name and watched the rail draw it would sign in and find it
+  replaced by a hex string, which is the sign-in *costing* them something — and the whole of § D456's
+  second refusal test is that the social layer may not take the game away.
+- **The adoption is legal, and that is measured rather than assumed.** `everyday/profile.ts:361`
+  already validates the device-local name with `displayNameIssueOf` imported from `menu/account.js`
+  — **the server's own rule** — and refuses a stored name that fails it. So the value being offered
+  has already passed the gate it is being offered into. This was true before this ruling and is the
+  reason the ruling is cheap.
+- **The device-local value is kept, not overwritten.** It lives in its own slot and answers again
+  when the player signs out. Deleting it would lose a value nothing else holds, and a sign-out that
+  renames you `'you'` is the same theft as the mint.
+- **An account that already has a chosen display name keeps it.** Adoption is an offer on first
+  sign-in only, gated on `displayName` still being the mint. A second device does not get to rename
+  the player.
+
+**The pair is declared rather than left to be noticed.** `AGREED_FIGURES` is a *declared* register,
+so a pair nobody declares is never compared, and § D359's original defect had exactly this signature
+— each screen internally honest, the product incoherent. The name is registered there on the same
+commit, so `surfaces-disagree` compares the rail's name, the Settings field and the board row rather
+than three surfaces each being separately truthful.
+
+---
+
+## D491 — a state the product must show and the wire cannot carry is a wire defect, so the server grows the refusal
+
+**Date: 2026-09-05 · Owner: the integrator · Rules on: GitHub issue #332's third acceptance
+criterion, `packages/server/src/http/api.ts`, `packages/server/src/http/serve.ts`. Dated before the
+code.**
+
+#332 asks for four labelled failure states carrying the server's own sentence. Three are available
+and precise — `link-expired`, `link-spent`, `too-many-link-requests`. **The fourth is not
+distinguishable on the wire.** `api.ts` awaits `deps.mailer.send(...)` with nothing catching it, so
+a dropped send throws, propagates, and `serve.ts:277` answers `internal-error` /
+*"The server failed to handle that request."* — byte-identical to every other unhandled fault.
+
+The map framed this as a choice: ship three labelled states and say so, or the server grows a
+distinct refusal first, which is another package and outside the issue as written.
+
+**Ruling: the server grows the refusal.**
+
+The awaiting is already deliberate and `api.ts` says why in its own comment — *"a send that was
+dropped silently would be a player staring at 'check your email' forever."* The intent is on the
+file; what is missing is the code that lets a client act on it. **A cause the server knows and does
+not put on the wire is § D486's rule failing in the direction that costs the player**: the receiver
+cannot derive *the mail did not go* from a generic fault, and the two want opposite things from the
+reader — one says try again in a moment, the other says something is wrong with us.
+
+Shipping three and declaring the fourth undeliverable was the alternative and is refused, because
+the declaration would be honest about a limit this repository can lift in one handler. § D460's rule
+is that a refusal a surface cannot stand behind is withdrawn; this is the case where the surface
+*could* stand behind it if the wire were fixed, and fixing the wire is smaller than the paragraph
+explaining why it was not.
+
+**Bounds, so this does not become a server lane.** One `try`/`catch` around the send, one new error
+code, one sentence, and its test. If the lane finds it is not that — that the mailer's failure modes
+do not separate cleanly, or that answering non-`internal-error` reveals whether the address is known
+— it **reports and stops**, and the fallback is the three states with the fourth named as
+undeliverable on the issue. Deciding that mid-lane by widening the change is the failure this bound
+exists for.
+
+**One trap named, because the obvious reuse is wrong.** `CLIENT_FAILURES.unreachable` reads *"Your
+run is not lost — it can be posted when the connection is back."* A player who has just typed an
+email address has no run in flight, so carrying it verbatim would be a sentence about something that
+did not happen.
