@@ -384,7 +384,13 @@ CI · #239 accessibility sweep · #240 small-screen and touch layout.
       you check?"*
 - [ ] **No open P0 or P1 defects.**
 - [ ] **All twenty-one journey rows in [`TEST_MATRIX.md`](TEST_MATRIX.md) read `passing`** — today
-      all twenty-one read `planned`, which is the single largest testing gap in the repository.
+      **3 read `passing`, 14 read `owned` and 4 read `planned`**, counted off the bolded status cell
+      at `fb12bc4`. This line read *"today all twenty-one read `planned`"* and was wrong by seventeen
+      rows; GitHub issue #237's body carries the same stale claim, and both are corrected together.
+      **The reason it survived is the useful half:** `documentation.test.ts`'s S10 case re-derives all
+      four counts from `TEST_MATRIX.md` and compares them against `docs/22-charter.md:226`, failing in
+      both directions — and it reads *that* file, never this one, so nothing has ever checked this
+      sentence. `RISKS.md` R44 with a milestone gate as its subject.
 - [ ] #234's criterion is met by an **automated sweep over all dispatchers per stage**
       (`charter S5`), not by a judgement — and **no test derives that count across all ten shipped
       stages today**, which is why its published figure went stale twice without failing anything.
