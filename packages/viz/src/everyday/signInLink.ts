@@ -106,17 +106,24 @@ export const SIGN_IN_NOTICE_LABEL = 'SIGN-IN LINK';
  *
  * It is drawn on both settled arms and never while the request is in flight, and both arms need it
  * for different reasons: a refused link is asked for again from that screen, and a session that
- * exists is named from it. The route is spelled out to the press because `dispatchMenu`'s `reopen`
- * arm navigates to `main` — so *open the menu* genuinely is not enough, and a sentence that stopped
- * there would strand the reader on the screen before the one they want.
+ * exists is named from it.
  *
- * There is no button here that performs it. § 3.2's swap is one control with one home — the rail's
- * footer row — and `everyday/swap.ts` refuses a second verb in terms; a banner that crossed the door
- * itself would be that second way in, with the two halves free to disagree about `inert`.
+ * ## It pointed across § 3.2's door and does not any more — GitHub issue #332
+ *
+ * It read: *"Your account lives on the Engineer surface — Switch to Engineer at the foot of this
+ * rail, then open the menu and choose Account."* That was true when this module landed and stopped
+ * being true on the commit that put the account on § 15.1's own screen
+ * ([§ D489](../../../../DECISIONS.md)) — a pointer at a door the reader no longer has to cross,
+ * which is § D227's stale sentence in the shape that costs a player the most: it sends them through
+ * a whole other product to reach a control two rows below the banner. Substituted rather than
+ * added to, so this surface still says exactly one thing about where the account is.
+ *
+ * There is no button here that performs it, and that is unchanged. § 3.2's swap is one control with
+ * one home and `everyday/swap.ts` refuses a second verb in terms; the same argument applies to a
+ * navigation into a screen, which the rail's own Settings row already is.
  */
 export const SIGN_IN_NOTICE_POINTER =
-  'Your account lives on the Engineer surface — Switch to Engineer at the foot of this rail, then ' +
-  'open the menu and choose Account.';
+  'Your account is on the Settings screen — the gear row at the foot of this rail, under YOU.';
 
 /** The banner's one control. It withdraws the report; it does not undo the sign-in. */
 export const SIGN_IN_NOTICE_DISMISS = 'Dismiss';

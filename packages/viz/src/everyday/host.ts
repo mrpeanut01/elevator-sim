@@ -261,6 +261,46 @@ export async function dailyBoardOf(
 export const DAILY_BOARD_METRIC = 'awtS';
 
 /**
+ * **The four account effects, as calls** — GitHub issue #332,
+ * [§ D489](../../../../DECISIONS.md), in {@link dailyBoardOf}'s own shape and for its own reason:
+ * *take the calls rather than a client*, so a screen is drivable with plain stubs and `dev/main.ts`
+ * keeps only the wiring. `boundaries.test.ts` permits exactly two modules to hold a leaderboard
+ * client and a screen that imported one would be the third.
+ *
+ * ## The *state* does not come back through here, and that is measured rather than stylistic
+ *
+ * `EverydayHost.onChange` is drained at the end of `dev/main.ts#renderAll()` and **no account path
+ * calls it** — all thirteen call `drawMenu()`. So a screen that read the account through this host
+ * would render once and never move, across a § D243 § 4 cold start measured at 28.7 s. The state
+ * and its notification travel on `everyday/accountPort.ts`, which says why widening this drain is
+ * the wrong repair and cites `everyday/signInLink.ts`, which refused the same widening one wave
+ * earlier.
+ *
+ * ## Four rather than three, and the fourth is the one a shared state machine needs
+ *
+ * {@link setEmail} commits the address into `menu/account.ts`'s **shared** form, so the two shells
+ * are one state machine rather than two — the property that makes it impossible for them to
+ * disagree about whether anybody is signed in. It is committed on `change` rather than on every
+ * keystroke, which is the rule that module already states for the Engineer panel and the reason
+ * issue #106's *a commit that changes nothing is not an edit* exists.
+ *
+ * **There is deliberately no `redeem` here.** A mailed link is redeemed by `dev/main.ts` at boot
+ * out of the URL fragment and its outcome already reaches this world through
+ * `everyday/signInLink.ts` (GitHub issue #336). A port for it would have no caller, which is the
+ * dead seam this repository has shipped eleven times in code and once in `data/`.
+ */
+export interface EverydayAccountActions {
+  /** Commit the address into the shared form. `menu/account.ts#updateForm`, unchanged. */
+  setEmail(email: string): void;
+  /** Ask the server to mail a sign-in link to whatever {@link setEmail} last committed. */
+  requestLink(): void;
+  /** Rename this account. The one write § D490 leaves; the device-local name is untouched. */
+  chooseDisplayName(name: string): void;
+  /** End the session. It does not touch the device-local name, which answers again afterwards. */
+  signOut(): void;
+}
+
+/**
  * § 7.4's race, as the shell knows it — GitHub issue **#226**, [§ D482](../../../../DECISIONS.md).
  *
  * **Read as one value, on `EverydayWatchSession`'s own rule.** Four independent reads of four
@@ -889,6 +929,16 @@ export interface EverydayHost {
   dailyBoard(): Promise<EverydayDailyBoard>;
 
   /**
+   * The four account effects, or `undefined` when this build was served with no API origin.
+   *
+   * `undefined` is `EverydayDailyBoard`'s `no-server` said as an absence rather than a state, and
+   * it means the same thing: a property of the page decided once at boot. A screen draws the
+   * *there is nowhere to sign in* arm from it — before it draws a field, which is GitHub issue
+   * #30's own fix ordering — rather than offering a form whose press it knows will do nothing.
+   */
+  accountActions(): EverydayAccountActions | undefined;
+
+  /**
    * Put a row on the stage — § 1.5's *"never replay something approximate"*, and the press behind
    * § 14.1's `Watch it`.
    *
@@ -1012,6 +1062,18 @@ export interface EverydayHostBindings {
    * imported one would be the third.
    */
   readonly dailyBoard: (() => Promise<EverydayDailyBoard>) | undefined;
+  /**
+   * The account effects — GitHub issue #332. `undefined` when there is no account server.
+   *
+   * **Optional rather than required, unlike {@link dailyBoard}, and the reason is a file boundary
+   * rather than a design one.** Two binding literals that would have to gain a field
+   * (`campaign/wearClock.test.ts`, `campaign/buildStandingOrder.test.ts`) are outside the set this
+   * lane may write. What is lost is the compile-time forcing a required field buys — a future shell
+   * that composes bindings and omits this one gets `undefined`, which is *no account server*, and
+   * draws that arm honestly rather than failing to build. Worth making required the next time
+   * either of those files is open.
+   */
+  readonly accountActions?: EverydayAccountActions | undefined;
   /** § 7.4's rival — `dev/main.ts`'s own ghost fields, read together so they cannot disagree. */
   ghostRace(): EverydayGhostRace;
   /**
@@ -1633,6 +1695,12 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       const read = b.dailyBoard;
       return read === undefined ? { kind: 'no-server' } : read();
     },
+    /*
+     * Handed straight back. The host's part is that there is nothing to hand back when the page was
+     * served with no API origin; everything else is the caller's, because everything else is the
+     * client's — {@link dailyBoard}'s split, applied to a write.
+     */
+    accountActions: () => b.accountActions,
     watchableRuns: async () => {
       const state = b.state();
       /*
