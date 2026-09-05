@@ -1690,3 +1690,107 @@ unpushed rather than cancelling a run that was already 20 minutes deep.
 - **#333 lands in the repository and not in the deployed database.** The image is deployed by hand
   from `scripts/deploy-azure.sh`, invoked by nothing in CI, so a migration runner existing is not a
   migration having run.
+
+---
+
+# Wave Q — 2026-09-05: five lanes, one regression run, and four briefs proved wrong
+
+**Opened at `771e65f`, closed at `51d3553`.** Five builders in parallel worktrees, one integration
+branch, one suite. The combining was the point: five pull requests would have cost five fifty-minute
+runs and five chances to cancel each other.
+
+| lane | issue | decision | verified by the integrator |
+|---|---|---|---|
+| **Q-A** | #123 the preview allowlist is membership | **D469** | `--project server` **16 files / 367 passed** |
+| **Q-B** | #277 the stage draws five goals, as readings | **D470** | `--project viz` **217 / 5 023** |
+| **Q-C** | #341 the CSP gate names its permitted origins | **D471** | shell reproduction, both directions |
+| **Q-D** | #295's three confirmed defects | **D472** | `--project viz` **217 / 5 011** |
+| **Q-E** | #204 the accessibility standard | **D473** | document guards **35 passed** |
+
+Every figure above was produced by the integrator running the suite in the lane's own worktree, never
+read off the lane's report. `tsc -b` exit 0 at every merge and again on the integrated tree.
+
+## Q.1 Four of five lanes refuted their own brief, and one of the four saved a dead feature
+
+This is the wave's finding, and it is not a compliment to the lanes so much as an indictment of the
+briefs. Every brief carried one cheap instruction: **verify the premise first, and a refuted premise
+is a successful outcome.** Four lanes took it.
+
+**Q-B's is the one that mattered.** The brief said the mechanism already existed and was proven, that
+the job was *a caller, not a new mechanism*, and pointed at `host.goalsToday()` with its four
+non-test callers. The lane studied those four and found that every one of them is a surface shown
+**before a run or after one**, which is why none had ever exposed what `goalsToday()` does:
+it folds at `EverydayHostBindings.playheadS`, which `dev/main.ts:3745` binds to the **Engineer**
+transport's `playback?.simTimeS`. The Everyday stage builds a `Playback` of its own.
+
+**A caller written exactly as the brief described would have drawn five figures that never moved,
+over a day the player could watch running.** It would have passed every other check this repository
+runs: the control moves, the screen looks right, the run does not change. That is the standing
+requirement's own defect class, and the lane found it by writing the standing-requirement test
+**before** the feature rather than after. The fix is a port, `goalsAt(simTimeS)`, with `goalsToday()`
+delegating to it so the two cannot drift.
+
+**Q-A** proved by mutation that the test the brief said would go red does not: with the pre-§ D330
+equality rule restored, all four pre-existing cases in that block still pass. That case asserted only
+that a *disagreeing* allowlist throws, and under membership one still throws, for another reason. It
+never distinguished the two rules. The lane kept it and wrote that reason into it rather than
+deleting the evidence.
+
+**Q-C** measured that the fix its own issue proposed, pinning the CSP terminator, rejects a
+**correct** policy whose `connect-src` is written last, because this CSP carries no trailing
+semicolon. It built position-independent tokenised equality instead. It also corrected the brief's
+documentation classification in both directions, moving one line the brief called a dated record and
+leaving one the brief implied should move.
+
+**Q-D** found the shared `plural()` helper the brief told it to reuse does not exist. Three
+module-private copies, two ternaries, one inline, and a docstring at `shift/report.ts:1784` already
+recording why nobody imported one. The fix was to **export** one first, and the lane's own sentence
+is the lesson: a helper nobody can import is a helper nobody reaches for.
+
+## Q.2 The decision block returned no holes, which no block had managed before
+
+Wave Q reserved **D469–D473**, one number per lane, and spent all five. Wave P reserved four per lane
+and returned **six** unspent, the most any block has produced. The change was to size the block to the
+unit that actually consumes a number, and that unit is an **issue**: one issue closed end to end is
+one decision however many modules it touches. Four consecutive waves had been saying so by returning
+their spare numbers.
+
+**The reservation was opened mid-wave rather than at dispatch, and that is the part to keep.** Lane
+Q-C landed D471 before Q-A's D469 and Q-B's D470 existed, so the tree read as though two numbers below
+the highest were holes. They were unlanded. **Three separate lanes reported the resulting red as an
+integrator action**, each computing it from `documentation.test.ts`'s own arithmetic rather than
+running it, and each was right. `OPEN_RESERVATION` and the charter row were reconciled on the same
+commit as the last merge, which is the step § D387 records nobody performing when nothing asks.
+
+## Q.3 Two predictions the integrator made that were wrong, in the harmless direction
+
+**The `honesty/surfaces.ts` collision never happened.** It was mapped as certain before dispatch and
+both lanes were told to keep their edits minimal and localised. They did, and git merged the file
+with no conflict at all. Q-B measured the separation in advance and said so: its hunks end around
+line 9031 and Q-D's `GAUNTLET` adapter begins at 9371.
+
+**Q-B's mid-run honesty needed no correction.** The brief spent a paragraph on it. The lane
+implemented it as a projection of the input rather than an edit of the output, so the stage's
+unjudged row and the Engineer rail's are the same object: `state: 'pending'`, `progressPct: 0`,
+`observed: null` rather than a stand-in zero, `display` kept. Its reasoning on the progress bar is
+better than the brief's: an `at-most` bar fills to 100 while the observed value is under the ceiling,
+so *never let a landing stack past 34 people* would draw a **full** track at 00:00 on an empty
+building. A full track is a verdict with no word in it.
+
+## Q.4 What is owed, and what is not discharged
+
+- **#277's AC5 is not discharged.** `docs/22-charter.md` § 2 and `MULTI_AGENT_PLAN.md` § 1 goal 4
+  both still cite the closed #212 and need re-adjudicating against what landed. Outside the lane's
+  scope, named in § D470, and the reason this issue should not be closed as wholly complete.
+- **`docs/25:516`** still says *"the four goals still grade"* under saturation. Q-C flagged it and
+  refused to correct it: the type argument holds, the count probably does not, and whether all five
+  grade on a saturated day is a measurement nobody has taken.
+- **Q-D's residue.** Reachable uninflected counts in `everyday/campaignModel.ts`,
+  `campaignScreens.ts`, `failStates.ts`, `buildNotes.ts`, `today.ts`, `rightRail.ts`,
+  `designerModel.ts`, `benchScreen.ts`, left because those files belong to other lanes. `nights: 1`
+  appears six times in shipped tier data.
+- **A scanner artifact, measured and left alone.** `honesty/derive.test-helper.ts` splits module
+  spans at `function`, `const` and `class` and never at `interface`, so one span runs over an
+  interface and picks up a member name. That, and nothing the module authors, is why `derive.test.ts`
+  classifies `gauntlet/ladder.ts` as a text producer while the exclusion's own reason says it authors
+  nothing.
