@@ -92,20 +92,66 @@ const alias = {
  *
  * **What survives the retraction is a different problem, and it is a real one.** A 109 s case and a
  * 77 s case are a **wall-clock** cost on the `viz` leg rather than a timeout risk, and the
- * population that can outrun that leg is far larger than two: **93 cases in `packages/viz` carry an
- * annotation above this ceiling** (81 at 600 s, 7 at 900 s, 3 at 3 000 s, 2 at 3 600 s). That is
- * GitHub issue #344's subject, not this constant's.
+ * population that can outrun that leg is far larger than two. That is GitHub issue #344's subject
+ * rather than this constant's, and it is now measured.
+ *
+ * **The census that stood here was right about the population and wrong about the ceiling**, and it
+ * is corrected in place rather than edited away. It read:
+ *
+ * > *"**93 cases in `packages/viz` carry an annotation above this ceiling** (81 at 600 s, 7 at
+ * > 900 s, 3 at 3 000 s, 2 at 3 600 s)."*
+ *
+ * Ninety-three is right for `packages/viz` as a **directory** and wrong for this **ceiling**: four
+ * of them are `*.browser.test.ts`, which the `viz` project excludes and the browser tier runs at
+ * its own 120 000 ms. Those four are above a ceiling — by 5× rather than by 2× — and not above this
+ * one. Re-derived on `13e7b93`, the tree #344's own figures were taken on, the scanner named below
+ * reproduces all three of them exactly (555 annotations, 182 at exactly 300 000 ms, 93 above it)
+ * and finds two more that a numeric scan cannot see, because they are written as file-local
+ * constants rather than literals. Today, per project and each against its own ceiling:
+ *
+ * | | `viz` | `viz-browser` |
+ * |---|---|---|
+ * | ceiling | 300 000 ms | 120 000 ms |
+ * | annotations | 425 | 135 |
+ * | above its own ceiling | **89** | **63** |
+ * | at its own ceiling | 165 | 69 |
+ * | above 300 000 ms | 89 | 4 |
+ *
+ * **The last two rows disagree for the browser tier, and that disagreement is a second finding.**
+ * Counting *above 300 000 ms* is counting against a number rather than against a budget: it sees
+ * four browser cases and misses the **63** that sit above the tier's own ceiling, including twenty
+ * annotated at exactly this file's constant — 2.5× what the project they run in allows. A census
+ * that asks each project about its own ceiling finds them; one that asks the tree about a number
+ * does not.
+ *
+ * **The annotations are not this leg's wall clock, and that is the finding rather than the
+ * correction.** Measured 2026-09-05 on one `--project viz --reporter=json` run — 223 files, 5 065
+ * cases, 397 s of run wall over 838 s of summed file wall — **one file is 33.3 % of the leg and
+ * three are half of it**, while the 89 above-ceiling annotations govern cases whose **median
+ * measured cost is 0.00 s**. Only two of the 89 pass 300 s even at the 4.5× amplification measured
+ * below, and they are the two the retraction above names. Bringing the other 87 down would move no
+ * wall clock and no outcome, which is why none of them is brought down.
+ *
+ * Every count above is re-derived from the tree by `packages/viz/src/testCost.test-helper.ts` and
+ * asserted against this docstring by `testCost.test.ts` — `RISKS.md` R38 applied to the file whose
+ * three retractions are what that risk looks like when nothing re-derives a number. The run figures
+ * are a dated record of one machine on one day and deliberately not a budget: § D483 measured a
+ * sibling leg moving **1.82×** on identical work, so what that deriver publishes is shares and
+ * ratios, which survive the swing, beside the seconds, which do not.
  *
  * **What it costs, stated rather than glossed.** A genuinely hung pure-function test now takes five
  * minutes to fail instead of five seconds. That is the real price and it is worth paying: a hang is
  * a bug you find once and fix, while a 5 s ceiling under load is a false red that recurs forever and
  * trains people to re-run the suite instead of reading it.
  *
- * **The explicit annotations are deliberately left in place, and there are 182 of them now, not
+ * **The explicit annotations are deliberately left in place, and there are far more of them than
  * 113.** The 113 above is a dated figure — what this suite had converged on when the constant was
- * chosen — and it is correct as history. This sentence was in the present tense and had drifted:
- * derived 2026-09-05, `packages/viz` carries **555** timeout annotations in all, of which **182**
- * sit exactly at 300 000 ms. Removing them would be 182 edits whose only effect is to make those
+ * chosen — and it is correct as history. The sentence that replaced it was in the present tense and
+ * had drifted within a day of being written: it read *"`packages/viz` carries **555** timeout
+ * annotations in all, of which **182** sit exactly at 300 000 ms"*, which was exact on `13e7b93`
+ * and is not exact here. Derived on this tree, and re-derived on every run of `testCost.test.ts`
+ * rather than typed: `packages/viz` carries **560** timeout annotations in all, of which **185**
+ * sit exactly at 300 000 ms. Removing them would be 185 edits whose only effect is to make those
  * sites depend silently on a line in another file. A site that knows it runs a simulation is
  * allowed to say so.
  *

@@ -1898,6 +1898,17 @@ count**. Three `echo` lines now fix that. Which hardware difference it was stays
   a stale brief and had to rediscover it. Every read-only lane's findings land as an issue comment.
 - **#344 is filed and unowned** — 146 cases across five packages annotated above the 300 s project
   ceiling, and a wall-clock watch that must survive a 1.82× machine swing.
+  **Corrected 2026-09-05 by wave S's lane B, and the figure is low by 123** ([§ D492](DECISIONS.md)).
+  *"146 cases across five packages"* counts trailing arguments written as **numeric literals**; a
+  scan that also resolves a file-local `const TIMEOUT_MS = 900_000` finds **269**, because
+  `experiments` writes 123 of its 168 that way and a literal scan sees only 45 of them. The other
+  four packages reproduce the original exactly (`viz` 93, `core` 5, `cli` 2, `server` 1), which is
+  what says this is a method gap rather than tree drift. Two further corrections to the frame rather
+  than the count: 4 of `viz`'s 93 are `*.browser.test.ts`, which the `viz` project does not run and
+  the browser tier runs at its own 120 000 ms ceiling — so the `viz` **leg**'s population is **89** —
+  and counting *above 300 000 ms* misses the **63** browser-tier annotations above the ceiling that
+  actually applies to them. Left standing rather than rewritten: the count was correct for the
+  method it used, and the method is the finding.
 - **The three stale "five scenarios" docstrings turned out to be ten sentences**, and are fixed.
   `scenariosPanel.ts` had *"The eight swatches"* nine lines below a header saying *"Five cards"* —
   half-corrected is how a claim outlives its correction.
