@@ -31888,3 +31888,84 @@ footing abandonment sits on beside AWT. Publish the deviation next to the figure
 an out-of-band rate remains a defect. And `traffic/generator.ts` treating `arrivalRatePctPop5min` as
 an override that *"overrides every profile"* is unchanged: the override is the mechanism an authored
 case uses, and it remains available to nothing else.
+
+---
+
+## D480 — the content plan sets targets from arithmetic, the capability rule binds new content, and the two proof-case towers are authored rather than accepted
+
+**Date: 2026-09-05 · Owner: lane R-B, GitHub issue #199 · Rules on: [`docs/37-content-plan.md`](docs/37-content-plan.md),
+and the acceptance criteria of issues #232, #233, #249, #158 and #159.**
+
+A `DECISIONS.md` entry is owed here under [§ D405](DECISIONS.md)'s test rather than by default: this
+reaches well past the module that took it. It sets a rule other lanes must satisfy (CR-4), it fixes
+the first acceptance criterion of four open issues that each reference a target that did not exist,
+it rules on a question an issue explicitly left open (#158's two exits), and it corrects a count that
+`data/`, the roadmap and the issue tracker disagreed about.
+
+**Four rulings.**
+
+**1. The counts in the issue were checked and one was wrong.** #199 states *eight buildings, ten
+campaign stages, five contracts, eighteen fix cases, forty proof cases*. Measured: buildings **8**,
+campaign stages **10**, fix cases **18**, proof cases **40** — and contracts **8**, not five. Five is
+the design handoff's figure and was true until `chancery-house`, `crown-hotel` and
+`st-jude-hospital` landed; `docs/12` § 4.7 recorded the deviation and the issue was never
+re-measured. `packages/experiments/src/validation/contentPlan.test.ts` now re-derives all seven and
+fails in both directions, so the plan's *current* counts cannot drift while its *targets* stay prose.
+That split is [`RISKS.md`](RISKS.md) R38 applied on purpose.
+
+**2. The targets are derived, and the derivations are independent of the total.** Buildings **12**
+and wrinkle templates **20** come from the gameplay guide § 17's rotation arithmetic — at eight
+towers the *no tower twice in seven days* rule leaves exactly one legal choice a day, which
+satisfies the rule and destroys its purpose. Fix cases **44** is 18 plus the 26 the guide's own
+§ 10.6 catalogue names. Contracts **12** is one per shipped building, which is `docs/12` § 4.7's own
+rule. Proof cases stay at **40** by the rule that a rating is comparable only if the cases never
+move, and dispatchers stay at **13** because a weight vector adds no run to watch. Those seven land
+at **8.9 finite play-hours** against a **6.5–10.8** band derived from #249's quarter and the
+charter's `S3`. Nothing was divided by anything; the agreement is the argument.
+
+**3. CR-4 — the capability rule — with the distinction that makes it usable.** *New content ships
+only if every element it declares is expressible in fields the shipped engine already reads and the
+content type's own schema already carries; otherwise the missing capability is separately scheduled.*
+The blockage has **two shapes and they have different owners**: the engine lacks the capability (an
+engine issue), or the engine has it and the content schema cannot reach it (a schema widening owned
+by the content lane). Measured against the tree, #159's wrinkle library is four of six kinds
+authorable today and needs one named engine capability — *a service event that changes a car's or a
+bank's service range and rated load, not only its mode* — and of #233's twenty-six catalogue cases
+**six are blocked outright, four are blocked by the second shape alone, and sixteen are authorable
+today**. The four matter most: `FixitCase.run` carries `seed`, `durationS` and
+`arrivalRatePctPop5min`, so a case can change the demand *level* and not its *shape*, and cannot
+declare a directional split, a demand template, patience, crowding, `serviceEvents` or
+`accessZones`, every one of which the engine reads. **That widening buys more play-hours per unit of
+engine work than anything else in the plan**, and it is `fixit/`'s to do.
+
+**4. #158 is resolved as option 1 — author Harbour Point and Ashgate Mixed-Use — with a deadline
+condition, and its option 2 is found unavailable.** #158 offers *amend § 12.3* as its second exit;
+`docs/12` states of the vendored handoff that it is *a record, not a source file*, so that exit does
+not exist and the equivalent is a recorded deviation, which `data/proof-cases.json`'s `$comment`
+already is. Authoring is chosen because the substitutes do not carry the role the set was chosen for
+(`secure-tower` is not *a group that cannot cope*), because neither building needs a new capability,
+and because the objection that an over-subscribed tower's mean is suppressed does not bite —
+`gauntlet/rating.ts` scores on `pctOverLongWait`, an observation, expressly so that saturation
+cannot drop a case. **The deadline is the daily board**: while no server exists, ratings live in one
+device's own slot and there is no cross-player comparison to break, so the cost of moving a case is
+at its minimum now and rises permanently the day § 14's board ships.
+
+**The finding that came with it, and it is larger than #158.** The same substitution runs through
+Fix a building and is **not recorded anywhere**. The guide § 10.5 specifies eighteen cases on
+eighteen distinct buildings; **five ship**, and **thirteen of the eighteen shipped cases run on a
+substitute tower**, including the two the specification places on Harbour Point and on Ashgate.
+`data/proof-cases.json` names its two departures outright; `data/fixit-cases.json`'s `$comment` says
+only that each case names a shipped building. **The asymmetry is the defect, not the substitution**,
+and the rule that settles both is one rule: *a substitution is acceptable where the content brings
+its own configuration to a shipped building, and unacceptable where the content's identity is the
+building*. A fix case carries its own fault, patches and figures and may be re-based freely; a proof
+case carries nothing but a tower and a crowd. So the other eleven missing buildings are **formally
+accepted, permanently**, and the disclosure paragraph `data/fixit-cases.json` owes is #233's
+cheapest acceptance item.
+
+**What this does not decide.** No cadence — #249's window is used as an input and its cadence is
+left to it, with the blunt input that at the plan's own rate one fix case replaces a sixth of a
+week's play, so a cadence cannot be justified as content replacement. No difficulty ordering —
+[`docs/33-difficulty-curve.md`](docs/33-difficulty-curve.md) owns that for all three modes and this
+plan defers to it in full. And no play-hours figure for Endless rush, whose content-hours are a
+property of the player rather than of the content ([§ D477](DECISIONS.md)).
