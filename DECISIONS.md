@@ -32190,3 +32190,74 @@ SQL or in the store. Those are the plumbing, and they are the lane's.
 only `awtIsValid: true` runs, checked against the server's own replay at `leaderboard/verify.ts:298`
 — so an aggregate over `entries` inherits the suppression rule rather than re-deriving it. That was
 the criterion that looked hardest and it is structural.
+
+---
+
+## D485 — a blocker is a fact in the issue body, never a state in a register, and staleness is what triggers the check
+
+**Date: 2026-09-05 · Owner: the integrator, on the process `ISSUE_TRIAGE_PLAN.md` records · Rules
+on: GitHub issue #329, `RISKS.md` R45. Dated before the code.**
+
+#329 asks which of three shapes the blocker index takes — a line in the issue body, a GitHub label,
+or a column in `ISSUE_WORKER_LEDGER.md` — and notes that all three parse and that picking by writing
+the parser first is how the expensive one gets chosen by accident. **They are not three versions of
+one idea. Two of them store state that somebody has to maintain, and one stores a fact that is true
+forever.** That is the whole decision.
+
+**Ruling: a line in the issue body, of the fixed form `Blocked by #N`.**
+
+**Why the distinction decides it.** *"#275 is blocked by #280"* is not a state; it is a fact about
+what #275's work depends on, and it stays true after #280 merges. What changes is a **derived**
+property — whether the blocker is closed — and the check derives it by asking GitHub. So the line is
+written once and never edited, and **its going stale is the detection mechanism rather than a
+failure of it.** R45 is *a blocker that clears is not an event anything watches for*; a form that
+must be updated when the blocker clears requires exactly the act nobody performs, which is R45
+rebuilt as its own solution.
+
+That disqualifies the other two:
+
+- **A label carries no target.** A bare `blocked` says nothing about what blocks, and
+  `blocked-by-179` is label sprawl that must be *created* per blocker and *deleted* when it clears.
+  It is state, and its maintenance is the disease.
+- **A ledger column is a second register**, and #325 (R44) is open on the first one overstating what
+  is missing. Fixing a stale-state problem by adding a register is the same mistake with more
+  surface. It would also drift against GitHub, and `ISSUE_TRIAGE_PLAN.md` already rules that *the
+  GitHub issue remains the public source of truth* while the file is the orchestration record.
+
+**Four constraints on the build, each of which the obvious implementation gets wrong.**
+
+**1. It cannot be a vitest test, and the repository already said so.** `everyday/buildNotes.test.ts`
+records the bound in its own words: it does not check whether an issue is still open, because *"that
+needs the network and this tier has none."* So it is a scheduled CI job — `deep-tiers.yml` proves
+scheduled workflows run here, and `review.yml`'s gates job is the shape, a plain Node script under
+narrow `permissions`. It needs `issues: read`.
+
+**2. It does not fail the build.** An issue becoming unblocked is not a defect in the tree, and a red
+CI over a backlog condition would block merges for something no diff caused. It comments on the
+unblocked issue and writes a job summary. **A gate that gates the wrong thing is R40 wearing a
+different hat**, and the temptation here is strong because failing is easier than reporting.
+
+**3. Both directions are asserted, and the vacuity guard is not optional.** A parser that matches
+nothing reports *nothing is unblocked* forever and looks green permanently — `deadCode.test.ts`'s
+non-vacuity idiom is the answer, so the job fails when it finds **no** declarations at all. And the
+direction #329's own AC3 names: an issue whose blocker is still open must not be reported, asserted
+against a fixture rather than assumed.
+
+**4. Adoption is opportunistic and the check ships before the backfill finishes.** One issue in
+seventy carries the convention today. Requiring seventy before shipping is how it never ships, so:
+every issue a triage lane touches gets its line, the wave that builds the check backfills the
+blocked set it can verify, and the vacuity floor is **ten declarations** rather than one — high
+enough that a broken parser is caught, low enough to reach in one pass.
+
+**What is refused rather than mechanised.** #329's third instance — a triage snapshot correct when
+written and wrong three hours later — is **irreducibly human and is left that way**. Its subject is a
+wave's merge state rather than an issue dependency, so its wrongness is time-relative, and no check
+can separate *this snapshot is stale* from *this snapshot is a dated record* without a rule that
+snapshots carry a timestamp and are not read past their wave. That is an agreement, and it is
+adopted as one: **every snapshot in `ISSUE_TRIAGE_PLAN.md` carries its date and its commit sha, and
+a reader may not treat one as current state.** Saying so is better than a guard that pretends to
+cover it, which is § D256's rule pointed at a mechanism instead of a sentence.
+
+**What this does not decide.** Whether this account permits granting `issues: read` to a workflow,
+and what `GITHUB_TOKEN`'s default permissions are here. Both are unchecked settings facts, and the
+lane finds out rather than assuming.

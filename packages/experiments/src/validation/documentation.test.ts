@@ -1478,7 +1478,7 @@ type DecisionReservation = {
  * reported the resulting red as an integrator action, each computing it from this file's own
  * arithmetic rather than running it, and each was right.
  */
-const OPEN_RESERVATION = { wave: 'R', from: 479, to: 485 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'R', from: 479, to: 487 } as DecisionReservation | null;
 /*
  * **Wave R reserved D479–D483 at dispatch: one number per issue, plus one for the integrator.**
  *
@@ -1502,6 +1502,15 @@ const OPEN_RESERVATION = { wave: 'R', from: 479, to: 485 } as DecisionReservatio
  * not per issue: they are per finding, and a wave's findings are not enumerable at dispatch.
  * Recorded here rather than silently taken, because taking the number above a block is exactly what
  * § D404 forbids and the guard below is what would have caught it.
+ *
+ * **Widened a second time, to D487, and this one is the lesson applied rather than re-learned.**
+ * The first widening was reactive: a number was needed and the block did not hold it. Widening
+ * again the moment that happened, before needing it, is what the paragraph above says to do — an
+ * integrator's allocation is a **stream** rather than a batch, because it is spent per finding and
+ * a wave's findings are not enumerable at dispatch. Over-reserving costs nothing: the ceiling check
+ * below requires at least one number in the block to be unwritten while the wave is open, and a
+ * number the wave never reaches is free rather than holed. Under-reserving costs a mid-wave edit to
+ * this file every time.
  */
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
