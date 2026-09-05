@@ -1049,3 +1049,111 @@ one). #327, #329 and #338 were ruled this wave.
 
 Anything needing the API redeployed. Unchanged since snapshot G. #333's migration runner has landed
 in the repository, which does not mean a migration has run anywhere.
+
+---
+
+# § D — snapshot 2026-09-05, at `8ff0215`, **61 open**
+
+**This snapshot is a dated record and not current state.** § D485 adopted that as an agreement
+rather than mechanising it: instance 3 of #329 is a triage snapshot correct when written and wrong
+three hours later, whose subject is a wave's merge state rather than an issue dependency, so its
+wrongness is time-relative and no check can separate *this is stale* from *this is a dated record*.
+The date and the sha above are what stands in for the guard. Read them first.
+
+The previous snapshot, § C, says **89 open** and is dated 2026-08-29. Twenty-eight issues have closed
+since across waves M through R. § C's batch plan has shipped and its cluster reasoning is history.
+
+## D.1 What the backlog is now, which is not what § C described
+
+§ C's opening line — *no open issue reports a wrong simulation number* — still holds, and it has
+stopped being the useful thing to say. **The backlog has changed kind.** Of the 61, only a handful
+are defect reports. The rest divide into four things that are not defects and want different
+handling:
+
+| kind | count | what it is | what unblocks it |
+|---|---|---|---|
+| **specification landed, implementation absent** | 8 | a document decided it and no code exists | a build lane |
+| **product decision unowned** | 9 | nobody has ruled, so nobody can build | a ruling, taken before the lane |
+| **content and balance** | 11 | authoring, not engineering | a content pipeline and a rebalance measurement |
+| **launch and liveops programme** | 14 | true, large, and not yet startable | the game layer reaching feature complete |
+| **defect or gap in shipped code** | 13 | the classic kind | verification, then a lane |
+| **epic / tracking** | 6 | #219 #231 #241 #247 and two others | its children |
+
+**The dominant failure mode is now the second row, and it has a name in this repository.**
+`RISKS.md` **R42** is *a ruling with no consumer*; the shape here is one level earlier — a question
+nobody has answered, sitting silently in front of work that reads as schedulable. Wave S's own
+opening move is the counter: three rulings taken before the lane rather than at commit four. #342
+exists because a whole document of them landed and no issue can see it.
+
+## D.2 The clusters, and the canonical in each
+
+Chosen on § 2's standing rule — the issue carrying reproductions, root causes or a measurement is
+canonical over the one asserting the same ground.
+
+**Telemetry — canonical #340.** #201 and #202 landed as documents and are still open, which makes
+the area *look staffed*; #340 is the build they specified. **#236 and #250 both consume data nothing
+emits** and are blocked by it rather than merely related. Not duplicates: each has its own
+acceptance and its own release.
+
+**Onboarding and the first session — canonical #208, gated by `docs/35` Q4.** #210 is the build
+shape, gated by Q2. Both carry 2026-09-02 comments recommending § D372's tutorial building, and
+`docs/35`'s `PM-DOOR` route claims to discharge #208 AC1 and AC2, #210, #217 AC2 and #220 together —
+**under which there may be no tutorial building to author at all.** That is wave S lane S-C's
+subject and it is the most expensive stale recommendation in the backlog, because the action it
+recommends is content authoring and content is the costly kind to discard.
+
+**Social layer — canonical #221 for the wiring, #332 for the door.** #222 (seed the boards), #93
+(social hooks), #327 (distribution endpoint), #328 (server-side scheduling), #337 (spectate a board
+row), #338 (post an intervened run) are each a distinct capability over the same server, not
+duplicates of one another. #327, #337 and #338 all had their gating rulings taken in wave R
+(§ D482, § D484, § D486), so they are schedulable and were not before.
+
+**Content and balance — canonical #234 for the rebalance, #233 for the pipeline.** #232 (building
+set), #158 (two missing proof-case towers), #159 (wrinkle library), #169 (campaign completeness),
+#174 (three unbuilt programmes), #270 (stage 1's DC-1 breach) all wait on the same two. #235
+(traffic realism) is the measurement half and stands alone.
+
+**Process and QA — no single canonical, and that is correct.** #218 (vertical slice review, P0),
+#237 (twenty-one journey tests, P0), #238 (performance budget), #239 (accessibility), #240
+(small-screen), #242 (error monitoring), #243 (launch checklist), #325 (GAPS staleness), #329
+(blocker watch), #344 (the `viz` leg's wall clock). #329's ruling is taken (§ D485) and it is now a
+build; #344 is wave S's lane S-B.
+
+**Engineer-side and Everyday gaps — #178 and #177**, each a bundle of small independent items, and
+#146, #171, #213, #229, #324 individually. Wave S's two read-only lanes are pointed at the older
+half of this, because a bundle issue filed on 2026-08-13 has had thirteen waves to become partly
+untrue and nobody has checked.
+
+## D.3 The three P0s, and why only one of them is startable
+
+- **#237 — the twenty-one journey tests.** Startable. It is the largest single QA debt in the tree
+  and `TEST_MATRIX.md` is 55 lines against #197's completed flow maps, which both files state.
+- **#218 — define and hold the vertical slice review.** Startable, and it is a *process* deliverable
+  rather than a build: what the review asks, who holds it, and what it exits on.
+- **#208 — the first session presents no problem to solve.** **Not startable**, and this is the
+  instance that shows what D.1's second row costs. It is gated by `docs/35` Q4, which is unowned,
+  and the two most recent dispositions on it recommend an action `PM-DOOR` may make unnecessary.
+- **#219 and #241** are epics and exit on their children.
+- **#202 and #201** are P0-labelled and **landed as documents**; their implementation is #340.
+
+## D.4 The next batches, in order, with the ground
+
+1. **Wave S (running).** #332 with its three rulings, #344, #342, plus two verification lanes over
+   the 2026-08-13 cohort. Chosen because #332 was wave R's named next and turned out to be blocked,
+   and unblocking it costs three rulings rather than a lane.
+2. **Wave T.** #329 (ruled, small, and it is the guard against the disease this file keeps
+   catching), #340 (telemetry, the prerequisite two open issues silently depend on), and whatever
+   S-C's routing makes startable on #208/#210/#220. #329 touches `.github/`, which no lane may touch
+   in wave S, so it waits one wave by construction rather than by priority.
+3. **Wave U.** #237 and #218 — the two startable P0s, both QA-process shaped, neither blocked on a
+   ruling.
+4. **Deferred as a programme, not as individual issues.** The fourteen launch-and-liveops issues
+   (#241–#252 and their siblings) exit on the game layer reaching feature complete. Scheduling them
+   individually before that is what makes a backlog look actionable when it is not.
+
+## D.5 What this snapshot deliberately does not do
+
+It does not close anything for tidiness, and it does not combine two issues that share a component
+but need distinct fixes. § C's #170 ↔ #229 finding is the standing warning: two issues that read as
+duplicates were the *opposite* of duplicates once the register was partitioned by owner, and closing
+either against the other would have silently dropped a requirement.
