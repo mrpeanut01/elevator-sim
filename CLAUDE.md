@@ -84,8 +84,50 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **583 006** | **606** | **56** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **727 213** | **4 710** | **57** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **584 239** | **606** | **56** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **728 743** | **4 710** | **57** | **0** | **green**, and the register is empty |
+
+  **Wave S's move is the first this row has recorded that is deliberately *not* a per-case constant,
+  and the lane forecast it exactly anyway.** Measured on the integrated tree after wave S, both tiers
+  in one sitting, with the base at `589660f` re-measured first in a detached worktree — where it
+  reproduced its published row **exactly in both tiers**, the **ninth** consecutive wave that has
+  held.
+
+  | | base `589660f` | wave S | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 583 006 | **584 239** | **+1 233** | **25.16** |
+  | deep strings | 727 213 | **728 743** | **+1 530** | **25.50** |
+  | surfaces | 56 / 57 | **56 / 57** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **Every wave since G has reported a per-case integer — 19, 20, 28, 76 — and this one cannot,
+  because one of its three terms is conditional.** The decomposition, published before the
+  measurement and matching it to the string:
+
+  - `everyday/settingsView.ts#settingsScreenViewOf` — **+16 a case** (+784 / +960). Twenty-two new
+    seeds over the six account arms the six cases now carry, less the deleted `you.home` on each.
+  - `everyday/buildNotes.ts` — **−1 a case** (−49 / −60), the `Sign out` absence leaving.
+  - `honesty/agreement.ts`'s `display-name` pair — **6 or 12 a case** (+498 / +630): two sides ×
+    three arms, **doubled where the case's building has an authored whole day**. That is the
+    conditional term, and it is why no integer exists.
+
+  784 − 49 + 498 = 1 233 and 960 − 60 + 630 = 1 530.
+
+  **The conditional term is the part worth reading, because it identifies three buildings by
+  arithmetic and the histogram then confirms them.** Solving the pair's contribution in both tiers
+  gives **exactly 15 cases at 6** in each — 15 × 6 + 34 × 12 = 498 across 49 cases, and
+  15 × 6 + 45 × 12 = 630 across 60. The run's own `buildings` line says which: `garden-apartments=15`
+  in always-on, and `garden-apartments=9 + st-jude-hospital=3 + crown-hotel=3` in deep. **Three
+  buildings, which is the number this file says have no authored day, arrived at from two tiers of
+  arithmetic rather than read off a file** — and then agreeing with a histogram nothing in the
+  derivation consulted.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: **identical,
+  nothing added, nothing removed**, on a wave that shipped a new player-facing account block across
+  six states. That is what building a *state* on an existing surface looks like from here, and it is
+  § D489's ruling showing up in the measurement — an eighteenth screen would have moved this column.
+  The deep tier's one-surface lead survives and the diff names it: `campaign/judge.ts#judgeStage` is
+  the only surface in deep and not in always-on, and nothing is in always-on and not in deep.
 
   **Wave R's move is twenty strings a case in both tiers, three lanes each forecast their own share,
   and all three were exact** ([§ D487](DECISIONS.md)). Measured on the integrated tree after wave R,
