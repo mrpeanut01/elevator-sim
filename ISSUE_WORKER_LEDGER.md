@@ -1993,3 +1993,69 @@ stays"**, calling item 4 *"the one I would not let sit"*. A reader reaching only
 schedules two built things, one at P1. The issue is retitled and the comment superseded rather than
 left to be read — which is the same failure mode as #329's third instance, a record correct in one
 paragraph and wrong in the next.
+
+## S.4 The telemetry cluster's dependency graph, verified rather than asserted
+
+Lane S-V3 adjudicated **#201, #202, #236, #250, #340** read-only at `8e3c2ea`. **Nothing in the
+cluster is closable and nothing is a duplicate** — five issues, five distinct scopes. The edges below
+are in § D485's form (a line in the issue body, written once, never edited, whose going stale is the
+detection mechanism), and they are recorded here because **#329's build owes a backfill of "the
+blocked set it can verify"** and this is that set for this cluster.
+
+| edge | the fact that justifies it |
+|---|---|
+| **#340 `Blocked by #202`** | `CHARTER_PROGRAMME.md:172` — *"#202 lands **before** any telemetry ships … shipping in the other order is not recoverable"*; `RISKS.md` R31 lists it as a trigger. Concretely: #340's AC4 needs consent copy `docs/26` § 4.1 does not draft and #202's AC5 owes |
+| **#250 `Blocked by #340`** | No emitter, no route, no store. `grep -rni telemetry packages/viz/src` → 0, mechanised by `documentation.test.ts:1136` |
+| **#250 `Blocked by #201`** | `docs/26` § 8 — *"Two routes, and no third"*. A dashboard reads; #340 **excludes** the dashboard; § 8 is #201's section |
+| **#236 `Blocked by #340`** | AC1 is *"against telemetry"*; AC2's abandonment points are § 6.3's beat-drop diagnostic over E8 |
+| **#236 `Blocked by #234`** | AC5 names S1–S5. `docs/22-charter.md:183` assigns **S5** to a paired CRN sweep, not to telemetry, and `docs/26` § 9.5 records the charter gate as *"assigning a criterion to the wrong instrument"* |
+| **#201 (AC3's baseline clause only) `Blocked by #340`** | `grep -c -i baseline docs/26` → 0, and § 11: *"Nothing in this document has been built."* **This edge does not cover AC5**, which is schedulable today |
+
+**The edges deliberately not drawn are the more useful half**, because a wrong `Blocked by` line never
+goes stale and is therefore worse than a missing one:
+
+- **#201 `Blocked by #340` as a whole issue** — false for AC5, which is a specification and needs no
+  instrument.
+- **#202 `Blocked by` anything** — all three of its residues are documentation and design. **#202 is a
+  root of this graph and the backlog reads it as a leaf.** That inversion is the cluster's sharpest
+  finding: #340 looks like the thing that unblocks everything and is itself blocked by an explicitly
+  non-recoverable ordering rule recorded in two places.
+- **#236 `Blocked by #205`** — #205 closed as completed and its deliverable landed. What is missing is
+  **recruitment**, and `docs/30:4` says the programme *"recruits nobody"* while `:51` scores it *0 of
+  4*. **No open issue owns it.**
+
+### S.4.1 Four unowned prerequisites the cluster will meet
+
+Collected rather than left to be rediscovered, because every one of them is the shape #340 was filed
+about:
+
+1. **Cohort recruitment** (#236 AC1) — no issue.
+2. **The visible-trouble threshold and dwell, and the `controlKey` registry** (#340 AC1) — both *"owed
+   by M2"* per `docs/26` § 11, and **#212, the M2 issue that owed them, is closed**. Without them E3
+   and E4 cannot be emitted to spec, and § 6.2 forbids the telemetry client restating the threshold,
+   because two definitions of *visible trouble* would be two sets of statistics.
+3. **The § 8 read-route question** (#250, settled on #201).
+4. **The lawful basis, the published privacy notice, and whether an age statement is needed**
+   (`docs/26` § 1.3 and § 11) — a repository-wide search returns only #202.
+
+### S.4.2 What the lane refused, and it is the right refusal
+
+Two closures a reader would plausibly propose — **#201 as a duplicate of #250**, **#202 as a duplicate
+of #340** — are refused on the register-partition test rather than on titles. **In both pairs the
+older issue's deliverable is a specification the newer one consumes as an unstated input**, so closing
+it would push a design decision into a build lane with no criterion requiring it be reviewed. That is
+`ISSUE_WORKER_LEDGER.md` § D's #170 ↔ #229 lesson with the polarity that applies here.
+
+**And #202's AC6 has a near-neighbour that is also not a duplicate: #229's AC3.** #229 builds the
+*control* (*Clear saved progress works*); #202 AC6 wants the *posture* to carry the category, its
+period and its deletion path. Closing either against the other drops half. That this lands on #229 for
+the second time is a coincidence, and the lane named it as one so that nobody reads it as a pattern.
+
+### S.4.3 Two figures in `docs/26` § 0 have gone stale, in the class § 0 documents
+
+`:37` records `telemetry` as *"2 files / 6 lines"* — it is **3 files** today, `documentation.test.ts`
+having joined when the guard was written, while the 6-line figure describes the narrower server grep
+and is still exact. `:55` states *"`analytics` is still 0 files"* — the published command returns **2
+files**, both prose by the document's own test. **The claims are intact and the counts are not**, and
+§ 0's own rule is the one to apply: *"a measurement whose command is retuned until it gives the old
+answer is the defect this table exists to prevent."*
