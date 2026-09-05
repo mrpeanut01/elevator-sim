@@ -31694,13 +31694,45 @@ the same as a right one, and no clause in the standard is satisfied by adding an
 
 Three changes, and the third is the one that was actually costing time.
 
-**One leg per vitest project, run concurrently.** `npm test` is every registered project in series,
-which was ~49 minutes on the one run that completed on 2026-09-04. The arithmetic was measured on
-that run rather than estimated: setup is **35 seconds** end to end, so paying it five times costs
-about three extra runner-minutes and returns the wall clock of the longest project instead of the
-sum of all of them. Roughly a fifth more runner time for between a two and a threefold improvement
-in how long a branch waits. § D462 established that runner minutes are this owner's currency, so the
-cost is stated rather than buried.
+**One leg per vitest project, run concurrently.** `npm test` is every registered project in series.
+
+**This entry originally published two numbers from arithmetic, before a run could check either, and
+both were wrong in the unflattering direction.** They are corrected here rather than quietly edited,
+because a published figure that does not reproduce is what this repository refuses hardest and
+`RISKS.md` R38 is the row for it. What was claimed: *"between a two and a threefold improvement"* and
+*"about three extra runner-minutes"*. What the tree actually does, measured on run 33939825985 at
+`db016b3`, every leg green, against the serial baseline of run 33919955524 at `d2c16bc`:
+
+| leg | wall clock |
+|---|---|
+| `service` | 2 m 10 s |
+| `core` | 3 m 59 s |
+| `browser` | 4 m 33 s |
+| `viz` | 9 m 03 s |
+| **`experiments`** | **36 m 05 s** |
+| aggregate gate | 3 s |
+
+| | measured | claimed |
+|---|---|---|
+| wall clock | **36 m 12 s**, against a serial **49 m 56 s** | — |
+| improvement | **1.38×**, saving 13 m 44 s | *two to threefold* |
+| runner time | **55 m 53 s**, **+5 m 57 s** on serial | *about +3 minutes* |
+
+**`experiments` is 64 % of all runner time and the entire ceiling.** The split cannot beat it, so the
+total improvement was never going to be what the arithmetic suggested; the error was reasoning from
+a 35-second setup cost without knowing how the 49 minutes were distributed across projects.
+
+**The honest claim, which the same measurement supports and is the one that matters for parallel
+development, is about time to first signal rather than total wall clock.** Before, nothing reported
+until everything finished, so every branch waited 49 minutes for any verdict at all. Now four of the
+five channels answer in under ten minutes: a change to `packages/server` is judged in **2 m 10 s**,
+`core` in **3 m 59 s**, the browser tier in **4 m 33 s**, `viz` in **9 m 03 s**. Only `experiments`
+still takes the long time, and it took that long before too; it was hidden inside a single number.
+
+That is a large improvement for several branches making progress at once, and it is a different
+claim from the one first published here. § D462 established that runner minutes are this owner's
+currency, so the real cost is stated plainly: **+5 m 57 s per run, about 12 % more**, for a verdict
+on most work roughly twelve times sooner.
 
 **Cancelling is now conditional on the event.** A pull request's own iterations supersede each
 other, and cancelling there protects the shared pool, which is what lets several branches progress
