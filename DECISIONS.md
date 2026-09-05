@@ -32054,3 +32054,61 @@ on a quantity that swings 1.8× with the host is a gate that has to say what it 
 **1 017 s**; these two runs measured it at 782.8 s and 1 335.3 s, which bracket it. The pin is not
 called stale, because the machine it was taken on is not recorded — which is this entry's subject
 arriving on its own evidence.
+
+---
+
+## D484 — the world distribution is a quantile ladder per axis, and there is no typical run
+
+**Date: 2026-09-05 · Owner: the integrator, on the statistical discipline `CLAUDE.md` reserves ·
+Rules on: GitHub issue #327, and through it #161's world figures and #226's `world` ghost arm.
+Dated before the code, on § D139's precedent.**
+
+#327 is gated on a statistical decision rather than on any code dependency, and it was going to be
+taken by whoever wrote the SQL. Its triage named the three candidates — median vector, histogram, or
+percentile line — as though they were presentation choices. They are not. **The two consumers want
+different things, and one of the three answers is unsound.**
+
+**Ruling, in five parts.**
+
+**1. The endpoint publishes a quantile ladder per axis, independently, at p10 / p25 / p50 / p75 /
+p90.** Not a histogram: bin edges are an opinion, and a server that picks them has baked a reading
+of the data into the wire format where no client can question it. Quantiles at fixed probabilities
+carry no such choice. Not a scalar: *do not scalarize too early* is a standing rule here, and a
+board's distribution is exactly where a single "world score" would be manufactured.
+
+**2. There is no typical run, and the median vector is refused.** The median AWT, the median WT95 and
+the median energy are drawn from **three different submissions**. Presented together they describe a
+run nobody played — a fabricated record with the shape of a measured one, which is the failure this
+repository refuses hardest. So #226's `world` ghost does **not** take its line from the ladder. Its
+source is a **real entry at the median of one named axis**, returned by id, and the surface says
+which axis chose it. A ghost is a run or it is not a ghost.
+
+**3. No confidence interval, and this is the part most likely to be added back by someone being
+helpful.** A client holding its own run's interval and the board's interval would compare them and
+conclude from overlap, which `CLAUDE.md` forbids by name. The distribution is **descriptive of who
+submitted**, never inferential about a population of players — the submissions are self-selected,
+so there is no population it could be a sample of. The route says so in its own docstring or the
+next reader will assume otherwise.
+
+**4. Every figure carries its count, and the ladder is withheld below n = 20.** The count rule is
+§ D459's, and a distribution needs it more than a mean does. The floor is arithmetic rather than
+taste: at n = 20 each outer rung has two observations beyond it, so p90 is an interpolation between
+two real runs; below about n = 10 p90 *is* the maximum, and the endpoint would be publishing one
+player's run as a world figure. **20 is an assumption with its reasoning attached rather than a
+citation**, on the footing `data/traffic-profiles.json`'s badge share sits on. Below the floor the
+route returns the count and no ladder — an honest refusal, not an empty ladder, because an empty
+ladder reads as a distribution with nothing in it.
+
+**5. Energy rides beside wait and is never ordered against it** (§ D106), with
+`workPerServedLegKJ` beside raw `energyKJ` — a board whose runs delivered fewer people has not
+saved anything. And any authored or fixture figure on the surface is marked as one, per § 20.11,
+which is the clause transferred from #161 and the one most likely to be skipped: a distribution
+surface is precisely where an authored figure gets read as a measured one.
+
+**What this does not decide.** The route's name, its caching, and whether the ladder is computed in
+SQL or in the store. Those are the plumbing, and they are the lane's.
+
+**What it makes cheaper.** #327's AC2 is already satisfied at ingress — `store.ts:660-661` admits
+only `awtIsValid: true` runs, checked against the server's own replay at `leaderboard/verify.ts:298`
+— so an aggregate over `entries` inherits the suppression rule rather than re-deriving it. That was
+the criterion that looked hardest and it is structural.

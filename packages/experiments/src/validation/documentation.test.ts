@@ -1478,7 +1478,7 @@ type DecisionReservation = {
  * reported the resulting red as an integrator action, each computing it from this file's own
  * arithmetic rather than running it, and each was right.
  */
-const OPEN_RESERVATION = { wave: 'R', from: 479, to: 483 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'R', from: 479, to: 485 } as DecisionReservation | null;
 /*
  * **Wave R reserved D479–D483 at dispatch: one number per issue, plus one for the integrator.**
  *
@@ -1492,6 +1492,16 @@ const OPEN_RESERVATION = { wave: 'R', from: 479, to: 483 } as DecisionReservatio
  * got wrong by opening it mid-wave. Reconcile it and the charter row on the same commit as the last
  * lane merge; a number no lane reaches is free rather than holed, and only a number written below
  * a higher one is a hole.
+ *
+ * **Widened to D485 mid-wave, and the widening is the finding.** One integrator number was
+ * dispatched, on wave H's lesson that an integrator who works during a wave needs one — and it was
+ * spent on the first integrator decision of the wave (D483), with more integrator work still open.
+ * **That is the second consecutive wave where the integrator's own allocation was wrong**, wave H
+ * having had none at all and § D418 landing one past its ceiling as a result. The sizing rule that
+ * works for lanes — one number per issue — does not transfer, because an integrator's numbers are
+ * not per issue: they are per finding, and a wave's findings are not enumerable at dispatch.
+ * Recorded here rather than silently taken, because taking the number above a block is exactly what
+ * § D404 forbids and the guard below is what would have caught it.
  */
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
