@@ -1478,7 +1478,21 @@ type DecisionReservation = {
  * reported the resulting red as an integrator action, each computing it from this file's own
  * arithmetic rather than running it, and each was right.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'R', from: 479, to: 483 } as DecisionReservation | null;
+/*
+ * **Wave R reserved D479–D483 at dispatch: one number per issue, plus one for the integrator.**
+ *
+ * Two lessons applied at once. Wave Q's sizing rule — a block belongs to the issues it will close
+ * rather than to the lanes that close them — gives four: D479 issue #336, D480 issue #199, D481
+ * issue #315, D482 issue #226. The fifth, D483, is wave H's lesson from § D418, recorded above:
+ * an integrator who works during a wave needs a number too, and dispatching a block fitted to the
+ * lanes alone is what pushed § D418 one past its ceiling.
+ *
+ * The reservation is opened on the wave branch **before** any lane starts, which is the half wave Q
+ * got wrong by opening it mid-wave. Reconcile it and the charter row on the same commit as the last
+ * lane merge; a number no lane reaches is free rather than holed, and only a number written below
+ * a higher one is a hole.
+ */
 /*
  * **Wave H's block is closed, and it is worth recording what closing it caught.**
  *
