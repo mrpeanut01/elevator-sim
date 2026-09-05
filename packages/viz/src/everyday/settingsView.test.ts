@@ -468,6 +468,34 @@ describe('the account block — § D489’s asking half, drawn as six states', (
     expect(again.notice).toBeUndefined();
   });
 
+  /**
+   * **The session token reaches this world and no surface may draw it.**
+   *
+   * #332's second acceptance clause is about the **link** token and that is asserted where it lives
+   * (`everyday/signInLink.test.ts`). This is its neighbour: `everyday/accountPort.ts` carries
+   * `menu/account.ts`'s whole state into `everyday/`, and that state holds the **session** token —
+   * in memory, never in storage, and deliberately not a second copy. So the thing to prove here is
+   * the one this screen could get wrong: that no string it publishes is that credential. Asserted
+   * over every arm and every field rather than over the two a reader would think of, because a
+   * field added later is exactly how one would arrive.
+   */
+  it('never publishes the session token on any arm', () => {
+    const secret = 'session-token-9f3c2b';
+    const withToken = (displayNameChosen: boolean): AccountState =>
+      signedIn(SIGNED_OUT, secret, {
+        id: 'u1',
+        email: 'someone@example.test',
+        displayName: displayNameChosen ? 'A player' : 'player-a1b2c3d4e5f6',
+        displayNameChosen,
+      });
+    for (const account of [withToken(true), withToken(false)]) {
+      const view = settingsScreenViewOf({ ...BASE, ...live(account) });
+      expect(view.you.signIn.stage === 'naming' || view.you.signIn.stage === 'signed-in').toBe(true);
+      /* The whole view, not the fields this case happens to name. */
+      expect(JSON.stringify(view)).not.toContain(secret);
+    }
+  });
+
   it('offers Sign out on both signed-in arms, including the unnamed one', () => {
     expect(settingsScreenViewOf({ ...BASE, ...live(minted) }).you.signIn.signOut).toBe(
       SIGN_IN_COPY.signOut,
