@@ -78,6 +78,10 @@ const CLEAN: GoalObservations = Object.freeze({
   abandoned: 0,
   worstWaitS: 40,
   worstWaitIsCensored: false,
+  // Under `GOAL_BARS.energyPerLegMaxKJ`, because *every bar the day asks for* is five of them
+  // since § D468. Left absent the energy reading is `pending`, and `outcomeOf` counts unjudged as
+  // not passed, so this fixture would stop being clean without saying so.
+  workPerServedLegKJ: 34.7,
 });
 
 /** A day nobody would want banked: everything asked for, nothing delivered. */
@@ -91,6 +95,8 @@ const AWFUL: GoalObservations = Object.freeze({
   // maximum is exact and the goal grades `missed` rather than refusing.
   worstWaitS: 940,
   worstWaitIsCensored: false,
+  // Past the energy ceiling too, so the fifth bar misses like the other four rather than refusing.
+  workPerServedLegKJ: 260.5,
 });
 
 function outcome(week: WeekState, observed: GoalObservations) {

@@ -303,12 +303,14 @@ const GOAL_COMPARISONS: Readonly<Record<GoalComparison, true>> = Object.freeze({
   'at-most': true,
 });
 
-// ` s` joined with the worst-wait goal (slice 5): a restored reading may carry `187 s`. The other
-// two are unchanged, and a version-4 build meeting ` s` refuses by version rather than by shape —
-// see `SESSION_SCHEMA_VERSION`'s version-5 paragraph.
+// ` s` joined with the worst-wait goal (slice 5): a restored reading may carry `187 s`. ` kJ`
+// joined with the energy bar (§ D468, GitHub issue #275), so a restored reading may carry
+// `62.4 kJ`. The other two are unchanged, and an older build meeting either refuses by version
+// rather than by shape; see `SESSION_SCHEMA_VERSION`'s version-5 paragraph.
 const GOAL_UNITS: Readonly<Record<ShiftGoal['unit'], true>> = Object.freeze({
   '%': true,
   ' s': true,
+  ' kJ': true,
   '': true,
 });
 

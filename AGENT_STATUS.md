@@ -1049,3 +1049,154 @@ have replaced two accurate refusals with two inaccurate ones.
 parallel with another suite · corpus measured on the integrated tree, both tiers, with the base
 re-measured first in a detached worktree, where it reproduced its published row **exactly in both
 tiers** — the seventh consecutive wave.
+
+---
+
+# Wave P — dispatched 2026-09-04 at `eb5b3b6`
+
+**Opened at `origin/main`, wave O merged, working tree clean, zero open pull requests. Open issues at
+the start: 71.**
+
+Wave O's hand-off named the next batch in order: **#332**, **#333**, then **#275 and #329**. This
+wave is that batch, with one addition the hand-off could not have known about. A reconciliation pass
+over the seven issues filed on 2026-09-01 and 2026-09-02 found, before any lane was dispatched, that
+at least two of them describe defects the tree has already fixed. `vitest.config.ts` names GitHub
+issue #320 in its own body and says the sentence that issue quotes was retracted; `.gitignore`
+line 23 carries #321's first fix with the four-cell measurement in its header, and
+`.worktree-setup.sh`'s header carries the second. So the wave opens with three read-only
+verification lanes rather than with a build.
+
+## Decision block allocation
+
+Pre-allocated per lane before any lane started, per the working agreement. `CHARTER_PROGRAMME.md`'s
+next-free row read **D464** and is the integrator's input rather than a lane's.
+
+| lane | block | may not take |
+|---|---|---|
+| A — #333 | **D464–D467** | D468 and above |
+| B — #332 | **D468–D471** *(reserved; map first, build not yet dispatched)* | — |
+| C — #275 | **D468–D471** | D472 and above |
+| integrator | **D472–D475** | — |
+
+**The B/C collision is real and is recorded rather than tidied.** Lane B was dispatched as a
+read-only mapping task that allocates nothing, and lane C was dispatched afterwards into the block B
+had been pencilled for. Only one lane can spend it and lane C is the one that will. If B's build
+follows in this wave it takes a fresh block above the integrator's. This is the failure § D404 was
+written for, arriving one wave later, and it is written down because two lanes both computing § D336
+is how the rule came to exist.
+
+## Lanes
+
+| task | issue | kind | branch | worktree | status |
+|---|---|---|---|---|---|
+| **P-V1** | #315, #317, #320 | read-only verification | — | main checkout | dispatched |
+| **P-V2** | #316, #318, #321 | read-only verification | — | main checkout | dispatched |
+| **P-V3** | #324, #325, #327, #328, #329 | read-only verification | — | main checkout | dispatched |
+| **P-A** | #333 | build | `fix/issue-333-store-migrations` | `.worktrees/wave-p-lane-a` | dispatched |
+| **P-B-MAP** | #332 | architect, investigation only | — | main checkout | dispatched |
+| **P-C** | #275 | build | `feat/issue-275-energy-goal` | `.worktrees/wave-p-lane-c` | dispatched |
+
+Three read-only lanes share the main checkout, which is safe because none of them writes. The two
+builders have their own worktrees, provisioned by `.worktree-setup.sh` so that built artifacts
+resolve against the worktree's own packages rather than the main checkout's. Every lane brief
+carries the `pkill -f` prohibition; three concurrent suites in one container is the exact condition
+that hazard needs.
+
+## The rulings taken at dispatch rather than at integration
+
+**#333's open question is answered before the lane starts.** The issue left the pre-existing-row
+answer as a decision to record. It is recorded: migration 1 adds `legs` as a **nullable** column and
+there is no replay backfill in the runner. `BoardEntry.legs` is already `number | undefined` on the
+client and a row with no count withholds its mean, so a `NULL` row keeps its rank and its name and
+loses a figure the server cannot substantiate. A replay backfill inside a migration runner would
+couple schema versioning to the simulation engine and make container startup unbounded, and the
+store's own docstring already refuses that shape for `board_key`, calling it a backfill only the
+application can write. The lane may return **needs decision** with evidence if it finds the ruling
+wrong; it may not quietly pick a different answer.
+
+**#275 needed no ruling and that is the finding.** § D367 permitted the independent energy bar on
+2026-08-25, § D106 absorbed the clause on 2026-08-26, and the blocker recorded on the issue was a
+pull request that merged hours after the comment naming it. The issue has been unblocked for over a
+week and three consecutive waves have passed it over. That is #329's own subject arriving for the
+fourth time, on the issue that is the clearest instance of it.
+
+## Wave P closed
+
+| task | issue | outcome |
+|---|---|---|
+| **P-V1** | #315, #317, #320 | reported; none closed, all three carry residue past the code fix |
+| **P-V2** | #316, #318, #321 | **all three closed**, two of them fixed within hours of filing |
+| **P-V3** | #324, #325, #327, #328, #329 | reported; #328 and #329 moved to **needs decision**, #325's preferred fix found unsound |
+| **P-D** | overlap clusters | **#162 closed as duplicate of #227**; **#161 split into #337, #338 and closed** |
+| **P-A** | #333 | **merged** — `d4d2e4f` |
+| **P-B-MAP** | #332 | map returned; **#332 is blocked on a product decision**, and the map found **#336** |
+| **P-C** | #275 | **merged** — `2808a0a` |
+
+**Verified by the integrator rather than accepted**, each in the lane's own worktree: lane A
+`--project server` **15 files / 356 passed** against a base of 14 / 337; lane C `--project viz`
+**216 files / 4 999 passed, 4 skipped** against a base of 216 / 4 987. `tsc -b` exit 0 in both
+worktrees and again on the integrated tree.
+
+**The B/C decision-block collision recorded at dispatch cost nothing**, because lane B was a mapping
+task that allocated no number and its build was not dispatched. The collision that did cost
+something was the integrator's own hole convention, and `documentation.test.ts` caught it: see
+[`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md) § P.3.
+
+**Both worktrees are kept until the push is confirmed green**, then removed with their branches.
+Neither holds uncommitted work.
+
+---
+
+# Wave Q — dispatched 2026-09-04 at `771e65f`
+
+**Five builders in parallel, one integration branch, one regression run.** The combining is the point:
+five separate pull requests would cost five ~50-minute suites and five chances to cancel each other,
+and the working agreement's *one push per wave* exists for exactly that arithmetic.
+
+## Decision block, sized to the lesson wave P learned rather than to the lanes
+
+Wave P reserved four numbers per lane and spent one each, returning **six** unspent, the most any
+block has returned. The cause was sizing a block to a lane when the unit that consumes a number is an
+**issue**. So wave Q allocates **one number per lane** and no more:
+
+| lane | issue | number | worktree | branch |
+|---|---|---|---|---|
+| **Q-A** | #123 origin membership | **D469** | `.worktrees/q-a` | `fix/issue-123-origin-membership` |
+| **Q-B** | #277 the stage shows its goals | **D470** | `.worktrees/q-b` | `feat/issue-277-stage-goals` |
+| **Q-C** | #341 CSP gate, plus wave P's doc debt | **D471** | `.worktrees/q-c` | `fix/issue-341-csp-gate` |
+| **Q-D** | #295's three confirmed defects | **D472** | `.worktrees/q-d` | `fix/issue-295-confirmed-defects` |
+| **Q-E** | #204 the accessibility standard | **D473** | `.worktrees/q-e` | `docs/issue-204-a11y-standard` |
+| integrator | — | **D474** | main checkout | — |
+
+Every brief carries the same instruction: **if you need a second number, report it and stop.** Taking
+the next one is what produced two lanes computing § D336, and asking is cheap.
+
+## The conflict map, declared before dispatch rather than discovered at merge
+
+| file | owner | note |
+|---|---|---|
+| `packages/server/src/main.ts`, `http/static.test.ts` | Q-A | nobody else may touch `packages/server` |
+| `everyday/stageScreen.ts`, `stageScreenModel.ts` | Q-B | Q-D forbidden here |
+| `.github/workflows/deploy-viz.yml`, `docs/33`, `docs/25` | Q-C | nobody else may touch `.github` or those two documents |
+| `campaign/judge.ts`, `everyday/designerScreen.ts`, `gauntlet/rating.ts` | Q-D | Q-B forbidden here |
+| `docs/` new file, `docs/28` § 7.2, `docs/31` § 5 | Q-E | — |
+| **`honesty/surfaces.ts`** | **shared, Q-B and Q-D** | both add player-facing copy; both told to keep the edit minimal and localised, integrator resolves |
+| **`DECISIONS.md`** | **shared, all five** | all append; a conflict here is certain and is resolved in numeric order |
+
+Two files are deliberately shared rather than assigned. `honesty/surfaces.ts` is shared because both
+lanes ship new player copy and the corpus must sweep it; refusing one lane access would ship an
+unswept string, which is worse than a merge conflict. `DECISIONS.md` is shared because appending is
+what the file is for.
+
+## What each lane was told about its premise
+
+All five premises were verified read-only at `771e65f` before dispatch, and every brief nonetheless
+opens with *verify the premise first, and a refuted premise is a successful outcome*. Wave P closed
+five issues whose premises had expired, and three of those would have become build lanes if anybody
+had trusted the titles. The instruction costs a lane two minutes and has already saved this process
+three lanes.
+
+**One brief carries a correction rather than a specification.** Q-B's issue #277 says *four goals* in
+its own title and there are **five** since § D468 landed yesterday. A lane building four would drop
+the goal the report grades, which is the defect that issue exists to fix, committed while fixing it.
+The brief says so in those terms.

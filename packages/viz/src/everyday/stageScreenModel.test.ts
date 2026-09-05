@@ -68,8 +68,15 @@ import {
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_SWITCH_NO_CHANGE,
+  stageGoalsOf,
+  STAGE_GOALS_COPY,
+  type StageGoalsView,
 } from './stageScreenModel.js';
 import { restBarWidthPx } from '../render/carRest.js';
+/* Pillar 3's strip is read against the rail's own fold and the shift's own goals — issue #277. */
+import { goalRowsOf } from '../dev/leftRail.js';
+import { goalsForDay, readGoals, GOAL_GLYPHS, PENDING_DISPLAY } from '../shift/goals.js';
+import { shiftObservationsOf } from '../shift/observations.js';
 
 /* -------------------------------------------------------------------------- *
  * § 4.6 — the transport
@@ -1292,6 +1299,223 @@ describe('stageCarRestBarOf — where the mark lands and how big it gets', () =>
      */
     for (const fill of [0, 0.25, 1]) {
       expect(stageCarRestBarOf({ bodyWidth: 44, fill }).width).toBe(restBarWidthPx(fill, 44));
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Pillar 3 — what today asks, read at the playhead
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The goal strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
+ *
+ * The charter names P3 as the pillar this build fails outright, and its refusal test is *where on
+ * the stage would a player have seen this?* Before this strip the answer was nowhere: the day asks
+ * five things, the brief lists them, the report grades them, and `grep -ni "goal"` over the stage's
+ * two files returned nothing at all.
+ *
+ * Three claims carry this block, and the middle one is the one the feature could ship broken
+ * without.
+ *
+ * 1. **Five, and the count is read rather than written.** The ids are asserted against
+ *    `goalsForDay`'s own, so a sixth bar draws itself and a build that dropped one fails here.
+ *    #277's title and its first acceptance criterion both say *four*; a lane that took them
+ *    literally would have dropped the energy bar, which is the goal the report grades fifth.
+ * 2. **The reading tracks the run, and it is compared on the legs.** This repository's standing
+ *    requirement is *move the control and require the run to change*, and it is not satisfied by a
+ *    figure that moves with the clock: two runs whose legs differ are folded at **one** playhead
+ *    and required to read differently. A strip fed from another screen's transport would pass a
+ *    moving-clock test and fail this one.
+ * 3. **No verdict lands early, and unjudged is not passed.** § D371 rules that the stage draws the
+ *    reading only. The interesting direction is the one an implementation gets wrong by being
+ *    generous: a goal whose *raw* reading is `met` at a part-way playhead must still be drawn as
+ *    ungraded, and the case below builds exactly that state rather than hoping to meet it.
+ */
+describe('the § 7 goal strip', () => {
+  /**
+   * Legs spread across the whole day, so a fold at `t` has something to move.
+   *
+   * `growth` lengthens each rider's wait over the one before, which is what makes the worst wait
+   * and the deepest queue *rise* through the day rather than settle: a building whose every rider
+   * waits the same 30 s reaches its maximum in the first minute and holds it, and a strip read
+   * against that run would look like a constant while being perfectly correct.
+   */
+  function spreadRun(options: {
+    readonly every: number;
+    readonly waitS: number;
+    readonly growth?: number;
+  }): VizRecording {
+    const growth = options.growth ?? 0;
+    const legs = [];
+    for (let index = 0; index < 50; index += 1) {
+      const arrivedAt = index * options.every;
+      const waited = options.waitS + index * growth;
+      legs.push(
+        servedLeg(`rider-${String(index)}`, arrivedAt, arrivedAt + waited, arrivedAt + waited + 25),
+      );
+    }
+    return syntheticRecording({ startedAt: 0, endedAt: 600, legs });
+  }
+
+  const DAY = 1;
+
+  function stripAt(recording: VizRecording, at: number, day = DAY): StageGoalsView {
+    return stageGoalsOf({
+      readings: readGoals(
+        goalsForDay(day),
+        shiftObservationsOf(observationsAt(recording, at)),
+      ),
+      simTimeS: at,
+      endedAt: recording.endedAt,
+      history: [],
+      day,
+    });
+  }
+
+  const valueOf = (strip: StageGoalsView, id: string): string =>
+    strip.rows.find((row) => row.id === id)?.value ?? 'no such row';
+
+  it('draws one row per goal the day actually asks, energy included', () => {
+    const strip = stripAt(spreadRun({ every: 8, waitS: 30 }), 300);
+    /*
+     * Against `goalsForDay`'s own ids and never against a literal five. The issue's title says
+     * four; the day has asked five since § D468 landed the energy bar, and a strip that counted
+     * would go stale the next time the count moved.
+     */
+    expect(strip.rows.map((row) => row.id)).toEqual(goalsForDay(DAY).map((goal) => goal.id));
+    /* Named outright, because dropping this one is the specific defect a stale count produces. */
+    expect(strip.rows.map((row) => row.id)).toContain('energy');
+    /* The words are the goal's own — one vocabulary for the brief, the stage and the sheet. */
+    expect(strip.rows.map((row) => row.label)).toEqual(goalsForDay(DAY).map((goal) => goal.label));
+  });
+
+  /**
+   * **The standing requirement, on the drawn figure.**
+   *
+   * *Move the control and require the run to change, compared on the legs rather than on a window
+   * statistic.* The playhead is the control here and the figures below are folds over legs, so a
+   * strip that had been wired to a constant — or to another screen's transport — reads the same
+   * string at every one of these instants.
+   */
+  it('moves as the playhead advances', () => {
+    const recording = spreadRun({ every: 8, waitS: 30, growth: 2 });
+    /*
+     * Past the wake-up gate at every sample. Under twenty arrivals every reading is `pending` and
+     * prints the em dash — `WAKE_UP_ARRIVALS`, and a quiet morning is not a failure — so a strip
+     * asked at 60 s of an eight-second arrival stream is honestly showing nothing.
+     */
+    const worst = [200, 300, 400, 500].map((at) => valueOf(stripAt(recording, at), 'worst-wait'));
+    /* Not a constant, and not a dash: the run is being read. */
+    expect(new Set(worst).size).toBeGreaterThan(1);
+    for (const reading of worst) expect(reading).not.toBe(PENDING_DISPLAY);
+    /* And the queue depth the day is graded on is a fold at `t` too. */
+    const queues = [200, 400, 599].map((at) => valueOf(stripAt(recording, at), 'queue'));
+    expect(new Set(queues).size).toBeGreaterThan(1);
+  });
+
+  /**
+   * **The negative control, and the half a moving clock cannot fake.**
+   *
+   * One playhead, two runs. If the strip were reading anything other than this recording's legs —
+   * a cached fold, another transport's instant, a constant — both towers would answer the same
+   * string here while the case above still passed.
+   */
+  it('reads the legs rather than the clock', () => {
+    const prompt = stripAt(spreadRun({ every: 8, waitS: 15 }), 400);
+    const slow = stripAt(spreadRun({ every: 8, waitS: 240 }), 400);
+    expect(valueOf(prompt, 'worst-wait')).not.toBe(valueOf(slow, 'worst-wait'));
+    expect(valueOf(prompt, 'minute')).not.toBe(valueOf(slow, 'minute'));
+  });
+
+  /**
+   * § D371, the whole of it: *the reading only, and no met/not-met verdict until the playhead
+   * reaches `endedAt`*.
+   */
+  it('draws no verdict at any playhead short of the run’s end', () => {
+    const recording = spreadRun({ every: 8, waitS: 30 });
+    for (const at of [0, 120, 300, 599.9]) {
+      const strip = stripAt(recording, at);
+      expect(strip.judged, `@${String(at)}s`).toBe(false);
+      expect(strip.note, `@${String(at)}s`).toBe(STAGE_GOALS_COPY.reading);
+      for (const row of strip.rows) {
+        expect(row.state, `${row.id} @${String(at)}s`).toBe('pending');
+        expect(row.glyph, `${row.id} @${String(at)}s`).toBe(GOAL_GLYPHS.pending);
+        /*
+         * The bar too, and this is the clause worth reading twice. `progressOf` fills an `at-most`
+         * bar to 100 while the observed value is under its ceiling, so *never let a landing stack
+         * past 34 people* would draw a **full** track on an empty building at 00:00. A full track
+         * is a verdict with no word in it.
+         */
+        expect(row.barPct, `${row.id} @${String(at)}s`).toBe(0);
+      }
+    }
+  });
+
+  /**
+   * **Unjudged is not passed** — `campaign/judge.ts`'s rule, at the scale of one row.
+   *
+   * The state is built rather than hoped for: a run this prompt has every wait far under the
+   * ceiling, so `readGoal` answers `met` on the raw reading at 400 s. The strip must still draw it
+   * ungraded, because the day is not over. A generous implementation passes every other case in
+   * this block and fails this one.
+   */
+  it('draws a goal that is already met as ungraded while the run is unfinished', () => {
+    const recording = spreadRun({ every: 8, waitS: 15 });
+    const raw = readGoals(
+      goalsForDay(DAY),
+      shiftObservationsOf(observationsAt(recording, 400)),
+    );
+    /* The premise of this case, asserted rather than assumed. */
+    expect(raw.some((reading) => reading.state === 'met')).toBe(true);
+
+    const strip = stripAt(recording, 400);
+    expect(strip.rows.every((row) => row.state === 'pending')).toBe(true);
+    /* And the figure survives the projection — the reading is what a reading is. */
+    const met = raw.find((reading) => reading.state === 'met');
+    expect(met).toBeDefined();
+    expect(valueOf(strip, met?.goal.id ?? '')).toBe(met?.display);
+  });
+
+  /**
+   * The other side of the same rule. § D371 withholds the verdict *until the playhead reaches
+   * `endedAt`*, and a strip that never graded would be as wrong as one that graded early: the
+   * report is about to say all five, and P3's refusal test asks that the stage showed it first.
+   */
+  it('grades once the playhead reaches the end, and says which state it is in', () => {
+    const recording = spreadRun({ every: 8, waitS: 30 });
+    const strip = stripAt(recording, recording.endedAt);
+    expect(strip.judged).toBe(true);
+    expect(strip.note).toBe(STAGE_GOALS_COPY.graded);
+    expect(strip.rows.some((row) => row.state !== 'pending')).toBe(true);
+    /*
+     * And the graded arm is `goalRowsOf`'s row, unaltered — § D371's *never a second
+     * implementation*. Asserted against the rail's own fold rather than against expected strings,
+     * so a stage that started deciding its own glyphs would fail here.
+     */
+    const readings = readGoals(
+      goalsForDay(DAY),
+      shiftObservationsOf(observationsAt(recording, recording.endedAt)),
+    );
+    const rail = goalRowsOf(readings, [], DAY);
+    expect(strip.rows.map((row) => [row.glyph, row.value, row.was, row.barPct])).toEqual(
+      rail.map((row) => [row.glyph, row.value, row.was, row.barPct]),
+    );
+  });
+
+  /**
+   * **The energy bar refuses for the whole day, and it refuses in the product rather than here.**
+   *
+   * `live/observations.ts#energyPerServedLegAt` returns `undefined` at every playhead short of
+   * `recording.endedAt` — the quantity is a window statistic `core` computed once, not a fold —
+   * and `readGoal`'s third gate reads an absent observation as `pending`. So the one goal whose
+   * quantity genuinely *is* whole-run draws the em dash rather than a preview of itself, and the
+   * corpus's `whole-run-figure-early` property has nothing to catch.
+   */
+  it('withholds the energy figure at every playhead short of the end', () => {
+    const recording = spreadRun({ every: 8, waitS: 30 });
+    for (const at of [0, 200, 400, 599.9]) {
+      expect(valueOf(stripAt(recording, at), 'energy'), `@${String(at)}s`).toBe(PENDING_DISPLAY);
     }
   });
 });

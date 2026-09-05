@@ -1,4 +1,4 @@
-# 34 — A problem per mode
+# 35 — A problem per mode
 
 **This document is [§ D414](../DECISIONS.md)** (2026-08-29). It proposed **D361** for itself; that
 number had already been taken on a branch this document could not see, which is

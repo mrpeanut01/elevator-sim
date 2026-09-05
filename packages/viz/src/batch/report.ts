@@ -77,6 +77,7 @@ import {
   type BatchResult,
 } from './types.js';
 import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
+import { plural } from '../mode/disclosure.js';
 
 /* -------------------------------------------------------------------------- *
  * Shape
@@ -871,12 +872,26 @@ function summarise(
       `${String(suppressed.length)} could not be compared at all — ${labels(suppressed)}`,
     );
   }
+  /*
+   * **Two of these six clauses carry a verb that has to agree with the count** — GitHub issue
+   * #295's F37, which reported `1 are energy axes` from a playtest. The other four begin with a
+   * past-tense verb that reads correctly at one (*"1 separated the two"*), so they are left alone;
+   * inflecting a word that is already right would be a change with no reader.
+   *
+   * `shown.length === 1` is a state and not a corner: `BATCH_METRICS` carries exactly two axes
+   * `docs/10` § 7.3 forbids ranking, so a batch in which one of them measures nothing leaves the
+   * other on its own. `unmeasured.length === 1` needs no argument at all.
+   */
   if (unmeasured.length > 0) {
-    clauses.push(`${String(unmeasured.length)} were never measured — ${labels(unmeasured)}`);
+    clauses.push(
+      `${String(unmeasured.length)} ${plural(unmeasured.length, 'was', 'were')} never ` +
+        `measured — ${labels(unmeasured)}`,
+    );
   }
   if (shown.length > 0) {
     clauses.push(
-      `${String(shown.length)} are energy axes, shown and never ranked — ${labels(shown)}`,
+      `${String(shown.length)} ${plural(shown.length, 'is an energy axis', 'are energy axes')}, ` +
+        `shown and never ranked — ${labels(shown)}`,
     );
   }
 

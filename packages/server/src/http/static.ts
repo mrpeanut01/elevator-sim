@@ -243,6 +243,132 @@ export function requireOrigin(value: string, what: string): string {
 }
 
 /**
+ * The only host suffix under which a preview pattern is derived. Compared label by label.
+ */
+const PREVIEW_HOST_SUFFIX = 'azurestaticapps.net';
+
+/**
+ * A preview environment's label, as this repository's workflow mints it: a pull request number.
+ *
+ * `.github/workflows/deploy-viz.yml` passes no `deployment_environment` to
+ * `Azure/static-web-apps-deploy`, so Azure names the environment after the pull request and every
+ * origin this deployment can mint carries an all-digit label. Constraining it to digits is what
+ * keeps the permitted set finite and Azure-assigned rather than open-ended. No `g` flag, so
+ * `test` holds no state between calls.
+ */
+const PREVIEW_ENVIRONMENT = /^[0-9]{1,9}$/u;
+
+/**
+ * The preview hostnames one Azure Static Web App can mint, derived from its own production origin.
+ *
+ * [§ D330](../../../../DECISIONS.md) widened `ELEVATOR_SIM_ALLOW_ORIGIN` from equality to
+ * **membership**, so that a pull request preview can reach the API at all, and bounded the widening
+ * to *"one preview pattern bound to the same Static Web App"*. This is that pattern, and it is a
+ * **derivation rather than a configuration**: every field comes from `ELEVATOR_SIM_ORIGIN`, so an
+ * allowlist cannot go stale against the site it describes. A hostname written into an environment
+ * variable would go stale the first time the site is recreated; previews would stop being
+ * permitted, and the failure would look exactly like GitHub issue #123 again. That is § D330's
+ * second condition and the reason this function exists rather than a list.
+ *
+ * Azure names a Static Web App's default hostname `<base>.<region>.azurestaticapps.net`, where
+ * `<base>` is Azure's own adjective-noun-hash label rather than the resource name, and it names a
+ * preview environment `<base>-<environment>.<region>.azurestaticapps.net`.
+ *
+ * ## What this deliberately does not claim
+ *
+ * The binding is by hostname, and hostnames under `azurestaticapps.net` are Azure's to hand out. A
+ * third party whose own Static Web App were assigned a default hostname of the shape
+ * `<base>-<digits>.<region>.azurestaticapps.net`, for this deployment's own base and region, would
+ * hold an origin {@link isPreviewOriginOf} admits. It is not reachable by choosing a resource name,
+ * because `<base>` carries a hash its creator does not pick, and it is written down here rather
+ * than argued away: what is guaranteed is *the same suffix labels, the same base label, and a
+ * numeric environment*, which is weaker than the exact equality it widens. § D330 weighed that
+ * against every preview dead-ending every account, leaderboard and challenge surface, and took it.
+ */
+export interface PreviewOrigins {
+  /** The first DNS label of the production hostname, for example `yellow-glacier-0ff81230f`. */
+  readonly base: string;
+  /** Every label after it, joined. Compared whole, never as a suffix of something longer. */
+  readonly suffix: string;
+  /** The production origin this was derived from, carried so that a refusal can name it. */
+  readonly of: string;
+}
+
+/**
+ * The previews `viewerOrigin`'s own deployment can mint, or `undefined` when it can mint none.
+ *
+ * `undefined` is the answer for every origin that is not an Azure Static Web App default hostname:
+ * `http://localhost:8787`, a custom domain, anything carrying a port. Those deployments have no
+ * preview environments, so there is no pattern to derive and the allowlist stays exactly as strict
+ * as it was before § D330. The caller in `main.ts` turns that `undefined` into a boot refusal
+ * rather than into silence, because a `previews` entry that expanded to nothing would fail closed
+ * and read, from outside, as issue #123 all over again.
+ */
+export function previewOriginsFor(viewerOrigin: string): PreviewOrigins | undefined {
+  if (originIssues(viewerOrigin).length > 0) return undefined;
+
+  let url: URL;
+  try {
+    url = new URL(viewerOrigin);
+  } catch {
+    return undefined;
+  }
+  // https on the default port, because a preview environment is only ever served over Azure's
+  // managed TLS. Anything else is a deployment that mints no previews.
+  if (url.protocol !== 'https:' || url.port !== '') return undefined;
+
+  const [base, ...rest] = url.hostname.split('.');
+  if (base === undefined || base.length === 0) return undefined;
+  // `<base>.azurestaticapps.net` or `<base>.<region>.azurestaticapps.net`, and nothing longer. The
+  // label count is part of the shape rather than a formality: a hostname that merely ends in the
+  // suffix, such as `azurestaticapps.net.example.com`, has a different count and stops here.
+  if (rest.length !== 2 && rest.length !== 3) return undefined;
+  if (rest.slice(rest.length - 2).join('.') !== PREVIEW_HOST_SUFFIX) return undefined;
+  if (rest.length === 3 && !/^[a-z0-9]{1,10}$/u.test(rest[0] ?? '')) return undefined;
+
+  return { base, suffix: rest.join('.'), of: viewerOrigin };
+}
+
+/**
+ * Whether `candidate` is one of the preview origins `previews` describes.
+ *
+ * **Every comparison here is an equality between parsed values.** There is no substring test and no
+ * suffix test, because an allowlist is a security boundary and both of those admit
+ * `https://evil.example` for containing something permitted. The order is: refuse anything that is
+ * not an exact origin, refuse anything that is not https on the default port, require every label
+ * after the first to equal the production hostname's labels, and only then read the first label,
+ * which must be the base plus a separator plus a pull request number.
+ *
+ * Splitting the host on `.` before any of that is what makes the last step safe: the base is
+ * compared against a **whole label**, so `evil-azurestaticapps.net` and
+ * `viz.azurestaticapps.net.evil.example` differ in the label comparison rather than in where they
+ * happen to end. The production origin is not a preview of itself, since its first label carries no
+ * separator, so the two sets are disjoint and the caller can hold them separately.
+ */
+export function isPreviewOriginOf(previews: PreviewOrigins, candidate: string): boolean {
+  // Strict first, with the same instrument the boot check uses. A candidate with a path, a query, a
+  // fragment, credentials, an uppercase scheme, a trailing slash or surrounding whitespace is not
+  // an origin, and it is refused before anything is compared.
+  if (originIssues(candidate).length > 0) return false;
+
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:' || url.port !== '') return false;
+
+  const [first, ...rest] = url.hostname.split('.');
+  if (first === undefined) return false;
+  if (rest.join('.') !== previews.suffix) return false;
+
+  const separator = `${previews.base}-`;
+  if (!first.startsWith(separator)) return false;
+  return PREVIEW_ENVIRONMENT.test(first.slice(separator.length));
+}
+
+/**
  * Whether a document **declares** the tag — as opposed to merely mentioning it.
  *
  * The comment strip is not defensive tidiness; it is a bug that was found by a test rather than

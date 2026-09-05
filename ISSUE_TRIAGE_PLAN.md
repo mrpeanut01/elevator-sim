@@ -902,3 +902,74 @@ wording.**
 
 **Still not in a batch:** anything needing the API redeployed. Unchanged from F, and #333 sharpens
 it — the image is deployed by hand and now has a schema change waiting for that deploy.
+
+---
+
+# Snapshot H — wave P, 2026-09-04 at `eb5b3b6`
+
+**71 open at the start. Five closed, three filed, ten dispositioned with evidence on the issue.**
+
+## H.1 The sorting principle this wave used, and why it paid
+
+Wave O's hand-off named a build batch. This wave dispatched it **and** sent three read-only lanes at
+the seven issues filed on 2026-09-01 and 2026-09-02 first. That second half is what the wave turned
+out to be: **five of those issues described defects the tree had already fixed**, three within hours
+of filing, and one that was already false when written by six days.
+
+The rule worth keeping: **an issue filed against a fast-moving tree is a hypothesis with a
+timestamp.** Verify before scheduling, and verify against the code rather than against the last
+comment. Three of this wave's five closures would have been build lanes if anybody had trusted the
+titles.
+
+## H.2 Dispositions moved
+
+| issue | before | after |
+|---|---|---|
+| **#316** | open, untriaged | **closed** — fixed `587dee0`, 7 hours after filing |
+| **#318** | open, untriaged | **closed** — the first `## D63` was never a decision |
+| **#321** | open, untriaged | **closed** — both halves fixed `a661238`, under 2 hours after filing |
+| **#162** | open, *related not duplicate* | **closed as duplicate of #227**, scope transferred verbatim |
+| **#161** | open umbrella, split proposed | **split and closed** → #337, #338 |
+| **#332** | next in the build queue | **open, blocked on a product decision** the design handoff cannot answer |
+| **#324** | open, P3 | open — and its absence entry's stated reason is **false for a shipped tower** |
+| **#325** | open, P2 | open — and its **preferred fix is unsound** |
+| **#327** | open, P2 | open, cheaper than filed: AC2 already satisfied at ingress |
+| **#328** | open, P2 | **needs decision** — mechanism choice changes the size by a factor |
+| **#329** | open, P2 | **needs decision** — 2 of 3 mechanisable, and it cannot be a vitest test |
+| **#174** | open, no comment since filing | **needs information** — day variation is built and `docs/14` says it is not |
+| **#248** | open, P2 | AC4 met, strike it; #161's cadence ruling folded into AC1 |
+| **#225** | open, P2 | AC1 met and enforced in four places; rewrite to the mode question |
+| **#178** | open, nine items | three items off; item 3 re-points at #225 |
+| **#336, #337, #338** | — | **filed** |
+
+## H.3 The next batch, and it is not the one wave O named
+
+Wave O put **#332** first. It should not be first, and the reason is not engineering.
+
+1. **#336 — the mailed link redeems onto a covered surface.** A live defect in the product's only
+   credential path, broken in the direction that looks like nothing happening. Small, verified in
+   code, and a strict prerequisite for #332. **This is the one to take first.**
+2. **The account-change notification.** `everydayHostListeners` fires only from `renderAll()`, and
+   all thirteen account paths call `drawMenu()`. Also a prerequisite, also small, and the obvious
+   one-line fix is wrong for the reason § issue #106 records.
+3. **#333 and #275** — in flight this wave.
+4. **#327** — well specified, two parents were waiting and one has now closed. Gated on one
+   statistical decision about what the aggregate publishes, which should be ruled before the lane
+   starts rather than by whoever writes the SQL.
+5. **#332's screen** — only after the two product decisions are taken.
+
+## H.4 What is blocked on a decision rather than on work
+
+Five, and naming them together is the point: **#328** (where a scheduled job runs), **#329** (what
+shape the blocker index takes), **#327** (what figure a distribution publishes), **#332** (the screen
+has no design, and there are two display names where § 15.1 asserts one), **#338** (whether two
+intervention refusals are permanent).
+
+None of these is waiting on capacity. Each would be decided in a paragraph and none has been, which
+is a different failure from the one this file usually tracks and probably a more expensive one.
+
+## H.5 Still not in a batch
+
+Anything needing the API redeployed. Unchanged from snapshot G, and #333 sharpens it further: the
+image is deployed by hand from `scripts/deploy-azure.sh`, invoked by nothing in CI, so a migration
+runner landing in the repository does not mean a migration has run anywhere.

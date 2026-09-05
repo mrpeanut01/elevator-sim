@@ -163,6 +163,7 @@ import {
   stageBarModelOf,
   stageCarReadoutOf,
   stageCrowdCapOf,
+  stageGoalsOf,
   stageHeaderOf,
   stageInkFor,
   stageInterventionsOf,
@@ -170,6 +171,7 @@ import {
   stageOpeningLineOf,
   STAGE_ABSENCES,
   STAGE_AWAITING_RUN,
+  STAGE_GOALS_COPY,
   STAGE_INTERVENTIONS,
   STAGE_NO_GHOST,
   STAGE_OUT_OF_SERVICE,
@@ -243,6 +245,7 @@ import {
   ladderRowsOf,
   sendGateOf,
   whatAreTheFortyOf,
+  DROPPED_WITHOUT_REASON,
   LADDER_EMPTY,
   LADDER_WORLD_ABSENCE,
   REFERENCE_RUN_LABEL,
@@ -251,6 +254,7 @@ import {
 import { proofCasesOf, type ProofCase, type ProofCaseSet } from '../gauntlet/proofCases.js';
 import {
   proofCaseCountOf,
+  proofCaseScoreOf,
   ratingFigureOf,
   RATING_BASIS,
   RATING_CAVEAT,
@@ -8702,6 +8706,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_DAY_OVER',
     'everyday/stageScreenModel.ts#stageOpeningLineOf',
     'everyday/stageScreenModel.ts#stageNextStretchOf',
+    /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
+    'everyday/stageScreenModel.ts#stageGoalsOf',
+    'everyday/stageScreenModel.ts#STAGE_GOALS_COPY',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -8797,6 +8804,51 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       role: 'label',
     });
     seeds.push({ field: 'stage.race.noGhost', text: STAGE_NO_GHOST, role: 'reason' });
+
+    /*
+     * **Pillar 3's goal strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
+     *
+     * The chrome is iterated rather than listed, on `BOARD_SCREEN_COPY`'s and `DESIGNER_COPY`'s
+     * ground: a key added to `STAGE_GOALS_COPY` is swept the day it is added. Both notes are in
+     * that record, so the arm the sampling below does not reach is still read.
+     */
+    for (const [key, text] of Object.entries(STAGE_GOALS_COPY)) {
+      seeds.push({ field: `stage.goals.copy.${key}`, text, role: 'prose' });
+    }
+    /*
+     * The row's one playhead-independent slot, seeded once rather than at every sample time.
+     * `wasDisplayOf` reads a `DayOutcome` out of **another day's** history and folds nothing from
+     * this recording, so it does not move with this clock and is deliberately given no playhead:
+     * declaring this run's instant over last night's figure would be the false declaration
+     * `TextPlayhead`'s own docstring refuses.
+     *
+     * Both arms, which is `LIVE_RAIL`'s own pairing: the day the bundle closed holds no *previous*
+     * day and draws the em dash, and the morning after is the one shipped state whose slot carries
+     * a figure. Without the second the corpus would sweep the dash and never the number.
+     */
+    const goalWeeks = shiftBundleOf(context).days[0];
+    if (goalWeeks !== undefined) {
+      const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+      for (const [arm, week] of [
+        ['today', goalWeeks.week],
+        ['nextDay', nextDay(goalWeeks.week)],
+      ] as const) {
+        const strip = stageGoalsOf({
+          readings: readGoals(goalsForDay(week.day), atEnd),
+          simTimeS: recording.endedAt,
+          endedAt: recording.endedAt,
+          history: week.history,
+          day: week.day,
+        });
+        for (const row of strip.rows) {
+          seeds.push({
+            field: `stage.goals(${arm}).${row.id}.was`,
+            text: row.was,
+            role: 'observation',
+          });
+        }
+      }
+    }
 
     /* § 14's overflow chip — the one string `stageCrowdCapOf` produces. */
     const capped = stageCrowdCapOf(412);
@@ -8911,6 +8963,68 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           role: 'observation',
           playhead: atPlayhead(recording, at),
         });
+      }
+
+      /*
+       * **The five goals at this playhead** — the strip § D371 authorises and the reason it is a
+       * reading rather than a verdict.
+       *
+       * Driven over the sample times rather than at one instant, because the whole claim of this
+       * surface is that the figures move and the verdict does not appear. `sampleTimes` spans
+       * `startedAt` to `endedAt`, so both arms are read: four ungraded strips and, at the last
+       * sample, the graded one.
+       *
+       * **The label and the value are separate seeds, and the split is not cosmetic.** A goal's
+       * label is a caption carrying a *threshold* — `Keep the work inside 80 kJ per ride delivered`
+       * — which is `role: 'label'`'s own definition and the reason the temporal property exempts
+       * that role from its textual half. Seeding the composed row instead would put the bar's `80`
+       * in one clause with the word `delivered`, and a run whose `summary.delivered` happened to
+       * be 80 would report a violation about a threshold nobody folded. The value is the
+       * observation and carries the playhead, which is where the property should look.
+       *
+       * **One goal set here rather than two.** `GoalReading.display` is the observed figure and its
+       * unit, so the day-1 and morning-after bars read the *same* string at the same playhead and
+       * the second set would be twenty-five duplicate seeds. What actually differs between them is
+       * the *was* slot, which does not move with this clock and is swept once above.
+       */
+      const goalDay = shiftBundleOf(context).days[0];
+      if (goalDay !== undefined) {
+        const strip = stageGoalsOf({
+          readings: readGoals(goalsForDay(goalDay.day), shiftObservationsOf(observations)),
+          simTimeS: at,
+          endedAt: recording.endedAt,
+          history: goalDay.week.history,
+          day: goalDay.day,
+        });
+        seeds.push({
+          field: `stage(@${stamp}s).goals.note`,
+          text: strip.note,
+          /*
+           * A `reason` only while it *is* one. The ungraded arm is the panel's own retraction —
+           * § D293's shape, and the role R3 and the temporal property exempt for that reason. The
+           * graded arm is not a refusal and is not declared as one: it says the day has run out
+           * and the rows above it are what the report grades, which is ordinary prose and is
+           * checked as such.
+           */
+          role: strip.judged ? 'prose' : 'reason',
+          playhead: atPlayhead(recording, at),
+        });
+        for (const row of strip.rows) {
+          seeds.push({
+            field: `stage(@${stamp}s).goals.${row.id}.label`,
+            /* KB-15: the glyph is never the only signal, so the pair is read as a reader sees it. */
+            text: `${row.glyph} ${row.label}`,
+            role: 'label',
+          });
+          seeds.push({
+            field: `stage(@${stamp}s).goals.${row.id}.value`,
+            text: row.value,
+            role: 'observation',
+            /* R11 / § D106: the fifth bar's figure is an energy quantity and declares itself one. */
+            ...(row.id === 'energy' ? { energyAxis: true } : {}),
+            playhead: atPlayhead(recording, at),
+          });
+        }
       }
 
       const stamped = stageInterventionsOf({
@@ -9260,6 +9374,7 @@ const GAUNTLET: SurfaceAdapter = {
   id: 'gauntlet/ladder.ts#ladderRowsOf',
   covers: [
     'gauntlet/ladder.ts#ladderRowsOf',
+    'gauntlet/ladder.ts#DROPPED_WITHOUT_REASON',
     'gauntlet/ladder.ts#sendGateOf',
     'gauntlet/ladder.ts#whatAreTheFortyOf',
     'gauntlet/ladder.ts#caseNameOf',
@@ -9412,6 +9527,35 @@ const GAUNTLET: SurfaceAdapter = {
         fingerprint: 'as-rated',
         summary: { ...finished, rating: null, casesRated: 0, complete: false, weakest: null },
       });
+      /*
+       * A rating with one case it could not score — GitHub issue #295's F26. A fourth entry rather
+       * than a mutation of the three above, because those three are § 14's states and this is a
+       * fourth one: the row that reports the smaller denominator *and* says which case is missing
+       * from it. Without a case in this shape the reason `rating.ts` computes for every unscored
+       * case would still reach no rendered string, which is the defect itself.
+       */
+      const first = finished.cases[0];
+      /*
+       * The reason comes out of `rating.ts` on a batch shape it really handles rather than out of
+       * a literal here. A case whose batch carries no arm is `proofCaseScoreOf`'s own first branch,
+       * so what the corpus sweeps is the sentence the product would print.
+       */
+      const noScore = proofCaseScoreOf({ ...context.batch, arms: [] });
+      if (first !== undefined && noScore.reason !== null) {
+        const droppedCase = { ...first, score: null, noScoreReason: noScore.reason };
+        entries.push({
+          dispatcherId: 'partly-rated',
+          dispatcherName: '⟨partly rated dispatcher⟩',
+          isReference: false,
+          fingerprint: 'as-rated',
+          summary: {
+            ...finished,
+            casesRated: Math.max(finished.casesRated - 1, 0),
+            complete: false,
+            cases: [droppedCase, ...finished.cases.slice(1)],
+          },
+        });
+      }
     }
     const rows = ladderRowsOf(entries, {
       fingerprintOf: (id) => (id === 'edited' ? 'moved-since' : 'as-rated'),
@@ -9444,6 +9588,14 @@ const GAUNTLET: SurfaceAdapter = {
       if (row.incompleteNote !== null) {
         seeds.push({ field: `${at}.incomplete`, text: row.incompleteNote, role: 'reason' });
       }
+      /* Which cases are not in the mean, and what each said — issue #295's F26. */
+      row.dropped.forEach((dropped, index) => {
+        seeds.push({
+          field: `${at}.dropped${String(index)}`,
+          text: `${dropped.caseName}: ${dropped.reason}`,
+          role: 'reason',
+        });
+      });
     }
 
     /* The two formatters on a rating nothing produced — § 13's `—`, never a zero. */
@@ -9471,6 +9623,13 @@ const GAUNTLET: SurfaceAdapter = {
     seeds.push({ field: 'board.daily.absent', text: DAILY_BOARD_ABSENCE, role: 'reason' });
     seeds.push({ field: 'ladder.world.absent', text: LADDER_WORLD_ABSENCE, role: 'reason' });
     seeds.push({ field: 'ladder.empty', text: LADDER_EMPTY, role: 'reason' });
+    /*
+     * The branch a rated case should never be in — a `null` score with no reason beside it. It is
+     * seeded rather than driven because `ratedCaseIssue` refuses that pair on the way in and
+     * `proofCaseScoreOf` cannot emit one, so there is no run that reaches it; and it is seeded
+     * rather than left out because a sentence a player could meet is a sentence this search reads.
+     */
+    seeds.push({ field: 'ladder.dropped.mute', text: DROPPED_WITHOUT_REASON, role: 'reason' });
     seeds.push({ field: 'ladder.reference.label', text: REFERENCE_RUN_LABEL, role: 'label' });
     seeds.push({ field: 'rating.basis', text: RATING_BASIS, role: 'prose' });
     seeds.push({ field: 'rating.caveat', text: RATING_CAVEAT, role: 'reason' });

@@ -118,6 +118,7 @@ import type { PublishedGoalRecord, PublishedRate, PublishedScenario } from '../s
 import { stageSeedSetOf, type StageSeedSet } from './stageRun.js';
 import type { CampaignStage } from './types.js';
 import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
+import { plural } from '../mode/disclosure.js';
 
 /** One goal, judged on the batch that just ran. */
 export interface StageGoalVerdict {
@@ -361,7 +362,7 @@ function holdoutVerdictFor(
   const met = goals.filter((goal) => goal.met === true).length;
   const held = goals.length > 0 && met === goals.length;
   const unjudged = goals.filter((goal) => goal.met === null).length;
-  const runs = `${String(batch.report.replications)} runs`;
+  const runs = `${String(batch.report.replications)} ${plural(batch.report.replications, 'run', 'runs')}`;
   const tail =
     unjudged === 0
       ? ''
@@ -373,9 +374,11 @@ function holdoutVerdictFor(
     held,
     sentence: held
       ? `The holdout set ${seeds.name} (seed ${seeds.seed}) agrees: all ${String(goals.length)} ` +
-        `goals reached over ${runs} this setting was not tuned against.`
+        `${plural(goals.length, 'goal', 'goals')} reached over ${runs} this setting was not tuned ` +
+        'against.'
       : `The holdout set ${seeds.name} (seed ${seeds.seed}) does not agree: ${String(met)} of ` +
-        `${String(goals.length)} goals reached over ${runs} this setting was not tuned against.` +
+        `${String(goals.length)} ${plural(goals.length, 'goal', 'goals')} reached over ${runs} ` +
+        'this setting was not tuned against.' +
         `${tail} A gain that does not survive a disjoint seed set is a fit to fifty passenger ` +
         'populations rather than a better way of running the building.',
   };
@@ -590,7 +593,7 @@ function comparisonSentence(
   behind: readonly BatchComparisonRow[],
   underBudget: readonly BatchComparisonRow[],
 ): string {
-  const runs = `${String(replications)} runs`;
+  const runs = `${String(replications)} ${plural(replications, 'run', 'runs')}`;
   const names = (rows: readonly BatchComparisonRow[]): string =>
     rows.map((row) => row.label).join(', ');
   /*
@@ -710,6 +713,15 @@ function headlineFor(
 ): string {
   const unjudged = goals.filter((goal) => goal.met === null).length;
   const total = goals.length;
+  /*
+   * Every numeral in this sentence is inflected, and the singular is the case that shipped wrong —
+   * GitHub issue #295's F37. `data/campaign.json`'s first stage carries exactly one goal, so
+   * *"all 1 goals reached"* is not a corner a player has to look for; it is the first verdict the
+   * campaign ever prints. It is issue #134 in a seventh place, and the fix is the shared helper
+   * rather than a seventh private ternary — see `mode/disclosure.ts#plural`.
+   */
+  const goalWord = plural(total, 'goal', 'goals');
+  const runWord = plural(replications, 'run', 'runs');
   const tail =
     unjudged === 0
       ? ''
@@ -723,7 +735,7 @@ function headlineFor(
   const scope =
     ' That is a statement about these runs on these passenger populations, and not a ranking of dispatchers.';
   if (cleared) {
-    return `${stage.name}: all ${String(total)} goals reached over ${String(replications)} runs, and again on the holdout seeds.${scope}`;
+    return `${stage.name}: all ${String(total)} ${goalWord} reached over ${String(replications)} ${runWord}, and again on the holdout seeds.${scope}`;
   }
   /*
    * Said only when the tuning half is the half that passed. On a batch that missed a bar the
@@ -740,5 +752,5 @@ function headlineFor(
         : holdout.held
           ? ''
           : ` Not cleared: ${holdout.sentence}`;
-  return `${stage.name}: ${String(met)} of ${String(total)} goals reached over ${String(replications)} runs.${tail}${holdoutClause}${scope}`;
+  return `${stage.name}: ${String(met)} of ${String(total)} ${goalWord} reached over ${String(replications)} ${runWord}.${tail}${holdoutClause}${scope}`;
 }

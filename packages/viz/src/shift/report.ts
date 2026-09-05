@@ -1781,8 +1781,15 @@ function leverPointersFor(
    * the reader that this line is boilerplate, at the moment it is carrying a real and unusual fact.
    *
    * The `${n === 1 ? '' : 's'}` form is this file's own, used by the clean-shift line below rather
-   * than imported: `mode/disclosure.ts`'s `plural` is module-private, and exporting it to spend two
-   * words here would add a `shift/` → `mode/` edge for nothing.
+   * than imported, because importing one would add a `shift/` → `mode/` edge to spend two words.
+   *
+   * **The other half of that sentence has stopped being true, and saying so is the point.** It used
+   * to read *"`mode/disclosure.ts`'s `plural` is module-private"*, and it was, until
+   * [§ D472](../../../../DECISIONS.md) exported it. The edge argument above is unchanged and this
+   * file still does not import it; what changed is that a directory which already depends on
+   * `mode/` can now reach for the helper instead of writing a seventh copy — which is what
+   * `campaign/judge.ts` had not done, and GitHub issue #295's F37 is the string a player read
+   * because of it.
    */
   if (summary.unservedCount > 0) {
     const legs = summary.unservedCount;

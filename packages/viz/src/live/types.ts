@@ -365,6 +365,27 @@ export interface LiveObservations {
    * Non-decreasing in `t`, like every other count here.
    */
   readonly loadedDepartures: number | undefined;
+  /**
+   * **Work per delivered leg, kilojoules, once the run has ended.** It is
+   * `VizEnergy.workPerServedLegKJ` rounded to the tenth the report sheet prints, and the figure
+   * the energy goal grades
+   * ([§ D367](../../../../DECISIONS.md), [§ D468](../../../../DECISIONS.md), GitHub issue #275).
+   *
+   * **`undefined` at every playhead short of `recording.endedAt`, and that is the point of the
+   * field rather than a caveat on it.** Every other member here is folded from the recording's own
+   * arrays and is therefore true at `t`. This one is not foldable: `core` computes it once over the
+   * reporting window from load-and-distance pairs the recording does not carry
+   * (`contract/types.ts#VizRecording.loadedDepartures` states that omission for the sibling case),
+   * so the only honest readings are *the run has ended, here it is* and *not yet*. Publishing it
+   * earlier would put a figure that can only be true of a completed window onto a rail drawn at an
+   * instant, which is exactly the class § D307's temporal axis was built to find.
+   *
+   * `undefined` also when the run recorded no travel at all, or when no leg alighted in the window:
+   * `VizEnergy.measured` false, or the ratio `null`. Folded to `undefined` and never to `0`, for
+   * {@link loadedDepartures}' reason: the bar is `at-most`, so a fabricated zero would grade **met**
+   * on every run nobody measured.
+   */
+  readonly workPerServedLegKJ: number | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

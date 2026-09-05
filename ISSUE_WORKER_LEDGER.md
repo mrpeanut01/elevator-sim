@@ -1479,3 +1479,322 @@ treat it as a habit to keep rather than a guarantee to rely on.
   would have read as *CI is done* while the current head was still running, and once the sibling job
   had been **cancelled** rather than passed. Verify with `list_workflow_jobs` against the current
   head sha before acting on one.
+
+---
+
+# Wave P — 2026-09-04: seven issues closed before a single build landed
+
+**Opened at `eb5b3b6`** (= `origin/main`, wave O merged). **Open issues at the start: 71. Open pull
+requests: 0.**
+
+## P.1 The wave's subject is that the backlog was measurably staler than the tree
+
+Wave O's hand-off named the batch in order — #332, #333, then #275 and #329 — and that batch was
+dispatched. But three verification lanes went out **before** any build, and they are what the wave
+turned out to be about. **Five issues filed on 2026-09-01 and 2026-09-02 described defects the tree
+had already fixed**, in three cases within hours of filing, and nobody had closed them.
+
+| issue | filed | fixed | gap |
+|---|---|---|---|
+| **#316** the reveal goes quiet on a mixed board | 2026-09-01 17:27 | `587dee0`, same day | **7 hours** |
+| **#321** two worktree sharp edges | 2026-09-01 21:17 | `a661238`, same day | **under 2 hours** |
+| **#318** nothing checks for a duplicate heading | 2026-09-01 17:28 | `f38823c`, 2026-08-26 | **already false when filed, by 6 days** |
+| **#320** `cli` has not been reported failing | 2026-09-01 21:13 | in `vitest.config.ts`'s own body | verified by P-V1 |
+| **#315** every `garden-apartments` run is a 422 | 2026-09-01 17:27 | `leaderboard/verify.ts:111` | verified by P-V1 |
+
+**#318 is the instructive one and it is not the fastest.** Its closing claim was that the collision
+survived *because no check looks for it*. A check had looked for it for six days, found it, and
+registered it deliberately with its reason. The register worked. What was missing was anybody
+scheduled to re-read the entry — which is #329's subject arriving on an issue that is not about a
+blocker, and is the fifth instance this project has recorded.
+
+## P.2 D63 was cleared by asking a question nobody had asked
+
+The duplicate heading is gone, and not by any of the three remedies the issue or the guard proposed.
+Renumbering is forbidden by R1. Retitling does not work at all, because the number still heads two
+blocks and only a human reading the file benefits. Registering had already been done.
+
+**The first `## D63` was never a decision.** It is a sub-agent's hand-back status note, recording
+that a suite was already red before that branch touched anything, lifted into `DECISIONS.md` with
+the Phase 4 decisions that follow it. The preamble sitting **between** the two blocks still addresses
+the orchestrator who was meant to lift them, which is the paste showing through. Demoted out of the
+`## Dnnn —` shape, `D63` names one decision, `KNOWN_DUPLICATE_DECISIONS` is empty, and no citation
+broke: `runner/types.ts:744` already disambiguated itself and `docs/10:2466` cited it bare and now
+resolves uniquely. **The one ambiguous citation in the tree was closed by the heading change rather
+than by editing the citation**, which is the better outcome, since editing it would have left the
+ambiguity for the next citation to rediscover.
+
+The guard's own advice is corrected in the same commit. It offered *retitle the newer heading*, and
+that is wrong for the reason above.
+
+## P.3 The reservation mechanism caught the integrator, for the second time in four waves
+
+Appending `## D472` while lanes A and C hold D464–D471 leaves a numbering hole, and
+`documentation.test.ts` went red on exactly that. The entry was backed out and the argument moved
+into the `KNOWN_DUPLICATE_DECISIONS` docstring, which is where § D405 puts it anyway. **The
+integrator's number is allocated at integration, after the lanes' entries land**, which is what the
+process says and what this wave had to be reminded of by a test.
+
+There is a second collision, recorded in `AGENT_STATUS.md` rather than tidied: D468–D471 was
+pencilled for lane B and then dispatched to lane C. Only lane C will spend it.
+
+## P.4 Two issues combined, one umbrella split, and one product blocker found
+
+**#162 closed as a duplicate of #227**, scope transferred verbatim first. The ruling that had kept
+them apart rested on a premise *that issue's own earlier comment had already retracted*: the body
+still claimed B2 and B5 while comment one had given B2 to #167, and #167 has since closed. Same
+disease as P.1, in an issue body rather than a docstring.
+
+**#161 split and closed.** Two of five bullets verified done, two re-homed to issues that already
+existed, two residues filed as **#337** and **#338**. Two corrections to the issue's own third
+comment fell out: the weekly challenge period is **not** a § 12.1 board-key disagreement, because
+the contract scopes *one board a day* to board keys and the daily key is now the date alone; and
+bullet 5 now has **three** refusal grounds rather than two, the third being that an `answer-incident`
+would carry the answer without the thing answered and replay to a different run the server would
+verify as honest. That is worse than a refusal, so #338 asks for a ruling rather than assuming a fix.
+
+**#332 is blocked on a product decision nobody had noticed, and the map found it before the build.**
+`CLAUDE.md` makes the design handoff canonical for the interface. **The handoff specifies no sign-in
+screen**: § 4's inventory has seventeen keys and none is an account screen, § 15.1 specifies the
+signed-in half only, and the prototype's one account line is fixture copy of an already-signed-in
+state. A builder starting today would invent a screen's worth of player copy, four failure states
+included, with nothing to check it against, in a repository whose § D460 rule is that a sentence a
+surface cannot stand behind gets withdrawn rather than reworded.
+
+Two more findings from the same map. **A mailed sign-in link is redeemed onto a surface the player
+cannot see** — filed as **#336**, a live defect in the product's only credential path, broken in the
+direction that looks like nothing happening. And **the host does not notify on an account
+transition**: `everydayHostListeners` fires in one place, the last statement of `renderAll()`, and
+all thirteen account paths call `drawMenu()` instead. A screen wired to `onChange` would render once
+and never update, across a 28.7 second cold start.
+
+## P.5 What was verified rather than accepted
+
+Every closure in this wave was re-checked by the integrator against the tree before the issue moved.
+`587dee0` and `a661238` were confirmed as ancestors of `HEAD`; `f38823c` was dated with `git log -S`;
+the `reportWindow` derivation was read at `leaderboard/verify.ts:111` rather than taken from a test's
+docstring; `boardScreen.ts` was grepped for `watch` and returns zero; `data/engineering-briefs.json`
+and `packages/viz/src/briefs/` were confirmed absent.
+
+**One agent claim did not survive.** P-V2 reported that the checkout had no `node_modules` and that
+it ran `npm ci`. Both worktrees carry 95 packages matching root and `vitest` resolves in each, so
+either the claim is wrong or the reinstall was a no-op. Nothing was harmed, and it is recorded
+because a lane's account of its own environment is evidence like any other.
+
+**One agent finding was corrected.** P-D reported #161 bullet 5's residue as ground 2 alone. The code
+names three grounds and the third is the substantive one.
+
+---
+
+# Wave P — 2026-09-04: the backlog was decaying faster than anyone was reading it
+
+**Opened at `eb5b3b6`** (= `origin/main`, wave O merged), clean tree, **zero open pull requests**,
+**71 open issues**. Closed at **69 open**: five closed, three filed, two built.
+
+## P.1 The wave's real subject, and it was not what the hand-off named
+
+Wave O handed over a build batch. This wave ran it, and also sent three read-only lanes at the seven
+issues filed on 2026-09-01 and 2026-09-02 before dispatching anything. That second half is what the
+wave turned out to be about. **Five of those seven described defects the tree had already fixed**,
+three of them within hours of being filed.
+
+The instances are worth naming individually, because the pattern only becomes visible when they sit
+together:
+
+- **#316** was fixed roughly seven hours after it was filed.
+- **#321** was fixed under two hours after it was filed, on both of its halves. `.gitignore:23`
+  carries the `node_modules` symlink fix with a four-cell measurement table in its own header, and
+  `.worktree-setup.sh`'s header carries the `pkill -f` hazard together with a safe kill-by-PID form.
+- **#318**'s premise did not survive at all: the first of the two `## D63` headings was never a
+  decision.
+- **#162** was a duplicate of #227.
+- **#161** was an umbrella whose own body said to split it when its blocker cleared. The blocker had
+  cleared, two of its five bullets were done, and it was split into #337 and #338 and closed.
+
+**The rule this wave would hand forward: an issue filed against a fast-moving tree is a hypothesis
+with a timestamp.** Verify against the code rather than against the last comment, and verify before
+scheduling. Three of these five would have become build lanes if anybody had trusted the titles.
+
+## P.2 What was built, and both lanes refused the same thing without conferring
+
+| lane | issue | branch | verified by the integrator |
+|---|---|---|---|
+| **A** | **#333** — the store gets a versioned migration table | `fix/issue-333-store-migrations` | `--project server` **15 files / 356 passed** (base 14 / 337), `tsc -b` exit 0 |
+| **C** | **#275** — the day asks a fifth thing, 80 kJ per delivered leg | `feat/issue-275-energy-goal` | `--project viz` **216 files / 4 999 passed, 4 skipped** (base 216 / 4 987), `tsc -b` exit 0 |
+
+Both suites were run by the integrator in the lane's own worktree rather than accepted from the
+lane's report, and the integrated tree typechecks clean.
+
+**The finding worth keeping is that the two lanes reached the same refusal independently, from
+opposite ends of the product.** Lane A ruled that a board row written before `entries.legs` existed
+gets `NULL` rather than a backfilled zero, because `Number(null)` is `0` and a zero *looks like an
+answer*. Lane C ruled that a persisted day played before the energy bar existed gets no energy
+reading rather than a stand-in, because the bar is `at-most` and a fabricated zero would read as a
+day that **passed** it. Neither lane could see the other's code. The shared rule underneath is one
+this repository already applies to `workPerServedLegKJ` beside raw energy: a figure nobody measured
+is withheld, and the dangerous substitute is not the obviously wrong one but the plausible one.
+
+**Lane C came in at 24 files against a brief naming six, and the overrun is justified rather than
+tolerated.** Adding a fifth goal necessarily widens the persisted envelope (version 7 to 8, with 1
+through 7 still read), the live observation types, and the honesty corpus. The scope was challenged
+before it was accepted, which is the only reason it can be called justified.
+
+**The threshold is derived rather than chosen**, which is the half of #275 that had been deferred for
+a week. 400 seeds pooled, two-thirds point at 78.30 kJ, and 80 taken because at n = 400 the standard
+error on a one-third proportion is 2.4 points and the move sits inside it. The lower bound was
+checked in the same run: 60 kJ leaves day one unpassable rather than difficult.
+
+## P.3 The decision block, and the guard catching the integrator for the second wave running
+
+Wave P reserved **D464–D471** and spent **two**: D464 and D468. That is a 4:1 reservation against a
+1:1 spend, and it is a sizing lesson rather than an accident. Wave H's note already said the block
+should be sized to include the integrator; what it had not said is that it should be sized to the
+**issues**, because one issue closed end to end is one decision however many modules it touches.
+Fourth consecutive wave in which a lane has returned its spare numbers for exactly that reason.
+
+**The integrator got the hole convention wrong and `documentation.test.ts` caught it.** All six
+unspent numbers were registered as holes and the charter row was set to **D472**. That is wrong:
+D469 to D471 sit *above* the highest written decision, so nothing was written past them and they are
+free rather than holed. A hole is a gap **between** written decisions, which is why every previously
+registered hole sits inside a block and not at its top. Corrected to three holes, D465 to D467,
+closed from above by D468, and a charter row naming **D469**.
+
+Second wave running that this guard has caught the process's author rather than a lane.
+
+## P.4 A notification pattern, now at four recorded instances
+
+A `check_suite.completed` envelope arrived saying no third-party suite was still running or failed,
+naming head `6aa4b99`. That head had been **superseded**, and its suite was **cancelled** by the
+push rather than passed. Acting on it would have meant declaring CI green while the real head's
+45-minute suite was 20 minutes in. A second envelope, naming the live head `d2c16bc`, was genuine.
+
+**The two are indistinguishable without checking the head sha**, which is why the working agreement
+says to check it. The agreement's other half also paid: a documentation commit was deliberately held
+unpushed rather than cancelling a run that was already 20 minutes deep.
+
+## P.5 Owed to the next wave
+
+- **#336 should be taken before #332, and this reverses wave O's hand-off.** A mailed sign-in link
+  redeems onto a surface the Everyday shell covers, so the product's only credential path is broken
+  in the direction that looks like nothing happening. It is small, and it is a strict prerequisite
+  for the sign-in screen #332 asks for.
+- **#332 is blocked on a product decision, not on capacity.** The design handoff specifies no
+  sign-in screen, and there are two display names where § 15.1 asserts one.
+- **Five issues are blocked on a decision rather than on work**: #327, #328, #329, #332, #338. Each
+  would be settled in a paragraph. None has been. That is a different failure from the one this file
+  usually tracks and probably a more expensive one.
+- **#174 needs a run, not an opinion.** Day variation is built and `docs/14`'s status line says it is
+  not, because that line means *its criterion has been measured* and the criterion is a variance
+  comparison nobody appears to have run. **#235's premise depends on the answer** and has not been
+  re-checked.
+- **#333 lands in the repository and not in the deployed database.** The image is deployed by hand
+  from `scripts/deploy-azure.sh`, invoked by nothing in CI, so a migration runner existing is not a
+  migration having run.
+
+---
+
+# Wave Q — 2026-09-05: five lanes, one regression run, and four briefs proved wrong
+
+**Opened at `771e65f`, closed at `51d3553`.** Five builders in parallel worktrees, one integration
+branch, one suite. The combining was the point: five pull requests would have cost five fifty-minute
+runs and five chances to cancel each other.
+
+| lane | issue | decision | verified by the integrator |
+|---|---|---|---|
+| **Q-A** | #123 the preview allowlist is membership | **D469** | `--project server` **16 files / 367 passed** |
+| **Q-B** | #277 the stage draws five goals, as readings | **D470** | `--project viz` **217 / 5 023** |
+| **Q-C** | #341 the CSP gate names its permitted origins | **D471** | shell reproduction, both directions |
+| **Q-D** | #295's three confirmed defects | **D472** | `--project viz` **217 / 5 011** |
+| **Q-E** | #204 the accessibility standard | **D473** | document guards **35 passed** |
+
+Every figure above was produced by the integrator running the suite in the lane's own worktree, never
+read off the lane's report. `tsc -b` exit 0 at every merge and again on the integrated tree.
+
+## Q.1 Four of five lanes refuted their own brief, and one of the four saved a dead feature
+
+This is the wave's finding, and it is not a compliment to the lanes so much as an indictment of the
+briefs. Every brief carried one cheap instruction: **verify the premise first, and a refuted premise
+is a successful outcome.** Four lanes took it.
+
+**Q-B's is the one that mattered.** The brief said the mechanism already existed and was proven, that
+the job was *a caller, not a new mechanism*, and pointed at `host.goalsToday()` with its four
+non-test callers. The lane studied those four and found that every one of them is a surface shown
+**before a run or after one**, which is why none had ever exposed what `goalsToday()` does:
+it folds at `EverydayHostBindings.playheadS`, which `dev/main.ts:3745` binds to the **Engineer**
+transport's `playback?.simTimeS`. The Everyday stage builds a `Playback` of its own.
+
+**A caller written exactly as the brief described would have drawn five figures that never moved,
+over a day the player could watch running.** It would have passed every other check this repository
+runs: the control moves, the screen looks right, the run does not change. That is the standing
+requirement's own defect class, and the lane found it by writing the standing-requirement test
+**before** the feature rather than after. The fix is a port, `goalsAt(simTimeS)`, with `goalsToday()`
+delegating to it so the two cannot drift.
+
+**Q-A** proved by mutation that the test the brief said would go red does not: with the pre-§ D330
+equality rule restored, all four pre-existing cases in that block still pass. That case asserted only
+that a *disagreeing* allowlist throws, and under membership one still throws, for another reason. It
+never distinguished the two rules. The lane kept it and wrote that reason into it rather than
+deleting the evidence.
+
+**Q-C** measured that the fix its own issue proposed, pinning the CSP terminator, rejects a
+**correct** policy whose `connect-src` is written last, because this CSP carries no trailing
+semicolon. It built position-independent tokenised equality instead. It also corrected the brief's
+documentation classification in both directions, moving one line the brief called a dated record and
+leaving one the brief implied should move.
+
+**Q-D** found the shared `plural()` helper the brief told it to reuse does not exist. Three
+module-private copies, two ternaries, one inline, and a docstring at `shift/report.ts:1784` already
+recording why nobody imported one. The fix was to **export** one first, and the lane's own sentence
+is the lesson: a helper nobody can import is a helper nobody reaches for.
+
+## Q.2 The decision block returned no holes, which no block had managed before
+
+Wave Q reserved **D469–D473**, one number per lane, and spent all five. Wave P reserved four per lane
+and returned **six** unspent, the most any block has produced. The change was to size the block to the
+unit that actually consumes a number, and that unit is an **issue**: one issue closed end to end is
+one decision however many modules it touches. Four consecutive waves had been saying so by returning
+their spare numbers.
+
+**The reservation was opened mid-wave rather than at dispatch, and that is the part to keep.** Lane
+Q-C landed D471 before Q-A's D469 and Q-B's D470 existed, so the tree read as though two numbers below
+the highest were holes. They were unlanded. **Three separate lanes reported the resulting red as an
+integrator action**, each computing it from `documentation.test.ts`'s own arithmetic rather than
+running it, and each was right. `OPEN_RESERVATION` and the charter row were reconciled on the same
+commit as the last merge, which is the step nobody performs when nothing asks for it. **D387 is
+the registered hole that shows it**, and this paragraph originally cited that number in the
+section form. `citations.test.ts` resolves every such reference to a heading, a hole heads
+nothing, and the guard went red naming this file. A hole is written as a bare number for
+exactly that reason, which the code around it already did and the prose did not.
+
+## Q.3 Two predictions the integrator made that were wrong, in the harmless direction
+
+**The `honesty/surfaces.ts` collision never happened.** It was mapped as certain before dispatch and
+both lanes were told to keep their edits minimal and localised. They did, and git merged the file
+with no conflict at all. Q-B measured the separation in advance and said so: its hunks end around
+line 9031 and Q-D's `GAUNTLET` adapter begins at 9371.
+
+**Q-B's mid-run honesty needed no correction.** The brief spent a paragraph on it. The lane
+implemented it as a projection of the input rather than an edit of the output, so the stage's
+unjudged row and the Engineer rail's are the same object: `state: 'pending'`, `progressPct: 0`,
+`observed: null` rather than a stand-in zero, `display` kept. Its reasoning on the progress bar is
+better than the brief's: an `at-most` bar fills to 100 while the observed value is under the ceiling,
+so *never let a landing stack past 34 people* would draw a **full** track at 00:00 on an empty
+building. A full track is a verdict with no word in it.
+
+## Q.4 What is owed, and what is not discharged
+
+- **#277's AC5 is not discharged.** `docs/22-charter.md` § 2 and `MULTI_AGENT_PLAN.md` § 1 goal 4
+  both still cite the closed #212 and need re-adjudicating against what landed. Outside the lane's
+  scope, named in § D470, and the reason this issue should not be closed as wholly complete.
+- **`docs/25:516`** still says *"the four goals still grade"* under saturation. Q-C flagged it and
+  refused to correct it: the type argument holds, the count probably does not, and whether all five
+  grade on a saturated day is a measurement nobody has taken.
+- **Q-D's residue.** Reachable uninflected counts in `everyday/campaignModel.ts`,
+  `campaignScreens.ts`, `failStates.ts`, `buildNotes.ts`, `today.ts`, `rightRail.ts`,
+  `designerModel.ts`, `benchScreen.ts`, left because those files belong to other lanes. `nights: 1`
+  appears six times in shipped tier data.
+- **A scanner artifact, measured and left alone.** `honesty/derive.test-helper.ts` splits module
+  spans at `function`, `const` and `class` and never at `interface`, so one span runs over an
+  interface and picks up a member name. That, and nothing the module authors, is why `derive.test.ts`
+  classifies `gauntlet/ladder.ts` as a text producer while the exclusion's own reason says it authors
+  nothing.

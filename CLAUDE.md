@@ -84,8 +84,44 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **576 930** | **606** | **55** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **719 773** | **4 710** | **56** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **582 026** | **606** | **55** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **726 013** | **4 710** | **56** | **0** | **green**, and the register is empty |
+
+  **Waves P and Q moved this row by exactly 104 strings a case, in both tiers, and the 104 splits
+  into two waves rather than decomposing into parts of one.** Measured on the integrated tree after
+  wave Q, both tiers in one sitting, with **two** bases re-measured in a detached worktree rather
+  than one: wave O's published row at `eb5b3b6`, and wave P integrated at `771e65f`.
+
+  | | wave O `eb5b3b6` | wave P `771e65f` | wave Q | wave P's move | wave Q's move |
+  |---|---|---|---|---|---|
+  | always-on strings | 576 930 | **578 302** | **582 026** | +1 372 = **28.0**/case | +3 724 = **76.0**/case |
+  | deep strings | 719 773 | **721 453** | **726 013** | +1 680 = **28.0**/case | +4 560 = **76.0**/case |
+  | surfaces, both tiers | 55 / 56 | 55 / 56 | **55 / 56** | **0** | **0** |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | unmoved | **unmoved** | **0** | **0** |
+
+  **The second base is the whole reason this row can say anything.** Wave P closed without taking its
+  corpus measurement, and that debt was recorded and left standing. So the move from wave O's row to
+  today spans **two** waves, and the integrator's first reading of it was that wave Q's two lane
+  forecasts summed to 76 a case against 104 measured and were therefore short by 28. **They were not
+  short by anything.** Measuring `771e65f` rather than reasoning about it splits the 104 exactly: 28
+  a case is wave P's energy goal, and 76 a case is wave Q's.
+
+  **76 is what the two lanes forecast, to the string.** Lane Q-B published *roughly 68 a case* before
+  the measurement and lane Q-D published *+8 a case in both tiers*; 68 + 8 = 76, and the tree reads
+  76.0 in both tiers. This is the first time this column has scored a forecast exactly and had it come
+  out right. § D454 recorded four forecasts short by one string a case, and § D457 recorded one that
+  predicted motion where the answer was zero.
+
+  **The lesson is a correct figure with a misleading denominator**, which is a new shape for this
+  column. Nothing about 582 026 was wrong. What was wrong was the wave it would have been attributed
+  to, and the fix was a ninety-second run rather than a paragraph of caveat. Publishing the caveat
+  instead would have left the record saying two lanes forecast short by 28 when they were exact.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers and against both
+  bases: identical, nothing added, nothing removed, across two waves that added a screen's worth of
+  goal rows, an accessibility standard, three defect fixes and a membership allowlist. The deep tier's
+  one-surface lead survives and the diff names it — `campaign/judge.ts#judgeStage`, the only surface in
+  deep and not in always-on, with nothing in always-on and not in deep.
 
   **Wave O's move is exactly nineteen strings a case, in both tiers, and the nineteen decompose
   without remainder** ([§ D461](DECISIONS.md)). Measured once on the integrated tree, both tiers in
@@ -612,12 +648,35 @@ to **eleven in code plus two in `data/`**. The existing ordinals do not move: *t
 eleventh* name specific instances, and renumbering them would break every reference for a running
 total. None of that was allowed to round a verdict up.
 
-**Energy is an axis, never a score.** The matrix that closed Phase 8 measured `nearest-car` — the
-weakest shipped dispatcher, and the viewer's default until § D134 — **on the Pareto front at six of
-eight cells**, because it is best on energy and worst on wait. A dispatcher that drives less carries fewer people.
-So the energy proxy may be shown **beside** AWT and WT95 and never aggregated into a grade, and
+**Energy is an axis, never a score, and since 2026-09-04 it also carries exactly one bar.** The
+matrix that closed Phase 8 measured `nearest-car` (the weakest shipped dispatcher, and the viewer's
+default until § D134) **on the Pareto front at six of eight cells**, because it is best on energy and
+worst on wait. A dispatcher that drives less carries fewer people. So the energy proxy may be shown
+**beside** AWT and WT95 and never aggregated into a grade, and
 `EnergyStatistics.workPerServedLegKJ` goes beside the raw figure: a configuration that spends less
 by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
+
+**What that rule does not forbid, because four lanes read it as forbidding everything.** A
+**single, independent, unweighted** goal that passes or fails on energy alone is permitted and is
+not an aggregation ([§ D367](DECISIONS.md), [§ D106](DECISIONS.md)'s own added clause). It ships:
+`shift/goals.ts#goalsForDay` returns a fifth `ShiftGoal`, *"Keep the work inside 80 kJ per ride
+delivered"*, and the daily loop now asks five things rather than four. **Specified against
+`workPerServedLegKJ` and never raw `energyKJ`**, which is the whole of why it survives the rule
+above: the legs delivered are the denominator, so a day that saves work by carrying fewer people
+fails the bar instead of winning it. Still forbidden, unchanged: no weight, no combined score, no
+letter or star, and no ordering two arms on energy. `campaign/judge.ts`'s refusal is untouched.
+
+**80 is derived and the run is pinned** ([§ D468](DECISIONS.md), `docs/33` § 4.6). Eight contracts ×
+50 seeds at day 1 under `collective`, seeds `20 260 824 + 7 919 n`: the pooled two-thirds point is
+78.30 kJ and below about 70 kJ the day leaves `docs/33` DC-4's band at the top, so the bar is
+bracketed on both sides and 80 is the round figure 400 runs support. **It does not harden with the
+day**, because the quantity falls ×1.6 to ×15.6 over a twenty-day week as the building fills and no
+ladder tracks both ends. Two things the same measurement found and did not fix: the bar is dominated
+by building fabric rather than by play, which is `docs/33` O2 on a fifth goal, and
+`mixed-use-high-rise` day 1 stops clearing under every shipped dispatcher, which is #234's. The
+check § D106 most needed was run rather than argued: `nearest-car` wins the energy bar at all seven
+contracts measured and **loses the day at every one where the bar binds**, so the perverse ranking
+§ D106 measures is not reachable through this bar.
 
 **The page opens on Everyday Mode, and that changed on 2026-08-12.** `packages/viz/index.html` loads
 `everyday/boot.ts`, which imports `dev/main.ts` for its side effect — so the Engineer surface still

@@ -18,7 +18,13 @@
 import { createServer, type IncomingMessage, type Server as NodeServer, type ServerResponse } from 'node:http';
 
 import type { Api, ApiRequest } from './api.js';
-import { assetFor, cacheControlFor, type StaticBundle } from './static.js';
+import {
+  assetFor,
+  cacheControlFor,
+  isPreviewOriginOf,
+  type PreviewOrigins,
+  type StaticBundle,
+} from './static.js';
 
 /**
  * The largest request body the server will read.
@@ -33,7 +39,8 @@ export interface ServeOptions {
   readonly api: Api;
   readonly port: number;
   /**
-   * The one origin allowed to call this API from a browser, or `'null'` for none.
+   * The origin this API answers a caller {@link ServeOptions.previewOrigins} does not cover, or
+   * `'null'` for none.
    *
    * Explicit and required. A default of `'*'` is how a CORS policy becomes "no policy" without
    * anybody deciding it should be — and since § D257 `'*'` is not merely undefaulted but
@@ -42,11 +49,31 @@ export interface ServeOptions {
    * into the header, because the decision belongs at the place that reads the environment and the
    * tests hand it values directly.
    *
-   * Singular on purpose. A list would need `Vary: Origin` and a per-request match against the
-   * request's own `Origin` header, which is a second place deciding who may call — and the only
-   * deployment this product has is one viewer, at one origin.
+   * **It used to say *singular on purpose*, and § D330 withdrew that.** The sentence read: *"A list
+   * would need `Vary: Origin` and a per-request match against the request's own `Origin` header,
+   * which is a second place deciding who may call, and the only deployment this product has is one
+   * viewer, at one origin."* Every clause of that is still true as a description of the cost. What
+   * changed is the ruling above it: a preview environment is also this product's deployment, and
+   * paying that cost is what stops every pull request preview dead-ending its account, leaderboard
+   * and challenge surfaces. The second place is not a second decision. `main.ts` still decides who
+   * may call; this field and {@link ServeOptions.previewOrigins} are two halves of one answer,
+   * parsed once from one variable, and this file only chooses which half a given request gets.
    */
   readonly allowOrigin: string;
+  /**
+   * The preview origins of the same Static Web App, or `undefined` when none are permitted.
+   *
+   * Set, `Access-Control-Allow-Origin` is decided per request rather than fixed, because the header
+   * carries exactly one origin and a preview hostname is per pull request. A request whose own
+   * `Origin` is a member is echoed back; everything else gets {@link ServeOptions.allowOrigin}, so
+   * the refusal is byte for byte what it was before § D330. `Vary: Origin` goes out with it, and
+   * only then: without previews the header is a constant, and claiming it varies would be false.
+   *
+   * **Derived, like `siteOrigin`, and for the same reason.** `main.ts` expands it from
+   * `ELEVATOR_SIM_ORIGIN`, so there is no hostname pattern in any environment to keep in agreement
+   * with the site it describes. See `previewOriginsFor`.
+   */
+  readonly previewOrigins?: PreviewOrigins | undefined;
   /**
    * The built viewer, served from this same origin. Omitted, the server is the JSON API alone.
    *
@@ -117,9 +144,21 @@ export function serve(options: ServeOptions): NodeServer {
 }
 
 async function respond(options: ServeOptions, incoming: IncomingMessage, response: ServerResponse): Promise<void> {
+  // Which origin this answer permits, decided per request only when it can be. The header holds
+  // exactly one origin, so a membership allowlist has to echo the member that actually called;
+  // `isPreviewOriginOf` is the same predicate the boot check used, so a request cannot be admitted
+  // here on terms the startup refusal would have rejected.
+  const requestOrigin = incoming.headers.origin;
+  const permittedOrigin =
+    options.previewOrigins !== undefined &&
+    requestOrigin !== undefined &&
+    isPreviewOriginOf(options.previewOrigins, requestOrigin)
+      ? requestOrigin
+      : options.allowOrigin;
+
   const headers: Record<string, string> = {
     'content-type': 'application/json; charset=utf-8',
-    'access-control-allow-origin': options.allowOrigin,
+    'access-control-allow-origin': permittedOrigin,
     'access-control-allow-headers': 'content-type, authorization',
     // `DELETE` is here because `DELETE /api/me` exists. A method the API answers and the preflight
     // does not name is a route that works from `curl` and from nothing a browser can do — which is
@@ -130,6 +169,13 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
     // header exists to close.
     'x-content-type-options': 'nosniff',
   };
+
+  if (options.previewOrigins !== undefined) {
+    // The answer now depends on the request's own `Origin`, so a cache that did not know it would
+    // hand one caller another caller's permission. Added only when previews are configured: with a
+    // constant header this would be a claim that is not true.
+    headers['vary'] = 'Origin';
+  }
 
   if (incoming.method === 'OPTIONS') {
     response.writeHead(204, headers);

@@ -48,6 +48,9 @@ const CLEAN: GoalObservations = {
   abandoned: 0,
   worstWaitS: 45,
   worstWaitIsCensored: false,
+  // Under `GOAL_BARS.energyPerLegMaxKJ`. The energy bar reads it, and a fixture that left it out
+  // would grade `pending`, which `outcomeOf` counts as not passed.
+  workPerServedLegKJ: 38.9,
 };
 
 const POOR: GoalObservations = {

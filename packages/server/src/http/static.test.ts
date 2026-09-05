@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   NO_CROSS_ORIGIN,
   allowOriginFrom,
+  previewOriginsFrom,
   siteOriginFrom,
   trustedHopsFrom,
   viewerOriginFrom,
@@ -27,8 +28,11 @@ import {
   cacheControlFor,
   loadStaticBundle,
   declaresApiOrigin,
+  isPreviewOriginOf,
   originIssues,
+  previewOriginsFor,
   withApiOriginTag,
+  type PreviewOrigins,
   type StaticBundle,
 } from './static.js';
 
@@ -484,6 +488,15 @@ describe('which origin may call this API', () => {
   // the file about how the page and the API find each other; splitting them would put two halves of
   // one contract in two places, which is the thing the § D257 seam exists to avoid.
 
+  // A Static Web App's default hostname, in the shape Azure assigns: an adjective-noun-hash label,
+  // a region label, then the suffix. Invented rather than the live site's, because a test that
+  // pinned the deployment's real hostname would be a hostname committed to this repository, which
+  // is the thing § 3.5 of `docs/16-static-site-deployment.md` says no file here does.
+  const BASE = 'silver-forest-0ab12cd34';
+  const SUFFIX = '7.azurestaticapps.net';
+  const SITE = `https://${BASE}.${SUFFIX}`;
+  const PREVIEW = `https://${BASE}-7.${SUFFIX}`;
+
   it('permits none by default, which is the current deployment', () => {
     expect(allowOriginFrom({}, 'http://localhost:8787')).toBe(NO_CROSS_ORIGIN);
     expect(allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: '' }, 'http://localhost:8787')).toBe(NO_CROSS_ORIGIN);
@@ -500,6 +513,12 @@ describe('which origin may call this API', () => {
   it('refuses an allowed origin that is not where the viewer is', () => {
     // Two values, one fact. Drifting apart gives a site that loads, a page that knows where the API
     // is, and a `fetch` that fails CORS — which the client reports as a server that is down.
+    //
+    // This case is older than § D330 and it pinned *equality*. It survives the move to membership
+    // unchanged, and that is worth saying rather than quietly keeping: it asserts that a
+    // disagreeing allowlist throws, and under membership one still does, so the case never
+    // distinguished the two rules. The reason it throws has changed from "these two strings are
+    // not equal" to "the viewer's origin is not a member", and the cases below are what pin that.
     expect(() =>
       allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: 'https://other.example' }, 'https://viz.example'),
     ).toThrow(/ELEVATOR_SIM_ORIGIN/u);
@@ -509,6 +528,136 @@ describe('which origin may call this API', () => {
     expect(allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: 'https://viz.example' }, 'https://viz.example')).toBe(
       'https://viz.example',
     );
+    // A one-entry allowlist derives no previews, whatever the origin is. The pattern is opted into
+    // by name; it is never implied by the hostname happening to be a Static Web App.
+    expect(previewOriginsFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: SITE }, SITE)).toBeUndefined();
+  });
+
+  it('admits a member of the allowlist and refuses a non-member — § D330, GitHub issue #123', () => {
+    // The whole of the change. `previews` is one entry beside the production origin, and it is a
+    // word rather than a hostname because § D330's second condition is that the pattern is derived
+    // from the deployment's own name.
+    const env = { ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},previews` };
+    expect(allowOriginFrom(env, SITE)).toBe(SITE);
+
+    const previews = previewOriginsFrom(env, SITE);
+    expect(previews).toBeDefined();
+    // A member: the hostname Azure mints for a pull request against this same site.
+    expect(isPreviewOriginOf(previews as PreviewOrigins, PREVIEW)).toBe(true);
+    // A non-member, and the reason the equality rule existed at all.
+    expect(isPreviewOriginOf(previews as PreviewOrigins, 'https://evil.example')).toBe(false);
+    // The production origin is not a preview of itself, so the two halves of the allowlist are
+    // disjoint and `serve.ts` can hold them separately.
+    expect(isPreviewOriginOf(previews as PreviewOrigins, SITE)).toBe(false);
+  });
+
+  it('refuses every near miss, because an allowlist is a security boundary', () => {
+    const previews = previewOriginsFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},previews` }, SITE);
+    expect(previews).toBeDefined();
+    const permits = (candidate: string): boolean =>
+      isPreviewOriginOf(previews as PreviewOrigins, candidate);
+
+    // This is the case the membership rule could have shipped and the equality rule could not: a
+    // string that contains a permitted origin, or is contained by one, and is a different site.
+    for (const nearMiss of [
+      // The permitted origin, with more host after it. A suffix or `startsWith` test admits this.
+      `${PREVIEW}.evil.example`,
+      // A prefix of the permitted origin. A `startsWith` test in the other direction admits this.
+      PREVIEW.slice(0, PREVIEW.length - 1),
+      // The base label extended rather than separated: a different Static Web App.
+      `https://${BASE}5-7.${SUFFIX}`,
+      // The base label with the separator but no pull request number.
+      `https://${BASE}-.${SUFFIX}`,
+      // An environment label that is not a number, so not one this deployment can mint.
+      `https://${BASE}-staging.${SUFFIX}`,
+      // Somebody else's Static Web App in the same region.
+      `https://other-site-0000abcde-7.${SUFFIX}`,
+      // The right host, downgraded. A preview is only ever served over managed TLS.
+      `http://${BASE}-7.${SUFFIX}`,
+      // The right host on another port, which is a different origin to a browser.
+      `https://${BASE}-7.${SUFFIX}:8443`,
+      // The right host in another region: the labels after the first are compared whole.
+      `https://${BASE}-7.8.azurestaticapps.net`,
+      // Not an exact origin. A trailing slash, a path and whitespace each fail before comparison.
+      `https://${BASE}-7.${SUFFIX}/`,
+      `https://${BASE}-7.${SUFFIX}/api`,
+      ` https://${BASE}-7.${SUFFIX}`,
+      // The wildcard, which no origin comparison should ever see.
+      '*',
+      '',
+    ]) {
+      expect(permits(nearMiss), `${nearMiss} must not be permitted`).toBe(false);
+    }
+
+    // And the members still are, so the refusals above are not a function that always says no.
+    expect(permits(PREVIEW)).toBe(true);
+    expect(permits(`https://${BASE}-1.${SUFFIX}`)).toBe(true);
+  });
+
+  it('refuses at boot an origin the deployment cannot mint, however it is written', () => {
+    // § D330 kept the refusal and re-expressed it: the allowlist may hold the production origin and
+    // one preview pattern bound to the same Static Web App, and nothing else.
+    expect(() =>
+      allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},https://evil.example` }, SITE),
+    ).toThrow(/cannot mint/u);
+    // Including a near miss that a substring rule would have admitted.
+    expect(() =>
+      allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},${PREVIEW}.evil.example` }, SITE),
+    ).toThrow(/cannot mint/u);
+    // And a preview origin written out by hand rather than derived, which is the stale allowlist
+    // § D330's second condition exists to prevent. The message names the entry that replaces it.
+    expect(() => allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},${PREVIEW}` }, SITE)).toThrow(
+      /"previews"/u,
+    );
+    // Written beside the pattern it belongs to, it is a member and is accepted.
+    expect(allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},previews,${PREVIEW}` }, SITE)).toBe(SITE);
+  });
+
+  it('refuses "previews" where the deployment mints none, rather than expanding it to nothing', () => {
+    // An entry that quietly expanded to the empty set would permit nothing and say nothing, which
+    // is the shape of issue #123 itself: previews load, and every API surface dead-ends.
+    expect(() =>
+      allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: 'https://viz.example,previews' }, 'https://viz.example'),
+    ).toThrow(/Static Web App/u);
+    expect(() =>
+      allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: 'http://localhost:8787,previews' }, 'http://localhost:8787'),
+    ).toThrow(/Static Web App/u);
+  });
+
+  it('refuses a blank entry rather than dropping it', () => {
+    // An entry dropped for being blank is an origin somebody meant to permit and a refusal nobody
+    // sees. A stray comma is a typo with a security consequence, so it stops the process.
+    expect(() => allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},` }, SITE)).toThrow(/blank entry/u);
+    expect(() => allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},,previews` }, SITE)).toThrow(
+      /blank entry/u,
+    );
+    // Whitespace around an entry is list syntax and is trimmed; whitespace inside one is not.
+    expect(allowOriginFrom({ ELEVATOR_SIM_ALLOW_ORIGIN: ` ${SITE} , previews ` }, SITE)).toBe(SITE);
+  });
+
+  it('derives the preview pattern from the deployment rather than from a hostname anyone typed', () => {
+    const previews = previewOriginsFor(SITE);
+    expect(previews).toEqual({ base: BASE, suffix: SUFFIX, of: SITE });
+    // The older three-label form of a Static Web App hostname, without a region.
+    expect(previewOriginsFor(`https://${BASE}.azurestaticapps.net`)).toEqual({
+      base: BASE,
+      suffix: 'azurestaticapps.net',
+      of: `https://${BASE}.azurestaticapps.net`,
+    });
+    // Everything that is not one: a custom domain, a local run, a port, a lookalike suffix, and a
+    // host that merely ends in the suffix. None of these mints a preview, so none derives a pattern.
+    for (const notASite of [
+      'https://elevator-sim.example',
+      'http://localhost:8787',
+      `https://${BASE}.${SUFFIX}:8443`,
+      `https://${BASE}.7.azurestaticapps.net.evil.example`,
+      `https://${BASE}.7.evil-azurestaticapps.net`,
+      `https://${BASE}.a.b.azurestaticapps.net`,
+      'https://azurestaticapps.net',
+      `https://${BASE}.${SUFFIX}/`,
+    ]) {
+      expect(previewOriginsFor(notASite), `${notASite} mints no previews`).toBeUndefined();
+    }
   });
 
   it('reads the viewer origin, and refuses one a sign-in link could not be built from', () => {

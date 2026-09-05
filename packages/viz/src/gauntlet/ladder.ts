@@ -258,6 +258,26 @@ export interface LadderRowView {
   readonly staleness: string | null;
   /** Set when the rating covers fewer than every case — see `RatingSummary.complete`. */
   readonly incompleteNote: string | null;
+  /**
+   * The cases behind the smaller denominator, each named and each carrying its own reason. Empty
+   * on a complete rating.
+   *
+   * **This exists because the reason was already being computed and thrown away** — GitHub issue
+   * #295's F26. `rating.ts#proofCaseScoreOf` writes a sentence for every case it cannot score, and
+   * until this field every reference to `RatedCase.noScoreReason` outside that file was a test. So
+   * the ladder said `39 of 40` and stopped, while the code that knew which case dropped and why
+   * had already run. That is this repository's own standing requirement — *name the non-test
+   * caller* — with no caller to name; the fix is to give it one rather than to delete it.
+   */
+  readonly dropped: readonly DroppedCaseView[];
+}
+
+/** One case a rating could not score, worded for the row that reports the smaller denominator. */
+export interface DroppedCaseView {
+  /** The case, through {@link LadderContext.caseNameOf}. Never an engine identifier. */
+  readonly caseName: string;
+  /** `rating.ts`'s own sentence for why it scored nothing. */
+  readonly reason: string;
 }
 
 /** What the ladder needs from the library to draw a row, supplied by the caller. */
@@ -271,6 +291,53 @@ export interface LadderContext {
 /** § 14's *weakest at* is drawn from the summary, so no renderer picks the worst case itself. */
 function weakestCellOf(summary: RatingSummary, context: LadderContext): string {
   return summary.weakest === null ? '—' : context.caseNameOf(summary.weakest.caseId);
+}
+
+/*
+ * **Declared here rather than beside {@link DroppedCaseView}, and the reason is an instrument
+ * rather than a preference.** `honesty/derive.test-helper.ts` splits a module into spans at each
+ * `function`/`const`/`class` declaration and never at an `interface`, so `ladderEntryOf`'s span
+ * currently runs forward over `LadderRowView` and `LadderContext` and picks up the latter's
+ * `caseNameOf` member name. That is why `derive.test.ts` classifies `ladderEntryOf` as a text
+ * producer at all, and why it carries an exclusion whose own reason says it *"authors nothing"*.
+ * A `const` placed between those two interfaces cuts the span, drops `ladderEntryOf` out of the
+ * producer set, and turns that exclusion into a ghost — a register in another lane's file going
+ * red for a reason that has nothing to do with this change. The artifact is worth reporting and is
+ * not worth reshaping somebody else's register mid-wave, so the constant sits below the split
+ * instead.
+ */
+
+/**
+ * A case that scored nothing and said nothing about why.
+ *
+ * `ratedCaseIssue` refuses that pair on the way out of storage and `ratedCaseOf` cannot build one,
+ * so nothing in the product should reach this. It is a sentence rather than a `continue` because
+ * the defect this field closes is a case leaving a denominator without a word, and closing it with
+ * a branch that drops one silently would be the same defect one level down.
+ */
+export const DROPPED_WITHOUT_REASON = 'this case scored nothing and the run did not say why';
+
+/**
+ * The unscored cases, in the order the gauntlet ran them, named and worded.
+ *
+ * Read off `summary.cases` rather than recomputed, for {@link weakestCellOf}'s reason: the rating
+ * decided which cases scored, and a renderer that decided it a second time could disagree with the
+ * denominator printed beside it.
+ *
+ * A case that **never ran** has no row here and is not in this list. That is deliberate and is why
+ * the note beside it still cites `casesTotal`: the two counts differ exactly when a case is
+ * missing altogether, and this list can only speak for the cases the gauntlet reached.
+ */
+function droppedCasesOf(
+  summary: RatingSummary,
+  context: LadderContext,
+): readonly DroppedCaseView[] {
+  return summary.cases
+    .filter((entry) => entry.score === null)
+    .map((entry) => ({
+      caseName: context.caseNameOf(entry.caseId),
+      reason: entry.noScoreReason ?? DROPPED_WITHOUT_REASON,
+    }));
 }
 
 /**
@@ -301,6 +368,7 @@ export function ladderRowsOf(
           ? `this rating is a mean over ${proofCaseCountOf(entry.summary)} cases, so it is not ` +
             'comparable with a rating taken over all of them'
           : null,
+      dropped: droppedCasesOf(entry.summary, context),
       sortKey: entry.summary.rating,
     };
   });

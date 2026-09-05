@@ -1885,7 +1885,16 @@ They must be added to `benchmark/index.ts` and `src/index.ts` **in the same comm
 
 ---
 
-## D63 — Pre-existing failure this branch did not cause — **HANDBACK**
+### Hand-back note, not a decision: a pre-existing failure this branch did not cause
+
+This block wore `## D63` until 2026-09-04, and it was never a decision. It is a sub-agent's hand-back
+status report, lifted into this file along with the Phase 4 decisions that follow it; the preamble
+below it still addresses the orchestrator who was meant to lift them. What it records is that a suite
+was already red before the branch touched anything. Nothing cites it, and both substantive `§ D63`
+citations in the tree mean the `VIZ_SCHEMA_VERSION` entry further down. Demoting the heading leaves
+`D63` naming exactly one decision, so no id changed meaning and `RISKS.md` R1 is satisfied rather
+than bent. The argument is in `validation/documentation.test.ts`'s `KNOWN_DUPLICATE_DECISIONS`
+docstring, beside the register the demotion emptied.
 
 `packages/experiments/src/validation/documentation.test.ts` *"lists every docs/*.md on disk"* fails
 on `integration` before any change on this branch: `docs/09-destination-dispatch-contract.md` landed
@@ -30930,3 +30939,748 @@ the environment down on close, which is what keeps the three-preview quota a non
 **What this does not do.** It does not stop the preview deploy, which still costs runner minutes on
 every push. If the minutes are the objection rather than the noise, the change is to the job's `if:`
 and is a different decision from this one — nobody has asked for it and it is not assumed here.
+
+
+## D464 — the store gets a versioned migration table, and a row that predates `legs` keeps its rank and loses its count
+
+**Date: 2026-09-04 · Owner: the wave P lane A builder · GitHub issue #333.**
+
+**The decision, in two halves.** `packages/server/src/store/store.ts` gains a `schema_migrations`
+table and a runner. Migration 0 is the existing `SCHEMA` constant, by reference rather than by copy.
+Migration 1 is `ALTER TABLE entries ADD COLUMN IF NOT EXISTS legs INTEGER`, **nullable**, with no
+backfill. A row written before the column therefore carries `NULL`, `EntryRow.legs` becomes
+`number | undefined`, and the client withholds that row's figure instead of printing one.
+
+**Why there is now something to migrate, which is the part worth checking rather than believing.**
+`entries.legs INTEGER NOT NULL` landed in `5ea3805` on 2026-09-02. The infrastructure that gives
+this product a persistent Azure PostgreSQL landed on 2026-08-06. `CREATE TABLE IF NOT EXISTS` adds
+no column to a table that exists, so on any database created between those dates the column is
+simply absent, and both directions break. Measured against the in-process PostgreSQL rather than
+reasoned about: an `INSERT` naming the column raises SQLSTATE `42703`, and a `SELECT *` returns rows
+in which the key is **missing** rather than null, so the old mapping computed `Number(undefined)`,
+which is `NaN`. Both are asserted in `migrations.test.ts` against a database built to the old shape,
+because a premise nothing reproduces is a premise nobody has checked.
+
+**`challenge_entries.legs` is not in the same boat, and it was asked rather than assumed.**
+`git log -S` dates it to `f6569df` on 2026-08-06, the same commit that created the
+`challenge_entries` table and the whole PostgreSQL seam. The column has never not existed, so no
+database can hold that table without it, and it needs no migration. The issue did not claim
+otherwise; the check is recorded because *"the other column is probably fine"* is exactly the shape
+of an assumption that turns out not to be.
+
+**What a pre-existing row gets, and why it is not a zero and not a replay.** `BoardEntry.legs` is
+already `number | undefined` on the client, and `everyday/boardScreen.ts` draws
+`BOARD_SCREEN_COPY.dailyRowWithheld` for a row that carries no count, with its own reason written
+beside it: *"a row from a server too old to send one has no denominator this client could honestly
+supply, and it withholds rather than inventing"*. So `NULL` is a shipped outcome rather than a
+stopgap. The row keeps its rank and its name and loses a figure the server cannot substantiate,
+which is the footing `workPerServedLegKJ` already sits on beside raw energy (§ D106).
+
+The two alternatives were refused for stated reasons. A backfilled zero is ruled out by `SCHEMA`'s
+own comment on the column, and it is the worse of the two failure shapes, because `Number(null)` is
+`0` and a zero looks like an answer: a mean printed over a denominator of nothing. A replay would
+couple schema versioning to the simulation engine and make container startup unbounded in time, and
+this module already refuses that shape by name for `board_key`, calling it a backfill only the
+application can write.
+
+**The version row is written before its migration, and that is the concurrency design rather than a
+detail.** Each migration is one `Sql.exec` whose text is `INSERT INTO schema_migrations …` followed
+by the migration. PostgreSQL runs a multi-statement simple query as a single implicit transaction,
+so the two commit together or neither does; measured, not assumed, by execing `INSERT …; SELECT
+1/0;` and finding the table empty. Two containers starting at once therefore both read the same set
+of applied versions, PostgreSQL serialises them, and the loser's very first statement hits the
+primary key on `version`, raises `23505`, and rolls the whole batch back **before its migration
+runs**. The loser then asks the register whether the version is recorded and continues if it is. It
+asks rather than assuming, because a `23505` can also come out of a migration's own statements, and
+swallowing that one would skip a migration that had failed. Only the SQLSTATE is read, never the
+constraint name, which is § D358's rule.
+
+No explicit `BEGIN` appears anywhere, and no advisory lock. An explicit `BEGIN` would be worse than
+useless here, because `PgSql.query` takes a connection from a pool per call and the `COMMIT` would
+land on a different one, which is the trigger § D361 recorded for giving `Sql` a real transaction
+seam. This runner does not reach it: one `exec` is one statement batch on one connection. An
+advisory lock was refused for a second reason on top of that one. `pg_try_advisory_lock` returns
+true for a lock the same session already holds, measured, and `pglite.test-helper.ts` is one
+session, so a lock-based runner would have been untestable in this harness rather than merely partly
+tested.
+
+**One divergence is created, and it is measured rather than left to be found.** A database created
+today gets `legs` from migration 0 with its `NOT NULL` intact, and migration 1 is a no-op on it. A
+database created before 2026-09-02 gets the column here, nullable. The two schemas differ in that
+one constraint forever, which is the price of applying migration 0 unchanged, and it is asserted in
+both directions against `information_schema.columns`. Only the older database can ever hold a row
+with no count.
+
+**What this does not do, stated because half a migration presented as a whole one is the failure
+mode this issue is about.** `entries.config_hash` became `board_key` and `data_hash` in `e8aac0d` on
+2026-09-01, which is the **older** of the two drifts and would sort before `legs`. It is not
+migration 1 and it is not written at all. Its backfill is precisely the shape refused above: a board
+key is decided by replaying each old row's `run_json` through `leaderboard/boardKey.ts#placeSubmission`
+against the fixture for its `submitted_at_ms`, and neither input is a column in this table. So a
+database created before 2026-09-01 is still broken by this runner, in a way this runner records
+rather than repairs, and the steps it would need are written out in `store.ts`'s module docstring.
+Whether that database exists is a question about a deployment rather than about this repository, and
+nothing here can answer it.
+
+The § D241 migration on `users` is unwritten for the older and better reason: there is nothing to
+migrate, the password path never having been reachable from a viewer that could not find its own
+API (§ D243). That claim is about a specific database too, and it now has somewhere to go the day it
+stops being true.
+
+**Where the runner lives, and the audit consequence.** In `store.ts`, as module-private functions
+reached from `Store.open`, rather than in a new file. `concurrency.test-helper.ts` resolves calls
+within one file and `concurrency.test.ts` asserts that `store.ts` is the only file in the directory
+that issues SQL; a second SQL-issuing file would have made that assertion pass while being false,
+which is the one direction an audit may never fail in. The migration statements are reached through
+a parameter rather than through `this.#sql`, so the concurrency derivation does not see them, which
+is exactly the visibility today's `exec(SCHEMA)` already had. `MIGRATIONS_TABLE` is declared **after**
+`SCHEMA` for a sharper reason: `schemaFacts` finds the product's schema as the first string literal
+in the file containing `CREATE TABLE`, so a second such literal placed above it would leave the
+whole concurrency audit reading a four-line bookkeeping table as the schema and reporting no risk
+anywhere.
+---
+
+## D468 — the energy bar is 80 kJ per delivered leg, derived, and it does not harden
+
+**Date: 2026-09-04 · Owner: wave P lane C · Rules on: GitHub issue #275 AC2 and AC3, under
+[§ D367](#d367) and [§ D106](#d106).**
+
+§ D367 permitted one independent, unweighted energy goal and required its threshold to be **derived
+from measured runs rather than chosen**. This is the number, the run behind it, and the three things
+the measurement found that nobody had asked about.
+
+### The goal
+
+`shift/goals.ts#goalsForDay` returns a fifth `ShiftGoal`: *"Keep the work inside 80 kJ per ride
+delivered"*, `at-most`, reading `GoalObservations.workPerServedLegKJ`. It is read alone by
+`readGoal` like the other four, carries no weight, adds no term to any other goal, and produces no
+combined number. `campaign/judge.ts`'s refusal to order two arms on energy is untouched, and raw
+`workKJ` is still ungraded: there is no observation id that names it, so a goal that wanted to grade
+the total could not be written.
+
+*Per ride delivered* is load-bearing in the label rather than decorative. The legs delivered are the
+denominator, so a day that spends less by carrying fewer people moves the number the wrong way and
+fails the bar. That is the whole of why § D106 rule 2 does not reach it.
+
+### The run that produced 80
+
+`dev/state.ts#shiftRunConfigOf` at seeds `20 260 824 + 7 919 n`, `n = 0…49`, day 1, the shipped
+default dispatcher `collective`, each of the eight contracts at its own shift length, ordinary day
+with no event, folded through `observationsAt(recording, recording.endedAt)` and
+`shift/observations.ts`. **400 runs.** Every one recorded travel. Medians run from 10.4 kJ on
+`midtown-office` to 131.8 kJ on `mixed-use-high-rise`, a factor of 12.6.
+
+Two constraints bracket the threshold, and both are stated so they can be attacked:
+
+1. Pooled over the 400, the distribution's **two-thirds point is 78.30 kJ**. That is the value at
+   which one day in three across the shipped catalogue misses the bar, which is `docs/33` DC-4's own
+   lower edge read over one goal rather than over a whole day.
+2. Below about 70 kJ the pooled day-1 miss rate over all five goals leaves DC-4's band at the top:
+   66.2 % at 70 kJ, 68.8 % at 65, 73.2 % at 60. A tighter bar does not make day one difficult, it
+   makes it unpassable.
+
+**80 rather than 78.30.** At `n = 400` the standard error on a one-third proportion is 2.4 points,
+and moving the bar from 78.30 to 80 moves the proportion it refuses from 33.3 % to 32.0 %, about
+half of one standard error. A decimal place would claim a precision 400 runs do not support. That is
+`shift/goals.ts#WORST_WAIT_WHOLE_DAY_FACTOR`'s refusal of a third decimal, on a different bar.
+
+The full tables, the percentiles and the cell-by-cell figures are `docs/33-difficulty-curve.md`
+§ 4.6, which is where a reader looking for the derivation will go.
+
+### It is a constant, and that is a measurement
+
+The other four bars harden nightly. This one does not, because the quantity falls steeply as the
+building fills up: median `workPerServedLegKJ` goes 25.6 → 22.1 → 19.4 → 16.2 over days 1, 5, 10 and
+20 on `garden-apartments`, and 95.1 → 19.5 → 12.2 → 6.1 on `st-jude-hospital`. Those are falls of
+×1.6 and ×15.6. No single ladder tracks both, and a ladder that hardened would tighten a bar that
+growth is already loosening much faster than any rung could. So the bar holds still and the goal
+binds hardest on day one, which is the opposite shape from the other four. `GOAL_BARS` carries one
+key for it and deliberately no `energyBase` or `energyPerDay`, because a key that existed and was
+always zero would read as a ladder somebody forgot to author.
+
+### The check § D106 requires, run rather than argued
+
+§ D106's measured objection is that `nearest-car` sits on the Pareto front at six of eight matrix
+cells purely by being worst on wait, so a grade folding energy in ranks the weakest dispatcher
+first. § D367 answered that on arithmetic: an independent bar adds no term and produces no combined
+number. **The arithmetic answer is weaker than it looks**, because a bar creates an incentive even
+when it creates no number, so it was measured: thirteen shipped dispatchers, seven contracts, 50
+seeds under common random numbers, day 1.
+
+`nearest-car` does win the energy bar, at every one of the seven contracts, and on
+`mixed-use-high-rise` it takes the median from 131.8 kJ to 72.4 kJ, under the bar. **And it loses
+the day at every contract where the bar binds**: clean days out of 50 against all five goals are
+49, 0, 2, 0, 0, 1 and 27, against a best shipped profile of 49, 0, 37, 0, 48, 47 and 32. It is never
+**strictly** the best arm at any contract and it is strictly the worst at three of them. So the
+perverse ranking § D106 measures is not reachable through this bar. That is now a measurement rather than an inference from
+the arithmetic, and it is the part of § D367's reasoning that most needed one.
+
+The same sweep answers the standing requirement in the other direction. Best-to-worst median spans
+per contract are ×1.36, ×1.69, ×1.58, ×1.85, ×3.50, ×1.91 and ×2.61, so a player moving the
+dispatcher moves this goal.
+
+### Two findings that are reported and not fixed
+
+**`mixed-use-high-rise` day 1 stops clearing.** Four goals, best shipped profile: 12 of 50 seeds
+clean. Five goals: **0 of 50, under all thirteen profiles.** Across 650 runs at that contract the
+lowest energy figure on a run that also clears the four wait goals is 81.7 kJ, so a bar of 82 would
+buy back exactly one run in 650 and a bar that made the contract a real possibility is above 120 kJ,
+where the goal binds on no contract but this one. The threshold is not what makes c4 hard and moving
+it does not fix c4. It is a rebalancing question and it belongs to **#234**; `docs/33` § 4.6 files it
+as **F7**, against **W3**.
+
+**The bar is dominated by the building.** It is met on every seed of `garden-apartments` and
+`midtown-office` and missed on every seed of `mixed-use-high-rise`, so on the shipped catalogue it
+discriminates between contracts more than between days. That is `docs/33` § 7's **O2** arriving on a
+fifth goal. It is not fixed here, because fixing it means authoring a bar per contract and § 1.4
+refused exactly that for the wait bars on grounds one grading lane may not overturn alone.
+
+The useful counterweight is `st-jude-hospital`, which § 4.2 measured as a second unfailable opening
+day at 0 of 30 missing. The bar takes it to 35 of 50 missing, and it is the one contract where the
+energy goal is the only goal the shipped default misses.
+
+### What the bar is true of, said once
+
+`VizSummary.energy` is computed over the run's **reporting window**, which is the five-minute peak on
+seven of the eight shipped contracts and the whole hour on `garden-apartments`. The other four goals
+grade the whole shift. That inhomogeneity is real and it is named here rather than papered over. What
+it is not is a second answer to one question: this is the only work-per-delivered-leg figure the
+product has, the goal grades exactly the figure `shift/report.ts#energyFigures` prints, and the
+rounding happens once, to the tenth, in `live/observations.ts#energyPerServedLegAt`.
+
+The consequence a reader meets first is that the energy goal reads `pending` at every playhead short
+of the run's end, because the figure is a window statistic rather than a fold and a rail drawn at an
+instant may not publish one (§ D307). Unjudged is not passed, so a day whose energy reading is
+`pending` is not a clean day. `week.ts#outcomeOf`'s rule is unchanged.
+
+### `CLAUDE.md` moved on this commit and not before
+
+§ D367 and § D106 both defer the *"Energy is an axis, never a score"* paragraph to the commit that
+ships the goal, on the ground that until then the paragraph is true as written. It ships here, so it
+moves here. `menu/screens.ts`' *What a shift is* panel moved with it, for the same reason and with
+more urgency: it is player-facing copy that said *"against four goals, all four every day"* and
+enumerated four, which the goal makes false.
+
+### What is deliberately not built
+
+**No sweep test re-derives this number.** `docs/33` § 6.4 bounds the sweep's cost at 198 s over
+7 700 simulations and § 6.1 puts the week arm in a file that does not exist yet; a 400-run derivation
+in the viz suite would be a minute on every run for a figure that is interesting once. The constant
+is pinned by `goals.test.ts` and the run is pinned here and in § 4.6, which is the discipline this
+repository asks for. If the catalogue's buildings or the growth rule move, this number goes stale
+the way every published number can, and § 4.6 names the instrument that re-derives it.
+
+---
+
+## D469 — the preview allowlist is membership, and the pattern is derived rather than typed
+
+**Date: 2026-09-04 · Owner: wave Q lane A · Rules on: GitHub issue #123, implementing
+[§ D330](#d330).**
+
+§ D330 decided on 2026-08-09 that preview-origin handling should be membership rather than equality,
+and nothing consumed the ruling for twenty-six days. `RISKS.md` R42 exists because of this exact
+instance. This is the implementation, and it is deliberately not a redesign: § D330 chose Option 2,
+bounded by a deployment we control, and the only questions left open were how to parse an allowlist
+strictly and where the pattern comes from.
+
+### What changed
+
+`ELEVATOR_SIM_ALLOW_ORIGIN` is a comma-separated list. The viewer's origin must be a **member** of
+it, and every other member must be an origin this same Static Web App can mint. One entry is not an
+origin: the word `previews`, which `http/static.ts#previewOriginsFor` expands from
+`ELEVATOR_SIM_ORIGIN` into a base label, the labels after it, and a numeric environment.
+
+The argument under the old equality check survives untouched and is worth restating, because it is
+what the new rule has to keep providing: the page a sign-in link opens is the page that then calls
+this API, so an allowlist that omits the viewer either mails links to a page that cannot call the
+API or permits an origin that is not the viewer. Equality enforced that by making the set a
+singleton. Membership enforces it directly.
+
+### Why the pattern is a word and not a hostname
+
+§ D330's second condition. An operator who can write the pattern can write a stale one, and a stale
+allowlist fails closed: previews stop being permitted, every account surface dead-ends, and the
+symptom is indistinguishable from the issue this closes. So the pattern names no hostname anywhere,
+in code or in configuration, and `docs/16` § 3.5's claim that no file in this repository names a
+hostname still holds. A preview origin written out by hand is refused at boot with a message naming
+the entry that replaces it, rather than accepted as a one-pull-request allowlist that goes stale on
+the next one.
+
+The environment label is constrained to digits, which is tighter than Azure's rule and is the
+accurate expression of *what this deployment can mint*: `.github/workflows/deploy-viz.yml` passes no
+`deployment_environment`, so Azure names the environment after the pull request. If that workflow
+ever names its environments, this stops admitting them and the refusal is loud.
+
+### The parsing, because an allowlist is a security boundary
+
+Every comparison is an equality between parsed values. The host is split on `.` before anything is
+compared, the labels after the first must equal the production hostname's labels, and only then is
+the first label read, which must be the base plus a separator plus a number. There is no substring
+test and no suffix test, because both admit a lookalike for containing something permitted:
+`viz.azurestaticapps.net.evil.example` and `evil-azurestaticapps.net` fail at the label comparison
+rather than at where they happen to end. A blank entry stops the process instead of being dropped,
+since a dropped entry is an origin somebody meant to permit and a refusal nobody sees.
+
+**What this does not claim.** The binding is by hostname, and hostnames under `azurestaticapps.net`
+are Azure's to hand out. A third party whose Static Web App were assigned a default hostname of the
+shape `<our base>-<digits>.<our region>.azurestaticapps.net` would hold an origin this admits. That
+is not reachable by choosing a resource name, because the base label carries a hash its creator does
+not pick, and it is written down rather than argued away: this is weaker than the exact equality it
+replaces, and § D330 weighed that against every preview dead-ending every account surface.
+
+### The header can only carry one origin, so `serve.ts` had to change
+
+`ServeOptions.allowOrigin` used to say *singular on purpose*, on the grounds that a list would need
+`Vary: Origin` and a per-request match, *"which is a second place deciding who may call, and the only
+deployment this product has is one viewer, at one origin"*. Every clause of that is still true as a
+description of the cost, and § D330 withdrew the conclusion: a preview environment is also this
+product's deployment. The docstring records the withdrawal rather than being rewritten over, because
+a refusal that quietly stops being true is § D227's defect. There is still one decision site:
+`main.ts` parses the variable once, and `serve.ts` only chooses which half of the answer a given
+request gets. `Vary: Origin` is emitted only when previews are configured, because without them the
+header is a constant and claiming it varies would be false.
+
+### § D330's four conditions, individually
+
+1. **The boot refusal is kept and pinned by a run.** Met. `http/boot.test.ts` spawns the built
+   `dist/main.js` with a wrong allowlist and requires exit code 1, the message on stderr with no
+   stack frame, and no startup line on stdout. Four refusals and one acceptance, the last of which
+   shows a correct membership allowlist getting past the origin checks and stopping at the database
+   instead, which is how a run can show an allowlist was accepted without a database to accept it
+   into. The gap: no port is ever bound and no browser is involved, so this pins the refusal rather
+   than the permission.
+2. **The pattern is derived from the deployment's own name.** Met, and asserted in both directions:
+   a member is admitted, thirteen near misses are refused, and the derivation is checked against
+   eight origins that mint no previews at all.
+3. **The honest failure message does not regress.** Not established here. The message lives in
+   `packages/viz/src/menu/client.ts` and `everyday/boardScreen.ts`, which this lane may not touch
+   and did not; the claim that it is unchanged rests on the diff, and its own tests were not run.
+4. **The seeded board stays labelled.** Same standing. The label is
+   `packages/viz/src/dev/menuPanel.ts` and is untouched by this change.
+
+So two of the four are met by a run in this lane, and two are untouched rather than verified. Saying
+which is which is the point of listing them.
+
+### Turning it on takes an `infra/` change, and that is left undone on purpose
+
+`infra/azure/main.bicep` sets `ELEVATOR_SIM_ALLOW_ORIGIN` to `viewerOrigin` alone, and
+`infra/azure/swa/provision.sh` refuses to arm unless the deployed value **equals** the site's origin
+string. Both still describe the one-origin form, and nothing regresses: a one-entry allowlist is
+accepted exactly as before, so the shipped deployment boots unchanged and its previews stay
+unpermitted. Appending `previews` to that variable would make `provision.sh` refuse to arm, so the
+feature is reachable only after `infra/` moves too. That is named rather than done, because a
+provisioning path changed without being run is exactly the claim `docs/16` § 9 exists to keep apart
+from the verified ones.
+
+### One finding about the test that was supposed to pin the old rule
+
+`static.test.ts`'s *"refuses an allowed origin that is not where the viewer is"* was expected to turn
+red under membership. It does not, and it was checked by mutation rather than assumed: with the
+pre-§ D330 equality rule restored, all four pre-existing cases in that block still pass and eight of
+the new ones fail. The case asserts that a disagreeing allowlist throws, which is true under both
+rules, so it never distinguished them. It is kept, with the reason written into it. A test that
+survives the change it was believed to pin is worth a sentence, because the next reader will
+otherwise conclude the rule did not move.
+
+## D470 — the stage draws five goals, the reading only, and asks its own transport for them
+
+**Date: 2026-09-04 · Owner: wave Q lane B · Rules on: GitHub issue #277, under
+[§ D371](#d371) and [§ D468](#d468).**
+
+§ D371 ruled the hard half of #277 before any code existed: when the Everyday stage draws the day's
+goals at the playhead it draws **the reading only**, and no met/not-met verdict until the playhead
+reaches `endedAt`. This entry is what building that found, and it is owed a number because two of
+the three findings reach past `everyday/stageScreenModel.ts`.
+
+### The strip
+
+`everyday/stageScreenModel.ts#stageGoalsOf` folds `host.goalsAt(playhead)` through
+`dev/leftRail.ts#goalRowsOf` and returns a heading, a note, a `judged` flag and one row per goal.
+`everyday/stageScreen.ts` mounts it under the § 7.1 header and chooses ink; it decides no word and
+no verdict. That closes the charter's P3 refusal test on the one surface the pillar is about: the
+day asks, the stage shows, the report grades, and all three now use one vocabulary.
+
+**Five rows and never a literal five.** #277's title and its first acceptance criterion both say
+*four*, and they were correct when it was filed: § D468's energy bar landed eight days later. The
+map is generic over whatever `goalsForDay` returns, exactly as `goalRowsOf` is, and
+`stageScreenModel.test.ts` asserts the drawn ids **against `goalsForDay`'s own** rather than against
+a list. A lane taking AC1 literally would have dropped the goal the report grades fifth while
+fixing the defect that the stage grades none.
+
+### The verdict is stood down on the way in, not erased on the way out
+
+`unjudged` projects each `GoalReading` to `state: 'pending'`, `glyph: GOAL_GLYPHS.pending`,
+`progressPct: 0` and `observed: null`, keeping `display`. `goalRowsOf` then draws its own ungraded
+row from it. The alternative — call the fold and blank three fields of the row — is a second
+implementation of *ungraded* drawn a screen away from the first, which is what § D371's *"never a
+second implementation"* is about.
+
+**`progressPct` goes to zero, and that is the clause worth arguing.** A progress bar is not
+decoration on an `at-most` goal: `progressOf` fills it to 100 while the observed value is under the
+ceiling, so *never let a landing stack past 34 people* draws a **full** track at 00:00 on a building
+nobody has arrived at. A full track is a verdict with no word in it, and `campaign/judge.ts`'s rule
+settles it: unjudged is not passed. What moves during the day is the figure, which is what § D371
+says moves.
+
+### `EverydayHost.goalsAt` — the port, and the defect that made it necessary
+
+**`goalsToday()` on the Everyday stage is a constant, not a reading.** It folds at
+`EverydayHostBindings.playheadS`, which `dev/main.ts` binds to the **Engineer** transport's
+`Playback`; the Everyday stage runs a `Playback` of its own and the Engineer one is not moving while
+that shell has the page. Every caller `goalsToday` had before this — the brief, the door, the tile,
+the campaign screens — is a surface shown before a run or after one, so that instant was right for
+all four and wrong for the first mid-run caller.
+
+`goalsAt(simTimeS)` takes the instant; `goalsToday()` is now `goalsAt(b.playheadS())`, one local
+expression with two entry points rather than two folds. This is the standing requirement finding a
+defect **before** the surface shipped rather than after: a five-row strip fed from another screen's
+clock passes every check this repository runs, looks right, and shows the player a run that does not
+move. `host.test.ts` asserts both halves, because a port that answered the binding's instant
+whatever it was handed would pass a test of the first alone.
+
+### What the honesty corpus gained, and the one thing it deliberately did not
+
+`honesty/surfaces.ts`' `EVERYDAY_STAGE` adapter drives the strip at every sample time, so the
+ungraded arm and the graded one are both read, and iterates `STAGE_GOALS_COPY` with
+`Object.entries` so a key added to that record is swept the day it is added.
+
+**The label and the value are separate seeds, and the split is not cosmetic.** A goal's label is a
+caption carrying a *threshold* — *Keep the work inside 80 kJ per ride delivered* — which is
+`role: 'label'`'s own definition and the reason `whole-run-figure-early` exempts that role from its
+textual half. Seeding the composed row instead would put the bar's `80` in one clause with the word
+`delivered`, and a case whose `summary.delivered` happened to be 80 would report a violation about a
+threshold nobody folded. The *was* slot carries **no** playhead, because `wasDisplayOf` reads
+another day's `DayOutcome` and folds nothing from this recording; declaring this run's clock over it
+would be a false declaration of the kind `TextPlayhead`'s docstring refuses.
+
+Nothing in `honesty/properties.ts` moved, no scope constant moved, and `OUTSTANDING` is unmoved.
+
+### What is deliberately not built
+
+**`docs/10` R6's provisional-verdict-with-retraction.** § D371 refused it and did not retire it, and
+this entry does not revive it: a labelled provisional verdict can lie in the interval before it
+retracts, and a reading claims nothing so nothing needs withdrawing. R6 stays available to whoever
+wants the verdict later.
+
+**The strip is down before the first recording lands**, which is `nextPhase`'s rule on the same
+header: an empty strip of five ungraded rows before the first press is a control saying nothing, and
+the brief is where the bars are read before a run.
+
+**And down on a watched stage**, which is § 14.1's rule rather than a second one. The bars are the
+player's week and harden with `WeekState.day`; the run on a watched stage is a record somebody else
+made. A strip headed *what today asks* over it grades another player's run against this player's
+ladder, which is the reading half of the thing § 14.1 already refuses on the intervention rows
+(*"a spectator who could intervene would be playing, not watching"*). The record's own posted result
+is what that screen draws instead, with `watch/view.ts`'s note saying which figures are which.
+
+**AC5 is not discharged here.** `docs/22-charter.md` § 2's P3 sentence and `MULTI_AGENT_PLAN.md` § 1
+goal 4 both cite the closed #212 and both need re-adjudicating against what has landed. Those are
+coordination documents this lane may not write, so the re-adjudication is owed and is named here
+rather than done.
+
+## D471 — the deploy CSP gate names its permitted origins, and two live rules stop naming a goal count
+
+**Date: 2026-09-04 · Owner: wave Q lane C · Rules on: GitHub issue #341, and the documentation debt
+[§ D468](#d468) left behind.**
+
+One number covering two changes, because the lane holds one. They are unrelated in subject and
+identical in shape: a predicate and a rule each carried a count that had stopped being true, and
+neither had anything checking it.
+
+### The gate admitted an arbitrary second origin, and this was reproduced rather than read
+
+`.github/workflows/deploy-viz.yml` asserts that the built page's CSP permits reaching the API origin
+the page names. Its two arms were not equally strict:
+
+```sh
+armed:    case "$csp" in *"connect-src 'self' $EXPECTED"*) ;;   # no terminator
+unarmed:  case "$csp" in *"connect-src 'self';"*) ;;            # pinned by the semicolon
+```
+
+The armed arm has wildcards on both sides and nothing closing the directive, so it matched any policy
+merely *containing* that text. Replayed with the workflow's own expressions, a CSP reading
+`connect-src 'self' https://api.example.com https://evil.example.com;` **passed**. The arm that runs
+on every production deploy was the looser of the two, and the strict one ran only when nothing was
+configured.
+
+### Why an allowlist rather than the pinned terminator the issue suggests
+
+Issue #341 proposes `*"connect-src 'self' $EXPECTED;"*`, and names two things to check first. Both
+were checked by running them.
+
+**`connect-src` is not the final directive today.** The committed
+`packages/viz/staticwebapp.config.json` writes eleven directives and `connect-src` is the sixth;
+`frame-ancestors 'none'` is last and the string carries no trailing semicolon, so whichever directive
+is written last has none. `hostConfigWithApiOrigin` widens in place, so the sixth position survives
+widening. `packages/server/src/http/static.test.ts` already asserts the semicolon after `connect-src`
+in both the committed and the widened form, reading the file from disk. So the pinned form is correct
+today and is correct only by an ordering nothing in the workflow states.
+
+**Measured, it rejects a correct policy.** Three candidate gates were replayed against six built
+configs. The row that decides it is a legitimate widened policy whose `connect-src` is written last:
+
+| case | old | pinned terminator | source list compared |
+|---|---|---|---|
+| expected origin only | PASS | PASS | PASS |
+| expected origin **plus a second** | **PASS** | FAIL | FAIL |
+| expected origin only, `connect-src` written last | PASS | **FAIL** | PASS |
+| expected plus a second, `connect-src` written last | **PASS** | FAIL | FAIL |
+| a duplicated `connect-src *` directive | **PASS** | **PASS** | FAIL |
+
+So the gate extracts `connect-src`'s **source list**, single spaced, and both arms compare it for
+equality against a list written in the workflow. Armed expects `'self' $EXPECTED`; unarmed expects
+`'self'`. Splitting on `;` makes the check independent of where the directive sits, which is the
+column the pinned form loses.
+
+Two consequences worth stating. A second origin, an error reporting endpoint for #242 being the
+likely one, is now added by editing one line in the gate, which is a reviewable diff; it is not
+something a config can acquire on its own. And the duplicate row is a config hygiene catch rather
+than a closed hole: CSP semantics ignore a repeated directive, so the policy in that row is still
+safe, and a build emitting two of them is a build nobody understands.
+
+### `staticwebapp.config.json` is unchanged, deliberately
+
+The gate fix needed no edit to the hosting config, and none was made. The committed policy was
+already the shape the new predicate wants.
+
+### The comment said *"asserted BOTH WAYS"* and that was true of the wrong pair
+
+It described armed against unarmed, which is real and remains. Sitting directly above the block, it
+read as though it also covered how many origins `connect-src` names, and a reader planning #242 would
+have concluded that a second origin required changing the gate. It did not. The comment now names the
+pair it means and says outright that the origin count is a separate check.
+
+**Nothing automated guards this.** No test in the tree parses `.github/workflows/`, so the proof here
+is a reproduction run against the step body extracted from the YAML and against artifacts produced by
+the real `hostConfigWithApiOrigin`, quoted in the lane report. That is the same class of exposure as
+the defect being fixed, and it is named rather than implied.
+
+### Two live rules stop naming a goal count
+
+§ D468 made the day ask five things. Two governing rules still said four, and both are scored against
+open issues:
+
+- **`docs/33` DC-4**, *"must fail at least one of the day's four goals"*, which #234 and #270 are
+  measured against.
+- **`docs/25` X6**, an M2 exit row #218 is measured against.
+
+Both now read over *the day's goals* with no count in the rule, because a rule that names one goes
+stale the next time a goal lands and a stale rule is worse than a loose one. Each says where the count
+stands and that it has moved, so a figure quoted against either has to declare which set it was taken
+over.
+
+**A third instance was corrected and it was not on the lane's list.** `docs/33` § 1.4 tells the lane
+that lands the `Difficulty.tests` fix that *"`goalsForDay` has no trip goal. Its four bars are …"*.
+That is a present tense enumeration of a shipped function rather than a dated measurement, and it is
+read by a future lane as fact. It now reads five and names the energy bar as a constant rather than a
+rung, which is the property that lane needs.
+
+**What was deliberately left alone, on the rule that a dated record and a live claim are different
+things.** `docs/33` § 4.2's instrument and result prose, its F6 finding and its § 4.4 comparison table
+all say four and were all measured when the day asked four. Rewriting a measurement to say five would
+falsify it. § 4.6's *"the four wait goals"* is a correct designation of the four non energy goals, and
+§ 5's *"the other four goals grade the whole shift"* is correct as written for the same reason: the
+energy goal is the one on the reporting window and the other four are not.
+
+**One live claim is flagged and not corrected.** `docs/25` § 6.1 says *"The four goals still grade"*
+under saturation, with the argument that `GoalObservations` carries no suppressible mean field. The
+type argument still holds and the count probably does not, but `workPerServedLegKJ` is an optional
+member that reads `pending` when absent, which is a gate the original four do not have. Whether all
+five grade on that saturated day is a measurement, and this lane did not take it. A plausible sentence
+in place of one is what [§ D256](#d256) refuses.
+
+## D472 — a shared inflection helper, and a guard `everyday/` did not have
+
+**Date: 2026-09-04 · Owner: wave Q lane D · Rules on: GitHub issue #295 rows F37 and F29, under
+[§ D405](#d405).**
+
+Two decisions in one entry because this lane holds one number, and both reach past the module that
+took them. The lane's third row, F26, is deliberately **not** here: `LadderRowView.dropped` binds
+`gauntlet/ladder.ts`, which owns the view model, and `everyday/boardScreen.ts`, which is its one
+reader, so under § D405 the docstrings on those two are the record and no number is owed.
+
+### `mode/disclosure.ts#plural` is exported, and a recorded sentence moves with it
+
+`(n, one, many) => string` shipped **three** times as a module-private lambda, in
+`render/runSummary.ts`, `menu/catalogue.ts` and `mode/disclosure.ts`, plus two `'' : 's'` ternaries
+in `dev/` and an inline one in `batch/report.ts#runs`. `shift/report.ts` closed GitHub issue #134
+against the same defect and wrote down why it did not import one: doing so would add a
+`shift/` → `mode/` edge to spend two words.
+
+That reasoning is sound and it is left standing. What it did not say is that a helper nobody can
+import is a helper nobody reaches for, and the consequence is measured rather than argued:
+`campaign/judge.ts` shipped `all 1 goals reached` on the campaign's opening verdict, because
+`data/campaign.json`'s first stage declares exactly one goal. So the lambda is exported, and the
+three sites this lane fixed import it rather than copying it: `campaign/`, `batch/` and `dev/` all
+already depend on `mode/`, so no directory edge is created anywhere.
+
+**The sentence in `shift/report.ts` is corrected on this commit rather than left to rot.** It said
+`plural` *"is module-private"*; it is not any more. The edge argument it makes is untouched and that
+file still writes its own form. This is the stale-refusal class § D227 records, created by this
+change and closed in the same breath.
+
+**What is deliberately not done.** The two remaining private copies in `render/` and `menu/` are
+left alone. Converging them is a change in files this lane does not own, it fixes no string a player
+reads, and quietly rewriting another lane's helper is how a guard's meaning erodes without its
+assertions changing.
+
+### `everyday/` gets a guard that binds every screen in it
+
+`el.hidden = true` is honoured by a **user agent** rule, so any author `display` outranks it and the
+element keeps its box while claiming to be hidden. `packages/viz/index.html` guards that seventeen
+times with a paired `.x[hidden] { display: none; }` rule, `dev/surfaces.test.ts` states the mechanism
+in prose, and **every one of those guards is Engineer-side**: that file contains no `everyday-`
+string. This directory builds its DOM in TypeScript with inline `style.cssText`, so none of the
+seventeen reach it, and one of its six `.hidden` sites was tripping — the Design a building screen's
+advisory banner, drawn empty with a border and an amber wash.
+
+`everyday/hiddenBox.test.ts` reads the site list off the directory rather than naming the six, so a
+seventh screen is covered the day it lands. That is what makes it an entry: it binds every file in
+`everyday/`, including files this lane does not own, and a lane that adds a hideable element with an
+inline `display` will be failed by a test it did not write.
+
+Three limits are in the file rather than implied, because a guard whose blind spots are unstated is
+worse than none. There is no jsdom in this repository, so it reads source and never layout. It
+follows one level of `const` indirection and **fails** on a style it cannot read through rather than
+skipping it. And it cannot see a class rule, which this directory has none of today; if `everyday/`
+ever grows a stylesheet, this guard needs a second half.
+
+`display:none` is not flagged. It hides the element the same way the attribute does, and a guard
+that refused it would force a workaround to satisfy a rule about a defect that is not present.
+
+### Two sweep results, one of them a null
+
+F37's brief asked whether any other uninflected count is reachable on a player-facing surface. A
+scan of every non-test module under `packages/viz/src` for a numeral interpolated in front of a
+plural word returns **253** candidate sites, the great majority of which are counts that cannot be
+one (`replications` is floored at 50 by `campaign/parse.ts`, the proof set is forty, `BATCH_METRICS`
+is a constant list) or are already inflected (`campaignModel.ts:552`, `rail.ts:366`,
+`designerScreen.ts:462` all carry an explicit singular branch).
+
+Two more were reachable and are fixed here: `batch/report.ts#summarise`'s `1 are energy axes`, which
+is the second string issue #295 quotes for F37 and lives in a different module from the first, and
+`dev/campaignPanel.ts`'s mirror of the same goal tally on the same stage. The rest of the residue is
+reported to the wave rather than fixed, because fixing it means editing files five other lanes are
+holding.
+
+**The residue's shape is the finding, and it is one word.** `everyday/campaignModel.ts` inflects
+`night`/`nights` explicitly at three sites and leaves the same word bare at two others in the same
+file, with `everyday/campaignScreens.ts` leaving it bare at a third. It also carries an explicit
+singular for `miss` and for `month`. So this is not a directory that never learned the rule; it is
+the rule applied by hand, one site at a time, by whoever happened to be thinking about it. That is
+exactly the shape a shared helper exists to replace, and it is why F37's fix is the export rather
+than a seventh repair.
+
+## D473 — the accessibility standard is adopted; the conformance target is not
+
+**Date: 2026-09-04 · Owner: wave Q lane E · Rules on: GitHub issue #204, and binds
+[`docs/28-art-direction.md`](docs/28-art-direction.md) § 7 and
+[`docs/31-support-matrix.md`](docs/31-support-matrix.md) § 5, which both deferred to that issue by
+name.**
+
+[`docs/36-accessibility-standard.md`](docs/36-accessibility-standard.md) is the standard this product
+is held to. Seventeen clauses, `AX-0` to `AX-16`, each naming the instrument that checks it or saying
+plainly that there is none and who does it instead. This entry exists because the standard reaches
+past the module that wrote it: it binds two adopted specifications, it hands an acceptance criterion
+to another issue, and it sets a contrast floor that decides a shipped colour. § D405's *your
+docstring is the record* does not cover any of those.
+
+### What is decided
+
+**The tiering rule is `docs/31` § 5's, adopted unamended.** A clause no instrument checks is a
+tier-3 claim and is labelled one. The standard extends it by one sentence and no more: where a clause
+can only be checked by a person, it names the role.
+
+**The non-text contrast floor is 3:1**, measured against the ground the mark is actually drawn on
+(`AX-7`). This is the ruling `docs/28` § 7.2 asked for by name, and it decides a shipped value:
+`tapping-foot` at **1.78:1** against `cardSunk` fails it. The *remedy* is deliberately not chosen.
+Three are viable, they cross `guide § 19`, the plot's surface token and AD-S7 respectively, and
+picking one is a design change a specifications milestone may not make.
+
+**Hue plus size satisfies the non-colour-only requirement** (`AX-5`), which adopts `docs/28` AD-S7's
+height encoding by reference rather than re-arguing it. That was the second ruling § 9 of that
+document asked for.
+
+**The screen-reader promise is split in two, and only one half is committed.** The accessibility tree
+being well formed is mechanisable and is promised. *A screen-reader user can complete a journey* is
+not mechanisable at any price and stays a tier-3 claim until a walkthrough is recorded with its date,
+its reader and its platform. `docs/31` § 5's *no record exists* is repeated and nothing is added to
+it, in either direction.
+
+**The automated-sweep criterion goes to #239.** It is word for word that issue's first criterion and
+this one's second, both issues' verification comments identify the duplication, and a sweep specified
+in a milestone that may not touch `.github/**` is not a sweep. Two candidate instruments are priced
+in § 6.2, `axe-core` against `playwright-core`'s own aria snapshot, and the cheaper one needs no new
+dependency.
+
+### What is deliberately not decided
+
+**The conformance target.** WCAG 2.2 AA, WCAG 2.1 AA, or no external standard. It is marked in § 1 as
+needing the product owner, on the footing `docs/29` used before § D344 ruled on it, and the three
+options are priced rather than described. The finding worth carrying out of that pricing is that
+Option A costs Option B **one unmeasured criterion and one small check**: of the six criteria WCAG 2.2
+adds at A and AA, 3.3.8 is already satisfied because § D241 deleted the password in favour of a
+mailed link, 3.2.6 and 3.3.7 have no subject, 2.5.7 is probably satisfied because
+`dev/dom.ts#onHorizontalDrag` sets its value on `pointerdown` before any move listener attaches, and
+only 2.5.8 target size is real work. **Nothing in the standard is blocked on the answer**, because
+every clause is invariant across the three options; what the answer changes is the size of the claim
+the product may make in public.
+
+### The measurement this entry pins
+
+The eight shaft tints, unmeasured since they were authored and recorded as unmeasured by `docs/28`
+§ 8 item 4, measured in both themes over `render/tokens.ts`'s literals by WCAG 2.x relative
+luminance. The instrument was licensed before it was used: it reproduces **all ten** of `docs/28`
+§ 7.2's published figures exactly, four band-against-ground and six band-against-band.
+
+**Twenty-eight pairs per theme, and not one pair in either theme reaches 2:1.** The light set's
+widest separation is 1.43:1 and its narrowest 1.02:1; the dark set's are 1.66:1 and **1.0014:1**. In
+the dark theme `--shaft-3`, `--shaft-4`, `--shaft-5` and `--shaft-7` all sit within 1.03:1 of each
+other, three of them within 1.004:1. Four of eight banks are one greyscale value.
+
+**No dichromat model was simulated, and the omission is the argument.** A luminance measurement is
+model independent: it establishes that the set is separated by hue and by essentially nothing else,
+and that holds under every model one might have picked next. A simulation would change which pairs
+collapse and could not produce a set in which hue is a reliable channel for a viewer with fewer hue
+channels. So `AX-8` asks for a second channel rather than for a ratio between simulated colours,
+because the requirement is identical under every model and naming one would add an argument and no
+constraint.
+
+**And the measurement does not establish that anything is broken for a player**, which is the half
+that would have been easy to leave out. `dev/buildingEditor.ts:815` already gives every car a legend
+carrying its id, its role and the floors it serves, so a greyscale reader loses the grouping and
+keeps the facts. That is why `AX-8` is worded as a **declaration** rather than as a threshold: declare
+each colour set load-bearing or decorative and hold the declaration to a test. An undeclared set is
+the defect, because it is the one where nobody can tell which case they are in.
+
+### Three findings the standard produced on the way
+
+**No clause is wholly tier 1.** Every clause that has an instrument has it on the Engineer shell, and
+the Engineer shell is the one a player meets second. `packages/viz/src/everyday/stageScreen.ts` line
+671 creates the stage canvas and line 672 sets `style.cssText`; nothing else in the file touches that
+element except sizing and `getContext`. The Engineer canvas has carried an `aria-label` from
+`render/describeFrame.ts` since `KB-13`, and that function is already a registered honesty surface
+(`honesty/surfaces.ts:951`), so the Engineer text alternative is held to all ten honesty properties
+and the Everyday stage is held to none. The remedy is an adapter onto words that exist, registered in
+the same file, which is why `AX-16` is the only clause that is tier 1 without anybody building an
+instrument.
+
+**"This project's own accessibility ledger" has never existed.** `dev/dom.ts:484` and
+`dev/reportPanel.ts:34` both cite it, both reason correctly about what happens under
+`prefers-contrast`, and both point at nothing. It is § D227's class in its quietest form, a sentence
+right in what it reasons and wrong in what it points at, and `docs/36` § 9 asks for the two citations
+to be repointed. The standard is that ledger now.
+
+**`UX.md` § 5's header is a stale claim of coverage.** It opens *"applies to every surface"* and its
+seventeen `KB-` rows, seven of them non-negotiable, are the Engineer shell's; the file does not
+mention Everyday Mode anywhere. That is worse than an absent row, because a reader checking whether
+keyboard operation is covered finds a sentence saying it is.
+
+### One correction to a figure this issue published
+
+#204's verification comment reports 66 `aria-label`, 49 `aria-pressed`, 38 `aria-describedby` and 19
+`aria-hidden` across 33 non-test modules. The module count is right. Three of the four attribute
+counts reproduce only when **test files are counted**, and the fourth reproduces at neither figure.
+Excluding tests, on `771e65f`, the counts are **41 / 29 / 20 / 13**. Published as a correction and
+then deliberately unused: a census of ARIA measures effort rather than coverage, a wrong label counts
+the same as a right one, and no clause in the standard is satisfied by adding an attribute.
