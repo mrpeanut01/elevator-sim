@@ -1,5 +1,5 @@
 /**
- * The five scenarios name five buildings that exist, and the stat line is derived from them.
+ * Every scenario names a building that exists, and the stat line is derived from it.
  *
  * The first suite is the one that matters: a contract's `buildingId` is a string, and a string
  * that no longer names a file is a scenario the reader can select and never run. It is loaded
@@ -140,7 +140,7 @@ describe('every scenario is open from the start', () => {
 });
 
 describe('statLineOf is generated from the building, not authored', () => {
-  it('agrees with the building it was given, on all five', () => {
+  it('agrees with the building it was given, on every contract', () => {
     for (const contract of CONTRACTS) {
       const building = requireBuilding(config, contract.buildingId);
       const line = statLineOf(building);
