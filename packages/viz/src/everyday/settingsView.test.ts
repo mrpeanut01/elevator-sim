@@ -6,14 +6,52 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { displayNameIssueOf, MAX_DISPLAY_NAME } from '../menu/account.js';
+import {
+  SIGNED_OUT,
+  displayNameIssueOf,
+  linkRequested,
+  MAX_DISPLAY_NAME,
+  rateLimited,
+  signedIn,
+  updateForm,
+  type AccountState,
+} from '../menu/account.js';
 
 import { AVATAR_SWATCHES } from './profile.js';
 import { railFooter } from './rail.js';
-import { SETTINGS_ABSENCES, settingsScreenViewOf } from './settingsView.js';
+import {
+  NAME_NOTE,
+  SETTINGS_ABSENCES,
+  SIGN_IN_COPY,
+  settingsScreenViewOf,
+  type SettingsSignInStage,
+} from './settingsView.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
 
 const BASE = { profile: undefined, reduceMotion: false } as const;
+
+/** A page with an account server behind it — `everyday/host.ts#accountActions()` answered. */
+const live = (account: AccountState): { account: AccountState; accountServer: true } => ({
+  account,
+  accountServer: true,
+});
+
+/** Signed in and named. Built through the reducer, so it is a state the machine can produce. */
+const named = (displayName: string): AccountState =>
+  signedIn(SIGNED_OUT, 'session-token', {
+    id: 'u1',
+    email: 'someone@example.test',
+    displayName,
+    displayNameChosen: true,
+  });
+
+/** Signed in and still carrying the server's mint — `menu/account.ts#namingStage`. */
+const minted = signedIn(SIGNED_OUT, 'session-token', {
+  id: 'u1',
+  email: 'someone@example.test',
+  displayName: 'player-a1b2c3d4e5f6',
+  displayNameChosen: false,
+});
 
 describe('the § 15.1 header', () => {
   it('carries the prototype’s eyebrow, title and lede, verbatim', () => {
@@ -65,10 +103,23 @@ describe('You — the name, the disc and the six swatches', () => {
     expect(view.you.initial).toBe('N');
   });
 
-  it('says where the name shows up, in the prototype’s words', () => {
-    expect(settingsScreenViewOf(BASE).you.note).toBe(
-      'This is the name on the daily board, on the ladder, and on any run somebody else watches.',
+  /**
+   * **The note used to be one sentence and is two** — [§ D490](../../../../DECISIONS.md).
+   *
+   * It read *"This is the name on the daily board, on the ladder, and on any run somebody else
+   * watches"* in **both** states, which was a claim about the device-local name that nothing in
+   * this tree could falsify while nothing on this side had an account — and § D490 is the ruling
+   * that ends that. Measured against the tree rather than argued: the only reader of
+   * `everyday/profileStore.ts`'s name is `everyday/shell.ts#drawRail`'s `PLAYING AS` card.
+   */
+  it('says where the name shows up, and says a different thing about each of the two names', () => {
+    expect(settingsScreenViewOf(BASE).you.note).toBe(NAME_NOTE.device);
+    expect(NAME_NOTE.device).toContain('this device');
+    expect(NAME_NOTE.device).toContain('reaches no board');
+    expect(settingsScreenViewOf({ ...BASE, ...live(named('A player')) }).you.note).toBe(
+      NAME_NOTE.account,
     );
+    expect(NAME_NOTE.account).toContain('account');
   });
 
   it('owns up when a write did not survive the tab, and only then', () => {
@@ -182,7 +233,6 @@ describe('This device — statements of fact, and the register of refusals besid
       'Sound',
       'Default speed',
       'Post runs to the board',
-      'Sign out',
       'Clear saved progress',
       /*
        * `Switch to Engineer` was the seventh and is deliberately absent — the rail's § 3.2 row
@@ -203,6 +253,17 @@ describe('This device — statements of fact, and the register of refusals besid
     expect(
       entries.filter((entry) => entry.startsWith('Units')),
       'the Units refusal outlived its consumer',
+    ).toEqual([]);
+    /*
+     * **`Sign out` is asserted gone, in the same direction and for the same reason** — GitHub issue
+     * #332, [§ D489](../../../../DECISIONS.md). Its entry refused the button on the grounds that
+     * *nothing on this surface is signed in*; the YOU section holds the session now and *Sign out*
+     * is one of its presses. Asserted rather than merely dropped from the list above, because a
+     * list that stopped naming it would pass just as well if somebody re-added the entry tomorrow.
+     */
+    expect(
+      entries.filter((entry) => entry.startsWith('Sign out')),
+      'the Sign out refusal outlived the control it refused',
     ).toEqual([]);
     // § 20.12's own sentence rides with the Sound entry.
     expect(entries.find((entry) => entry.startsWith('Sound'))).toContain(
@@ -275,5 +336,189 @@ describe('This device — statements of fact, and the register of refusals besid
     const swap = railFooter({ screen: 'settings', ctx: 'daily' }).engineerSwap;
     expect(swap.label).toBe('Switch to Engineer');
     expect(swap.note).not.toMatch(/not built/);
+  });
+});
+
+/**
+ * **§ 15.1's account state, and the whole of what GitHub issue #332 authors** —
+ * [§ D489](../../../../DECISIONS.md).
+ *
+ * The six arms are the point rather than the copy: a sign-in surface is judged on its unhappy
+ * states, and this file is where they are reachable without a document, a network or a server.
+ */
+describe('the account block — § D489’s asking half, drawn as six states', () => {
+  /**
+   * Every declared stage is produced by an input this file names, and the **table is exhaustive by
+   * the type** — a seventh stage that nothing here drives does not compile.
+   *
+   * That is why `settingsView.ts` keeps its stage list module-private and exports the union: a
+   * `Record` keyed by the type is a stronger check than a value-list comparison, and it needs no
+   * entry in `honesty/derive.test.ts`'s register of exported id tables.
+   */
+  it('reaches every declared stage, so no arm is a branch nothing produces', () => {
+    const inputs: Record<SettingsSignInStage, Parameters<typeof settingsScreenViewOf>[0]> = {
+      booting: BASE,
+      'no-server': { ...BASE, account: SIGNED_OUT, accountServer: false },
+      'signed-out': { ...BASE, ...live(SIGNED_OUT) },
+      'link-sent': {
+        ...BASE,
+        ...live(linkRequested(SIGNED_OUT, { detail: 'on its way', expiresInMs: 900_000 })),
+      },
+      naming: { ...BASE, ...live(minted) },
+      'signed-in': { ...BASE, ...live(named('A player')) },
+    };
+    for (const [stage, input] of Object.entries(inputs)) {
+      expect(settingsScreenViewOf(input).you.signIn.stage, stage).toBe(stage);
+    }
+  });
+
+  /**
+   * GitHub issue #30's own fix ordering, which is a privacy rule rather than a layout one: the
+   * screen used to be indistinguishable from a working login until the button was pressed, *"at
+   * which point it admitted there had never been anywhere for the address to go"*.
+   */
+  it('says there is nowhere to sign in before it draws a field, and draws none', () => {
+    const view = settingsScreenViewOf({ ...BASE, account: SIGNED_OUT, accountServer: false });
+    expect(view.you.signIn.stage).toBe('no-server');
+    expect(view.you.signIn.note).toBe(SIGN_IN_COPY.noServer);
+    expect(view.you.signIn.fieldLabel).toBeUndefined();
+    expect(view.you.signIn.action).toBeUndefined();
+  });
+
+  it('draws the booting window as a sentence rather than a form pointed at nothing', () => {
+    const view = settingsScreenViewOf(BASE).you.signIn;
+    expect(view.stage).toBe('booting');
+    expect(view.note).toBe(SIGN_IN_COPY.booting);
+    expect(view.fieldLabel).toBeUndefined();
+    expect(view.action).toBeUndefined();
+  });
+
+  it('asks for an address, and offers the press before anything has been typed', () => {
+    const view = settingsScreenViewOf({ ...BASE, ...live(SIGNED_OUT) }).you.signIn;
+    expect(view.stage).toBe('signed-out');
+    expect(view.fieldLabel).toBe(SIGN_IN_COPY.emailLabel);
+    expect(view.action).toBe(SIGN_IN_COPY.request);
+    /*
+     * § D488: *a reason a player cannot see is not a reason*. An empty box is a form problem and
+     * `menu/account.ts#formIssues` answers it **after** the press, in words; greying the button
+     * here would be a refusal with nothing beside it, which is the defect that ruling names.
+     */
+    expect(view.actionOffered).toBe(true);
+    expect(view.notice).toBeUndefined();
+  });
+
+  /**
+   * #332's third criterion, at the file where a paraphrase would be introduced.
+   *
+   * The four labelled failures are `link-expired`, `link-spent`, `too-many-link-requests` and —
+   * since [§ D491](../../../../DECISIONS.md) — `sign-in-mail-not-sent`. Every one of them arrives
+   * as `AccountState.notice`, and this asserts the screen carries it rather than writing its own.
+   */
+  it('carries the server’s own sentence for every refusal, byte for byte', () => {
+    for (const detail of [
+      'That sign-in link has expired. Ask for a new one — they are good for a few minutes.',
+      'That sign-in link has already been used. Each one works once; ask for a new one.',
+      'Too many sign-in links have been asked for. Try again shortly, and check your inbox meanwhile.',
+      'The sign-in link could not be sent — that is a fault on our side, not with the address. Nothing is on its way, so try again in a moment.',
+    ]) {
+      const view = settingsScreenViewOf({
+        ...BASE,
+        ...live(rateLimited(SIGNED_OUT, detail, 60_000)),
+      }).you.signIn;
+      expect(view.notice).toBe(detail);
+      /* Nothing this screen authors may be a second wording of it. */
+      expect(Object.values(SIGN_IN_COPY)).not.toContain(detail);
+    }
+  });
+
+  it('stops offering the press only where a sentence is already standing beside it', () => {
+    const gated = settingsScreenViewOf({
+      ...BASE,
+      ...live(rateLimited(SIGNED_OUT, 'Too many sign-in links have been asked for.', 60_000)),
+    }).you.signIn;
+    expect(gated.actionOffered).toBe(false);
+    expect(gated.notice).toBe('Too many sign-in links have been asked for.');
+  });
+
+  it('says a link is out in the server’s own words, and offers a way back to the box', () => {
+    const detail =
+      'If that address can receive mail, a sign-in link is on its way. It works once and expires in 15 minutes.';
+    /*
+     * The address is in the form by the time the 202 arrives — the press commits it before it asks
+     * — so the state below is the one the shipped flow produces rather than a bare reducer call.
+     */
+    const asked = linkRequested(updateForm(SIGNED_OUT, { email: 'someone@example.test' }), {
+      detail,
+      expiresInMs: 900_000,
+    });
+    const view = settingsScreenViewOf({ ...BASE, ...live(asked) }).you.signIn;
+    expect(view.stage).toBe('link-sent');
+    expect(view.notice).toBe(detail);
+    expect(view.action).toBe(SIGN_IN_COPY.otherAddress);
+    /* The address field is gone; the reducer is what brings it back. */
+    expect(view.fieldLabel).toBeUndefined();
+    /*
+     * *Use a different address* is `updateForm`'s own reducer and nothing else — an address that
+     * changed takes back *a link is on its way*, because that sentence is no longer about the
+     * address in the box. This is the press, driven at the layer that decides it.
+     */
+    const again = settingsScreenViewOf({ ...BASE, ...live(updateForm(asked, { email: '' })) }).you
+      .signIn;
+    expect(again.stage).toBe('signed-out');
+    expect(again.notice).toBeUndefined();
+  });
+
+  it('offers Sign out on both signed-in arms, including the unnamed one', () => {
+    expect(settingsScreenViewOf({ ...BASE, ...live(minted) }).you.signIn.signOut).toBe(
+      SIGN_IN_COPY.signOut,
+    );
+    expect(settingsScreenViewOf({ ...BASE, ...live(named('A player')) }).you.signIn.signOut).toBe(
+      SIGN_IN_COPY.signOut,
+    );
+  });
+
+  /**
+   * **§ D490's adoption, which is the half a screen would otherwise get backwards.**
+   *
+   * The server mints `player-<12 hex>` because it must return something. A player who has typed a
+   * name and watched the rail draw it must not sign in and find a hex string in its place — that is
+   * the sign-in costing them something, and § D456's second refusal test aimed at identity.
+   */
+  it('offers this device’s name rather than the server’s mint, until one is chosen', () => {
+    const device = { profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' } };
+    const offering = settingsScreenViewOf({ ...BASE, ...device, ...live(minted) });
+    expect(offering.you.nameValue).toBe('Nadia R.');
+    expect(offering.you.initial).toBe('N');
+    expect(offering.you.signIn.stage).toBe('naming');
+    expect(offering.you.signIn.action).toBe(SIGN_IN_COPY.saveName);
+    /* An account that has chosen a name keeps it — a second device does not get to rename it. */
+    const chosen = settingsScreenViewOf({ ...BASE, ...device, ...live(named('Somebody Else')) });
+    expect(chosen.you.nameValue).toBe('Somebody Else');
+    expect(chosen.you.initial).toBe('S');
+    /* And the device-local value is kept, not overwritten: it answers again on sign-out. */
+    expect(settingsScreenViewOf({ ...BASE, ...device }).you.nameValue).toBe('Nadia R.');
+  });
+
+  /**
+   * § D490's pair, asserted at the two files rather than only in `honesty/agreement.ts`.
+   *
+   * The corpus property is what catches a *later* reader dropping the ask; this is what catches the
+   * two disagreeing today, which is the state the ruling was written about.
+   */
+  it('publishes the same name as the rail card, signed in and signed out', () => {
+    const device = { name: 'Nadia R.', avatarColor: '#4F8A5B' };
+    for (const account of [undefined, SIGNED_OUT, minted, named('Somebody Else')]) {
+      const settings = settingsScreenViewOf({
+        ...BASE,
+        profile: device,
+        ...(account === undefined ? {} : live(account)),
+      });
+      const card = railFooter(
+        { screen: 'settings', ctx: 'daily' },
+        { profile: device, account },
+      ).identity;
+      expect(card.name, JSON.stringify(account?.user ?? null)).toBe(settings.you.nameValue);
+      expect(card.initial).toBe(settings.you.initial);
+    }
   });
 });

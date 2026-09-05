@@ -32766,3 +32766,91 @@ exists for.
 run is not lost — it can be posted when the connection is back."* A player who has just typed an
 email address has no run in flight, so carrying it verbatim would be a sentence about something that
 did not happen.
+
+---
+
+## D494 — sign-in lands as a state, the account name wins where it exists, and the repaint is a channel rather than a rebuild
+
+**Date: 2026-09-05 · Owner: wave S lane S-A · GitHub issue #332 · Rules on: `everyday/accountPort.ts`,
+`everyday/host.ts#EverydayAccountActions`, `everyday/settingsView.ts`, `everyday/profile.ts#effectiveNameOf`,
+`everyday/rail.ts#RailOptions.account`, `honesty/agreement.ts#AGREED_FIGURES`,
+`packages/server/src/http/api.ts`.**
+
+[§ D489](DECISIONS.md), [§ D490](DECISIONS.md) and [§ D491](DECISIONS.md) are the specification and
+this entry does not re-litigate them. It records the three things the build had to decide that they
+left open, each of which reaches past the module that took it.
+
+**1. The repaint is a third channel, because both of the two obvious ones are refused by a
+measurement already in the tree.** `EverydayHost.onChange` is drained by `dev/main.ts#renderAll()`
+and **no account path calls it** — thirteen call sites, every one of them `drawMenu()` — so a screen
+wired to the data host would render once and never move across a § D243 § 4 cold start measured at
+**28.7 s**, which is exactly long enough for a screen that does not repaint to read as a hang.
+Widening that drain to `drawMenu` is the other obvious repair and `everyday/signInLink.ts` refused it
+one wave earlier in writing: it would notify every Everyday screen on every commit in the Engineer
+account form, *"a redraw storm in the direction GitHub issue #106 documents"*. And calling
+`renderAll()` from the account paths is the tempting one-liner `dev/main.ts:3676-3681` already
+answers — rebuilding on every state change is *"issue #106 with a new trigger: a press swallowed
+mid-`mousedown`, and focus taken off whatever the reader was on"*, which on a form with a focused
+email field is the defect itself.
+
+So `everyday/accountPort.ts` is a channel of its own, published from `drawMenu()` — the one choke
+point every account write already passes through — and **it publishes nothing when the state is the
+same object**. That de-duplication is not a new rule: `menu/account.ts`'s reducers return a fresh
+frozen state for a real transition and hand back *the state they were given* for a commit that
+changes nothing, which is that module's own first paragraph and is issue #106's answer to the
+identical question one layer down. Reference identity is therefore an exact test for *did the account
+move*, and a menu navigation, a slider and the same address arriving three times from one blur reach
+no listener. `everyday/accountPort.test.ts` drives that through the shipped reducers rather than
+asserting it about a hand-built pair.
+
+The **effects** are on `everyday/host.ts` in `dailyBoard`'s shape, per the brief and for
+`dailyBoardOf`'s own stated reason. `undefined` means *no account server*, which is what lets the
+screen say there is nowhere to sign in **before** it draws a field — GitHub issue #30's own fix
+ordering, and a privacy rule rather than a layout one. There is deliberately **no redeem port**: a
+mailed link is redeemed by `dev/main.ts` at boot and its outcome already reaches this world through
+`everyday/signInLink.ts` (#336), so a port for it would have no caller, which is the dead seam this
+repository has shipped eleven times in code and once in `data/`.
+
+**2. § D490's adoption is implemented on the server's own flag, in one expression, and the mint arm
+is what makes the declared pair non-vacuous.** `everyday/profile.ts#effectiveNameOf` answers the
+device-local name while `AccountSummary.displayNameChosen` is `false` — the flag rather than the
+`player-<12 hex>` shape, which `menu/account.ts#namingStage` refuses by name because a client that
+recognised the pattern would be a second place deciding what a generated name looks like. Both
+readers ask it: `everyday/rail.ts#railFooter` and `everyday/settingsView.ts#settingsScreenViewOf`.
+`AGREED_FIGURES` gains `display-name` over those two, and the account rides on
+`AGREEMENT_ARMS`' existing three arms — signed out, holding the mint, named — rather than on a fourth
+axis, because a fourth axis would double every *other* pair's readings to reach three states of one.
+The mint arm is the half that stops the pair being a tautology: a side that took `displayName`
+unconditionally publishes `player-…` there while the other publishes the device-local name, which is
+precisely the sign-in-costs-you-something defect § D490 refuses.
+
+**3. § D491's bound held, and the enumeration check was run rather than argued.** One `try`/`catch`,
+one code (`sign-in-mail-not-sent`), one sentence, one test — and **502 rather than 500**, because the
+failure is a dependency this server called and did not get an answer from, so a client grouping by
+status stops grouping it with the faults it is not. It cannot be an account-enumeration oracle
+structurally: by the time the send is attempted the account **exists either way**, since asking for a
+link on an unknown address is what creates one. `api.test.ts` drives both halves anyway and requires
+the status and the body to be byte-identical for a known and an unknown address, because *cannot be*
+is what a test is for. What it can still reveal is **deliverability**, which is not a fact about this
+product's accounts and is already disclaimed in the 202's own wording — *"If that address **can
+receive mail**"*.
+
+**Four sentences were retracted, and one moved rather than went.** `SETTINGS_ABSENCES`' *Sign out*
+entry, `SettingsYouView.home`, and the two docstring passages behind them are deleted whole with the
+originals quoted where they stood, on § D227's rule that a refusal standing over a control that works
+is the more dangerous half. `everyday/buildNotes.ts`' *Putting your run on the daily board* row
+**narrowed** for the second time and its triage row moves from #332 to #221: the sign-in clause is
+false now and *nothing posts* is what is left, which is the issue that will build the press.
+`SETTINGS_ABSENCES`' *Post runs to the board* row deliberately did **not** move — it refuses a
+*switch* over a capability that still does not exist, and § D460 corrected that confusion once
+already. `everyday/signInLink.ts#SIGN_IN_NOTICE_POINTER` was substituted rather than added to: it
+pointed across § 3.2's door at the Engineer menu, and sending a reader through a whole other product
+to reach a control two rows under the banner is the same defect with a friendlier face.
+
+**One thing is knowingly weaker than it should be, and it is a file boundary rather than a design
+call.** `EverydayHostBindings.accountActions` is **optional** where `dailyBoard` is required, because
+two binding literals that a required field would break (`campaign/wearClock.test.ts`,
+`campaign/buildStandingOrder.test.ts`) are outside this lane's writable set. What is lost is the
+compile-time forcing: a future shell that composes bindings and omits it gets `undefined`, reads that
+as *no account server*, and draws that arm honestly rather than failing to build. Worth making
+required the next time either of those files is open.

@@ -445,9 +445,13 @@ async function requestLink(
   // Awaited, and a failure fails the request. Since § D241 the mail is not a courtesy at the start
   // of an account's life, it is the only door: a send that was dropped silently would be a player
   // staring at "check your email" forever.
-  await deps.mailer.send(
-    signInMessage(user.email, deps.signInUrl(link.token), Math.round(LOGIN_TTL_MS / 60_000)),
-  );
+  try {
+    await deps.mailer.send(
+      signInMessage(user.email, deps.signInUrl(link.token), Math.round(LOGIN_TTL_MS / 60_000)),
+    );
+  } catch {
+    return mailNotSent();
+  }
 
   return {
     status: 202,
@@ -564,6 +568,50 @@ function badLink(reason: 'expired' | 'spent' | 'invalid'): ApiResponse {
   // will help — and it leaks nothing, because learning "already used" requires presenting a token
   // this server signed, which only its recipient has.
   return { status: 400, body: { error: `link-${reason}`, detail } };
+}
+
+/**
+ * The mail did not go — [§ D491](../../../../DECISIONS.md).
+ *
+ * ## Why this is a distinct refusal rather than the 500 it used to be
+ *
+ * The `await` above is deliberate and the comment on it says why. What was missing is the half a
+ * client can act on: with nothing catching, a dropped send propagated and `http/serve.ts` answered
+ * `internal-error` / *"The server failed to handle that request."* — **byte-identical to every
+ * other unhandled fault**. The two want opposite things from a reader. A generic fault says *try
+ * again in a moment*; this one says *nothing is on its way, and it is us*. A viewer cannot derive
+ * the second from the first, so a surface that promised four labelled sign-in failures could ship
+ * only three.
+ *
+ * ## It cannot be an account-enumeration oracle, which is the bound § D491 set on this change
+ *
+ * § D241 § 7's whole design is that a request-link response says nothing about whether the address
+ * is known. This one cannot: by the time the send is attempted the account **exists either way** —
+ * the loop above creates one when `userByEmail` finds nothing, because asking for a link on an
+ * unknown address is exactly what creates an account. So the send is attempted for every accepted
+ * request, and this refusal is a fact about the mailer rather than about the address. What it can
+ * still reveal is *deliverability* — a driver that rejects a domain outright — and that is not a
+ * fact about this product's accounts and is already disclaimed in the 202's own wording: *"If that
+ * address **can receive mail**"*.
+ *
+ * ## 502 rather than 500
+ *
+ * The failure is a dependency this server called and did not get an answer from, which is what a
+ * bad-gateway status is. A client that groups by status alone therefore stops grouping this with
+ * the faults it is not.
+ */
+function mailNotSent(): ApiResponse {
+  return {
+    status: 502,
+    body: {
+      error: 'sign-in-mail-not-sent',
+      // Worded around whether asking again will help, which is what every other sign-in refusal in
+      // this file is worded around. It says the fault is here, because a player who reads
+      // "something went wrong" checks their own spelling first.
+      detail:
+        'The sign-in link could not be sent — that is a fault on our side, not with the address. Nothing is on its way, so try again in a moment.',
+    },
+  };
 }
 
 function tooManyLinks(retryInMs: number): ApiResponse {

@@ -1317,6 +1317,37 @@ describe('the daily board read', () => {
     expect(await host.dailyBoard()).toEqual({ kind: 'no-server' });
   });
 
+  /**
+   * **The account effects, in `dailyBoard`'s shape and for its reason** — GitHub issue #332,
+   * [§ D489](../../../../DECISIONS.md).
+   *
+   * Two clauses, and the first is what a settings screen draws its whole *there is nowhere to sign
+   * in* arm from: the absence is a property of the **page**, decided once at boot, so it is an
+   * absent binding rather than a method that always refuses. The second is why this is a port at
+   * all — `boundaries.test.ts` permits exactly two modules to hold a leaderboard client, and
+   * handing the composition four functions is what keeps a screen from being the third.
+   */
+  it('hands the account effects through, or nothing where there is no account server', () => {
+    const h = harnessOf(base());
+    expect(createEverydayHost({ ...h.bindings }).accountActions()).toBeUndefined();
+
+    const pressed: string[] = [];
+    const actions = {
+      setEmail: (email: string) => pressed.push(`email:${email}`),
+      requestLink: () => pressed.push('link'),
+      chooseDisplayName: (name: string) => pressed.push(`name:${name}`),
+      signOut: () => pressed.push('out'),
+    };
+    const wired = createEverydayHost({ ...h.bindings, accountActions: actions });
+    const reached = wired.accountActions();
+    expect(reached).toBe(actions);
+    reached?.setEmail('someone@example.test');
+    reached?.requestLink();
+    reached?.chooseDisplayName('A player');
+    reached?.signOut();
+    expect(pressed).toEqual(['email:someone@example.test', 'link', 'name:A player', 'out']);
+  });
+
   it('asks for the key the server named, never one it worked out for itself', async () => {
     const asked: string[] = [];
     const board = await dailyBoardOf(

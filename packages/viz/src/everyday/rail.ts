@@ -39,11 +39,12 @@
  * calls that wrong, so its absence is deliberate and is asserted.
  */
 
+import type { AccountState } from '../menu/account.js';
 import type { WeekState } from '../shift/types.js';
 import { HISTORY_DAYS } from '../shift/week.js';
 
 import { EM_DASH, percentFigure } from './figures.js';
-import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE } from './profile.js';
+import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE, effectiveNameOf } from './profile.js';
 import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
 import { ENGINEER_SWAP_NOTE } from './types.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
@@ -139,6 +140,21 @@ export interface RailOptions {
         readonly avatarColor?: string | undefined;
       }
     | undefined;
+  /**
+   * The account, when there is one — `everyday/accountPort.ts#everydayAccount()`.
+   *
+   * **It outranks {@link RailOptions.profile}'s name and nothing else**, which is
+   * [§ D490](../../../../DECISIONS.md)'s whole of it: there is one display name, the account holds
+   * it while a session exists, and the device-local one answers again on sign-out. The colour is
+   * untouched — no account carries one.
+   *
+   * The card asks `profile.ts#effectiveNameOf` rather than reading `account.user.displayName`
+   * here, because `everyday/settingsView.ts` asks the same expression one click away and two
+   * readers of one question is how one of them goes stale. What keeps them together is
+   * `honesty/agreement.ts`'s `display-name` pair: the failure it catches is not this line being
+   * wrong, it is a later reader dropping the ask and being internally honest about the wrong name.
+   */
+  readonly account?: AccountState | undefined;
   /**
    * The week the host holds — `EverydayHost.week()`, read at draw time like
    * {@link RailOptions.inCampaign} rather than latched, because a career that had to be threaded
@@ -370,9 +386,10 @@ function careerLineOf(
 /**
  * § 3.2's footer.
  *
- * The identity is `everyday/profileStore.ts`'s, handed in through {@link RailOptions.profile};
- * with nothing stored the card does not invent one — the name falls back to
- * `DEFAULT_EVERYDAY_PROFILE`'s `you` on sun. **The career line is the week's**, through
+ * The identity is `everyday/profileStore.ts`'s, handed in through {@link RailOptions.profile} —
+ * **unless a session is open, in which case the account's name wins**
+ * ([§ D490](../../../../DECISIONS.md), {@link RailOptions.account}). With neither, the card does
+ * not invent one: the name falls back to `DEFAULT_EVERYDAY_PROFILE`'s `you` on sun. **The career line is the week's**, through
  * {@link RailOptions.week}, and never the profile's: the two stores are separate for the reason
  * `profile.ts` gives at length, and the defect that made this file worth reading twice was the card
  * asking the store that holds no days how many days there were. An authored fixture presented as a
@@ -382,7 +399,7 @@ function careerLineOf(
  * one.
  */
 export function railFooter(state: EverydayState, options: RailOptions = {}): RailFooter {
-  const name = options.profile?.name ?? DEFAULT_EVERYDAY_PROFILE.name;
+  const name = effectiveNameOf(options.profile, options.account);
   const streak = careerLineOf(
     options.week,
     options.dayClosed ?? false,

@@ -176,8 +176,14 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * *you cannot post to the one there is*, and the row follows it to the issue that will build
    * that: #332, the Everyday sign-in surface posting waits on. A row left pointing at #161 would
    * have kept an owner for an absence that no longer exists.
+   *
+   * **And it moved a second time, for the same reason one step later.** #332 landed
+   * ([§ D489](../../../../DECISIONS.md)), the register entry narrowed again — the sign-in half of
+   * its sentence is gone and only *nothing posts* is left — so the owner follows the remaining
+   * absence to **#221**, the issue that builds the press. A triage row still naming a closed issue
+   * is the same defect as a register naming a closed absence, one level up.
    */
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Putting your run on the daily board', issue: 332 },
+  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Putting your run on the daily board', issue: 221 },
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'third piece of advice does not open the tuner', issue: 177 },
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Endless rush', issue: 220 },
 
@@ -235,7 +241,17 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * ruling and § D447's correction rather than by this deletion.
    */
   { register: 'SETTINGS_ABSENCES', fragment: 'Post runs to the board', issue: 161 },
-  { register: 'SETTINGS_ABSENCES', fragment: 'Sign out', issue: 221 },
+  /*
+   * **`Sign out` left this table on the commit that built the control** — GitHub issue #332,
+   * [§ D489](../../../../DECISIONS.md). Its entry refused a button on the grounds that *nothing on
+   * this surface is signed in*; § 15.1's YOU section holds the session now and *Sign out* is one of
+   * its presses, so both the entry and this row go together. It is `Units`' case exactly (§ D448),
+   * and the assertion below is the one that makes the pairing checkable rather than remembered.
+   *
+   * **`Post runs to the board` above deliberately did not go with it.** It refuses a *switch* over
+   * a capability that still does not exist; sign-in does not make it false, posting does, and
+   * § D460 corrected that confusion once already.
+   */
   { register: 'SETTINGS_ABSENCES', fragment: 'Clear saved progress', issue: 229 },
 ]);
 

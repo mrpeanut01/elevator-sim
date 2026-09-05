@@ -66,6 +66,7 @@ import { BUILD_NOTES_POINTER } from './buildNotes.js';
 import { HOST_PENDING_REASON } from './host.js';
 import type { EverydayHost, EverydayHostSlot } from './host.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
+import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { everydayProfileStore } from './profileStore.js';
 import { railFooter, railModel } from './rail.js';
 import type { RailModel } from './rail.js';
@@ -987,6 +988,19 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   let careerLineDrawn: string | undefined;
 
   /**
+   * The name the `PLAYING AS` card last drew — {@link careerLineDrawn}'s twin, and a guard for the
+   * same reason.
+   *
+   * `drawRail` calls `replaceChildren`, which takes the focus off whatever rail row a keyboard
+   * player is on, and an account notification arrives on every rung of a 28.7 s wait ladder. So the
+   * rail is redrawn exactly when the name it publishes moves — which is a sign-in, a sign-out and a
+   * rename, and nothing else. Signing in while the front door is up is precisely the case a
+   * subscription-free rail would have got wrong: a `'menu'` route mounts no screen, so nothing else
+   * would ever repaint it.
+   */
+  let nameDrawn: string | undefined;
+
+  /**
    * The career line as it would be drawn **now** — one derivation, asked without touching the DOM.
    *
    * Through {@link railFooter} rather than through `rail.ts`'s own `careerLineOf`, which is
@@ -998,6 +1012,21 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     return railFooter(state, weekRailOptions()).identity.streak;
   }
 
+  /**
+   * The name the card would draw **now** — one derivation, asked without touching the DOM.
+   *
+   * Through {@link railFooter} for {@link careerLineNow}'s reason: the choice between the two names
+   * is `rail.ts`'s, made through `profile.ts#effectiveNameOf`, and a shell that reproduced it here
+   * would be the third reader of the question § D490 exists to give one answer to.
+   */
+  function railNameNow(): string {
+    const stored = profileStore.current();
+    return railFooter(state, {
+      ...(stored === undefined ? {} : { profile: { name: stored.name } }),
+      account: everydayAccount(),
+    }).identity.name;
+  }
+
   function drawRail(): void {
     rail.replaceChildren();
     const stored = profileStore.current();
@@ -1007,8 +1036,15 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       ...(stored === undefined
         ? {}
         : { profile: { name: stored.name, avatarColor: stored.avatarColor } }),
+      /*
+       * § D490's one display name. The card asks `rail.ts`, which asks `profile.ts#effectiveNameOf`
+       * — the shell does not choose between the two names here, because a third reader of that
+       * question is exactly what the pair in `honesty/agreement.ts` exists to catch.
+       */
+      account: everydayAccount(),
     });
     careerLineDrawn = model.footer.identity.streak;
+    nameDrawn = model.footer.identity.name;
 
     /* The brand block — the little lift glyph beside the two-line name, per the prototype. */
     const brand = el(doc, 'div');
@@ -1920,6 +1956,17 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   const stopProfileWatch = profileStore.subscribe(drawRail);
 
   /*
+   * § D490's other half, wired the same way and guarded like {@link connectDataHost}'s: the card
+   * draws the account's name while a session is open, so a sign-in taken on the settings screen has
+   * to reach the rail — and a sign-out has to give the device-local name back. Redrawn only when
+   * the drawn name actually moves, because this notification also fires for a link request, three
+   * wait rungs, a 429 and its expiry, none of which change a word on the rail.
+   */
+  const stopAccountWatch = onEverydayAccount(() => {
+    if (railNameNow() !== nameDrawn) drawRail();
+  });
+
+  /*
    * GitHub issue #336. Drawn once here and again on every report, because both orders happen: the
    * no-server arm publishes synchronously inside `dev/main.ts`'s boot, which on a slow mount has
    * already run by the time this shell exists, and a real redemption answers seconds later. A
@@ -1959,6 +2006,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       // The host wiring goes first: a destroyed shell must not hear another notification and
       // write a latch for a page it is no longer on.
       slotUnsubscribe?.();
+      stopAccountWatch();
       dataHostUnsubscribe?.();
       dataHost = undefined;
       /*

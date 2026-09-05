@@ -56,6 +56,7 @@ import {
   EVERYDAY_HOST,
   type EverydayHostBindings,
 } from '../everyday/host.js';
+import { publishEverydayAccount } from '../everyday/accountPort.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
@@ -66,6 +67,7 @@ import {
 import type { AccountForm } from '../menu/account.js';
 import {
   SIGNED_OUT,
+  displayNameIssueOf,
   formIssues,
   linkRequested,
   linkRetryInMsOf,
@@ -2753,6 +2755,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   function drawMenu(): void {
     renderMenu(menuRoot, menuHost);
+    /*
+     * **The Everyday world's account, published here and nowhere else** — GitHub issue #332.
+     *
+     * This is the one choke point every account write already passes through: thirteen call sites,
+     * every one of them `accountState = …; drawMenu();`. `renderAll` is not, and that is the whole
+     * reason this line is here rather than beside `everydayHostListeners` — no account path calls
+     * it, so a screen wired to the data host's `onChange` would render once and never move.
+     *
+     * It is safe to call from a *menu* draw rather than only from an account one because
+     * `everyday/accountPort.ts` publishes nothing when the state is the same object, and
+     * `menu/account.ts` returns the same object for a commit that changes nothing — GitHub issue
+     * #106's own rule, borrowed rather than re-decided. So a navigation, a slider and a re-blurred
+     * address notify no one.
+     *
+     * After `renderMenu`, on `renderAll`'s precedent: a subscriber reads the state the page has
+     * just been drawn from.
+     */
+    publishEverydayAccount(accountState);
   }
 
   /**
@@ -3795,6 +3815,60 @@ function boot(ui: Elements, resources: BrowserResources): void {
       client === undefined
         ? undefined
         : () => dailyBoardOf(() => client.boards(), (key, metric) => client.board(key, metric)),
+    /*
+     * § D489's asking half, as four calls — GitHub issue #332. `undefined` on a build served with
+     * no API origin, which is what lets the Everyday settings screen say *there is nowhere to sign
+     * in* **before** it draws a field, GitHub issue #30's own fix ordering.
+     *
+     * Every arm goes through the path the Engineer menu's own control goes through, so the two
+     * surfaces cannot drift: `updateForm` is `dispatchMenu`'s `account-form`, the submit arm is its
+     * `account-submit` including the client-side courtesy check, and the sign-out arm is its
+     * `sign-out` down to clearing the local state before the network is told. Nothing here is a
+     * second implementation of anything.
+     */
+    accountActions:
+      client === undefined
+        ? undefined
+        : {
+            setEmail: (email) => {
+              accountState = updateForm(accountState, { email });
+              drawMenu();
+            },
+            requestLink: () => {
+              const issues = formIssues(accountState);
+              if (issues.length > 0) {
+                accountState = withNotice(accountState, issues.map((issue) => issue.message).join(' '));
+                drawMenu();
+                return;
+              }
+              void askForLink(client);
+            },
+            chooseDisplayName: (name) => {
+              accountState = updateForm(accountState, { displayName: name });
+              /*
+               * `displayNameIssueOf` rather than `formIssues`, and the difference is a live defect
+               * rather than a preference. `formIssues` takes the **state** and picks the live field
+               * from it — the name only while `namingStage` holds — so a signed-in *and named*
+               * player renaming themselves would have had their empty address box validated and the
+               * rename refused with *"Enter your email address"*. That function's own docstring is
+               * why the single rule was extracted: one home, two readers, and this is the second.
+               */
+              const issue = displayNameIssueOf(name);
+              if (issue !== undefined) {
+                accountState = withNotice(accountState, issue);
+                drawMenu();
+                return;
+              }
+              void chooseDisplayName(client);
+            },
+            signOut: () => {
+              const token = accountState.token;
+              accountState = signedOut('Signed out.');
+              drawMenu();
+              // Local state first, the server second — `dispatchMenu`'s `sign-out` and its reason.
+              if (token !== undefined) void client.logout(token);
+            },
+          },
     state: () => state,
     playheadS: () => playback?.simTimeS ?? state.recording?.startedAt ?? 0,
     dayClosed: () => state.recording !== undefined && filedRunId === state.recording.runId,

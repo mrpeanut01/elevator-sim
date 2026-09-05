@@ -157,7 +157,7 @@ import {
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
 import { everydayReportViewOf } from '../everyday/reportView.js';
-import { SETTINGS_ABSENCES, settingsScreenViewOf } from '../everyday/settingsView.js';
+import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
   stageAlarmOf,
@@ -214,7 +214,15 @@ import { renderControls, renderUnsearchable, type ControlNode } from '../control
 import { casualRefusalFor, disclosureItems } from '../mode/disclosure.js';
 import { GLOSSARY_TERMS, glossaryFor } from '../mode/glossary.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
-import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '../menu/account.js';
+import {
+  SIGNED_OUT,
+  formIssues,
+  linkRequested,
+  postingRefusal,
+  rateLimited,
+  signedIn,
+  updateForm,
+} from '../menu/account.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { screenOf } from '../menu/screens.js';
 import { DEFAULT_SETTINGS, MENU_SCREENS } from '../menu/types.js';
@@ -8180,27 +8188,94 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * `units: 'imperial'` for exactly that.
      */
     'everyday/units.ts#UNITS_ROW_COPY',
+    /*
+     * § 15.1's account state — GitHub issue #332, § D489. Twelve authored strings over six arms,
+     * and every one of them is reached below: the six cases each carry a different account, so the
+     * block is swept in every state a player can load the page into rather than in whichever one a
+     * fixture happened to be in. A screen that is not in this count is a screen the search has
+     * never read, and the states a sign-in surface gets wrong are exactly its unhappy ones.
+     */
+    'everyday/settingsView.ts#SIGN_IN_COPY',
+    /*
+     * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
+     * names — § D490. Both arms are reached below: five of the six cases draw the device one, and
+     * `not-durable` is signed in and named and draws the account one. A pair of sentences with one
+     * arm driven would be the half-swept surface this adapter's own `Units` note argues about.
+     * Reached through `view.you.note` rather than imported, which is how `#UNITS_ROW_COPY` above is
+     * reached too — a `covers` entry names an expression this surface publishes, not one this file
+     * mentions.
+     */
+    'everyday/settingsView.ts#NAME_NOTE',
   ],
   render(context) {
     void context;
     const seeds: TextSeed[] = [];
 
     const stored = { name: 'A player', avatarColor: AVATAR_SWATCHES[2].color };
+    /*
+     * The six accounts the six cases below carry — one per arm of {@link SettingsSignInView}, built
+     * out of `menu/account.ts`'s own reducers rather than by hand, so a state this corpus drives is
+     * a state that module can actually produce. `SIGNED_OUT` plus a reducer is the whole of it.
+     *
+     * The two carrying a `notice` carry a **server** sentence, which is the point of the criterion
+     * they exist for: #332 asks that every failure state carry the server's own words rather than a
+     * paraphrase, and a corpus that only ever swept the happy arm would never read one.
+     */
+    const linkRefused = rateLimited(
+      SIGNED_OUT,
+      'Too many sign-in links have been asked for. Try again shortly, and check your inbox meanwhile.',
+      60_000,
+    );
+    const linkOut = linkRequested(SIGNED_OUT, {
+      detail:
+        'If that address can receive mail, a sign-in link is on its way. It works once and expires in 15 minutes.',
+      expiresInMs: 900_000,
+    });
+    const minted = signedIn(SIGNED_OUT, 'token', {
+      id: 'u1',
+      email: 'someone@example.com',
+      displayName: 'player-a1b2c3d4e5f6',
+      displayNameChosen: false,
+    });
+    const named = signedIn(SIGNED_OUT, 'token', {
+      id: 'u1',
+      email: 'someone@example.com',
+      displayName: 'A player',
+      displayNameChosen: true,
+    });
     const cases = [
+      /* No account published yet — the window this shell mounts into on every cold load. */
       ['fresh', { profile: undefined, reduceMotion: false }],
-      ['named', { profile: stored, reduceMotion: false }],
-      ['reduced', { profile: stored, reduceMotion: true }],
-      /* The still-booting window: the Motion row's absence rather than the row. */
-      ['booting', { profile: stored, reduceMotion: undefined }],
+      /* Signed out, with § D242's gate down and the server's own 429 beside it. */
+      ['named', { profile: stored, reduceMotion: false, account: linkRefused, accountServer: true }],
+      /* The link is out, carrying the 202's own sentence — the only place the expiry is worded. */
+      ['reduced', { profile: stored, reduceMotion: true, account: linkOut, accountServer: true }],
+      /*
+       * The still-booting window: the Motion row's absence rather than the row — **and** the
+       * account block's *no account server* arm, which is the same class of fact about the page and
+       * the one issue #30 says must be stated before a field is drawn.
+       */
+      ['booting', { profile: stored, reduceMotion: undefined, account: SIGNED_OUT, accountServer: false }],
       /*
        * A refused draft — `menu/account.ts`'s sentence, drawn beside the field — **and the `Units`
        * row's other face**, carried here rather than in a seventh case. The row is the only thing
        * on this screen the preference changes, so a whole extra state would seed every other
-       * sentence a second time under a different name to reach one pill.
+       * sentence a second time under a different name to reach one pill. It also carries the
+       * **naming** arm, § D241 § 7's one question over a session still holding the server's mint.
        */
-      ['refused-name', { profile: stored, draftName: 'x', reduceMotion: false, units: 'imperial' }],
-      /* A store that keeps nothing: the profile is real for this tab and says so. */
-      ['not-durable', { profile: stored, durable: false, reduceMotion: false }],
+      [
+        'refused-name',
+        {
+          profile: stored,
+          draftName: 'x',
+          reduceMotion: false,
+          units: 'imperial',
+          account: minted,
+          accountServer: true,
+        },
+      ],
+      /* A store that keeps nothing: the profile is real for this tab and says so. Signed in and named. */
+      ['not-durable', { profile: stored, durable: false, reduceMotion: false, account: named, accountServer: true }],
     ] as const;
 
     for (const [label, input] of cases) {
@@ -8214,7 +8289,30 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       seeds.push({ field: `${label}.you.name`, text: view.you.nameValue, role: 'label' });
       seeds.push({ field: `${label}.you.pictureLabel`, text: view.you.pictureLabel, role: 'label' });
       seeds.push({ field: `${label}.you.note`, text: view.you.note, role: 'prose' });
-      seeds.push({ field: `${label}.you.home`, text: view.you.home, role: 'prose' });
+      /*
+       * The account block — § D489's asking half and § 15.1's signed-in one. `fieldValue` is
+       * deliberately not seeded: it is the reader's own address, and `settingsView.ts` says why
+       * the display name beside it is a different kind of thing.
+       */
+      const signIn = view.you.signIn;
+      seeds.push({ field: `${label}.signIn.heading`, text: signIn.heading, role: 'label' });
+      seeds.push({ field: `${label}.signIn.${signIn.stage}`, text: signIn.note, role: 'prose' });
+      if (signIn.fieldLabel !== undefined) {
+        seeds.push({ field: `${label}.signIn.fieldLabel`, text: signIn.fieldLabel, role: 'label' });
+      }
+      if (signIn.action !== undefined) {
+        seeds.push({ field: `${label}.signIn.action`, text: signIn.action, role: 'label' });
+      }
+      if (signIn.notice !== undefined) {
+        /*
+         * `reason`, because it is a refusal or a confirmation the **server** wrote and this screen
+         * carries. Seeding it as prose would classify somebody else's sentence as this surface's.
+         */
+        seeds.push({ field: `${label}.signIn.notice`, text: signIn.notice, role: 'reason' });
+      }
+      if (signIn.signOut !== undefined) {
+        seeds.push({ field: `${label}.signIn.signOut`, text: signIn.signOut, role: 'label' });
+      }
       if (view.you.nameIssue !== undefined) {
         seeds.push({ field: `${label}.you.nameIssue`, text: view.you.nameIssue, role: 'reason' });
       }
