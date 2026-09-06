@@ -335,10 +335,18 @@ const DC2B_SHORT: ReadonlySet<string> = new Set([
 
 /**
  * DC-2's measured breaches — the shipped profiles that meet every bar on the tuning seeds, per stage,
- * measured 2026-09-06 on the integrated tree by the deep tier below (`ELEVATOR_SIM_DEEP=1`). A stage
- * absent here had none. See § D520 for the run.
+ * measured 2026-09-06 on the integrated tree by the deep tier below (`ELEVATOR_SIM_DEEP=1`): 45
+ * admitted cells over the ten stages, 217 s on one worker of a four-core box. A stage absent here had
+ * none. The three are `docs/33` § 3.1's three, and each is one profile: `fairness-first` on stage 3,
+ * `eta` on stage 5, `destination-panel` on stage 7. Emptying this table is C2's rebalance, by demand
+ * or fabric and never by a bar (DC-R1); a row leaves on the commit that makes it stop reproducing.
+ * See § D520 for the run.
  */
-const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.freeze({});
+const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'stage-3-overwhelmed': ['fairness-first'],
+  'stage-5-credentials': ['eta'],
+  'stage-7-prove-it': ['destination-panel'],
+});
 
 /** The shipped profiles a stage admits from its dropdown, its own baseline excluded. */
 function admittedProfilesOf(stage: CampaignStage): readonly string[] {

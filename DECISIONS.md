@@ -34113,3 +34113,43 @@ authored neighbours each sits between, and the fabric used to say which side.
 than as two integers, so a change to either table has to re-argue them. Both figures are an
 assumption with its reasoning attached — the footing `data/traffic-profiles.json`'s badge share
 sits on — and are said to be, in the table's own docstring.
+
+## D520 — The dropdown sweep is built and tiered, and its register names the three stages that still clear from the dropdown
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #234**, `docs/33` §§ 2.3, 3.3 (C2, C5)
+and § 6.
+
+**Context.** #234's acceptance has four clauses: no shipped stage clears by dispatcher selection
+alone; an automated sweep runs every dispatcher against every stage and fails the build when one
+does; each stage names its lesson; and any change is demand or fabric. The third is already true
+(`teaches` on every stage) and the fourth is `docs/33` DC-R1. The published count of stages the
+dropdown clears had gone stale three times because nothing re-derived it (C5), and § 6 specified
+the instrument in enough detail to build without a second design pass.
+
+**Decision.**
+
+1. **DC-2b runs always-on** in `campaign/difficultyCurve.test.ts`, pure: every stage must admit at
+   least two shipped profiles other than its own baseline, through the shipped `admitProfile` over
+   `editableIdsOf`, with both lists read off `data/`. Stages 8, 9 and 10 are registered short and
+   the register is checked in both directions.
+2. **DC-2 runs as a deep tier** (`ELEVATOR_SIM_DEEP=1`), in the same file, weekly in
+   `deep-tiers.yml` as `difficulty-curve` and registered in `deepTiers.test.ts`. Every admitted
+   stage × profile cell is played through `runStageToVerdict`, and the set of profiles that meet
+   every bar on the tuning seeds is matched **exactly**, per stage, against a register. A new
+   dropdown clear is red; a registered clear that stops is red; an empty sweep is red (§ 6.3
+   row 12). `metOnTuningSeeds` rather than `cleared`, for § 2.3's reason.
+3. **The register is the measurement, and it is not empty.** Run 2026-09-06 on the wave W tree,
+   45 admitted cells, 217 s on one worker of a four-core box: stage 3 clears under
+   `fairness-first`, stage 5 under `eta`, stage 7 under `destination-panel`, and no other stage
+   under anything. Those are § 3.1's three, one profile each; the sweep re-derived the published
+   count rather than inheriting it, which is C5 met.
+4. **The rebalance is not taken here.** C2 says stages 3, 5 and 7 must stop clearing, by demand or
+   fabric and never by a bar, and each is a content change that has to be re-measured on the same
+   instrument. This entry builds the instrument and states the debt; the register is where the
+   debt is held, and a row leaves on the commit that makes it stop reproducing. Until then #234's
+   first clause is unmet and says so in a test rather than a document.
+
+**Consequences.** `stageFiveClears.test.ts`'s *at least one profile clears stage 5* is unchanged,
+because it asks whether a stage can be won and this asks whether the dropdown can win it; under C2
+that assertion inverts, as § 3.3 predicts. The 45 admitted cells here are without the baseline
+arm; § 3.1's 77 counted the control on every stage.
