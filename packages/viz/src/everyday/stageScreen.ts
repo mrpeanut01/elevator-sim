@@ -78,7 +78,8 @@ import {
 } from '../live/raceStrip.js';
 import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
-import type { ActionBarModel } from './actionBar.js';
+import { actionBarFor, type ActionBarModel } from './actionBar.js';
+import { RUSH_NOT_LANDED, rushStageHeaderOf } from './rush.js';
 import type { EverydayHost } from './host.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -236,7 +237,8 @@ const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
  * it under, and the gate would go red rather than the product going quietly non-compliant — which
  * is the correct direction, and the reason no larger figure was invented to buy slack. A number
  * above 60 would have been a threshold with nothing behind it, which this file already refuses one
- * constant over (`today.ts`'s `COMFORTABLE_PER_CAR` carries a citation for exactly that reason).
+ * constant over (`today.ts`'s plate carried a cited 400 for exactly that reason, until § D514
+ * made it configuration).
  *
  * **No floor is set beneath it.** `340px` would only bind below a 567 px viewport, which is shorter
  * than anything the support matrix carries, so keeping it would have added a constant that nothing
@@ -1362,14 +1364,27 @@ function mountStage(
     const labelOf = (id: string): string =>
       recording.floors.find((floor) => floor.id === id)?.label ?? id;
 
-    const head = stageHeaderOf({
-      simTimeS,
-      recording,
-      observations,
-      dayStartS: host.dayStartS(),
-      driverName:
-        host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId,
-    });
+    const driverName = host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId;
+    /*
+     * § 9.2, GitHub issue #220: in the `rush` context the clock is held time and the pill is the
+     * wave, and the run ends where the recording crosses the hold line — the stage stops the replay
+     * there and hands the player to the result. `everyday/rush.ts` decides both; nothing is worked
+     * out here.
+     */
+    if (context.ctx === 'rush') {
+      const session = host.rush();
+      if (session?.holdAtS !== undefined && session.endedAtS === undefined && simTimeS >= session.holdAtS) {
+        playback.pause();
+        host.endRush(session.holdAtS);
+        context.go('report');
+        return;
+      }
+    }
+    const rushHead = context.ctx === 'rush' ? rushStageHeaderOf({ recording, simTimeS, driverName }) : undefined;
+    const head =
+      rushHead === undefined
+        ? stageHeaderOf({ simTimeS, recording, observations, dayStartS: host.dayStartS(), driverName })
+        : { clock: rushHead.held, phase: rushHead.wave, next: undefined, drivingLabel: rushHead.drivingLabel, driverName: rushHead.driverName, figures: rushHead.figures };
     const watching = watchingNow();
     clock.textContent = head.clock;
     /*
@@ -1387,6 +1402,8 @@ function mountStage(
     drivingName.textContent = watching?.dispatcherName ?? head.driverName;
     drawFigures(head.figures);
     drawGoals(recording, simTimeS, watching);
+    /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
+    goals.style.display = context.ctx === 'rush' ? 'none' : '';
     drawWatching(watching);
 
     const alarmLine = stageAlarmOf(observations, labelOf);
@@ -1802,7 +1819,7 @@ function mountStage(
    * *the player's day* and this is about *which flow the screen is serving* — § 18's own split, and
    * the reason `ctx` is a parameter of the screen rather than a field of the run.
    */
-  if (context.ctx !== 'watch' && stageEntryStartsARun(host.runState())) host.startRun();
+  if (context.ctx !== 'watch' && context.ctx !== 'rush' && stageEntryStartsARun(host.runState())) host.startRun();
   /*
    * The handover arm is drawn from inside this call, before any frame — `draw` returns early with
    * no recording, so without it the button would sit on the awaiting-run stage with no words on it.
@@ -1862,6 +1879,13 @@ function mountStage(
         playback?.pause();
         host.playThisCrowd(session.run);
         context.go('brief');
+        return;
+      }
+      /* § 9.2's *End the rush*: stopped by hand, at the playhead, and straight to its own result. */
+      if (context.ctx === 'rush') {
+        playback?.pause();
+        host.endRush(playback?.simTimeS ?? adopted?.startedAt ?? 0);
+        context.go('report');
         return;
       }
       playback?.pause();
@@ -2002,6 +2026,11 @@ function breathingDot(doc: Document): HTMLElement {
  */
 function stageBar(state: EverydayState): ActionBarModel {
   if (state.ctx === 'watch') return watchStageBarOf(state, watchFacts);
+  /* § 3.3's rush row is its own: one primary, *End the rush*, live once the stream has landed. */
+  if (state.ctx === 'rush') {
+    const base = actionBarFor(state);
+    return barFacts.hasRun ? base : { ...base, primary: { ...base.primary, inert: RUSH_NOT_LANDED } };
+  }
   return stageBarModelOf(state, barFacts);
 }
 

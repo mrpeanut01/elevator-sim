@@ -131,12 +131,14 @@ describe('the triage screen (§ 8.1)', () => {
     const view = towersView(inputOf(twoTowers()));
     expect(view.rows[0]?.terms).toBe('complexity 1 of 5 · 3 u a day');
 
+    /* Every shipped building is priced since § D519 (GitHub issue #169 item 4), so the refusal arm
+       is driven on a building no table names — the case that keeps the function total. */
     const unlisted: CampaignCareer = {
       ...openingCareer('eta'),
       towers: [
         freshTower({
           contractId: 'c3',
-          buildingId: 'secure-tower',
+          buildingId: 'nowhere-tower',
           dispatcherId: 'eta',
           rate: 4,
         }),
@@ -769,12 +771,11 @@ describe('§ 8.8’s offers, and the gate on ambition', () => {
     const opening = openingCareer('collective');
     const view = towersView(inputOf(opening));
     const ids = view.offers.rows.map((row) => row.contractId);
-    /* Garden Apartments is held; the two unpriced buildings are not offers at all. */
+    /* Garden Apartments is held; every other shipped building is priced since § D519 (GitHub issue
+       #169 item 4), so all seven are on the table. */
     expect(ids).not.toContain('c1');
-    expect(ids).not.toContain('c3');
-    expect(ids).not.toContain('c4');
-    expect(ids).toEqual(['c2', 'c5', 'c6', 'c7', 'c8']);
-    expect(view.offers.caption).toBe('5 offers');
+    expect(ids).toEqual(['c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']);
+    expect(view.offers.caption).toBe('7 offers');
     expect(view.offers.empty).toBeUndefined();
     for (const row of view.offers.rows) {
       expect(row.terms).toMatch(/^complexity \d of 5 · \d+ u a day$/u);

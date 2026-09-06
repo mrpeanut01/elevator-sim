@@ -48,6 +48,7 @@ import {
 } from './screenDom.js';
 import { everydayProfileStore } from './profileStore.js';
 import { drawElevation } from './elevation.js';
+import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
 import { todayOf, type TodayRecord } from './today.js';
 import {
   EVERYDAY_COLORS as C,
@@ -96,6 +97,7 @@ function mountBrief(
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
       goals: data.goalsToday(),
       seed: data.seed(),
+      firstSession: isFirstDayOnALegibleTower(data.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),
     });

@@ -39,6 +39,7 @@ import type {
   EverydayState,
   RunContext,
 } from './types.js';
+import { REPLAY_COPY } from './replay.js';
 import { MODE_PICKS } from './types.js';
 
 /** The two flows that have a § 3.3 timeline. A rush has none, and a watched run has none. */
@@ -280,6 +281,35 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     note: 'Stops the clock and writes the report.',
     inverted: false,
   }),
+  /*
+   * § 6.1's replay — GitHub issue #177 item 1, § D517. The daily rows over the same three screens,
+   * with the one thing a replay changes said on each: the day is closed and written up as any day
+   * is, and none of it counts. The timeline is the daily one, because the four steps are the same
+   * four; what differs is the week under them, which is parked.
+   */
+  row({
+    screen: 'stage',
+    ctx: 'replay',
+    guide: false,
+    leave: leave(LEAVE_TOWER),
+    back: { label: 'Brief', screen: 'brief' },
+    timeline: { flow: 'daily', step: 3 },
+    primary: primary(['Close the day']),
+    note: 'Stops the clock and writes the report. A replay is never scored.',
+    inverted: false,
+  }),
+  row({
+    screen: 'report',
+    ctx: 'replay',
+    guide: false,
+    leave: leave(LEAVE_TOWER),
+    back: { label: 'The day', screen: 'stage' },
+    timeline: { flow: 'daily', step: 4 },
+    primary: primary(['Front door']),
+    note: 'Your week is where you left it.',
+    inverted: true,
+    wayOut: '⌂ Return to Main Menu',
+  }),
   row({
     screen: 'stage',
     ctx: 'rush',
@@ -484,6 +514,14 @@ export function actionBarFor(state: EverydayState): ActionBarModel {
  */
 export function confirmStripFor(ctx: RunContext): ConfirmStrip | undefined {
   if (ctx === 'watch') return undefined;
+  if (ctx === 'replay') {
+    return {
+      question: REPLAY_COPY.leaveQuestion,
+      consequence: REPLAY_COPY.leaveConsequence,
+      leaveLabel: 'Leave it',
+      stayLabel: 'Stay',
+    };
+  }
   if (ctx === 'rush') {
     return {
       question: 'Leave the rush?',

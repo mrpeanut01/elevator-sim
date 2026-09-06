@@ -104,6 +104,18 @@ export const ENDLESS_CONTRACT_ID = 'endless';
 export const SANDBOX_CONTRACT_ID = 'sandbox';
 
 /**
+ * The contract id a week carries while an Endless rush is running — GitHub issue #220, § D515.
+ *
+ * The same mechanics as {@link ENDLESS_CONTRACT_ID}, no contract and nothing banked, and a fourth
+ * sentinel for the reason the sandbox is a third: it is a different *event*. A rush is a
+ * demonstration the player asked for from the front door, ninety minutes of a stream no building is
+ * sized for; the week they were playing is parked by `switchWeek` when it starts and resumed when
+ * they leave, so the rush's run can never be filed as a day of theirs. Nothing closes a rush week:
+ * the stage's primary in the `rush` context is *End the rush*, not *Close the day*.
+ */
+export const RUSH_CONTRACT_ID = 'rush';
+
+/**
  * The contract id a **Free Play** week carries — GitHub issue #125.
  *
  * ## Why free play needs an id of its own, which is a fact about {@link switchWeek} rather than a
@@ -170,10 +182,26 @@ export const FREE_PLAY_CONTRACT_ID = 'free-play';
  * `FIRST_CONTRACT_ID` is **not** here and must not be: it resolves, so it is a scenario rather than
  * a sentinel, and the corpus seeds it separately as the branch that *does* resolve.
  */
+/**
+ * The id of a **replay** week — § 6.1's *every past day stays playable*, GitHub issue #177 item 1,
+ * § D517.
+ *
+ * A replay is a past day of the player's week handed back to be played as the day it was: the
+ * same building at the same day's growth, the same seed, the same calendar day and its event.
+ * `everyday/replay.ts` parks the live week and opens one of these standing on that day, so the
+ * run goes through `shiftRunConfigOf` and `closeShift` untouched and every consumer that reads a
+ * week reads this one. What makes it *not count* is the id: it resolves to no contract, so
+ * {@link closeDay} banks nothing and clears nothing, the streak and the best day it keeps are the
+ * replay week's own and are discarded when the player leaves, and nothing here reaches the board.
+ */
+export const REPLAY_CONTRACT_ID = 'replay';
+
 export const WEEK_CONTRACT_SENTINELS: Readonly<Record<string, string>> = Object.freeze({
   endless: ENDLESS_CONTRACT_ID,
   sandbox: SANDBOX_CONTRACT_ID,
   'free play': FREE_PLAY_CONTRACT_ID,
+  rush: RUSH_CONTRACT_ID,
+  replay: REPLAY_CONTRACT_ID,
 });
 
 /**
@@ -203,6 +231,28 @@ export const WEEK_CONTRACT_SENTINELS: Readonly<Record<string, string>> = Object.
  */
 export function openEndless(): WeekState {
   return openWeek(ENDLESS_CONTRACT_ID);
+}
+
+/** The week an Endless rush runs on — see {@link RUSH_CONTRACT_ID}. */
+export function openRush(): WeekState {
+  return openWeek(RUSH_CONTRACT_ID);
+}
+
+
+/**
+ * A replay week standing on `day` of the week it copies — {@link REPLAY_CONTRACT_ID}.
+ *
+ * `history` is the days **before** the one being replayed, so the report's *yesterday* is the
+ * yesterday that day had. `dayIdx` is the weekday that day fell on. Nothing else is carried: a
+ * replay's streak and best day start from nothing because they are never the player's.
+ */
+export function openReplay(day: number, dayIdx: number, history: readonly DayOutcome[]): WeekState {
+  return {
+    ...openWeek(REPLAY_CONTRACT_ID),
+    day: Math.max(1, Math.floor(day)),
+    dayIdx: ((Math.floor(dayIdx) % 7) + 7) % 7,
+    history: history.filter((entry) => entry.day < day),
+  };
 }
 
 /** A fresh week on a scenario, at day 1. Nothing banked, nothing cleared, no history. */
@@ -545,10 +595,11 @@ export function takeContract(week: WeekState, contractId: string): WeekState {
 /**
  * How many weeks are kept beside the one being played, and why it is this number.
  *
- * One per contract, plus the three sentinel weeks a player can also be on —
- * {@link SANDBOX_CONTRACT_ID}, {@link ENDLESS_CONTRACT_ID} and {@link FREE_PLAY_CONTRACT_ID}. So the
- * set is *closed*: every id {@link switchWeek} can ever be asked for has a place, and the ceiling is
- * a bound on a slot rather than a policy about how much history a player may keep.
+ * One per contract, plus one per sentinel week a player can also be on — every entry of
+ * {@link WEEK_CONTRACT_SENTINELS}, which is why the count is read off that table rather than
+ * written as a number (the rush and the replay each added one). So the set is *closed*: every id
+ * {@link switchWeek} can ever be asked for has a place, and the ceiling is a bound on a slot rather
+ * than a policy about how much history a player may keep.
  *
  * It was `+ 2` until issue #125 gave free play a week of its own to leave behind. The `+ 3` is
  * derived from the same closed set rather than nudged: a sentinel that can be parked and has no slot
@@ -565,7 +616,7 @@ export function takeContract(week: WeekState, contractId: string): WeekState {
  * entries that go — oldest parked first. `persist/validate.ts#unknownContractsIn` refuses such a
  * session outright, so in practice the list never fills.
  */
-export const PARKED_WEEKS_MAX = CONTRACTS.length + 3;
+export const PARKED_WEEKS_MAX = CONTRACTS.length + Object.keys(WEEK_CONTRACT_SENTINELS).length;
 
 /** The live week and the ones parked beside it, which are only ever produced together. */
 export interface WeekSwitch {

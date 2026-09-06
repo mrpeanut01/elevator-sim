@@ -19,7 +19,8 @@
  */
 
 import { actionBarFor } from './actionBar.js';
-import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
+import type { EverydayScreenModule } from './screens.js';
+import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   rushBandViews,
   rushBarModel,
@@ -56,7 +57,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScreenHandle {
+function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedEverydayScreen {
   const doc = host.ownerDocument;
 
   const root = el(doc, 'div', 'everyday-rush');
@@ -223,11 +224,26 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   const drivingNote = el(doc, 'p', undefined, COPY.drivingNote);
   drivingNote.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
   drivingBlock.append(drivingEyebrow, driving, drivingNote);
+  /* § D478: a stream this far outside the building's band says so before it starts. */
+  const disclosureLine = context.host.rushDisclosure();
+  if (disclosureLine !== undefined) {
+    const disclosure = el(doc, 'p', 'everyday-rush-disclosure', disclosureLine);
+    disclosure.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:12px 0 0`;
+    drivingBlock.append(disclosure);
+  }
   ink.append(drivingBlock);
 
   root.append(paper, ink);
   host.append(root);
-  return {};
+  return {
+    /*
+     * § 9.1's *Start the rush* — GitHub issue #220. The run first, the context second, the brief's
+     * own order: a stage entered before a run was asked for would be a stage with nothing to play.
+     */
+    primary: () => {
+      if (context.host.startRush() === undefined) context.enterRush();
+    },
+  };
 }
 
 /**

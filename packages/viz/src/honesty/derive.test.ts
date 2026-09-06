@@ -635,6 +635,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * rather than leaving to look like the gap moving one file over.
          */
         'shift/week.ts#WEEK_CONTRACT_SENTINELS',
+        /*
+         * Reached through that table since GitHub issue #177 item 1: `PARKED_WEEKS_MAX` is its
+         * key count and `switchWeek` reads the bound, so both inherit `free play`'s two words.
+         * Neither authors a sentence. `replayPatchOf` returns a state patch keyed on ids.
+         */
+        'shift/week.ts#PARKED_WEEKS_MAX',
+        'shift/week.ts#switchWeek',
+        'everyday/replay.ts#replayPatchOf',
       ],
     },
     {
@@ -727,6 +735,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scope/types.ts#PLAY_MODES',
         'scope/surface.ts#SCOPE_OF',
         'scope/permits.ts#permits',
+        /*
+         * GitHub issue #178 item 1's two id-only exports beside it. `permittedScopes` returns
+         * members of `CHANGE_SCOPES` and authors nothing; `MODE_OF_SCREEN` maps screen ids to
+         * `PLAY_MODES` members or `null`. Both are derived only because a hyphen reads as a word
+         * break — `stage-campaign`, `free-play` — which is `commitmentOf`'s case below. The
+         * sentence the model draws is `permittedLineFor`, driven by the menu adapter.
+         */
+        'scope/permits.ts#permittedScopes',
+        'menu/affordances.ts#MODE_OF_SCREEN',
         'scope/commitment.ts#COMMITMENTS',
         'scope/commitment.ts#commitmentOf',
         /*
@@ -1392,6 +1409,26 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'campaign/incidents.ts#CAMPAIGN_INCIDENT_STREAM',
         'campaign/incidents.ts#campaignEventFor',
       ],
+    },
+    {
+      reason:
+        'A stream name and a table of measurements, not prose — GitHub issue #208, § D514. ' +
+        '`first-session` is the name `deriveStreamSeed` mixes into the first tower’s draw, and ' +
+        '`LEGIBILITY_SWEEP` is § D512’s table as data (`garden-apartments`, a count, a median), ' +
+        'from which `shift/firstSession.ts` derives the eligible set. What a player reads of the ' +
+        'draw is `FIRST_SESSION_LINE`, which `EVERYDAY_TODAY` seeds on a first day and covers.',
+      ids: [
+        'shift/firstSession.ts#FIRST_SESSION_STREAM',
+        'shift/firstSession.ts#firstSessionContractFor',
+        'shift/legibility.ts#LEGIBILITY_SWEEP',
+      ],
+    },
+    {
+      reason:
+        'A template id, not prose — GitHub issue #220, § D515. `endless-rush` names the record in ' +
+        '`data/traffic-profiles.json` and `rushPatchOf` writes it into `ViewerState.freePlay`; what ' +
+        'a player reads of the rush is `EVERYDAY_RUSH`’s result and stage header, which it seeds.',
+      ids: ['everyday/rush.ts#RUSH_TEMPLATE_ID', 'everyday/rush.ts#rushPatchOf'],
     },
     {
       reason:

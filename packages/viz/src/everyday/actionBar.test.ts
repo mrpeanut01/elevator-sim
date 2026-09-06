@@ -290,8 +290,11 @@ describe('the table matches the guide, cell for cell', () => {
     expect(dataKeys).toEqual(guideKeys);
     // The defensive row is the only non-guide one, and it is the watched report — see the module
     // docstring in actionBar.ts for why it exists and why it is not a transcription.
+    // The three non-guide rows: the watched report, and § 6.1's replay over the stage and the
+    // report (GitHub issue #177 item 1, § D517) — the guide gives the replay a door variant and no
+    // bar rows of its own, so these two are the daily rows restated with *never scored* on them.
     const extras = ACTION_BAR_ROWS.filter((row) => !row.guide);
-    expect(extras.map((row) => keyOf(row.screen, row.ctx))).toEqual(['report·watch']);
+    expect(extras.map((row) => keyOf(row.screen, row.ctx)).sort()).toEqual(['report·replay', 'report·watch', 'stage·replay']);
   });
 
   for (const guide of GUIDE_TABLE) {

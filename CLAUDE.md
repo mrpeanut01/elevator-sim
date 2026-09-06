@@ -77,15 +77,57 @@ verdict:
   of those were already wrong in the published row — the deep tier's surface count is **31**, not 30,
   because `campaign/judge.ts#judgeStage` speaks in no other tier, and *0 violations* had stopped
   being true of the deep half the day the temporal axis landed. The current figures, **measured on the
-  integrated tree after wave V** against a base that was re-measured first (the habit § D442 set);
+  integrated tree after wave W** against a base that was re-measured first (the habit § D442 set);
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **609 249** | **606** | **56** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **759 296** | **4 710** | **57** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **623 363** | **606** | **57** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **776 588** | **4 710** | **58** | **0** | **green**, and the register is empty |
+
+  **Wave W's move is 288 strings a case to within a fraction in both tiers, and one surface, and the
+  fraction is the door.** Measured on the integrated tree after wave W, both tiers in one sitting,
+  with the base at `4111655` re-measured first in a detached worktree — where it reproduced wave V's
+  published row **exactly in both tiers**, the **thirteenth** consecutive wave that has held.
+
+  | | base `4111655` | wave W | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 609 249 | **623 363** | **+14 114** | **288.04** |
+  | deep strings | 759 296 | **776 588** | **+17 292** | **288.20** |
+  | surfaces | 56 / 57 | **57 / 58** | **+1 / +1** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **The first corpus case moves by exactly 288, rendered on each tree and diffed by producer**, and
+  it sums to the string across eight adapters:
+
+  - `everyday/today.ts#todayOf` — **+132**: the door adapter now renders a third door per arm, at
+    yesterday's chip, because § D517 made that chip pressable and its note had to be swept — a whole
+    door's chips, steps, world band and primary twice over — plus § D514's first-session line.
+  - `everyday/rush.ts#rushResultViewOf` — **+62**: the new adapter, GitHub issue #220's result sheet
+    in both outcomes and the held stage header at three playheads. This is the surface the column
+    gained.
+  - `everyday/campaignModel.ts#towersView` — **+38**: two more offer cards on the campaign screen,
+    § D519's Secure Tower and Mixed-Use High-Rise, across the seeded states.
+  - `everyday/modes.ts#EVERYDAY_MODES` — **+30**: the `replay` run context's rail sublines, bar
+    rows and leave strip, swept over `RUN_CONTEXTS` as every context is.
+  - `menu/menu.ts#freePlayIssues` — **+23**: § D516's one sentence on the four menu screens inside a
+    mode, over the arms the menu adapter drives.
+  - `everyday/designerModel.ts#designerFigures` — **+6**: § D518's escalator and document copy.
+  - `shift/report.ts#dayReportOf` — **+4**.
+  - `everyday/buildNotes.ts#buildNotesViewOf` — **−7**: seven register rows out — the rush's three
+    and the shell's rush row (#220), the shell's replay row (#177 item 1), and the designer's
+    escalator and document rows (#177 item 5).
+
+  132 + 62 + 38 + 30 + 23 + 6 + 4 − 7 = 288. The tier quotients sit a fraction above 288 because
+  the door's third render is conditional on the case's week having a day to hand back, and the
+  deep tier draws a different mix of days.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: exactly one added
+  in each, `everyday/rush.ts#rushResultViewOf`, nothing removed. The deep tier's one-surface lead
+  survives and the diff names it: `campaign/judge.ts#judgeStage` is the only surface in deep and not
+  in always-on, and nothing is in always-on and not in deep.
 
   **Wave V's move is 299 strings a case in the always-on tier and 298 or 299 in the deep one, and
   the one conditional string was found by rendering every deep case rather than by reasoning about
@@ -844,7 +886,7 @@ verdict:
   the Day report and the live-metrics panel became mode-aware for GitHub issues #110 and #100, and
   both adapters now render **both** registers on every case, which is where the always-on tier's
   string count moved to 278 756. A null is a measurement of a tree, not a property of the axis)*,
-  **34 statically swept DOM entry points** are not driven *(**18** mounts and **16**
+  **35 statically swept DOM entry points** are not driven *(**18** mounts and **17**
   screen-registry rows, derived by `packages/viz/src/honesty/derive.test.ts` rather than
   transcribed, and published in this verdict as three until [§ D421](DECISIONS.md) measured it —
   the screen rows' pure halves **are** driven, so what goes unswept in both groups is only what the

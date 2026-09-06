@@ -167,6 +167,14 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
     reason: 'the 200-replication census every declared matrix ceiling and spread derives from',
     scheduled: true,
   },
+  'packages/viz/src/campaign/difficultyCurve.test.ts': {
+    gates: ['ELEVATOR_SIM_DEEP'],
+    reason:
+      'docs/33 § 6’s campaign arm, DC-2: every admitted stage × profile cell played to a verdict ' +
+      'and matched against the register of measured dropdown clears in both directions — ' +
+      'GitHub issue #234, § D520. § 6.4 measured the arm at 198 s on one worker',
+    scheduled: true,
+  },
   'packages/experiments/src/fuzz/deep.test.ts': {
     gates: ['ELEVATOR_SIM_FUZZ'],
     reason:

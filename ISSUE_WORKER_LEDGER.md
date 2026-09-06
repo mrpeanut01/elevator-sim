@@ -2430,3 +2430,72 @@ scope-note reason, `eta`'s authored sentence ordering two dispatchers on a singl
 legibility sweep's gate missing from the deep-tier table, and the annotation census. Each was fixed
 where it was found and rerun green before its push. The cost was two cancelled CI runs and the
 knowledge, again, that the wave rule about one push exists for a reason.
+
+# Wave W — 2026-09-06: one worker, six issues and items, a replay stood on a parked week, and a sweep that put its own findings in a register
+
+## W.1 The wave's shape: one worker, six issues and items, one push
+
+Wave W ran as waves T to V did: one integrator, no lanes, serial on one branch, opened in a
+worktree while wave V's pull request was open and merged on its way. Decisions D514 to D520 were
+allocated from the reservation opened before the first commit, and the block's other ten went
+unspent.
+
+| issue | what landed | decision |
+|---|---|---|
+| #208 | the first session opens on one of the five legible towers, drawn on a named stream from § D512's table, and the brief's load plate is configuration rather than a grade | § D514 |
+| #220 | Endless rush runs as a week of its own on the contract's climbing stream, ends on the hold line, and quotes the recording's own trend test; `saturation` travels on the wire at contract version 13 | § D515 |
+| #178 item 1 | the menu's affordance model: a screen inside a mode offers only the rows the mode permits, records what it withheld, and says once what it never offers; `permits.ts`'s two deleted exports arrive with their caller | § D516 |
+| #177 item 1 | § 6.1's replay: a past day handed back over a `replay` sentinel week standing on that day, the same crowd on the legs, closed as any day is and counting for nothing | § D517 |
+| #177 item 5 | escalator rows and the folded document on the designer; the class per shaft stays a stated absence | § D518 |
+| #169 item 4 | Secure Tower a 3, Mixed-Use High-Rise a 4, authored with the 400-day measurement that places them beside the contract's six; every shipped contract is now an offer | § D519 |
+| #234 | the dropdown sweep, DC-2b always on and DC-2 as a weekly deep tier, with a register that names the three stages still clearing from the dropdown | § D520 |
+
+## W.2 What the measurement refused, and what the code found
+
+**No single axis reproduces § 8.5's complexities.** The one instrument covering all eight contracts
+(`docs/33` § 4.6's 400 days) was consulted before anything was authored, and it refused to fit:
+Midtown clears no day and is a 3, Vertical City clears every goal and is a 5. So the two missing
+complexities are authored, with the measurement used only to name the neighbours each sits between.
+A fitted number would have been an invention with a decimal point.
+
+**The rush stream leaked into three lists.** `endless-rush` is a template, so the Free Play
+catalogue offered it, the day-part derivation put a ninety-minute "morning rush" on the office day
+from its 08:00, and the guide test asked to name it. A `selectable: false` field on the record now
+says what the template is for, the catalogue and `partsOfDay` honour it, and the server refuses a
+submission naming it on the code it uses for a template it does not ship.
+
+**Two template-set pins and a day-start pin named the new record.** Each was a guard that lists
+what ships; each was widened by one row with the reason, which is what those guards are for.
+
+**The rush's dead button had three browser cases pinning it, and #220 made all three false.** They
+asserted a disabled primary, a reason on the control and its geometry above the fold. The reason
+left with the engine (§ D227); the cases now pin a live button, § 3.3's note and no timeline.
+
+**The dropdown sweep re-derived the published count.** 45 admitted cells, 217 s: stage 3 under
+`fairness-first`, stage 5 under `eta`, stage 7 under `destination-panel`, nothing else. Those are
+§ 3.1's three, and the register holds them so the rebalance has to empty it row by row.
+
+## W.3 What was not built, and is said on the issues
+
+- **#177 item 4**, the two bench shapes: `BatchRequest` carries no fabric, so *a lift out of
+  service* would need an out-of-service axis threaded to `recordRun`, and *a sky lobby transfer at
+  35* needs a floor-focused demand option core does not declare. Neither is a bench change.
+- **#177 item 5's class per shaft**: a per-car class in `BuildingSpec` and in `buildingFromSpec`'s
+  car writer. Authoring-model work; the register row stays.
+- **#234's rebalance** of stages 3, 5 and 7 by demand or fabric, each re-measured on the new
+  instrument. The register is where the debt is held.
+- **#222** (board seeding) and **#346** (a service event that moves range and load) were planned
+  for this wave and not started; both go to the next.
+
+## W.4 The corpus, once after integration
+
+**Both tiers in one sitting, with the base at `4111655` re-measured first in a detached worktree,
+where it reproduced wave V's row exactly: 609 249 always-on and 759 296 deep, the thirteenth
+consecutive wave that has held.** Wave W: always-on **623 363** strings (+14 114, 288.04 a case),
+deep **776 588** (+17 292, 288.20 a case); cases, simulations and failing cases unmoved; surfaces
+**57 / 58**, exactly one added in each tier and the diff names it, `everyday/rush.ts#rushResultViewOf`.
+The first case decomposes the 288 to the string across eight adapters (the door's third render
++132, the rush sheet +62, two offer cards +38, the replay context's rail and bar +30, the menu's
+sentence +23, the designer's copy +6, the report +4, seven register rows −7); the fraction above 288
+is the door's third render being conditional on the case's week having a day to hand back. The
+full table and the decomposition are in `CLAUDE.md`'s Phase 9 row.

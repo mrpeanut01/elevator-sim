@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { permits } from './permits.js';
+import { SCOPE_WORDS, permits, permittedLineFor, permittedScopes } from './permits.js';
 import { CHANGE_SCOPES, PLAY_MODES, type ChangeScope, type PlayMode } from './types.js';
 
 /**
@@ -102,5 +102,45 @@ describe('the unions are the categories, and are small on purpose', () => {
       CHANGE_SCOPES.some((scope: ChangeScope) => permits(mode, scope)),
     );
     expect(answered).toEqual(PLAY_MODES);
+  });
+});
+
+describe('the two exports that arrived with their caller — GitHub issue #178 item 1, § D516', () => {
+  it('permittedScopes is the matrix, row by row, in the scopes’ own order', () => {
+    for (const mode of PLAY_MODES) {
+      expect(permittedScopes(mode)).toEqual(CHANGE_SCOPES.filter((scope) => permits(mode, scope)));
+    }
+  });
+
+  it('every scope has words a player reads, and they are prose rather than the id', () => {
+    for (const scope of CHANGE_SCOPES) {
+      expect(SCOPE_WORDS[scope]).toMatch(/^[a-z][a-z’ ]+$/u);
+      expect(SCOPE_WORDS[scope]).not.toContain(scope);
+    }
+  });
+
+  it('the sentence names every permitted scope in its first clause and every forbidden one in its second', () => {
+    for (const mode of PLAY_MODES) {
+      const line = permittedLineFor(mode);
+      const [may, never] = line.split('. ');
+      for (const scope of CHANGE_SCOPES) {
+        const words = SCOPE_WORDS[scope];
+        expect(may?.includes(words), `${mode}: ${scope} in the first clause`).toBe(permits(mode, scope));
+        expect(never?.includes(words) ?? false, `${mode}: ${scope} in the second clause`).toBe(!permits(mode, scope));
+      }
+    }
+  });
+
+  it('a mode that permits everything says so in one clause, and a restricted one in two', () => {
+    for (const mode of PLAY_MODES) {
+      const clauses = permittedLineFor(mode).split('. ').length;
+      expect(clauses, mode).toBe(UNRESTRICTED.includes(mode) ? 1 : 2);
+    }
+  });
+
+  it('two modes with the same row read the same sentence, and different rows differ', () => {
+    expect(permittedLineFor('ranked')).toBe(permittedLineFor('commissioning'));
+    expect(permittedLineFor('free-play')).not.toBe(permittedLineFor('ranked'));
+    expect(permittedLineFor('stage-campaign')).not.toBe(permittedLineFor('free-play'));
   });
 });

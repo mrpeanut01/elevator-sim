@@ -2,10 +2,10 @@
  * When a move on a control reaches the run — GitHub issue #104.
  *
  * Not `permits.ts`'s missing half, and the difference is worth stating because the two look alike.
- * That file's closing comment records a `refusalSentenceFor` deleted for want of a caller, and it
- * answers *may this move in this mode at all* — a question about permission, whose surface is the
- * menu's affordance model and which is still unbuilt. This one answers *what happens to the shift I
- * am watching when it does move*, which every one of these panels already permits.
+ * That file answers *may this move in this mode at all* — a question about permission, whose
+ * surface is the menu's affordance model, `menu/affordances.ts` (GitHub issue #178 item 1, § D516).
+ * This one answers *what happens to the shift I am watching when it does move*, which every one of
+ * these panels already permits.
  *
  * ## The issue, and why one note could not have answered it
  *

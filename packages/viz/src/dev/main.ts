@@ -266,6 +266,7 @@ import {
   disclosureOf,
   drivingProfileOf,
   initialState,
+  withFirstSession,
   profileById,
   resolvedBuildingOf,
   shiftRunConfigOf,
@@ -1704,6 +1705,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       loadedWithNothingRestored = restored.failure.kind === 'absent';
       if (restored.failure.kind !== 'absent') clearSession(sessionStore);
+      /*
+       * The first-ever load, and the third consumer of the same read — GitHub issue #208, § D475.
+       * A device with no session draws its first tower from the legible set on a named stream off
+       * the seed it was just given, unless the address named a building, which is the player's own
+       * choice and wins. Nothing is stored: a reload that finds a session finds the week the draw
+       * opened, and one that finds none draws again from a fresh seed, which is § D476's shape.
+       */
+      else if (!new URLSearchParams(window.location.search).has('building')) {
+        state = withFirstSession(state, resources);
+      }
       return;
     }
     menuState = {

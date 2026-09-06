@@ -166,6 +166,9 @@ describe.skipIf(!HAS_BROWSER)('the Everyday settings screen', () => {
 
     /* The consumer. § 13.2's rating plate, reached through the rail the way a player reaches it. */
     await page.click('nav.everyday-rail button:has-text("Design a building")');
+    /* § 13.3's document is a collapsed disclosure since § D518; the plate is inside it. */
+    await page.waitForSelector('.everyday-designer-document-summary', { timeout: 30_000 });
+    await page.click('.everyday-designer-document-summary');
     await page.waitForSelector('.everyday-designer-plate', { timeout: 30_000 });
     const plate = (await page.textContent('.everyday-designer-plate')) ?? '';
     expect(plate).toContain('ft/s');

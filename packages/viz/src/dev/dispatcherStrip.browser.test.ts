@@ -224,7 +224,7 @@ describe.skipIf(!HAS_BROWSER)('the dispatcher editor reports the run it started'
    * `browserTier.test.ts` now forbids a file re-declaring it.
    */
   beforeAll(async () => {
-    await page.goto(origin, { waitUntil: 'load' });
+    await page.goto(`${origin}?building=garden-apartments`, { waitUntil: 'load' });
     await page.waitForFunction(
       () => document.querySelector('canvas')?.width !== undefined,
       undefined,

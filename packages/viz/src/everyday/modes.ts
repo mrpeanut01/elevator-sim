@@ -67,11 +67,11 @@ function unlessBuilt(refusal: string, ...screens: readonly EverydayScreen[]): st
  *   other end of the file, and nothing in the repository read either sentence. A number in prose
  *   that no test derives is a number waiting to be wrong.
  * - **Endless rush** — § 9.1's setup screen is built and the tile opens onto it; what is still
- *   missing is behind it rather than in front, and the refusal moved with it. There is no climbing
- *   arrival stream, no held-time clock and no § 9.3 result, so the screen's § 3.3 primary is drawn
- *   inert with `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL` on it. That is the rule this module states
- *   below, applied in the other direction for once: where the *screen* exists and the thing behind
- *   it does not, the refusal belongs on the control that cannot act.
+ *   missing is behind it rather than in front, and the refusal moved with it — until GitHub issue
+ *   #220 built the engine (`everyday/rush.ts`, § D515) and the refusal was deleted with the gap it
+ *   named. While it stood, the rule this module states below applied in the other direction for
+ *   once: where the *screen* exists and the thing behind it does not, the refusal belongs on the
+ *   control that cannot act.
  */
 export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
   Object.freeze({
@@ -145,9 +145,9 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
      *
      * - the **register** of what the rush lacks — `buildNotes.ts`, the Settings build-information
      *   panel, since #207 put every register in one place a reader goes looking;
-     * - the **primary's** refusal — `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL`, drawn into the
-     *   § 3.3 bar beside the button it is about, which is where a refusal about a missing engine
-     *   belongs once the screen in front of it is real;
+     * - the **primary's** refusal, while there was one — drawn into the § 3.3 bar beside the button
+     *   it was about, which is where a refusal about a missing engine belongs once the screen in
+     *   front of it is real, and gone since #220 built the engine;
      * - the **standings'** fixture marker — `rushScreenModel.ts#RUSH_BESTS_FIXTURE_NOTE`, drawn by
      *   `rushScreen.ts` beside the five rows, because § 20.11 requires a fixture's marker to
      *   travel with the fixture rather than sit two clicks away.

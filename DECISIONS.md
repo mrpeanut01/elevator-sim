@@ -33868,3 +33868,288 @@ it: a figure nobody can regenerate in one call is a figure that goes stale in si
 **What this does not decide.** Whether `predictive-balanced` should ship at the optimum deadband
 rather than the authored 8 s — the verdict left the profile as authored and named the dimension
 for Phase 7 to search, and this entry makes the curve reproducible rather than moving the profile.
+
+## D514 — the first session draws from the five legible contracts on a named stream, and the plate is configuration
+
+**Date: 2026-09-06 · Owner: the integrator, wave W · Rules on: GitHub issue #208's code half under
+§ D475 and § D512, `docs/35` `PM-TT1`, `packages/viz/src/shift/firstSession.ts`, `dev/state.ts`,
+`dev/main.ts`'s boot, `everyday/today.ts`, the door.**
+
+§ D475 ruled that every eligible building can carry the first session, drawn at random, and that
+*eligible* is a measurement. § D512 made the measurement and handed this issue a table. This entry
+is the two consequences the ruling named as the work.
+
+1. **The set is derived, not typed.** `shift/legibility.ts` now carries its sweep as data beside the
+   window, and `shift/firstSession.ts#ELIGIBLE_FIRST_CONTRACT_IDS` is every contract legible on more
+   than a third of the fifty seeds: `c2`, `c3`, `c4`, `c5`, `c7`. The gated sweep refuses the constant
+   the day a fresh sweep disagrees with it. Garden Apartments, Chancery House and St Jude's are out
+   by the instrument's own count.
+2. **The draw is a named stream off the session's seed**, `first-session`, a sibling of the run's
+   `StreamSet` on `campaign/incidents.ts`'s ground, applied once by the boot on the load that
+   restored no session and was handed no building by its address. The seed is the one the door
+   prints, so the draw is reproducible from what the player can read. A reload that finds a session
+   finds the week the draw opened; one that finds none draws again from a fresh seed — nothing is
+   stored, which is § D476's shape. The address's own `building` wins, because it is the player's
+   choice.
+3. **The door says why, on the day it is true and no other.** A first day nobody has played on one
+   of the five carries a line naming the set and the measurement. It is worded to be true of a
+   player who moved to one of the five before playing, since the condition is derived from the week
+   and cannot tell the two apart, and it names no draw it cannot vouch for.
+4. **The pre-run plate no longer grades the day** — `docs/35` `PM-TT1`, its second option. The 400
+   was a citation to the prototype rather than a measurement, and *Comfortable* at `t = 0` is a
+   whole-day verdict on a screen whose point is that the day has not run. The plate now reads the
+   figure — people per working car — and says in its own words that the day shows whether that is
+   comfortable. `COMFORTABLE_PER_CAR` is deleted with its citation.
+
+**What this closes and what it does not.** #208's first three criteria are properties of the run
+and are held by `firstSession.test.ts`: every member's day 1 is legible on the pinned seeds and says
+when, and the one change that measurably helps is the report's lever path, already pinned on the
+legs. The fourth, ten first-time testers, is not a property of code (§ D349) and stays open. The
+campaign's `c1` is untouched, per § D512.
+
+**What the browser tier had to learn.** Sixteen browser files loaded the page bare and were written
+against Garden Apartments without saying so; they now name it in the address, which is the deep
+link's purpose, and the two that test a first load assert the draw instead.
+
+## D515 — Endless rush runs as a week of its own on the contract's stream, ends on the hold line, and quotes the sheet's own trend test
+
+**Date: 2026-09-06 · Owner: the integrator, wave W · Rules on: GitHub issue #220 under § D477 and
+§ D478, `data/traffic-profiles.json`'s `endless-rush` template, `packages/viz/src/everyday/rush.ts`,
+`shift/week.ts#RUSH_CONTRACT_ID`, `everyday/host.ts`, the stage, the report screen, the setup
+screen, and `contract/types.ts` version 13.**
+
+§ D477 kept the mode and specified it as a ramp against a fail state; § D478 ruled that a run outside
+its band says so. This entry is the four things a lane had to decide to build it.
+
+1. **The stream is a template plus a rate, and the rate is the building's own population.**
+   ENGINE_CONTRACT § 3.2 states the stream in persons per bucket, the same number of people on every
+   tower; a template carries shape and no rate (`docs/35` § 11 item 3, checked), so `endless-rush`
+   authors each wave's rate as intensity against wave 30's, and `rushPatchOf` writes wave 30's rate
+   converted to `arrivalRatePctPop5min` for the standing building. Each wave holds its rate for
+   150 s and climbs over its last 30, because the schema declares no step; the template's own
+   `$comment` says what that costs. The rate leaves every shipped band by design, and
+   `rushDisclosureOf` draws `fixit/parse.ts`'s sentence for it on the setup screen and the result —
+   § D478's obligation, met with the sentence already shipped for the fixit cases.
+2. **The rush is a week of its own through the ordinary run pipeline.** `RUSH_CONTRACT_ID` is a
+   fourth sentinel beside endless, sandbox and free play: the player's week is parked by
+   `switchWeek` when the rush starts and resumed when they leave, so a rush can never be filed as a
+   day, and nothing closes a rush week. The stage plays the recording as it plays any recording; no
+   second simulator, clock or playback was built.
+3. **The fail state and the hold line are the same line.** § D477's *the lobby overfills* and
+   § 20.5's *forty people standing over two minutes at once* are not competing definitions:
+   overfill without a wait clause ends a run on forty fresh arrivals, the exact reading § 20.5
+   corrects. `rushHoldAt` reads the recording at the stream's two-second buckets with the stage's own
+   band authority and names the first bucket at which the fourth band holds forty; the stage stops
+   the replay there. The player may stop earlier by hand, and the result then reports no breaking
+   point, in so many words.
+4. **The result quotes `summary.saturation` and computes no divergence of its own** (`docs/35`
+   `PM-RU3`). The diagnosis now travels on the recording (`VizSummary.saturation`, contract version
+   13), and the result names the verdict, the window, the slope and its sample count from it. The
+   hold moment is an observation of the recording, not an estimate; every figure carries its clock;
+   and the mode says *better* about nothing, since it never has two configurations to compare. No
+   *"you called it 90 s early"* is drawn, because that figure needs the across-seed spread `docs/10`
+   R12 asks for first, and the waves are one seed by design.
+
+**What this closes and does not.** The three rush entries in the build-information register and
+the shell's own rush absence leave with the engine; the standings stay #177's. Where the rush sits
+in the player's path — the bench, or minute one — is the half of `docs/35` Q3 § D477 left open, and
+this entry does not take it: the tile is where it was.
+
+## D516 — The menu's affordance model: a screen inside a mode offers only the rows the mode permits, and says once what it never offers
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #178 item 1**, `docs/16` S7.
+
+**Context.** `docs/16` S7 says *a control a mode forbids is not offered. Not offered-and-refused.*
+`scope/permits.ts` has answered *may this scope move in this mode* since § D216, and `scope/permits.ts`
+and `scope/commitment.ts` both recorded, in their own docstrings, that the surface which should ask
+it — the menu's affordance model — did not exist. Two exports written for it were deleted on the
+file's first run because `deadCode.test.ts` found no caller, which was the right call: a
+`refusalSentenceFor` with no surface is a sentence nobody reads. So the matrix could say what a mode
+forbids and every screen's rows went from their builder to the panel unasked.
+
+**Decision.**
+
+1. **`menu/affordances.ts` is the model, and it decides three things.** `MODE_OF_SCREEN` names the
+   play mode each of the eight menu screens serves, or `null` for a door between modes; it is a
+   `Record` over `MenuScreen`, so a ninth screen does not compile until somebody answers. `offeredIn`
+   splits a screen's rows into the ones the mode permits and the ones it withholds. And
+   `permits.ts#permittedLineFor` is the one sentence a screen shows in place of the controls it
+   never offers, composed from `permittedScopes` and `SCOPE_WORDS` rather than authored per mode,
+   so re-scoping a row in the matrix rewrites the sentence on the same commit (§ D227's rule that a
+   refusal is pinned by the thing it is about).
+2. **The model is applied once, in `screenOf`.** A screen inside a mode offers `offeredIn`'s
+   `offered`, records the withheld ids on the view, and appends the sentence as its last notice. A
+   door offers whatever its builder built and says nothing. `BACK` is appended after the split
+   because `presentation` is permitted everywhere, and a Back row the model could remove would be a
+   screen with no way out.
+3. **A door is not an unscoped screen.** The campaign screen's scenario pick and calendar select are
+   `between-games` rows on the way *into* `stage-campaign`, a mode that forbids `between-games`
+   once entered. Mapping that screen to the mode it opens would withhold the row that opens it. So
+   `main`, `campaign`, `settings` and `account` are doors, and the rooms are Free Play
+   (`free-play`), the challenge and the leaderboard (`ranked`) and commissioning (`commissioning`).
+4. **S7 is met by construction and checked, and those are two claims.** On every shipped screen,
+   over every state `affordances.test.ts` drives, the withheld set is empty. The filter is what makes
+   a future forbidden row disappear rather than ship; the guard is what makes it fail the build
+   rather than disappear silently. Neither alone is the clause.
+
+**Consequences.** `permittedScopes` and `SCOPE_WORDS` join `permits` in `scope/permits.ts` with the
+caller the file was waiting for. The sentence enters the honesty corpus through the menu adapter on
+four screens. `scope/commitment.ts`'s docstring stops describing the model as unbuilt. Item 2 of
+#178, `showEnergyAxis`, was closed on 2026-09-02 and is not part of this entry; `GAPS.md` § 3 says so.
+
+## D517 — A past day is handed back over a replay week: the same day, closed as any day is, counting for nothing
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #177 item 1**, GAMEPLAY § 6.1.
+
+**Context.** § 6.1 says *every past day stays playable* and *never silently rescore history*. The
+front door's week strip drew the last seven days from the day it landed and refused each with *"a
+week moves forward one day at a time and this build has no way to stand it back up"*. The
+build-information panel's register said the same thing more exactly: a tower grows through a week,
+so the same seed on a later day meets a different crowd, and nothing hands a day back. Both were
+true. § D515 then built the rush by parking the player's week and opening a sentinel one in its
+place, so a run could go through `shiftRunConfigOf` and `closeShift` untouched — and that is the
+whole of the mechanism a replay needs.
+
+**Decision.**
+
+1. **A replay is a sentinel week stood on the day** — `shift/week.ts#openReplay`, contract id
+   `replay`, joining endless, sandbox, free play and the rush in `WEEK_CONTRACT_SENTINELS`. It
+   stands on the replayed day at that day's growth, on that day's weekday, with the days before it
+   as its history, and starts every other field from nothing. The seed, building, dispatcher,
+   levers and shift length are the player's own and are not touched, so the run meets the crowd
+   the day met. `replay.test.ts` says so on the legs: a replay of day 2 produces the legs a week
+   standing on day 2 produces, and the standing day 3 does not.
+2. **It counts for nothing by construction, not by a guard.** The id resolves to no contract, so
+   `closeDay` banks nothing and clears nothing (the sandbox's own precedent); the replay week's
+   streak and best day are its own and are discarded when the player leaves; nothing here posts.
+   The parked week is put back exactly as parked. A missed day and a closed day are the same case:
+   the door says *does not count* and means it for both, and no gap in the record is filled,
+   because a replay week's outcome reaches the parked week's history never.
+3. **The loop is the daily loop.** `RunContext` gains `replay`; the door's primary on a past chip
+   inside the week hands the day to `EverydayHost.startReplay`, which stands the week up and says
+   why it cannot, and the shell enters the brief in the replay context only on its yes. The brief,
+   the stage and the report are the daily screens over the replay week; the bar's two replay rows
+   are the daily rows with *never scored* on them and are marked as not the guide's; leaving any
+   of the three for another screen leaves the replay and puts the week back. A chip from before
+   the week began stays inert with the reason.
+4. **The parked-week bound is read off the sentinel table** rather than written as `+ 3`, which
+   had already been wrong by one since the rush.
+
+**Consequences.** The door's replay refusal, the shell register's replay row and the two docstrings
+that said the build had no replay leave on this commit (§ D227). `watchStage.ts`'s *play this
+crowd* refusal on another day's row stays, because that control sets up a crowd on the standing
+week and the standing week is on another day; its docstring now points at the door.
+
+## D518 — The designer writes escalator rows and folds its document; a class per shaft stays a stated absence
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #177 item 5**, GAMEPLAY § 13.3.
+
+**Context.** `DESIGNER_ABSENCES` named three things § 13 asks for that the board did not draw. Two
+of them had their mechanism already: `BuildingSpec.transportModes` is carried through a save and
+written into the building by `buildingFromSpec`, `authoring.test.ts` holds that an escalator
+changes the run on the legs, and the Engineer editor authors one with a button; and the
+specification block printed everything § 13.3's *document* prints, without the fold. The third has
+no mechanism: a design carries one class, one rated speed and one rated load for the whole
+building, so a picker on each shaft would be five controls writing one field — § D219's class.
+
+**Decision.**
+
+1. **An escalators panel on the designer** — `designerScreen.ts#drawEscalatorPanel`. One row per
+   machine the design carries, with its two floors, its seconds a landing and `remove`; and
+   `+ escalator`, seeded exactly as the Engineer editor seeds one (the lowest sky floor and the
+   level above it, or the lobby and floor 1, at EN 115-1's seconds for the rise). The writers are
+   the spec's own (`withTransportEnd`, `withTransportSeconds`, `nextTransportModeId`,
+   `escalatorSecondsFor`), so the two surfaces cannot disagree about what a row means. A loaded
+   stair is drawn and not editable, with the reason, because its climb and descent are two numbers
+   and there is one box (§ D227).
+2. **The specification block is a `<details>` fold**, collapsed by default as § 13.3 draws it, with
+   the heading and its *nothing here is scored* note outside so the block says what it is before it
+   is opened.
+3. **The class-per-shaft row stays**, in the register, in the words it had. Building it means a
+   per-car class in `BuildingSpec` and in `buildingFromSpec`'s car writer, which is authoring-model
+   work rather than a control, and this entry does not take it.
+
+**Consequences.** Two rows leave `DESIGNER_ABSENCES` on the commit that made them false, and the
+build-information panel's floor follows them down. The words are `DESIGNER_COPY`'s, driven by the
+designer's adapter where the rest of that board's are.
+
+## D519 — Secure Tower is a 3 and Mixed-Use High-Rise a 4: authored, with the measurement that places them beside the six the contract authored
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #169 item 4**, GAMEPLAY § 8.5.
+
+**Context.** § 8.5 gives seven buildings a complexity and this repository ships six of them; the
+seventh, Ashgate, is nobody's. `secure-tower` and `mixed-use-high-rise` therefore read
+`complexity —`, were not offered under § 8.8, and could not be renewed at a rate: a stated gap,
+kept rather than defaulted because a 3 nobody measured would have priced a renewal from nothing.
+The issue calls that *correct, and a content gap*.
+
+**What was measured first, and what it refused.** `docs/33` § 4.6's 400-day cell is the one
+measurement that covers all eight contracts on one instrument: each contract's day 1 under
+`collective`, seeds `20 260 824 + 7 919 n`, with days cleared and work per delivered leg per
+contract. The authored six are not monotone in either figure. Midtown Office clears 0 of 50 days
+and is a 3; Vertical City clears every goal on every seed and is a 5; Garden Apartments clears 49
+and is a 1. So complexity is the contract's judgement of the fabric a player has to understand,
+and a number fitted to a clear rate would have been an invention with a decimal point. § D256's
+rule against a plausible sentence in place of a measurement cuts the other way here too: the
+measurement exists, and it says the axis is not the one being asked for.
+
+**Decision.** The two are **authored**, with the two measured figures used only to say which
+authored neighbours each sits between, and the fabric used to say which side.
+
+- **Secure Tower — 3.** Days cleared 24/50 against Crown Hotel's 25/50 (a 3); work per ride
+  60.1 kJ against Chancery House's 57.4 (a 2). Two banks off one lobby and five access zones — the
+  only shipped building whose credentials bite (§ D265) — is more to understand than either, so it
+  takes the higher neighbour.
+- **Mixed-Use High-Rise — 4.** Days cleared 0/50 like Midtown Office (a 3); work per ride 131.8 kJ,
+  the most of any shipped building and above Vertical City's 82.8 (a 5). Three banks and a sky lobby
+  sit between those two fabrics, so it takes the step between them, and Vertical City keeps the 5
+  the contract gave it.
+- **Fees follow § D510's rule**, complexity plus two: 5 u and 6 u a day. Every shipped contract is
+  now offerable, and `offersUnpriced` leaves `TOWERS_COPY` on the commit that made it false
+  (§ D227). `career.ts#offerRefusalOf`'s `unpriced` arm stays, because the function is total over
+  ids and a building no table names must still be refused rather than defaulted.
+
+**Consequences.** `economy.test.ts` pins the placements as relations to their neighbours rather
+than as two integers, so a change to either table has to re-argue them. Both figures are an
+assumption with its reasoning attached — the footing `data/traffic-profiles.json`'s badge share
+sits on — and are said to be, in the table's own docstring.
+
+## D520 — The dropdown sweep is built and tiered, and its register names the three stages that still clear from the dropdown
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #234**, `docs/33` §§ 2.3, 3.3 (C2, C5)
+and § 6.
+
+**Context.** #234's acceptance has four clauses: no shipped stage clears by dispatcher selection
+alone; an automated sweep runs every dispatcher against every stage and fails the build when one
+does; each stage names its lesson; and any change is demand or fabric. The third is already true
+(`teaches` on every stage) and the fourth is `docs/33` DC-R1. The published count of stages the
+dropdown clears had gone stale three times because nothing re-derived it (C5), and § 6 specified
+the instrument in enough detail to build without a second design pass.
+
+**Decision.**
+
+1. **DC-2b runs always-on** in `campaign/difficultyCurve.test.ts`, pure: every stage must admit at
+   least two shipped profiles other than its own baseline, through the shipped `admitProfile` over
+   `editableIdsOf`, with both lists read off `data/`. Stages 8, 9 and 10 are registered short and
+   the register is checked in both directions.
+2. **DC-2 runs as a deep tier** (`ELEVATOR_SIM_DEEP=1`), in the same file, weekly in
+   `deep-tiers.yml` as `difficulty-curve` and registered in `deepTiers.test.ts`. Every admitted
+   stage × profile cell is played through `runStageToVerdict`, and the set of profiles that meet
+   every bar on the tuning seeds is matched **exactly**, per stage, against a register. A new
+   dropdown clear is red; a registered clear that stops is red; an empty sweep is red (§ 6.3
+   row 12). `metOnTuningSeeds` rather than `cleared`, for § 2.3's reason.
+3. **The register is the measurement, and it is not empty.** Run 2026-09-06 on the wave W tree,
+   45 admitted cells, 217 s on one worker of a four-core box: stage 3 clears under
+   `fairness-first`, stage 5 under `eta`, stage 7 under `destination-panel`, and no other stage
+   under anything. Those are § 3.1's three, one profile each; the sweep re-derived the published
+   count rather than inheriting it, which is C5 met.
+4. **The rebalance is not taken here.** C2 says stages 3, 5 and 7 must stop clearing, by demand or
+   fabric and never by a bar, and each is a content change that has to be re-measured on the same
+   instrument. This entry builds the instrument and states the debt; the register is where the
+   debt is held, and a row leaves on the commit that makes it stop reproducing. Until then #234's
+   first clause is unmet and says so in a test rather than a document.
+
+**Consequences.** `stageFiveClears.test.ts`'s *at least one profile clears stage 5* is unchanged,
+because it asks whether a stage can be won and this asks whether the dropdown can win it; under C2
+that assertion inverts, as § 3.3 predicts. The 45 admitted cells here are without the baseline
+arm; § 3.1's 77 counted the control on every stage.

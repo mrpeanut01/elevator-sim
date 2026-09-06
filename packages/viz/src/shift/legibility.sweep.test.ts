@@ -21,7 +21,7 @@ import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import type { BrowserResources } from '../dev/data.js';
 
 import { CONTRACTS } from './contracts.js';
-import { legibilityOf } from './legibility.js';
+import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 
 const SEEDS = Number(process.env['LEGIBILITY_SEEDS'] ?? '50');
 
@@ -43,6 +43,7 @@ describe.runIf(process.env['LEGIBILITY_SWEEP'] === '1')('the legibility sweep â€
   it('publishes the fraction of seeds with a legible landing per contract, day 1, collective', () => {
     const resources = allBuildings();
     const lines: string[] = ['| contract | building | legible seeds | of | median longest stretch (s) | per seed |', '|---|---|---|---|---|---|'];
+    const measured: Record<string, { legibleOf50: number; medianStretchS: number }> = {};
     for (const contract of CONTRACTS) {
       const longest: number[] = [];
       let legible = 0;
@@ -63,10 +64,17 @@ describe.runIf(process.env['LEGIBILITY_SWEEP'] === '1')('the legibility sweep â€
       }
       const sorted = [...longest].sort((a, b) => a - b);
       const median = sorted[Math.floor((sorted.length - 1) / 2)] ?? 0;
+      measured[contract.id] = { legibleOf50: legible, medianStretchS: Math.round(median) };
       lines.push(`| ${contract.id} | ${contract.buildingId} | ${String(legible)} | ${String(SEEDS)} | ${median.toFixed(0)} | ${longest.map((value) => value.toFixed(0)).join(' ')} |`);
     }
     const out = process.env['LEGIBILITY_OUT'];
     if (out !== undefined) writeFileSync(out, `${lines.join('\n')}\n`);
     expect(lines.length).toBe(CONTRACTS.length + 2);
+    /* The constant beside the window is this sweep as data; at the published budget it must agree. */
+    if (SEEDS === 50) {
+      expect(measured).toEqual(
+        Object.fromEntries(LEGIBILITY_SWEEP.map((row) => [row.contractId, { legibleOf50: row.legibleOf50, medianStretchS: row.medianStretchS }])),
+      );
+    }
   }, 3_600_000);
 });

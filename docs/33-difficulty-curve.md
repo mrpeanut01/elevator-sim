@@ -1711,7 +1711,10 @@ over § 4.6's own 400 days — every contract's day 1 under `collective`, seeds 
 `n = 0…49` — and the table lives beside the constant. The reading that matters here: Garden
 Apartments is legible on **0 of 50** seeds, Chancery House on 2 and St Jude's on 1, so § D475's
 *eligible* set for a first session is measured rather than assumed, and it excludes the building
-the campaign opens on. No interval, because no arms are compared (§ 6.5).
+the campaign opens on. No interval, because no arms are compared (§ 6.5). **The set is now read by
+code**: `shift/legibility.ts#LEGIBILITY_SWEEP` carries this table as data, `shift/firstSession.ts`
+derives the five from it, and a first session draws one of them on a named stream
+([§ D514](../DECISIONS.md)).
 
 ### 6.5 Two things the sweep is not allowed to do
 

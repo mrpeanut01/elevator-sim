@@ -106,7 +106,9 @@ export const WATCH_ROWS_LOADING = 'Reading the reference runs…';
  * Matching the building and the seed is not enough and it is worth being exact about why: two runs
  * of one seed on one building on **different week days** meet different crowds, because the
  * population the arrivals are drawn against has grown. That is the whole of § 6.1's replay
- * (GitHub issue #177), which this build has not got.
+ * (GitHub issue #177 item 1), which since § D517 the front door's week strip offers over a week
+ * stood back on the day — `everyday/replay.ts`. This control stays a refusal because it sets up
+ * a crowd on the *standing* week, and the standing week is on another day.
  */
 export function playThisCrowdRefusalFor(
   /**

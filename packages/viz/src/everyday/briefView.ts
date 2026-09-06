@@ -316,7 +316,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
     load:
       today.load === undefined
         ? undefined
-        : { heading: 'HOW HARD THIS LOOKS', word: today.load.word, note: today.load.note },
+        : { heading: 'THE CROWD, AS CONFIGURED', word: today.load.word, note: today.load.note },
     wrinkle: {
       heading: 'TODAY’S WRINKLE',
       title: today.wrinkle.name,

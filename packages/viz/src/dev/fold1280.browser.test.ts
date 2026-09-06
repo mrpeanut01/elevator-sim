@@ -74,7 +74,7 @@ const VIEWPORT = { width: 1280, height: 800 };
 /** A loaded page on the Engineer stage, boot's own run on it. */
 async function stagePage(): Promise<Page> {
   const page = await openPage(browser, { viewport: VIEWPORT });
-  await page.goto(origin, { waitUntil: 'load' });
+  await page.goto(`${origin}?building=garden-apartments`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });

@@ -559,6 +559,8 @@ export const trafficProfilesSchema = z
         durationMin: positive,
         reportWindow: z.string().optional(),
         shape: z.string().optional(),
+        // A stream a mode owns and no list offers — `endless-rush`, GitHub issue #220. Absent is yes.
+        selectable: z.boolean().optional(),
         discardFirstMin: nonNegative.optional(),
         discardLastMin: nonNegative.optional(),
         directionalSplitAtStart: directionalSplitSchema.optional(),

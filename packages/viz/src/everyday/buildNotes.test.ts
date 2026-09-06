@@ -76,8 +76,11 @@ describe('the build-information panel', () => {
     // settings rows the register used to refuse, and 15 → 12 when GitHub issue #171 emptied the
     // stage's register and #169 item 1 took the campaign's incidents entry (§ D507): a register
     // whose entries only ever fall is what § D370's queue reading predicts, so the floor follows it
-    // down rather than standing over it.
-    expect(view.entryCount).toBeGreaterThan(12);
+    // down rather than standing over it — and 12 → 9 when GitHub issue #220 built the rush's
+    // engine (§ D515) and three of the rush register's four entries left with it — and 9 → 8 when
+    // GitHub issue #177 item 1 handed a past day back over a replay week (§ D517), and 8 → 6 when
+    // item 5 wrote the designer's escalator rows and folded its document (§ D518).
+    expect(view.entryCount).toBeGreaterThan(6);
   });
 
   it('says which build it is, in a sentence the corpus sweeps — GitHub issue #246', () => {
@@ -189,7 +192,6 @@ interface TriagedAbsence {
  */
 const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /* The shell — the front door, the week strip, the boards, the report's levers. */
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Replaying a past day', issue: 177 },
   /*
    * **This row's fragment and its owner both moved, and neither moved on its own.** It read
    * `'The daily board'` against #161 — the umbrella issue for everything that needed a server,
@@ -206,7 +208,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * is the same defect as a register naming a closed absence, one level up.
    */
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Putting your run on the daily board', issue: 221 },
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Endless rush', issue: 220 },
 
   /*
    * The stage. The camera was #283's, held there while it was open whether the whole-building
@@ -231,10 +232,11 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * was internally honest, and only the pair was wrong.
    */
 
-  /* The rush. Three of the four are one issue, because they are one missing engine. */
-  { register: 'RUSH_ABSENCES', fragment: 'the climbing stream', issue: 220 },
-  { register: 'RUSH_ABSENCES', fragment: 'a rush stage of its own', issue: 220 },
-  { register: 'RUSH_ABSENCES', fragment: 'a result screen of its own', issue: 220 },
+  /*
+   * The rush. Three of its four entries were one issue, because they were one missing engine, and
+   * GitHub issue #220 built it (§ D515): the climbing stream, the held-time stage and the result
+   * screen left the register on that commit. The standings are #177's and stay.
+   */
   { register: 'RUSH_ABSENCES', fragment: 'the standings', issue: 177 },
 
   /*
@@ -245,8 +247,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * pointing at two more issues.
    */
   { register: 'DESIGNER_ABSENCES', fragment: 'a machine class per shaft', issue: 177 },
-  { register: 'DESIGNER_ABSENCES', fragment: 'escalator rows', issue: 177 },
-  { register: 'DESIGNER_ABSENCES', fragment: 'the folded-up specification', issue: 177 },
 
   /*
    * The campaign. The incidents row — *"Incidents here are the two the building implies"*, issue

@@ -58,7 +58,9 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { collectSearchSpace } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { parseCampaign, type CampaignContext } from './parse.js';
+import { useCampaignFixture } from './campaign.test-helper.js';
+import { admitProfile } from './dimensions.js';
+import { editableIdsOf, parseCampaign, type CampaignContext } from './parse.js';
 import type { Campaign, CampaignStage } from './types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { isPerReplicationGoal, type GoalKind } from '../scenario/goals.js';
@@ -295,4 +297,111 @@ describe('the derivation reads the rates it claims to read', () => {
     });
     expect(failableGoalsOf(registered, mutated)).toEqual([]);
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * DC-2b, always-on, and DC-2, deep — GitHub issue #234, docs/33 § 6, § D520
+ * -------------------------------------------------------------------------- */
+
+/**
+ * § 6's campaign arm, the two dropdown rules. Both iterate `parseCampaign(data/campaign.json).stages`
+ * × `data/dispatcher-profiles.json` through the shipped `admitProfile`, and neither list is written
+ * down (§ 6.2). DC-2b is pure and always on; DC-2 plays every admitted cell through the shipped
+ * `runStageToVerdict` and sits behind `ELEVATOR_SIM_DEEP=1` — § 6.4 measured the arm at 198 s on one
+ * worker, which is far too slow for the suite somebody runs on every save and inside a CI job.
+ *
+ * ## The registers, and why each is checked in both directions
+ *
+ * `honesty.test.ts`'s `OUTSTANDING` precedent, § 6.3 rows 5 and 6: a stage in a register must still
+ * breach, and a stage that breaches must be in it. {@link DC2B_SHORT} is § 3.1's DC-2b column — the
+ * three stages whose `editable` list admits fewer than two profiles other than their own baseline.
+ * {@link DROPDOWN_CLEARS} is the deep tier's measurement: for each stage, exactly the shipped
+ * profiles that meet every bar on the tuning seeds from the dropdown, `metOnTuningSeeds` and not
+ * `cleared`, because DC-2 asks whether the dropdown can meet the bars at all (§ 2.3). A stage with no
+ * entry must have none; a fourth clearer on a registered stage is red; a registered clearer that
+ * stops clearing is red, and the entry is deleted on the commit that made it stop. So the register
+ * is #234's *fails the build* clause with the measured breaches named rather than hidden: the
+ * rebalance (docs/33 C2, by demand or fabric, never a bar) empties it row by row, and nothing can
+ * quietly reintroduce a clear. The pinned sets are stated as measured, with the tree, in § D520.
+ */
+const fixture = useCampaignFixture();
+
+/** § 3.1's DC-2b column, measured 2026-09-06: two admit only their own baseline, one admits one other. */
+const DC2B_SHORT: ReadonlySet<string> = new Set([
+  'stage-8-the-headline-address',
+  'stage-9-both-ways-at-once',
+  'stage-10-the-bed-and-the-visitor',
+]);
+
+/**
+ * DC-2's measured breaches — the shipped profiles that meet every bar on the tuning seeds, per stage,
+ * measured 2026-09-06 on the integrated tree by the deep tier below (`ELEVATOR_SIM_DEEP=1`): 45
+ * admitted cells over the ten stages, 217 s on one worker of a four-core box. A stage absent here had
+ * none. The three are `docs/33` § 3.1's three, and each is one profile: `fairness-first` on stage 3,
+ * `eta` on stage 5, `destination-panel` on stage 7. Emptying this table is C2's rebalance, by demand
+ * or fabric and never by a bar (DC-R1); a row leaves on the commit that makes it stop reproducing.
+ * See § D520 for the run.
+ */
+const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'stage-3-overwhelmed': ['fairness-first'],
+  'stage-5-credentials': ['eta'],
+  'stage-7-prove-it': ['destination-panel'],
+});
+
+/** The shipped profiles a stage admits from its dropdown, its own baseline excluded. */
+function admittedProfilesOf(stage: CampaignStage): readonly string[] {
+  const baseline = fixture.requireProfile(stage.dispatcher.startingProfileId);
+  const editable = editableIdsOf(stage.dispatcher.editable, fixture.space.ids);
+  return fixture.config.dispatcherProfiles.profiles
+    .filter((candidate) => candidate.id !== baseline.id)
+    .filter((candidate) => admitProfile(fixture.space, baseline, candidate, editable).admissible)
+    .map((candidate) => candidate.id);
+}
+
+describe('DC-2b — a stage admits at least two profiles other than its own baseline, or is registered short', () => {
+  it('holds on every unregistered stage, and every registered stage is still short', () => {
+    const shortStages: string[] = [];
+    let admittedCells = 0;
+    for (const stage of fixture.campaign.stages) {
+      const admitted = admittedProfilesOf(stage);
+      admittedCells += admitted.length;
+      if (admitted.length < 2) shortStages.push(stage.id);
+    }
+    /* § 6.3 row 12: the sweep found something to check. */
+    expect(fixture.campaign.stages.length).toBeGreaterThan(0);
+    expect(admittedCells).toBeGreaterThan(0);
+    expect(new Set(shortStages)).toEqual(DC2B_SHORT);
+  });
+
+  it('names only stages the campaign ships', () => {
+    const ids = new Set(fixture.campaign.stages.map((stage) => stage.id));
+    for (const id of DC2B_SHORT) expect(ids.has(id), id).toBe(true);
+    for (const id of Object.keys(DROPDOWN_CLEARS)) expect(ids.has(id), id).toBe(true);
+  });
+});
+
+describe.skipIf(process.env['ELEVATOR_SIM_DEEP'] !== '1')('DC-2 — no stage clears from the dispatcher dropdown alone, beyond the register', () => {
+  it('plays every admitted cell and matches the register in both directions', async () => {
+    const measured: Record<string, string[]> = {};
+    let cells = 0;
+    const lines: string[] = [];
+    for (const stage of fixture.campaign.stages) {
+      const admitted = admittedProfilesOf(stage);
+      const met: string[] = [];
+      for (const id of admitted) {
+        cells += 1;
+        const attempt = await fixture.playToVerdict(stage, id);
+        if (attempt.verdict.metOnTuningSeeds) met.push(id);
+      }
+      if (met.length > 0) measured[stage.id] = met;
+      lines.push(`${stage.id}: admitted ${String(admitted.length)}, met on tuning seeds ${met.length === 0 ? 'none' : met.join(' ')}`);
+    }
+    process.stderr.write(`DC-2 sweep over ${String(cells)} admitted cells\n${lines.join('\n')}\n`);
+    expect(cells, 'the sweep admitted no cell at all').toBeGreaterThan(0);
+    const expected = Object.fromEntries(
+      Object.entries(DROPDOWN_CLEARS).map(([id, ids]) => [id, [...ids].sort()]),
+    );
+    const got = Object.fromEntries(Object.entries(measured).map(([id, ids]) => [id, [...ids].sort()]));
+    expect(got, 'the register and the measurement disagree — a new dropdown clear, or a registered one that stopped').toEqual(expected);
+  }, 3_600_000);
 });

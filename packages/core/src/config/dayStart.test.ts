@@ -140,9 +140,14 @@ const SHIPPED_HOURS: Readonly<Record<string, string | null>> = {
   // 08:00 and nothing was chosen. Its evening hold sits at 17:30 — the same instant
   // `office-down-peak`'s 17:15 places — so the day invents no hour of its own at all.
   'office-day': '08:00',
+  // `endless-rush` is a mode's own stream (GitHub issue #220, § D515) and 08:00 is the hour its
+  // record argues for: the contract states the stream from its own first second, and the stage's
+  // clock has to open somewhere, so it opens where the office day does. No list offers it
+  // (`selectable: false`), so the hour reaches a clock and never a menu.
+  'endless-rush': '08:00',
 };
 
-describe('the shipped reference data authors six hours and deliberately omits one', () => {
+describe('the shipped reference data authors seven hours and deliberately omits one', () => {
   it('every template declares the hour its comment argues for, or none', async () => {
     const config = await load();
     const measured: Record<string, string | null> = {};

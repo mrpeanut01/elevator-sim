@@ -31,9 +31,10 @@ const TODAY: TodayRecord = {
   } as TodayRecord['wrinkle'],
   outOfService: { badge: 'car-c', sentence: 'Car car-c is out of service today.' },
   facts: [{ label: 'Floors', value: '14 above ground' }],
-  load: { word: 'Busy', note: '590 people per working car today. Comfortable is around 400.' },
+  load: { word: '590 per working car', note: '1,180 people and 2 working cars today, as the building is configured. The day shows whether that is comfortable; this plate does not grade it.' },
   asks: ['Carry 90% of the people who turn up', 'Nobody waits longer than 120 s'],
   seedLine: 'tower chancery-house · crowd 424242 · everyone identical',
+  firstSessionLine: undefined,
   driver: 'Steady hand',
 };
 
@@ -223,7 +224,7 @@ describe('everything else on the card is the day record’s, unedited', () => {
   it('carries the facts, the load reading and the strip straight through', () => {
     const view = viewOf();
     expect(view.facts).toBe(TODAY.facts);
-    expect(view.load?.word).toBe('Busy');
+    expect(view.load?.word).toBe('590 per working car');
     expect(view.outOfService?.badge).toBe('car-c');
     expect(view.seedLine).toBe(TODAY.seedLine);
   });

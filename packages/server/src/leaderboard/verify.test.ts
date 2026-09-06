@@ -511,6 +511,22 @@ describe('the one intervention kind a submission may not carry, and the switch t
     if (!verification.ok) expect(verification.code).toBe('unknown-dispatcher');
   });
 
+  it('refuses a run under a template no list offers, on the code the board uses for one it does not ship', () => {
+    // `endless-rush` declares `selectable: false` (GitHub issue #220): a mode's own stream, which no
+    // shipped surface lets a player choose or post under. Refused before anything simulates.
+    const rush = config.trafficProfiles.demandTemplates.find((entry) => entry.selectable === false);
+    expect(rush, 'the shipped data carries at least one unselectable template').toBeDefined();
+    const verification = verifySubmission(
+      {
+        run: { ...RUN, demandTemplateId: rush?.id ?? '' },
+        claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+      },
+      resources,
+    );
+    expect(verification.ok).toBe(false);
+    if (!verification.ok) expect(verification.code).toBe('unknown-template');
+  });
+
   it('refuses an incident answer, because the incident it answers is not on the wire', () => {
     /*
      * Not a missing field: a missing **cause**. `viz`'s `shift/incidents.ts` writes the day's

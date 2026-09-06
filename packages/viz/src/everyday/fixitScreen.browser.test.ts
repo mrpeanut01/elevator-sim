@@ -65,7 +65,7 @@ afterAll(async () => {
 /** A cold load, waited out to the point where the Engineer menu has been dismissed. */
 async function coldLoad(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-  await page.goto(origin, { waitUntil: 'load' });
+  await page.goto(`${origin}?building=garden-apartments`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
     undefined,
