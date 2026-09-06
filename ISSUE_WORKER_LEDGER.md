@@ -2142,3 +2142,96 @@ hit**, and named the fix as the integrator opening `OPEN_RESERVATION`. That was 
 integrated tree is green: **24 files, 236 passed, 6 skipped, exit 0**. A lane that predicts the
 integrator's failure and declines to fix it from inside its own branch is the division of labour
 § D343 asks for, arriving on a lane rather than being imposed on one.
+
+## T.1 The wave's shape: one worker, thirteen issues, one push
+
+Wave T ran differently from every wave since H. There was no dispatch, no lane board and no
+conflict map, because one integrator worked the batch serially on one branch, with two lanes
+(#329 and #356) delegated to worktrees and merged by hand. The owner's brief was *"get a batch of
+10 to 20 committed, and execute a single PR and merge, then continue"*, and the push agreement was
+kept: seventeen commits, one push.
+
+| issue | what landed | decision |
+|---|---|---|
+| #349 | `fixit/parse.ts` refuses a population patch on the three fabric roles, permits it on the diagnosed repair, and the pair's basis line says the crowd changed | § D497 |
+| #350 | `record/crowd.ts`: the crowd is the first legs on `(passengerId, arrivedAt, originFloorId, finalDestinationFloorId)`, asserted at three sites; schema 11 | § D498 |
+| #351 | a symptom is a sight (two cases rewritten); the demand declaration is derived from the rate and the band, never authored | § D499 |
+| #352 | a fourth intervention, *spread the cars*, on both shells, the wire and the server | docstring, § D405 |
+| #146 | the Engineer editor's cost line has a Basic register, read at all four print sites | § D495 (wave S) |
+| #225, #277 | Sandbox is a state: the door label, `docs/12` § 4.13, the GAPS row deleted, P3 re-adjudicated | § D496 (wave S) |
+| #229 | Default speed is a row; Clear saved progress clears both slots on a second press and seals the session first | § D500 |
+| #338 | a handover travels to the board as a shipped id plus rule rows; the incident answer stays refused | § D486 (wave S) |
+| #329 | the blocker check, scheduled daily and asserted without the network | § D485 (wave S) |
+| #348 | Fix a building opens on the as-built run, played, before the four figures | docstring, § D405 |
+| #246 | the bundle carries its commit; the panel and every recording say it; `RELEASE_NOTES.md` | § D501 |
+| #356 | `campaign.test.ts` split by the batch each case reads; the census reads helpers | § D502 |
+
+## T.2 Three issue premises that were false, found by building the thing as asked
+
+The pattern wave S named as its lesson held three more times, and each time the refutation came
+from running the requested check once rather than from reading the code.
+
+**#349** asked for a blanket refusal of `floorPopulations` in a repair patch. Written and run over
+the shipped cases, it refused three, and each was the case's diagnosed repair and its whole lesson.
+The refusal is narrowed to the roles that are purchases.
+
+**#350** asked for a four-field key over every leg. It came back *different* on all seven cases in
+the three transfer buildings while the repairs touched no population. A transfer leg's `arrivedAt`
+is the dispatcher's, and a zoning repair moves a first leg's destination without moving the
+journey's. The key is the first legs on the journey's end, and the recording grew two fields to
+carry that.
+
+**#351** asked for an authored declaration on cases outside their band. Fourteen of eighteen are
+outside it, thirteen below. An authored key on that many cases is a register that goes stale on the
+next rate change, so the declaration is derived at load time and an authored one is refused.
+
+## T.3 What the guards caught, and what the probe caught that the guards did not
+
+`honesty/derive.test.ts` flagged nineteen unclassified string producers across the wave's lanes and
+the dead-code audit flagged the new `build/` directory, both on the integrator's first full run of
+the touched projects rather than on any lane. The DOM entry-point figure moved from 33 to 34 at six
+sites because the as-built stage is a mount, and `stageScreen.test.ts`'s painter assertions had to
+follow the painter into `cutaway.ts`.
+
+**The one the guards did not catch.** The corpus probe (§ T.4) showed the fix-it screen's three
+as-built words moving the count by nothing. They were in the FIXIT adapter's `covers` and in
+nothing's output, because their only reader is a mount. The adapter now seeds them by name, which
+is the same shape as wave G's speed chips, and the derive exclusion that had claimed the adapter
+*iterates* the copy table was corrected to say what it does.
+
+## T.4 The corpus: 114 a case in both tiers, and the probe that found the last three
+
+Measured once, after integration, both tiers in one sitting, with the base at `36255b4` re-measured
+first in a detached worktree. The base reproduced its published row exactly in both tiers, the
+tenth consecutive wave that has held.
+
+| | base `36255b4` | wave T | move | per case |
+|---|---|---|---|---|
+| always-on strings | 584 239 | **589 825** | +5 586 | **114.0** |
+| deep strings | 728 743 | **735 583** | +6 840 | **114.0** |
+| surfaces | 56 / 57 | 56 / 57 | 0 | |
+| cases, simulations, failing cases | 49 / 60, 606 / 4 710, 0 | unmoved | 0 | |
+
+The decomposition is in `CLAUDE.md`'s row and was taken by a probe rather than forecast: a scratch
+test rendered the first corpus case on each tree and diffed the seeded fields by adapter. The first
+pass read 111, and the three missing strings were the as-built stage's copy keys, in `covers` and
+reached by nothing. Seeded, re-measured, 114. The interim figures (589 678 and 735 403) were correct
+for the tree they were taken on and are not published as the row.
+
+## T.5 Verified on the integrated tree, and what the first full run found
+
+`tsc -b` exit 0. All six vitest projects were run in one sitting on the integrated tree, and the
+first pass was red in three of them, every red a guard catching this wave's own work:
+
+| project | first pass | what it was | second pass |
+|---|---|---|---|
+| `core` | 111 / 112 files | `moduleTree.test.ts`: `docs/01` did not name `viz/build` | green |
+| `experiments` | 107 files, 1 409 passed, 11 skipped | | |
+| `server` | 16 files, 370 passed | | |
+| `cli` | 10 files, 158 passed | | |
+| `viz` | 232 / 236 files, 5 139 passed | `boundaries.test.ts`: `cutaway.ts` reads the DOM and was not exempt | green |
+| `viz-browser` | 35 / 37 files, 221 passed | two literals #229 moved (schema 3 → 4, register floor 20 → 15) | green |
+
+The three fixes are three commits after the records, and each is a literal or a list that a
+guard derives from disk catching a hand-written claim, which is this repository's oldest lesson
+and the reason the full suite runs before the one push rather than after it.
