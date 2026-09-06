@@ -78,7 +78,7 @@ afterAll(async () => {
  */
 async function openFreePlay(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1280, height: 900 } });
-  await page.goto(`${origin}?seed=20260807`, { waitUntil: 'load' });
+  await page.goto(`${origin}?building=garden-apartments&seed=20260807`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });

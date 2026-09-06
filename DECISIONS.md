@@ -33868,3 +33868,45 @@ it: a figure nobody can regenerate in one call is a figure that goes stale in si
 **What this does not decide.** Whether `predictive-balanced` should ship at the optimum deadband
 rather than the authored 8 s — the verdict left the profile as authored and named the dimension
 for Phase 7 to search, and this entry makes the curve reproducible rather than moving the profile.
+
+## D514 — the first session draws from the five legible contracts on a named stream, and the plate is configuration
+
+**Date: 2026-09-06 · Owner: the integrator, wave W · Rules on: GitHub issue #208's code half under
+§ D475 and § D512, `docs/35` `PM-TT1`, `packages/viz/src/shift/firstSession.ts`, `dev/state.ts`,
+`dev/main.ts`'s boot, `everyday/today.ts`, the door.**
+
+§ D475 ruled that every eligible building can carry the first session, drawn at random, and that
+*eligible* is a measurement. § D512 made the measurement and handed this issue a table. This entry
+is the two consequences the ruling named as the work.
+
+1. **The set is derived, not typed.** `shift/legibility.ts` now carries its sweep as data beside the
+   window, and `shift/firstSession.ts#ELIGIBLE_FIRST_CONTRACT_IDS` is every contract legible on more
+   than a third of the fifty seeds: `c2`, `c3`, `c4`, `c5`, `c7`. The gated sweep refuses the constant
+   the day a fresh sweep disagrees with it. Garden Apartments, Chancery House and St Jude's are out
+   by the instrument's own count.
+2. **The draw is a named stream off the session's seed**, `first-session`, a sibling of the run's
+   `StreamSet` on `campaign/incidents.ts`'s ground, applied once by the boot on the load that
+   restored no session and was handed no building by its address. The seed is the one the door
+   prints, so the draw is reproducible from what the player can read. A reload that finds a session
+   finds the week the draw opened; one that finds none draws again from a fresh seed — nothing is
+   stored, which is § D476's shape. The address's own `building` wins, because it is the player's
+   choice.
+3. **The door says why, on the day it is true and no other.** A first day nobody has played on one
+   of the five carries a line naming the set and the measurement. It is worded to be true of a
+   player who moved to one of the five before playing, since the condition is derived from the week
+   and cannot tell the two apart, and it names no draw it cannot vouch for.
+4. **The pre-run plate no longer grades the day** — `docs/35` `PM-TT1`, its second option. The 400
+   was a citation to the prototype rather than a measurement, and *Comfortable* at `t = 0` is a
+   whole-day verdict on a screen whose point is that the day has not run. The plate now reads the
+   figure — people per working car — and says in its own words that the day shows whether that is
+   comfortable. `COMFORTABLE_PER_CAR` is deleted with its citation.
+
+**What this closes and what it does not.** #208's first three criteria are properties of the run
+and are held by `firstSession.test.ts`: every member's day 1 is legible on the pinned seeds and says
+when, and the one change that measurably helps is the report's lever path, already pinned on the
+legs. The fourth, ten first-time testers, is not a property of code (§ D349) and stays open. The
+campaign's `c1` is untouched, per § D512.
+
+**What the browser tier had to learn.** Sixteen browser files loaded the page bare and were written
+against Garden Apartments without saying so; they now name it in the address, which is the deep
+link's purpose, and the two that test a first load assert the draw instead.

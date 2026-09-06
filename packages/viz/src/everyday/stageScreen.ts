@@ -236,7 +236,8 @@ const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
  * it under, and the gate would go red rather than the product going quietly non-compliant — which
  * is the correct direction, and the reason no larger figure was invented to buy slack. A number
  * above 60 would have been a threshold with nothing behind it, which this file already refuses one
- * constant over (`today.ts`'s `COMFORTABLE_PER_CAR` carries a citation for exactly that reason).
+ * constant over (`today.ts`'s plate carried a cited 400 for exactly that reason, until § D514
+ * made it configuration).
  *
  * **No floor is set beneath it.** `340px` would only bind below a 567 px viewport, which is shorter
  * than anything the support matrix carries, so keeping it would have added a constant that nothing

@@ -85,6 +85,32 @@ import { isWaitingAt } from '../frame/overlay.js';
  */
 export const LEGIBILITY_WINDOW_S = 120;
 
+/** One row of the sweep {@link LEGIBILITY_WINDOW_S}'s docstring tabulates. */
+export interface LegibilitySweepRow {
+  readonly contractId: string;
+  readonly buildingId: string;
+  /** Seeds of the fifty on which day 1 is legible. */
+  readonly legibleOf50: number;
+  /** The median, over the fifty seeds, of the longest third-band stretch on any landing. */
+  readonly medianStretchS: number;
+}
+
+/**
+ * The sweep's table, as data — the same figures as the docstring above, so `shift/firstSession.ts`
+ * can derive § D475's eligible set from the measurement rather than from a list somebody typed, and
+ * `legibility.sweep.test.ts` can refuse this constant the day a fresh sweep disagrees with it.
+ */
+export const LEGIBILITY_SWEEP: readonly LegibilitySweepRow[] = Object.freeze([
+  { contractId: 'c1', buildingId: 'garden-apartments', legibleOf50: 0, medianStretchS: 0 },
+  { contractId: 'c2', buildingId: 'midtown-office', legibleOf50: 50, medianStretchS: 2504 },
+  { contractId: 'c3', buildingId: 'secure-tower', legibleOf50: 20, medianStretchS: 108 },
+  { contractId: 'c4', buildingId: 'mixed-use-high-rise', legibleOf50: 32, medianStretchS: 136 },
+  { contractId: 'c5', buildingId: 'vertical-city', legibleOf50: 45, medianStretchS: 191 },
+  { contractId: 'c6', buildingId: 'chancery-house', legibleOf50: 2, medianStretchS: 28 },
+  { contractId: 'c7', buildingId: 'crown-hotel', legibleOf50: 40, medianStretchS: 161 },
+  { contractId: 'c8', buildingId: 'st-jude-hospital', legibleOf50: 1, medianStretchS: 38 },
+]);
+
 /** The third band's floor — `WAIT_BANDS[2].fromS`, read rather than retyped. */
 export function legibilityBandFromS(): number {
   const third = WAIT_BANDS[2];
@@ -98,6 +124,11 @@ export interface LandingLegibility {
   readonly longestS: number;
   /** Total simulated seconds with somebody in the third band, as a union. */
   readonly totalS: number;
+  /**
+   * The simulated second at which this landing's first stretch of `windowS` completes — when the
+   * day became legible here — or `undefined` while no stretch reaches the window.
+   */
+  readonly legibleAtS: number | undefined;
 }
 
 export interface DayLegibility {
@@ -108,6 +139,12 @@ export interface DayLegibility {
   readonly longestS: number;
   /** `longestS >= windowS`. */
   readonly legible: boolean;
+  /**
+   * The earliest {@link LandingLegibility.legibleAtS} over the landings — when a player watching the
+   * stage from the start could first have seen the problem — or `undefined` on a day that is not
+   * legible. GitHub issue #208's first criterion asks for it in seconds from the day's start.
+   */
+  readonly legibleAtS: number | undefined;
 }
 
 /** When a leg stopped standing on its landing: boarded, turned away, or the run's end. */
@@ -157,9 +194,13 @@ export function legibilityOf(
       const merged = unionOf(intervals);
       const longestS = merged.reduce((best, [a, b]) => Math.max(best, b - a), 0);
       const totalS = merged.reduce((sum, [a, b]) => sum + (b - a), 0);
-      return { floorId, longestS, totalS };
+      const first = merged.find(([a, b]) => b - a >= windowS);
+      const legibleAtS = first === undefined ? undefined : first[0] + windowS;
+      return { floorId, longestS, totalS, legibleAtS };
     })
     .sort((a, b) => b.longestS - a.longestS || a.floorId.localeCompare(b.floorId));
   const longestS = landings[0]?.longestS ?? 0;
-  return { bandFromS, windowS, landings, longestS, legible: longestS >= windowS };
+  const moments = landings.flatMap((landing) => (landing.legibleAtS === undefined ? [] : [landing.legibleAtS]));
+  const legibleAtS = moments.length === 0 ? undefined : Math.min(...moments);
+  return { bandFromS, windowS, landings, longestS, legible: longestS >= windowS, legibleAtS };
 }

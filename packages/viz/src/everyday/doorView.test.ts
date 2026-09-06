@@ -67,6 +67,7 @@ const TODAY: TodayRecord = {
   load: undefined,
   asks: [],
   seedLine: 'tower chancery-house · crowd 424242 · everyone identical',
+  firstSessionLine: undefined,
   driver: 'Steady hand',
 };
 

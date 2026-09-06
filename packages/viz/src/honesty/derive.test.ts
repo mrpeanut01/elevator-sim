@@ -1395,6 +1395,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A stream name and a table of measurements, not prose — GitHub issue #208, § D514. ' +
+        '`first-session` is the name `deriveStreamSeed` mixes into the first tower’s draw, and ' +
+        '`LEGIBILITY_SWEEP` is § D512’s table as data (`garden-apartments`, a count, a median), ' +
+        'from which `shift/firstSession.ts` derives the eligible set. What a player reads of the ' +
+        'draw is `FIRST_SESSION_LINE`, which `EVERYDAY_TODAY` seeds on a first day and covers.',
+      ids: [
+        'shift/firstSession.ts#FIRST_SESSION_STREAM',
+        'shift/firstSession.ts#firstSessionContractFor',
+        'shift/legibility.ts#LEGIBILITY_SWEEP',
+      ],
+    },
+    {
+      reason:
         'A table keyed by building id and a kind vocabulary, not prose — GitHub issue #169 item 3, ' +
         '§ D510. `OFFER_FEES` is `garden-apartments: 3` six times over and `offerFeeOf` reads it; ' +
         '`offerRefusalOf` answers `held` / `unpriced` / `no-slot` / `at-risk` and a number, never a ' +

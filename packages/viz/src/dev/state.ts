@@ -80,6 +80,7 @@ import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
+import { firstSessionContractFor } from '../shift/firstSession.js';
 import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import { SHIFT_EVENTS, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
@@ -1061,6 +1062,28 @@ export function withDispatcher(
 /** The disclosure mode in the handoff's own words. `mode/` calls the two levels basic/advanced. */
 export function disclosureOf(mode: ViewMode): DisclosureMode {
   return mode === 'advanced' ? 'engineer' : 'casual';
+}
+
+/**
+ * A fresh device's first session — GitHub issue #208, § D475, § D514.
+ *
+ * {@link initialState} opens on `CONTRACTS[0]`, which every test in this package leans on; the draw
+ * is applied by `dev/main.ts` once, on the load that restored nothing and was handed no building by
+ * its address. The week is opened fresh on the drawn contract rather than switched to — nothing has
+ * been played, so there is nothing to park — and the building follows the week, `withBuilding`'s
+ * own rule.
+ */
+export function withFirstSession(state: ViewerState, resources: BrowserResources): ViewerState {
+  const contractId = firstSessionContractFor(state.seed);
+  const contract = contractById(contractId);
+  if (contract === undefined) return state;
+  const drawn: ViewerState = {
+    ...state,
+    week: openWeek(contractId),
+    shiftLengthS: shiftLengthForContract(contractId),
+    windowStartS: null,
+  };
+  return withBuilding(drawn, resources, contract.buildingId);
 }
 
 /**

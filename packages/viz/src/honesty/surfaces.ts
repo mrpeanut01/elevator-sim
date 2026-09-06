@@ -10356,6 +10356,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
   id: 'everyday/today.ts#todayOf',
   covers: [
     'everyday/today.ts#todayOf',
+    'shift/firstSession.ts#FIRST_SESSION_LINE',
     'everyday/doorView.ts#doorScreenViewOf',
     'everyday/doorView.ts#DOOR_STEPS',
     'everyday/doorView.ts#SAME_FOR_EVERYONE',
@@ -10395,6 +10396,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        /* A first day nobody has played, on a legible tower — the one state that draws the line. */
+        firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         /*
          * The corpus's own arm. Both preferences reach the *Rated speed* fact, and the day record
          * is seeded once per day rather than once per screen (§ 16 rule 14) — so the second
@@ -10406,6 +10409,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       seeds.push({ field: `${at}.today.label`, text: today.dayLabel, role: 'label' });
       seeds.push({ field: `${at}.today.lede`, text: today.lede, role: 'observation' });
       seeds.push({ field: `${at}.today.seed`, text: today.seedLine, role: 'label' });
+      if (today.firstSessionLine !== undefined) {
+        seeds.push({ field: `${at}.today.firstSession`, text: today.firstSessionLine, role: 'observation' });
+      }
       for (const fact of today.facts) {
         seeds.push({ field: `${at}.today.fact.${fact.label}`, text: fact.value, role: 'observation' });
       }
@@ -10426,6 +10432,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
       }).facts;
       for (const [index, fact] of imperialFacts.entries()) {

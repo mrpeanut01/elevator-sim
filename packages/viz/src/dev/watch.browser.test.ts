@@ -79,7 +79,7 @@ const SPECTATOR_SEED = '20260101';
 /** A loaded page with a run of its own on the stage, paused where the player left it. */
 async function pageWithARun(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1400, height: 950 } });
-  await page.goto(`${origin}?seed=${SPECTATOR_SEED}`, { waitUntil: 'load' });
+  await page.goto(`${origin}?building=garden-apartments&seed=${SPECTATOR_SEED}`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });

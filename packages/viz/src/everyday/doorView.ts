@@ -120,6 +120,8 @@ export interface DoorScreenView {
   /** Who is driving as things stand, and where it is changed. */
   readonly driver: { readonly heading: string; readonly name: string; readonly note: string };
   readonly seedLine: string;
+  /** Why this tower, on a first day nobody has played on a legible one; `undefined` otherwise. */
+  readonly firstSessionLine: string | undefined;
   readonly sameForEveryone: string;
   readonly primary: DoorPrimaryView;
 }
@@ -295,6 +297,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
       note: 'Change it on the brief, which is the next screen.',
     },
     seedLine: input.today.seedLine,
+    firstSessionLine: input.today.firstSessionLine,
     sameForEveryone: SAME_FOR_EVERYONE,
     primary: primaryOf(clamped, chips),
   };

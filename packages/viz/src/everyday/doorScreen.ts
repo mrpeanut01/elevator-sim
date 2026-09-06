@@ -18,6 +18,7 @@ import { doorScreenViewOf, type DoorScreenView } from './doorView.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import { BODY, CARD, el, EYEBROW, LEDE, MONO, pill, QUIET, section, unavailableBand } from './screenDom.js';
+import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
 import { todayOf } from './today.js';
 import {
   EVERYDAY_COLORS as C,
@@ -53,6 +54,7 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
       goals: host.goalsToday(),
       seed: host.seed(),
+      firstSession: isFirstDayOnALegibleTower(host.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),
     }),
@@ -204,6 +206,12 @@ function mountDoor(
     const seed = el(document_, 'div', 'everyday-door-seed', view.seedLine);
     seed.style.cssText = `${MONO(11.5, C.label)};margin-top:8px`;
     foot.append(same, seed);
+    /* GitHub issue #208, § D514: why this tower, said once, on the day it is true and no other. */
+    if (view.firstSessionLine !== undefined) {
+      const drawn = el(document_, 'p', 'everyday-door-first-session', view.firstSessionLine);
+      drawn.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
+      foot.append(drawn);
+    }
     column.append(foot);
     return column;
   }
