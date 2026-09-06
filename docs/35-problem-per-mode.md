@@ -1146,8 +1146,11 @@ absence of `abandonedAt` · the two of eighteen `symptom` strings carrying a raw
    `dispatch/lifecycle.ts#repositionDecisionFor` is where to look. **If none exists, `PM-PARK` is a
    `core` change and must be priced as one.**
 5. **Whether 120 contiguous seconds is the right legibility window** in `PM-TT2`. It is a design choice
-   with its reasoning attached and **not** a citation. *Check:* § 10 row 13's sweep arm, and a
-   playtest.
+   with its reasoning attached and **not** a citation — and it is now *declared* as one:
+   `packages/viz/src/shift/legibility.ts#LEGIBILITY_WINDOW_S` carries the reasoning (two simulated
+   minutes are on the order of ten real seconds at the stage's default speed) and the sweep arm is
+   built ([§ D512](../DECISIONS.md), GitHub issue #354). *Check:* a playtest, which is what would
+   move the constant.
 6. **Whether each of the sixteen sight-shaped `symptom` strings is legible at the sizes the stage
    actually draws.** Capsules are 4.5 px on a 6.5 px pitch. *Check:* `docs/28` `AD-S7` and `AD-S8`
    landing first, then a playtest.
@@ -1509,7 +1512,7 @@ prose: `issue #N` · `new issue —` · `out of scope —` · `built —`.
 | 10 | `PM-RU2` | **issue #220** (AC2) | And **re-priced**: see § 13.2c. The template layer cannot ramp past the profile's rate, so row 10 depends on [§ D478](../DECISIONS.md) as well as on § 11 item 3, which is now checked |
 | 11 | `PM-RU1`, `PM-RU3` | **issue #220** | docs/35 names it *"GitHub issue #220's whole scope"*. Unblocked for the build by [§ D477](../DECISIONS.md); the placement half stays open |
 | 12 | `PM-PARK` | **built —** in the only form that is honest; residue **out of scope —** | `packages/viz/src/render/carRest.ts` derives *standing still* and both renderers draw it: `render/canvas.ts:1463` and `everyday/stageScreen.ts:386`. It deliberately does **not** add a `FrameCar` field, and its own docstring is the argument: *parked* claims the dispatcher decided and only `core` can check that; *standing still* is an observable. The residue — a mark that says *parked* — is out of scope on that ground, and reviving it would need a `core` change nobody has asked for. **§ 3.2's row and § 9.2's third bullet are stale**; see § 13.5 |
-| 13 | `PM-TT2` | **issue #354** — *A legibility arm on the difficulty sweep* | Verified absent: nothing in `packages/` measures a contiguous third-band window. **Body:** `docs/33` `DC-4` requires a contract's day 1 to miss a goal on a third to two thirds of seeds; a day can miss *worst wait inside 230 s* on one rider at minute 41 and be invisible for the other fifty-nine minutes. Add an arm to `docs/33` § 6's instrument: for each contract's day 1, the fraction of seeds holding a landing with somebody in the third wait band for **120 contiguous simulated seconds**. It is the only way `PM-TT2` stops being an assertion — and under [§ D475](../DECISIONS.md) it is also the shape of #208's per-building eligibility measurement, so the two should be built once |
+| 13 | `PM-TT2` | **built** — [§ D512](../DECISIONS.md), GitHub issue #354 | `packages/viz/src/shift/legibility.ts#legibilityOf` measures the longest contiguous stretch a landing holds somebody in the third wait band, by exact interval union over the legs (§ 9.3's method); `legibility.sweep.test.ts` runs every contract's day 1 over `docs/33` § 4.6's 400 days and the table is published beside the window constant, with a ten-seed slice pinned by `legibility.test.ts`. **The finding:** Garden Apartments is legible on **0 of 50** seeds, Chancery House on 2 and St Jude's on 1, Midtown Office on 50 — which is #208's per-building eligibility measurement, built once here rather than twice. |
 | 14 | `PM-DOOR` | **issue #210** (the build) and **issue #208** (AC1, AC2) | Unblocked by [§ D476](../DECISIONS.md) with one playability condition. Sized **Large** |
 
 **Nine of the fourteen are unbuilt and eight of those nine are blocked by nothing.** Rows 2, 10 and

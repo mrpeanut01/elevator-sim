@@ -33795,3 +33795,39 @@ version-12 one with nobody refused structurally, which is the only honest defaul
 landing's refusal by floor and cause, and the leg-level reason is on the record for the consumer
 that wants a rider's own sentence; naming one here would be the dead seam the field exists to
 avoid. The warning `Simulation` prints is unchanged.
+
+---
+
+## D512 — a day is legible when a landing holds somebody in the third wait band for two contiguous minutes, and the sweep says which buildings ever are
+
+**Date: 2026-09-06 · Owner: the integrator, wave V · Rules on: GitHub issue #354 and #208's
+per-building eligibility (§ D475), `packages/viz/src/shift/legibility.ts`, `docs/33` § 6, `docs/35`
+row 13 and § 11 item 5.**
+
+`docs/33` DC-4 is about the verdict; `docs/35` PM-TT2 asked whether the player could have seen the
+problem, and nothing measured it. This entry defines the measurement, declares its one assumption,
+and publishes the run.
+
+1. **Legible means a landing holds somebody in the stage's third wait band — `WAIT_BANDS`'
+   *checking watch*, sixty seconds — for 120 contiguous simulated seconds**, computed by exact
+   interval union over the legs, `docs/35` § 9.3's method, with a refused rider excluded on § D266's
+   rule. Pure over a recording; parameterised so a test can move the band and the window and see
+   the answer move.
+2. **The window is an assumption with its reasoning attached, not a citation.** Two simulated
+   minutes are on the order of ten real seconds at the stage's default speed, which is the time a
+   reader spends on one screen before their eye moves; a shorter window would count a crowd the
+   cutaway drew for one frame. It is uncited by construction and a playtest is what would move it.
+3. **The sweep is § 4.6's own 400 days**, so the energy bar and the legibility arm are measured on
+   the same runs, and the table is published beside the constant with a ten-seed slice pinned. It
+   is a proportion with its `n` and a median stretch, never a mean of a mean, and there is no
+   interval because no arms are compared.
+4. **It is #208's eligibility instrument, built once.** § D475 draws a first session from *eligible*
+   buildings, and eligible was a word. Measured: Garden Apartments is legible on 0 of 50 seeds,
+   Chancery House on 2, St Jude's on 1; Midtown Office on 50 with a stretch longer than the shift.
+   The five contracts legible on more than a third of seeds are the eligible set; the building the
+   campaign opens on is not in it, which is exactly the finding #208 filed by playing.
+
+**What this does not decide.** Whether § D475's draw should now exclude Garden Apartments — that is
+#208's build, and this entry hands it a table rather than a ruling; and whether the campaign's `c1`
+should stay Garden Apartments, which #270 measured from the other direction and is not reopened
+here.
