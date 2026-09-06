@@ -1496,6 +1496,14 @@ type DecisionReservation = {
  * reported the resulting red as an integrator action, each computing it from this file's own
  * arithmetic rather than running it, and each was right.
  */
+/**
+ * **Wave T's block: D497 to D502, six numbers for thirteen issues, and the block is closed on the
+ * same commit that opened it.** One integrator worked the batch serially rather than dispatching
+ * lanes, so the reservation exists only so the charter row's arithmetic is the same as every other
+ * wave's: the row names the floor while the block is open and highest + 1 once it is reconciled.
+ * Six of the thirteen issues reached past their own module and took a number; the other seven are
+ * recorded in their docstrings under § D405.
+ */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave S reserved D489–D498, and it was opened four lanes late — which is wave Q's error

@@ -128,7 +128,9 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * GitHub issue #348's as-built stage on the fix-it screen and the painter it shares with
          * § 7's stage. `mountAsBuiltStage` builds a canvas and a transport, so it cannot run
          * without a document; every word it draws is `everyday/fixitScreenModel.ts`'s copy table,
-         * which the FIXIT adapter iterates. `drawCutaway` paints geometry and floor labels onto a
+         * whose three as-built keys the FIXIT adapter seeds by name because no model reaches them
+         * — the first probe of this wave's corpus move found them in `covers` and in nothing's
+         * output. `drawCutaway` paints geometry and floor labels onto a
          * canvas context and authors no sentence — it is derived because a floor label is a word
          * beside a word — and the labels it draws are the recording's own.
          */

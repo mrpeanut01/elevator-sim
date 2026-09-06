@@ -163,7 +163,7 @@ export function symptomFigureIn(symptom: string): string | null {
 }
 
 /**
- * § D478's declaration, **derived** — the sentence a case outside its profile's declared band
+ * § D478's declaration, **derived** ([§ D499](../../../../DECISIONS.md)) — the sentence a case outside its profile's declared band
  * carries on its own face, or `undefined` for a case inside it or one running the building's own
  * profile (`arrivalRatePctPop5min: null`, which cannot be outside a band it does not override).
  *

@@ -6765,6 +6765,16 @@ const FIXIT: SurfaceAdapter = {
      * them, on this adapter's established habit.
      * ================================================================== */
 
+    /*
+     * The as-built stage's three words — GitHub issue #348. Authored in the copy table so they are
+     * sweepable, and seeded here directly because their only reader is `everyday/asBuiltStage.ts`,
+     * a mount, which the search cannot drive; the rail and bar models below reach the table's other
+     * keys, and these three would otherwise be in `covers` and in nothing's output.
+     */
+    seeds.push({ field: 'asBuilt.eyebrow', text: FIXIT_SCREEN_COPY.asBuiltStageEyebrow, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'asBuilt.note', text: FIXIT_SCREEN_COPY.asBuiltStageNote, role: 'prose', provenance: 'authored' });
+    seeds.push({ field: 'asBuilt.skip', text: FIXIT_SCREEN_COPY.asBuiltStageSkip, role: 'label', provenance: 'authored' });
+
     /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
     for (const [where, solvedIds] of [
       ['none-solved', new Set<string>()],

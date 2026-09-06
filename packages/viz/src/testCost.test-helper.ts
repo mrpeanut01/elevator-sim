@@ -21,7 +21,8 @@
  * and `vitest.config.ts` and needs no clock, so it runs in the ordinary suite and costs milliseconds.
  * Everything it says is a property of the code.
  *
- * **The helpers joined the population on 2026-09-06, and the reason is one annotation.** GitHub
+ * **The helpers joined the population on 2026-09-06, and the reason is one annotation**
+ * ([§ D502](../../../DECISIONS.md)). GitHub
  * issue #356 split `campaign/campaign.test.ts` and moved its fixture hook — a `beforeAll` closing
  * `}, 120_000);` — into `campaign/campaign.test-helper.ts`, where every suite that shares the
  * fixture registers it. Read over `*.test.ts` alone, the census would have reported that annotation
