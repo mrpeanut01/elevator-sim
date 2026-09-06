@@ -199,6 +199,7 @@ import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
 import { rushBeforeOf, rushDisclosureOf, rushHoldAt, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, type RushBefore } from './rush.js';
+import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 
 import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
 
@@ -393,6 +394,11 @@ export interface EverydayRushSession {
   readonly holdAtS: number | undefined;
   /** Where the player pressed *End the rush*, or where the stage stopped at the line; `undefined` while it plays. */
   readonly endedAtS: number | undefined;
+}
+
+/** § 6.1's replay in progress — which day of the parked week is being played again (GitHub issue #177 item 1). */
+export interface EverydayReplaySession {
+  readonly day: number;
 }
 
 /** What § 7.5's dock reads — see {@link EverydayHost.campaignDay}. */
@@ -1091,6 +1097,17 @@ export interface EverydayHost {
   rushDisclosure(): string | undefined;
 
   /**
+   * § 6.1's replay: park the week and stand a replay week on `day` — `everyday/replay.ts`, GitHub
+   * issue #177 item 1, § D517. The run is the brief's to start, as on any day. Returns the reason it
+   * cannot, or `undefined` when the replay week is standing.
+   */
+  startReplay(day: number): string | undefined;
+  /** The replay in progress, or `undefined`. */
+  replay(): EverydayReplaySession | undefined;
+  /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
+  leaveReplay(): void;
+
+  /**
    * § 14.1's primary — drop the spectator state and set the same crowd up to be played.
    *
    * It carries the record's **selection** (building, dispatcher, pattern, the two Free Play axes,
@@ -1351,6 +1368,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     for (const listener of [...campaignListeners]) listener();
   };
   /** The rush in progress — GitHub issue #220. Host-scoped like the career: a rush is not a day. */
+  let replaySession: { readonly day: number; readonly before: ReplayBefore } | undefined;
   let rushSession:
     | {
         readonly before: RushBefore;
@@ -2033,6 +2051,23 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     rushDisclosure: () => {
       const building = resolvedBuildingOf(b.resources, b.state());
       return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building));
+    },
+    startReplay: (day) => {
+      const state = b.state();
+      if (replaySession !== undefined) return 'a replay is already standing; leave it before opening another';
+      if (!replayableDay(state.week, day)) return REPLAY_COPY.beforeTheWeek;
+      replaySession = { day, before: replayBeforeOf(state) };
+      b.applyPatch(replayPatchOf(state, day));
+      notifyCampaign();
+      return undefined;
+    },
+    replay: () => (replaySession === undefined ? undefined : { day: replaySession.day }),
+    leaveReplay: () => {
+      if (replaySession === undefined) return;
+      const before = replaySession.before;
+      replaySession = undefined;
+      b.applyPatch(replayRestorePatchOf(b.state(), before));
+      notifyCampaign();
     },
     playThisCrowd: (run) => {
       b.playThisCrowd(run);

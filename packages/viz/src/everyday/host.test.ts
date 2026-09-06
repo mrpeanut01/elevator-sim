@@ -22,7 +22,8 @@ import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { RUSH_SEED, RUSH_TEMPLATE_ID } from './rush.js';
-import { RUSH_CONTRACT_ID } from '../shift/week.js';
+import { REPLAY_COPY } from './replay.js';
+import { RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID } from '../shift/week.js';
 
 import { towerById, type CampaignTower } from '../campaign/career.js';
 import { clearedDays, purseOf, spentTodayUnits, type ShopCategoryId } from '../campaign/economy.js';
@@ -1577,6 +1578,38 @@ describe('the rush — GitHub issue #220, § D515', () => {
     expect(restore?.week?.contractId).toBe(base().week.contractId);
     /* Leaving twice is a no-op. */
     host.leaveRush();
+    expect(h.patches).toHaveLength(2);
+  });
+});
+
+describe('the replay — GitHub issue #177 item 1, § D517', () => {
+  it('stands a replay week on the day asked for, parks the player’s, starts no run, and puts the week back on leaving', () => {
+    const start = { ...base(), week: { ...base().week, day: 4, dayIdx: 3, streak: 2, bestMinutePct: 71 } };
+    const h = harnessOf(start);
+    const host = createEverydayHost(h.bindings);
+    expect(host.replay()).toBeUndefined();
+    /* A day the week has not reached, and a day before it began, are both refused before any patch. */
+    expect(host.startReplay(4)).toBe(REPLAY_COPY.beforeTheWeek);
+    expect(host.startReplay(0)).toBe(REPLAY_COPY.beforeTheWeek);
+    expect(h.patches).toHaveLength(0);
+    expect(host.startReplay(2)).toBeUndefined();
+    /* The brief starts the run, exactly as on any day; the host only stands the week up. */
+    expect(h.calls).toEqual(['applyPatch']);
+    const patch = h.patches[0];
+    expect(patch?.week?.contractId).toBe(REPLAY_CONTRACT_ID);
+    expect(patch?.week?.day).toBe(2);
+    expect(patch?.week?.dayIdx).toBe(1);
+    expect(patch?.week?.streak).toBe(0);
+    expect(patch?.playMode).toBe('shift-week');
+    expect(patch?.seed).toBeUndefined();
+    expect(host.replay()?.day).toBe(2);
+    expect(host.startReplay(1)).toContain('already standing');
+    host.leaveReplay();
+    expect(host.replay()).toBeUndefined();
+    const restore = h.patches[1];
+    expect(restore?.week?.contractId).toBe(start.week.contractId);
+    expect(restore?.playMode).toBe(start.playMode);
+    host.leaveReplay();
     expect(h.patches).toHaveLength(2);
   });
 });

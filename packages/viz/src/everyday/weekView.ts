@@ -92,8 +92,8 @@ export interface WeekDayCard {
    * and a sheet actually standing — because a button that opened an empty sheet would be § 16
    * rule 4's defect (an affordance for a state that is not there).
    *
-   * A **past** day is never readable, and that is the same refusal the front door's replay makes:
-   * `ViewerState` keeps one sheet, so yesterday's account is not in this build to open.
+   * A **past** day is never readable: `ViewerState` keeps one sheet, so yesterday's account is not
+   * in this build to open. (Playing one again is the front door's, since § D517 — a different verb.)
    */
   readonly readable: boolean;
 }

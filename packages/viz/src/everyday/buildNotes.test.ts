@@ -77,8 +77,10 @@ describe('the build-information panel', () => {
     // stage's register and #169 item 1 took the campaign's incidents entry (§ D507): a register
     // whose entries only ever fall is what § D370's queue reading predicts, so the floor follows it
     // down rather than standing over it — and 12 → 9 when GitHub issue #220 built the rush's
-    // engine (§ D515) and three of the rush register's four entries left with it.
-    expect(view.entryCount).toBeGreaterThan(9);
+    // engine (§ D515) and three of the rush register's four entries left with it — and 9 → 8 when
+    // GitHub issue #177 item 1 handed a past day back over a replay week (§ D517), and 8 → 6 when
+    // item 5 wrote the designer's escalator rows and folded its document (§ D518).
+    expect(view.entryCount).toBeGreaterThan(6);
   });
 
   it('says which build it is, in a sentence the corpus sweeps — GitHub issue #246', () => {
@@ -190,7 +192,6 @@ interface TriagedAbsence {
  */
 const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /* The shell — the front door, the week strip, the boards, the report's levers. */
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Replaying a past day', issue: 177 },
   /*
    * **This row's fragment and its owner both moved, and neither moved on its own.** It read
    * `'The daily board'` against #161 — the umbrella issue for everything that needed a server,
@@ -246,8 +247,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * pointing at two more issues.
    */
   { register: 'DESIGNER_ABSENCES', fragment: 'a machine class per shaft', issue: 177 },
-  { register: 'DESIGNER_ABSENCES', fragment: 'escalator rows', issue: 177 },
-  { register: 'DESIGNER_ABSENCES', fragment: 'the folded-up specification', issue: 177 },
 
   /*
    * The campaign. The incidents row — *"Incidents here are the two the building implies"*, issue

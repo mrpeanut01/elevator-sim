@@ -119,6 +119,19 @@ export const DESIGNER_COPY = Object.freeze({
     'This board sets which floors each lift physically serves. Who is allowed where is saved with the design as well, and is written in the simulator’s building editor.',
   machineOwnershipHint:
     'A sky lobby’s starting floor, and the finer ride characteristics behind a class, are set in the simulator’s machine editor.',
+  /*
+   * § 13.3's escalator rows and its folded document — GitHub issue #177 item 5, § D518. Both were
+   * rows in {@link DESIGNER_ABSENCES} until this board wrote them.
+   */
+  escalatorsEyebrow: 'ESCALATORS',
+  escalatorsHint:
+    'A two-level lobby is joined by an escalator, not by a shaft. One joins two floors and takes the seconds it takes; a rider whose whole journey is those two floors rides it instead of calling a lift.',
+  escalatorsNone: 'No escalators. Every journey between floors here calls a lift.',
+  addEscalator: '+ escalator',
+  removeEscalator: 'remove',
+  escalatorSecondsLabel: 'seconds a landing',
+  escalatorStairsNote: 'a stair this board cannot write — its climb and its descent are two numbers, and there is one box',
+  documentFold: 'The document, as an engineer would write it',
 } as const);
 
 /**
@@ -143,8 +156,13 @@ export const DESIGNER_COPY = Object.freeze({
  */
 export const DESIGNER_ABSENCES: readonly string[] = Object.freeze([
   'a machine class per shaft — a design carries one class, one rated speed and one rated load for the whole building, so a picker on each shaft would be five controls writing the same setting',
-  'escalator rows — a design can carry escalators through a save, and nothing on this board writes them',
-  'the folded-up specification — the block below is what it would print, without the fold',
+  /*
+   * Two rows left on the commit that built them — GitHub issue #177 item 5, § D518: the escalator
+   * rows (`designerScreen.ts#drawEscalatorPanel` writes `transportModes`, and `authoring.test.ts`
+   * holds that an escalator changes the run on the legs) and the folded document (the
+   * specification block is now the § 13.3 disclosure, collapsed). § D227: a refusal leaves on the
+   * commit that makes it false.
+   */
 ]);
 
 /* -------------------------------------------------------------------------- *

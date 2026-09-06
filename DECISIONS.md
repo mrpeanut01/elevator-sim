@@ -33996,3 +33996,79 @@ forbids and every screen's rows went from their builder to the panel unasked.
 caller the file was waiting for. The sentence enters the honesty corpus through the menu adapter on
 four screens. `scope/commitment.ts`'s docstring stops describing the model as unbuilt. Item 2 of
 #178, `showEnergyAxis`, was closed on 2026-09-02 and is not part of this entry; `GAPS.md` § 3 says so.
+
+## D517 — A past day is handed back over a replay week: the same day, closed as any day is, counting for nothing
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #177 item 1**, GAMEPLAY § 6.1.
+
+**Context.** § 6.1 says *every past day stays playable* and *never silently rescore history*. The
+front door's week strip drew the last seven days from the day it landed and refused each with *"a
+week moves forward one day at a time and this build has no way to stand it back up"*. The
+build-information panel's register said the same thing more exactly: a tower grows through a week,
+so the same seed on a later day meets a different crowd, and nothing hands a day back. Both were
+true. § D515 then built the rush by parking the player's week and opening a sentinel one in its
+place, so a run could go through `shiftRunConfigOf` and `closeShift` untouched — and that is the
+whole of the mechanism a replay needs.
+
+**Decision.**
+
+1. **A replay is a sentinel week stood on the day** — `shift/week.ts#openReplay`, contract id
+   `replay`, joining endless, sandbox, free play and the rush in `WEEK_CONTRACT_SENTINELS`. It
+   stands on the replayed day at that day's growth, on that day's weekday, with the days before it
+   as its history, and starts every other field from nothing. The seed, building, dispatcher,
+   levers and shift length are the player's own and are not touched, so the run meets the crowd
+   the day met. `replay.test.ts` says so on the legs: a replay of day 2 produces the legs a week
+   standing on day 2 produces, and the standing day 3 does not.
+2. **It counts for nothing by construction, not by a guard.** The id resolves to no contract, so
+   `closeDay` banks nothing and clears nothing (the sandbox's own precedent); the replay week's
+   streak and best day are its own and are discarded when the player leaves; nothing here posts.
+   The parked week is put back exactly as parked. A missed day and a closed day are the same case:
+   the door says *does not count* and means it for both, and no gap in the record is filled,
+   because a replay week's outcome reaches the parked week's history never.
+3. **The loop is the daily loop.** `RunContext` gains `replay`; the door's primary on a past chip
+   inside the week hands the day to `EverydayHost.startReplay`, which stands the week up and says
+   why it cannot, and the shell enters the brief in the replay context only on its yes. The brief,
+   the stage and the report are the daily screens over the replay week; the bar's two replay rows
+   are the daily rows with *never scored* on them and are marked as not the guide's; leaving any
+   of the three for another screen leaves the replay and puts the week back. A chip from before
+   the week began stays inert with the reason.
+4. **The parked-week bound is read off the sentinel table** rather than written as `+ 3`, which
+   had already been wrong by one since the rush.
+
+**Consequences.** The door's replay refusal, the shell register's replay row and the two docstrings
+that said the build had no replay leave on this commit (§ D227). `watchStage.ts`'s *play this
+crowd* refusal on another day's row stays, because that control sets up a crowd on the standing
+week and the standing week is on another day; its docstring now points at the door.
+
+## D518 — The designer writes escalator rows and folds its document; a class per shaft stays a stated absence
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #177 item 5**, GAMEPLAY § 13.3.
+
+**Context.** `DESIGNER_ABSENCES` named three things § 13 asks for that the board did not draw. Two
+of them had their mechanism already: `BuildingSpec.transportModes` is carried through a save and
+written into the building by `buildingFromSpec`, `authoring.test.ts` holds that an escalator
+changes the run on the legs, and the Engineer editor authors one with a button; and the
+specification block printed everything § 13.3's *document* prints, without the fold. The third has
+no mechanism: a design carries one class, one rated speed and one rated load for the whole
+building, so a picker on each shaft would be five controls writing one field — § D219's class.
+
+**Decision.**
+
+1. **An escalators panel on the designer** — `designerScreen.ts#drawEscalatorPanel`. One row per
+   machine the design carries, with its two floors, its seconds a landing and `remove`; and
+   `+ escalator`, seeded exactly as the Engineer editor seeds one (the lowest sky floor and the
+   level above it, or the lobby and floor 1, at EN 115-1's seconds for the rise). The writers are
+   the spec's own (`withTransportEnd`, `withTransportSeconds`, `nextTransportModeId`,
+   `escalatorSecondsFor`), so the two surfaces cannot disagree about what a row means. A loaded
+   stair is drawn and not editable, with the reason, because its climb and descent are two numbers
+   and there is one box (§ D227).
+2. **The specification block is a `<details>` fold**, collapsed by default as § 13.3 draws it, with
+   the heading and its *nothing here is scored* note outside so the block says what it is before it
+   is opened.
+3. **The class-per-shaft row stays**, in the register, in the words it had. Building it means a
+   per-car class in `BuildingSpec` and in `buildingFromSpec`'s car writer, which is authoring-model
+   work rather than a control, and this entry does not take it.
+
+**Consequences.** Two rows leave `DESIGNER_ABSENCES` on the commit that made them false, and the
+build-information panel's floor follows them down. The words are `DESIGNER_COPY`'s, driven by the
+designer's adapter where the rest of that board's are.

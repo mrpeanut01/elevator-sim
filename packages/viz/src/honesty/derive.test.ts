@@ -635,6 +635,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * rather than leaving to look like the gap moving one file over.
          */
         'shift/week.ts#WEEK_CONTRACT_SENTINELS',
+        /*
+         * Reached through that table since GitHub issue #177 item 1: `PARKED_WEEKS_MAX` is its
+         * key count and `switchWeek` reads the bound, so both inherit `free play`'s two words.
+         * Neither authors a sentence. `replayPatchOf` returns a state patch keyed on ids.
+         */
+        'shift/week.ts#PARKED_WEEKS_MAX',
+        'shift/week.ts#switchWeek',
+        'everyday/replay.ts#replayPatchOf',
       ],
     },
     {

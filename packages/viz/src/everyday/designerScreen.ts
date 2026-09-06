@@ -32,11 +32,16 @@ import {
   banksOf,
   bandOf,
   carLabelOf,
+  escalatorSecondsFor,
+  nextTransportModeId,
   riseM,
   servesLobby,
   upPeakAnalysisOf,
   validateSpec,
+  withTransportEnd,
+  withTransportSeconds,
   type BuildingSpec,
+  type SpecTransportMode,
 } from '../authoring/buildingSpec.js';
 import type { MachineClass } from '../authoring/machineSpec.js';
 import {
@@ -200,7 +205,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   machinePanel.style.cssText = cardStyle();
   const servicePanel = el(doc, 'div', 'everyday-designer-service');
   servicePanel.style.cssText = cardStyle();
-  panels.append(buildingPanel, machinePanel, servicePanel);
+  const escalatorPanel = el(doc, 'div', 'everyday-designer-escalators');
+  escalatorPanel.style.cssText = servicePanel.style.cssText;
+  panels.append(buildingPanel, machinePanel, servicePanel, escalatorPanel);
   root.append(panels);
 
   /* ------------------------------------------------- the specification block */
@@ -517,6 +524,88 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     }
   }
 
+  /**
+   * § 13.3's escalator rows — GitHub issue #177 item 5, § D518. One row per machine the design
+   * carries: its two floors, its landing-to-landing seconds, and `remove`; and `+ escalator`, which
+   * seeds a new one exactly as the Engineer editor does (`dev/buildingEditor.ts`): on the lowest sky
+   * floor and the level above it, or the lobby and floor 1, at EN 115-1's seconds for the rise.
+   * `spec.transportModes` is what `buildingFromSpec` writes, and `authoring.test.ts` holds that an
+   * escalator changes the run on the legs — so a row here is a control that reaches the run.
+   */
+  function drawEscalatorPanel(): void {
+    escalatorPanel.replaceChildren();
+    const heading = el(doc, 'div', undefined, COPY.escalatorsEyebrow);
+    heading.style.cssText = `${EYEBROW};margin-bottom:10px`;
+    escalatorPanel.append(heading);
+    const hint = el(doc, 'p', 'everyday-designer-escalators-hint', COPY.escalatorsHint);
+    hint.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.45;margin:0 0 11px`;
+    escalatorPanel.append(hint);
+
+    if (spec.transportModes.length === 0) {
+      const none = el(doc, 'div', 'everyday-designer-escalators-none', COPY.escalatorsNone);
+      none.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-bottom:11px`;
+      escalatorPanel.append(none);
+    }
+
+    const rows = el(doc, 'div');
+    rows.style.cssText = 'display:grid;gap:9px;margin-bottom:11px';
+    escalatorPanel.append(rows);
+    const highest = spec.floors;
+    for (const mode of spec.transportModes) {
+      const row = el(doc, 'div', 'everyday-designer-escalator');
+      row.dataset['modeId'] = mode.id;
+      row.style.cssText = `display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid ${C.ruleLight};border-radius:${String(R.row)}px;background:${C.paper};flex-wrap:wrap`;
+      const from = el(doc, 'span', undefined, 'from');
+      from.style.cssText = `font-size:12px;color:${C.warmGrey};flex:none`;
+      const to = el(doc, 'span', undefined, 'to');
+      to.style.cssText = from.style.cssText;
+      const endField = (end: 0 | 1): HTMLInputElement =>
+        numberField(String(mode.connects[end]), (next) => {
+          /* Both ends inside the tower and never on one floor — the schema's own two refusals, made unreachable. */
+          const floor = Math.max(-spec.belowLobby.length, Math.min(highest, next));
+          if (floor === mode.connects[1 - end]) return;
+          edit({ transportModes: withTransportEnd(spec, mode.id, end, floor) });
+        });
+      row.append(from, endField(0), to, endField(1));
+      if (typeof mode.traversalTimeS === 'number') {
+        const seconds = numberField(mode.traversalTimeS.toFixed(1), (next) => {
+          edit({ transportModes: withTransportSeconds(spec, mode.id, next) });
+        });
+        seconds.step = '0.1';
+        const unit = el(doc, 'span', 'everyday-designer-escalator-seconds', COPY.escalatorSecondsLabel);
+        unit.style.cssText = from.style.cssText;
+        row.append(seconds, unit);
+      } else {
+        const stairs = el(doc, 'span', 'everyday-designer-escalator-stairs', COPY.escalatorStairsNote);
+        stairs.style.cssText = `font-size:11.5px;color:${C.warmGrey};flex:1 1 200px`;
+        row.append(stairs);
+      }
+      const remove = el(doc, 'button', 'everyday-designer-escalator-remove', COPY.removeEscalator);
+      remove.type = 'button';
+      remove.style.cssText = `margin-left:auto;flex:none;cursor:pointer;border:1.5px solid ${C.rule};background:${C.card};color:${C.ink};border-radius:${String(R.pill)}px;padding:4px 11px;font:500 11px ${TYPE.mono}`;
+      remove.addEventListener('click', () => {
+        edit({ transportModes: spec.transportModes.filter((entry) => entry.id !== mode.id) });
+      });
+      row.append(remove);
+      rows.append(row);
+    }
+
+    const add = el(doc, 'button', 'everyday-designer-escalator-add', COPY.addEscalator);
+    add.type = 'button';
+    add.style.cssText = `cursor:pointer;border:1.5px solid ${C.ink};background:${C.paper};color:${C.ink};border-radius:${String(R.pill)}px;padding:6px 12px;font-size:12px;font-weight:600`;
+    add.addEventListener('click', () => {
+      const lower = [...spec.skyFloors].filter((floor) => floor > 0 && floor < spec.floors).sort((a, b) => a - b)[0];
+      const connects: readonly [number, number] = lower === undefined ? [0, 1] : [lower, lower + 1];
+      const mode: SpecTransportMode = {
+        id: nextTransportModeId(spec),
+        connects,
+        traversalTimeS: escalatorSecondsFor(spec, connects),
+      };
+      edit({ transportModes: [...spec.transportModes, mode] });
+    });
+    escalatorPanel.append(add);
+  }
+
   function numberField(value: string, onCommit: (next: number) => void): HTMLInputElement {
     const input = el(doc, 'input', 'everyday-designer-band');
     input.type = 'number';
@@ -529,13 +618,35 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     return input;
   }
 
+  /*
+   * § 13.3's *document*: a collapsed disclosure that prints the design as an engineer would write it
+   * — GitHub issue #177 item 5, § D518. The heading and its note stay outside the fold so the block
+   * says what it is before it is opened; the plate, the capacity line and the readings are inside.
+   * `<details>` rather than a hand-rolled toggle: the fold's state is the element's own, it needs no
+   * listener, and a keyboard reaches it. Collapsed by default, as the guide draws it.
+   */
+  let documentOpen = false;
+
   function drawSpecBlock(): void {
     specBlock.replaceChildren();
     const heading = el(doc, 'div', undefined, COPY.specEyebrow);
     heading.style.cssText = `${EYEBROW};margin-bottom:8px`;
     const note = el(doc, 'p', 'everyday-designer-spec-note', COPY.specNote);
     note.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin:0 0 13px;max-width:80ch`;
-    specBlock.append(heading, note);
+    const fold = el(doc, 'details', 'everyday-designer-document');
+    fold.open = documentOpen;
+    fold.addEventListener('toggle', () => {
+      documentOpen = fold.open;
+    });
+    const summary = el(doc, 'summary', 'everyday-designer-document-summary', COPY.documentFold);
+    summary.style.cssText = `cursor:pointer;font-size:12.5px;font-weight:600;color:${C.ink};margin-bottom:10px`;
+    fold.append(summary);
+    specBlock.append(heading, note, fold);
+    drawSpecDocument(fold);
+  }
+
+  /** The document's body — the plate, the capacity line and the readings — drawn inside the fold. */
+  function drawSpecDocument(specBlock: HTMLElement): void {
 
     const machineClass = classOfSpec(classes, spec);
     const plate = el(doc, 'div', 'everyday-designer-plate');
@@ -641,6 +752,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     drawBuildingPanel();
     drawMachinePanel(machineClass);
     drawServicePanel();
+    drawEscalatorPanel();
     drawSpecBlock();
     savedNote.textContent = savedLine;
   }

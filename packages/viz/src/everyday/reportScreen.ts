@@ -632,6 +632,11 @@ function mountReportScreen(
         if (context.host.startRush() === undefined) context.go('stage');
         return;
       }
+      /* § 6.1's replay ends at the door it started from; `go` puts the parked week back on the way. */
+      if (context.ctx === 'replay') {
+        context.go('door');
+        return;
+      }
       context.go(context.ctx === 'campaign' ? 'building' : 'week');
     },
   };

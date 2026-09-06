@@ -46,6 +46,7 @@ import { HISTORY_DAYS } from '../shift/week.js';
 import { EM_DASH, percentFigure } from './figures.js';
 import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE, effectiveNameOf } from './profile.js';
 import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
+import { REPLAY_COPY } from './replay.js';
 import { ENGINEER_SWAP_NOTE } from './types.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 
@@ -214,9 +215,11 @@ export function sublineFor(state: EverydayState): string {
       return 'AT THE BRIEF';
     case 'stage':
       if (state.ctx === 'watch') return 'WATCHING';
+      if (state.ctx === 'replay') return REPLAY_COPY.subline;
       return state.ctx === 'rush' ? 'IN THE RUSH' : 'MID-DAY';
     case 'report':
       if (state.ctx === 'watch') return 'WATCHING';
+      if (state.ctx === 'replay') return REPLAY_COPY.subline;
       return state.ctx === 'rush' ? 'READING THE RUSH' : 'READING THE REPORT';
     case 'towers':
       return 'CAMPAIGN';

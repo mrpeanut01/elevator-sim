@@ -10429,6 +10429,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/today.ts#todayOf',
     'shift/firstSession.ts#FIRST_SESSION_LINE',
     'everyday/doorView.ts#doorScreenViewOf',
+    /* § 6.1's replay words — GitHub issue #177 item 1. The door's primary note carries both arms
+       (a day inside the week, a chip from before it), and the bar and rail adapters carry the rest. */
+    'everyday/replay.ts#REPLAY_COPY',
     'everyday/doorView.ts#DOOR_STEPS',
     'everyday/doorView.ts#SAME_FOR_EVERYONE',
     'everyday/briefView.ts#briefScreenViewOf',
@@ -10537,8 +10540,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       for (const closed of [false, true]) {
         const arm = `${at}.${closed ? 'closed' : 'open'}`;
 
-        /* ---- the front door, at today and at a past day (the replay refusal) ---- */
-        for (const offset of [0, DAY_OFFSET_MIN]) {
+        /* ---- the front door: today, yesterday (a replay the week can hand back), and the strip's far end ---- */
+        for (const offset of [0, -1, DAY_OFFSET_MIN]) {
           const door = doorScreenViewOf({
             week: entry.week,
             today,
