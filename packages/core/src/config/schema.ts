@@ -860,6 +860,17 @@ export const dispatcherProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
   name: z.string().min(1),
+  /*
+   * The authored player-facing line — GitHub issue #178 item 5, § D508, on `TrafficProfile.blurb`'s
+   * bound and for its reason. Optional on the schema, because a saved or edited profile is written
+   * by a player rather than authored, and a working copy that lost its blurb is not a broken
+   * document; every *shipped* profile carries one, which `dispatcherProfiles.test.ts` holds.
+   */
+  blurb: z
+    .string()
+    .min(1, 'blurb is player-facing copy and may not be empty')
+    .max(160, 'a blurb over 160 characters is maintainer prose on a player surface; see DECISIONS.md § D186')
+    .optional(),
   role: z.string().min(1).optional(),
   engine: z.string().min(1).optional(),
   weights: z.record(identifier, z.number()),

@@ -277,36 +277,99 @@ export function dispatcherCardOf(
   profile: DispatcherProfile,
   cards: readonly DispatcherProfile[],
   mode: ViewMode = 'advanced',
+  /**
+   * The **shipped** profiles, when `cards` holds more than them — § D508's guard compares against
+   * the file, and a list that also carries the reader's saved copies would let a copy vouch for
+   * itself. Every caller that draws only shipped cards leaves it at the default.
+   */
+  shipped: readonly DispatcherProfile[] = cards,
 ): DispatcherCard {
   const vector = dispatcherBlurbOf(profile);
   const behaviour = dispatcherBehaviourOf(profile, cards);
+  const authored = authoredBlurbOf(profile, shipped);
   const identity = `Profile id \`${profile.id}\`.`;
+  /*
+   * § D508: the authored sentence takes the Casual face when there is one, and the derived
+   * behaviour sentence moves behind the disclosure beside the vector rather than leaving — both
+   * registers still carry every string, which is § D299 § 2 and what `rightRail.test.ts` asserts.
+   */
   return mode === 'basic'
-    ? { sub: behaviour, help: `${vector} ${identity}` }
-    : { sub: vector, help: `${behaviour} ${identity}` };
+    ? authored === undefined
+      ? { sub: behaviour, help: `${vector} ${identity}` }
+      : { sub: authored, help: `${behaviour} ${vector} ${identity}` }
+    : { sub: vector, help: `${authored === undefined ? '' : `${authored} `}${behaviour} ${identity}` };
+}
+
+/**
+ * The fields a blurb is written about — everything that decides a car, and nothing that names one.
+ *
+ * `name` and `$comment` are outside it on purpose: renaming a profile does not change what it does,
+ * and a comment is maintainer documentation. `blurb` itself is outside it because the question is
+ * whether the *vector* the sentence describes is the one on the card.
+ */
+function decisionFingerprintOf(profile: DispatcherProfile): string {
+  return JSON.stringify({
+    weights: profile.weights,
+    hardConstraints: profile.hardConstraints ?? null,
+    normalization: profile.normalization ?? null,
+    dispatch: profile.dispatch ?? null,
+    eligibility: profile.eligibility ?? null,
+    answer: profile.answer ?? null,
+    idle: profile.idle ?? null,
+    auction: profile.auction ?? null,
+    selection: profile.selection ?? null,
+    rules: profile.rules ?? null,
+    engine: profile.engine ?? null,
+  });
+}
+
+/**
+ * The authored sentence for this card, or `undefined` when the card is not the shipped profile the
+ * sentence was written for — GitHub issue #178 item 5, § D508.
+ *
+ * Three things have to hold, and each is a way the sentence would otherwise go stale beside a
+ * vector it does not describe: the profile carries a blurb at all; a **shipped** profile under the
+ * same id carries the same blurb; and that profile decides exactly as this one does
+ * ({@link decisionFingerprintOf}). A saved copy fails the second, an edited working copy fails the
+ * third, and a searched vector fails both. `shipped` is the file's list and never the reader's,
+ * because a list that held the copies would let a copy vouch for itself.
+ */
+export function authoredBlurbOf(
+  profile: DispatcherProfile,
+  shipped: readonly DispatcherProfile[],
+): string | undefined {
+  const blurb = profile.blurb;
+  if (blurb === undefined || blurb.trim() === '') return undefined;
+  const source = shipped.find((card) => card.id === profile.id);
+  if (source === undefined || source.blurb !== blurb) return undefined;
+  return decisionFingerprintOf(source) === decisionFingerprintOf(profile) ? blurb : undefined;
 }
 
 /**
  * What this dispatcher does differently in the building — **derived from its weight vector and from
  * the other cards on the list, never authored per id.**
  *
- * ## Why there is no sentence-per-dispatcher, and why an authored `blurb` field is not the fix
+ * ## Why this sentence is derived, and where the authored one is allowed — § D508
  *
- * {@link dispatcherBlurbOf}'s docstring ends by wishing for one: *"a short authored player-facing
- * blurb would be better copy than any of this … that needs a new field in
- * `data/dispatcher-profiles.json`"*. That wish is **withdrawn here rather than granted**, and the
- * reason is the one CLAUDE.md's invariant 7 exists for pointed one step further on.
+ * {@link dispatcherBlurbOf}'s docstring used to end by wishing for an authored field, and this
+ * paragraph used to **withdraw** that wish: a dispatcher's weight vector is the one object in this
+ * repository that a **search** writes — Phase 7's optimizer, `tuning/`, § D145's learned arm — so
+ * authored prose beside a searched vector is stale on the first round that improves it, and
+ * nothing would notice. A per-id sentence in this module would be `if (strategy === 'nearest-car')`
+ * wearing prose, and a per-id sentence in `data/` cleared invariant 7 on a technicality.
  *
- * A per-id sentence in this module would be `if (strategy === 'nearest-car')` wearing prose. A
- * per-id sentence in `data/` would clear invariant 7 on a technicality and fail the thing invariant
- * 7 is *for*: a dispatcher's weight vector is the one object in this repository that a **search**
- * writes — Phase 7's optimizer emits weight vectors, `tuning/` emits weight vectors, and § D145's
- * learned arm emits weight vectors. Authored prose beside a searched vector is stale on the first
- * round it improves, and nothing would notice. `TrafficProfile.blurb` is the precedent for authored
- * copy and it is a precedent about a *pattern*, which nothing tunes.
+ * GitHub issue #178 item 5 asked for a ruling on what survived the withdrawal — a derived card
+ * *"reads as configuration, not as a sentence a building manager would say"*, which `docs/12`
+ * § 2.2 makes a requirement — and § D508 is it: **the authored sentence exists, and it is drawn only
+ * beside the exact shipped vector it was written for.** `DispatcherProfile.blurb` is authored on
+ * every shipped profile, and {@link authoredBlurbOf} answers it only when the card's profile is the
+ * shipped one under that id with the same vector, constraints and stages — so a saved copy, an
+ * edited working copy or a searched vector gets *this* derived sentence and never a sentence about
+ * a different vector. That guard is what the withdrawal was really about, and it is a property a
+ * test can run rather than a rule about who writes prose.
  *
- * So every clause below is computed, and the vocabulary comes from the two places that already
- * declare it:
+ * So every clause below is still computed, and the vocabulary comes from the two places that
+ * already declare it:
  *
  * | clause | source | goes stale when |
  * |---|---|---|

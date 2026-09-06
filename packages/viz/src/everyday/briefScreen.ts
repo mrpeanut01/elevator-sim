@@ -85,6 +85,9 @@ function mountBrief(
     const { host: data } = context;
     const selection = data.selection();
     const dispatchers = data.dispatchers();
+    /* The reader's saved copies, by id — § D508's guard needs the shipped list without them. */
+    const savedIds = new Set(data.savedDispatchers().map((entry) => entry.profile.id));
+    const shipped = dispatchers.filter((profile) => !savedIds.has(profile.id));
     const today = todayOf({
       week: data.week(),
       calendar: data.calendarPeriod(),
@@ -105,16 +108,16 @@ function mountBrief(
           name: profile.name,
           /*
            * The Engineer's own player-facing sentence for this profile, in its Casual register —
-           * `dev/rightRail.ts#dispatcherCardOf(profile, cards, 'basic').sub`. Read rather than
-           * authored, and it is not a shortcut: `dispatcherBlurbOf`'s docstring argues at length
-           * that a per-dispatcher sentence may not be authored *anywhere*, because a weight vector
-           * is the one object in this repository a search writes and authored prose beside a
-           * searched vector is stale on the first round that improves it. A second sentence here
-           * would be that mistake with a Casual accent.
+           * `dev/rightRail.ts#dispatcherCardOf(profile, cards, 'basic', shipped).sub`. Read rather
+           * than authored here: since § D508 that is the profile's authored line when the card is
+           * the shipped vector it was written for, and the derived behaviour sentence otherwise —
+           * a saved copy or an edited vector never wears a sentence about a different one. The
+           * shipped list is passed separately so a copy on the reader's shelf cannot vouch for
+           * itself. A second sentence authored here would be the mistake with a Casual accent.
            */
-          description: dispatcherCardOf(profile, dispatchers, 'basic').sub,
+          description: dispatcherCardOf(profile, dispatchers, 'basic', shipped).sub,
         })),
-        savedIds: data.savedDispatchers().map((entry) => entry.profile.id),
+        savedIds: [...savedIds],
         selectedId: selection.dispatcherId,
       }),
     };

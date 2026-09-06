@@ -49,6 +49,7 @@ import type { PlateEntry } from './dom.js';
 import {
   buildingPlateOf,
   closedFormRowsOf,
+  authoredBlurbOf,
   dispatcherBehaviourOf,
   dispatcherBlurbOf,
   dispatcherCardOf,
@@ -217,6 +218,49 @@ describe('the dispatcher list’s words', () => {
   it('tells every shipped profile apart', () => {
     const blurbs = config.dispatcherProfiles.profiles.map((entry) => dispatcherBlurbOf(entry));
     expect(new Set(blurbs).size).toBe(blurbs.length);
+  });
+
+  /**
+   * § D508's guard, both ways — GitHub issue #178 item 5. The authored sentence is on the Casual
+   * face of every shipped card, and off the face of anything that is not the shipped vector under
+   * that id: a saved copy, an edited working copy, a profile with no sentence at all.
+   */
+  it('draws the authored sentence only beside the exact shipped vector it was written for', () => {
+    const shipped = config.dispatcherProfiles.profiles;
+    for (const entry of shipped) {
+      expect(authoredBlurbOf(entry, shipped), entry.id).toBe(entry.blurb);
+      expect(dispatcherCardOf(entry, shipped, 'basic').sub).toBe(entry.blurb);
+      /* Engineer's face is still the vector; the authored line rides behind its disclosure. */
+      expect(dispatcherCardOf(entry, shipped, 'advanced').sub).toBe(dispatcherBlurbOf(entry));
+      expect(dispatcherCardOf(entry, shipped, 'advanced').help).toContain(entry.blurb ?? '\u0000');
+    }
+    const collective = profile('collective');
+    /* A saved copy: same vector, new id — not the shipped profile, so not its sentence. */
+    const saved = { ...collective, id: 'saved-1', name: 'My collective' };
+    expect(authoredBlurbOf(saved, shipped)).toBeUndefined();
+    expect(dispatcherCardOf(saved, [...shipped, saved], 'basic', shipped).sub).not.toBe(collective.blurb);
+    /* A list that held the copy would let it vouch for itself — which is why the fourth argument exists. */
+    expect(authoredBlurbOf(saved, [...shipped, saved])).toBe(collective.blurb);
+    /* An edited working copy: same id, a moved weight — a different vector under the same name. */
+    const edited = { ...collective, weights: { ...collective.weights, waitTime: 0.5 } };
+    expect(authoredBlurbOf(edited, shipped)).toBeUndefined();
+    expect(dispatcherCardOf(edited, shipped, 'basic').sub).toBe(dispatcherBehaviourOf(edited, shipped));
+    /* And the vector's own line is untouched by any of this. */
+    expect(dispatcherBlurbOf(edited)).toContain('waitTime 0.50');
+  });
+
+  it('keeps every string in both registers with the authored line in play — § D299 § 2', () => {
+    const shipped = config.dispatcherProfiles.profiles;
+    for (const entry of shipped) {
+      for (const mode of ['basic', 'advanced'] as const) {
+        const card = dispatcherCardOf(entry, shipped, mode);
+        const all = `${card.sub} ${card.help}`;
+        expect(all).toContain(dispatcherBlurbOf(entry));
+        expect(all).toContain(dispatcherBehaviourOf(entry, shipped));
+        expect(all).toContain(entry.blurb ?? '\u0000');
+        expect(all).toContain(`Profile id \`${entry.id}\``);
+      }
+    }
   });
 
   it('generates an honest one-liner from the weight vector', () => {
@@ -1060,7 +1104,9 @@ describe('Casual removes nothing — the registers swap places, issue #100', () 
         expect(whole, `${entry.id}/${mode} behaviour`).toContain(behaviour);
       }
       // …and they really do swap, or the equality above would hold for a card that never moved.
-      expect(dispatcherCardOf(entry, profiles, 'basic').sub).toBe(behaviour);
+      // Since § D508 the Casual face of a shipped card is its authored line, with the behaviour
+      // sentence behind the disclosure; a profile with no line still leads with the behaviour.
+      expect(dispatcherCardOf(entry, profiles, 'basic').sub).toBe(entry.blurb ?? behaviour);
       expect(dispatcherCardOf(entry, profiles, 'advanced').sub).toBe(vector);
     }
   });

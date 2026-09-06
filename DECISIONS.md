@@ -33650,3 +33650,47 @@ demand — `docs/37` § 5.1 records that the engine has no timed burst, and this
 crowd honestly in the fields the engine has rather than inventing one. And whether a campaign day
 should ever inherit a period from the player's week: the calendar's period asks still apply to a
 campaign day exactly as before, which is unchanged rather than ruled on.
+
+---
+
+## D508 — every shipped dispatcher carries an authored sentence, and a card draws it only beside the exact vector it was written for
+
+**Date: 2026-09-06 · Owner: the integrator, wave V · Rules on: GitHub issue #178 item 5,
+`data/dispatcher-profiles.json`, `core`'s `DispatcherProfile.blurb`, `dev/rightRail.ts#authoredBlurbOf`,
+`dev/rightRail.ts#dispatcherCardOf`, `GAPS.md` § 3's card row.**
+
+`GAPS.md` recorded two halves of one wish. The authored-field half was withdrawn in code —
+`rightRail.ts` argued that a dispatcher's weight vector is the one object a **search** writes, so
+authored prose beside a searched vector is stale on the first round that improves it — and the
+other half stayed open: a derived card *"reads as configuration, not as a sentence a building
+manager would say"*, which `docs/12` § 2.2 makes a requirement. The issue asked for a ruling.
+
+**The ruling is that the withdrawal was about a guard, not about who writes prose.** The staleness
+argument is true of prose beside a vector *it does not describe*. It is not true of prose beside the
+one vector it was written for, and a card can know which it is holding. So:
+
+1. `DispatcherProfile.blurb` is authored on all thirteen shipped profiles, 1–160 characters on
+   `TrafficProfile.blurb`'s bound and for its reason (§ D186's: a sentence a player reads is a
+   sentence somebody wrote for a player). Optional on the schema, because a saved or edited profile
+   is a player's document and is not broken for lacking one; required of the shipped file by
+   `loader.test.ts`, so a fourteenth profile without a sentence is red rather than a silent
+   fallback.
+2. `authoredBlurbOf` answers the sentence only when the card's profile is the shipped one under
+   that id on the list the card is drawn among, carrying the same blurb, with the same decision
+   fingerprint — weights, constraints and every stage. A saved copy fails the id, an edited working
+   copy fails the fingerprint, a searched vector fails both, and each gets the derived line, which
+   is exactly right for it.
+3. Nothing leaves either register (§ D299 § 2). The Casual face is the authored line when there is
+   one and the derived behaviour sentence moves behind the disclosure beside the vector; the
+   Engineer face is still the vector, with the authored line behind its disclosure.
+   `rightRail.test.ts` asserts both directions and pins the Engineer face byte-for-byte as before.
+
+**What the blurbs say, and what they may not.** Each is written in the building manager's voice the
+gap asked for and says what the dispatcher does to a queue, never how well: no estimate cue and no
+probability word, which `rightRail.test.ts`'s cue sweep and the corpus's R10 hold. `$comment` still
+reaches nothing, by the same guards as before.
+
+**What this does not decide.** Whether the thirteen should become four or five play styles — still
+refused (§ D299 § 2, § D319). And whether a *saved* dispatcher should be able to carry a sentence
+of the player's own: the field is on the type and the schema allows it, but no editor writes it,
+and a control that writes nothing is not built.

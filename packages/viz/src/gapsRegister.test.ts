@@ -141,6 +141,13 @@ const CLOSED_ORACLES: readonly Oracle[] = [
       sourceOf('shift/report.ts').includes('readonly showEnergyAxis?: boolean'),
   },
   {
+    key: "A dispatcher card's words are derived, and the better ones are authored where nothing may read them",
+    claim: 'every shipped profile carries a blurb and the card draws it only beside the shipped vector',
+    holds: () =>
+      sourceOf('dev/rightRail.ts').includes('export function authoredBlurbOf(') &&
+      sourceOf('../../../data/dispatcher-profiles.json').split('"blurb":').length >= 14,
+  },
+  {
     key: 'A live weight editor makes overfitting the tuning seeds the dominant strategy',
     claim: 'the shipped brief names the holdout set and its seed, and the judge gates on the holdout',
     holds: () =>
@@ -188,12 +195,6 @@ const UNGUARDED: readonly Named[] = [
   {
     key: "Basic's curated three-dimension subset is not built",
     reason: 'The subset has no name in code; the row records that the editable set is data instead.',
-  },
-  {
-    key: "A dispatcher card's words are derived, and the better ones are authored where nothing may read them",
-    reason:
-      'The residual is a copy judgement (GitHub issue #178 item 5): whether a derived card reads as ' +
-      'a sentence a building manager would say. The withdrawn half is recorded in the row itself.',
   },
   {
     key: 'The access block\'s six mount-private copy sentences in `dev/buildingEditor.ts` are static-only',

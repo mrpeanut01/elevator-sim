@@ -158,6 +158,26 @@ describe('loadConfig against the real data/ directory', () => {
     }
   });
 
+  it('every shipped dispatcher profile authors a bounded player-facing blurb that is not its $comment', () => {
+    /*
+     * GitHub issue #178 item 5, § D508. Optional on the schema — a player's saved or edited profile
+     * is not a broken document without one — and required of the shipped file by this case, so a
+     * fourteenth profile without a sentence is red here rather than a card that falls back to the
+     * derived line without anybody noticing.
+     */
+    expect(config.dispatcherProfiles.profiles.length).toBeGreaterThanOrEqual(13);
+    const blurbs = new Set<string>();
+    for (const profile of config.dispatcherProfiles.profiles) {
+      expect(profile.blurb, profile.id).toBeDefined();
+      expect(profile.blurb?.trim().length, profile.id).toBeGreaterThan(0);
+      expect(profile.blurb?.length, profile.id).toBeLessThanOrEqual(160);
+      if (profile.$comment !== undefined) expect(profile.blurb).not.toBe(profile.$comment);
+      blurbs.add(profile.blurb ?? '');
+    }
+    // No two shipped profiles share one — the derived line's own rule, kept for the authored one.
+    expect(blurbs.size).toBe(config.dispatcherProfiles.profiles.length);
+  });
+
   it('loads every shipped building, in filename order', () => {
     expect(config.buildings.map((building) => building.id)).toEqual([
       'chancery-house',
