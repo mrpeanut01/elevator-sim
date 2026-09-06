@@ -396,8 +396,12 @@ function mountStage(
    * positions are one picture, and a chip that changed nothing would be a lie in a strip.
    */
   const cameras = el(doc, 'div', 'everyday-stage-cameras');
+  /*
+   * Never `hidden`: the strip is a flex box whose whole content is the chips, so with none in it
+   * the box has no height, and `hiddenBox.test.ts` refuses an inline `display` on anything the
+   * `hidden` attribute is asked to hide, because the inline value outranks `[hidden]`.
+   */
   cameras.style.cssText = `display:flex;gap:${String(GAP.tight)}px`;
-  cameras.hidden = true;
   const cameraButtons = STAGE_CAMERAS.map((chip) => {
     const button = el(doc, 'button', 'everyday-stage-camera', chip.label);
     button.type = 'button';
@@ -1193,7 +1197,6 @@ function mountStage(
          * measures every control the DOM holds, and a hidden chip is a zero-sized control to it.
          */
         const offered = stageCameraChipsOf(recording.floors, rect.height).length > 0;
-        cameras.hidden = !offered;
         if (offered && cameras.childElementCount === 0) cameras.replaceChildren(...cameraButtons);
         if (!offered && cameras.childElementCount > 0) cameras.replaceChildren();
       }
