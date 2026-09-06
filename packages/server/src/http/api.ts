@@ -91,6 +91,7 @@ import {
 import { verifyChallengeSubmission } from '../challenge/verify.js';
 import { signInMessage, type Mailer } from '../mail/mailer.js';
 import { BOARD_KEYS, dailyFixtureAt, placeSubmission, runDataHashOf } from '../leaderboard/boardKey.js';
+import { boardDistributionOf, type AxisObservation } from '../leaderboard/distribution.js';
 import { submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
 import {
@@ -344,6 +345,8 @@ export function createApi(deps: ApiDeps): Api {
         };
       case 'GET /api/board':
         return board(deps, request);
+      case 'GET /api/board-distribution':
+        return boardDistribution(deps, request);
       case 'GET /api/challenges':
         return challenges(deps);
       case 'GET /api/challenge':
@@ -892,6 +895,25 @@ async function board(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
       entries: entries.map((entry) => publicEntry(entry)),
     },
   };
+}
+
+/**
+ * A board's quantile ladder per axis — GitHub issue #327, § D484's ruling as a route, § D506.
+ *
+ * What it publishes and refuses is `leaderboard/distribution.ts`'s; this is the wire. No interval
+ * travels, for the reason that module's docstring gives, and a client that computed one from the
+ * rungs would be doing what this route declined to.
+ */
+async function boardDistribution(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const boardKey = request.query.get('board') ?? '';
+  if (boardKey.length === 0) {
+    return { status: 400, body: { error: 'no-board', detail: 'Name a board with ?board=…' } };
+  }
+  const byAxis = new Map<BoardMetric, readonly AxisObservation[]>();
+  for (const metric of BOARD_METRICS) {
+    byAxis.set(metric, await deps.store.axisObservations(boardKey, metric));
+  }
+  return { status: 200, body: boardDistributionOf(boardKey, byAxis) };
 }
 
 /* ----------------------------------------------------------------- challenges */

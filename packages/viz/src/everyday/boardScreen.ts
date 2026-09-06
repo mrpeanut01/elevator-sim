@@ -134,6 +134,18 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    */
   dailyRowWithheld: 'no count',
   /*
+   * The middle of today's board — GitHub issue #327, § D484's ladder drawn as words. Each axis is
+   * its own line with its own count; no line combines two axes, none orders energy against wait
+   * (the wire says why energy is absent, and that sentence is carried), and no interval is drawn.
+   */
+  worldHeading: "THE MIDDLE OF TODAY'S BOARD",
+  worldUnasked: 'This build did not ask the server for the middle of the board.',
+  worldUnreachable: 'The middle of the board could not be read:',
+  worldAxisAwtS: 'Mean wait',
+  worldAxisWt95S: '95th-percentile wait',
+  worldAxisTtdMeanS: 'Time to destination',
+  worldAxisPctOverLongWait: 'Share waiting past the long-wait line',
+  /*
    * The heading over the cases a rating could not score — GitHub issue #295's F26. It sits under
    * the incomplete note rather than replacing it: the note says the mean is not comparable, and
    * this says which cases are missing from it and what each of them said. `rating.ts` computes
@@ -590,7 +602,15 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
       p.style.cssText = line.role === 'reason' ? NOTE : `${NOTE};color:${C.label}`;
       wrap.append(p);
     }
-    if (view.rows.length === 0) return wrap;
+    if (view.rows.length === 0) {
+      for (const line of view.world) {
+        const p = el(doc, 'p', line.text);
+        p.className = line.className;
+        p.style.cssText = line.role === 'reason' ? NOTE : `${NOTE};color:${C.label}`;
+        wrap.append(p);
+      }
+      return wrap;
+    }
 
     const rows = el(doc, 'div');
     rows.className = 'everyday-board-rows';
@@ -651,6 +671,13 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
       rows.append(row);
     }
     wrap.append(rows);
+    /* The middle of the board, under the rows — GitHub issue #327; the view decided every word. */
+    for (const line of view.world) {
+      const p = el(doc, 'p', line.text);
+      p.className = line.className;
+      p.style.cssText = line.role === 'reason' ? NOTE : `${NOTE};color:${C.label}`;
+      wrap.append(p);
+    }
     return wrap;
   }
 
@@ -813,6 +840,13 @@ export interface DailyBoardRowView {
 export interface DailyBoardView {
   readonly lines: readonly DailyBoardLine[];
   readonly rows: readonly DailyBoardRowView[];
+  /**
+   * The middle of the board, under the rows — GitHub issue #327. Empty on every state but a read
+   * board; on one, a heading and then one line per axis (or the server's own withholding sentence),
+   * the wire's note, and the axes it names as absent. Drawn after the rows so a ladder never reads
+   * as a ranking.
+   */
+  readonly world: readonly DailyBoardLine[];
 }
 
 /**
@@ -833,6 +867,69 @@ export interface DailyBoardView {
  * Pure and exported so `boardScreen.test.ts` can drive every state without a document, and so the
  * shape of the decision is readable without reading a renderer.
  */
+/** The axis's name in the player's words, or its id for an axis this build does not know. */
+function worldAxisLabelOf(axis: string): string {
+  switch (axis) {
+    case 'awtS':
+      return BOARD_SCREEN_COPY.worldAxisAwtS;
+    case 'wt95S':
+      return BOARD_SCREEN_COPY.worldAxisWt95S;
+    case 'ttdMeanS':
+      return BOARD_SCREEN_COPY.worldAxisTtdMeanS;
+    case 'pctOverLongWait':
+      return BOARD_SCREEN_COPY.worldAxisPctOverLongWait;
+    default:
+      return axis;
+  }
+}
+
+/** `18.2 s` for a seconds axis, `3.4%` for the share. Unit from the axis, never guessed. */
+function worldFigureOf(axis: string, value: number): string {
+  return axis === 'pctOverLongWait' ? `${value.toFixed(1)}%` : `${value.toFixed(1)} s`;
+}
+
+/**
+ * The middle of the board as lines — GitHub issue #327. Every figure carries its count in its own
+ * line (R13 clause one), the withholding is the server's sentence rather than a paraphrase, and an
+ * axis the wire names as absent is drawn as absent with the wire's reason.
+ */
+function worldLinesOf(board: Extract<EverydayDailyBoard, { kind: 'board' }>): readonly DailyBoardLine[] {
+  const heading: DailyBoardLine = { text: BOARD_SCREEN_COPY.worldHeading, className: 'everyday-board-world-heading', role: 'note' };
+  const spread = board.distribution;
+  if (spread === undefined) {
+    return [
+      heading,
+      board.distributionDetail === undefined
+        ? { text: BOARD_SCREEN_COPY.worldUnasked, className: 'everyday-board-world-unasked', role: 'reason' }
+        : {
+            text: `${BOARD_SCREEN_COPY.worldUnreachable} ${board.distributionDetail}`,
+            className: 'everyday-board-world-unreachable',
+            role: 'reason',
+          },
+    ];
+  }
+  if (spread.withheld !== undefined) {
+    return [heading, { text: spread.withheld, className: 'everyday-board-world-withheld', role: 'reason' }];
+  }
+  const axes: DailyBoardLine[] = spread.ladders.map((ladder) => ({
+    text:
+      ladder.rungs === undefined
+        ? `${worldAxisLabelOf(ladder.axis)} — withheld over ${String(ladder.n)} players`
+        : `${worldAxisLabelOf(ladder.axis)} — the middle is ${worldFigureOf(ladder.axis, ladder.rungs.p50)}; ` +
+          `a quarter of players are under ${worldFigureOf(ladder.axis, ladder.rungs.p25)} and a quarter over ` +
+          `${worldFigureOf(ladder.axis, ladder.rungs.p75)}, the outer tenths at ${worldFigureOf(ladder.axis, ladder.rungs.p10)} ` +
+          `and ${worldFigureOf(ladder.axis, ladder.rungs.p90)} — over ${String(ladder.n)} players, one best run each`,
+    className: 'everyday-board-world-axis',
+    role: 'note',
+  }));
+  const absent: DailyBoardLine[] = spread.absent.map((entry) => ({
+    text: `${entry.axis}: ${entry.reason}`,
+    className: 'everyday-board-world-absent',
+    role: 'reason',
+  }));
+  return [heading, ...axes, { text: spread.note, className: 'everyday-board-world-note', role: 'reason' }, ...absent];
+}
+
 export function dailyBoardViewOf(
   board: EverydayDailyBoard | undefined,
   ownDisplayName: string | undefined = undefined,
@@ -840,6 +937,7 @@ export function dailyBoardViewOf(
   const only = (text: string, className: string, role: 'reason' | 'note' = 'reason'): DailyBoardView => ({
     lines: [{ text, className, role }],
     rows: [],
+    world: [],
   });
 
   if (board === undefined) {
@@ -864,6 +962,7 @@ export function dailyBoardViewOf(
           },
         ],
         rows: [],
+        world: [],
       };
     case 'undeclared':
       return only(BOARD_SCREEN_COPY.dailyUndeclared, 'everyday-board-undeclared');
@@ -880,6 +979,7 @@ export function dailyBoardViewOf(
             { text: BOARD_SCREEN_COPY.dailyEmpty, className: 'everyday-board-empty', role: 'note' },
           ],
           rows: [],
+          world: worldLinesOf(board),
         };
       }
       return {
@@ -909,6 +1009,7 @@ export function dailyBoardViewOf(
               ? undefined
               : `over ${entry.legs.toLocaleString('en-US')} rides`,
         })),
+        world: worldLinesOf(board),
       };
     }
   }

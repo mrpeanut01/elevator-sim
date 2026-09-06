@@ -3857,7 +3857,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     dailyBoard:
       client === undefined
         ? undefined
-        : () => dailyBoardOf(() => client.boards(), (key, metric) => client.board(key, metric)),
+        : () =>
+            dailyBoardOf(
+              () => client.boards(),
+              (key, metric) => client.board(key, metric),
+              (key) => client.distribution(key),
+            ),
     /*
      * § D489's asking half, as four calls — GitHub issue #332. `undefined` on a build served with
      * no API origin, which is what lets the Everyday settings screen say *there is nowhere to sign

@@ -115,7 +115,7 @@ import type {
  * of `menu/client.js` are exactly `dev/main.ts` and `honesty/surfaces.ts`, and it exempts type
  * imports by name. The row shape crosses this façade; the transport does not.
  */
-import type { BoardEntry, BoardPage, BoardsPage, Result } from '../menu/client.js';
+import type { BoardDistribution, BoardEntry, BoardPage, BoardsPage, Result } from '../menu/client.js';
 
 import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
 import {
@@ -224,6 +224,14 @@ export type EverydayDailyBoard =
       readonly date: string;
       readonly note: string;
       readonly rows: readonly BoardEntry[];
+      /**
+       * The board's distribution — GitHub issue #327 — or `undefined` when that read failed after
+       * the board itself was read, with the client's sentence in {@link distributionDetail}. A
+       * board with rows and no ladder is still a board; the two reads are kept apart so a ranked
+       * page never waits on, or is refused for, a second question.
+       */
+      readonly distribution: BoardDistribution | undefined;
+      readonly distributionDetail: string | undefined;
     };
 
 /**
@@ -243,6 +251,7 @@ export type EverydayDailyBoard =
 export async function dailyBoardOf(
   list: () => Promise<Result<BoardsPage>>,
   read: (boardKey: string, metric: string) => Promise<Result<BoardPage>>,
+  distribution?: (boardKey: string) => Promise<Result<BoardDistribution>>,
 ): Promise<EverydayDailyBoard> {
   const listed = await list();
   if (!listed.ok) return { kind: 'unreachable', detail: listed.detail };
@@ -253,10 +262,23 @@ export async function dailyBoardOf(
    * which is why this is its own state rather than an empty board.
    */
   if (today === undefined) return { kind: 'undeclared' };
-  const page = await read(`daily:${today.date}`, DAILY_BOARD_METRIC);
-  return page.ok
-    ? { kind: 'board', date: today.date, note: page.value.note, rows: page.value.entries }
-    : { kind: 'unreachable', detail: page.detail };
+  const key = `daily:${today.date}`;
+  const page = await read(key, DAILY_BOARD_METRIC);
+  if (!page.ok) return { kind: 'unreachable', detail: page.detail };
+  /*
+   * The third read, after the second and never instead of it — GitHub issue #327. Optional so a
+   * caller without the route (an older client binding, the honesty corpus) gets a board with a
+   * stated absence rather than a rejection.
+   */
+  const spread = distribution === undefined ? undefined : await distribution(key);
+  return {
+    kind: 'board',
+    date: today.date,
+    note: page.value.note,
+    rows: page.value.entries,
+    distribution: spread?.ok === true ? spread.value : undefined,
+    distributionDetail: spread === undefined || spread.ok ? undefined : spread.detail,
+  };
 }
 
 /** What the daily board is ranked on. The Engineer board list asks for the same one. */

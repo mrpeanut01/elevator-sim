@@ -285,6 +285,28 @@ export interface BoardSummary {
 }
 
 /**
+ * One axis's quantile ladder — `packages/server/src/leaderboard/distribution.ts#AxisLadder`,
+ * restated for the wire (GitHub issue #327, § D484). `rungs` is absent below the server's floor,
+ * with `n` still published; `medianEntryId` is a real entry at this axis's median, never a vector.
+ */
+export interface BoardAxisLadder {
+  readonly axis: string;
+  readonly n: number;
+  readonly rungs: Readonly<Record<'p10' | 'p25' | 'p50' | 'p75' | 'p90', number>> | undefined;
+  readonly medianEntryId: string | undefined;
+}
+
+/** A board's distribution as the server publishes it. No interval, by that module's argument. */
+export interface BoardDistribution {
+  readonly boardKey: string;
+  readonly n: number;
+  readonly ladders: readonly BoardAxisLadder[];
+  readonly withheld: string | undefined;
+  readonly absent: readonly { readonly axis: string; readonly reason: string }[];
+  readonly note: string;
+}
+
+/**
  * One row of the server's own board-key table — the contract's three keys, each with the route that
  * reaches it or `null` for a key the product declares and cannot yet produce.
  *
@@ -542,6 +564,8 @@ export interface LeaderboardClient {
    */
   boards(): Promise<Result<BoardsPage>>;
   board(boardKey: string, metric: string): Promise<Result<BoardPage>>;
+  /** `GET /api/board-distribution` — a quantile ladder per axis for one board. GitHub issue #327. */
+  distribution(boardKey: string): Promise<Result<BoardDistribution>>;
   /**
    * The challenge index — **the only answer** to *"which challenge is it today"*.
    *
@@ -767,6 +791,22 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
            */
           const page = { ...record, entries: entries.map(withLegs) };
           return page as unknown as BoardPage;
+        },
+      ),
+    distribution: (boardKey) =>
+      call(
+        {
+          method: 'GET',
+          url: `${base}/api/board-distribution?board=${encodeURIComponent(boardKey)}`,
+          token: undefined,
+          body: undefined,
+        },
+        (body) => {
+          const record = body as Record<string, unknown> | null;
+          // The server's arithmetic, carried as given: nothing here recomputes a rung or a count.
+          return typeof record?.['boardKey'] === 'string' && Array.isArray(record['ladders'])
+            ? (record as unknown as BoardDistribution)
+            : undefined;
         },
       ),
     challenges: () =>

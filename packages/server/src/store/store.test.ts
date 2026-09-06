@@ -322,6 +322,18 @@ describe('a board', () => {
     expect((await store.board('board-2', 'wt95S', 25)).map((entry) => entry.displayName)).toEqual(['Bo', 'Ada']);
   });
 
+  it('gives the distribution one observation per player, their best on the axis asked — GitHub issue #327', async () => {
+    const { store, ada, bo } = await fixture();
+    /* Ada twice on this board, Bo once: two observations, and Ada's is her better wait. */
+    const better = await store.recordEntry({ boardKey: 'board-4', dataHash: 'd', userId: ada, run: RUN, measured: metrics(30), legs: 100 });
+    await store.recordEntry({ boardKey: 'board-4', dataHash: 'd2', userId: ada, run: { ...RUN, seed: '77' }, measured: metrics(45), legs: 100 });
+    await store.recordEntry({ boardKey: 'board-4', dataHash: 'd3', userId: bo, run: { ...RUN, seed: '78' }, measured: metrics(35), legs: 100 });
+    const observed = await store.axisObservations('board-4', 'awtS');
+    expect(observed.map((row: { value: number }) => row.value).sort((a: number, b: number) => a - b)).toEqual([30, 35]);
+    expect(observed.find((row: { value: number }) => row.value === 30)?.entryId).toBe(better.id);
+    expect(await store.axisObservations('board-nobody', 'awtS')).toEqual([]);
+  });
+
   it('replaces rather than appends when the same seed is submitted again', async () => {
     const { store, ada } = await fixture();
     const first = await store.recordEntry({ boardKey: 'board-3', dataHash: 'data-1', userId: ada, run: RUN, measured: metrics(40), legs: 200 });

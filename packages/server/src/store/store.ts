@@ -711,6 +711,28 @@ export class Store {
     return Object.freeze(result.rows.map((row) => entryOf(row)));
   }
 
+  /**
+   * Every contributing player's best on one axis, with the entry it came from — the observations
+   * `leaderboard/distribution.ts` folds into a ladder (GitHub issue #327, § D484). The same
+   * `DISTINCT ON (e.user_id)` the ranked board uses, per axis, so a player who posted twenty times
+   * is one observation; and the same table, so only `awtIsValid: true` runs are ever counted.
+   */
+  async axisObservations(
+    boardKey: string,
+    metric: BoardMetric,
+  ): Promise<readonly { readonly entryId: string; readonly value: number }[]> {
+    const column = COLUMN_OF[metric];
+    const result = await this.#sql.query(
+      `SELECT DISTINCT ON (e.user_id) e.id AS id, e.${column} AS value ` +
+        `FROM entries e WHERE e.board_key = $1 ` +
+        `ORDER BY e.user_id, e.${column} ASC, e.submitted_at_ms ASC`,
+      [boardKey],
+    );
+    return Object.freeze(
+      result.rows.map((row) => ({ entryId: String(row['id']), value: Number(row['value']) })),
+    );
+  }
+
   /** Every board that has an entry, most recently posted to first. For the leaderboard index. */
   async boards(): Promise<readonly { readonly boardKey: string; readonly entries: number; readonly latestMs: number }[]> {
     const result = await this.#sql.query(

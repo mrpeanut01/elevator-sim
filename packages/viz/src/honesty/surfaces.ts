@@ -10080,14 +10080,14 @@ const GAUNTLET: SurfaceAdapter = {
       ['noServer', { kind: 'no-server' }],
       ['unreachable', { kind: 'unreachable', detail: 'The board service did not answer.' }],
       ['undeclared', { kind: 'undeclared' }],
-      ['empty', { kind: 'board', date: '2026-09-02', note: BOARD_NOTE, rows: [] }],
+      ['empty', { kind: 'board', date: '2026-09-02', note: BOARD_NOTE, distribution: undefined, distributionDetail: undefined, rows: [] }],
       [
         'rows',
         {
           kind: 'board',
           date: '2026-09-02',
           note: BOARD_NOTE,
-          rows: [
+          distribution: undefined, distributionDetail: undefined, rows: [
             placeholderBoardEntry('A. Turing', 21.4),
             placeholderBoardEntry('G. Hopper', 29.5),
             /*
@@ -10099,12 +10099,55 @@ const GAUNTLET: SurfaceAdapter = {
           ],
         },
       ],
+      /*
+       * The middle of the board with a ladder published — GitHub issue #327 — so every axis line,
+       * the wire's note and the energy absence are swept. Plausible rungs rather than round ones,
+       * and 24 players: the server withholds below twenty.
+       */
+      [
+        'ladder',
+        {
+          kind: 'board',
+          date: '2026-09-02',
+          note: BOARD_NOTE,
+          distribution: {
+            boardKey: 'daily:2026-09-02',
+            n: 24,
+            ladders: [
+              { axis: 'awtS', n: 24, rungs: { p10: 12.4, p25: 14.1, p50: 18.3, p75: 23.0, p90: 30.6 }, medianEntryId: 'e1' },
+              { axis: 'wt95S', n: 24, rungs: { p10: 28.0, p25: 33.5, p50: 41.2, p75: 52.9, p90: 66.1 }, medianEntryId: 'e2' },
+              { axis: 'ttdMeanS', n: 24, rungs: { p10: 40.5, p25: 45.8, p50: 53.0, p75: 61.4, p90: 74.9 }, medianEntryId: 'e3' },
+              { axis: 'pctOverLongWait', n: 24, rungs: { p10: 0.0, p25: 0.8, p50: 2.5, p75: 4.9, p90: 8.7 }, medianEntryId: 'e4' },
+            ],
+            withheld: undefined,
+            absent: [
+              {
+                axis: 'energy',
+                reason:
+                  'A posted run claims its four ranked figures and no energy figure, so no energy ladder can be computed from what the board holds.',
+              },
+            ],
+            note:
+              'Each axis is its own ladder over the players who posted, one best run each. The rungs are not one run; the median entry is. No interval is published, because the players who posted are not a sample of anybody else.',
+          },
+          distributionDetail: undefined,
+          rows: [placeholderBoardEntry('A. Turing', 21.4), placeholderBoardEntry('G. Hopper', 29.5)],
+        },
+      ],
     ];
     for (const [state, board] of dailyStates) {
       const view = dailyBoardViewOf(board);
       view.lines.forEach((line, index) => {
         seeds.push({
           field: `board.daily.${state}.line${String(index)}`,
+          text: line.text,
+          role: line.role === 'note' ? 'observation' : 'reason',
+        });
+      });
+      /* The middle of the board's lines — GitHub issue #327 — in the state's own field space. */
+      view.world.forEach((line, index) => {
+        seeds.push({
+          field: `board.daily.${state}.world${String(index)}`,
           text: line.text,
           role: line.role === 'note' ? 'observation' : 'reason',
         });

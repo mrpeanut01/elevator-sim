@@ -33550,3 +33550,32 @@ the standing requirement applied to a view control: a control that writes nothin
 the honest way to say so is not to draw it. The test asserts the pairing both ways, a chip exactly
 when its window is a real band. The camera writes no field of the run, and the register entry is
 deleted rather than reworded.
+
+## D506 — a board publishes a quantile ladder per axis and a real entry at each axis's median, withheld below twenty players, with no interval and energy named as absent
+
+**Date: 2026-09-06 · Owner: the integrator, wave U, building § D484's ruling · Rules on: GitHub
+issue #327, `packages/server/src/leaderboard/distribution.ts`, `store.ts#axisObservations`,
+`GET /api/board-distribution`, `menu/client.ts#distribution`, `everyday/host.ts#dailyBoardOf`,
+`everyday/boardScreen.ts`'s middle-of-the-board block.**
+
+§ D484 settled the statistical shape before any code existed, and this entry records what landed
+and the two places it had to choose. The ladder is Hyndman and Fan's type 7 quantile, linear
+interpolation between order statistics, chosen because every reader's tooling agrees on it and
+because it never publishes a value no run produced except as a weighted pair of two that did. The
+median entry is the lower median on an even count, so it is always a run somebody played. Each axis
+takes one row per player, their best on that axis, through the same distinct-per-user query the
+ranked board uses, so a player who posted twenty times is one observation.
+
+The note travels on the wire and names the interval it refuses. A route docstring alone would leave
+the next client free to compute one from the rungs; a sentence in the body a screen has to carry
+does not. The tests forbid the shape of an interval on the wire rather than the word, because a
+refusal is entitled to name the thing it refuses.
+
+Energy is absent and said so. A submission's claim is the four ranked figures and no energy figure
+reaches the store, so there is nothing to build a ladder from. § D106's rule binds the day an energy
+claim travels, and the wire's absent list is where a client learns that today it does not.
+
+The viewer's consumer is the daily board tab, which draws the middle under the rows, one axis a
+line with its own count, the withholding in the server's words, the note, and the absent axis with
+its reason. The ghost's use of the median entry id is #226's and is not built here; the id is on
+the wire for it.

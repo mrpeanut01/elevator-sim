@@ -1365,7 +1365,50 @@ describe('the daily board read', () => {
       date: '2019-04-01',
       note: 'Ranked on average wait.',
       rows: [],
+      distribution: undefined,
+      distributionDetail: undefined,
     });
+  });
+
+  it('asks for the distribution after the board, carries it, and keeps a failed third read from refusing the board — GitHub issue #327', async () => {
+    const asked: string[] = [];
+    const spread = {
+      boardKey: 'daily:2019-04-01',
+      n: 3,
+      ladders: [],
+      withheld: '3 players have posted.',
+      absent: [],
+      note: 'n',
+    };
+    const carried = await dailyBoardOf(
+      () => Promise.resolve(listed(TODAY)),
+      () => Promise.resolve(page('Ranked on average wait.', [])),
+      (key) => {
+        asked.push(key);
+        return Promise.resolve({ ok: true as const, value: spread });
+      },
+    );
+    expect(asked).toEqual(['daily:2019-04-01']);
+    if (carried.kind !== 'board') throw new Error('expected a board');
+    expect(carried.distribution).toEqual(spread);
+    expect(carried.distributionDetail).toBeUndefined();
+
+    const refused = await dailyBoardOf(
+      () => Promise.resolve(listed(TODAY)),
+      () => Promise.resolve(page('Ranked on average wait.', [])),
+      () => Promise.resolve(failed('Older server.')),
+    );
+    if (refused.kind !== 'board') throw new Error('a failed third read is still a board');
+    expect(refused.distribution).toBeUndefined();
+    expect(refused.distributionDetail).toBe('Older server.');
+
+    const unasked = await dailyBoardOf(
+      () => Promise.resolve(listed(TODAY)),
+      () => Promise.resolve(page('Ranked on average wait.', [])),
+    );
+    if (unasked.kind !== 'board') throw new Error('expected a board');
+    expect(unasked.distribution).toBeUndefined();
+    expect(unasked.distributionDetail).toBeUndefined();
   });
 
   it('keeps an empty board apart from a board it could not reach', async () => {
