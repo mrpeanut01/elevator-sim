@@ -1470,6 +1470,13 @@ before the local suite reached the same files. The records went up with the thir
 reds in two files that had run before the fixes landed, both rerun green; viz-browser 37 / 226 on
 the fixed tree.
 
+**The corpus, once after integration**: always-on 609 249 strings (+14 651 on wave U's 594 598,
+exactly 299.0 a case), deep 759 296 (+17 929, 298.82 a case), with the base at `f60e816`
+reproducing wave U's row exactly in both tiers first. Surfaces 56 / 57 unmoved, sets identical,
+failing cases 0. The eleven strings the deep tier is short of a constant are one string on eleven
+cases, the technician refusal on a seeded breakdown, found by rendering every deep case rather than
+by inference.
+
 | issue | outcome |
 |---|---|
 | #171, #169 item 1 | **closed**, § D507; the campaign dock, and a campaign day that is the campaign's own |

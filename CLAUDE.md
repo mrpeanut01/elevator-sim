@@ -77,15 +77,65 @@ verdict:
   of those were already wrong in the published row — the deep tier's surface count is **31**, not 30,
   because `campaign/judge.ts#judgeStage` speaks in no other tier, and *0 violations* had stopped
   being true of the deep half the day the temporal axis landed. The current figures, **measured on the
-  integrated tree after wave U** against a base that was re-measured first (the habit § D442 set);
+  integrated tree after wave V** against a base that was re-measured first (the habit § D442 set);
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **594 598** | **606** | **56** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **741 367** | **4 710** | **57** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **609 249** | **606** | **56** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **759 296** | **4 710** | **57** | **0** | **green**, and the register is empty |
+
+  **Wave V's move is 299 strings a case in the always-on tier and 298 or 299 in the deep one, and
+  the one conditional string was found by rendering every deep case rather than by reasoning about
+  it.** Measured on the integrated tree after wave V, both tiers in one sitting, with the base at
+  `f60e816` re-measured first in a detached worktree — where it reproduced wave U's published row
+  **exactly in both tiers**, the **twelfth** consecutive wave that has held.
+
+  | | base `f60e816` | wave V | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 594 598 | **609 249** | **+14 651** | **299.0** |
+  | deep strings | 741 367 | **759 296** | **+17 929** | **298.82** |
+  | surfaces | 56 / 57 | **56 / 57** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **The always-on tier is exactly 299 a case, and the first corpus case decomposes it to the string**,
+  rendered on each tree and diffed by producer:
+
+  - `everyday/stageScreenModel.ts#stageHeaderOf` — **+185**: GitHub issue #171's dock over the nine
+    states the stage adapter seeds — quiet, none, a breakdown open, late, answered, broke and with no
+    run, a coach party alone and held — with the figure grid, each option's cost, effect, timing and
+    refusal, and `CAMPAIGN_DOCK_COPY`'s sixteen keys.
+  - `everyday/campaignModel.ts#towersView` — **+95**: #169 item 3's offers, five cards of five
+    strings plus a heading and a note on three of the four seeded states and four cards of four on
+    `second-month`, less the one refusal line each state used to carry.
+  - `everyday/today.ts#todayOf` — **+8**: #211's fold handle, two on each of the four report states.
+  - `gauntlet/ladder.ts#ladderRowsOf` — **+8**: #93's driver and gap on the daily rows and on the
+    ladder, and #252's reset policy.
+  - `shift/report.ts#dayReportOf` — **+5**: the two new events' names and notes, and the coach
+    party's withheld line.
+  - `everyday/buildNotes.ts#buildNotesViewOf` — **−2**: three register entries out (#171, #352), one
+    empty-register line in.
+
+  185 + 95 + 8 + 8 + 5 − 2 = 299, and 49 × 299 = 14 651.
+
+  **The deep tier is eleven strings short of 60 × 299, and the eleven were located by measurement.**
+  Every deep case was rendered on both trees and diffed: 49 cases move by 299 and **11 by 298** — six
+  on `midtown-office`, four on `mixed-use-high-rise`, one on `vertical-city` — and on each of the
+  eleven the dock reads 184 rather than 185. One of them rendered beside a 299 case names the string:
+  `stage.dock(breakdown).option.technician.refusal`, *the day ends before the car would be back*,
+  which the seeded breakdown state draws only where fewer than twenty minutes remain on the clock.
+  The eleven are the cases where more do, so the technician is offered without a refusal. The probe
+  counts in a different unit from the corpus (739 687 → 757 616 across the sixty), and its move is
+  17 929 to the string. No lane forecast this move, because there were no lanes.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical, nothing
+  added, nothing removed, on a wave that put a dock beside the campaign stage, offers on the campaign
+  screen, a fold on every figure card and two rows on the daily board. Every one of them went into an
+  adapter that already existed. The deep tier's one-surface lead survives and the diff names it:
+  `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is in
+  always-on and not in deep.
 
   **Wave U's move is not a per-case constant, and the probe that decomposed wave T's says why before
   anybody has to guess.** Measured on the integrated tree after wave U, both tiers in one sitting,

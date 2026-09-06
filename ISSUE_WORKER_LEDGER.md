@@ -2396,6 +2396,22 @@ counted, *inert* means no rate BETTER or WORSE, and the four rows reproduced the
   pin could derive them, and `documentation.test.ts` refused the roadmap naming two entry points the
   package did not export.
 
+## V.4 The corpus, measured once after integration
+
+Both tiers in one sitting on the integrated tree, with the base at `f60e816` re-measured first in a
+detached worktree, where it reproduced wave U's row exactly in both tiers, the twelfth consecutive
+wave that has held. Always-on 594 598 → **609 249** (+14 651, exactly 299.0 a case); deep 741 367 →
+**759 296** (+17 929, 298.82 a case). Cases, simulations, surfaces and failing cases unmoved; the
+surface sets diffed identical in both tiers, and the deep tier's one-surface lead is still
+`campaign/judge.ts#judgeStage`.
+
+The first corpus case decomposes the 299 to the string: +185 the dock over nine seeded states, +95
+the offers, +8 the figure-card handles, +8 the board's driver, gap and policy lines, +5 the two
+events and the coach party's withheld line, −2 the register. The deep tier's eleven missing strings
+were located by rendering all sixty cases on both trees: eleven cases at 298, each with the dock at
+184, and the one string is the technician option's refusal on the seeded breakdown, drawn only
+where the day ends before the car would be back. `CLAUDE.md`'s row carries the arithmetic.
+
 ## V.5 The suite, and what the first push cost
 
 Typecheck clean. Core 112 files / 2 558 tests, experiments 108 / 1 413 with 11 skipped, server
