@@ -81,7 +81,7 @@ const alias = {
  *
  * | case | annotation | at 4.5× | headroom |
  * |---|---|---|---|
- * | `campaign/campaign.test.ts:866` | `}, 3_000_000);` | 490 s | **6.1×** |
+ * | `campaign/campaign.test.ts:866` — `campaign/stageFiveClears.test.ts` since #356's split, annotation unchanged | `}, 3_000_000);` | 490 s | **6.1×** |
  * | `campaign/stageSequence.test.ts:187` | `}, 900_000);` | 348 s | **2.6×** |
  *
  * So neither can produce the red the paragraph predicts, and *"the ceiling is 300 s"* is false of

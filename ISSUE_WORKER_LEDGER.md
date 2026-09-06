@@ -1056,7 +1056,8 @@ was**.
   same shape one file over; at the measured 4.5× amplification that is **490 s against a 300 s
   ceiling**. `campaign/stageSequence.test.ts` behind it at 77 363 ms. Neither fixed.
   **Corrected 2026-09-05 — the ceiling in that sentence is the wrong ceiling.** Both cases carry an
-  explicit per-test timeout overriding the project default: `campaign.test.ts:866` closes
+  explicit per-test timeout overriding the project default: `campaign.test.ts:866` (since #356's
+  split, `stageFiveClears.test.ts`; the annotation is unchanged) closes
   `}, 3_000_000);` and `stageSequence.test.ts:187` closes `}, 900_000);`. At the same 4.5×, that is
   490 s against 3 000 s and 348 s against 900 s, so neither can time out. The claim was inherited
   verbatim from `vitest.config.ts`, where it has been retracted in place; what survives is a
