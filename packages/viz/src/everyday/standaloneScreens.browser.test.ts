@@ -499,7 +499,8 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     const rows = await page.$$eval('.everyday-settings-build-notes li', (items) =>
       items.map((item) => item.textContent ?? ''),
     );
-    expect(rows.length).toBeGreaterThan(20);
+    /* Nineteen after GitHub issue #229 built two Settings rows and deleted their entries. */
+    expect(rows.length).toBeGreaterThan(15);
     expect(rows.some((row) => row.includes('escalator rows'))).toBe(true);
     /* And the other direction: the panel no longer offers either as something the build lacks. */
     expect(rows.some((row) => row.includes('credential dots'))).toBe(false);

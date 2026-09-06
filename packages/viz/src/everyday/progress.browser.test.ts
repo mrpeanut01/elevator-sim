@@ -37,7 +37,7 @@
  * That leaves one thing to say honestly about vacuity, in two halves.
  *
  * - **The write half cannot go vacuous.** `keepSolved` runs on every press that finishes a run,
- *   whatever the verdict, so `schemaVersion: 3` is in the slot either way — measured by removing
+ *   whatever the verdict, so the current schema version is in the slot either way — measured by removing
  *   the call, which reddens this case.
  * - **The read half would, if the run solved nothing**, because two empty badge sets compare equal.
  *   Measured on this host 2026-09-01: the shipped catalogue's diagnosed free repair solves exactly
@@ -201,7 +201,8 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
        * holding ids the rail does not badge, or a rail badging cases the store does not hold, is a
        * seam that will restore the wrong afternoon.
        */
-      expect(stored?.schemaVersion).toBe(3);
+      // `profile.ts`'s `PROFILE_SCHEMA_VERSION`, which GitHub issue #229 moved 3 → 4 while this read 3.
+      expect(stored?.schemaVersion).toBe(4);
       const kept = stored?.progress?.solvedCaseIds ?? [];
       expect(kept.length).toBe(ran.tags.filter((tag) => tag === 'FIXED').length);
 
@@ -448,7 +449,7 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
       await page.waitForSelector('.everyday-fixit-outcome', { timeout: 120_000 });
 
       expect(await slotContents(page)).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
         profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
         units: 'metric',
       });
