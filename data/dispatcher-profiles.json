@@ -32,7 +32,7 @@
     {
       "id": "eta",
       "name": "Minimum estimated wait",
-      "blurb": "Sends the car that can reach the landing soonest, counting the stops it already owes. The plain answer, and hard to beat on a quiet day.",
+      "blurb": "Sends the car that can reach the landing soonest, counting the stops it already owes. The plain answer, and a strong one on a quiet day.",
       "role": "baseline",
       "weights": { "waitTime": 1.0 }
     },

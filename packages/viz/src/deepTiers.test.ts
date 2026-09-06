@@ -271,6 +271,15 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
    * a `.github/` change, which was outside the scope of the lane that wrote the deriver, and it is
    * GitHub issue #344's remaining piece of work.
    */
+  'packages/viz/src/shift/legibility.sweep.test.ts': {
+    gates: ['LEGIBILITY_SWEEP'],
+    reason:
+      '§ D512’s instrument — the legibility arm over docs/33 § 4.6’s 400 days, eight buildings by ' +
+      'fifty seeds at day 1, which produced docs/33 § 6.4b’s table. Not scheduled because the table ' +
+      'is pinned by legibility.test.ts’s ten-seed slice on every run, and a nightly re-derivation ' +
+      'would write a figure nothing reads; it is re-run by hand when a building or a band moves',
+    scheduled: false,
+  },
   'packages/viz/src/testCost.test.ts': {
     gates: ['TEST_COST_OUT'],
     reason:

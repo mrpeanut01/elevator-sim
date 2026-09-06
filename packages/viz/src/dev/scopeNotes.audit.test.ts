@@ -257,6 +257,12 @@ const WITHOUT_A_NOTE: Readonly<Record<string, string>> = Object.freeze({
     'and there is no next run to warn about: the press that writes it is the press that runs it. ' +
     'What a player is told instead is what § 8.2 already tells them — a tier’s nights, and the ' +
     'shop row reading under works until they are past.',
+  'viewer.campaignEventId':
+    'no block, and no control either — the campaign day’s event is decided by everyday/host.ts' +
+    '#runCampaignDay from the contract’s calendar and § 8.3’s failure figure on a stream derived ' +
+    'from the seed, written in the same call that presses Run, and cleared with the latch when the ' +
+    'day closes. The press that writes it is the press that runs it, so there is no next run for a ' +
+    'note to warn about; what the player is told is the dock’s own day line (GitHub issue #171).',
   'viewer.week':
     'no block — the day boundary itself, written by closeShift and by taking a contract.',
   'viewer.patience':

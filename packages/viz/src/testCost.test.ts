@@ -76,8 +76,8 @@ const config = readFileSync(VITEST_CONFIG, 'utf8');
  */
 const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly totalMs: number }> =
   new Map([
-    ['viz', { count: 89, totalMs: 68_700_000 }],
-    ['viz-browser', { count: 63, totalMs: 15_660_000 }],
+    ['viz', { count: 90, totalMs: 72_300_000 }],
+    ['viz-browser', { count: 65, totalMs: 16_140_000 }],
   ]);
 
 /**
