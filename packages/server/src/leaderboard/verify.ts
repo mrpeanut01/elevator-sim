@@ -25,6 +25,7 @@
  */
 
 import {
+  type RunInterventionConfig,
   runSimulation,
   type RuleRowConfig,
   type RunSummary,
@@ -106,6 +107,10 @@ export function configFor(
 
   // The player's rules over the **server's** profile. Never a profile the submission carried.
   const dispatcherProfile = profileWithRules(shipped, run.ruleRows ?? []);
+  // And the log's handovers the same way — a switch to an id this server does not ship is refused
+  // exactly as an unshipped base profile is.
+  const log = interventionsFor(run, resources);
+  if (log === 'unknown-dispatcher') return 'unknown-dispatcher';
 
   // Derived from the id, never read off the wire — the argument is at the spread below.
   const reportWindow = reportWindowForBuilding(run.buildingId);
@@ -195,8 +200,35 @@ export function configFor(
      * with a fingerprint, so an empty log has to carry *no key at all* rather than an empty array.
      * That is what lets every score posted before this field re-verify unchanged.
      */
-    ...((run.interventions ?? []).length === 0 ? {} : { interventions: run.interventions }),
+    ...(log.length === 0 ? {} : { interventions: log }),
   } as SimulationConfig;
+}
+
+/**
+ * The wire's log as `core` runs it — GitHub issue #338, § D486. A switch arrives as a shipped id
+ * plus rows and leaves here as the profile `core`'s arm carries, built **from this server's own
+ * `data/`** through the same {@link profileWithRules} the base profile goes through; an id this
+ * server does not ship is the same rejection the base profile gets. The two parking kinds pass
+ * through unchanged.
+ */
+function interventionsFor(
+  run: SubmittedRun,
+  resources: VerificationResources,
+): readonly RunInterventionConfig[] | 'unknown-dispatcher' {
+  const log: RunInterventionConfig[] = [];
+  for (const entry of run.interventions ?? []) {
+    if (entry.change.kind === 'switch-dispatcher') {
+      const shipped = resources.dispatcherProfilesById.get(entry.change.toProfileId);
+      if (shipped === undefined) return 'unknown-dispatcher';
+      log.push({
+        atS: entry.atS,
+        change: { kind: 'switch-dispatcher', profile: profileWithRules(shipped, entry.change.ruleRows ?? []) },
+      });
+    } else {
+      log.push({ atS: entry.atS, change: { kind: entry.change.kind } });
+    }
+  }
+  return log;
 }
 
 /**

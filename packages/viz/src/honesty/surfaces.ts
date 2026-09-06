@@ -245,6 +245,7 @@ import {
   type FixitMeasurement,
 } from '../fixit/engine.js';
 import { demandDisclosureOf } from '../fixit/parse.js';
+import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
@@ -9049,6 +9050,18 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         : ([
             ['offered', { target: elsewhere, driving: () => driving }],
             ['already', { target: driving, driving: () => driving }],
+            /* A hand-tuned target: the arm is offered and its note says the day will not post. */
+            [
+              'unpostable',
+              {
+                target: { ...elsewhere, id: 'saved-tuned', name: 'Tuned by hand', weights: { ...elsewhere.weights, waitTime: 0.61 } },
+                driving: () => driving,
+                unpostable: switchUnpostableReasonOf(
+                  { ...elsewhere, id: 'saved-tuned', name: 'Tuned by hand', weights: { ...elsewhere.weights, waitTime: 0.61 } },
+                  context.dispatcherProfiles.profiles,
+                ),
+              },
+            ],
           ] as const)),
     ];
     for (const [state, switchTo] of switchStates) {
@@ -9075,6 +9088,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           seeds.push({
             field: `stage.intervene(${state}).${arm.change.kind}.refusal`,
             text: arm.refusal,
+            role: 'reason',
+          });
+        }
+        if (arm.note !== undefined) {
+          seeds.push({
+            field: `stage.intervene(${state}).${arm.change.kind}.note`,
+            text: arm.note,
             role: 'reason',
           });
         }

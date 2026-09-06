@@ -558,20 +558,42 @@ describe('the grounds that are still true after the refusals shrank', () => {
     return { ...baseState(), buildingId: 'midtown-office', shiftLengthS: 1800, interventions: [{ atS: 120, change }] };
   }
 
-  it('refuses a mid-run dispatcher switch, and names the vector rather than the log', () => {
+  it('carries a mid-run handover to a shipped style, and to a shipped style with rules on it', () => {
     /*
-     * The ground `interventions`' arm called **structural** when it had two, and it is the one that
-     * survived: a switch carries a whole `DispatcherProfile` inline, which is `submission.ts`'s
-     * *ids rather than inline objects* violated exactly. `packages/server`'s
-     * `SUBMITTABLE_INTERVENTION_KINDS` refuses it there too, so the client is not stricter than the
-     * server — the failure direction this module exists to prevent.
+     * The ground `interventions`' arm called **structural** is overturned — GitHub issue #338,
+     * § D486: every clause of it was equally true of the run's base profile, and the base profile
+     * posts. A switch travels as the shipped id plus the rows (`scope/switchWire.ts`), and both
+     * shapes a stage picker can hand the day to are accepted here.
      */
-    const state = logged({ kind: 'switch-dispatcher', profile: RESOURCES.dispatcherProfiles.profiles[1]! });
-    const mine = runIdentityIssues(state, RESOURCES, 'ranked').filter(
+    const style = RESOURCES.dispatcherProfiles.profiles[1]!;
+    const saved = {
+      ...style,
+      id: 'saved-mine',
+      name: 'Mine',
+      rules: { rows: [{ when: 'call-waited' as const, whenValue: 60, then: 'jump-queue' as const }] },
+      selection: { ...(style.selection ?? {}), policy: 'rules' as const },
+    };
+    for (const profile of [style, saved]) {
+      expect(
+        runIdentityIssues(logged({ kind: 'switch-dispatcher', profile }), RESOURCES, 'ranked').filter(
+          (issue) => issue.key === 'viewer.interventions',
+        ),
+        profile.name,
+      ).toEqual([]);
+    }
+  });
+
+  it('refuses a handover to a hand-tuned vector, naming the dispatcher and the narrow reason', () => {
+    // What stays refused is the bound the base profile already lives under, not a category.
+    const style = RESOURCES.dispatcherProfiles.profiles[1]!;
+    const tuned = { ...style, id: 'saved-tuned', name: 'Tuned by hand', weights: { ...style.weights, waitTime: 0.61 } };
+    const mine = runIdentityIssues(logged({ kind: 'switch-dispatcher', profile: tuned }), RESOURCES, 'ranked').filter(
       (issue) => issue.key === 'viewer.interventions',
     );
     expect(mine.length).toBe(1);
-    expect(mine[0]?.message).toContain('weight vector inline');
+    expect(mine[0]?.message).toContain('“Tuned by hand”');
+    expect(mine[0]?.message).toContain('hand-tuned dispatcher');
+    expect(mine[0]?.message).not.toContain('weight vector inline');
   });
 
   it('refuses an incident answer, and names the missing cause rather than the answer', () => {
@@ -588,6 +610,9 @@ describe('the grounds that are still true after the refusals shrank', () => {
     );
     expect(mine.length).toBe(1);
     expect(mine[0]?.message).toContain('the answer and not the thing answered');
+    // Permanent, and said so — § D486: a refusal that prevents a verified-but-wrong replay is a
+    // feature, and the sentence a player reads carries that rather than an implied *not yet*.
+    expect(mine[0]?.message).toContain('stays so by design');
   });
 
   it('accepts the two kinds that carry nothing but their instant', () => {

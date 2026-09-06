@@ -801,6 +801,13 @@ export interface StageInterventionRow {
    * no control at all, and it says so while the arm beside it is still pressable.
    */
   readonly refusal?: string | undefined;
+  /**
+   * A fact about this arm the player is owed **before** pressing, drawn beside the button and
+   * disabling nothing — GitHub issue #338, § D486's fourth criterion: a handover that cannot be
+   * posted says so while the day is still being played, not at the moment they try to post. A
+   * refusal stops a press; a note lets it through with its consequence stated.
+   */
+  readonly note?: string | undefined;
 }
 
 /** What either parking press does to the record — one sentence for the two settings of one control. */
@@ -912,6 +919,12 @@ export interface StageSwitchTarget {
   readonly target: DispatcherProfile;
   /** The vector **actually driving**, derived. See the interface docstring for the thunk. */
   readonly driving: () => DispatcherProfile;
+  /**
+   * Why a day handed to this target could not be posted, or `undefined` when it could —
+   * `scope/switchWire.ts#switchUnpostableReasonOf`, decided by the caller that knows the shipped
+   * shelf. Drawn as the row's {@link StageInterventionRow.note}.
+   */
+  readonly unpostable?: string | undefined;
 }
 
 /** § 7.6's `recomputing` beat, so a re-simulation is a state rather than a freeze. */
@@ -956,6 +969,7 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
       label: switchDispatcherLabelOf(switchTo.target.name),
       explains: STAGE_SWITCH_EXPLAINS,
       ...(changesNothing ? { refusal: STAGE_SWITCH_NO_CHANGE } : {}),
+      ...(switchTo.unpostable === undefined ? {} : { note: switchTo.unpostable }),
     }),
   ]);
 }

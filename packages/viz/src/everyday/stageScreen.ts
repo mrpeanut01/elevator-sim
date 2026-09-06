@@ -114,6 +114,7 @@ import {
   type StageSwitchTarget,
 } from './stageScreenModel.js';
 import { everydayProfileStore } from './profileStore.js';
+import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as GAP,
@@ -896,19 +897,32 @@ function mountStage(
   });
   const switchTarget = (): StageSwitchTarget | undefined => {
     const target = switchable.find((profile) => profile.id === switchPicker.value);
-    return target === undefined ? undefined : { target, driving: () => host.drivingProfile() };
+    if (target === undefined) return undefined;
+    /*
+     * GitHub issue #338, § D486: the shipped shelf is every dispatcher the host offers less the
+     * ones the reader saved, and a handover the board could not carry says so on the row before
+     * the press rather than at the moment of posting.
+     */
+    const savedIds = new Set(host.savedDispatchers().map((entry) => entry.id));
+    const shipped = switchable.filter((profile) => !savedIds.has(profile.id));
+    const unpostable = switchUnpostableReasonOf(target, shipped);
+    return { target, driving: () => host.drivingProfile(), ...(unpostable === undefined ? {} : { unpostable }) };
   };
   const interventionStamp = el(doc, 'span', 'everyday-stage-stamp');
   interventionStamp.setAttribute('role', 'status');
   interventionStamp.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
   const interventionRefusal = el(doc, 'span', 'everyday-stage-intervene-refusal');
   interventionRefusal.style.cssText = `font-size:11.5px;color:${C.label}`;
+  /* The handover arm's note — drawn, not a title, because a reason a player cannot see is not one. */
+  const interventionNote = el(doc, 'span', 'everyday-stage-intervene-note');
+  interventionNote.style.cssText = `font-size:11.5px;color:${C.warmGrey};flex-basis:100%`;
   interventions.append(
     ...interventionButtons,
     switchPicker,
     switchButton,
     interventionStamp,
     interventionRefusal,
+    interventionNote,
   );
 
   /* --- § 7.4's strip. SVG rather than a second canvas: `raceLaneOf` computes polyline
@@ -1279,6 +1293,7 @@ function mountStage(
       switchPicker.disabled = sharedRefusal !== undefined;
     }
     interventionRefusal.textContent = sharedRefusal ?? switchRow?.refusal ?? '';
+    interventionNote.textContent = switchRow?.note ?? '';
   }
 
   /** The handover arm re-asked from the live facts — for the picker, and for the mount. */

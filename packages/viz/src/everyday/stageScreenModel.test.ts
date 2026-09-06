@@ -576,6 +576,20 @@ describe('§ 7.6 — the intervention control', () => {
     expect(handover?.refusal).toBeUndefined();
   });
 
+  it('carries the caller’s unpostable reason onto the row as a note, disabling nothing — #338', () => {
+    const handover = stageInterventionsOf({
+      interventions: [],
+      simTimeS: 0,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      switchTo: { target: OTHER, driving: () => PLAIN, unpostable: 'A day handed to Lobby anchor cannot be posted.' },
+    }).rows.at(-1);
+    expect(handover?.note).toBe('A day handed to Lobby anchor cannot be posted.');
+    expect(handover?.refusal).toBeUndefined();
+    expect(armsFor({ target: OTHER, driving: PLAIN }).rows.at(-1)?.note).toBeUndefined();
+  });
+
   it('refuses a handover to the vector already driving, and says why', () => {
     /*
      * The § D177 case with its polarity checked in both directions. Equal vectors under different

@@ -167,6 +167,7 @@ import { systemClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
 import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
 import { assertSameCrowd } from '../record/crowd.js';
+import { wireInterventionsOf } from '../scope/switchWire.js';
 import { recordRun } from '../record/recordRun.js';
 import {
   DEFAULT_THEME,
@@ -2577,7 +2578,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * kind the wire may not carry.
          */
         ...(state.ruleRows.length === 0 ? {} : { ruleRows: state.ruleRows }),
-        ...(state.interventions.length === 0 ? {} : { interventions: state.interventions }),
+        ...(state.interventions.length === 0
+          ? {}
+          : { interventions: wireInterventionsOf(state.interventions, resources.dispatcherProfiles.profiles) }),
       },
       claimed: claim.claimed,
     });
