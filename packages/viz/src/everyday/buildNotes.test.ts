@@ -204,7 +204,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * record the decision not to.
    */
   { register: 'STAGE_ABSENCES', fragment: 'no campaign dock', issue: 181 },
-  { register: 'STAGE_ABSENCES', fragment: 'no camera', issue: 324 },
   { register: 'STAGE_ABSENCES', fragment: 'no answer to a live incident', issue: 171 },
   /*
    * **Two rows left together here, and that they were a pair is the whole reason to say so.**

@@ -95,7 +95,18 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
 
   /* --- Floor slabs, with the number and the tenant line in the gutter. --- */
   const slab = Math.max(2, Math.min(4, g.rowPitch * 0.16));
+  /*
+   * Everything from here to the end of the cars is clipped to the plot — GitHub issue #324. With
+   * the camera on a band, rows and cars outside it still have a `y` (the same scale, continued),
+   * and the clip is what turns that into a window rather than a drawing that spills over the
+   * chrome. With the whole tower fitted nothing lies outside the plot and the clip is a no-op.
+   */
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(g.plot.x, g.plot.y, g.plot.width, g.plot.height);
+  ctx.clip();
   for (const row of g.rows) {
+    if (!row.visible) continue;
     ctx.fillStyle = row.isEntrance ? C.ruleMid : C.ruleLight;
     ctx.fillRect(g.plot.x + 6, row.y, g.plot.width - 12, slab);
     if (!row.labelled) continue;
@@ -136,7 +147,7 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
   const perRow = Math.max(1, Math.floor((g.landing.width - 8) / (capsuleW + 2)));
   for (const floor of input.queues) {
     const row = g.rows.find((candidate) => candidate.floorId === floor.floorId);
-    if (row === undefined) continue;
+    if (row === undefined || !row.visible) continue;
     const cap = stageCrowdCapOf(floor.riders.length);
     for (let index = 0; index < cap.drawn; index += 1) {
       const rider = floor.riders[index];
@@ -239,6 +250,7 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
       }
     }
   }
+  ctx.restore();
 }
 
 function roundedRect(

@@ -176,6 +176,7 @@ import {
   STAGE_INTERVENTIONS,
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
+  STAGE_CAMERAS,
   STAGE_SPEEDS,
   STAGE_RACE_PICKER_LABEL,
   STAGE_SWITCH_PICKER_LABEL,
@@ -9080,6 +9081,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * Engineer strip needs it as well, and one screen's model is not where both shells can read it.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
+    'everyday/stageScreenModel.ts#STAGE_CAMERAS',
+    /* Returns the chips above or none; the words are theirs, seeded below once per case. */
+    'everyday/stageScreenModel.ts#stageCameraChipsOf',
     /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
@@ -9146,6 +9150,10 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     for (const speed of STAGE_SPEEDS) {
       seeds.push({ field: `stage.speed.${String(speed.simPerRealS)}`, text: speed.label, role: 'label' });
+    }
+    /* § 7.3's camera chips — GitHub issue #324 — seeded once per case, like the speed chips above. */
+    for (const chip of STAGE_CAMERAS) {
+      seeds.push({ field: `stage.camera.${chip.id}`, text: chip.label, role: 'label' });
     }
     /*
      * **Every arm the control can offer, including the one that is built per call** — GitHub issue

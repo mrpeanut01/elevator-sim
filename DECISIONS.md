@@ -33516,3 +33516,37 @@ says so in its own comment rather than drawing a hole it cannot yet know.
 Whether a works night should hold more than one car for a shafts tier, and whether the held car
 should be the one being refitted rather than the chooser's. Both are content decisions with a
 measurement attached, and neither is needed for the ordering GD11 asks for.
+
+## D505 — the stage has a camera, it is measured per tower, and it is drawn only where it changes the picture
+
+**Date: 2026-09-06 · Owner: the integrator, wave U · Rules on: GitHub issue #324, GAMEPLAY § 7.3,
+`everyday/stageScreenModel.ts` (`STAGE_CAMERAS`, `stageCameraWindowOf`, `stageGeometryOf`'s window),
+`everyday/cutaway.ts`, `everyday/stageScreen.ts`, `STAGE_ABSENCES`.**
+
+§ 7.3 lists the camera among what a player can touch, and the stage's register said for three waves
+that the cutaway draws the whole building at once, so there is nothing to pan and nothing to follow.
+The issue asked for that reason to be measured per tower before anything was built, because it was a
+claim about the canvas rather than the design.
+
+### The measurement
+
+At the stage's own box, 60 vh of a 720 px viewport, the geometry labels a floor every 13 px. Two of
+the eight shipped towers have more floors than that pitch can label, `mixed-use-high-rise` and
+`vertical-city`; the other six, `secure-tower`'s thirty floors included, fit with room to spare. The
+first draft of that list was written from the floor counts and had `secure-tower` in it, which is the
+mistake the issue warned about, and the test now pins the measured pair.
+
+### The ruling
+
+The camera is three positions over the recording. Whole tower is what the stage always drew. Lobby is
+the band of legible floors from the entrance up. Follow the fullest car is a band of the same size
+centred on the car carrying the most riders at the playhead, recentred every paint. The band is as
+many floors as the plot can label, so a band never thins its own labels. Every floor keeps a row and a
+y on the band's scale, and the painter clips to the plot, so a car crossing the band's edge leaves
+the picture the way it would leave a window.
+
+The chips are drawn on the two towers where a band differs from the whole and on no other. That is
+the standing requirement applied to a view control: a control that writes nothing must say so, and
+the honest way to say so is not to draw it. The test asserts the pairing both ways, a chip exactly
+when its window is a real band. The camera writes no field of the run, and the register entry is
+deleted rather than reworded.
