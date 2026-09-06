@@ -63,16 +63,23 @@ import {
   type ShopCategoryId,
   type TowerEconomy,
   type WorksBooking,
+  atRiskTowers,
   bookingFor,
   clearedDays,
+  complexityOf,
   contractIsLost,
   dayIndexOf,
+  nextSlot,
+  offerFeeOf,
   purseOf,
+  slotsOpen,
+  standingOf,
   renewalOffer,
   shopTierAt,
   startIsLegal,
   wearHeadOf,
 } from './economy.js';
+import { contractById } from '../shift/contracts.js';
 
 /* -------------------------------------------------------------------------- *
  * The record
@@ -539,6 +546,13 @@ export type CampaignAction =
   /** § 8.2's desk decision. */
   | { readonly kind: 'answer-need'; readonly towerId: string; readonly optionId: string }
   /**
+   * § 8.8 — take an offer. The building's contract id, because an offer *is* a contract
+   * (`shift/contracts.ts`); the reducer applies § 8.8's gate and refuses otherwise. The week
+   * switch that goes with it is `everyday/host.ts#campaignAct`'s, since the week is not this
+   * record's to move.
+   */
+  | { readonly kind: 'take-offer'; readonly contractId: string }
+  /**
    * § 7.5's dock decision — the money half. `units` and `label` are the option's own, carried
    * rather than looked up because the incident is the *run's* (`everyday/host.ts` holds it beside
    * the day it belongs to) and this record deliberately does not know which day is on the stage.
@@ -607,6 +621,8 @@ export function applyCampaignAction(
       return answerNeed(career, action.towerId, action.optionId);
     case 'answer-incident':
       return answerIncident(career, action.towerId, action.units, action.label);
+    case 'take-offer':
+      return takeOffer(career, action.contractId);
     case 'file-day':
       return fileDay(career, action.towerId, action.verdict, action.trips);
   }
@@ -883,6 +899,65 @@ function answerNeed(career: CampaignCareer, towerId: string, optionId: string): 
           },
     ),
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * § 8.8 — offers, and the gate on ambition
+ * -------------------------------------------------------------------------- */
+
+/** Why an offer cannot be taken now, in the card's own words, or `undefined` when it can. */
+export type OfferRefusal =
+  | { readonly kind: 'held' }
+  | { readonly kind: 'unpriced' }
+  | { readonly kind: 'no-slot'; readonly standingShort: number }
+  | { readonly kind: 'at-risk'; readonly towerName: string };
+
+/**
+ * § 8.8's gate for one contract — GitHub issue #169 item 3, § D510.
+ *
+ * *"An offer is takeable only when `slotsOpen > towersHeld` and `atRisk === 0`."* Both conditions
+ * are the economy's own arithmetic read here, never restated: `slotsOpen(standingOf(...))` and
+ * `atRiskTowers(...)`. A building already held is not an offer at all (§ 8.8: *"exclude buildings
+ * you already hold"*), and one whose complexity or fee nothing published is not offered rather
+ * than priced by guesswork. Checked in the order the card names them, so the sentence a player
+ * reads is the first thing that blocks them.
+ */
+export function offerRefusalOf(career: CampaignCareer, contractId: string): OfferRefusal | undefined {
+  const contract = contractById(contractId);
+  if (contract === undefined) return { kind: 'unpriced' };
+  if (career.towers.some((tower) => tower.id === contractId || tower.buildingId === contract.buildingId)) {
+    return { kind: 'held' };
+  }
+  if (complexityOf(contract.buildingId) === undefined || offerFeeOf(contract.buildingId) === undefined) {
+    return { kind: 'unpriced' };
+  }
+  const standing = standingOf(career.carry, career.towers);
+  if (slotsOpen(standing) <= career.towers.length) {
+    const next = nextSlot(standing);
+    return { kind: 'no-slot', standingShort: next === undefined ? 0 : next.standing - standing };
+  }
+  const risk = atRiskTowers(career.towers)[0];
+  if (risk !== undefined) return { kind: 'at-risk', towerName: risk.buildingId };
+  return undefined;
+}
+
+/**
+ * § 8.8's press, applied — a fresh tower on the offered contract, opened on the desk.
+ *
+ * The dispatcher is the career's standing one — the open tower's, or the first held tower's — so
+ * the new building runs under a dispatcher the player already chose rather than a default they did
+ * not; the desk's own select moves it from there. Refused on {@link offerRefusalOf}'s own answer,
+ * so the reducer and the card cannot disagree about what blocks a take.
+ */
+function takeOffer(career: CampaignCareer, contractId: string): CampaignCareer {
+  if (offerRefusalOf(career, contractId) !== undefined) return career;
+  const contract = contractById(contractId);
+  const fee = contract === undefined ? undefined : offerFeeOf(contract.buildingId);
+  if (contract === undefined || fee === undefined) return career;
+  const standing = openTowerOf(career) ?? career.towers[0];
+  const dispatcherId = standing?.dispatcherId ?? 'collective';
+  const tower = freshTower({ contractId, buildingId: contract.buildingId, dispatcherId, rate: fee });
+  return { ...career, towers: [...career.towers, tower], openTowerId: tower.id, pendingBooking: undefined };
 }
 
 /**

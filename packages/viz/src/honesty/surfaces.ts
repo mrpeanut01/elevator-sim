@@ -8534,6 +8534,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
   id: 'everyday/campaignModel.ts#towersView',
   covers: [
     'everyday/campaignModel.ts#towersView',
+    /* § 8.8's offers — GitHub issue #169 item 3, § D510 — every row the snapshot renders, seeded below. */
+    'everyday/campaignModel.ts#offersView',
     'everyday/campaignModel.ts#buildingView',
     'everyday/campaignModel.ts#contractView',
     'everyday/campaignModel.ts#calendarView',
@@ -8706,7 +8708,18 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
         role: 'observation',
         declaredCount: towers.rows.length,
       });
-      seeds.push({ field: `${label}.towers.offers`, text: towers.offers.refusal, role: 'reason' });
+      /* § 8.8's offers — GitHub issue #169 item 3, § D510 — every row the snapshot renders. */
+      seeds.push({ field: `${label}.towers.offers.heading`, text: `${towers.offers.heading} · ${towers.offers.caption}`, role: 'label' });
+      if (towers.offers.empty !== undefined) seeds.push({ field: `${label}.towers.offers.empty`, text: towers.offers.empty, role: 'reason' });
+      seeds.push({ field: `${label}.towers.offers.note`, text: towers.offers.note, role: 'prose' });
+      towers.offers.rows.forEach((offer, index) => {
+        const where = `${label}.towers.offers.${String(index)}`;
+        seeds.push({ field: `${where}.name`, text: offer.name, role: 'label' });
+        seeds.push({ field: `${where}.terms`, text: offer.terms, role: 'label' });
+        seeds.push({ field: `${where}.quirk`, text: offer.quirk, role: 'prose' });
+        seeds.push({ field: `${where}.cta`, text: offer.cta, role: 'label' });
+        if (offer.refusal !== undefined) seeds.push({ field: `${where}.refusal`, text: offer.refusal, role: 'reason' });
+      });
       seeds.push({ field: `${label}.towers.lately`, text: towers.lately.refusal, role: 'reason' });
       seeds.push({ field: `${label}.towers.lately.sub`, text: towers.lately.sub, role: 'prose' });
       seeds.push({ field: `${label}.towers.footnote`, text: towers.oddsFootnote, role: 'prose' });

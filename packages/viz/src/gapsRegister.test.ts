@@ -148,6 +148,13 @@ const CLOSED_ORACLES: readonly Oracle[] = [
       sourceOf('../../../data/dispatcher-profiles.json').split('"blurb":').length >= 14,
   },
   {
+    key: 'The structural-refusal reason is prose keyed on an id the leg record does not carry',
+    claim: 'core joins the reason to the undelivered leg and viz carries it on the leg record',
+    holds: () =>
+      sourceOf('../../core/src/sim/simulation.ts').includes('#structuralRefusalFor(') &&
+      sourceOf('contract/types.ts').includes('readonly structuralRefusal?: string | undefined;'),
+  },
+  {
     key: 'A live weight editor makes overfitting the tuning seeds the dominant strategy',
     claim: 'the shipped brief names the holdout set and its seed, and the judge gates on the holdout',
     holds: () =>
@@ -185,12 +192,6 @@ const UNGUARDED: readonly Named[] = [
   {
     key: 'Thirteen warning rows on one building is a wall',
     reason: 'A deliberate position rather than an absence; there is nothing for an oracle to find built.',
-  },
-  {
-    key: 'The structural-refusal reason is prose keyed on an id the leg record does not carry',
-    reason:
-      'An absence in two places with no name to look for: no type carries the id and no module ' +
-      'names the join, so an oracle would be asserting a negative over an identifier nobody has written.',
   },
   {
     key: "Basic's curated three-dimension subset is not built",

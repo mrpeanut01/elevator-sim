@@ -180,9 +180,9 @@ describe('the triage screen (§ 8.1)', () => {
     }
   });
 
-  it('names both panels it cannot fill, rather than drawing them empty', () => {
+  it('names the panel it cannot fill, rather than drawing it empty', () => {
     const view = towersView(inputOf(twoTowers()));
-    expect(view.offers.refusal.length).toBeGreaterThan(40);
+    /* The offers panel is built now (§ D510); the *lately* panel still says why it is empty. */
     expect(view.lately.refusal.length).toBeGreaterThan(40);
     /*
      * The campaign's register of absences is no longer on this view: GitHub issue #207 draws all
@@ -757,5 +757,68 @@ describe('what marks a campaign day', () => {
     expect(buildingView(inputOf(openingCareer('eta'), { observations: GOOD }))?.tests.note).toBe(
       BUILDING_COPY.testsNote,
     );
+  });
+});
+
+/**
+ * § 8.8's offers — GitHub issue #169 item 3, § D510. The gate is `career.ts#offerRefusalOf`'s, and
+ * the card says which of its two conditions blocks a take in the guide's own words.
+ */
+describe('§ 8.8’s offers, and the gate on ambition', () => {
+  it('offers every priced building the career does not hold, and counts what it renders', () => {
+    const opening = openingCareer('collective');
+    const view = towersView(inputOf(opening));
+    const ids = view.offers.rows.map((row) => row.contractId);
+    /* Garden Apartments is held; the two unpriced buildings are not offers at all. */
+    expect(ids).not.toContain('c1');
+    expect(ids).not.toContain('c3');
+    expect(ids).not.toContain('c4');
+    expect(ids).toEqual(['c2', 'c5', 'c6', 'c7', 'c8']);
+    expect(view.offers.caption).toBe('5 offers');
+    expect(view.offers.empty).toBeUndefined();
+    for (const row of view.offers.rows) {
+      expect(row.terms).toMatch(/^complexity \d of 5 · \d+ u a day$/u);
+      expect(row.quirk.length).toBeGreaterThan(10);
+    }
+  });
+
+  it('refuses on the slot first, naming the standing it takes, and the reducer refuses the same take', () => {
+    const opening = openingCareer('collective');
+    const view = towersView(inputOf(opening));
+    /* Standing 0 opens one slot, and it is taken by Garden Apartments. */
+    for (const row of view.offers.rows) {
+      expect(row.takeable).toBe(false);
+      expect(row.cta).toBe('Not yet');
+      expect(row.refusal).toBe('No free slot — 14 more standing opens the next one.');
+    }
+    expect(applyCampaignAction(opening, { kind: 'take-offer', contractId: 'c2' })).toBe(opening);
+  });
+
+  it('refuses on a tower one miss from ending once a slot is free, and takes an offer when neither blocks', () => {
+    const base = openingCareer('collective');
+    const tower = base.towers[0]!;
+    /* Seven cleared days is 14 standing, which opens the second slot. */
+    const earned = { ...base, towers: [{ ...tower, day: 8, missed: 0 }] };
+    const offered = towersView(inputOf(earned)).offers.rows.find((row) => row.contractId === 'c2');
+    expect(offered?.takeable).toBe(true);
+    expect(offered?.cta).toBe('Take it');
+    const taken = applyCampaignAction(earned, { kind: 'take-offer', contractId: 'c2' });
+    expect(taken.towers.map((entry) => entry.id)).toEqual(['c1', 'c2']);
+    expect(taken.openTowerId).toBe('c2');
+    expect(taken.towers[1]?.rate).toBe(5);
+    expect(taken.towers[1]?.dispatcherId).toBe('collective');
+    /* Held now, so it is no longer offered; and a second take of the same contract moves nothing. */
+    expect(towersView(inputOf(taken)).offers.rows.map((row) => row.contractId)).not.toContain('c2');
+    expect(applyCampaignAction(taken, { kind: 'take-offer', contractId: 'c2' })).toBe(taken);
+    /*
+     * A standard month allows three misses; a tower at its allowance is one miss from ending. Day
+     * 16 with three misses is twelve cleared days — 24 − 9 = 15 standing, so the slot is open and
+     * the risk is the only thing left to block on, which is the order the card names them in.
+     */
+    const risky = { ...earned, towers: [{ ...earned.towers[0]!, missed: 3, day: 16 }] };
+    const blocked = towersView(inputOf(risky)).offers.rows.find((row) => row.contractId === 'c2');
+    expect(blocked?.takeable).toBe(false);
+    expect(blocked?.refusal).toBe('A tower is one miss from ending. Fix that before adding another.');
+    expect(applyCampaignAction(risky, { kind: 'take-offer', contractId: 'c2' })).toBe(risky);
   });
 });

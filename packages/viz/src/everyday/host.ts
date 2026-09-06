@@ -150,6 +150,7 @@ import {
 } from '../campaign/incidents.js';
 import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
+import { switchWeek } from '../shift/week.js';
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -1694,6 +1695,27 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
          would repaint a screen mid-interaction for no reason a player could see. */
       if (next === career) return;
       career = next;
+      /*
+       * **§ 8.8: taking an offer moves a week between assignments** — GitHub issue #169 item 3,
+       * § D510. The record above is the campaign's; the week is `ViewerState`'s, and it moves the
+       * way `dev/scenariosPanel.ts`'s *take* moves it: the destination restarts (the card's own
+       * promise — a fresh week on this building) and the week being left is **parked**, not lost.
+       * The length is the contract's, for `runCampaignDay`'s reason.
+       */
+      if (action.kind === 'take-offer') {
+        const contract = contractById(action.contractId);
+        if (contract !== undefined) {
+          const state = b.state();
+          const moved = switchWeek(state.week, state.parkedWeeks, contract.id, 'restart');
+          b.applyPatch({
+            week: moved.week,
+            parkedWeeks: moved.parked,
+            buildingId: contract.buildingId,
+            shiftLengthS: shiftLengthForContract(contract.id),
+            windowStartS: null,
+          });
+        }
+      }
       notifyCampaign();
     },
     runCampaignDay: (towerId) => {

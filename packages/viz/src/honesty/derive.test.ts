@@ -1393,6 +1393,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'campaign/incidents.ts#campaignEventFor',
       ],
     },
+    {
+      reason:
+        'A table keyed by building id and a kind vocabulary, not prose — GitHub issue #169 item 3, ' +
+        '§ D510. `OFFER_FEES` is `garden-apartments: 3` six times over and `offerFeeOf` reads it; ' +
+        '`offerRefusalOf` answers `held` / `unpriced` / `no-slot` / `at-risk` and a number, never a ' +
+        'sentence. What a player reads of an offer — its terms, its quirk, its button and the ' +
+        'guide’s two refusals — is `everyday/campaignModel.ts#offersView`’s, which the campaign ' +
+        'adapter drives over every snapshot it renders.',
+      ids: [
+        'campaign/economy.ts#OFFER_FEES',
+        'campaign/economy.ts#offerFeeOf',
+        'campaign/career.ts#offerRefusalOf',
+      ],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));

@@ -33731,3 +33731,67 @@ its own archive — are not built and not refused; nothing here would have to ch
 because a label over dated boards deletes nothing. And GAMEPLAY § 22's open question, whether the
 gauntlet should cost something so free re-runs do not churn ratings, stays open: a cost is a
 different decision from a reset, and this entry takes neither side of it.
+
+---
+
+## D510 — § 8.8's offers are priced by a fee table beside the complexity table, gated by the economy's own arithmetic, and a take parks the week being left
+
+**Date: 2026-09-06 · Owner: the integrator, wave V · Rules on: GitHub issue #169 item 3,
+`campaign/economy.ts#OFFER_FEES`, `campaign/career.ts#offerRefusalOf` and the `take-offer` action,
+`everyday/campaignModel.ts#offersView`, `everyday/host.ts#campaignAct`.**
+
+The triage screen's ON THE TABLE panel refused on its own face: *"a building is offered on a
+complexity and a fee, and taking one moves a week between assignments; neither of those reaches
+this screen in this build"*. Both halves existed one layer down — `complexityOf` and
+`shift/week.ts#switchWeek` — and what was missing was a fee, a gate and a press.
+
+1. **The fee is a table beside the complexity table, and three of its six rows are the design
+   file's.** § 8.9 prices a renewal from a rate the building already pays; an offer has no record
+   and the contract publishes no formula. Garden Apartments 3 u, Chancery House 4 u and Crown
+   Hotel 3 u are the fixtures' own; the three the fixtures do not price follow complexity plus two,
+   the one rule the priced pair that is not Crown Hotel shares, stated as an assumption with its
+   reasoning rather than a citation. `secure-tower` and `mixed-use-high-rise` are not offered at
+   all, for `COMPLEXITY`'s reason: *offered on a complexity and a fee* is the definition, and a
+   building with neither is not an offer with a refusal on it.
+2. **The gate is § 8.8's sentence read off the economy**, never restated: takeable when
+   `slotsOpen(standing) > towersHeld` and `atRiskTowers` is empty, checked in the order the guide's
+   card names them so the sentence a player reads is the first thing blocking them — *No free slot
+   — N more standing opens the next one* / *A tower is one miss from ending. Fix that before adding
+   another.* The reducer refuses on the same function the card reads, so the two cannot disagree.
+3. **A take is a fresh tower on the offered contract, under the dispatcher the player already
+   chose**, opened on the desk; and the week moves the way `dev/scenariosPanel.ts`'s take moves it —
+   the destination restarts, which is the card's own promise, and the week being left is parked
+   rather than lost (issue #107's rule). The record does not own the week, so the switch is the
+   host's, on the action's success.
+
+**What this does not decide.** The fee rule for buildings that ship later; the two unpriced
+buildings' complexity, which is #169 item 4 and a measurement; and whether an offer should expire —
+§ 8.8 says *per snapshot*, and a snapshot that always holds every unheld priced building is what
+this builds.
+
+---
+
+## D511 — a structural refusal is joined to the leg it refused, by `core`, at reconcile time
+
+**Date: 2026-09-06 · Owner: the integrator, wave V · Rules on: GitHub issue #178 item 9,
+`core`'s `UndeliveredJourney.structuralRefusal`, `Simulation.#structuralRefusalFor`,
+`viz`'s `VizLeg.structuralRefusal`, `VIZ_SCHEMA_VERSION` 12, `GAPS.md` § 3's row.**
+
+`Simulation` warned per call — *call "…" was never collected: every car in bank "…" refused it for a
+structural reason (…)* — keyed on a call id no leg record carries, so a reader holding a leg that
+never boarded could not ask *why* (`GAPS.md`: *"prose keyed on an id the leg record does not
+carry"*; § D134 row 2; T76, never briefed).
+
+**The join is made where both ids exist, which is `core` at reconcile time.** A call id is minted
+from a bank, a landing, a direction and, under a panel, a destination — the leg's own fields — so
+the undelivered journey's leg is matched to the active call on those fields and the reasons are
+carried on `UndeliveredJourney.structuralRefusal`. `viz` copies it onto the leg by journey id and
+leg index in `recordRun`, as `VizLeg.structuralRefusal`, optional and absent on every leg that
+boarded or whose call was merely late. Version 12, because a reader that draws the reason must know
+a recording without the field is *older* rather than *clean*; a version-11 recording reads as a
+version-12 one with nobody refused structurally, which is the only honest default.
+
+**What this does not build.** A surface that draws it. `access/lockedOut.ts` still reconstructs a
+landing's refusal by floor and cause, and the leg-level reason is on the record for the consumer
+that wants a rider's own sentence; naming one here would be the dead seam the field exists to
+avoid. The warning `Simulation` prints is unchanged.

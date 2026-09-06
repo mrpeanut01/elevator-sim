@@ -1011,6 +1011,34 @@ export function complexityOf(buildingId: string): number | undefined {
 /** The highest complexity the table publishes — the denominator in `complexity 3 of 5`. */
 export const COMPLEXITY_MAX = 5;
 
+/**
+ * § 8.8's fee for a building offered fresh, in units a day, keyed by shipped building id —
+ * GitHub issue #169 item 3, § D510.
+ *
+ * § 8.9 prices a *renewal* from the rate the building already pays plus the record; an *offer* has
+ * no record, and the contract publishes no formula for it. The design file's fixtures give three
+ * fees — Garden Apartments 3 u, Chancery House 4 u, Crown Hotel 3 u — and those three are used as
+ * given. The other three priced buildings follow the one rule the fixtures share for the two that
+ * are not Crown Hotel, complexity plus two, which is an assumption with its reasoning attached
+ * rather than a citation: a harder building pays more because it will cost more days (§ 8.9's own
+ * sentence), and a flat two over complexity keeps Garden Apartments' 3 u where `openingCareer`
+ * has always put it. `secure-tower` and `mixed-use-high-rise` are absent for {@link COMPLEXITY}'s
+ * reason and are not offered.
+ */
+export const OFFER_FEES: Readonly<Record<string, number>> = Object.freeze({
+  'garden-apartments': 3,
+  'chancery-house': 4,
+  'crown-hotel': 3,
+  'midtown-office': 5,
+  'st-jude-hospital': 6,
+  'vertical-city': 7,
+});
+
+/** The fee an offer on a shipped building pays, or `undefined` for one the campaign does not offer. */
+export function offerFeeOf(buildingId: string): number | undefined {
+  return OFFER_FEES[buildingId];
+}
+
 export interface RenewalOffer {
   /** § 8.5's `clearRate = cleared / (day − 1)`, or `0` on a contract's first day. */
   readonly clearRate: number;
