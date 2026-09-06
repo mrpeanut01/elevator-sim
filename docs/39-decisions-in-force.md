@@ -18,8 +18,8 @@ tidy is done the only way it can be: the entries the owner's 2026-09-06 rulings 
 
 ## 1. In force
 
-The three rulings that declare the game's shape, taken by the product owner on 2026-09-06 and
-recorded as drafts until the owner confirms their text:
+The three rulings that declare the game's shape, taken and confirmed by the product owner on
+2026-09-06:
 
 | decision | what it rules |
 |---|---|

@@ -1,8 +1,8 @@
 # 38 — What the game is
 
-**Status: draft for the product owner to edit. Written 2026-09-06, revised the same day to the
-owner's rulings on §§ 2.1, 2.3 and 2.4.** Two questions are still open and are marked
-`[OWNER: …]`. Delete the brackets when they are answered. [`39-decisions-in-force.md`](39-decisions-in-force.md) is the
+**Status: adopted. Written 2026-09-06 and decided the same day by the product owner as
+[§ D497](../DECISIONS.md), [§ D498](../DECISIONS.md) and [§ D499](../DECISIONS.md).** Two questions
+are still open and are marked `[OWNER: …]`; each is ruled separately when the owner takes it. [`39-decisions-in-force.md`](39-decisions-in-force.md) is the
 index of which older decisions this page supersedes and how their names map.
 
 This page comes before the charter. [`22-charter.md`](22-charter.md) says how we build the game.

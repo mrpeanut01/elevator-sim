@@ -33298,8 +33298,7 @@ next reader finds it named rather than discovering it.
 
 **Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md), [§ D373](#d373), [§ D477](#d477), [§ D354](#d354), `docs/32` § 1.2 and GD4, `docs/23` § 4, `docs/16` S5's `ranked` row, the design handoff §§ 5 and 10, GitHub issues #217 and #220.**
 
-**DRAFT — the rulings below were given in conversation on 2026-09-06 and the text has not been
-confirmed by the owner. Edit it and delete this line when it is a ruling.**
+**Decided by the product owner, 2026-09-06** — given in conversation and confirmed the same day.
 
 Given directly, first note: three modes the owner wants to keep — a career over several buildings
 with a budget; a scenario mode of authored and player-built problems, which is where a first-time
@@ -33375,9 +33374,8 @@ the week — and is not reopened here as design.
 
 **Date: 2026-09-06 · Owner: product owner · Rules on: `docs/26` § 10 non-goal 1, `docs/32` § 3.1's three currencies and § 9 Q4, `docs/32` GD9 and GD13, [§ D366](#d366), [`docs/38`](docs/38-what-the-game-is.md) § 2.4.**
 
-**DRAFT — the rulings below were given in conversation on 2026-09-06 and the text has not been
-confirmed by the owner. Two brackets are open. Edit, answer them, and delete this line when it is a
-ruling.**
+**Decided by the product owner, 2026-09-06** — given in conversation and confirmed the same day. Two
+items below are marked *Open* and are ruled separately when the owner takes them.
 
 Given directly: *"we don't need actual monetization yet. We want to provide the eventual ability to
 'add credits' … to an account. … across each of the play modes, completing a challenge, or getting
@@ -33395,7 +33393,7 @@ against it."*
 1. **One currency across Scenario, Career and Rush**, a fourth beside `docs/32` § 3.1's units,
    nights and standing, and the only one that crosses a mode boundary. *Credits* is the placeholder
    name; the real name may not be a quantity the run measures and may not be *units*.
-   [OWNER: the name — `docs/38` § 2.4 recommends *chimes*, with *fares* and *bells* as alternatives.]
+   *Open:* the name. `docs/38` § 2.4 recommends *chimes*, with *fares* and *bells* as alternatives.
 2. **Earned by completing a turn, never by a run's figures.** A scenario cleared, a contract day
    paid, a rush wave survived, each paying a flat amount authored in `data/` (invariant 7). A harder
    scenario may pay more by its survivor-count band, which is a property of the scenario. **No
@@ -33427,8 +33425,8 @@ against it."*
 7. **A sign-in bonus is permitted in one shape only**, because the owner said *maybe*: a small,
    flat, unconditional credit on the first session after `x` hours away, that does not compound,
    carries no streak, and costs nothing to miss. It is a gift and not a timer, which is how it
-   survives clause 4. [OWNER: on at launch, or off until `S4` is measured? The ledger carries the
-   source either way.]
+   survives clause 4. *Open:* on at launch, or off until `S4` is measured. The ledger carries the
+   source either way.
 
 **What this answers.** `docs/32` § 9 Q4 asked for the day-2 return mechanism and found only the
 daily seed. It now has three: the daily seed, a record to beat, and a balance to save up for a
@@ -33451,8 +33449,7 @@ allowlist are edited on the commit that lands the ledger, not before.
 
 **Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.5, `docs/04`, `data/buildings/README.md`, the charter's § 6 escalation rule, [§ D167](#d167), [§ D131](#d131), [§ D391](#d391), [§ D483](#d483).**
 
-**DRAFT — given in conversation on 2026-09-06 and not yet confirmed by the owner. Edit and delete
-this line when it is a ruling.**
+**Decided by the product owner, 2026-09-06** — given in conversation and confirmed the same day.
 
 Given directly: *"the modeling aspect needs to be able to model and simulate buildings up to and
 slightly beyond the largest building(s) in the world. For example, The Burj Khalifa has 163 floors
