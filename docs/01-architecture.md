@@ -310,6 +310,7 @@ packages/
 │   ├── editor/            — building-config edits, validation, history, preview geometry
 │   ├── controls/          — the schema-generated parameter form: four control renderers
 │   ├── batch/             — Phase 9 W3: N paired replications, and the paired-t report on them
+│   ├── build/             — which build this is: the commit the bundler stamped, read by the panel and by every recording (#246)
 │   ├── fixit/             — Everyday Mode slice 6: the Fix-a-building case engine, two real runs sharing a crowd
 │   ├── watch/             — Everyday Mode slice 8: a run replayed from its record, read-only and never scored
 │   ├── gauntlet/          — Everyday Mode slice 9a: the forty proof cases as data, the rating that is their mean, and the ladder that orders it
