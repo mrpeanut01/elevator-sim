@@ -1699,6 +1699,20 @@ the always-on tier compares the pin against the cheap re-derivation. A pin that 
 red. This is `benchmark/published.ts`'s pattern, and it is the direct answer to C5 — the published
 count has now gone stale three times because **nothing re-derived it**.
 
+### 6.4b The legibility arm — built, and its table
+
+`DC-4` is a statement about the verdict and says nothing about whether a player could have *seen*
+the problem; `docs/35` `PM-TT2` adds the legibility clause, and GitHub issue #354 built the arm
+([§ D512](../DECISIONS.md)). `packages/viz/src/shift/legibility.ts#legibilityOf` measures, by exact
+interval union over the legs, the longest contiguous stretch any landing holds somebody in the
+stage's third wait band (sixty seconds); a day is legible when that stretch reaches
+`LEGIBILITY_WINDOW_S` (120 s, a declared assumption with its reasoning beside it). The sweep is
+over § 4.6's own 400 days — every contract's day 1 under `collective`, seeds `20 260 824 + 7 919 n`,
+`n = 0…49` — and the table lives beside the constant. The reading that matters here: Garden
+Apartments is legible on **0 of 50** seeds, Chancery House on 2 and St Jude's on 1, so § D475's
+*eligible* set for a first session is measured rather than assumed, and it excludes the building
+the campaign opens on. No interval, because no arms are compared (§ 6.5).
+
 ### 6.5 Two things the sweep is not allowed to do
 
 **It may not report a mean.** Every figure it publishes is a count with its denominator — *3 of 10

@@ -33,6 +33,7 @@ import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import {
   BUILD_NOTES_POINTER,
   buildNotesSummaryOf,
+  REGISTER_EMPTY_LINE,
   buildNotesViewOf,
   EVERYDAY_SHELL_ABSENCES,
 } from './buildNotes.js';
@@ -72,9 +73,11 @@ describe('the build-information panel', () => {
      * typed beside a list is a total that is wrong one merge later.
      */
     // A floor rather than a pin, and it moved 20 → 15 when GitHub issue #229 built two of the
-    // settings rows the register used to refuse: a register whose entries only ever fall is what
-    // § D370's queue reading predicts, so the floor follows it down rather than standing over it.
-    expect(view.entryCount).toBeGreaterThan(15);
+    // settings rows the register used to refuse, and 15 → 12 when GitHub issue #171 emptied the
+    // stage's register and #169 item 1 took the campaign's incidents entry (§ D507): a register
+    // whose entries only ever fall is what § D370's queue reading predicts, so the floor follows it
+    // down rather than standing over it.
+    expect(view.entryCount).toBeGreaterThan(12);
   });
 
   it('says which build it is, in a sentence the corpus sweeps — GitHub issue #246', () => {
@@ -87,8 +90,16 @@ describe('the build-information panel', () => {
     for (const section of buildNotesViewOf().sections) {
       expect(section.heading.length).toBeGreaterThan(4);
       expect(section.note.length).toBeGreaterThan(20);
-      expect(section.entries.length).toBeGreaterThan(0);
+      /* Rows, or the sentence that says there are none — never a heading over nothing. */
+      if (section.entries.length === 0) expect(section.empty).toBe(REGISTER_EMPTY_LINE);
+      else expect(section.empty).toBeUndefined();
     }
+  });
+
+  it('says so where the stage’s rows were, now that its register is empty — GitHub issue #171', () => {
+    const stage = buildNotesViewOf().sections.find((section) => section.entries === STAGE_ABSENCES);
+    expect(stage?.entries).toEqual([]);
+    expect(stage?.empty).toBe(REGISTER_EMPTY_LINE);
   });
 
   /**
@@ -203,8 +214,11 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * among what a player can touch, so it is a gap, and #324 is the issue that will build it or
    * record the decision not to.
    */
-  { register: 'STAGE_ABSENCES', fragment: 'no campaign dock', issue: 181 },
-  { register: 'STAGE_ABSENCES', fragment: 'no answer to a live incident', issue: 171 },
+  /*
+   * `STAGE_ABSENCES`' two rows — *no campaign dock* (#181) and *no answer to a live incident*
+   * (#171) — left this table on the commit that built the dock and the incident it answers
+   * (GitHub issue #171, § D507). The register is empty and still asserted both ways below.
+   */
   /*
    * **Two rows left together here, and that they were a pair is the whole reason to say so.**
    * `STAGE_ABSENCES`' *no rival lane* and `EVERYDAY_SHELL_ABSENCES`' *Racing a second dispatcher*
@@ -234,8 +248,12 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   { register: 'DESIGNER_ABSENCES', fragment: 'escalator rows', issue: 177 },
   { register: 'DESIGNER_ABSENCES', fragment: 'the folded-up specification', issue: 177 },
 
-  /* The campaign. */
-  { register: 'CAMPAIGN_ABSENCES', fragment: 'Incidents here are the two the building implies', issue: 169 },
+  /*
+   * The campaign. The incidents row — *"Incidents here are the two the building implies"*, issue
+   * #169 — left this table on the commit that built the breakdown draw and the contract calendar
+   * (GitHub issues #171 and #169 item 1, § D507), and this test's own rule is what took it out: an
+   * entry deleted while the map still names it fails here.
+   */
   { register: 'CAMPAIGN_ABSENCES', fragment: 'nothing files on', issue: 223 },
   { register: 'CAMPAIGN_ABSENCES', fragment: 'The career is this session', issue: 224 },
 

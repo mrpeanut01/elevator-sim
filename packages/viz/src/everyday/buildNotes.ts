@@ -244,7 +244,18 @@ export interface BuildNotesSection {
   /** One line of context, so a heading is not the only thing placing the rows. */
   readonly note: string;
   readonly entries: readonly string[];
+  /**
+   * The sentence drawn where the rows would be when the register is empty — `undefined` while it
+   * holds anything. A register that has emptied is a fact worth a line: a heading over nothing reads
+   * as a rendering fault, and dropping the section would be the editor in front of the register
+   * this module's docstring forbids. `STAGE_ABSENCES` is the first to reach it (GitHub issue #171).
+   */
+  readonly empty?: string | undefined;
 }
+
+/** {@link BuildNotesSection.empty}'s sentence, one for every register that has emptied. */
+export const REGISTER_EMPTY_LINE =
+  'Nothing missing here any more — every absence this part of the game ever named has been built.';
 
 /** The whole panel. Total — every register the build keeps, in the order a reader meets them. */
 export interface BuildNotesView {
@@ -280,6 +291,7 @@ export function buildNotesViewOf(): BuildNotesView {
       heading: 'Watching a run',
       note: 'The stage a day plays on.',
       entries: STAGE_ABSENCES,
+      ...(STAGE_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
     {
       heading: 'Endless rush',

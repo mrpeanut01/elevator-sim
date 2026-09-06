@@ -372,7 +372,12 @@ function describeRun(
   });
 
   const { landings, progress } = foldPassengers(result.record.passengers);
-  const legs = describeLegs(result.record.passengers);
+  /* GitHub issue #178 item 9, § D511: the structural refusal `core` joined to each undelivered leg. */
+  const refusals = new Map<string, string>();
+  for (const journey of result.undelivered) {
+    if (journey.structuralRefusal !== undefined) refusals.set(`${journey.journeyId}#${String(journey.legIndex)}`, journey.structuralRefusal);
+  }
+  const legs = describeLegs(result.record.passengers, refusals);
 
   const recording: {
     -readonly [K in keyof VizRecording]: VizRecording[K];
@@ -641,7 +646,10 @@ function loadSeries(result: SimulationResult): ReadonlyMap<string, CarLoadSeries
  * `undefined`s would not equal itself after the trip. `recordRun.test.ts` § *survives a JSON
  * round trip unchanged* is the test that says so.
  */
-function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[] {
+function describeLegs(
+  passengers: readonly PassengerRecord[],
+  refusals: ReadonlyMap<string, string> = new Map(),
+): readonly VizLeg[] {
   const legs = passengers.map((passenger): VizLeg => {
     const leg: {
       -readonly [K in keyof VizLeg]: VizLeg[K];
@@ -664,6 +672,9 @@ function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[]
     if (passenger.credentialGroup !== undefined) leg.credentialGroup = passenger.credentialGroup;
     // Absent on every leg the building did not turn away, by the same rule the five above keep.
     if (passenger.refusedAt !== undefined) leg.refusedAt = passenger.refusedAt;
+    // Version 12: joined by journey and leg index, absent on every leg `core` did not name.
+    const structural = refusals.get(`${passenger.journeyId}#${String(passenger.legIndex)}`);
+    if (structural !== undefined) leg.structuralRefusal = structural;
     return leg;
   });
   legs.sort((a, b) => a.arrivedAt - b.arrivedAt || a.passengerId.localeCompare(b.passengerId));

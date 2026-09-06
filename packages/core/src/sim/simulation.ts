@@ -4719,6 +4719,29 @@ export class Simulation {
    * 3. **Every materialized leg reached the recorder.** A leg that exists in the model but not
    *    in the record is invisible to every metric while still looking delivered here.
    */
+  /**
+   * The structural reasons every car refused the call a waiting rider stood on, joined to the leg
+   * — GitHub issue #178 item 9, § D511.
+   *
+   * `#unservable` is keyed on the call id, which no record carries; the leg carries the landing,
+   * the direction and, under destination dispatch, the destination, and those are exactly what
+   * `callIdOf` was minted from. So the join is the call that matches the leg's own fields on the
+   * active list, which is a total match under a panel and the landing's one button otherwise.
+   */
+  #structuralRefusalFor(leg: {
+    readonly originFloorId: string;
+    readonly direction: Direction;
+    readonly destinationFloorId: string;
+  }): string | undefined {
+    for (const active of this.#activeCalls.values()) {
+      if (active.floorId !== leg.originFloorId || active.direction !== leg.direction) continue;
+      if (active.destinationFloorId !== undefined && active.destinationFloorId !== leg.destinationFloorId) continue;
+      const reasons = this.#unservable.get(active.id);
+      if (reasons !== undefined) return reasons;
+    }
+    return undefined;
+  }
+
   #reconcile(runRecord: RunRecord): {
     audit: ConservationAudit;
     undelivered: UndeliveredJourney[];
@@ -4830,12 +4853,14 @@ export class Simulation {
         : last.hasBoarded
           ? 'riding'
           : 'waiting';
+      const structuralRefusal = last.hasBoarded ? undefined : this.#structuralRefusalFor(last);
       undelivered.push(
         Object.freeze({
           journeyId: record.journeyId,
           legId: last.id,
           legIndex: last.legIndex,
           reason,
+          ...(structuralRefusal === undefined ? {} : { structuralRefusal }),
           originFloorId: last.originFloorId,
           destinationFloorId: last.destinationFloorId,
           finalDestinationFloorId: last.finalDestinationFloorId,

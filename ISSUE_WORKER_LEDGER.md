@@ -2330,3 +2330,103 @@ chips were already absent from the document when unoffered the `hidden` writes s
 tests this wave added moved it (425 → 429 in the viz project, 560 → 564 in the directory); the
 figures in `vitest.config.ts` were re-read from the run. The three tests were rerun green, and the
 two stage browser files were rerun green on the fixed tree.
+
+# Wave V — 2026-09-06: one worker, six issues, six umbrella items, and a rate sweep that refuted its own draft
+
+## V.1 The wave's shape: one worker, six issues and six items, one push
+
+Wave V ran as waves T and U did: one integrator, no lanes, serial on one branch, opened in a
+worktree while wave U's suite finished and its pull request was open. Decisions D507 to D513 were
+allocated from the reservation opened before the first commit.
+
+| issue | what landed | decision |
+|---|---|---|
+| #171, #169 item 1 | § 7.5's dock beside the campaign stage, and a campaign day that is the campaign's own: the contract's calendar first, then a breakdown drawn against § 8.3's odds on a stream derived from the seed; an answer moves the purse and the record on one press | § D507 |
+| #178 item 5 | an authored sentence on all thirteen dispatchers, drawn only beside the exact shipped vector it was written for | § D508 |
+| #252 | ratings never reset and boards reset by their date, said on the ladder tab before a rating is earned | § D509 |
+| #93 | the daily board names who drove each row and tells the player their distance from the top, in the one gap sentence both Engineer boards already said | docstring, § D405 |
+| #211 | a figure card leads with its first sentence and folds the rest on a stated budget; the closing block was already layered | docstring, § D405 |
+| #177 item 6 | measured rather than built: no shipped constraint reaches the fallback, and a run holds it | docstring, § D405 |
+| #169 item 3 | § 8.8's offers, priced by a fee table beside the complexity table and gated by the economy's own arithmetic; a take parks the week being left | § D510 |
+| #178 item 9 | a structural refusal joined to the leg by `core` at reconcile time, carried as `VizLeg.structuralRefusal`, version 12 | § D511 |
+| #354 | a day is legible when a landing holds somebody in the third band for two minutes, and the sweep over `docs/33` § 4.6's 400 days says which buildings ever are | § D512 |
+| #178 item 6 | the deadband and rate sweeps as entry points, both pinned; all twelve published differences reproduced to the printed digit, and eleven un-derivable interval entries came out of the register | § D513 |
+
+## V.2 What the code refuted, and what the measurement did
+
+**The technician's forty-five minutes.** The first draft of the breakdown's call-out was 45 minutes,
+the design file's multi-day scale scaled down by feel. The test that pins the option on the legs
+found it unreachable on every shipped contract length: the car goes at three tenths of the day, and
+on `c1`'s hour the earliest answer landed the car back after the day ended. A paid option that can
+never take effect is § D219's defect priced in units; the figure is twenty minutes, which the
+shipped contracts can hold.
+
+**"A campaign day runs the campaign's event."** It did not. `shiftRunConfigOf` read the week's
+calendar for every run, so a contract's third day ran a move-in because the player's week stood on
+its third. Found while giving the day an event of its own, corrected on the same commit.
+
+**Garden Apartments presents no problem to solve.** #208 filed it by playing; the legibility arm
+measured it at 0 of 50 seeds, with Chancery House at 2 and St Jude's at 1. § D475's *eligible* set
+is a table now rather than a word, and the building the campaign opens on is not in it.
+
+**The deadband curve reproduced to the digit, and the rate sweep refuted its own first draft.**
+Eight paired differences quoted by hand in the Phase 5 verdict, re-measured through the entry point
+at the same budget and seed: every one of them the same to three decimals. That is the case where
+shipping the entry point changed nothing about the figures and everything about whether they could
+be trusted. The rate sweep's first draft classified it a count with no intervals and defined *inert
+at every rate* as every rate bit-identical; a twelve-replication run agreed, and the n = 300 run did
+not: only 4 % is 300 of 300, and 2, 8 and 16 % are 298, 297 and 299 with intervals containing zero,
+which is what the verdict's own table had said all along. So the sweep is pinned rather than
+counted, *inert* means no rate BETTER or WORSE, and the four rows reproduced the table too.
+
+## V.3 What the guards caught
+
+- `hiddenBox.test.ts` and `testCost.test.ts` caught wave U's two reds on the full run, fixed before
+  the push; the same rule carried into this wave, where the camera strip's `hidden` writes came out.
+- `boundaries.test.ts` refused `campaign/incidents.ts` reaching `core` through the wrong subpath.
+- `derive.test.ts` found nine unclassified producers across the wave — the calendar's and the
+  stream's identifiers, the offer table, the gap sentence, the emptied register's line — each
+  classified with its reason or covered by the adapter that drives it.
+- `persist.test.ts`, `surface.test.ts` and `runIdentity.test.ts` each required the new
+  `campaignEventId` field to say what it is, both ways.
+- `campaignModel.test.ts`'s risk fixture was wrong before it was right: standing seven with three
+  misses blocks on the slot, not the risk, and the card names the first thing that blocks.
+- `published.test.ts` refused a study in the domain with no pins, which is what forced the sweep to
+  be run before it was registered; it then refused eleven `UNPINNED_INTERVALS` entries the moment a
+  pin could derive them, and `documentation.test.ts` refused the roadmap naming two entry points the
+  package did not export.
+
+## V.4 The corpus, measured once after integration
+
+Both tiers in one sitting on the integrated tree, with the base at `f60e816` re-measured first in a
+detached worktree, where it reproduced wave U's row exactly in both tiers, the twelfth consecutive
+wave that has held. Always-on 594 598 → **609 249** (+14 651, exactly 299.0 a case); deep 741 367 →
+**759 296** (+17 929, 298.82 a case). Cases, simulations, surfaces and failing cases unmoved; the
+surface sets diffed identical in both tiers, and the deep tier's one-surface lead is still
+`campaign/judge.ts#judgeStage`.
+
+The first corpus case decomposes the 299 to the string: +185 the dock over nine seeded states, +95
+the offers, +8 the figure-card handles, +8 the board's driver, gap and policy lines, +5 the two
+events and the coach party's withheld line, −2 the register. The deep tier's eleven missing strings
+were located by rendering all sixty cases on both trees: eleven cases at 298, each with the dock at
+184, and the one string is the technician option's refusal on the seeded breakdown, drawn only
+where the day ends before the car would be back. `CLAUDE.md`'s row carries the arithmetic.
+
+## V.5 The suite, and what the first push cost
+
+Typecheck clean. Core 112 files / 2 558 tests, experiments 108 / 1 413 with 11 skipped, server
+17 / 381, cli 10 / 158, viz-browser 37 / 226, all green on the integrated tree. Viz ran 243 files
+with 5 214 passing and three reds in two files, the annotation census and the honesty tier, both of
+which ran before the fixes below landed and were rerun green on the fixed tree together with the
+three guards that ran after.
+
+**The first push went up before the suite had finished, and CI found eight reds in it, every one
+this wave's.** Three in the browser tier: the offers' disabled *Not yet* button said nothing about
+why on the control, the report test asserted the word *stairs* inside a note whose cohort clause
+names the stairs only on a day somebody took them, and the build-notes floor was one row too high
+after the registers emptied. Five in the viz project: `viewer.campaignEventId` declared with no
+scope-note reason, `eta`'s authored sentence ordering two dispatchers on a single-run surface
+(*hard to beat*, where *beat* contains the id), two instruments with no non-test caller, the
+legibility sweep's gate missing from the deep-tier table, and the annotation census. Each was fixed
+where it was found and rerun green before its push. The cost was two cancelled CI runs and the
+knowledge, again, that the wave rule about one push exists for a reason.

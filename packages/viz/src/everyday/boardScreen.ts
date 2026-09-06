@@ -48,6 +48,7 @@
  * comparison is the same one whether the digest arrived from storage or from this sitting.
  */
 
+import { gapSentence } from '../menu/gap.js';
 import type { DispatcherProfile, ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import { savedProfilesOf } from '../batch/library.js';
@@ -133,6 +134,16 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    * do — and the ranking is still the server's, which is why the row stays on the board at all.
    */
   dailyRowWithheld: 'no count',
+  /*
+   * § D509 — the reset policy, said before a rating is earned (GitHub issue #252). Two clocks and
+   * two sentences: the daily board is one date and resets by construction; the ladder is a standing
+   * rating over forty fixed cases and never resets, decays or deletes a verified run.
+   */
+  ladderPolicy:
+    'Ratings here do not reset and are not decayed. A rating is a mean over forty fixed cases, kept ' +
+    'as the cases with their seeds and recomputed from them, so two ratings a month apart are still ' +
+    'the same measurement. If the proof cases ever change, every rating is re-run from what it kept, ' +
+    'and no verified run is ever deleted.',
   /*
    * The middle of today's board — GitHub issue #327, § D484's ladder drawn as words. Each axis is
    * its own line with its own count; no line combines two axes, none orders energy against wait
@@ -593,6 +604,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
     const view = dailyBoardViewOf(
       board,
       account?.token !== undefined ? account.user?.displayName : undefined,
+      (id) => context.host.dispatcherById(id)?.name,
     );
     const wrap = el(doc, 'div');
     wrap.style.cssText = `margin-top:${String(G.section)}px`;
@@ -623,9 +635,19 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
       place.style.cssText = `font:600 12px ${TYPE.mono};color:${C.label};min-width:2ch`;
       const who = el(doc, 'span', entry.displayName);
       who.style.cssText = 'flex:1';
+      /* GitHub issue #93: who drove it, beside the name, and the player's own gap after the figure. */
+      const driver = el(doc, 'span', entry.driver);
+      driver.className = 'everyday-board-row-driver';
+      driver.style.cssText = `font-size:11.5px;color:${C.label}`;
       const wait = el(doc, 'span', entry.figure);
       wait.style.cssText = `font:600 13px ${TYPE.mono}`;
-      row.append(place, who, wait);
+      row.append(place, who, driver, wait);
+      if (entry.gap !== '') {
+        const gap = el(doc, 'span', entry.gap);
+        gap.className = 'everyday-board-row-gap';
+        gap.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label}`;
+        row.append(gap);
+      }
       if (entry.count !== undefined) {
         /* In the row, beside the mean — R13's clause one is about the visual unit, not the page. */
         const count = el(doc, 'span', entry.count);
@@ -747,7 +769,11 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
     const world = el(doc, 'p', LADDER_WORLD_ABSENCE);
     world.className = 'everyday-ladder-world-absent';
     world.style.cssText = NOTE;
-    body.append(world, sendBlock(set, resources), disclosure(set, resources));
+    /* § D509: the policy is on the tab a rating is earned from, before the button that earns one. */
+    const policy = el(doc, 'p', BOARD_SCREEN_COPY.ladderPolicy);
+    policy.className = 'everyday-ladder-policy';
+    policy.style.cssText = NOTE;
+    body.append(world, policy, sendBlock(set, resources), disclosure(set, resources));
   }
 
   /*
@@ -825,6 +851,17 @@ export interface DailyBoardRowView {
   readonly watch: 'watch' | 'yours';
   readonly place: string;
   readonly displayName: string;
+  /**
+   * Who drove the run — the dispatcher's name, or its id when this build does not ship it. GitHub
+   * issue #93's reveal, and it is not opt-in because the id has always travelled on every posted
+   * run: a board that ranks runs on one crowd has nothing to hide about which dispatcher ran them.
+   */
+  readonly driver: string;
+  /**
+   * The player's own distance from the top row, `menu/gap.ts`'s sentence — GitHub issue #93 § 3.
+   * `''` on every row that is not the player's, on the top row, and where either figure is withheld.
+   */
+  readonly gap: string;
   /** The mean wait, or the withholding sentence when this row carries no count. */
   readonly figure: string;
   /**
@@ -933,6 +970,8 @@ function worldLinesOf(board: Extract<EverydayDailyBoard, { kind: 'board' }>): re
 export function dailyBoardViewOf(
   board: EverydayDailyBoard | undefined,
   ownDisplayName: string | undefined = undefined,
+  /** The dispatcher's player-facing name for an id, or `undefined` for one this build does not ship. */
+  dispatcherNameOf: (id: string) => string | undefined = () => undefined,
 ): DailyBoardView {
   const only = (text: string, className: string, role: 'reason' | 'note' = 'reason'): DailyBoardView => ({
     lines: [{ text, className, role }],
@@ -1000,6 +1039,18 @@ export function dailyBoardViewOf(
           watch: ownDisplayName !== undefined && entry.displayName === ownDisplayName ? 'yours' : 'watch',
           place: String(index + 1),
           displayName: entry.displayName,
+          driver: dispatcherNameOf(entry.run.dispatcherProfileId) ?? entry.run.dispatcherProfileId,
+          /*
+           * The gap is the player's own and nobody else's, and only between two published figures:
+           * a withheld mean has no distance from anything (R3), and the top row's own gap is `''`.
+           */
+          gap:
+            ownDisplayName !== undefined &&
+            entry.displayName === ownDisplayName &&
+            entry.legs !== undefined &&
+            board.rows[0]?.legs !== undefined
+              ? gapSentence(entry.measured[DAILY_BOARD_METRIC] - (board.rows[0]?.measured[DAILY_BOARD_METRIC] ?? 0), 's')
+              : '',
           figure:
             entry.legs === undefined
               ? BOARD_SCREEN_COPY.dailyRowWithheld

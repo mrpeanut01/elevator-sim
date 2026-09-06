@@ -1456,3 +1456,60 @@ becomes a suppression list the day the thing is built.
   measurement attached; nothing here publishes one yet.
 - **#226's `world` ghost** now has its source on the wire (`medianEntryId`) and no consumer.
 - **#346**, **#177 item 5**, **#178 item 9** stand as written.
+
+## Wave V closed
+
+**Five issues and six umbrella items closed, seven decisions taken (D507 to D513), and three
+pushes where the rule says one.** One worker, serial, opened in a worktree while wave U's pull
+request was open. The first push went up before the local suite had finished, at the harness's
+insistence; CI found eight reds in it, every one this wave's own, and two fix pushes answered them
+before the local suite reached the same files. The records went up with the third.
+
+**The suite, on the integrated tree**: `tsc -b` clean; core 112 files / 2 558 tests; experiments
+108 / 1 413 (11 skipped); server 17 / 381; cli 10 / 158; viz 243 files with 5 214 passing and three
+reds in two files that had run before the fixes landed, both rerun green; viz-browser 37 / 226 on
+the fixed tree.
+
+**The corpus, once after integration**: always-on 609 249 strings (+14 651 on wave U's 594 598,
+exactly 299.0 a case), deep 759 296 (+17 929, 298.82 a case), with the base at `f60e816`
+reproducing wave U's row exactly in both tiers first. Surfaces 56 / 57 unmoved, sets identical,
+failing cases 0. The eleven strings the deep tier is short of a constant are one string on eleven
+cases, the technician refusal on a seeded breakdown, found by rendering every deep case rather than
+by inference.
+
+| issue | outcome |
+|---|---|
+| #171, #169 item 1 | **closed**, § D507; the campaign dock, and a campaign day that is the campaign's own |
+| #178 item 5 | **closed**, § D508; thirteen authored sentences, drawn only beside the vector they describe |
+| #252 | **closed**, § D509; ratings never reset, boards reset by their date, said before a rating is earned |
+| #93 | **closed**; the Engineer boards already had the hooks, and the daily board now names the driver and the gap |
+| #211 | **closed**; the cards fold on a stated budget, the closing block already did |
+| #177 item 6 | **closed** by measurement: no shipped constraint reaches the fallback |
+| #169 item 3 | **closed**, § D510; § 8.8's offers, priced, gated and taking a week with them |
+| #178 item 9 | **closed**, § D511; the structural refusal joined to the leg, version 12 |
+| #354 | **closed**, § D512; the legibility arm, and Garden Apartments at 0 of 50 |
+| #178 item 6 | **closed**, § D513; both sweeps as pinned entry points, and twelve figures that reproduced to the digit |
+
+### V.6 What this wave learned
+
+**1. A paid option that can never take effect is the signature defect priced in units.** The
+technician's forty-five minutes looked like a design choice and was unreachable on every shipped
+length; the test that compares on the legs found it before any player could.
+
+**2. Authored prose is safe beside the one vector it was written for.** The card guard turned a rule
+about who writes prose into a property a test runs: a saved copy, an edited working copy or a
+searched vector never wears a sentence about a different one.
+
+**3. Measure the eligibility, then argue about the draw.** § D475 said *eligible* and meant a
+measurement nobody had made. Made, it excludes the building the campaign opens on, which is what
+#208 filed by playing and what the table now says with its `n`.
+
+### V.7 Owed to the next wave
+
+- **#208's build** now has its instrument and its table; the draw and the first session are the
+  build, and the campaign's `c1` is #270's question.
+- **#169 item 4** (a complexity for the two unpriced buildings) is a measurement with the offers
+  now waiting on it: the two are not offered until somebody publishes one.
+- **#346** (a service event that moves a car's range and load) and **#159** (the wrinkle library)
+  stand as written, and the dock's coach party is expressed as a day's demand until #346 lands.
+- **#220** (Endless rush) is the largest front-door promise still unkept.

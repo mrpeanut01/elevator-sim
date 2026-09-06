@@ -125,6 +125,8 @@ import {
   SPECTATOR_MAKES_NO_CHANGES,
 } from './watchStage.js';
 import type { WatchingView } from '../watch/view.js';
+import { interventionLogOf } from '../live/interventions.js';
+import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
 
 /* -------------------------------------------------------------------------- *
  * The module store — what the § 3.3 refinement reads
@@ -843,7 +845,34 @@ function mountStage(
    * picked option's own note — or, when a pick cannot honestly be run, the reason. Still on the
    * control rather than only in a register, which is the rule that entry was the example of.
    */
-  root.append(header, goals, watchBand, alarm, stageWrap, legend, interventions, race);
+  /*
+   * § 7.5's dock — *"a 288 px column floats at the right of the stage"* when `ctx === 'campaign'`
+   * (GitHub issue #171, § D507). The stage and the column share a row that wraps, so on a narrow
+   * viewport the column drops under the picture rather than squeezing it: every control the dock
+   * holds is measured by `viewportGates.browser.test.ts`, and a column that overflowed the page
+   * would be a control nobody could reach. Every word in it is `campaignDock.ts`'s; this block only
+   * decides the elements. **Absent from the document** outside a campaign day — never hidden —
+   * for the camera strip's reason two blocks up.
+   */
+  const stageRow = el(doc, 'div', 'everyday-stage-row');
+  stageRow.style.cssText = `display:flex;flex-wrap:wrap;align-items:flex-start;gap:${String(GAP.row + 2)}px`;
+  stageWrap.style.flex = '1 1 480px';
+  stageWrap.style.minWidth = '0';
+  const dock = el(doc, 'aside', 'everyday-stage-dock');
+  dock.style.cssText = [
+    'flex:0 0 288px',
+    'max-width:100%',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.card)}px`,
+    `background:${C.paper}`,
+    'padding:12px 14px',
+    'display:flex',
+    'flex-direction:column',
+    `gap:${String(GAP.row)}px`,
+  ].join(';');
+  dock.setAttribute('aria-label', 'campaign dock');
+  stageRow.append(stageWrap);
+  root.append(header, goals, watchBand, alarm, stageRow, legend, interventions, race);
   region.append(root);
 
   /* ------------------------------------------------------------- behaviour */
@@ -890,19 +919,198 @@ function mountStage(
   function intervene(change: (typeof STAGE_INTERVENTIONS)[number]['change']): void {
     const current = adopted;
     if (playback === undefined || current === undefined) return;
-    recomputingOver = current;
-    barFacts.recomputing = true;
-    context.refreshBar();
-    /* The § 7.6 beat goes up on this frame rather than on the host's notification: *show a
-       `recomputing` beat rather than freezing silently*, and the freeze starts here. */
-    syncTransport();
-    draw();
+    const atS = playback.simTimeS;
     /*
      * The playhead is *this* screen's, not the shell's — `EverydayHost.intervene`'s whole reason for
      * taking it. A change stamped at the Engineer transport's position would be filed at an instant
      * nobody was looking at.
      */
-    host.intervene(playback.simTimeS, change);
+    withRecomputeBeat(current, () => {
+      host.intervene(atS, change);
+    });
+  }
+
+  /**
+   * § 7.6's `recomputing` beat around a press that grows the record — the stage's arms and the
+   * dock's answer share it, so the two cannot freeze differently.
+   *
+   * The beat goes up on this frame rather than on the host's notification: *show a `recomputing`
+   * beat rather than freezing silently*, and the freeze starts here. It comes down when the host
+   * notifies with a different recording ({@link adopt}).
+   */
+  function withRecomputeBeat(current: VizRecording, press: () => void): void {
+    recomputingOver = current;
+    barFacts.recomputing = true;
+    context.refreshBar();
+    syncTransport();
+    draw();
+    press();
+  }
+
+  /* ---------------------------------------------------------------- § 7.5's dock */
+
+  /** The dock's last drawn state, so a frame that changes nothing rebuilds nothing. */
+  let dockKey = '';
+  /** The reason the last press was refused, drawn under the rows until the next state change. */
+  let dockRefusal: string | undefined;
+
+  function dockViewNow(): CampaignDockView | undefined {
+    if (context.ctx !== 'campaign') return undefined;
+    const facts = host.campaignDay();
+    if (facts === undefined) return undefined;
+    const dayStartS = host.dayStartS();
+    const answer = host.interventions().find((entry) => entry.change.kind === 'answer-incident');
+    return campaignDockViewOf({
+      tower: facts.tower,
+      buildingName: facts.buildingName,
+      incident: facts.incident,
+      runLengthS: facts.runLengthS,
+      simTimeS: playback?.simTimeS ?? 0,
+      dayStartS,
+      answeredStamp: answer === undefined ? undefined : interventionLogOf([answer], dayStartS)[0],
+      hasRun: adopted !== undefined && !barFacts.dayClosed && !barFacts.recomputing,
+    });
+  }
+
+  function syncDock(): void {
+    const view = dockViewNow();
+    if (view === undefined) {
+      if (dock.parentElement !== null) dock.remove();
+      dockKey = '';
+      return;
+    }
+    if (dock.parentElement === null) stageRow.append(dock);
+    const key = `${JSON.stringify(view)}\u0000${dockRefusal ?? ''}`;
+    if (key === dockKey) return;
+    dockKey = key;
+    dock.replaceChildren(...dockChildrenOf(view));
+  }
+
+  function dockChildrenOf(view: CampaignDockView): readonly HTMLElement[] {
+    const name = el(doc, 'div', 'everyday-stage-dock-name', view.buildingName);
+    name.style.cssText = `font:600 13px ${TYPE.body};color:${C.ink}`;
+    const dayLine = el(doc, 'div', 'everyday-stage-dock-day', view.dayLine);
+    dayLine.style.cssText = `font:500 10px ${TYPE.mono};letter-spacing:.1em;color:${C.inkSoft};text-transform:uppercase`;
+    const figures = el(doc, 'div', 'everyday-stage-dock-figures');
+    figures.style.cssText = `display:grid;grid-template-columns:repeat(3,1fr);gap:${String(GAP.tight)}px`;
+    for (const figure of view.figures) {
+      const cell = el(doc, 'div', 'everyday-stage-dock-figure');
+      const value = el(doc, 'div', 'everyday-stage-dock-value', figure.value);
+      value.style.cssText = `font:600 15px ${TYPE.body};color:${C.ink}`;
+      const label = el(doc, 'div', 'everyday-stage-dock-label', figure.label);
+      label.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+      cell.append(value, label);
+      figures.append(cell);
+    }
+    const block = el(doc, 'div', 'everyday-stage-dock-incident');
+    block.dataset['state'] = view.incident.kind;
+    block.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.tight)}px;border-top:1px solid ${C.rule};padding-top:${String(GAP.row)}px`;
+    const eyebrowRow = el(doc, 'div', 'everyday-stage-dock-eyebrow-row');
+    eyebrowRow.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline';
+    const eyebrow = el(doc, 'span', 'everyday-stage-dock-eyebrow', view.incident.heading);
+    eyebrow.style.cssText = `font:500 10px ${TYPE.mono};letter-spacing:.12em;color:${C.sun}`;
+    eyebrowRow.append(eyebrow);
+    if (view.incident.kind !== 'quiet') {
+      const clock = el(doc, 'span', 'everyday-stage-dock-clock', view.incident.clock);
+      clock.style.cssText = `font:500 11px ${TYPE.mono};color:${C.inkSoft}`;
+      eyebrowRow.append(clock);
+    }
+    block.append(eyebrowRow);
+    if (view.incident.kind === 'quiet') {
+      block.append(el(doc, 'div', 'everyday-stage-dock-note', view.incident.note));
+    } else {
+      const title = el(doc, 'div', 'everyday-stage-dock-title', view.incident.title);
+      title.style.cssText = `font:600 13px ${TYPE.body};color:${C.ink}`;
+      block.append(title);
+      if (view.incident.kind === 'open') {
+        block.append(el(doc, 'div', 'everyday-stage-dock-note', view.incident.note));
+        const options = el(doc, 'div', 'everyday-stage-dock-options');
+        options.setAttribute('role', 'group');
+        options.setAttribute('aria-label', 'options, with what each costs and when it takes effect');
+        options.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.tight)}px`;
+        for (const option of view.incident.options) {
+          const button = el(doc, 'button', 'everyday-stage-dock-option');
+          button.type = 'button';
+          button.dataset['option'] = option.id;
+          button.title = option.effect;
+          button.style.cssText = [
+            'text-align:left',
+            `border:1px solid ${C.rule}`,
+            `border-radius:${String(R.control)}px`,
+            `background:${C.paper}`,
+            `color:${C.ink}`,
+            'padding:8px 10px',
+            `font:500 12.5px ${TYPE.body}`,
+            'cursor:pointer',
+            'display:flex',
+            'flex-direction:column',
+            'gap:2px',
+          ].join(';');
+          const head = el(doc, 'span', 'everyday-stage-dock-option-head');
+          head.style.cssText = 'display:flex;justify-content:space-between;gap:8px';
+          head.append(
+            el(doc, 'span', 'everyday-stage-dock-option-label', option.label),
+            el(doc, 'span', 'everyday-stage-dock-option-cost', option.cost),
+          );
+          const when = el(doc, 'span', 'everyday-stage-dock-option-when', option.when);
+          when.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+          button.append(head, when);
+          if (option.refusal !== undefined) {
+            button.disabled = true;
+            button.style.opacity = '.55';
+            button.style.cursor = 'default';
+            const why = el(doc, 'span', 'everyday-stage-dock-option-refusal', option.refusal);
+            why.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+            button.append(why);
+          }
+          button.addEventListener('click', () => {
+            answerFromDock(option.id);
+          });
+          options.append(button);
+        }
+        block.append(options);
+        if (dockRefusal !== undefined) {
+          const line = el(doc, 'div', 'everyday-stage-dock-refusal', dockRefusal);
+          line.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+          block.append(line);
+        }
+      } else {
+        const stamp = el(doc, 'div', 'everyday-stage-dock-stamp', view.incident.stamp);
+        stamp.style.cssText = `font:500 11px ${TYPE.mono};color:${C.inkSoft}`;
+        block.append(stamp);
+      }
+      const footer = el(doc, 'div', 'everyday-stage-dock-footer', view.incident.footer);
+      footer.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+      block.append(footer);
+    }
+    const levers = el(doc, 'div', 'everyday-stage-dock-levers', view.otherLevers);
+    levers.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+    return [name, dayLine, figures, block, levers];
+  }
+
+  function answerFromDock(optionId: string): void {
+    const current = adopted;
+    if (playback === undefined || current === undefined) return;
+    const atS = playback.simTimeS;
+    /*
+     * The host answers or says why not, in the dock's own words; a refusal is drawn under the rows
+     * rather than swallowed (§ 7.6's fourth rule), and a press that landed grows the record through
+     * the same beat the stage's arms use.
+     */
+    let reason: string | undefined;
+    withRecomputeBeat(current, () => {
+      reason = host.answerIncident(atS, optionId);
+    });
+    if (reason !== undefined) {
+      /* Nothing grew: take the beat back down on this frame rather than waiting for a run that never comes. */
+      recomputingOver = undefined;
+      barFacts.recomputing = false;
+      context.refreshBar();
+      syncTransport();
+    }
+    dockRefusal = reason;
+    dockKey = '';
+    syncDock();
   }
 
   /**
@@ -943,6 +1151,8 @@ function mountStage(
     adopted = recording;
     recomputingOver = undefined;
     barFacts.recomputing = false;
+    /* A fresh recording is a fresh answer to the dock's question; a stale refusal would outlive it. */
+    dockRefusal = undefined;
     if (resumeAtS === undefined) {
       speedIndex = defaultSpeedIndex();
       started = false;
@@ -1006,6 +1216,8 @@ function mountStage(
      * `change` event fires only when a player touches it.
      */
     syncSwitchArm();
+    /* The dock reads the log and the purse, both of which move on a notification. */
+    syncDock();
     syncTransport();
     requestFrame();
   }
@@ -1249,6 +1461,7 @@ function mountStage(
     applySwitchRow(intervention, refusal);
 
     drawRace(recording, simTimeS);
+    syncDock();
   }
 
   /**

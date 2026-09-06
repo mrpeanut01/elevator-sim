@@ -775,6 +775,13 @@ export interface UndeliveredJourney {
   readonly arrivedAt: SimTime;
   readonly boardedAt: SimTime | undefined;
   readonly carId: string | undefined;
+  /**
+   * Why every car in the bank refused the call this rider was standing on, when the refusal was
+   * structural — the reasons `Simulation` warns about per call, joined to the leg here rather than
+   * left keyed on a call id no record carries (GitHub issue #178 item 9, § D511). `undefined` on a
+   * rider whose call was simply not reached in time, and on every rider who boarded.
+   */
+  readonly structuralRefusal?: string | undefined;
 }
 
 /**

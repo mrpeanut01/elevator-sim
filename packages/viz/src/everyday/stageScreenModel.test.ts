@@ -615,19 +615,23 @@ describe('§ 7.6 — the intervention control', () => {
   });
 
   /**
-   * **The pin under the register's remaining absence** — [§ D227](../../../../DECISIONS.md): a
-   * refusal is held by a run, never by another sentence.
+   * **The register is empty, and the answer is not one of these rows** — GitHub issue #171,
+   * [§ D507](../../../../DECISIONS.md).
    *
-   * `STAGE_ABSENCES` still says this screen offers no answer to a live incident. The day it does,
-   * this case goes red, and the sentence has to come out with the arm that made it false — which is
-   * what the entry it replaced failed to do for the handover.
+   * This case used to pin *"builds no answered incident, which is what the register still says"*,
+   * and it went red on the commit that built the dock, which is what it was for. What survives is
+   * the structural half: § 7.6's third arm is composed by the dock from the incident's own option
+   * data (`campaign/incidents.ts#answerChangeOf`) and never by `stageInterventionsOf`, whose rows
+   * are the arms that need nothing the dock holds. And the register stays a constant that is
+   * checked, on `screens.ts#UNBUILT_REASONS`'s rule: an entry that ever returns owes its sentence.
    */
-  it('builds no answered incident, which is what the register still says', () => {
+  it('composes no answered incident here — the dock does — and the register is empty', () => {
     for (const switchTo of [undefined, { target: OTHER, driving: PLAIN }]) {
       for (const row of armsFor(switchTo).rows) {
         expect(row.change.kind).not.toBe('answer-incident');
       }
     }
+    expect(STAGE_ABSENCES).toEqual([]);
   });
 
   it('stamps the latest change at or before the playhead, and nothing later', () => {
@@ -955,39 +959,28 @@ describe('the cutaway’s geometry', () => {
  * -------------------------------------------------------------------------- */
 
 describe('the stage’s own register of absences', () => {
-  it('names the campaign dock and the one unbuilt intervention arm, and no longer the ghost', () => {
-    const joined = STAGE_ABSENCES.join('\n');
+  it('is empty — the dock, the answer, the handover and the ghost have all been built — and stays checked', () => {
     /*
      * **Keyed on subjects rather than on section numbers** — GitHub issue #207 took the numbers off
-     * every player-facing string, so `/§ 7\.5/` and `/§ 7\.6/` had nothing left to match. The two
-     * rows they identified are the campaign dock and the two unbuilt intervention arms, which is
-     * what this case's own name has always said it was checking.
+     * every player-facing string. Every subject this register ever named is now asserted as an
+     * absence, so a revert of any of the four has to face this case rather than slip a sentence
+     * back in beside a control that works (§ D227's defect with its polarity reversed):
+     *
+     * - *no decisions during a run* / *handover* — § 7.6's second arm, GitHub issue #171's first half;
+     * - *ghost* / *rival* — § 7.4's lane, GitHub issue #226, § D482;
+     * - *no campaign dock* / *no answer to a live incident* — § 7.5 and § 7.6's third arm, GitHub
+     *   issue #171's second half, § D507, built by `everyday/campaignDock.ts` and
+     *   `campaign/incidents.ts` on one commit.
+     *
+     * The **caution** on the race is unaffected and lives where it always did —
+     * `live/raceStrip.ts#RACE_FOOTER`, which is never conditional.
      */
-    expect(joined).toMatch(/no campaign dock/);
-    expect(joined).toMatch(/no answer to a live incident/);
-    /*
-     * And the entry that came out. GitHub issue #171's first arm landed, so *"a handover … and this
-     * screen offers neither"* became a refusal about a control a player can press — § D227's defect
-     * with its polarity reversed. Asserted as an absence so a revert would have to face it.
-     */
+    const joined = STAGE_ABSENCES.join('\n');
+    expect(STAGE_ABSENCES).toEqual([]);
     expect(joined).not.toMatch(/no decisions during a run/);
     expect(joined).not.toMatch(/handover/);
-    /*
-     * **And the second entry that came out** — GitHub issue #226, [§ D482](../../../../DECISIONS.md).
-     *
-     * `STAGE_NO_GHOST` read *"no rival lane — a ghost is a second run of the same crowd, and this
-     * screen cannot ask for one yet"*. The screen can ask for one now, through
-     * `everyday/host.ts#raceAgainst`, and a lane that shipped the picker without deleting the
-     * sentence would have left a refusal telling a player not to touch a control that works. The
-     * assertion is `not.toMatch` rather than an absent case for the same reason the pair above is:
-     * a revert has to face it, and the case's own name says what changed.
-     *
-     * The **caution** is unaffected and lives where it always did — `live/raceStrip.ts#RACE_FOOTER`,
-     * *"One day each on the same crowd. That is a race, not proof."*, which is never conditional.
-     * A race arriving is exactly when that sentence starts mattering, so nothing here relaxes it.
-     */
     expect(joined).not.toMatch(/ghost|rival/);
-    for (const absence of STAGE_ABSENCES) expect(absence.length).toBeGreaterThan(20);
+    expect(joined).not.toMatch(/no campaign dock|no answer to a live incident/);
   });
 });
 

@@ -1512,6 +1512,13 @@ type DecisionReservation = {
  */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
+ * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
+ * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
+ * for the integrator's findings. D507 is the campaign dock and the campaign's own event (#171,
+ * #169 item 1). The rest are allocated as the wave spends them and closed at integration; a number
+ * the wave does not reach is free rather than a hole.
+ */
+/*
  * **Wave S reserved D489–D498, and it was opened four lanes late — which is wave Q's error
  * repeated by the person who wrote it down.**
  *

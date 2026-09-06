@@ -197,6 +197,54 @@ describe.skipIf(!HAS_BROWSER)('§ 6.5’s closing block is layered on the page �
   }, 180_000);
 });
 
+describe.skipIf(!HAS_BROWSER)('the figure cards are layered on the page — issue #211', () => {
+  /** The cards' notes, drawn and present, on `smallPrint`'s two measurements. */
+  async function cardNotes(page: Page): Promise<{ drawn: string; present: string; folds: number }> {
+    return page.evaluate(() => {
+      const parts = [
+        ...document.querySelectorAll<HTMLElement>(
+          '.everyday-report-figures .everyday-figure-note, .everyday-report-figures .everyday-figure-note-rest',
+        ),
+      ];
+      const shown = (node: HTMLElement): boolean => {
+        const fold = node.closest('details');
+        return fold === null || fold.open;
+      };
+      return {
+        drawn: parts.filter(shown).map((node) => node.textContent ?? '').join(' '),
+        present: parts.map((node) => node.textContent ?? '').join(' '),
+        folds: document.querySelectorAll('.everyday-report-figures details.everyday-figure-note-more').length,
+      };
+    });
+  }
+
+  it('draws each card’s first sentence, keeps the rest one press away, and loses nothing', async () => {
+    const page = await coldLoad();
+    try {
+      await openTheReport(page);
+      const before = await cardNotes(page);
+      expect(before.folds).toBeGreaterThan(0);
+      expect(wordsIn(before.drawn)).toBeLessThan(wordsIn(before.present));
+      /*
+       * The stairs card is the one the issue named at seventy words; its lead is drawn whole. It is
+       * found by its label, because the note's cohort clause names the stairs only on a day somebody
+       * took them, and Garden Apartments at this seed does not always produce one.
+       */
+      const labels = await page.$$eval('.everyday-report-figures .everyday-figure-label', (nodes) =>
+        nodes.map((node) => node.textContent ?? ''),
+      );
+      expect(flat(labels.join(' ')).toLowerCase()).toContain('stairs');
+      const handles = page.locator('.everyday-report-figures details.everyday-figure-note-more summary');
+      for (let index = 0; index < before.folds; index += 1) await handles.nth(index).click();
+      const after = await cardNotes(page);
+      expect(after.present).toBe(before.present);
+      expect(after.drawn).toBe(after.present);
+    } finally {
+      await page.close();
+    }
+  }, 180_000);
+});
+
 describe.skipIf(!HAS_BROWSER)('the report’s lever opens what it names — issue #213', () => {
   it('hands the page to the Engineer surface with the panel the label named', async () => {
     const page = await coldLoad();

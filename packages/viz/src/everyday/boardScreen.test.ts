@@ -117,9 +117,31 @@ describe('the daily board tab', () => {
       distribution: undefined, distributionDetail: undefined, rows: [entry('Ada', 21.44), entry('Grace', 29.5)],
     });
     expect(view.rows).toEqual([
-      { id: 'row-Ada', watch: 'watch', place: '1', displayName: 'Ada', figure: '21.4 s', count: 'over 312 rides' },
-      { id: 'row-Grace', watch: 'watch', place: '2', displayName: 'Grace', figure: '29.5 s', count: 'over 312 rides' },
+      { id: 'row-Ada', watch: 'watch', place: '1', displayName: 'Ada', driver: 'eta', gap: '', figure: '21.4 s', count: 'over 312 rides' },
+      { id: 'row-Grace', watch: 'watch', place: '2', displayName: 'Grace', driver: 'eta', gap: '', figure: '29.5 s', count: 'over 312 rides' },
     ]);
+  });
+
+  /**
+   * GitHub issue #93 on the daily board: the dispatcher is revealed on every row by name when this
+   * build ships it, and the player's own row says how far behind the top row it is — in
+   * `menu/gap.ts`'s one sentence, on published figures only, and never on anybody else's row.
+   */
+  it('names who drove each row, and tells the player their own distance from the top', () => {
+    const rows = [entry('Ada', 21.44), entry('Grace', 29.5), entry('Lin', 31, null)];
+    const board = { kind: 'board' as const, date: '2026-09-02', note: 'note', distribution: undefined, distributionDetail: undefined, rows };
+    const named = dailyBoardViewOf(board, 'Grace', (id) => (id === 'eta' ? 'Minimum estimated wait' : undefined));
+    expect(named.rows.map((row) => row.driver)).toEqual(['Minimum estimated wait', 'Minimum estimated wait', 'Minimum estimated wait']);
+    expect(named.rows[1]?.watch).toBe('yours');
+    expect(named.rows[1]?.gap).toBe(' · 8.1 s behind the top row on this board’s metric');
+    /* Nobody else's row carries a gap, and the top row's own is empty even when it is the player's. */
+    expect(named.rows[0]?.gap).toBe('');
+    expect(named.rows[2]?.gap).toBe('');
+    expect(dailyBoardViewOf(board, 'Ada').rows[0]?.gap).toBe('');
+    /* A withheld mean has no distance from anything. */
+    expect(dailyBoardViewOf(board, 'Lin').rows[2]?.gap).toBe('');
+    /* An id this build does not ship is drawn as itself rather than invented into a name. */
+    expect(dailyBoardViewOf(board).rows[0]?.driver).toBe('eta');
   });
 
   it('withholds a row’s mean when the server sent no count for it', () => {

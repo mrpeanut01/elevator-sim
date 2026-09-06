@@ -550,8 +550,47 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
     /* ---- the two panels this build refuses, and the register ---- */
     const panels = el(doc, 'div');
     panels.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:${String(GAP.row)}px;margin-top:${String(GAP.section)}px`;
+    /* § 8.8's offers — GitHub issue #169 item 3, § D510. Every word is `campaignModel.ts#offersView`'s. */
+    {
+      const card = el(doc, 'div', 'everyday-towers-offers');
+      card.style.cssText = `${CARD};padding:14px 16px;background:${C.cardSunk}`;
+      card.append(eyebrow(doc, `${view.offers.heading} · ${view.offers.caption}`, '0 0 6px'));
+      if (view.offers.empty !== undefined) {
+        const none = el(doc, 'div', 'everyday-towers-offers-empty', view.offers.empty);
+        none.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.5`;
+        card.append(none);
+      }
+      for (const offer of view.offers.rows) {
+        const row = el(doc, 'div', 'everyday-towers-offer');
+        row.dataset['contract'] = offer.contractId;
+        row.style.cssText = `display:flex;flex-direction:column;gap:3px;padding:8px 0;border-top:1px solid ${C.ruleLight}`;
+        const name = el(doc, 'div', 'everyday-towers-offer-name', offer.name);
+        name.style.cssText = `font-size:13px;font-weight:600;color:${C.ink}`;
+        const terms = el(doc, 'div', 'everyday-towers-offer-terms', offer.terms);
+        terms.style.cssText = `${MONO};color:${C.warmGrey}`;
+        const quirk = el(doc, 'div', 'everyday-towers-offer-quirk', offer.quirk);
+        quirk.style.cssText = 'font-size:12px;color:#8D6A2F;line-height:1.4';
+        const take = button(doc, 'everyday-towers-offer-take', offer.cta, offer.takeable, () => {
+          host.campaignAct({ kind: 'take-offer', contractId: offer.contractId });
+          context.go('building');
+        });
+        row.append(name, terms, quirk, take);
+        if (offer.refusal !== undefined) {
+          const why = el(doc, 'div', 'everyday-towers-offer-refusal', offer.refusal);
+          why.style.cssText = `font-size:12px;color:${C.terracotta};line-height:1.5`;
+          /* A dead control says why on the control (GitHub issue #262): the refusal is the button's description. */
+          why.id = `everyday-towers-offer-refusal-${offer.contractId}`;
+          take.setAttribute('aria-describedby', why.id);
+          row.append(why);
+        }
+        card.append(row);
+      }
+      const offersNote = el(doc, 'div', 'everyday-towers-offers-note', view.offers.note);
+      offersNote.style.cssText = `font-size:11.5px;color:${C.faint};margin-top:6px;line-height:1.4`;
+      card.append(offersNote);
+      panels.append(card);
+    }
     for (const [heading, sub, refusal, className] of [
-      [view.offers.heading, undefined, view.offers.refusal, 'everyday-towers-offers'],
       [view.lately.heading, view.lately.sub, view.lately.refusal, 'everyday-towers-lately'],
     ] as const) {
       const card = el(doc, 'div', className);

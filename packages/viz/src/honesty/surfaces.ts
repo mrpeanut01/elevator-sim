@@ -156,7 +156,7 @@ import {
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
-import { everydayReportViewOf } from '../everyday/reportView.js';
+import { FIGURE_NOTE_HANDLE, everydayReportViewOf } from '../everyday/reportView.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
@@ -251,6 +251,9 @@ import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { BOARD_SCREEN_COPY, DAILY_BOARD_ABSENCE, dailyBoardViewOf } from '../everyday/boardScreen.js';
+import { CAMPAIGN_DOCK_COPY, campaignDockViewOf } from '../everyday/campaignDock.js';
+import { campaignIncidentOf } from '../campaign/incidents.js';
+import { carsToDerate } from '../shift/incidents.js';
 import {
   caseNameOf,
   caseNamesOf,
@@ -278,6 +281,7 @@ import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
 import {
+  interventionLogOf,
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
   SPREAD_CARS_LABEL,
@@ -8530,6 +8534,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
   id: 'everyday/campaignModel.ts#towersView',
   covers: [
     'everyday/campaignModel.ts#towersView',
+    /* § 8.8's offers — GitHub issue #169 item 3, § D510 — every row the snapshot renders, seeded below. */
+    'everyday/campaignModel.ts#offersView',
     'everyday/campaignModel.ts#buildingView',
     'everyday/campaignModel.ts#contractView',
     'everyday/campaignModel.ts#calendarView',
@@ -8702,7 +8708,18 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
         role: 'observation',
         declaredCount: towers.rows.length,
       });
-      seeds.push({ field: `${label}.towers.offers`, text: towers.offers.refusal, role: 'reason' });
+      /* § 8.8's offers — GitHub issue #169 item 3, § D510 — every row the snapshot renders. */
+      seeds.push({ field: `${label}.towers.offers.heading`, text: `${towers.offers.heading} · ${towers.offers.caption}`, role: 'label' });
+      if (towers.offers.empty !== undefined) seeds.push({ field: `${label}.towers.offers.empty`, text: towers.offers.empty, role: 'reason' });
+      seeds.push({ field: `${label}.towers.offers.note`, text: towers.offers.note, role: 'prose' });
+      towers.offers.rows.forEach((offer, index) => {
+        const where = `${label}.towers.offers.${String(index)}`;
+        seeds.push({ field: `${where}.name`, text: offer.name, role: 'label' });
+        seeds.push({ field: `${where}.terms`, text: offer.terms, role: 'label' });
+        seeds.push({ field: `${where}.quirk`, text: offer.quirk, role: 'prose' });
+        seeds.push({ field: `${where}.cta`, text: offer.cta, role: 'label' });
+        if (offer.refusal !== undefined) seeds.push({ field: `${where}.refusal`, text: offer.refusal, role: 'reason' });
+      });
       seeds.push({ field: `${label}.towers.lately`, text: towers.lately.refusal, role: 'reason' });
       seeds.push({ field: `${label}.towers.lately.sub`, text: towers.lately.sub, role: 'prose' });
       seeds.push({ field: `${label}.towers.footnote`, text: towers.oddsFootnote, role: 'prose' });
@@ -9113,12 +9130,109 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
     'everyday/stageScreenModel.ts#STAGE_GOALS_COPY',
+    /*
+     * § 7.5's dock — GitHub issue #171, § D507. The column is `stageScreen.ts`'s to draw and
+     * `campaignDock.ts`'s to word, and the incident it draws is `campaign/incidents.ts`'s: the
+     * breakdown's and the coach party's titles, notes and options, the answer's own refusals, and
+     * the copy table, all driven below over every state the dock can be in.
+     */
+    'everyday/campaignDock.ts#campaignDockViewOf',
+    'everyday/campaignDock.ts#CAMPAIGN_DOCK_COPY',
+    'everyday/campaignDock.ts#purseRefusalOf',
+    'campaign/incidents.ts#campaignIncidentOf',
+    'campaign/incidents.ts#answerChangeOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const { recording } = context;
     const floorLabelOf = (id: string): string =>
       recording.floors.find((floor) => floor.id === id)?.label ?? id;
+
+    /*
+     * **§ 7.5's dock, over every state a campaign day can put it in** — GitHub issue #171, § D507.
+     *
+     * The tower is a fresh contract on the case's own building, and the incidents are the two the
+     * campaign chooses, described from the case's resolved building so the car a breakdown names is
+     * one the building has. Six states: quiet (a breakdown before its clock), the breakdown open,
+     * the breakdown answered, the coach party with a held car and without, and the breakdown on a
+     * purse too thin for the technician — which is the one state that reaches the shortfall arm.
+     * The answer's *too late* refusal is reached by asking at the last second of the run.
+     */
+    {
+      const tower = freshTower({
+        contractId: 'c1',
+        buildingId: recording.buildingId,
+        dispatcherId: recording.dispatcherProfileId,
+        rate: 3,
+      });
+      const runLengthS = recording.endedAt;
+      const heldCars = carsToDerate(context.building, 1).held;
+      const breakdown = campaignIncidentOf({
+        event: SHIFT_EVENTS.breakdown,
+        building: context.building,
+        runLengthS,
+        heldCars: [],
+      });
+      const coachHeld = campaignIncidentOf({
+        event: SHIFT_EVENTS['coach-party'],
+        building: context.building,
+        runLengthS,
+        heldCars,
+      });
+      const coachAlone = campaignIncidentOf({
+        event: SHIFT_EVENTS['coach-party'],
+        building: context.building,
+        runLengthS,
+        heldCars: [],
+      });
+      const dockStates: readonly (readonly [string, Parameters<typeof campaignDockViewOf>[0]])[] = [
+        ['quiet', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: 0, answeredStamp: undefined, hasRun: true }],
+        ['none', { tower, buildingName: context.buildingName, incident: undefined, runLengthS, simTimeS: 0, answeredStamp: undefined, hasRun: true }],
+        ['breakdown', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: breakdown?.atS ?? 0, answeredStamp: undefined, hasRun: true }],
+        ['breakdown-late', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: Math.max(0, runLengthS - 1), answeredStamp: undefined, hasRun: true }],
+        ['breakdown-answered', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: (breakdown?.atS ?? 0) + 60, answeredStamp: interventionLogOf([{ atS: (breakdown?.atS ?? 0) + 60, change: { kind: 'answer-incident', option: breakdown?.options[0]?.label ?? '', serviceEvents: [] } }])[0], hasRun: true }],
+        ['breakdown-broke', { tower: { ...tower, carry: 1 }, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: breakdown?.atS ?? 0, answeredStamp: undefined, hasRun: true }],
+        ['breakdown-no-run', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: breakdown?.atS ?? 0, answeredStamp: undefined, hasRun: false }],
+        ['coach-held', { tower, buildingName: context.buildingName, incident: coachHeld, runLengthS, simTimeS: 0, answeredStamp: undefined, hasRun: true }],
+        ['coach-alone', { tower, buildingName: context.buildingName, incident: coachAlone, runLengthS, simTimeS: 0, answeredStamp: undefined, hasRun: true }],
+      ];
+      for (const [state, input] of dockStates) {
+        const view = campaignDockViewOf(input);
+        seeds.push({ field: `stage.dock(${state}).building`, text: view.buildingName, role: 'label' });
+        seeds.push({ field: `stage.dock(${state}).day`, text: view.dayLine, role: 'label' });
+        for (const figure of view.figures) {
+          seeds.push({ field: `stage.dock(${state}).figure.${figure.label}.value`, text: figure.value, role: 'label' });
+          seeds.push({ field: `stage.dock(${state}).figure.${figure.label}.label`, text: figure.label, role: 'label' });
+        }
+        seeds.push({ field: `stage.dock(${state}).heading`, text: view.incident.heading, role: 'label' });
+        seeds.push({ field: `stage.dock(${state}).levers`, text: view.otherLevers, role: 'prose' });
+        if (view.incident.kind === 'quiet') {
+          seeds.push({ field: `stage.dock(${state}).note`, text: view.incident.note, role: 'prose' });
+          continue;
+        }
+        seeds.push({ field: `stage.dock(${state}).clock`, text: view.incident.clock, role: 'label' });
+        seeds.push({ field: `stage.dock(${state}).title`, text: view.incident.title, role: 'label' });
+        seeds.push({ field: `stage.dock(${state}).footer`, text: view.incident.footer, role: 'prose' });
+        if (view.incident.kind === 'answered') {
+          seeds.push({ field: `stage.dock(${state}).stamp`, text: view.incident.stamp, role: 'label' });
+          continue;
+        }
+        seeds.push({ field: `stage.dock(${state}).note`, text: view.incident.note, role: 'prose' });
+        for (const option of view.incident.options) {
+          seeds.push({ field: `stage.dock(${state}).option.${option.id}.label`, text: option.label, role: 'label' });
+          seeds.push({ field: `stage.dock(${state}).option.${option.id}.cost`, text: option.cost, role: 'label' });
+          seeds.push({ field: `stage.dock(${state}).option.${option.id}.when`, text: option.when, role: 'prose' });
+          seeds.push({ field: `stage.dock(${state}).option.${option.id}.effect`, text: option.effect, role: 'prose' });
+          if (option.refusal !== undefined) {
+            seeds.push({ field: `stage.dock(${state}).option.${option.id}.refusal`, text: option.refusal, role: 'reason' });
+          }
+        }
+      }
+      /* The copy table, iterated rather than listed, on `BOARD_SCREEN_COPY`'s precedent. */
+      for (const [key, text] of Object.entries(CAMPAIGN_DOCK_COPY)) {
+        seeds.push({ field: `stage.dock.copy.${key}`, text, role: 'label' });
+      }
+    }
 
     for (const rung of stageLegend()) {
       seeds.push({ field: `stage.legend.${rung.id}`, text: rung.label, role: 'label' });
@@ -9826,6 +9940,8 @@ const GAUNTLET: SurfaceAdapter = {
     'gauntlet/run.ts#GAUNTLET_CANCELLED',
     // The board screen's own two string tables; its `mount` is excluded on the mounts' ground.
     'everyday/boardScreen.ts#BOARD_SCREEN_COPY',
+    /* GitHub issue #93 § 3: the one gap sentence, on the player's own row — seeded on the row states below. */
+    'menu/gap.ts#gapSentence',
     'everyday/boardScreen.ts#DAILY_BOARD_ABSENCE',
     // The daily tab's five states — driven below, all five, rather than the copy table alone.
     'everyday/boardScreen.ts#dailyBoardViewOf',
@@ -10136,7 +10252,13 @@ const GAUNTLET: SurfaceAdapter = {
       ],
     ];
     for (const [state, board] of dailyStates) {
-      const view = dailyBoardViewOf(board);
+      /*
+       * Rendered as the **second** row's player, so every row state carries a `your run` row that
+       * is behind the top by a published distance — GitHub issue #93's gap is on the player's own
+       * row and nowhere else, and a corpus that never signed in would never read it.
+       */
+      const own = board !== undefined && board.kind === 'board' ? board.rows[1]?.displayName : undefined;
+      const view = dailyBoardViewOf(board, own, (id) => context.profiles.find((profile) => profile.id === id)?.name);
       view.lines.forEach((line, index) => {
         seeds.push({
           field: `board.daily.${state}.line${String(index)}`,
@@ -10158,6 +10280,11 @@ const GAUNTLET: SurfaceAdapter = {
           text: `${row.place}. ${row.displayName}`,
           role: 'label',
         });
+        /* GitHub issue #93: who drove the row, and the player's own distance from the top. */
+        seeds.push({ field: `board.daily.${state}.row${String(index)}.driver`, text: row.driver, role: 'label' });
+        if (row.gap !== '') {
+          seeds.push({ field: `board.daily.${state}.row${String(index)}.gap`, text: row.gap, role: 'observation' });
+        }
         /*
          * Two roles, and which one applies is the row's own answer rather than the adapter's
          * preference. A row that printed a count is an `estimate` with `countShown` — from whether
@@ -10241,6 +10368,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/briefView.ts#SANDBOX_DOOR_LABEL',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
+    /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
+    'everyday/reportView.ts#FIGURE_NOTE_HANDLE',
     'everyday/world.ts#percentileLine',
     'everyday/world.ts#WORLD_FIGURES_LABEL',
     'everyday/world.ts#WORLD_FIGURES_REASON',
@@ -10450,6 +10579,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         seeds.push({ field: `${where}.figuresHeading`, text: view.headings.figures, role: 'label' });
         seeds.push({ field: `${where}.overnightHeading`, text: view.headings.overnight, role: 'label' });
         seeds.push({ field: `${where}.honesty.title`, text: view.honesty.title, role: 'label' });
+        /* GitHub issue #211: the handle on every folded card note, one string, seeded once per sheet. */
+        seeds.push({ field: `${where}.figure.handle`, text: FIGURE_NOTE_HANDLE, role: 'label' });
         /*
          * `role: 'reason'`, which is what `DAY_REPORT` and `DAY_REPORT_VIEW` classify the same
          * string as — and the classification is load-bearing rather than cosmetic. The small
@@ -11151,8 +11282,14 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     /* GitHub issue #246's build line, reached through `view.build`; under the corpus, the unbuilt arm. */
     'release/version.ts#buildVersionLineOf',
     'everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES',
+    'everyday/buildNotes.ts#REGISTER_EMPTY_LINE',
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
-    'everyday/stageScreenModel.ts#STAGE_ABSENCES',
+    /*
+     * `everyday/stageScreenModel.ts#STAGE_ABSENCES` stood here until GitHub issue #171 (§ D507)
+     * emptied it. An empty array produces no prose, so `derive.test.ts` no longer finds it and a
+     * `covers` entry would be a coverage claim for nothing; the register itself is still drawn,
+     * as the section's `empty` line below.
+     */
     'everyday/rushScreenModel.ts#RUSH_ABSENCES',
     'everyday/designerModel.ts#DESIGNER_ABSENCES',
     'campaign/career.ts#CAMPAIGN_ABSENCES',
@@ -11181,6 +11318,8 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
       for (const [row, entry] of section.entries.entries()) {
         seeds.push({ field: `${at}.entry.${String(row)}`, text: entry, role: 'reason' });
       }
+      /* An emptied register's line — the stage's, since GitHub issue #171 (§ D507). */
+      if (section.empty !== undefined) seeds.push({ field: `${at}.empty`, text: section.empty, role: 'prose' });
     }
 
     /*

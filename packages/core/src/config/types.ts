@@ -680,6 +680,16 @@ export interface AuctionStageConfig extends Commented {
 export interface DispatcherProfile extends Commented {
   readonly id: string;
   readonly name: string;
+  /**
+   * The authored player-facing line, 1–160 characters — GitHub issue #178 item 5, § D508.
+   *
+   * Present on every shipped profile and absent on nothing the schema refuses: a saved or edited
+   * profile is a player's, and `dev/rightRail.ts#authoredBlurbOf` draws this only beside the exact
+   * shipped vector it was written for, so a searched or moved vector never wears a sentence about
+   * a different one. That guard is what answers the objection that authored prose beside a
+   * searched vector goes stale — it is never beside one.
+   */
+  readonly blurb?: string | undefined;
   /** e.g. `baseline`. Free-form; used for reporting, not behaviour. */
   readonly role?: string | undefined;
   readonly engine?: string | undefined;

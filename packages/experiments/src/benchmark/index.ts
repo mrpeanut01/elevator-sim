@@ -795,6 +795,21 @@ export {
 export type { PrepositioningOptions, PrepositioningStudy } from './prepositioning.js';
 
 /* -------------------------------------------------------------------------- *
+ * § 4's two sweeps as entry points — GitHub issue #178 item 6, § D513
+ * -------------------------------------------------------------------------- */
+
+export {
+  DEADBAND_SWEEP_THRESHOLDS_S,
+  RATE_SWEEP_RATES,
+  SWEEP_REPLICATIONS,
+  SWEPT_STRATEGY,
+  runDeadbandSweep,
+  runRateSweep,
+} from './deadbandSweep.js';
+
+export type { DeadbandSweep, DeadbandSweepRow, RateSweep, RateSweepRow, SweepOptions } from './deadbandSweep.js';
+
+/* -------------------------------------------------------------------------- *
  * Where the tail terms earn their weights — a vs-`eta` study, never the criterion
  * -------------------------------------------------------------------------- */
 

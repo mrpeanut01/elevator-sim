@@ -70,7 +70,13 @@ import {
   type SheetContinuity,
 } from '../dev/reportPanel.js';
 
-import { everydayReportViewOf, type EverydayReportView, type HonestyPart } from './reportView.js';
+import {
+  FIGURE_NOTE_HANDLE,
+  everydayReportViewOf,
+  figureNotePartsOf,
+  type EverydayReportView,
+  type HonestyPart,
+} from './reportView.js';
 import { openTowerOf } from '../campaign/career.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayScreenModule } from './screens.js';
@@ -209,7 +215,17 @@ function mountReportScreen(
     const figures = section(doc, view.headings.figures);
     figures.body.className = 'everyday-report-figures';
     figures.body.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:${String(GAP.row)}px`;
-    for (const cell of sheet.figures) figures.body.append(figureCell(doc, cell));
+    /* GitHub issue #211: a card's note leads with its first sentence and folds the rest. */
+    for (const cell of sheet.figures) {
+      const parts = figureNotePartsOf(cell.note);
+      figures.body.append(
+        figureCell(
+          doc,
+          cell,
+          parts.rest === undefined ? undefined : { lead: parts.lead, rest: parts.rest, handle: FIGURE_NOTE_HANDLE },
+        ),
+      );
+    }
     root.append(figures.root);
 
     /* ---- the goals: what the day asked, and how it read ---- */

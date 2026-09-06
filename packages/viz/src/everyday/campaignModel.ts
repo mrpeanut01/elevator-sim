@@ -80,6 +80,7 @@ import {
   legalStarts,
   nextSlot,
   oddsAfterWorksPct,
+  offerFeeOf,
   occupiedDayIndices,
   perfectMonthUnits,
   purseOf,
@@ -94,6 +95,8 @@ import {
   wearOf,
   worksDayLine,
 } from '../campaign/economy.js';
+import { calendarDaysOf } from '../campaign/calendar.js';
+import { CONTRACTS } from '../shift/contracts.js';
 import {
   BUILD_IDS,
   BUILD_LABELS,
@@ -106,6 +109,8 @@ import {
   needOf,
   nextLineOf,
   openTowerOf,
+  offerRefusalOf,
+  quirkOf,
 } from '../campaign/career.js';
 import { worksTodayOf } from '../campaign/works.js';
 
@@ -370,9 +375,20 @@ export const TOWERS_COPY = Object.freeze({
   openCta: 'Open',
   renewCta: 'Renew',
   offersHeading: 'ON THE TABLE',
-  offersRefusal:
-    'no offers here yet — a building is offered on a complexity and a fee, and taking one moves a week ' +
-    'between assignments; neither of those reaches this screen in this build',
+  /*
+   * § 8.8's offers — GitHub issue #169 item 3, § D510. The refusal that stood here (*"no offers
+   * here yet — a building is offered on a complexity and a fee, and taking one moves a week between
+   * assignments; neither of those reaches this screen in this build"*) is deleted on the commit
+   * that built both halves: `economy.ts#OFFER_FEES` prices the offer and `career.ts#offerRefusalOf`
+   * gates it, and `everyday/host.ts#campaignAct` moves the week on a take.
+   */
+  offersTake: 'Take it',
+  offersNotYet: 'Not yet',
+  offersNone: 'Every building the agency offers is one you already hold.',
+  offersNoSlot: 'No free slot — {n} more standing opens the next one.',
+  offersAtRisk: 'A tower is one miss from ending. Fix that before adding another.',
+  offersUnpriced: 'complexity unpublished — not offered until somebody measures one',
+  offersFreshWeek: 'taking it starts a fresh week on this building; the week you are on is parked, not lost',
   incidentsHeading: 'WHAT HAS HAPPENED LATELY',
   incidentsSub: 'none of it was your doing',
   incidentsRefusal:
@@ -511,9 +527,76 @@ export interface TowersView {
   readonly headings: readonly string[];
   readonly rows: readonly TowerRowView[];
   readonly footer: string;
-  readonly offers: { readonly heading: string; readonly refusal: string };
+  readonly offers: OffersView;
   readonly lately: { readonly heading: string; readonly sub: string; readonly refusal: string };
   readonly oddsFootnote: string;
+}
+
+/** One offered building — § 8.8's card. */
+export interface OfferRowView {
+  readonly contractId: string;
+  readonly name: string;
+  /** `complexity 3 of 5 · 5 u a day`. */
+  readonly terms: string;
+  readonly quirk: string;
+  /** `Take it`, or `Not yet` with {@link refusal} beside it. */
+  readonly cta: string;
+  readonly takeable: boolean;
+  /** Which of § 8.8's two conditions blocks the take, in the guide's own words, or `undefined`. */
+  readonly refusal: string | undefined;
+}
+
+export interface OffersView {
+  readonly heading: string;
+  /** *3 offers* — § 8.8: the caption counts what is rendered. */
+  readonly caption: string;
+  readonly rows: readonly OfferRowView[];
+  /** The line drawn when there is nothing to offer. */
+  readonly empty: string | undefined;
+  /** What a take does to the week, said before the press. */
+  readonly note: string;
+}
+
+/**
+ * § 8.8's offers, per snapshot — GitHub issue #169 item 3, § D510.
+ *
+ * Every shipped contract whose building the career does not hold and whose complexity and fee are
+ * published, each with the gate `career.ts#offerRefusalOf` decides. The two unpriced buildings are
+ * absent rather than drawn with a refusal, because *offered on a complexity and a fee* is the
+ * definition of an offer and they have neither; `economy.ts#COMPLEXITY` says why. The caption counts
+ * the rows actually rendered.
+ */
+export function offersView(career: CampaignCareer, buildingNameOf: (id: string) => string | undefined): OffersView {
+  const rows: OfferRowView[] = [];
+  for (const contract of CONTRACTS) {
+    const refusal = offerRefusalOf(career, contract.id);
+    if (refusal?.kind === 'held' || refusal?.kind === 'unpriced') continue;
+    const complexity = complexityOf(contract.buildingId);
+    const fee = offerFeeOf(contract.buildingId);
+    if (complexity === undefined || fee === undefined) continue;
+    const words =
+      refusal === undefined
+        ? undefined
+        : refusal.kind === 'no-slot'
+          ? TOWERS_COPY.offersNoSlot.replace('{n}', String(refusal.standingShort))
+          : TOWERS_COPY.offersAtRisk;
+    rows.push({
+      contractId: contract.id,
+      name: buildingNameOf(contract.buildingId) ?? contract.buildingId,
+      terms: `complexity ${String(complexity)} of ${String(COMPLEXITY_MAX)} · ${units(fee)} a day`,
+      quirk: quirkOf(contract.buildingId) ?? contract.teaches,
+      cta: refusal === undefined ? TOWERS_COPY.offersTake : TOWERS_COPY.offersNotYet,
+      takeable: refusal === undefined,
+      refusal: words,
+    });
+  }
+  return {
+    heading: TOWERS_COPY.offersHeading,
+    caption: `${String(rows.length)} ${rows.length === 1 ? 'offer' : 'offers'}`,
+    rows,
+    empty: rows.length === 0 ? TOWERS_COPY.offersNone : undefined,
+    note: TOWERS_COPY.offersFreshWeek,
+  };
 }
 
 /**
@@ -625,9 +708,14 @@ export function calendarView(input: CampaignInput): CalendarView {
     rows: input.career.towers.map((tower): CalendarRowView => {
       const facts = factsFor(input, tower);
       const need = needOf(tower);
+      /*
+       * A calendared crowd is a flagged day the player can read before it comes — GitHub issue
+       * #169 item 1, § D507: `campaign/calendar.ts` books it, the design's Crown Hotel fixture marks
+       * it `bad`, and § 8.6's grid already has the glyph for that.
+       */
       const marks = {
         dueDays: need === undefined ? [] : [tower.day],
-        flaggedDays: tower.flaggedDays,
+        flaggedDays: [...new Set([...tower.flaggedDays, ...calendarDaysOf(tower.id)])].sort((a, b) => a - b),
       };
       return {
         towerId: tower.id,
@@ -760,7 +848,7 @@ export function towersView(input: CampaignInput): TowersView {
     headings: TOWERS_COPY.tableHeadings,
     rows: career.towers.map((tower) => towerRowView(input, tower)),
     footer: `${String(wanting)} of ${String(held)} buildings want a decision · the rest need nothing from you today`,
-    offers: { heading: TOWERS_COPY.offersHeading, refusal: TOWERS_COPY.offersRefusal },
+    offers: offersView(career, (id) => input.buildings.get(id)?.name),
     lately: {
       heading: TOWERS_COPY.incidentsHeading,
       sub: TOWERS_COPY.incidentsSub,

@@ -22,7 +22,9 @@ import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { towerById, type CampaignTower } from '../campaign/career.js';
-import { clearedDays, purseOf, type ShopCategoryId } from '../campaign/economy.js';
+import { clearedDays, purseOf, spentTodayUnits, type ShopCategoryId } from '../campaign/economy.js';
+import { TECHNICIAN_UNITS, campaignEventFor } from '../campaign/incidents.js';
+import { CAMPAIGN_DOCK_COPY } from './campaignDock.js';
 import { AS_BUILT } from '../campaign/fitOut.js';
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -879,6 +881,86 @@ describe('filing the campaign day — issue #223', () => {
 
   const towerOf = (host: ReturnType<typeof createEverydayHost>): CampaignTower =>
     towerById(host.campaign(), 'c1')!;
+
+  /**
+   * § 7.5's dock through the façade — GitHub issue #171, § D507.
+   *
+   * The harness's day is `c1`'s, so `campaignEventFor` draws against a fresh tower's 0.4 % and the
+   * event is almost always ordinary; the cases that need an incident force the latch's incident
+   * through the same press `runCampaignDay` makes, by running a tower whose wear clock is past its
+   * window on a seed the draw lands on. That seed is found rather than assumed: the loop below asks
+   * `campaignEventFor` directly and stops on the first breakdown, which is the honest way to reach a
+   * drawn state deterministically.
+   */
+  describe('the campaign dock — issue #171', () => {
+    it('writes the campaign’s own event on the press, and nothing else does', () => {
+      const h = campaignHarness(CLEAN);
+      const host = createEverydayHost(h.bindings);
+      expect(h.state.campaignEventId).toBeUndefined();
+      host.runCampaignDay('c1');
+      expect(h.state.campaignEventId).toBeDefined();
+      expect(host.campaignDay()?.tower.id).toBe('c1');
+      expect(host.campaignDay()?.runLengthS).toBe(shiftLengthForContract('c1'));
+      /* § 6's press is not a campaign day: the event comes off with the latch. */
+      host.startRun();
+      expect(h.state.campaignEventId).toBeUndefined();
+      expect(host.campaignDay()).toBeUndefined();
+    });
+
+    it('refuses an answer on a day with nothing to answer, in the dock’s words', () => {
+      const h = campaignHarness(CLEAN);
+      const host = createEverydayHost(h.bindings);
+      expect(host.answerIncident(0, 'leave')).toBe(CAMPAIGN_DOCK_COPY.refusedNoIncident);
+      host.runCampaignDay('c1');
+      const facts = host.campaignDay();
+      if (facts?.incident === undefined) {
+        expect(host.answerIncident(0, 'leave')).toBe(CAMPAIGN_DOCK_COPY.refusedNoIncident);
+      }
+    });
+
+    it('answers once, moving the purse and the record together, and refuses the second time', () => {
+      /*
+       * A seed the draw lands on for a worn tower, found rather than assumed. The harness's tower is
+       * worn by pressing the record: `trips` past the window makes § 8.3's odds ≈ 14 %, so a seed
+       * inside the first hundred lands on a breakdown with overwhelming likelihood.
+       */
+      const h = campaignHarness(CLEAN);
+      const pressed: { atS: number; kind: string }[] = [];
+      const host = createEverydayHost({
+        ...h.bindings,
+        intervene: (atS, change) => {
+          pressed.push({ atS, kind: change.kind });
+        },
+      });
+      /* Wear the machines out before the press, through the reducer's own arithmetic. */
+      host.campaignAct({ kind: 'file-day', towerId: 'c1', verdict: 'cleared', trips: 120_000 });
+      let seed = 1n;
+      while (campaignEventFor({ tower: towerOf(host), seed }).id !== 'breakdown' && seed < 400n) seed += 1n;
+      expect(seed).toBeLessThan(400n);
+      h.state = { ...h.state, seed };
+      host.runCampaignDay('c1');
+      const facts = host.campaignDay();
+      expect(facts?.incident?.eventId).toBe('breakdown');
+      const atS = (facts?.incident?.atS ?? 0) + 30;
+      const purseBefore = purseOf(towerOf(host));
+
+      expect(host.answerIncident(atS - 60, 'technician')).toContain('nothing has happened yet');
+      expect(host.answerIncident(atS, 'no-such-option')).toBe(CAMPAIGN_DOCK_COPY.refusedUnknownOption);
+      expect(pressed).toEqual([]);
+
+      expect(host.answerIncident(atS, 'technician')).toBeUndefined();
+      expect(pressed).toEqual([{ atS, kind: 'answer-incident' }]);
+      expect(purseOf(towerOf(host))).toBe(purseBefore - TECHNICIAN_UNITS);
+      expect(spentTodayUnits(towerOf(host))).toBe(TECHNICIAN_UNITS);
+
+      /* The record's own log is what says it was answered; the harness holds none, so the second
+         press is refused on the purse-side fact the host keeps rather than on the log. */
+      h.state = { ...h.state, interventions: [{ atS, change: { kind: 'answer-incident', option: 'x', serviceEvents: [] } }] };
+      expect(host.campaignDay()?.answered).toBe(true);
+      expect(host.answerIncident(atS + 10, 'leave')).toBe(CAMPAIGN_DOCK_COPY.refusedAnswered);
+      expect(pressed).toHaveLength(1);
+    });
+  });
 
   it('runs the day at the length this contract is graded over, whatever the state was left at', () => {
     /*
