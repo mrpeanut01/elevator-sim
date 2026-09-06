@@ -453,10 +453,20 @@ export function dwellHintOf(levers: GroupLevers, profile: DispatcherProfile): st
  * Card copy
  * -------------------------------------------------------------------------- */
 
-/** The one-line weight vector under a dispatcher's name in a list. */
-export function vectorLineOf(profile: DispatcherProfile, allIds: readonly string[]): string {
-  return costFunctionLine(specFromProfile(profile, profile.name), (id) =>
-    shortTermNameOf(id, allIds),
+/**
+ * The one-line weight vector under a dispatcher's name in a list — in the register the reader has
+ * chosen (GitHub issue #146, § D495). The default is the notation, so a caller that has not said
+ * is byte-identical to what it drew before the register existed.
+ */
+export function vectorLineOf(
+  profile: DispatcherProfile,
+  allIds: readonly string[],
+  register: ViewMode = 'advanced',
+): string {
+  return costFunctionLine(
+    specFromProfile(profile, profile.name),
+    (id) => shortTermNameOf(id, allIds),
+    register,
   );
 }
 
@@ -1787,7 +1797,7 @@ export function mountDispatcherEditor(
       ...everyone.map((profile) =>
         pick(doc, {
           title: profile.name,
-          sub: vectorLineOf(profile, allIds),
+          sub: vectorLineOf(profile, allIds, state.mode),
           ...(state.savedDispatchers.some((entry) => entry.id === profile.id)
             ? { tag: 'YOURS', tagClass: 'var(--ok)' }
             : profile.id === state.dispatcherId
@@ -1825,7 +1835,7 @@ export function mountDispatcherEditor(
     const pulledRow = plainRows.find((row) => row.id === pulledLever?.id);
     setText(plainEcho, pulledRow === undefined ? '' : plainLeverEchoOf(pulledRow));
     setHidden(plainEcho, pulledRow === undefined);
-    setText(plainCost, costFunctionLine(current, (id) => shortTermNameOf(id, allIds)));
+    setText(plainCost, costFunctionLine(current, (id) => shortTermNameOf(id, allIds), state.mode));
 
     const rows = termRowsOf(terms, current, inertTerms(current), state.mode);
     const weighted = rows.filter((row) => row.weighted).length;
@@ -1899,9 +1909,12 @@ export function mountDispatcherEditor(
     drawFamilies(at, current, source);
 
     /* Summary, advice, dirty. */
+    // In the register the reader chose — the four print sites of this line all read `state.mode`
+    // now, because three registers disagreeing on one screen is `surfaces-disagree`'s shape inside
+    // a single file (GitHub issue #146, § D495).
     setText(
       elements.summary,
-      costFunctionLine(current, (id) => shortTermNameOf(id, allIds)),
+      costFunctionLine(current, (id) => shortTermNameOf(id, allIds), state.mode),
     );
     setText(elements.advice, adviceFor(current));
     const dirty = specIsDirty(current, source);
@@ -2016,7 +2029,7 @@ export function mountDispatcherEditor(
     fill(
       elements.yours,
       ...state.savedDispatchers.map((entry) =>
-        savedRow(doc, entry.profile, allIds, {
+        savedRow(doc, entry.profile, allIds, state.mode, {
           onPick: () => {
             context.update({
               dispatcherSpec: specFromProfile(entry.profile, entry.profile.name),
@@ -2047,6 +2060,7 @@ function savedRow(
   doc: Document,
   profile: DispatcherProfile,
   allIds: readonly string[],
+  register: ViewMode,
   handlers: { readonly onPick: () => void; readonly onDelete: () => void },
 ): HTMLElement {
   const open = el(doc, 'button', {
@@ -2055,7 +2069,7 @@ function savedRow(
     style: { flex: '1', 'min-width': '0', border: '0', background: 'none' },
     children: [
       el(doc, 'div', { className: 'pick-title', text: profile.name }),
-      el(doc, 'div', { className: 'pick-sub', text: vectorLineOf(profile, allIds) }),
+      el(doc, 'div', { className: 'pick-sub', text: vectorLineOf(profile, allIds, register) }),
     ],
   });
   open.addEventListener('click', handlers.onPick);
