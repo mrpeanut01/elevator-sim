@@ -246,6 +246,13 @@ type CarryCheck = (state: ViewerState, resources: BrowserResources) => string | 
  * arrangement: the table is exported, the module that needs it consumes it, and the test settles
  * whether the two agree.
  */
+/**
+ * The intervention kinds the wire carries — `packages/server`'s `SUBMITTABLE_INTERVENTION_KINDS`,
+ * restated here because `viz` may not import the server, and asserted equal to it by
+ * `runIdentity.test.ts` so the two cannot drift. Both parking kinds carry nothing but their instant.
+ */
+export const CARRIED_INTERVENTION_KINDS: readonly string[] = Object.freeze(['park-cars-lobby', 'spread-cars']);
+
 export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze({
   week: (state) => weekCarries(state),
 
@@ -292,7 +299,7 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
    */
   interventions: (state) => {
     const refused = [...new Set(state.interventions.map((entry) => entry.change.kind))]
-      .filter((kind) => kind !== 'park-cars-lobby')
+      .filter((kind) => !CARRIED_INTERVENTION_KINDS.includes(kind))
       .sort((left, right) => left.localeCompare(right));
     if (refused.length === 0) return undefined;
     const clauses = refused.map((kind) =>

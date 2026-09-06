@@ -278,6 +278,7 @@ import { honestyAt } from '../live/honesty.js';
 import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
+  SPREAD_CARS_LABEL,
   RECOMPUTING_BEAT,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
@@ -1300,6 +1301,7 @@ const LIVE_RAIL: SurfaceAdapter = {
     'live/timeline.ts#timelineOf',
     'live/timeline.ts#phaseAt',
     'live/interventions.ts#PARK_CARS_LOBBY_LABEL',
+    'live/interventions.ts#SPREAD_CARS_LABEL',
     'live/interventions.ts#switchDispatcherLabelOf',
     'live/interventions.ts#SWITCH_PINS_NOTE',
     'live/interventions.ts#RECOMPUTING_BEAT',
@@ -1328,6 +1330,8 @@ const LIVE_RAIL: SurfaceAdapter = {
      * by a guard in the caller.
      */
     seeds.push({ field: 'interventionButton.label', text: PARK_CARS_LOBBY_LABEL, role: 'label' });
+    // The opposite verb — GitHub issue #352 — derived from the rules vocabulary, swept as a label.
+    seeds.push({ field: 'spreadButton.label', text: SPREAD_CARS_LABEL, role: 'label' });
     /*
      * The strip's other two controls and its beat — the log's second and third change kinds.
      *
@@ -1349,13 +1353,14 @@ const LIVE_RAIL: SurfaceAdapter = {
     seeds.push({ field: 'switchButton.title', text: SWITCH_PINS_NOTE, role: 'observation' });
     seeds.push({ field: 'interventionStamp.recomputing', text: RECOMPUTING_BEAT, role: 'observation' });
     /*
-     * One log carrying all three kinds, stamped across the run, so every stamp sentence enters the
+     * One log carrying all four kinds, stamped across the run, so every stamp sentence enters the
      * corpus at the playheads that can show it — and the deliberate `''` before the first, which is
      * what keeps `interventionStampOf`'s temporal property met by construction.
      */
     const third = (recording.endedAt - recording.startedAt) / 3;
     const interventionLog = [
       { atS: recording.startedAt + third, change: { kind: 'park-cars-lobby' } as const },
+      { atS: recording.startedAt + third * 1.25, change: { kind: 'spread-cars' } as const },
       {
         atS: recording.startedAt + third * 1.5,
         change: {

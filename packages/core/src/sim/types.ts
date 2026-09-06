@@ -388,7 +388,7 @@ export type TimeoutPolicy = (typeof TIMEOUT_POLICIES)[number];
  * `packages/viz`'s `watch/record.ts#recordUnreadableReason` refuses to re-ask a stored record
  * that names one, on the same footing it refuses an unknown rule condition.
  */
-export const INTERVENTION_KINDS = ['park-cars-lobby', 'switch-dispatcher', 'answer-incident'] as const;
+export const INTERVENTION_KINDS = ['park-cars-lobby', 'switch-dispatcher', 'answer-incident', 'spread-cars'] as const;
 
 /**
  * Deliberately **not** re-exported from `sim/index.ts` or `browser.ts`, and the absence is the
@@ -411,8 +411,9 @@ export function isInterventionKind(id: string): id is InterventionKind {
 }
 
 /**
- * One thing a mid-run intervention may change. A discriminated union — three arms today, and a
- * fourth is a new member beside these rather than a redesign of the field that carries it.
+ * One thing a mid-run intervention may change. A discriminated union — four arms, and the fourth
+ * arrived exactly as this sentence said it would: a new member beside the others rather than a
+ * redesign of the field that carries it.
  *
  * `park-cars-lobby` asks stage 7 to treat every idle car as though the profile had authored
  * `idle.parkingStrategy: 'lobby'` from the moment the intervention takes effect. It changes no
@@ -420,6 +421,17 @@ export function isInterventionKind(id: string): id is InterventionKind {
  * exactly as configured, and only *where a car with nothing to do waits* moves. That is why it
  * can travel through `RepositionContext` rather than through a second policy — see
  * `dispatch/lifecycle.ts#repositionDecisionFor`.
+ *
+ * `spread-cars` is the same mechanism with the opposite verb — GitHub issue #352, `docs/35`
+ * PM-TT4: `idle.parkingStrategy: 'zone-center'` from the stamped instant, so every idle car heads
+ * for the middle of the floors its shaft serves rather than for the lobby. It exists because
+ * *park the cars in the lobby* is the wrong instruction for two of the three shipped parking
+ * faults — a sky lobby whose shuttles all sleep at the street, a top-floor gym whose two cars
+ * wait at the front door — and a stage that offers only the lobby verb offers those players the
+ * opposite of their fix. The two parking kinds are one control with two settings: the **latest**
+ * of either at or before an instant is the one in force (`Simulation.#idleOverrideAt`), so a
+ * spread at 10:00 undoes a park at 08:00 the way turning a dial does, rather than the two arms
+ * interfering. It carries nothing but its kind, and it travels to the board on the same footing.
  *
  * `switch-dispatcher` hands the rest of the run to another dispatcher's **weight vector** — the
  * gameplay guide's § 7.6 policy change, and § 20.12's second wire. The arm carries the whole
@@ -457,6 +469,9 @@ export function isInterventionKind(id: string): id is InterventionKind {
 export type InterventionChange =
   | {
       readonly kind: 'park-cars-lobby';
+    }
+  | {
+      readonly kind: 'spread-cars';
     }
   | {
       readonly kind: 'switch-dispatcher';

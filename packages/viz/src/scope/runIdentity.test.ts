@@ -78,6 +78,7 @@ import { nextDay } from '../shift/week.js';
 
 import { PROBES, baseState, legsOf, RESOURCES } from './probes.test-helper.js';
 import {
+  CARRIED_INTERVENTION_KINDS,
   CARRY_CHECKS,
   EXPRESSIBLE_IN_A_SELECTION,
   fieldsAnsweredFor,
@@ -589,14 +590,37 @@ describe('the grounds that are still true after the refusals shrank', () => {
     expect(mine[0]?.message).toContain('the answer and not the thing answered');
   });
 
-  it('accepts the one kind that carries nothing but its instant', () => {
-    // The negative control. Refusing all three would satisfy both cases above and would be the
-    // widening undone, so the accepted arm is asserted beside them rather than elsewhere.
-    expect(
-      runIdentityIssues(logged({ kind: 'park-cars-lobby' }), RESOURCES, 'ranked').filter(
-        (issue) => issue.key === 'viewer.interventions',
-      ),
-    ).toEqual([]);
+  it('accepts the two kinds that carry nothing but their instant', () => {
+    // The negative control. Refusing every kind would satisfy both cases above and would be the
+    // widening undone, so the accepted arms are asserted beside them rather than elsewhere.
+    for (const kind of ['park-cars-lobby', 'spread-cars'] as const) {
+      expect(
+        runIdentityIssues(logged({ kind }), RESOURCES, 'ranked').filter(
+          (issue) => issue.key === 'viewer.interventions',
+        ),
+        kind,
+      ).toEqual([]);
+    }
+  });
+
+  it('carries exactly the kinds the server admits — read off the server’s own source', () => {
+    /*
+     * `viz` may not import `packages/server`, so the client's list is a restatement of
+     * `SUBMITTABLE_INTERVENTION_KINDS`, and this is what stops the two drifting: the server file is
+     * read from disk and its literal compared, both directions, the way the wire test below reads
+     * `submission.ts`. A kind the client carried and the server refused would spend the product's
+     * one accusation on an honest player; a kind the server admitted and the client refused would
+     * be a control the player is told not to press.
+     */
+    const source = readFileSync(
+      new URL('../../../server/src/leaderboard/submission.ts', import.meta.url),
+      'utf8',
+    );
+    const literal = /SUBMITTABLE_INTERVENTION_KINDS: readonly string\[\] = Object\.freeze\(\[([^\]]*)\]\)/u.exec(source);
+    expect(literal, 'the server’s allow-list literal moved; re-point this test').not.toBeNull();
+    const server = [...(literal?.[1] ?? '').matchAll(/'([^']+)'/gu)].map((m) => m[1]).sort();
+    expect([...CARRIED_INTERVENTION_KINDS].sort()).toEqual(server);
+    expect(server.length).toBeGreaterThan(0);
   });
 
   it('refuses a rule row naming a condition this build does not declare', () => {

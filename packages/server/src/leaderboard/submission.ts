@@ -134,7 +134,7 @@ export interface SubmittedRun {
    *   missing *cause*, not a missing field, and carrying the answer without it would be worse than
    *   refusing it.
    *
-   * `park-cars-lobby` carries nothing but its instant, and travels.
+   * `park-cars-lobby` and `spread-cars` carry nothing but their instant, and travel.
    *
    * Absent and `[]` are the same run, byte for byte — `core` pins that with a fingerprint
    * (`sim/interventions.test.ts`), and `runDataHashOf` drops the key.
@@ -390,9 +390,11 @@ const MAX_INTERVENTIONS = 64;
  * Written this way round on `core`'s own precedent for `INTERVENTION_KINDS`: a kind added tomorrow
  * is refused here until somebody decides it can travel, where a deny-list would let it through
  * silently and the first symptom would be an honest player accused of a forgery.
- * {@link SubmittedRun.interventions} carries the reason each of the other two is out.
+ * {@link SubmittedRun.interventions} carries the reason each of the two refused kinds is out.
+ * `spread-cars` joined `park-cars-lobby` when it landed (GitHub issue #352): the same control with
+ * the opposite setting, carrying nothing but its instant.
  */
-export const SUBMITTABLE_INTERVENTION_KINDS: readonly string[] = Object.freeze(['park-cars-lobby']);
+export const SUBMITTABLE_INTERVENTION_KINDS: readonly string[] = Object.freeze(['park-cars-lobby', 'spread-cars']);
 
 /** Everything structurally wrong with a submitted rule list, or nothing. */
 function ruleRowIssues(rows: readonly RuleRowConfig[] | undefined): readonly string[] {

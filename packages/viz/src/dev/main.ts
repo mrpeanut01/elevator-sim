@@ -139,6 +139,7 @@ import type { WaitBandDefinition, WaitBands } from '../live/types.js';
 import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
+  SPREAD_CARS_LABEL,
   RECOMPUTING_BEAT,
   switchChangesNothing,
   SWITCH_PINS_NOTE,
@@ -3315,6 +3316,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
   });
   /*
+   * The opposite verb — GitHub issue #352. The same mechanism as the park press with
+   * `zone-center` where that one writes `lobby`, so the two are one control with two settings and
+   * the later press is the one in force (`Simulation.#idleOverrideAt`). Here as well as on the
+   * Everyday stage, because § D299 § 1 says the Engineer surface may not say less.
+   */
+  const spreadButton = el(document, 'button', {
+    className: 'chip',
+    text: SPREAD_CARS_LABEL,
+    attrs: {
+      type: 'button',
+      title:
+        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
+        'everything before this moment is unchanged, and playback resumes here',
+    },
+  });
+  /*
    * The second intervention — § 20.12's own ordering (*start with park the cars in the lobby,
    * then dispatcher switching*). The target is the plain baseline through `plainBaselineOf`, the
    * § D134 resolution the ghost already uses, so the driver this hands the day to and the rival
@@ -3337,7 +3354,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   setHidden(switchButton, switchTarget === undefined);
   const interventionStrip = el(document, 'div', {
     style: { display: 'flex', 'align-items': 'center', gap: '10px', margin: '0 0 8px' },
-    children: [interventionButton, switchButton, interventionStamp],
+    children: [interventionButton, spreadButton, switchButton, interventionStamp],
   });
   {
     // `.stage-wrap` is the canvas's own wrapper; the strip goes immediately before it.
@@ -3384,6 +3401,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (state.recording === undefined || playback === undefined) return;
     interveneAt(playback.simTimeS, { kind: 'park-cars-lobby' });
   });
+  spreadButton.addEventListener('click', () => {
+    if (state.recording === undefined || playback === undefined) return;
+    interveneAt(playback.simTimeS, { kind: 'spread-cars' });
+  });
   switchButton.addEventListener('click', () => {
     if (state.recording === undefined || playback === undefined) return;
     if (switchTarget === undefined) return;
@@ -3422,6 +3443,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // Disabled rather than hidden while no run is on screen: a control that cannot act now says
     // so (`docs/design` § 7.6's rule), and the title carries what pressing it will do.
     interventionButton.disabled = !hasRun;
+    spreadButton.disabled = !hasRun;
     // Also disabled when the press would genuinely change nothing — a handover to the vector
     // already driving is a control that moves nothing, which § D177 ranks below no control at all.
     switchButton.disabled = !hasRun || switchWouldChangeNothing(view.state);

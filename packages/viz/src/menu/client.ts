@@ -130,7 +130,7 @@ export interface RunSubmission {
    * and refuses a submission whose metrics do not reproduce. Without this field it re-simulated the
    * seed without the log, got different legs, and refused an honest run as a forgery.
    *
-   * Only `park-cars-lobby` travels. A `switch-dispatcher` carries a whole weight vector inline,
+   * Only the two parking kinds travel. A `switch-dispatcher` carries a whole weight vector inline,
    * which is the cheat `RunSubmission`'s ids exist to prevent; an `answer-incident` answers a
    * campaign incident that is on no wire, so a replay would have the answer and not the thing
    * answered. `scope/runIdentity.ts` still refuses both, naming which.

@@ -86,6 +86,7 @@ import { WAIT_BANDS } from '../live/bands.js';
 import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
+  SPREAD_CARS_LABEL,
   switchChangesNothing,
   switchDispatcherLabelOf,
   SWITCH_PINS_NOTE,
@@ -801,21 +802,33 @@ export interface StageInterventionRow {
   readonly refusal?: string | undefined;
 }
 
+/** What either parking press does to the record — one sentence for the two settings of one control. */
+const PARKING_ARM_EXPLAINS =
+  'appends to today’s record at the playhead and re-simulates the day from the start — ' +
+  'everything before this moment is unchanged, and playback resumes here';
+
 /**
  * The arms that need nothing from the run to construct.
  *
- * One entry, and that is now a statement about **arity of data** rather than about what this build
- * ships: parking is the only change whose whole content is its kind. The handover arm is real and is
- * assembled per call, because its content is a profile this constant cannot know. Read
- * {@link stageInterventionsOf} for the rows a player actually meets.
+ * Two entries, and that is a statement about **arity of data** rather than about what this build
+ * ships: the two parking kinds are the changes whose whole content is their kind. They are one
+ * control with two settings — *in the lobby* and *across the tower* — and the second exists
+ * because the first is the wrong verb for two of the three shipped parking faults (GitHub issue
+ * #352, `docs/35` PM-TT4): a sky lobby whose shuttles sleep at the street is cured by sending the
+ * idle cars *away* from it. The handover arm is real and is assembled per call, because its
+ * content is a profile this constant cannot know. Read {@link stageInterventionsOf} for the rows
+ * a player actually meets.
  */
 export const STAGE_INTERVENTIONS: readonly StageInterventionRow[] = Object.freeze([
   Object.freeze({
     change: Object.freeze({ kind: 'park-cars-lobby' as const }),
     label: PARK_CARS_LOBBY_LABEL,
-    explains:
-      'appends to today’s record at the playhead and re-simulates the day from the start — ' +
-      'everything before this moment is unchanged, and playback resumes here',
+    explains: PARKING_ARM_EXPLAINS,
+  }),
+  Object.freeze({
+    change: Object.freeze({ kind: 'spread-cars' as const }),
+    label: SPREAD_CARS_LABEL,
+    explains: PARKING_ARM_EXPLAINS,
   }),
 ]);
 

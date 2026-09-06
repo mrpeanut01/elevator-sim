@@ -20,10 +20,11 @@
  * means.
  */
 
-import type {
-  DispatcherProfile,
-  InterventionChange,
-  RunInterventionConfig,
+import {
+  RULE_ACTION_WORDS,
+  type DispatcherProfile,
+  type InterventionChange,
+  type RunInterventionConfig,
 } from '@elevator-sim/core/browser';
 
 import { clockAt } from './timeline.js';
@@ -33,6 +34,20 @@ import { clockAt } from './timeline.js';
  * intervention control; {@link switchDispatcherLabelOf} is the second, beside this one.
  */
 export const PARK_CARS_LOBBY_LABEL = 'Park the cars in the lobby';
+
+/**
+ * The fourth kind's words, **derived from the rules vocabulary rather than authored beside it** —
+ * GitHub issue #352. `core`'s `RULE_ACTION_WORDS['spread-out']` is the player's own sentence for
+ * `idle.parkingStrategy: 'zone-center'` (*spread the other cars across the tower*), and the
+ * intervention writes the same setting, so the button says the same thing: the rule's *other* is
+ * relative to the car the rule is about, and an intervention is about the whole fleet, which is
+ * the one word that changes. Two vocabularies for one mechanism is how a label and a rule row drift
+ * into disagreeing about what *spread* means; deriving one from the other is what stops it.
+ */
+const SPREAD_SENTENCE = RULE_ACTION_WORDS['spread-out'].template.replace('the other cars', 'the cars');
+
+/** The control's label — imperative, capitalised, the rule's own sentence. */
+export const SPREAD_CARS_LABEL = SPREAD_SENTENCE.charAt(0).toUpperCase() + SPREAD_SENTENCE.slice(1);
 
 /**
  * The dispatcher-switch control's label — parametric over the *name*, never the id, because the
@@ -147,6 +162,9 @@ function stampVerbOf(change: InterventionChange): string {
   switch (change.kind) {
     case 'park-cars-lobby':
       return 'parked the cars in the lobby';
+    case 'spread-cars':
+      // The rule's sentence in the past tense — one vocabulary, see `SPREAD_CARS_LABEL`.
+      return SPREAD_SENTENCE.replace(/^spread /u, 'spread ');
     case 'switch-dispatcher':
       // The handoff's own worked example, verbatim in shape: `09:14 · switched to Lobby anchor`
       // (§ 7.6). The handoff wins every disagreement about copy.

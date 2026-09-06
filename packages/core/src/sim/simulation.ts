@@ -1602,7 +1602,8 @@ export class Simulation {
    *
    * Per kind:
    *
-   * - `park-cars-lobby` schedules its event; the handler walks the already-idle fleet.
+   * - `park-cars-lobby` and `spread-cars` schedule their event; the handler walks the already-idle
+   *   fleet.
    * - `switch-dispatcher` resolves the profile's vector **here**, through the same
    *   {@link resolveWeights} the run's own profile went through — so a misspelled term id is the
    *   same loud `DispatchError`, thrown at scheduling time — and schedules the event that adopts
@@ -1669,8 +1670,8 @@ export class Simulation {
   /**
    * An intervention taking effect, per kind.
    *
-   * **`park-cars-lobby`** walks the fleet's idle cars through stage 7, under the override in
-   * force as of this instant. The override itself needs no application step —
+   * **`park-cars-lobby` and `spread-cars`** walk the fleet's idle cars through stage 7, under the
+   * override in force as of this instant. The override itself needs no application step —
    * {@link #idleOverrideAt} is consulted by every later {@link #park} — so the whole job of this
    * arm is the fleet that is *already parked*: an idle car takes a stage 7 decision only when
    * something asks it to, and without this walk a building standing quiet at `atS` would honour
@@ -1720,27 +1721,29 @@ export class Simulation {
    * records "the intervention has happened", so a decision at `at` gives the same answer whether
    * it runs before or after the {@link #onIntervention} walk at the same instant.
    *
-   * The scan is over the **parking kind alone**, and the *latest* such entry at or before `at`
-   * wins. That is the semantics a log of changes to independent settings has to have: each kind
-   * is its own control, so a `switch-dispatcher` at 10:00 does not un-park a fleet parked at
-   * 08:00 — the player asked for both, and revoking one with the other would make the log's
-   * entries interfere in an order-dependent way no stamp on the report describes. A future kind
-   * that *does* address parking (an un-park, say) joins this scan; a kind about anything else
-   * does not.
+   * The scan is over the **parking kinds alone** — `park-cars-lobby` and `spread-cars`, the two
+   * settings of one control — and the *latest* such entry at or before `at` wins. That is the
+   * semantics a log of changes to independent settings has to have: each control is its own, so
+   * a `switch-dispatcher` at 10:00 does not un-park a fleet parked at 08:00 — the player asked for
+   * both, and revoking one with the other would make the log's entries interfere in an
+   * order-dependent way no stamp on the report describes — while a `spread-cars` at 10:00 *does*
+   * replace a park at 08:00, because both are answers to the one question *where does an idle car
+   * wait*, and the later answer is the one the player gave last. A future kind that addresses
+   * parking joins this scan; a kind about anything else does not.
    *
    * `undefined` — not a copy of `idle` — when no entry is in force, so the ordinary run passes no
    * override and `repositionDecisionFor` hands its helpers the identical frozen config it always
-   * did. For `park-cars-lobby` the override is the profile's own idle stage with the strategy
-   * replaced: the deadband and the energy exchange rate stay authored, because the player said
-   * *where*, not *at what price*.
+   * did. The override is the profile's own idle stage with the strategy replaced: the deadband and
+   * the energy exchange rate stay authored, because the player said *where*, not *at what price*.
    */
   #idleOverrideAt(at: SimTime, idle: ResolvedIdleStage): ResolvedIdleStage | undefined {
     let inForce: RunInterventionConfig | undefined;
     for (const entry of this.#interventions) {
-      if (entry.atS <= at && entry.change.kind === 'park-cars-lobby') inForce = entry;
+      if (entry.atS > at) continue;
+      if (entry.change.kind === 'park-cars-lobby' || entry.change.kind === 'spread-cars') inForce = entry;
     }
     if (inForce === undefined) return undefined;
-    return { ...idle, parkingStrategy: 'lobby' };
+    return { ...idle, parkingStrategy: inForce.change.kind === 'spread-cars' ? 'zone-center' : 'lobby' };
   }
 
   /* ---------------------------------------------------------------- *

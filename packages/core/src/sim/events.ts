@@ -259,7 +259,7 @@ export function abandonmentEvent(
 /**
  * One intervention taking effect at its scheduled simulated time.
  *
- * For `park-cars-lobby` the event exists for the already-parked fleet: the override itself is
+ * For `park-cars-lobby` and `spread-cars` the event exists for the already-parked fleet: the override itself is
  * read by every later `#park` decision whether or not this fires, but a car that is *currently*
  * idle takes a stage 7 decision only when something asks it to, and without this event a fleet
  * standing still at `atS` would ignore *park the cars in the lobby* until the next arrival
