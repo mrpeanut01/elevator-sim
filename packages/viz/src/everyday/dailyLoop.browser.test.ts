@@ -396,7 +396,12 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
     }
   }, 180_000);
 
-  it('refuses a past day’s replay in the § 3.3 primary rather than pretending to open it', async () => {
+  /*
+   * Since § D517 a past day inside the week is handed back as a replay (`replay.browser.test.ts`
+   * drives that route). On a fresh session the week stands on day 1, so the chip behind it is from
+   * before the week began, and that is the one arm of the primary that is still a refusal.
+   */
+  it('refuses a chip from before the week in the § 3.3 primary, rather than pretending to open it', async () => {
     const page = await coldLoad();
     try {
       await openEverydayDoor(page);
@@ -420,7 +425,7 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       // § 16 rule 6: visible, dimmed, inert — and it says what it is short by.
       expect(replay.label).toBe('Set up the replay');
       expect(replay.disabled).toBe(true);
-      expect(replay.note).toMatch(/cannot be re-opened/);
+      expect(replay.note).toMatch(/before this week/);
 
       // And forward again: today is pressable, so the refusal is about the day and not the screen.
       await page.locator('.everyday-door-forward').click();
