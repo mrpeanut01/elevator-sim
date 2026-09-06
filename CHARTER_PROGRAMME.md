@@ -47,7 +47,7 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
-| Next free decision number | **D507** — wave U reserved **D503–D510** and spent **four** (§ D503 #213, § D504 #353, § D505 #324, § D506 #327), returning **D507–D510 unreached, which makes them free rather than holes**. Wave T before it reserved D497–D502 and spent all six |
+| Next free decision number | **D514** — wave V reserved **D507–D520** and spent **seven** (§ D507 #171, § D508 #178 item 5, § D509 #252, § D510 #169 item 3, § D511 #178 item 9, § D512 #354, § D513 #178 item 6), returning **D514–D520 unreached, which makes them free rather than holes**. Wave U before it reserved D503–D510 and spent four |
 
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
