@@ -20,6 +20,7 @@
  * fails somewhere in the runner has moved an explainable error to a place with no words for it.
  */
 
+import { gapSentence } from '../menu/gap.js';
 import { el, fill, on, reconcile, setText, type ElementSpec } from './dom.js';
 import {
   canSubmitForm,
@@ -1366,22 +1367,7 @@ function gapToLeader(
   return gapSentence(ranked.of(score) - ranked.of(leader), ranked.unit);
 }
 
-/**
- * The one sentence both boards say about a gap, so they cannot come to say it differently.
- *
- * Extracted when the configuration board grew the same feature (GitHub issue #93 § 3): the challenge
- * board has highlighted the reader's row and printed its distance from the top since issue #112, and
- * the leaderboard — the screen #93 is actually about — did neither. Two copies of this arithmetic
- * would be two places deciding what *behind* means, and the tie case is exactly where they would
- * drift.
- */
-function gapSentence(gap: number, unit: string): string {
-  // Every ranked metric on either board is a cost, so a non-positive gap means this row *is* the top
-  // row — or ties it, which is not a thing to congratulate somebody on in a sentence about a
-  // difference.
-  if (!(gap > 0)) return '';
-  return ` · ${gap.toFixed(1)} ${unit} behind the top row on this board’s metric`;
-}
+/* `gapSentence` moved to `menu/gap.ts` so the Everyday daily board can read it — GitHub issue #93 § 3. */
 
 /**
  * How to read the ranked figure off a leaderboard row, and what its unit is called.

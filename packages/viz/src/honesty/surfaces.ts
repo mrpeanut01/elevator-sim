@@ -9927,6 +9927,8 @@ const GAUNTLET: SurfaceAdapter = {
     'gauntlet/run.ts#GAUNTLET_CANCELLED',
     // The board screen's own two string tables; its `mount` is excluded on the mounts' ground.
     'everyday/boardScreen.ts#BOARD_SCREEN_COPY',
+    /* GitHub issue #93 § 3: the one gap sentence, on the player's own row — seeded on the row states below. */
+    'menu/gap.ts#gapSentence',
     'everyday/boardScreen.ts#DAILY_BOARD_ABSENCE',
     // The daily tab's five states — driven below, all five, rather than the copy table alone.
     'everyday/boardScreen.ts#dailyBoardViewOf',
@@ -10237,7 +10239,13 @@ const GAUNTLET: SurfaceAdapter = {
       ],
     ];
     for (const [state, board] of dailyStates) {
-      const view = dailyBoardViewOf(board);
+      /*
+       * Rendered as the **second** row's player, so every row state carries a `your run` row that
+       * is behind the top by a published distance — GitHub issue #93's gap is on the player's own
+       * row and nowhere else, and a corpus that never signed in would never read it.
+       */
+      const own = board !== undefined && board.kind === 'board' ? board.rows[1]?.displayName : undefined;
+      const view = dailyBoardViewOf(board, own, (id) => context.profiles.find((profile) => profile.id === id)?.name);
       view.lines.forEach((line, index) => {
         seeds.push({
           field: `board.daily.${state}.line${String(index)}`,
@@ -10259,6 +10267,11 @@ const GAUNTLET: SurfaceAdapter = {
           text: `${row.place}. ${row.displayName}`,
           role: 'label',
         });
+        /* GitHub issue #93: who drove the row, and the player's own distance from the top. */
+        seeds.push({ field: `board.daily.${state}.row${String(index)}.driver`, text: row.driver, role: 'label' });
+        if (row.gap !== '') {
+          seeds.push({ field: `board.daily.${state}.row${String(index)}.gap`, text: row.gap, role: 'observation' });
+        }
         /*
          * Two roles, and which one applies is the row's own answer rather than the adapter's
          * preference. A row that printed a count is an `estimate` with `countShown` — from whether

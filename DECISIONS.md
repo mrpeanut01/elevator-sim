@@ -33694,3 +33694,40 @@ reaches nothing, by the same guards as before.
 refused (§ D299 § 2, § D319). And whether a *saved* dispatcher should be able to carry a sentence
 of the player's own: the field is on the type and the schema allows it, but no editor writes it,
 and a control that writes nothing is not built.
+
+---
+
+## D509 — ratings never reset and boards reset by construction, and the ladder says so before a rating is earned
+
+**Date: 2026-09-06 · Owner: the integrator, wave V · Rules on: GitHub issue #252,
+`everyday/boardScreen.ts#BOARD_SCREEN_COPY.ladderPolicy`, `gauntlet/ladder.ts`, the daily board.**
+
+The issue asks whether ratings reset, on what interval, what is preserved, and that whatever is
+chosen is stated to the player before they invest in a rating, without ever deleting a verified run.
+
+**Two clocks, and each already had its answer in code; this entry names them as policy.**
+
+1. **The daily board resets by construction and on no interval anybody chose.** Its key is the
+   UTC date (`server/leaderboard/boardKey.ts#dailyDateOf`), so *who had the best Friday* is a
+   question that expires with Friday. Nothing is deleted: yesterday's rows stay under yesterday's
+   key, and a board is never cleared, only left behind.
+2. **The ladder never resets and is never decayed.** A rating is a mean over forty fixed proof cases
+   (`gauntlet/rating.ts`), and what persists is the forty cases with their seeds rather than the
+   mean (§ D434), so a rating is recomputed from what it kept every time it is drawn. GAMEPLAY
+   § 14.2's argument decides it: *"the cases never move so two ratings a month apart are still
+   comparable"*, and a reset would throw away exactly the property the standing rating exists for. A
+   new player is not locked out by an old cohort, because the ladder is not a race for a finite top
+   — any dispatcher that clears the forty cases as well as the best one rates the same, whenever it
+   arrives.
+3. **What is preserved across a change to the proof cases is everything.** If `data/proof-cases.json`
+   ever changes, every ladder entry re-rates from its persisted cases and seeds against the new set
+   rather than being deleted; a run is never removed from the record it was verified into.
+4. **Said where a rating is earned.** `BOARD_SCREEN_COPY.ladderPolicy` is drawn on the ladder tab
+   above *Prove a dispatcher*, so the sentence is read before the button is pressed. It is one
+   paragraph rather than a settings page because the policy has no parameters to set.
+
+**What this does not decide.** Seasons as a *label* — a named period over the daily boards, with
+its own archive — are not built and not refused; nothing here would have to change to add one,
+because a label over dated boards deletes nothing. And GAMEPLAY § 22's open question, whether the
+gauntlet should cost something so free re-runs do not churn ratings, stays open: a cost is a
+different decision from a reset, and this entry takes neither side of it.

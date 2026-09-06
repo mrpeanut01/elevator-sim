@@ -53,8 +53,8 @@
  * same defect as a marshal.
  */
 
-import { Pcg32, deriveStreamSeed } from '@elevator-sim/core';
-import type { InterventionChange } from '@elevator-sim/core';
+import { Pcg32, deriveStreamSeed } from '@elevator-sim/core/browser';
+import type { InterventionChange } from '@elevator-sim/core/browser';
 
 import { BREAKDOWN_AT_FRACTION, SHIFT_EVENTS, eventCarChoice } from '../shift/events.js';
 import type { BankedBuilding, CarRef } from '../shift/incidents.js';
