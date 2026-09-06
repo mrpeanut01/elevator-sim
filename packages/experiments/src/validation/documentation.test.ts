@@ -1505,12 +1505,12 @@ type DecisionReservation = {
  * recorded in their docstrings under § D405.
  */
 /**
- * **Wave U's block: D503 to D510, opened on the first decision the wave took.** One worker again,
- * so the block is a courtesy to the charter row's arithmetic rather than a dispatch: numbers are
- * taken in order as issues reach past their module, and whatever is unreached at close is returned
- * as free, never as a hole.
+ * **Wave U's block, D503 to D510, is closed: four spent, four returned.** § D503 (#213), § D504
+ * (#353), § D505 (#324) and § D506 (#327); D507 to D510 were never written and are free rather
+ * than holes, because only a number written below the highest is a hole. The charter row
+ * reconciles to D507 on this same commit.
  */
-const OPEN_RESERVATION = { wave: 'U', from: 503, to: 510 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave S reserved D489–D498, and it was opened four lanes late — which is wave Q's error
  * repeated by the person who wrote it down.**
