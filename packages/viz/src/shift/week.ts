@@ -104,6 +104,18 @@ export const ENDLESS_CONTRACT_ID = 'endless';
 export const SANDBOX_CONTRACT_ID = 'sandbox';
 
 /**
+ * The contract id a week carries while an Endless rush is running — GitHub issue #220, § D515.
+ *
+ * The same mechanics as {@link ENDLESS_CONTRACT_ID}, no contract and nothing banked, and a fourth
+ * sentinel for the reason the sandbox is a third: it is a different *event*. A rush is a
+ * demonstration the player asked for from the front door, ninety minutes of a stream no building is
+ * sized for; the week they were playing is parked by `switchWeek` when it starts and resumed when
+ * they leave, so the rush's run can never be filed as a day of theirs. Nothing closes a rush week:
+ * the stage's primary in the `rush` context is *End the rush*, not *Close the day*.
+ */
+export const RUSH_CONTRACT_ID = 'rush';
+
+/**
  * The contract id a **Free Play** week carries — GitHub issue #125.
  *
  * ## Why free play needs an id of its own, which is a fact about {@link switchWeek} rather than a
@@ -174,6 +186,7 @@ export const WEEK_CONTRACT_SENTINELS: Readonly<Record<string, string>> = Object.
   endless: ENDLESS_CONTRACT_ID,
   sandbox: SANDBOX_CONTRACT_ID,
   'free play': FREE_PLAY_CONTRACT_ID,
+  rush: RUSH_CONTRACT_ID,
 });
 
 /**
@@ -203,6 +216,11 @@ export const WEEK_CONTRACT_SENTINELS: Readonly<Record<string, string>> = Object.
  */
 export function openEndless(): WeekState {
   return openWeek(ENDLESS_CONTRACT_ID);
+}
+
+/** The week an Endless rush runs on — see {@link RUSH_CONTRACT_ID}. */
+export function openRush(): WeekState {
+  return openWeek(RUSH_CONTRACT_ID);
 }
 
 /** A fresh week on a scenario, at day 1. Nothing banked, nothing cleared, no history. */

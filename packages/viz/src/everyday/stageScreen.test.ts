@@ -94,7 +94,7 @@ describe('the stage’s entry rule', () => {
   it('does not ask for a day on the way into a watch', () => {
     const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
     expect(source).toContain(
-      "if (context.ctx !== 'watch' && stageEntryStartsARun(host.runState())) host.startRun();",
+      "if (context.ctx !== 'watch' && context.ctx !== 'rush' && stageEntryStartsARun(host.runState())) host.startRun();",
     );
     /* The unguarded shape, by its own text — either half alone passes over a file that does both. */
     expect(source).not.toContain('if (stageEntryStartsARun(host.runState())) host.startRun();');

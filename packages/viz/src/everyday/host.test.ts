@@ -21,6 +21,9 @@ import {
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { RUSH_SEED, RUSH_TEMPLATE_ID } from './rush.js';
+import { RUSH_CONTRACT_ID } from '../shift/week.js';
+
 import { towerById, type CampaignTower } from '../campaign/career.js';
 import { clearedDays, purseOf, spentTodayUnits, type ShopCategoryId } from '../campaign/economy.js';
 import { TECHNICIAN_UNITS, campaignEventFor } from '../campaign/incidents.js';
@@ -1541,5 +1544,39 @@ describe('the daily board read', () => {
       () => Promise.resolve(failed('The server refused that request.')),
     );
     expect(board).toEqual({ kind: 'unreachable', detail: 'The server refused that request.' });
+  });
+});
+
+describe('the rush — GitHub issue #220, § D515', () => {
+  it('starts on the standing building: the week parked, the stream selected, the run pressed; and leaves by putting it back', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    expect(host.rush()).toBeUndefined();
+    expect(host.rushDisclosure()).toContain('Busier than a building like this is sized for');
+    expect(host.startRush()).toBeUndefined();
+    expect(h.calls).toEqual(['applyPatch', 'startRun']);
+    const patch = h.patches[0];
+    expect(patch?.week?.contractId).toBe(RUSH_CONTRACT_ID);
+    expect(patch?.freePlay?.demandTemplateId).toBe(RUSH_TEMPLATE_ID);
+    expect(patch?.seed).toBe(RUSH_SEED);
+    /* The harness does not apply patches; the session is the host's own record of the rush. */
+    const session = host.rush();
+    expect(session?.topRatePctPop5min).toBeGreaterThan(100);
+    expect(session?.holdAtS).toBeUndefined();
+    expect(session?.endedAtS).toBeUndefined();
+    host.endRush(300);
+    expect(host.rush()?.endedAtS).toBe(300);
+    /* Pressed again inside the rush, the same waves are asked for and the record is cleared. */
+    expect(host.startRush()).toBeUndefined();
+    expect(h.calls).toEqual(['applyPatch', 'startRun', 'startRun']);
+    expect(host.rush()?.endedAtS).toBeUndefined();
+    host.leaveRush();
+    expect(host.rush()).toBeUndefined();
+    const restore = h.patches[1];
+    expect(restore?.seed).toBe(base().seed);
+    expect(restore?.week?.contractId).toBe(base().week.contractId);
+    /* Leaving twice is a no-op. */
+    host.leaveRush();
+    expect(h.patches).toHaveLength(2);
   });
 });

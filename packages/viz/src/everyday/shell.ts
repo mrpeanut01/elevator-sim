@@ -132,6 +132,13 @@ export interface EverydayScreenShellContext extends EverydayScreenContext {
    * #337, `everyday/boardScreen.ts`'s, over a daily-board row.
    */
   enterWatch(): void;
+  /**
+   * § 9's *Start the rush*, as a call — put the § 7 stage into `ctx: 'rush'` (GitHub issue #220).
+   * The run is `EverydayHost.startRush`'s and is asked for first; this is only the context, and the
+   * rush setup screen is its one caller. Leaving the stage or the result for any other screen
+   * leaves the rush, which puts the parked week back — see {@link go}'s guard.
+   */
+  enterRush(): void;
 }
 
 /**
@@ -235,6 +242,8 @@ export interface EverydayShell {
    * are separate and why a caller must read the host's answer before calling this.
    */
   enterWatch(): void;
+  /** § 9's rush context, the shell's half — GitHub issue #220. See {@link EverydayScreenShellContext.enterRush}. */
+  enterRush(): void;
   /** Which world has the page. `'engineer'` between the two presses, `'everyday'` otherwise. */
   world(): EverydayWorld;
   /**
@@ -838,6 +847,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * so a rail row and a bar button cannot end a watch differently.
      */
     if (state.ctx === 'watch' && screen !== 'stage') leaveWatch();
+    if (state.ctx === 'rush' && screen !== 'stage' && screen !== 'report') leaveRush();
     state = { ...state, screen };
     draw();
     doc.defaultView?.scrollTo(0, 0);
@@ -911,10 +921,23 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     go('stage');
   }
 
+  /** § 9's rush, the shell's half — the context; `EverydayHost.startRush` owns the run. GitHub issue #220. */
+  function enterRushStage(): void {
+    state = { ...state, ctx: 'rush' };
+    go('stage');
+  }
+
+  /** Leave the rush: the context back to the daily loop, and the host puts the parked week back. */
+  function leaveRush(): void {
+    state = { ...state, ctx: 'daily' };
+    dataHost?.leaveRush();
+  }
+
   /** Leave for real: clear the flow and land on the menu. */
   function doLeave(): void {
     runOpen = false;
     if (state.ctx === 'watch') leaveWatch();
+    if (state.ctx === 'rush') leaveRush();
     state = { ...state, ctx: 'daily' };
     go(EVERYDAY_ROOT);
   }
@@ -1869,6 +1892,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           enterEngineer,
           /* § 14.1's `Watch it`, likewise — the context, never the run. */
           enterWatch: enterWatchStage,
+          enterRush: enterRushStage,
         };
         mounted = module.mount(screenRegion, context);
         /*
@@ -1998,6 +2022,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     },
     enterEngineer,
     enterWatch: enterWatchStage,
+    enterRush: enterRushStage,
     world: () => world,
     destroy: () => {
       stopProfileWatch();

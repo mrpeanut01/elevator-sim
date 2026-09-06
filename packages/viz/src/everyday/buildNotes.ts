@@ -221,7 +221,6 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * dispatcher pair open the workshop with the honesty kept on the card as a caveat rather than a
    * refusal. That also closes GitHub issue #177's item 2.
    */
-  'Endless rush — the setup screen draws, and the climbing stream of arrivals behind it does not exist, so its start button refuses. The rush’s own stage and its own result screen are unbuilt.',
 ]);
 
 /**

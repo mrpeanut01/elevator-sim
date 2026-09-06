@@ -520,6 +520,17 @@ function describeSummary(result: SimulationResult): VizSummary {
   const { waiting, handlingCapacity, achievedInterval, serviceLevel, energy } = summary;
   return {
     saturated: summary.saturation.saturated,
+    /* Version 13: the diagnosis itself, so a sheet can quote the test rather than re-run one. */
+    saturation: {
+      verdict: summary.saturation.verdict,
+      windowStartS: summary.saturation.windowStartS,
+      windowEndS: summary.saturation.windowEndS,
+      sampleCount: summary.saturation.sampleCount,
+      slopePersonsPerMinute: summary.saturation.slopePersonsPerMinute,
+      projectedGrowthPersons: summary.saturation.projectedGrowthPersons,
+      meanQueueLength: summary.saturation.meanQueueLength,
+      maxQueueLength: summary.saturation.maxQueueLength,
+    },
     awtIsValid: summary.awtIsValid,
     awtInvalidReason: summary.awtInvalidReason,
     /*

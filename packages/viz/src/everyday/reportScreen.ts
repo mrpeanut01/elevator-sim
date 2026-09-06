@@ -99,6 +99,7 @@ import {
   EVERYDAY_RADII as R,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
+import { RUSH_RESULT_EMPTY_LEDE, rushOutcomeOf, rushResultViewOf } from './rush.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 
 /**
@@ -159,6 +160,12 @@ function mountReportScreen(
     const open = openTowerOf(context.host.campaign());
     reportBuildingName =
       open === undefined ? undefined : context.host.buildingById(open.buildingId)?.name;
+    /* § 9.3: the rush's result is its own screen and never falls through to the day's sheet. */
+    if (context.ctx === 'rush') {
+      root.replaceChildren();
+      drawRushResult();
+      return;
+    }
     const view = viewNow();
     root.replaceChildren();
     if (!view.filed) {
@@ -172,6 +179,67 @@ function mountReportScreen(
       return;
     }
     drawSheet(view);
+  }
+
+  /** § 9.3's result — `everyday/rush.ts#rushResultViewOf`, drawn and not decided here. */
+  function drawRushResult(): void {
+    const recording = context.host.recording();
+    const session = context.host.rush();
+    if (recording === undefined || session === undefined) {
+      const empty = el(doc, 'div', 'everyday-report-empty');
+      const title = el(doc, 'h1', undefined, 'Nothing to report yet');
+      title.style.cssText = `font-family:${TYPE.heading};font-size:30px;font-weight:700;margin:0`;
+      const lede = el(doc, 'p', 'everyday-report-empty-lede', RUSH_RESULT_EMPTY_LEDE);
+      lede.style.cssText = `${LEDE};margin:12px 0 0`;
+      empty.append(title, lede);
+      root.append(empty);
+      return;
+    }
+    const view = rushResultViewOf(rushOutcomeOf(recording, session.endedAtS), session.disclosure);
+    const block = el(doc, 'div', 'everyday-rush-result');
+    block.dataset['outcome'] = view.outcome;
+    const eyebrow = el(doc, 'div', 'everyday-report-meta', view.eyebrow);
+    eyebrow.style.cssText = EYEBROW;
+    const head = el(doc, 'h1', 'everyday-rush-result-head', view.head);
+    head.style.cssText = `font-family:${TYPE.heading};font-size:34px;font-weight:700;letter-spacing:-.02em;margin:10px 0 0`;
+    const lede = el(doc, 'p', 'everyday-rush-result-lede', view.lede);
+    lede.style.cssText = `${LEDE};margin:12px 0 0`;
+    block.append(eyebrow, head, lede);
+    const account = el(doc, 'ol', 'everyday-rush-result-account');
+    account.style.cssText = 'margin:18px 0 0;padding-left:22px;max-width:70ch';
+    for (const beat of view.account) {
+      const item = el(doc, 'li', 'everyday-rush-result-beat', beat);
+      item.style.cssText = `${BODY};margin:6px 0`;
+      account.append(item);
+    }
+    block.append(account);
+    const grid = el(doc, 'div', 'everyday-rush-result-figures');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:22px';
+    for (const figure of view.figures) {
+      const cell = el(doc, 'div', 'everyday-rush-result-figure');
+      cell.style.cssText = `border:1px solid ${C.ruleLight};border-radius:${String(R.card)}px;padding:12px`;
+      const value = el(doc, 'div', 'everyday-rush-result-value', figure.value);
+      value.style.cssText = `font:700 24px ${TYPE.heading}`;
+      const label = el(doc, 'div', 'everyday-rush-result-label', figure.label);
+      label.style.cssText = `${EYEBROW};margin-top:6px`;
+      cell.append(value, label);
+      if (figure.note !== undefined) {
+        const note = el(doc, 'div', 'everyday-rush-result-note', figure.note);
+        note.style.cssText = `font-size:12px;color:${C.warmGrey};margin-top:6px;line-height:1.4`;
+        cell.append(note);
+      }
+      grid.append(cell);
+    }
+    block.append(grid);
+    if (view.disclosure !== undefined) {
+      const disclosure = el(doc, 'p', 'everyday-rush-result-disclosure', view.disclosure);
+      disclosure.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.terracotta};margin:18px 0 0;max-width:70ch`;
+      block.append(disclosure);
+    }
+    const footer = el(doc, 'p', 'everyday-rush-result-footer', view.footer);
+    footer.style.cssText = `font-size:12px;color:${C.label};margin:18px 0 0`;
+    block.append(footer);
+    root.append(block);
   }
 
   function drawSheet(view: EverydayReportView): void {
@@ -559,6 +627,11 @@ function mountReportScreen(
      * primary), so a fifth run context answers by being in that table.
      */
     primary: () => {
+      /* § 9.3's *Run the rush again* — the same waves, asked for again, and back onto the stage. */
+      if (context.ctx === 'rush') {
+        if (context.host.startRush() === undefined) context.go('stage');
+        return;
+      }
       context.go(context.ctx === 'campaign' ? 'building' : 'week');
     },
   };

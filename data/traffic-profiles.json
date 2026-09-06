@@ -489,6 +489,963 @@
           "$comment": "17:45-18:00. The last of the building leaving. The day ends on the same 0.05 it opened on, pointed the other way."
         }
       ]
+    },
+    {
+      "id": "endless-rush",
+      "name": "Endless rush",
+      "recommended": false,
+      "durationMin": 90,
+      "startOfDayMin": 480,
+      "reportWindow": "full-run",
+      "shape": "the climbing stream: thirty waves of three minutes, each one busier than the last, and no ceiling this building is sized for",
+      "$comment": "GAMEPLAY section 9's Endless rush stream, ENGINE_CONTRACT section 3.2 -- GitHub issue #220, DECISIONS.md sections D477, D478 and D515. STRUCTURAL: a template carries the SHAPE of demand and no rate. The contract states the stream in absolute persons per two-second bucket, (0.34 + wave x 0.11) x 2/3 with wave = floor(t / 180), which is 6.8 a minute in wave 1 climbing 2.2 a minute a wave to 70.6 in wave 30; so the intensity here is each wave's rate against wave 30's, and everyday/rush.ts sets arrivalRatePctPop5min to wave 30's rate converted to this building's own population, which is what makes the stream the same number of PEOPLE on every tower rather than the same fraction. NOT CITED, and stated as the demonstration it is (section D478): that rate leaves every shipped profile's declared band, on purpose -- the mode exists to find the point a building stops coping -- and a run of it says so on its own face, in everyday/rush.ts's disclosure, on the footing workPerServedLegKJ sits beside raw energy. It may not be reached from any judged surface (docs/35 PM-RU2): no scenario, no daily board and no campaign stage names this template. DERIVED, and a compromise the schema forces: the contract's stream is a STEP every 180 s and rule 6 of config/demandPhases.ts admits no step, so each wave holds its rate for 150 s and climbs to the next over its last 30 s, which puts a wave's mean 0.18 a minute above the contract's figure -- said here so nobody reads the setup screen's per-minute bands as exact. NOT CITED: the mix. The contract fixes 0.62 incoming and says nothing of the rest; the remainder is split evenly between outgoing and interfloor as the assumption that invents least.",
+      "phases": [
+        {
+          "startMin": 0,
+          "endMin": 2.5,
+          "startIntensity": 0.096317,
+          "endIntensity": 0.096317,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "$comment": "Wave 1, held for its first 150 s: (0.34 + 0 x 0.11) x 2/3 a bucket, 6.8 a minute, as intensity against wave 30's 70.6. Every wave below is the same shape one step up."
+        },
+        {
+          "startMin": 2.5,
+          "endMin": 3,
+          "startIntensity": 0.096317,
+          "endIntensity": 0.127479,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 3,
+          "endMin": 5.5,
+          "startIntensity": 0.127479,
+          "endIntensity": 0.127479,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 5.5,
+          "endMin": 6,
+          "startIntensity": 0.127479,
+          "endIntensity": 0.15864,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 6,
+          "endMin": 8.5,
+          "startIntensity": 0.15864,
+          "endIntensity": 0.15864,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 8.5,
+          "endMin": 9,
+          "startIntensity": 0.15864,
+          "endIntensity": 0.189802,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 9,
+          "endMin": 11.5,
+          "startIntensity": 0.189802,
+          "endIntensity": 0.189802,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 11.5,
+          "endMin": 12,
+          "startIntensity": 0.189802,
+          "endIntensity": 0.220963,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 12,
+          "endMin": 14.5,
+          "startIntensity": 0.220963,
+          "endIntensity": 0.220963,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 14.5,
+          "endMin": 15,
+          "startIntensity": 0.220963,
+          "endIntensity": 0.252125,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 15,
+          "endMin": 17.5,
+          "startIntensity": 0.252125,
+          "endIntensity": 0.252125,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 17.5,
+          "endMin": 18,
+          "startIntensity": 0.252125,
+          "endIntensity": 0.283286,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 18,
+          "endMin": 20.5,
+          "startIntensity": 0.283286,
+          "endIntensity": 0.283286,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 20.5,
+          "endMin": 21,
+          "startIntensity": 0.283286,
+          "endIntensity": 0.314448,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 21,
+          "endMin": 23.5,
+          "startIntensity": 0.314448,
+          "endIntensity": 0.314448,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 23.5,
+          "endMin": 24,
+          "startIntensity": 0.314448,
+          "endIntensity": 0.345609,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 24,
+          "endMin": 26.5,
+          "startIntensity": 0.345609,
+          "endIntensity": 0.345609,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 26.5,
+          "endMin": 27,
+          "startIntensity": 0.345609,
+          "endIntensity": 0.376771,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 27,
+          "endMin": 29.5,
+          "startIntensity": 0.376771,
+          "endIntensity": 0.376771,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 29.5,
+          "endMin": 30,
+          "startIntensity": 0.376771,
+          "endIntensity": 0.407932,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 30,
+          "endMin": 32.5,
+          "startIntensity": 0.407932,
+          "endIntensity": 0.407932,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 32.5,
+          "endMin": 33,
+          "startIntensity": 0.407932,
+          "endIntensity": 0.439093,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 33,
+          "endMin": 35.5,
+          "startIntensity": 0.439093,
+          "endIntensity": 0.439093,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 35.5,
+          "endMin": 36,
+          "startIntensity": 0.439093,
+          "endIntensity": 0.470255,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 36,
+          "endMin": 38.5,
+          "startIntensity": 0.470255,
+          "endIntensity": 0.470255,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 38.5,
+          "endMin": 39,
+          "startIntensity": 0.470255,
+          "endIntensity": 0.501416,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 39,
+          "endMin": 41.5,
+          "startIntensity": 0.501416,
+          "endIntensity": 0.501416,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 41.5,
+          "endMin": 42,
+          "startIntensity": 0.501416,
+          "endIntensity": 0.532578,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 42,
+          "endMin": 44.5,
+          "startIntensity": 0.532578,
+          "endIntensity": 0.532578,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 44.5,
+          "endMin": 45,
+          "startIntensity": 0.532578,
+          "endIntensity": 0.563739,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 45,
+          "endMin": 47.5,
+          "startIntensity": 0.563739,
+          "endIntensity": 0.563739,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 47.5,
+          "endMin": 48,
+          "startIntensity": 0.563739,
+          "endIntensity": 0.594901,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 48,
+          "endMin": 50.5,
+          "startIntensity": 0.594901,
+          "endIntensity": 0.594901,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 50.5,
+          "endMin": 51,
+          "startIntensity": 0.594901,
+          "endIntensity": 0.626062,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 51,
+          "endMin": 53.5,
+          "startIntensity": 0.626062,
+          "endIntensity": 0.626062,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 53.5,
+          "endMin": 54,
+          "startIntensity": 0.626062,
+          "endIntensity": 0.657224,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 54,
+          "endMin": 56.5,
+          "startIntensity": 0.657224,
+          "endIntensity": 0.657224,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 56.5,
+          "endMin": 57,
+          "startIntensity": 0.657224,
+          "endIntensity": 0.688385,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 57,
+          "endMin": 59.5,
+          "startIntensity": 0.688385,
+          "endIntensity": 0.688385,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 59.5,
+          "endMin": 60,
+          "startIntensity": 0.688385,
+          "endIntensity": 0.719547,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 60,
+          "endMin": 62.5,
+          "startIntensity": 0.719547,
+          "endIntensity": 0.719547,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 62.5,
+          "endMin": 63,
+          "startIntensity": 0.719547,
+          "endIntensity": 0.750708,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 63,
+          "endMin": 65.5,
+          "startIntensity": 0.750708,
+          "endIntensity": 0.750708,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 65.5,
+          "endMin": 66,
+          "startIntensity": 0.750708,
+          "endIntensity": 0.78187,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 66,
+          "endMin": 68.5,
+          "startIntensity": 0.78187,
+          "endIntensity": 0.78187,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 68.5,
+          "endMin": 69,
+          "startIntensity": 0.78187,
+          "endIntensity": 0.813031,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 69,
+          "endMin": 71.5,
+          "startIntensity": 0.813031,
+          "endIntensity": 0.813031,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 71.5,
+          "endMin": 72,
+          "startIntensity": 0.813031,
+          "endIntensity": 0.844193,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 72,
+          "endMin": 74.5,
+          "startIntensity": 0.844193,
+          "endIntensity": 0.844193,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 74.5,
+          "endMin": 75,
+          "startIntensity": 0.844193,
+          "endIntensity": 0.875354,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 75,
+          "endMin": 77.5,
+          "startIntensity": 0.875354,
+          "endIntensity": 0.875354,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 77.5,
+          "endMin": 78,
+          "startIntensity": 0.875354,
+          "endIntensity": 0.906516,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 78,
+          "endMin": 80.5,
+          "startIntensity": 0.906516,
+          "endIntensity": 0.906516,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 80.5,
+          "endMin": 81,
+          "startIntensity": 0.906516,
+          "endIntensity": 0.937677,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 81,
+          "endMin": 83.5,
+          "startIntensity": 0.937677,
+          "endIntensity": 0.937677,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 83.5,
+          "endMin": 84,
+          "startIntensity": 0.937677,
+          "endIntensity": 0.968839,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 84,
+          "endMin": 86.5,
+          "startIntensity": 0.968839,
+          "endIntensity": 0.968839,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 86.5,
+          "endMin": 87,
+          "startIntensity": 0.968839,
+          "endIntensity": 1.0,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        },
+        {
+          "startMin": 87,
+          "endMin": 90,
+          "startIntensity": 1.0,
+          "endIntensity": 1.0,
+          "startSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          },
+          "endSplit": {
+            "incoming": 0.62,
+            "outgoing": 0.19,
+            "interfloor": 0.19
+          }
+        }
+      ]
     }
   ],
   "passengerMass": {

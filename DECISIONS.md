@@ -33910,3 +33910,47 @@ campaign's `c1` is untouched, per § D512.
 **What the browser tier had to learn.** Sixteen browser files loaded the page bare and were written
 against Garden Apartments without saying so; they now name it in the address, which is the deep
 link's purpose, and the two that test a first load assert the draw instead.
+
+## D515 — Endless rush runs as a week of its own on the contract's stream, ends on the hold line, and quotes the sheet's own trend test
+
+**Date: 2026-09-06 · Owner: the integrator, wave W · Rules on: GitHub issue #220 under § D477 and
+§ D478, `data/traffic-profiles.json`'s `endless-rush` template, `packages/viz/src/everyday/rush.ts`,
+`shift/week.ts#RUSH_CONTRACT_ID`, `everyday/host.ts`, the stage, the report screen, the setup
+screen, and `contract/types.ts` version 13.**
+
+§ D477 kept the mode and specified it as a ramp against a fail state; § D478 ruled that a run outside
+its band says so. This entry is the four things a lane had to decide to build it.
+
+1. **The stream is a template plus a rate, and the rate is the building's own population.**
+   ENGINE_CONTRACT § 3.2 states the stream in persons per bucket, the same number of people on every
+   tower; a template carries shape and no rate (`docs/35` § 11 item 3, checked), so `endless-rush`
+   authors each wave's rate as intensity against wave 30's, and `rushPatchOf` writes wave 30's rate
+   converted to `arrivalRatePctPop5min` for the standing building. Each wave holds its rate for
+   150 s and climbs over its last 30, because the schema declares no step; the template's own
+   `$comment` says what that costs. The rate leaves every shipped band by design, and
+   `rushDisclosureOf` draws `fixit/parse.ts`'s sentence for it on the setup screen and the result —
+   § D478's obligation, met with the sentence already shipped for the fixit cases.
+2. **The rush is a week of its own through the ordinary run pipeline.** `RUSH_CONTRACT_ID` is a
+   fourth sentinel beside endless, sandbox and free play: the player's week is parked by
+   `switchWeek` when the rush starts and resumed when they leave, so a rush can never be filed as a
+   day, and nothing closes a rush week. The stage plays the recording as it plays any recording; no
+   second simulator, clock or playback was built.
+3. **The fail state and the hold line are the same line.** § D477's *the lobby overfills* and
+   § 20.5's *forty people standing over two minutes at once* are not competing definitions:
+   overfill without a wait clause ends a run on forty fresh arrivals, the exact reading § 20.5
+   corrects. `rushHoldAt` reads the recording at the stream's two-second buckets with the stage's own
+   band authority and names the first bucket at which the fourth band holds forty; the stage stops
+   the replay there. The player may stop earlier by hand, and the result then reports no breaking
+   point, in so many words.
+4. **The result quotes `summary.saturation` and computes no divergence of its own** (`docs/35`
+   `PM-RU3`). The diagnosis now travels on the recording (`VizSummary.saturation`, contract version
+   13), and the result names the verdict, the window, the slope and its sample count from it. The
+   hold moment is an observation of the recording, not an estimate; every figure carries its clock;
+   and the mode says *better* about nothing, since it never has two configurations to compare. No
+   *"you called it 90 s early"* is drawn, because that figure needs the across-seed spread `docs/10`
+   R12 asks for first, and the waves are one seed by design.
+
+**What this closes and does not.** The three rush entries in the build-information register and
+the shell's own rush absence leave with the engine; the standings stay #177's. Where the rush sits
+in the player's path — the bench, or minute one — is the half of `docs/35` Q3 § D477 left open, and
+this entry does not take it: the tile is where it was.

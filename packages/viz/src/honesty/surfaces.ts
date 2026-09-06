@@ -131,8 +131,8 @@ import { railModel, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
   RUSH_BESTS,
+  RUSH_HOLD_LINE,
   RUSH_BESTS_FIXTURE_NOTE,
-  RUSH_PRIMARY_REFUSAL,
   RUSH_SCREEN_COPY,
   rushBandViews,
   rushBarModel,
@@ -183,6 +183,7 @@ import {
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
+import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
 import {
   ENGINEER_RETURN_LABEL,
   ENGINEER_RETURN_TITLE,
@@ -7980,25 +7981,16 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#RUSH_SCREEN_COPY',
     /*
      * `#RUSH_ABSENCES` and `#DESIGNER_ABSENCES` are the {@link EVERYDAY_BUILD_NOTES} adapter's
-     * since GitHub issue #207 moved both registers off these two screens. `#RUSH_PRIMARY_REFUSAL`
-     * stays here, and the split is the issue's own rule: a refusal that belongs to a control a
-     * player can press is drawn on that control, and a register of what the build does not do is
-     * drawn once, somewhere a reader goes looking.
+     * since GitHub issue #207 moved both registers off these two screens. The primary's refusal
+     * used to stay here on the issue's own rule — a refusal that belongs to a control a player can
+     * press is drawn on that control — and left with the engine GitHub issue #220 built (§ D515);
+     * `rushBarModel` now produces no text, so it is no longer covered here.
      */
-    'everyday/rushScreenModel.ts#RUSH_PRIMARY_REFUSAL',
-    /*
-     * The § 3.3 refinement itself, which this adapter's docstring has claimed to drive since it was
-     * written and did not: while `BarPrimary.inert` was a `boolean` the refinement produced no text
-     * at all, so the derivation never found it and the claim cost nothing. GitHub issue #262 moved
-     * the refusal *onto* the cell the shell draws, which makes the refinement a text producer — so
-     * the sentence is now true, and it is checked.
-     */
-    'everyday/rushScreenModel.ts#rushBarModel',
     'everyday/rushScreenModel.ts#RUSH_BANDS',
     'everyday/rushScreenModel.ts#RUSH_BESTS',
     /*
      * The standings' fixture marker — GitHub issue #293. It belongs on this adapter rather than on
-     * {@link EVERYDAY_BUILD_NOTES} for the same rule that splits `#RUSH_PRIMARY_REFUSAL` from
+     * {@link EVERYDAY_BUILD_NOTES} for the same rule that once split the primary's refusal from
      * `#RUSH_ABSENCES` just above: a refusal drawn on the thing it is about is swept with that
      * thing, and `rushScreen.ts` draws this one directly above the five rows it describes.
      */
@@ -8058,11 +8050,11 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         role: key === 'holdLine' || key === 'lede' || key === 'drivingNote' ? 'prose' : 'label',
       });
     }
-    seeds.push({ field: 'rush.primary.refusal', text: RUSH_PRIMARY_REFUSAL, role: 'reason' });
     /*
-     * The resolved § 3.3 row, as the shell draws it. The reason and the label are seeded from the
-     * refinement rather than from the constant beside it, so a lane that marks this primary dead
-     * with some other sentence is swept on the commit that does it.
+     * The resolved § 3.3 row, as the shell draws it. The label and any reason are seeded from the
+     * refinement rather than from a constant beside it, so a lane that marks this primary dead
+     * with some sentence is swept on the commit that does it — and since GitHub issue #220 the
+     * primary is live, so the reason seed is the empty string the corpus filters.
      */
     {
       const bar = rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' }));
@@ -9076,6 +9068,78 @@ const FAMILY_CONTROLS: SurfaceAdapter = {
  * the property that would catch a schedule line turning into a preview is the one that has to see
  * it.
  */
+/**
+ * § 9's rush — its held-time header on the stage, its result, and the two refusals around them.
+ * GitHub issue #220, § D515. Both branches of the result are rendered: the case's own recording is
+ * read for the `stopped` arm (an ordinary day rarely crosses the hold line), and a `broke` outcome
+ * is built from the same recording's facts with the line placed at the playhead, so the wording
+ * every rush that breaks reads is in the corpus whether or not this case's day breaks.
+ */
+const EVERYDAY_RUSH: SurfaceAdapter = {
+  id: 'everyday/rush.ts#rushResultViewOf',
+  covers: [
+    'everyday/rush.ts#rushResultViewOf',
+    'everyday/rush.ts#rushStageHeaderOf',
+    'everyday/rush.ts#RUSH_RESULT_COPY',
+    'everyday/rush.ts#RUSH_STAGE_COPY',
+    'everyday/rush.ts#RUSH_NOT_LANDED',
+    'everyday/rush.ts#RUSH_RESULT_EMPTY_LEDE',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const recording = context.recording;
+    const mid = recording.startedAt + (recording.endedAt - recording.startedAt) / 2;
+    const stopped = rushOutcomeOf(recording, mid);
+    const broke: RushOutcome = {
+      ...stopped,
+      kind: 'broke',
+      overLine: RUSH_HOLD_LINE.people,
+      saturation: recording.summary.saturation ?? {
+        verdict: 'diverging-queue',
+        windowStartS: recording.startedAt,
+        windowEndS: recording.endedAt,
+        sampleCount: 8,
+        slopePersonsPerMinute: 1.5,
+        projectedGrowthPersons: 12,
+        meanQueueLength: 4,
+        maxQueueLength: 40,
+      },
+    };
+    const band = context.trafficProfiles.profiles.find((profile) => profile.id === context.building.trafficProfile)?.arrivalRatePctPop5min;
+    const disclosure = rushDisclosureOf(context.building, band);
+    for (const [arm, outcome] of [['stopped', stopped], ['broke', broke]] as const) {
+      const view = rushResultViewOf(outcome, disclosure);
+      seeds.push({ field: `rush.result(${arm}).eyebrow`, text: view.eyebrow, role: 'label' });
+      seeds.push({ field: `rush.result(${arm}).head`, text: view.head, role: 'label' });
+      seeds.push({ field: `rush.result(${arm}).lede`, text: view.lede, role: 'observation' });
+      for (const [index, beat] of view.account.entries()) {
+        seeds.push({ field: `rush.result(${arm}).account.${String(index)}`, text: beat, role: 'observation' });
+      }
+      for (const figure of view.figures) {
+        seeds.push({ field: `rush.result(${arm}).figure.${figure.label}.value`, text: figure.value, role: 'label' });
+        seeds.push({ field: `rush.result(${arm}).figure.${figure.label}.label`, text: figure.label, role: 'label' });
+        if (figure.note !== undefined) seeds.push({ field: `rush.result(${arm}).figure.${figure.label}.note`, text: figure.note, role: 'prose' });
+      }
+      seeds.push({ field: `rush.result(${arm}).footer`, text: view.footer, role: 'prose' });
+      if (view.disclosure !== undefined) seeds.push({ field: `rush.result(${arm}).disclosure`, text: view.disclosure, role: 'reason' });
+    }
+    for (const at of [recording.startedAt, mid, recording.endedAt]) {
+      const head = rushStageHeaderOf({ recording, simTimeS: at, driverName: dispatcherNameOf(context) });
+      const tag = `rush.stage(${String(Math.round(at - recording.startedAt))})`;
+      seeds.push({ field: `${tag}.held`, text: head.held, role: 'label' });
+      seeds.push({ field: `${tag}.wave`, text: head.wave, role: 'label' });
+      seeds.push({ field: `${tag}.driving`, text: head.drivingLabel, role: 'label' });
+      for (const figure of head.figures) {
+        seeds.push({ field: `${tag}.figure.${figure.label}.value`, text: figure.value, role: 'label' });
+        seeds.push({ field: `${tag}.figure.${figure.label}.label`, text: figure.label, role: 'label' });
+      }
+    }
+    seeds.push({ field: 'rush.bar.notLanded', text: RUSH_NOT_LANDED, role: 'reason' });
+    seeds.push({ field: 'rush.result.empty', text: RUSH_RESULT_EMPTY_LEDE, role: 'reason' });
+    return singleRun(this.id, seeds);
+  },
+};
+
 const EVERYDAY_STAGE: SurfaceAdapter = {
   id: 'everyday/stageScreenModel.ts#stageHeaderOf',
   covers: [
@@ -11495,6 +11559,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // header figures share wordings with the live rail's, so an earlier slot would move every
   // rail-shaped fault onto this surface.
   EVERYDAY_STAGE,
+  EVERYDAY_RUSH,
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 12.2's withheld matrix
   // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
   // every week-shaped and menu-shaped fault onto this surface.

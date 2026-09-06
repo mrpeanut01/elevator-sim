@@ -76,8 +76,9 @@ describe('the build-information panel', () => {
     // settings rows the register used to refuse, and 15 → 12 when GitHub issue #171 emptied the
     // stage's register and #169 item 1 took the campaign's incidents entry (§ D507): a register
     // whose entries only ever fall is what § D370's queue reading predicts, so the floor follows it
-    // down rather than standing over it.
-    expect(view.entryCount).toBeGreaterThan(12);
+    // down rather than standing over it — and 12 → 9 when GitHub issue #220 built the rush's
+    // engine (§ D515) and three of the rush register's four entries left with it.
+    expect(view.entryCount).toBeGreaterThan(9);
   });
 
   it('says which build it is, in a sentence the corpus sweeps — GitHub issue #246', () => {
@@ -206,7 +207,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * is the same defect as a register naming a closed absence, one level up.
    */
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Putting your run on the daily board', issue: 221 },
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Endless rush', issue: 220 },
 
   /*
    * The stage. The camera was #283's, held there while it was open whether the whole-building
@@ -231,10 +231,11 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * was internally honest, and only the pair was wrong.
    */
 
-  /* The rush. Three of the four are one issue, because they are one missing engine. */
-  { register: 'RUSH_ABSENCES', fragment: 'the climbing stream', issue: 220 },
-  { register: 'RUSH_ABSENCES', fragment: 'a rush stage of its own', issue: 220 },
-  { register: 'RUSH_ABSENCES', fragment: 'a result screen of its own', issue: 220 },
+  /*
+   * The rush. Three of its four entries were one issue, because they were one missing engine, and
+   * GitHub issue #220 built it (§ D515): the climbing stream, the held-time stage and the result
+   * screen left the register on that commit. The standings are #177's and stay.
+   */
   { register: 'RUSH_ABSENCES', fragment: 'the standings', issue: 177 },
 
   /*

@@ -197,6 +197,9 @@ import { postedRunOf } from '../watch/posted.js';
 import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
+import type { DemandBand } from '../fixit/parse.js';
+import { rushBeforeOf, rushDisclosureOf, rushHoldAt, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, type RushBefore } from './rush.js';
+
 import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
 
 /**
@@ -377,6 +380,21 @@ export interface EverydayWatchSession {
  * What an Everyday screen may know and do. The exact method list is the contract the six screen
  * lanes build against; the module docstring carries what is deliberately absent.
  */
+/**
+ * An Endless rush in progress — GitHub issue #220, § D515. The run itself is the shell's, read
+ * through {@link EverydayHost.recording} as any run is; what this carries is what the rush knows
+ * that a day does not: the rate the stream was converted to, § D478's line about it, where the
+ * recording crosses the hold line, and whether the player ended it first.
+ */
+export interface EverydayRushSession {
+  readonly topRatePctPop5min: number;
+  readonly disclosure: string | undefined;
+  /** The first two-second bucket with forty people past two minutes, or `undefined` before the run lands or if it never crosses. */
+  readonly holdAtS: number | undefined;
+  /** Where the player pressed *End the rush*, or where the stage stopped at the line; `undefined` while it plays. */
+  readonly endedAtS: number | undefined;
+}
+
 /** What § 7.5's dock reads — see {@link EverydayHost.campaignDay}. */
 export interface CampaignDayFacts {
   readonly tower: CampaignTower;
@@ -1056,6 +1074,23 @@ export interface EverydayHost {
   stopWatching(): void;
 
   /**
+   * § 9's *Start the rush* — GitHub issue #220, § D515. Parks the player's week, opens the rush
+   * week on the standing building and dispatcher, and presses the same latching run press a day
+   * uses. Returns the refusal when no building is resolved, `undefined` when the run was asked for;
+   * the recording lands as a `subscribe` notification, as every run does. Pressed again inside a
+   * rush it re-runs the same waves, which is § 9.3's *Run the rush again*.
+   */
+  startRush(): string | undefined;
+  /** The rush in progress, or `undefined` — see {@link EverydayRushSession}. */
+  rush(): EverydayRushSession | undefined;
+  /** Record where the rush ended: the hold line the stage reached, or the player's hand. */
+  endRush(atS: number): void;
+  /** Leave the rush, putting the parked week and the run it interrupted back. A no-op outside one. */
+  leaveRush(): void;
+  /** § D478's line for a rush on the standing building, before one starts; `undefined` inside the band or with no building. */
+  rushDisclosure(): string | undefined;
+
+  /**
    * § 14.1's primary — drop the spectator state and set the same crowd up to be played.
    *
    * It carries the record's **selection** (building, dispatcher, pattern, the two Free Play axes,
@@ -1315,6 +1350,19 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
   const notifyCampaign = (): void => {
     for (const listener of [...campaignListeners]) listener();
   };
+  /** The rush in progress — GitHub issue #220. Host-scoped like the career: a rush is not a day. */
+  let rushSession:
+    | {
+        readonly before: RushBefore;
+        readonly topRatePctPop5min: number;
+        readonly disclosure: string | undefined;
+        readonly hold: { readonly recording: VizRecording; readonly atS: number | undefined } | undefined;
+        readonly endedAtS: number | undefined;
+      }
+    | undefined;
+  /** The building's profile band, for § D478's line — `fixit/parse.ts#fixitContextOf`'s own lookup. */
+  const bandOf = (building: ResolvedBuilding): DemandBand | undefined =>
+    b.resources.trafficProfiles.profiles.find((profile) => profile.id === building.trafficProfile)?.arrivalRatePctPop5min;
 
   /**
    * Which tower the run on the stage is a day of, or `undefined` — GitHub issue **#223**.
@@ -1935,6 +1983,56 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     watching: () => b.watching(),
     stopWatching: () => {
       b.stopWatching();
+    },
+    startRush: () => {
+      const state = b.state();
+      const building = resolvedBuildingOf(b.resources, state);
+      if (building === undefined) return 'no building is standing, so there is nothing for the stream to arrive at';
+      if (rushSession === undefined) {
+        rushSession = {
+          before: rushBeforeOf(state),
+          topRatePctPop5min: rushTopRatePctPop5min(building.totalPopulation),
+          disclosure: rushDisclosureOf(building, bandOf(building)),
+          hold: undefined,
+          endedAtS: undefined,
+        };
+        b.applyPatch(rushPatchOf(state, building.totalPopulation));
+      } else {
+        rushSession = { ...rushSession, hold: undefined, endedAtS: undefined };
+      }
+      b.startRun();
+      notifyCampaign();
+      return undefined;
+    },
+    rush: () => {
+      if (rushSession === undefined) return undefined;
+      const recording = b.state().recording;
+      /* The hold line is read once per recording, keyed on identity — the stage asks every frame. */
+      if (recording !== undefined && rushSession.hold?.recording !== recording) {
+        rushSession = { ...rushSession, hold: { recording, atS: rushHoldAt(recording) } };
+      }
+      return {
+        topRatePctPop5min: rushSession.topRatePctPop5min,
+        disclosure: rushSession.disclosure,
+        holdAtS: rushSession.hold?.atS,
+        endedAtS: rushSession.endedAtS,
+      };
+    },
+    endRush: (atS) => {
+      if (rushSession === undefined) return;
+      rushSession = { ...rushSession, endedAtS: atS };
+      notifyCampaign();
+    },
+    leaveRush: () => {
+      if (rushSession === undefined) return;
+      const before = rushSession.before;
+      rushSession = undefined;
+      b.applyPatch(rushRestorePatchOf(b.state(), before));
+      notifyCampaign();
+    },
+    rushDisclosure: () => {
+      const building = resolvedBuildingOf(b.resources, b.state());
+      return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building));
     },
     playThisCrowd: (run) => {
       b.playThisCrowd(run);

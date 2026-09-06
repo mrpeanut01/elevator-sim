@@ -1408,6 +1408,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A template id, not prose — GitHub issue #220, § D515. `endless-rush` names the record in ' +
+        '`data/traffic-profiles.json` and `rushPatchOf` writes it into `ViewerState.freePlay`; what ' +
+        'a player reads of the rush is `EVERYDAY_RUSH`’s result and stage header, which it seeds.',
+      ids: ['everyday/rush.ts#RUSH_TEMPLATE_ID', 'everyday/rush.ts#rushPatchOf'],
+    },
+    {
+      reason:
         'A table keyed by building id and a kind vocabulary, not prose — GitHub issue #169 item 3, ' +
         '§ D510. `OFFER_FEES` is `garden-apartments: 3` six times over and `offerFeeOf` reads it; ' +
         '`offerRefusalOf` answers `held` / `unpriced` / `no-slot` / `at-risk` and a number, never a ' +
