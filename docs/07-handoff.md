@@ -1181,7 +1181,8 @@ counted twice, stale in both places.)*
 *Live debt* — **the campaign judges only on its tuning seeds**, so the live weight editor makes
 overfitting them the dominant strategy: stage 2's clearing vector is beaten by the shipped setting
 on three measures over the declared holdout set, and nothing on the shipped surface says so
-(asserted in `campaign/campaign.test.ts`) · ~~**`awtInvalidReason` is prose with no ground code**, so
+(asserted in `campaign/stageTwoEdited.test.ts`, split out of `campaign.test.ts` by GitHub issue #356) ·
+~~**`awtInvalidReason` is prose with no ground code**, so
 Basic mode cannot shorten a suppression reason without re-deciding which of `core`'s four grounds
 fired — R9's forbidden operation — and leads with a ground-free sentence instead~~ *(closed, both
 halves: the ground code landed in `core` beside the prose, [§ D183](../DECISIONS.md), and reaches

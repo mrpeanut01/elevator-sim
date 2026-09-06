@@ -292,7 +292,8 @@ which teaches exactly as little as one that clears itself. So DC-2 travels with:
 > **witness** — and the sweep runs the witness and requires the clear.
 
 That is not a new mechanism. It is `docs/10-experience-layer-contract.md` § 11 **W6**, the player move
-the campaign panel already supports, and the apparatus exists: `campaign/campaign.test.ts` carries an
+the campaign panel already supports, and the apparatus exists: `campaign/stageTwoEdited.test.ts`
+(split out of `campaign.test.ts` by GitHub issue #356) carries an
 authored `EditedVector` for stage 2 and plays it through the shipped `batchRequestForStage`.
 
 **Where the witnesses live.** In `data/`, as a new file — one entry per stage, each an
@@ -320,7 +321,7 @@ master seed checked rather than taken on the caller's word. So:
 > tuned on and is beaten on the holdout is **not a witness** — it is the shortcut O7 named, and the
 > register records it as a stage with no witness rather than as a witness with a caveat.
 
-**The one witness that existed is that case, and it no longer clears.** `campaign.test.ts` plays
+**The one witness that existed is that case, and it no longer clears.** `stageTwoEdited.test.ts` plays
 stage 2's authored vector — `weights.waitTime: 1`, `weights.loadFactor: 2.25`, found by sweeping
 `loadFactor` on the stage's own tuning seeds — through both batches and pins both halves: it meets
 every bar on the tuning seeds, and on the declared holdout seeds it loses `long-waits-under` (41
@@ -410,13 +411,15 @@ superseded:
    ***seven*** — a denominator the campaign left behind when it grew to ten.
 2. **`docs/10`'s correction is itself stale.** `docs/10:1683-1691` says *"That count is now four …
    Stage 6 clears under `destination-eta` and under `destination-panel`"*. **Stage 6 clears under
-   nothing**, over all thirteen profiles. `campaign/campaign.test.ts` has already inverted its own
+   nothing**, over all thirteen profiles. `campaign/stageSixEscalators.test.ts` (`campaign.test.ts`
+   until #356 split it) has already inverted its own
    stage-6 case and pins the negative; `docs/10` was never re-read against it.
 3. **Stage 5's clearer has moved.** § D161 and `docs/10` name `destination-eta`; the measured clearer
-   is **`eta`**, and `destination-eta` does **not** clear. `campaign.test.ts`'s stage-5 case survives
+   is **`eta`**, and `destination-eta` does **not** clear. `stageFiveClears.test.ts`'s stage-5 case survives
    this untouched, because it was deliberately written as *a search with a stated floor* rather than
    as a pinned profile id — which is that decision earning its keep for the second time.
-4. **A count in a docstring is off by one.** `campaign.test.ts`'s stage-6 case says it sweeps *"all
+4. **A count in a docstring is off by one.** `campaign.test.ts`'s stage-6 case (now
+   `stageSixEscalators.test.ts`) says it sweeps *"all
    twelve shipped profiles"*; there are **thirteen**. The test iterates the array, so it is correct
    and only its prose is wrong.
 
@@ -453,7 +456,7 @@ profiles, both batches, under the post-#255 judge: **six** meet every bar on the
 `answer-the-demand` on the holdout. Five of six apparent clears on this stage were a fit to fifty
 passenger populations, which is the case for the split stated as a measurement rather than as an
 argument. The **DC-2 breach stands** — a shipped dropdown profile still clears stage 5 — and only
-its name changed. `campaign.test.ts` pins the sweep and asserts that the holdout removes somebody,
+its name changed. `stageFiveClears.test.ts` pins the sweep and asserts that the holdout removes somebody,
 so a split that stopped biting would be red rather than quietly decorative.
 
 **Neither correction re-runs the other eight stages**, so the DC-1, DC-2 and DC-2b columns above are
@@ -501,7 +504,7 @@ expressible as demand or fabric or as a stage's `editable` list**, and none is a
 solves precisely because *"publishing which stages are already solved by a dropdown is less flattering
 than not measuring it, and it is the only version a player cannot be misled by."* Adopting DC-2 does
 not delete that honesty — it converts a published measurement into a gate, and the sweep in § 6 is
-what keeps it a measurement afterwards. What DC-2 does change is `campaign.test.ts`'s stage-5 case,
+what keeps it a measurement afterwards. What DC-2 does change is `stageFiveClears.test.ts`'s stage-5 case,
 which asserts today that **at least one** shipped profile clears stage 5. **Under DC-2 that assertion
 inverts**, exactly as the stage-6 case already did, and the clause it was protecting — *is this
 campaign winnable at all?* — moves to DC-3's witness, which is the better home for it: winnability is
@@ -1598,7 +1601,8 @@ the lane that builds it needs no second design pass.
 dead-code audit derives its directory list from disk and asserts it both ways, so a new directory
 holding only test files is a directory with no exports to classify and a change to that audit's
 subject. And each arm's subject already has a suite that loads exactly the `data/` it needs —
-`campaign/campaign.test.ts`, `shift/contracts.test.ts` and `fixit/cases.test.ts` — so three colocated
+`campaign/campaign.test.ts` (its loader is `campaign.test-helper.ts` since #356), `shift/contracts.test.ts`
+and `fixit/cases.test.ts` — so three colocated
 files reuse three loaders rather than writing a fourth. (`shift/week.test.ts` deliberately loads
 nothing: the week is a pure state machine and its suite deep-freezes its input. The week arm belongs
 beside `contracts.test.ts`, which already resolves all five — now eight — buildings.)

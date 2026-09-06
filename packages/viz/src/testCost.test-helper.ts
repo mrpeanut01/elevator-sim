@@ -17,9 +17,22 @@
  *
  * ## The two halves, and why only one of them can be always-on
  *
- * **The census is static.** It reads `packages/<pkg>/src/**.test.ts` and `vitest.config.ts` and needs
- * no clock, so it runs in the ordinary suite and costs milliseconds. Everything it says is a
- * property of the code.
+ * **The census is static.** It reads `packages/<pkg>/src/**.test.ts`, `packages/<pkg>/src/**.test-helper.ts`
+ * and `vitest.config.ts` and needs no clock, so it runs in the ordinary suite and costs milliseconds.
+ * Everything it says is a property of the code.
+ *
+ * **The helpers joined the population on 2026-09-06, and the reason is one annotation.** GitHub
+ * issue #356 split `campaign/campaign.test.ts` and moved its fixture hook — a `beforeAll` closing
+ * `}, 120_000);` — into `campaign/campaign.test-helper.ts`, where every suite that shares the
+ * fixture registers it. Read over `*.test.ts` alone, the census would have reported that annotation
+ * gone: a real bound on a real hook, uncounted, which is exactly the class this deriver was built to
+ * stop. So the population is *every file the `deadCode` scanner calls a test*, and the count that
+ * `vitest.config.ts` states did not move, because the annotation was moved and not removed. Measured
+ * before the change, no `*.test-helper.ts` in any package carried a trailing numeric argument of the
+ * shape this scanner reads, so widening the population changed no figure except by keeping that one.
+ * A helper is attributed to its package's ordinary project by {@link projectOf}, which is right for
+ * the one helper that carries an annotation and is stated as a limit rather than a rule: a helper
+ * whose hooks only browser suites call would be counted against the wrong ceiling, and none exists.
  *
  * **The attribution is a measurement**, and a measurement of a machine as much as of the code. It
  * needs a `--reporter=json` run, which is the leg itself — a test cannot measure the suite it is
@@ -78,7 +91,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { sourceFiles } from './deadCode.test-helper.js';
+import { isTest, sourceFiles } from './deadCode.test-helper.js';
 
 /** The repository root — this file sits at `packages/viz/src/`. */
 export const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -384,7 +397,12 @@ export interface Census {
  */
 export function censusOf(root: string = PACKAGES_DIR, configPath: string = VITEST_CONFIG): Census {
   const ceilings = ceilingsFrom(readFileSync(configPath, 'utf8'));
-  const files = sourceFiles(root).filter((path) => path.endsWith('.test.ts'));
+  /*
+   * Tests **and** test helpers — `deadCode.test-helper.ts#isTest`'s definition rather than a second
+   * one written here. A hook a helper registers on a suite's behalf carries its annotation in the
+   * helper, and the census has to see it there; the file docstring carries the instance.
+   */
+  const files = sourceFiles(root).filter(isTest);
 
   /*
    * Paths are made relative to the **tree being scanned** rather than to this worktree, because

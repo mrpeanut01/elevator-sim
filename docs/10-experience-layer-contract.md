@@ -1687,7 +1687,8 @@ U7.
 > `destination-panel` … `campaign.test.ts` now plays stage 6 at `destination-eta` and asserts the
 > clear, so it cannot go stale silently again."*
 >
-> **Stage 6 clears under nothing.** `campaign.test.ts` was inverted when the claim stopped holding —
+> **Stage 6 clears under nothing.** `campaign.test.ts` (the case is `stageSixEscalators.test.ts` since
+> GitHub issue #356 split the file) was inverted when the claim stopped holding —
 > its own docstring says *"This case asserted that `destination-eta` clears stage 6, and it was true
 > when it was written"* — and now sweeps every shipped profile asserting `cleared` is `false` for
 > all of them, naming `zoned-uppeak` as the closest at 1 metric for and 4 against. The cause is
@@ -1810,7 +1811,8 @@ same unit because both are about turning a shipped surface into something a play
 > The sweep that found it is that sharp — `2.2`, `2.25` and `2.3` clear and `2.35` does not. **The
 > campaign judges on the tuning seeds only, so a live weight editor makes overfitting them the
 > dominant strategy**, and nothing on the shipped surface says so. That is a finding about the
-> campaign rather than about this vector, and it is asserted in `campaign.test.ts` in both
+> campaign rather than about this vector, and it is asserted in `campaign.test.ts` (now
+> `stageTwoEdited.test.ts`) in both
 > directions so the suite carries the unflattering half.
 
 ### W7 — Rider queues and the credential lens *(depends on W1; W7b depends on W2)* — ✅ **DONE 2026-07-29, both halves**

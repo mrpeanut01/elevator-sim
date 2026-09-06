@@ -32240,7 +32240,8 @@ difference between reading the next excursion off a log and re-deriving it from 
 
 **The second finding is the same error committed in prose.** `vitest.config.ts` named two cases as
 *"already past this ceiling under load"* at 490 s and 348 s against 300 s. Both carry an explicit
-per-test timeout overriding the project default — `campaign/campaign.test.ts:866` closes
+per-test timeout overriding the project default — `campaign/campaign.test.ts:866` (since #356's split,
+`campaign/stageFiveClears.test.ts`; the annotation is unchanged) closes
 `}, 3_000_000);` and `campaign/stageSequence.test.ts:187` closes `}, 900_000);` — so the headroom is
 6.1× and 2.6× and neither can produce the red the paragraph predicts. **It is the third stale
 refusal in that one docstring**, after the `experiments` sentence and the `cli` sentence, and it is
@@ -32872,7 +32873,8 @@ Each of the 89 joined to what it governs in run A: **64** to a case by title, **
 of it.** The only thing an over-annotation costs is *failure latency on a hang* — a hung case at
 600 s takes ten minutes to go red instead of five — which is the same trade `SIMULATING_TIMEOUT_MS`'s
 docstring already makes in the paragraph beginning *"What it costs, stated rather than glossed"*.
-The two annotations doing real work are `campaign/campaign.test.ts:866` and
+The two annotations doing real work are `campaign/campaign.test.ts:866` (`stageFiveClears.test.ts`
+since #356's split) and
 `campaign/stageSequence.test.ts:187`, which are the two the retraction that produced this issue
 names.
 

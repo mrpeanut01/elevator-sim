@@ -56,7 +56,8 @@
  * enforced at this layer.
  *
  * **It was not hypothetical, and the campaign suite already carried the witness.**
- * `campaign.test.ts` plays an authored `EditedVector` on stage 2 (`weights.waitTime: 1`,
+ * `stageTwoEdited.test.ts` (`campaign.test.ts` until GitHub issue #356 split it) plays an authored
+ * `EditedVector` on stage 2 (`weights.waitTime: 1`,
  * `weights.loadFactor: 2.25`, found by sweeping `loadFactor` on the stage's own tuning seeds) and
  * pins both halves: it met every goal on the tuning seeds, and on the stage's declared holdout
  * seeds the shipped setting beats it on **three** measures with `beat-the-baseline` resolving
