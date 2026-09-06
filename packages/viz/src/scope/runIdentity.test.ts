@@ -313,6 +313,9 @@ describe('every field the module is asked about has an answer, and no answer is 
     // day somebody remembered, which is the third time this list has recorded that.
     expect(sorted(fieldsAnsweredFor('ranked').map(({ field }) => field))).toEqual([
       'calendar',
+      // `campaignEventId` is the twelfth — GitHub issues #171 and #169 item 1, § D507: the
+      // campaign's own event, which a submission of ids would replay under the week's calendar.
+      'campaignEventId',
       'campaignFitOut',
       'commissioning',
       'interventions',

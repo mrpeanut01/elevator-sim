@@ -33579,3 +33579,74 @@ The viewer's consumer is the daily board tab, which draws the middle under the r
 line with its own count, the withholding in the server's words, the note, and the absent axis with
 its reason. The ghost's use of the median entry id is #226's and is not built here; the id is on
 the wire for it.
+
+---
+
+## D507 — a campaign day's event is the campaign's own, chosen from the contract's calendar and § 8.3's odds on a stream derived from the seed, and § 7.5's dock answers it on the run's own log
+
+**Date: 2026-09-06 · Owner: the integrator, wave V · Rules on: GitHub issues #171 and #169 item 1,
+`campaign/incidents.ts`, `campaign/calendar.ts`, `shift/types.ts#SHIFT_EVENT_IDS`,
+`shift/events.ts#SHIFT_EVENTS`, `dev/state.ts#ViewerState.campaignEventId`,
+`everyday/host.ts#runCampaignDay`, `everyday/host.ts#answerIncident`, `everyday/campaignDock.ts`,
+`everyday/stageScreen.ts`'s dock column, `campaign/career.ts#CAMPAIGN_ABSENCES`,
+`everyday/stageScreenModel.ts#STAGE_ABSENCES`.**
+
+Three decisions that reach past the module that took them, and one correction.
+
+**1. The campaign's two incidents are events in the week's own vocabulary, chosen by the campaign
+and never by the rota.** § 8.11 says incidents arrive from the building. A lift failing its safety
+check is a draw against § 8.3's daily odds (`economy.ts#failureOddsPct`, the figure the desk already
+prints), and a coach party is a line in the contract's authored calendar (`campaign/calendar.ts`,
+today only `c7`, because Crown Hotel's quirk is the only shipped line that promises one). Both are
+added to `SHIFT_EVENT_IDS` and `SHIFT_EVENTS` rather than to a second table, so `events.test.ts`
+runs each against a no-event control, the corpus reads them through the adapters that already
+exist, and a caption cannot describe an effect the engine does not have. `events.ts#eventFor` is
+unchanged and reaches neither. `campaign/incidents.ts#campaignEventFor` is the one chooser:
+calendar first, then the draw, then an ordinary day.
+
+**2. The draw is on a named stream derived from the day's seed, and not on the run's `StreamSet`.**
+CLAUDE.md invariant 2 forbids a global draw; `career.ts` recorded for two waves that no named
+stream existed for a campaign day. It does now, derived with `core`'s `deriveStreamSeed` from the
+run's seed, the contract id and the day, so one seed on two days is two draws. It is deliberately
+not `policyNoise` or any other stream of the run's own set: a draw taken from one of those before
+the run would shift a stochastic dispatcher's sequence and quietly break common random numbers on a
+day the player never touched.
+
+**3. The answer is one press that moves the purse and the record together.** § 7.5's dock composes
+`core`'s `answer-incident` arm from the option's own data — the option's words for the stamp, an
+in-service event for the car it promises, at or after the answer's own second — and
+`everyday/host.ts#answerIncident` applies the money half (`career.ts`'s `answer-incident` action, a
+row in `TowerEconomy.spends`) and the run half (`intervene`) in that order, refusing both when the
+purse refuses. § 8.5: *the dock and the desk read the same purse.* Every option's effect is real or
+the option is not offered: a technician who brings the red-tagged car back, and a works-held car
+brought back for the coach party. The design file's marshal, handover and zoning options are not
+offered — a marshal is a person the engine cannot simulate, and the handover and the parking are
+the stage's own arms one row down, which the dock's footer names rather than duplicating as options
+that would append a different kind of entry. A return the day would end before is refused with the
+reason, because `core` skips an event past its deadline and a paid answer with no effect is § D219's
+defect priced in units.
+
+**4. The correction.** A campaign day used to run under the **week's** event: `shiftRunConfigOf`
+read `scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx)` for every run, so a
+contract's third day ran a move-in because the player's week stood on its third. `ViewerState`
+carries `campaignEventId` now, written only by `runCampaignDay` and cleared where `campaignFitOut`
+is, and the seam reads it before the week's calendar. `scope/surface.ts`, `scope/runIdentity.ts`,
+`scope/probes.test-helper.ts` and `persist.test.ts` each carry the field on `campaignFitOut`'s
+footing.
+
+**What this deletes.** `CAMPAIGN_ABSENCES`' incidents entry and both of `STAGE_ABSENCES`' entries,
+on the commit that made them false (§ D227). `STAGE_ABSENCES` is empty and stays, asserted both
+ways, and the build-information panel says so where its rows were rather than drawing a heading over
+nothing or dropping the section (`buildNotes.ts#REGISTER_EMPTY_LINE`).
+
+**Two assumptions with their reasoning attached, not citations.** The technician's call-out is
+twenty minutes: the first draft said forty-five, and the test that pins the option on the legs found
+it unreachable on every shipped contract length, so the figure is what the shipped contracts can
+hold. The breakdown happens at three tenths of the day, the design's *"this morning"*, so the player
+sees the building whole before losing a car and the loss is a thing that happens on the stage.
+
+**What this does not decide.** Whether a coach party should be a timed burst rather than a day's
+demand — `docs/37` § 5.1 records that the engine has no timed burst, and this entry expresses the
+crowd honestly in the fields the engine has rather than inventing one. And whether a campaign day
+should ever inherit a period from the player's week: the calendar's period asks still apply to a
+campaign day exactly as before, which is unchanged rather than ruled on.

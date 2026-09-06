@@ -1375,6 +1375,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'composition itself against stubs.',
       ids: ['everyday/host.ts#dailyBoardOf'],
     },
+    {
+      reason:
+        'A vocabulary id or a stream name, not prose — GitHub issues #171 and #169 item 1, § D507. ' +
+        '`coach-party` and `campaign-incident` are hyphenated identifiers the derivation reads as ' +
+        'two adjacent words: the first is a `ShiftEventId` the contract calendar files a day under, ' +
+        'the second the name `deriveStreamSeed` mixes into the breakdown draw. Neither reaches a ' +
+        'screen as itself. What a player reads of a calendared or drawn day is ' +
+        '`shift/events.ts#SHIFT_EVENTS`’ name and note, which `EVERYDAY_STAGE` drives through ' +
+        '`campaign/incidents.ts#campaignIncidentOf`, and the two ids here are classified rather ' +
+        'than the scan loosened, on `dailyBoardOf`’s ground above.',
+      ids: [
+        'campaign/calendar.ts#CONTRACT_CALENDAR',
+        'campaign/calendar.ts#calendarDaysOf',
+        'campaign/calendar.ts#calendarEventIdFor',
+        'campaign/incidents.ts#CAMPAIGN_INCIDENT_STREAM',
+        'campaign/incidents.ts#campaignEventFor',
+      ],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));

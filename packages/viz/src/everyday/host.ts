@@ -138,10 +138,18 @@ import {
   towerById,
   type CampaignAction,
   type CampaignCareer,
+  type CampaignTower,
 } from '../campaign/career.js';
-import { DIFFICULTIES } from '../campaign/economy.js';
+import { DIFFICULTIES, purseOf } from '../campaign/economy.js';
 import { fitOutOf } from '../campaign/fitOut.js';
-import { worksHeldCarsOf } from '../campaign/works.js';
+import {
+  answerChangeOf,
+  campaignEventFor,
+  campaignIncidentOf,
+  type CampaignIncident,
+} from '../campaign/incidents.js';
+import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
+import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -368,6 +376,17 @@ export interface EverydayWatchSession {
  * What an Everyday screen may know and do. The exact method list is the contract the six screen
  * lanes build against; the module docstring carries what is deliberately absent.
  */
+/** What § 7.5's dock reads — see {@link EverydayHost.campaignDay}. */
+export interface CampaignDayFacts {
+  readonly tower: CampaignTower;
+  readonly buildingName: string;
+  /** The day's incident, or `undefined` on a day nothing is happening. */
+  readonly incident: CampaignIncident | undefined;
+  readonly runLengthS: number;
+  /** Whether the run's log already carries an answer. */
+  readonly answered: boolean;
+}
+
 export interface EverydayHost {
   /* ---------------------------------------------------------------- reads */
 
@@ -892,6 +911,31 @@ export interface EverydayHost {
   runCampaignDay(towerId: string): void;
 
   /**
+   * § 7.5's dock — the campaign day on the stage, or `undefined` when the day on the stage is not
+   * one (GitHub issue #171, § D507).
+   *
+   * The tower is read from the career on every call, so the purse the dock draws is the purse the
+   * desk would show; the incident is the one `runCampaignDay` described when it pressed the run,
+   * held beside the latch and cleared with it. `answered` is read off the run's own intervention
+   * log rather than latched, because the log is the record and a second flag is a second place to
+   * be wrong.
+   */
+  campaignDay(): CampaignDayFacts | undefined;
+
+  /**
+   * Answer the open incident at the stage's playhead — § 7.5, *"stamped with the simulated time it
+   * was given"*, as one press that moves the purse and the record together.
+   *
+   * Returns the reason it could not, in the dock's own words, or `undefined` when it did. Refused
+   * before the incident is true of the run, on the purse (§ 8.5: *the dock and the desk read the
+   * same purse*), on a second answer, and on a return the day would end before — every one a
+   * sentence rather than a bare disabled button (§ 7.6's fourth rule). The run half is
+   * {@link intervene} with `core`'s `answer-incident` arm, so the stamp and the report's line are
+   * `live/interventions.ts`'s exactly as for a parked car.
+   */
+  answerIncident(atS: number, optionId: string): string | undefined;
+
+  /**
    * Save a drawn building **and stand the next run on it**, answering the id it took.
    *
    * The exact two presses the Engineer building editor's *Save* and *Run it* make, in one call:
@@ -1300,6 +1344,24 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
    * press the run, so a third run press cannot acquire the campaign by forgetting to.
    */
   let campaignDayTowerId: string | undefined;
+  /** The day's incident for the dock — `campaignIncidentOf`'s answer, held beside the latch. */
+  let campaignDayIncident: CampaignIncident | undefined;
+
+  /** {@link EverydayHost.campaignDay}, as a local so `answerIncident` reads the same fold. */
+  const campaignDayFacts = (): CampaignDayFacts | undefined => {
+    const towerId = campaignDayTowerId;
+    if (towerId === undefined) return undefined;
+    const tower = towerById(career, towerId);
+    if (tower === undefined) return undefined;
+    const building = b.resources.buildings.find((entry) => entry.id === tower.buildingId);
+    return {
+      tower,
+      buildingName: building?.name ?? tower.buildingId,
+      incident: campaignDayIncident,
+      runLengthS: shiftLengthForContract(tower.id),
+      answered: b.state().interventions.some((entry) => entry.change.kind === 'answer-incident'),
+    };
+  };
 
   /**
    * The one fold behind {@link EverydayHost.goalsAt} and {@link EverydayHost.goalsToday}.
@@ -1494,11 +1556,14 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
        * doing work a player could see for a change nobody made.
        */
       const kitToClear = b.state().campaignFitOut === undefined ? {} : { campaignFitOut: undefined };
-      const patch = { ...(day === undefined ? {} : wholeDayRun(day)), ...kitToClear };
+      // And the campaign's event, on the same ground one field over — § D507.
+      const eventToClear = b.state().campaignEventId === undefined ? {} : { campaignEventId: undefined };
+      const patch = { ...(day === undefined ? {} : wholeDayRun(day)), ...kitToClear, ...eventToClear };
       if (Object.keys(patch).length > 0) b.applyPatch(patch);
       // § 6's day is not a campaign day — see {@link campaignDayTowerId} for what a stale latch
       // here would file, and against which building.
       campaignDayTowerId = undefined;
+      campaignDayIncident = undefined;
       b.startRun();
     },
     /**
@@ -1534,6 +1599,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       b.closeDay();
       if (towerId === undefined || closedBefore || !b.dayClosed()) return;
       campaignDayTowerId = undefined;
+      campaignDayIncident = undefined;
       const state = b.state();
       const tower = towerById(career, towerId);
       const recording = state.recording;
@@ -1587,10 +1653,12 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
         ...openTomorrowPatch(state.week),
         ...dayPatchFor(b),
         campaignFitOut: undefined,
+        campaignEventId: undefined,
       });
       b.openRunTab();
       // § 6's tomorrow, for the same reason `startRun` clears it — {@link campaignDayTowerId}.
       campaignDayTowerId = undefined;
+      campaignDayIncident = undefined;
       b.startRun();
     },
     setDispatcher: (dispatcherId) => {
@@ -1633,6 +1701,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       if (tower === undefined) return;
       const towerBuilding = b.resources.buildings.find((building) => building.id === tower.buildingId);
       if (towerBuilding === undefined) return;
+      const event = campaignEventFor({ tower, seed: b.state().seed });
       b.applyPatch({
         buildingId: tower.buildingId,
         dispatcherId: tower.dispatcherId,
@@ -1684,11 +1753,57 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
         shiftLengthS: shiftLengthForContract(tower.id),
         /* A contract declares a length and not a part of a day — `scenariosPanel`'s own line. */
         windowStartS: null,
+        /*
+         * **And what happens today** — GitHub issues #171 and #169 item 1, § D507. The contract's
+         * calendar first, then § 8.3's odds on a stream derived from the day's seed, and never the
+         * week's rota; `campaign/incidents.ts` is the one chooser. Written on this press for the
+         * same reason the kit is.
+         */
+        campaignEventId: event.id,
       });
       b.openRunTab();
       // The one place this is armed. See {@link campaignDayTowerId}.
       campaignDayTowerId = towerId;
+      /*
+       * The dock's incident, described from the building the run is built on: the car a breakdown
+       * names is `eventCarChoice`'s over the same bank list `shiftRunConfigOf` hands the derate, so
+       * the caption names the car the run loses. Held beside the latch and cleared with it.
+       */
+      campaignDayIncident = campaignIncidentOf({
+        event,
+        building: towerBuilding,
+        runLengthS: shiftLengthForContract(tower.id),
+        heldCars: worksHeldCarRefsOf(tower, towerBuilding),
+      });
       b.startRun();
+    },
+    campaignDay: campaignDayFacts,
+    answerIncident: (atS, optionId) => {
+      const facts = campaignDayFacts();
+      if (facts === undefined || facts.incident === undefined) return CAMPAIGN_DOCK_COPY.refusedNoIncident;
+      if (facts.answered) return CAMPAIGN_DOCK_COPY.refusedAnswered;
+      const option = facts.incident.options.find((entry) => entry.id === optionId);
+      if (option === undefined) return CAMPAIGN_DOCK_COPY.refusedUnknownOption;
+      if (option.units > purseOf(facts.tower)) return purseRefusalOf(option.units);
+      const composed = answerChangeOf(facts.incident, option, atS, facts.runLengthS);
+      if (composed.kind === 'refused') return composed.reason;
+      if (b.state().recording === undefined) return CAMPAIGN_DOCK_COPY.refusedNoRun;
+      /*
+       * Money first, then the record — and both on one press, which is the whole reason this
+       * method exists rather than two. The reducer refuses on the purse it just checked, so a
+       * refusal there is a race with the desk and the answer must not land on the run either.
+       */
+      const before = career;
+      career = applyCampaignAction(career, {
+        kind: 'answer-incident',
+        towerId: facts.tower.id,
+        units: option.units,
+        label: option.label,
+      });
+      if (option.units > 0 && career === before) return CAMPAIGN_DOCK_COPY.refusedPurse;
+      notifyCampaign();
+      b.intervene(atS, composed.change);
+      return undefined;
     },
     applyBuildingSpec: (spec) => {
       const state = b.state();

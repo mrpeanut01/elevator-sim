@@ -34,10 +34,13 @@
  * kinds are **derivable from the record** and are derived here — a renewal falls due in the last
  * days of a contract (§ 8.9), and a service window falls due when the wear clock says so (§ 8.3).
  * The other two — a lift failing its safety check, a coach party booked in — are **draws against
- * the daily failure odds and against an authored event schedule**, and neither exists: there is no
- * named RNG stream for a campaign day (CLAUDE.md invariant 2 forbids a global one) and no event
- * calendar keyed to a contract. So this build's incidents are the two the state implies, and
- * {@link CAMPAIGN_ABSENCES} says so where a player reads it rather than only here.
+ * the daily failure odds and against an authored event schedule**, and since GitHub issues #171
+ * and #169 (§ D507) both exist one module over: `campaign/incidents.ts#campaignEventFor` draws the
+ * breakdown on a stream derived from the day's seed (CLAUDE.md invariant 2 — a named stream, never
+ * a global one) and reads the coach party off `campaign/calendar.ts`. Those two are *the run's*
+ * incidents rather than the desk's: they happen inside a day and are answered from § 7.5's dock,
+ * so this record carries only the money their answers cost (`economy.ts#IncidentSpend`) and never the
+ * incident itself.
  *
  * ## The career is this session's
  *
@@ -216,7 +219,16 @@ export const SERVICE_AT_TRIPS = 45_000;
  * that is absent must be named.
  */
 export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
-  'Incidents here are the two the building implies — a renewal falling due, and a service window the wear clock has reached. A lift failing its safety check and a coach party booked in are draws this build cannot make: there is no seeded stream for a campaign day and no event calendar behind a contract.',
+  /*
+   * **The incidents entry is deleted, not reworded** — GitHub issues #171 and #169 item 1, § D507.
+   * It read *"A lift failing its safety check and a coach party booked in are draws this build
+   * cannot make: there is no seeded stream for a campaign day and no event calendar behind a
+   * contract."* Both halves stopped being true on the commit that built them:
+   * `campaign/incidents.ts#campaignEventFor` draws against § 8.3's odds on a stream derived from the
+   * day's seed, and `campaign/calendar.ts` is the calendar. A refusal that has stopped being true is
+   * worse than a missing one (§ D227), so the sentence comes out with the mechanism that made it
+   * false, which is what `campaignModel.test.ts`'s register exists to force.
+   */
   /*
    * **This entry is unchanged, and issue #223 is why that is a decision rather than an oversight.**
    *
@@ -288,6 +300,7 @@ export function freshTower(input: {
     difficultyId: input.difficultyId ?? 'standard',
     fitted: {},
     bookings: [],
+    spends: [],
     trips: 0,
     serviceAt: SERVICE_AT_TRIPS,
     refit: 0,
@@ -526,6 +539,12 @@ export type CampaignAction =
   /** § 8.2's desk decision. */
   | { readonly kind: 'answer-need'; readonly towerId: string; readonly optionId: string }
   /**
+   * § 7.5's dock decision — the money half. `units` and `label` are the option's own, carried
+   * rather than looked up because the incident is the *run's* (`everyday/host.ts` holds it beside
+   * the day it belongs to) and this record deliberately does not know which day is on the stage.
+   */
+  | { readonly kind: 'answer-incident'; readonly towerId: string; readonly units: number; readonly label: string }
+  /**
    * § 6.4 step 4 — *"In a campaign run, evaluate the four tests and mark the day cleared or
    * missed"*, as the one thing that moves a contract forward. See {@link fileDay}.
    *
@@ -576,6 +595,7 @@ export function applyCampaignAction(
         missed: 0,
         carry: undefined,
         bookings: [],
+        spends: [],
       }));
     case 'press-tier':
       return pressTier(career, action.towerId, action.categoryId, action.level);
@@ -585,6 +605,8 @@ export function applyCampaignAction(
       return { ...career, pendingBooking: undefined };
     case 'answer-need':
       return answerNeed(career, action.towerId, action.optionId);
+    case 'answer-incident':
+      return answerIncident(career, action.towerId, action.units, action.label);
     case 'file-day':
       return fileDay(career, action.towerId, action.verdict, action.trips);
   }
@@ -854,11 +876,34 @@ function answerNeed(career: CampaignCareer, towerId: string, optionId: string): 
                     },
                   ]
                 : [],
+            /* The month's answers are paid: `carry` above already read the purse they left. */
+            spends: [],
             trips: option.id === 'refurbish' ? 0 : entry.trips,
             refit: option.id === 'refurbish' ? 0 : entry.refit,
           },
     ),
   };
+}
+
+/**
+ * § 7.5's dock decision, applied to the purse — GitHub issue #171, § D507.
+ *
+ * The **run** half of an answer travels on the day's intervention log as an `answer-incident` entry
+ * (`core`'s own arm, stamped at `runIncidentClock`); this is the **money** half, and the two are
+ * pressed together by `everyday/host.ts#answerIncident` so neither can land without the other.
+ * Refused on the same fact the dock dims the row on — § 8.5: *"An option you cannot afford is not
+ * selectable in the dock either. The dock and the desk read the same purse."* A refusal returns the
+ * same career object, which is the façade's convention for *nothing moved*.
+ */
+function answerIncident(career: CampaignCareer, towerId: string, units: number, label: string): CampaignCareer {
+  const tower = towerById(career, towerId);
+  if (tower === undefined) return career;
+  if (!Number.isFinite(units) || units < 0) return career;
+  if (units > purseOf(tower)) return career;
+  return mapTower(career, towerId, (current) => ({
+    ...current,
+    spends: [...current.spends, { day: current.day, units, label }],
+  }));
 }
 
 /**

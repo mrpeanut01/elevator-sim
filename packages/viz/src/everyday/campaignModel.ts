@@ -94,6 +94,7 @@ import {
   wearOf,
   worksDayLine,
 } from '../campaign/economy.js';
+import { calendarDaysOf } from '../campaign/calendar.js';
 import {
   BUILD_IDS,
   BUILD_LABELS,
@@ -625,9 +626,14 @@ export function calendarView(input: CampaignInput): CalendarView {
     rows: input.career.towers.map((tower): CalendarRowView => {
       const facts = factsFor(input, tower);
       const need = needOf(tower);
+      /*
+       * A calendared crowd is a flagged day the player can read before it comes — GitHub issue
+       * #169 item 1, § D507: `campaign/calendar.ts` books it, the design's Crown Hotel fixture marks
+       * it `bad`, and § 8.6's grid already has the glyph for that.
+       */
       const marks = {
         dueDays: need === undefined ? [] : [tower.day],
-        flaggedDays: tower.flaggedDays,
+        flaggedDays: [...new Set([...tower.flaggedDays, ...calendarDaysOf(tower.id)])].sort((a, b) => a - b),
       };
       return {
         towerId: tower.id,

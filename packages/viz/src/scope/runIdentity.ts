@@ -438,6 +438,23 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
         'the data ships',
 
   /**
+   * § 8's campaign event — `campaignFitOut`'s footing, one field over (GitHub issues #171 and
+   * #169 item 1, § D507).
+   *
+   * Asked as *is the field set?* rather than *is the event ordinary?*, and unlike the fabric arm
+   * that is the right question here: a submission of ids replays under the **week's** calendar,
+   * so even a campaign day whose event is `ordinary` would be replayed under whatever the week's
+   * rota says for that day, and a breakdown or a coach party would be replayed against a run that
+   * never had one. `undefined` is the only value that carries, and it is what every non-campaign
+   * path leaves here.
+   */
+  campaignEventId: (state) =>
+    state.campaignEventId === undefined
+      ? undefined
+      : 'this is a § 8 campaign day running under the campaign’s own event, and a submission ' +
+        'carries no event — a replay would run the week’s calendar instead',
+
+  /**
    * The patience curve — the field the UI readiness audit's B4 made reachable.
    *
    * `null` is *nobody leaves*, which is every run this repository has ever published and what

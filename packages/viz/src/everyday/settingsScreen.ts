@@ -134,6 +134,8 @@ function buildNotesPanel(doc: Document): HTMLElement {
     const list = el(doc, 'ul');
     list.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:12px;line-height:1.5;color:${C.warmGrey};max-width:80ch`;
     for (const entry of section.entries) list.append(el(doc, 'li', undefined, entry));
+    /* An emptied register says so where its rows were — `buildNotes.ts#BuildNotesSection.empty`. */
+    if (section.empty !== undefined) list.append(el(doc, 'li', 'everyday-build-notes-empty', section.empty));
     block.append(heading, note, list);
     panel.append(block);
   }

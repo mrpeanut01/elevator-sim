@@ -579,6 +579,21 @@ export interface WorksBooking {
 }
 
 /**
+ * Units an incident's answer cost, on the day it was given — § 7.5's *spent today*.
+ *
+ * A row rather than a running total, for the same reason {@link WorksBooking} is: the purse is
+ * derived from the record and never counted, and *spent today* is a sum over the rows whose `day`
+ * is today. `label` is the option's own words, so the contract sheet can say what the money went
+ * on without a second vocabulary.
+ */
+export interface IncidentSpend {
+  /** 1-based contract day the answer was given on. */
+  readonly day: number;
+  readonly units: number;
+  readonly label: string;
+}
+
+/**
  * What the economy needs to know about one building. `career.ts` holds the whole record; this is
  * the subset every formula below reads, named separately so a formula cannot reach for a field it
  * has no business in.
@@ -603,6 +618,8 @@ export interface TowerEconomy {
   readonly fitted: Readonly<Partial<Record<ShopCategoryId, number>>>;
   /** Every tier bought this month, live or still under works. */
   readonly bookings: readonly WorksBooking[];
+  /** Every incident answered for money this month — § 7.5's dock is the only writer. */
+  readonly spends: readonly IncidentSpend[];
   /** Loaded car departures since the last service window. */
   readonly trips: number;
   /** Trips at which a service window falls due — § 8.3's `serviceAt`, ≈ 45 000. */
@@ -661,7 +678,15 @@ export function carriedIn(tower: TowerEconomy): number {
  * is why this sums the bookings rather than the tiers that have gone live.
  */
 export function committedUnits(tower: TowerEconomy): number {
-  return tower.bookings.reduce((total, booking) => total + booking.units, 0);
+  return (
+    tower.bookings.reduce((total, booking) => total + booking.units, 0) +
+    tower.spends.reduce((total, spend) => total + spend.units, 0)
+  );
+}
+
+/** § 7.5's *spent today* — the incident answers paid for on the tower's current day. */
+export function spentTodayUnits(tower: TowerEconomy): number {
+  return tower.spends.filter((spend) => spend.day === tower.day).reduce((total, spend) => total + spend.units, 0);
 }
 
 /** § 8.1's `purse = max(0, carriedIn + earnedSoFar − committed)`. */

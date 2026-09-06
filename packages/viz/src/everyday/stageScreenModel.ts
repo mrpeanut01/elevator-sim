@@ -72,11 +72,12 @@
  *
  * ## What the stage does not have, and why the absences are named rather than mimed
  *
- * {@link STAGE_ABSENCES}. One is structural — § 7.5's campaign dock needs a `ctx` no route in this
- * build can produce — and one is a control that exists behind a screen nobody has built. (The § 7.4
- * ghost lane was a third until GitHub issue #226 gave this screen a second recording to draw.) Each
- * is a sentence a player reads on the build-information panel (`everyday/buildNotes.ts`), which is the shell
- * register's own precedent applied one screen down: a register nothing renders is read by nobody.
+ * {@link STAGE_ABSENCES} — **empty since GitHub issue #171 (§ D507)**, and kept. It held § 7.5's
+ * dock and § 7.6's third arm until `everyday/campaignDock.ts` and `campaign/incidents.ts` built
+ * both, and the § 7.4 ghost lane before that until issue #226. Each entry was a sentence a player
+ * read on the build-information panel (`everyday/buildNotes.ts`), which is the shell register's own
+ * precedent applied one screen down: a register nothing renders is read by nobody. An empty one is
+ * a state that keeps being checked rather than a rule that can be deleted.
  */
 
 import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
@@ -1051,7 +1052,17 @@ export const STAGE_RACE_PICKER_LABEL = 'Race against';
  * entry rather than re-taking it, is [§ D451](../../../../DECISIONS.md).
  */
 export const STAGE_ABSENCES: readonly string[] = Object.freeze([
-  'no campaign dock — a campaign day reaches this stage, and the money-and-incident panel that belongs beside it is not drawn',
+  /*
+   * **The dock entry and the answer entry are deleted, not reworded** — GitHub issue #171,
+   * § D507. They read *"no campaign dock — a campaign day reaches this stage, and the
+   * money-and-incident panel that belongs beside it is not drawn"* and *"no answer to a live
+   * incident — … over an incident this build does not raise while a day is running"*. Both stopped
+   * being true on one commit: `everyday/campaignDock.ts` is the panel, `stageScreen.ts` draws it
+   * beside the picture when `ctx === 'campaign'`, and `campaign/incidents.ts` raises the incident
+   * the second sentence said nobody raised. The register is empty now, and like
+   * `screens.ts#UNBUILT_REASONS` it stays — an empty table is a state that keeps being checked
+   * rather than a rule that can be deleted (`stageScreenModel.test.ts`).
+   */
   /*
    * **The camera entry is deleted, not reworded** — GitHub issue #324, § D505. It read *"no camera
    * — the cutaway draws the whole building at once, so there is nothing to pan and nothing to
@@ -1060,7 +1071,6 @@ export const STAGE_ABSENCES: readonly string[] = Object.freeze([
    * (`STAGE_CAMERAS`, `stageCameraWindowOf`) and absent on the others, which is what the measurement
    * said the honest control looks like.
    */
-  'no answer to a live incident — a day can carry one, stamped with the moment it was given, and this screen offers none: the answer comes from the money-and-incident panel above, which is not drawn, over an incident this build does not raise while a day is running',
 ]);
 
 /* -------------------------------------------------------------------------- *

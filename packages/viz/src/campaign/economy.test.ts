@@ -73,6 +73,7 @@ function tower(patch: Partial<TowerEconomy> = {}): TowerEconomy {
     difficultyId: 'standard',
     fitted: {},
     bookings: [],
+    spends: [],
     trips: 0,
     serviceAt: 45_000,
     refit: 0,
