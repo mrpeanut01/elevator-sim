@@ -135,6 +135,17 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    */
   dailyRowWithheld: 'no count',
   /*
+   * The house's rows — GitHub issue #222, § D521. A tag on the row and one note under the board's
+   * own. The note says the three things a reader could otherwise get wrong: nobody played these,
+   * they are here so the board is never empty, and they do not rank the dispatchers — one crowd,
+   * one seed, one run each is exactly the shape this project refuses to draw a conclusion from.
+   */
+  dailyHouseTag: 'house',
+  dailyHouseNote:
+    'Rows marked house are the game’s own runs, one per shipped dispatcher on today’s crowd, posted ' +
+    'so the board is never empty. Nobody played them, and they do not rank the dispatchers: one ' +
+    'crowd, one run each. Beat one and you have beaten a machine on the same arrivals.',
+  /*
    * § D509 — the reset policy, said before a rating is earned (GitHub issue #252). Two clocks and
    * two sentences: the daily board is one date and resets by construction; the ladder is a standing
    * rating over forty fixed cases and never resets, decays or deletes a verified run.
@@ -635,13 +646,23 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
       place.style.cssText = `font:600 12px ${TYPE.mono};color:${C.label};min-width:2ch`;
       const who = el(doc, 'span', entry.displayName);
       who.style.cssText = 'flex:1';
+      if (entry.house !== undefined) {
+        /* § D521's marker: a run nobody played, said on the row and not only in the note. */
+        const house = el(doc, 'span', entry.house);
+        house.className = 'everyday-board-row-house';
+        house.style.cssText = `font:600 10px ${TYPE.mono};letter-spacing:.12em;text-transform:uppercase;color:${C.label};border:1px solid ${C.rule};border-radius:${String(R.control)}px;padding:1px 6px`;
+        row.append(place, house);
+        row.append(who);
+      } else {
+        row.append(place, who);
+      }
       /* GitHub issue #93: who drove it, beside the name, and the player's own gap after the figure. */
       const driver = el(doc, 'span', entry.driver);
       driver.className = 'everyday-board-row-driver';
       driver.style.cssText = `font-size:11.5px;color:${C.label}`;
       const wait = el(doc, 'span', entry.figure);
       wait.style.cssText = `font:600 13px ${TYPE.mono}`;
-      row.append(place, who, driver, wait);
+      row.append(driver, wait);
       if (entry.gap !== '') {
         const gap = el(doc, 'span', entry.gap);
         gap.className = 'everyday-board-row-gap';
@@ -864,6 +885,8 @@ export interface DailyBoardRowView {
   readonly gap: string;
   /** The mean wait, or the withholding sentence when this row carries no count. */
   readonly figure: string;
+  /** `BOARD_SCREEN_COPY.dailyHouseTag` on a row the house posted, `undefined` on a player's — § D521. */
+  readonly house: string | undefined;
   /**
    * The `n` behind {@link figure}, in the row's own box — R13 clause one.
    *
@@ -1022,7 +1045,9 @@ export function dailyBoardViewOf(
         };
       }
       return {
-        lines: [note],
+        lines: board.rows.some((entry) => entry.baselineProfileId !== undefined)
+          ? [note, { text: BOARD_SCREEN_COPY.dailyHouseNote, className: 'everyday-board-house-note', role: 'note' }]
+          : [note],
         /*
          * One figure per row, and it is the one the board is ranked on. A row carrying more would
          * invite a comparison the ranking does not make, and `dataHash` — which says whether
@@ -1036,15 +1061,21 @@ export function dailyBoardViewOf(
          */
         rows: board.rows.map((entry, index) => ({
           id: entry.id,
-          watch: ownDisplayName !== undefined && entry.displayName === ownDisplayName ? 'yours' : 'watch',
+          /* A house row is never the player's own, whatever they are called (§ D521). */
+          watch:
+            entry.baselineProfileId === undefined && ownDisplayName !== undefined && entry.displayName === ownDisplayName
+              ? 'yours'
+              : 'watch',
           place: String(index + 1),
           displayName: entry.displayName,
+          house: entry.baselineProfileId === undefined ? undefined : BOARD_SCREEN_COPY.dailyHouseTag,
           driver: dispatcherNameOf(entry.run.dispatcherProfileId) ?? entry.run.dispatcherProfileId,
           /*
            * The gap is the player's own and nobody else's, and only between two published figures:
            * a withheld mean has no distance from anything (R3), and the top row's own gap is `''`.
            */
           gap:
+            entry.baselineProfileId === undefined &&
             ownDisplayName !== undefined &&
             entry.displayName === ownDisplayName &&
             entry.legs !== undefined &&

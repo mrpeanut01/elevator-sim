@@ -346,6 +346,36 @@ describe('the leaderboard client', () => {
     // composite score with nothing on screen saying it should not.
     expect(result.value.note).toMatch(/never combined/u);
   });
+
+  it('carries the house’s dispatcher on a seeded row and nothing on a player’s — GitHub issue #222, § D521', async () => {
+    const row = {
+      id: 'r',
+      displayName: 'The house',
+      run: { buildingId: 'b', dispatcherProfileId: 'collective', demandTemplateId: 't', arrivalRatePctPop5min: null, durationS: 900, windowStartS: null, seed: '1' },
+      dataHash: 'h',
+      measured: { awtS: 1, wt95S: 2, ttdMeanS: 3, pctOverLongWait: 0, awtIsValid: true },
+      legs: 10,
+      submittedAtMs: 0,
+    };
+    const { transport } = scripted({
+      status: 200,
+      body: {
+        configHash: 'abc',
+        metric: 'awtS',
+        note: 'n',
+        entries: [
+          { ...row, baselineProfileId: 'collective' },
+          { ...row, id: 'p', displayName: 'Ada' },
+          /* A server that sent something other than a name says nothing: the row is a player's. */
+          { ...row, id: 'q', displayName: 'Bo', baselineProfileId: '' },
+        ],
+      },
+    });
+    const result = await createClient('https://x', transport).board('abc', 'awtS');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.entries.map((entry) => entry.baselineProfileId)).toEqual(['collective', undefined, undefined]);
+  });
 });
 
 /* -------------------------------------------------------------------------- *

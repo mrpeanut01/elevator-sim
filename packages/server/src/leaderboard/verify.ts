@@ -298,21 +298,30 @@ export function metricsAgree(left: ClaimedMetrics, right: ClaimedMetrics): boole
  * a player whose queue diverged should be told that — not told their arithmetic disagrees with the
  * server's, which it does not.
  */
-export function verifySubmission(
-  submission: Submission,
+/**
+ * The server's own replay of a run, measured — the half of {@link verifySubmission} that has no
+ * claim in it, and the whole of what a **baseline** row needs (GitHub issue #222, § D521): the
+ * house does not claim, it measures.
+ *
+ * Same three refusals as the submission path, in the same words, so a seeded row and a posted row
+ * are refused on identical grounds. The fourth refusal — the claim not reproducing — has no
+ * subject here.
+ */
+export function measureRun(
+  run: SubmittedRun,
   resources: VerificationResources,
-): Verification {
-  const config = configFor(submission.run, resources);
+): { readonly ok: true; readonly measured: ClaimedMetrics; readonly legs: number } | VerificationRejected {
+  const config = configFor(run, resources);
   if (typeof config === 'string') {
     return {
       ok: false,
       code: config,
       detail:
         config === 'unknown-building'
-          ? `This server does not ship a building "${submission.run.buildingId}".`
+          ? `This server does not ship a building "${run.buildingId}".`
           : config === 'unknown-dispatcher'
-            ? `This server does not ship a dispatcher "${submission.run.dispatcherProfileId}".`
-            : `This server does not ship a demand template "${submission.run.demandTemplateId}".`,
+            ? `This server does not ship a dispatcher "${run.dispatcherProfileId}".`
+            : `This server does not ship a demand template "${run.demandTemplateId}".`,
     };
   }
 
@@ -342,7 +351,17 @@ export function verifySubmission(
     };
   }
 
-  if (!metricsAgree(submission.claimed, measured)) {
+  return { ok: true, measured, legs: summary.waiting.count };
+}
+
+export function verifySubmission(
+  submission: Submission,
+  resources: VerificationResources,
+): Verification {
+  const replayed = measureRun(submission.run, resources);
+  if (!replayed.ok) return replayed;
+
+  if (!metricsAgree(submission.claimed, replayed.measured)) {
     return {
       ok: false,
       code: 'metrics-do-not-reproduce',
@@ -352,5 +371,5 @@ export function verifySubmission(
     };
   }
 
-  return { ok: true, measured, legs: summary.waiting.count };
+  return { ok: true, measured: replayed.measured, legs: replayed.legs };
 }

@@ -240,3 +240,44 @@ describe('the daily board tab', () => {
     expect(drawn.join(' ')).not.toContain('hash');
   });
 });
+
+describe('the house’s rows — GitHub issue #222, § D521', () => {
+  const house = (awtS: number, dispatcher: string): BoardEntry => ({
+    ...entry('The house', awtS),
+    id: `row-house-${dispatcher}`,
+    baselineProfileId: dispatcher,
+    run: { ...entry('The house', awtS).run, dispatcherProfileId: dispatcher },
+  });
+  const board = {
+    kind: 'board' as const,
+    date: '2026-09-06',
+    note: 'One crowd.',
+    distribution: undefined,
+    distributionDetail: undefined,
+    rows: [house(19.8, 'collective'), entry('Ada', 21.4), house(31, 'eta')],
+  };
+
+  it('tags a house row, says the note once under the board’s own, and tags no player’s row', () => {
+    const view = dailyBoardViewOf(board, 'Ada', (id) => id);
+    expect(view.rows.map((row) => row.house)).toEqual([BOARD_SCREEN_COPY.dailyHouseTag, undefined, BOARD_SCREEN_COPY.dailyHouseTag]);
+    expect(view.lines.map((line) => line.className)).toEqual(['everyday-board-note', 'everyday-board-house-note']);
+    expect(view.lines[1]?.text).toBe(BOARD_SCREEN_COPY.dailyHouseNote);
+    /* Nobody played these, and the note may not read as a ranking of dispatchers. */
+    expect(BOARD_SCREEN_COPY.dailyHouseNote).toMatch(/Nobody played them/u);
+    expect(BOARD_SCREEN_COPY.dailyHouseNote).toMatch(/do not rank the dispatchers/u);
+  });
+
+  it('never treats a house row as the player’s own, even under the player’s name, and draws no gap on it', () => {
+    const named = { ...board, rows: [{ ...house(19.8, 'collective'), displayName: 'Ada' }, entry('Ada', 21.4)] };
+    const view = dailyBoardViewOf(named, 'Ada', (id) => id);
+    expect(view.rows[0]?.watch).toBe('watch');
+    expect(view.rows[0]?.gap).toBe('');
+    expect(view.rows[1]?.watch).toBe('yours');
+  });
+
+  it('draws no house note on a board with no house row', () => {
+    const view = dailyBoardViewOf({ ...board, rows: [entry('Ada', 21.4)] }, undefined, (id) => id);
+    expect(view.lines.map((line) => line.className)).toEqual(['everyday-board-note']);
+    expect(view.rows[0]?.house).toBeUndefined();
+  });
+});

@@ -64,7 +64,7 @@ import { refusalsBeside, type CommissioningReview } from '../commissioning/refus
 import { movedChoiceText } from '../commissioning/choices.js';
 
 import type { ChallengeBoardPage, ChallengeView } from './challenge.js';
-import type { BoardPage, RunSubmission } from './client.js';
+import type { BoardEntry, BoardPage, RunSubmission } from './client.js';
 import {
   BEATING_NOTE,
   BEAT_LABEL,
@@ -2115,6 +2115,15 @@ const COMMISSIONING_BRIEF =
 
 /* ------------------------------------------------------------- leaderboard */
 
+/**
+ * Who a board row is — the display name, with `house` on a row the server seeded (GitHub issue
+ * #222, § D521) so the Engineer board says the same thing the Everyday one does: a run nobody
+ * played, labelled as such wherever it is drawn.
+ */
+function whoOf(entry: BoardEntry): string {
+  return entry.baselineProfileId === undefined ? entry.displayName : `${entry.displayName} (house)`;
+}
+
 function leaderboardBody(input: MenuViewInput): Body {
   const boards = input.boards ?? [];
   const rows: MenuAffordance[] = boards.map((board) => ({
@@ -2164,8 +2173,8 @@ function leaderboardBody(input: MenuViewInput): Body {
       id: `leaderboard.beat.${String(index)}`,
       label:
         variation === undefined
-          ? `${BEAT_LABEL} — ${entry.displayName}`
-          : `${BEAT_LABEL} — ${entry.displayName} · ${variation.named}`,
+          ? `${BEAT_LABEL} — ${whoOf(entry)}`
+          : `${BEAT_LABEL} — ${whoOf(entry)} · ${variation.named}`,
       detail: beatDetailOf(entry.run, variation),
       kind: 'commit' as const,
       // Every field of the row is the run's identity, hashed into the board it came from. Same scope

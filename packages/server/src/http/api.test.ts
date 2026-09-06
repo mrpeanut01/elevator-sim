@@ -1441,3 +1441,63 @@ describe('two players reaching for the same name at the same moment', () => {
     expect(JSON.stringify(response.body)).not.toMatch(/duplicate key|constraint|users_display_name/u);
   }, 60_000);
 });
+
+describe('POST /api/boards/seed — GitHub issues #222 and #328, § D521 and § D522', () => {
+  it('answers 503 on a deployment that holds no seed token, whoever asks', async () => {
+    const response = await call('POST', '/api/boards/seed', { body: {}, token: 'anything' });
+    expect(response.status).toBe(503);
+    expect(bodyOf(response)['error']).toBe('seeding-not-configured');
+  });
+
+  it('refuses a short token at boot rather than serving a guessable route', async () => {
+    await expect(
+      bootstrap({
+        dataDir: DATA_DIR,
+        sql: new PgliteSql(),
+        env: { ELEVATOR_SIM_SECRET: SECRET, ELEVATOR_SIM_SEED_TOKEN: 'short' },
+        publicOrigin: 'https://elevator.example',
+        now: () => clock,
+        mailer: outbox,
+      }),
+    ).rejects.toThrow(/ELEVATOR_SIM_SEED_TOKEN/u);
+  });
+
+  it('with a token: 401 on a mismatch, 400 on a bad date, and 200 with every row named and the board carrying the house', async () => {
+    const seedToken = 'seed-token-with-at-least-thirty-two-characters';
+    const sql = new PgliteSql();
+    const seeded = await bootstrap({
+      dataDir: DATA_DIR,
+      sql,
+      env: { ELEVATOR_SIM_SECRET: SECRET, ELEVATOR_SIM_SEED_TOKEN: seedToken },
+      publicOrigin: 'https://elevator.example',
+      now: () => clock,
+      mailer: outbox,
+    });
+    try {
+      const ask = (options: { body?: unknown; token?: string; query?: Record<string, string> } = {}, method = 'POST', path = '/api/boards/seed'): Promise<ApiResponse> =>
+        seeded.api({ method, path, query: new Map(Object.entries(options.query ?? {})), body: options.body, token: options.token, clientIp: '203.0.113.9' });
+
+      expect((await ask({ body: {} })).status).toBe(401);
+      expect((await ask({ body: {}, token: `${seedToken}x` })).status).toBe(401);
+      expect((await ask({ body: { date: 'yesterday' }, token: seedToken })).status).toBe(400);
+
+      const response = await ask({ body: { date: '2026-09-06' }, token: seedToken });
+      expect(response.status).toBe(200);
+      const report = bodyOf(response);
+      expect(report['boardKey']).toBe('daily:2026-09-06');
+      const seededRows = report['seeded'] as readonly { dispatcherProfileId: string }[];
+      const skipped = report['skipped'] as readonly { dispatcherProfileId: string; code: string }[];
+      expect(seededRows.length + skipped.length).toBe(seeded.config.dispatcherProfiles.profiles.length);
+      expect(skipped.map((row) => row.dispatcherProfileId)).toContain('nearest-car');
+
+      /* The board the client reads carries the house's dispatcher on each row, and nothing on a player's. */
+      const board = await ask({ query: { board: 'daily:2026-09-06', metric: 'awtS', limit: '100' } }, 'GET', '/api/board');
+      expect(board.status).toBe(200);
+      const rows = bodyOf(board)['entries'] as readonly Record<string, unknown>[];
+      expect(rows.length).toBe(seededRows.length);
+      for (const row of rows) expect(typeof row['baselineProfileId']).toBe('string');
+    } finally {
+      await seeded.close();
+    }
+  }, 600_000);
+});

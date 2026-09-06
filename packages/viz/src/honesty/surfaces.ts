@@ -9928,10 +9928,13 @@ function placeholderBoardEntry(
   awtS: number,
   /** `null` is *the server sent no count*. Not `undefined`: that takes the default. */
   legs: number | null = 312,
+  /** The house's dispatcher on a seeded baseline row — GitHub issue #222, § D521. */
+  baselineProfileId: string | undefined = undefined,
 ): BoardEntry {
   return {
-    id: `row-${displayName}`,
+    id: `row-${displayName}${baselineProfileId === undefined ? '' : `-${baselineProfileId}`}`,
     displayName,
+    ...(baselineProfileId === undefined ? {} : { baselineProfileId }),
     run: {
       buildingId: 'midtown-office',
       dispatcherProfileId: 'eta',
@@ -10283,6 +10286,25 @@ const GAUNTLET: SurfaceAdapter = {
              * it can come from before and after the field existed.
              */
             placeholderBoardEntry('K. Lovelace', 34.2, null),
+          ],
+        },
+      ],
+      /*
+       * A board the house has seeded — GitHub issue #222, § D521 — so the row tag and the house note
+       * are swept beside two players' rows, and the player's own row is still theirs with a house row
+       * above it.
+       */
+      [
+        'house',
+        {
+          kind: 'board',
+          date: '2026-09-02',
+          note: BOARD_NOTE,
+          distribution: undefined, distributionDetail: undefined, rows: [
+            placeholderBoardEntry('The house', 19.8, 312, 'collective'),
+            placeholderBoardEntry('A. Turing', 21.4),
+            placeholderBoardEntry('G. Hopper', 29.5),
+            placeholderBoardEntry('The house', 31.0, 312, 'auction-multi-round'),
           ],
         },
       ],

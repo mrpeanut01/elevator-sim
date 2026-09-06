@@ -1,0 +1,68 @@
+# Seed today's daily board with the house's runs — GitHub issues #222 and #328, § D521 and § D522.
+#
+# Board identity rolls over by UTC date, so "when a new board opens" is a time and not a request,
+# and the API runs at `minReplicas: 0` with nothing executing between requests. This workflow is the
+# clock: ten minutes past midnight UTC it calls the deployed API's authenticated seed route, which
+# replays the day's fixture under every shipped dispatcher through the verifier's own path and posts
+# one row per quotable run, labelled as the house's. The route is idempotent by the store's conflict
+# key, so a re-run on the same date moves nothing — asserted in `leaderboard/seed.test.ts`.
+#
+# Why a scheduled workflow and not a platform timer: it is the cheapest of the three shapes #328
+# names, it needs no change to the deployment, and a failed run is a red workflow the repository
+# already surfaces — which is #328's third clause until #242 gives alerts a destination. The cost is
+# a secret in CI, so the token authorises this one route and nothing else (`bootstrap.ts`).
+#
+# What it needs, and refuses to run without: the repository variable `ELEVATOR_SIM_API_ORIGIN`
+# (already set for the deploy) and the secret `ELEVATOR_SIM_SEED_TOKEN`, the same value the API
+# holds in its environment. The response is printed whole so the run's log names every row seeded
+# and every dispatcher skipped with the verifier's reason — and so a lagging image shows up as a
+# route that answers 404, which is the visibility #328 asked for.
+name: seed-boards
+
+on:
+  schedule:
+    - cron: '10 0 * * *'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Board date to seed (YYYY-MM-DD); empty means today in UTC'
+        required: false
+        default: ''
+
+concurrency:
+  group: seed-boards
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    name: seed today's board
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Refuse to run unconfigured
+        env:
+          ORIGIN: ${{ vars.ELEVATOR_SIM_API_ORIGIN }}
+          TOKEN: ${{ secrets.ELEVATOR_SIM_SEED_TOKEN }}
+        run: |
+          if [ -z "$ORIGIN" ]; then echo "::error::vars.ELEVATOR_SIM_API_ORIGIN is not set"; exit 1; fi
+          if [ -z "$TOKEN" ]; then echo "::error::secrets.ELEVATOR_SIM_SEED_TOKEN is not set"; exit 1; fi
+      - name: Seed
+        env:
+          ORIGIN: ${{ vars.ELEVATOR_SIM_API_ORIGIN }}
+          TOKEN: ${{ secrets.ELEVATOR_SIM_SEED_TOKEN }}
+          DATE: ${{ inputs.date }}
+        run: |
+          set -euo pipefail
+          if [ -n "$DATE" ]; then body="{\"date\":\"$DATE\"}"; else body='{}'; fi
+          status=$(curl -sS --max-time 600 -o response.json -w '%{http_code}' \
+            -X POST "$ORIGIN/api/boards/seed" \
+            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            --data "$body")
+          echo "HTTP $status"
+          cat response.json; echo
+          if [ "$status" != "200" ]; then
+            echo "::error::seeding answered HTTP $status — a 404 is an API image that predates the route; a 503 is a deployment with no ELEVATOR_SIM_SEED_TOKEN"
+            exit 1
+          fi
+          seeded=$(node -e 'const r=JSON.parse(require("fs").readFileSync("response.json","utf8"));console.log(r.seeded.length)')
+          if [ "$seeded" = "0" ]; then echo "::error::no row was seeded"; exit 1; fi

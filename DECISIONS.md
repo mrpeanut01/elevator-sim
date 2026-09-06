@@ -34153,3 +34153,83 @@ the instrument in enough detail to build without a second design pass.
 because it asks whether a stage can be won and this asks whether the dropdown can win it; under C2
 that assertion inverts, as § 3.3 predicts. The 45 admitted cells here are without the baseline
 arm; § 3.1's 77 counted the control on every stage.
+
+## D521 — The house seeds a daily board: one replayable run per shipped dispatcher, posted by a reserved account, marked on the row, counted by no ladder
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #222.**
+
+**Context.** *"A leaderboard with nobody on it does not create competitive pull; it creates the
+impression the game has no players."* Every entry in the store requires a user and the table had no
+column telling a seeded row from a player's, so the first thing #222 needed was a row identity, and
+the issue's own re-verification said the choice was between a reserved synthetic user and a
+dedicated column. Both, it turns out: the constraint `entries.user_id NOT NULL REFERENCES users` is
+worth keeping, and a name a player could choose is not an identity.
+
+**Decision.**
+
+1. **A column, nullable, and a reserved account.** Migration 2 adds `entries.baseline_profile_id`,
+   `NULL` on every row a player ever posted and the dispatcher's id on a row the house posted. The
+   house is `users.id = 'house'`, display name *The house*, address under `.invalid` so no sign-in
+   link can ever reach it, inserted on every `Store.open` and idempotent by its fixed id. A baseline
+   goes through `recordEntry` exactly as a player's run does; the column is the one thing that tells
+   them apart, and it is on the wire as `baselineProfileId`.
+2. **A baseline is a run, measured by the verifier's own replay.** `verify.ts#measureRun` is the
+   half of `verifySubmission` with no claim in it, and `leaderboard/seed.ts#seedDailyBoard` runs the
+   day's fixture under every shipped dispatcher through it. A dispatcher whose mean is not quotable
+   is **not posted** and is reported with the verifier's sentence — `nearest-car` on the daily
+   fixture is measured `awtIsValid: false` — because the board would otherwise carry a figure the
+   rest of the project suppresses. A client's *Watch it* replays a house row exactly as it replays a
+   player's.
+3. **The ranking keeps one row per (player, baseline dispatcher); the ladder counts players only.**
+   `Store.board`'s `DISTINCT ON` widens to `(user_id, baseline_profile_id)` so thirteen house runs
+   are thirteen targets rather than one, and `axisObservations` excludes the house, because the
+   world figures' `n` is *players who posted*.
+4. **Said on the row and under the board, and never as a ranking of dispatchers.** The Everyday
+   board tags each house row and draws one note: nobody played these, they are here so the board is
+   never empty, and one crowd, one seed, one run each does not order the dispatchers. The Engineer
+   board appends *(house)* to the name. A house row is never the player's own, whatever the player
+   is called, and carries no gap.
+
+**Consequences.** Idempotent by the store's conflict key: each dispatcher's data hash differs, so a
+second seeding of the same date updates thirteen rows in place, which `seed.test.ts` asserts by
+entry id. What runs it on a clock is § D522.
+
+
+## D522 — A scheduled workflow calls an authenticated seed route: the cheapest of the three shapes, with its cost named
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #328.**
+
+**Context.** Nothing executed on the server when nobody was looking: the API is request-driven and
+runs at `minReplicas: 0`. Board identity rolls over by UTC date, so #222's *seeded when a new board
+opens* is a time and not a request, and #248's *a failure to generate a day raises an alert* has
+nothing to raise it. The issue named three mechanisms and asked for the choice to be made
+deliberately: a scheduled container job, a platform timer, or a scheduled GitHub Actions workflow
+calling an authenticated route.
+
+**Decision.** The third. `.github/workflows/seed-boards.yml` fires at 00:10 UTC daily and on
+dispatch, and calls `POST /api/boards/seed` on the deployed API with a bearer token.
+
+- **The route is gated twice.** A deployment holding no `ELEVATOR_SIM_SEED_TOKEN` answers 503 to
+  everyone: seeding is a capability an operator turns on. With one, the bearer is compared in
+  constant time and a mismatch is 401. The token is a second secret rather than the signing one, so
+  the workflow that holds it can seed a board and do nothing else, and `bootstrap.ts` refuses one
+  shorter than 32 characters because the route runs thirteen simulations.
+- **Synchronous, because the cost was measured.** One replay of the daily fixture is 1.2 to 1.6 s on
+  one worker, so thirteen are about twenty seconds, well inside any ingress timeout, and a route
+  that answers when it is done is one whose failure is a non-200 the caller sees.
+- **Idempotent across a repeated firing**, by the store's conflict key (§ D521), asserted in
+  `seed.test.ts` by entry id; the workflow's `concurrency` group refuses to overlap itself.
+- **Observable where a human will see it.** The workflow fails on a non-200 and on a report that
+  seeded nothing, and prints the response whole, so the log names every row and every skipped
+  dispatcher with the verifier's reason. #242 owns where an alert goes; this is the thing that runs
+  to raise one. A lagging image shows up as a 404 on the route, which is the visibility #328 asked
+  for and the reason the error text says so.
+- **The cost, named.** A secret in CI, outside the deployment boundary. The other two shapes keep it
+  inside and need infrastructure this repository deploys by hand; if the API ever gets a rebuild on
+  push, a platform timer is the shape to move to, and the route stays the same.
+
+**Consequences.** #222 AC5 and #248 AC5 can each name this workflow as their means. What it needs
+before it runs for real is the repository variable `ELEVATOR_SIM_API_ORIGIN`, which the deploy
+already sets, and the secret `ELEVATOR_SIM_SEED_TOKEN` matching the API's environment; unset, the
+workflow refuses to run rather than failing halfway. `docs/16` § 10 is the operator's page.
+
