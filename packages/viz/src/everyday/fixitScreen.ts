@@ -114,6 +114,7 @@ import {
 } from '../fixit/run.js';
 import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
 import type { VizRecording } from '../contract/types.js';
+import { mountAsBuiltStage, type AsBuiltStage } from './asBuiltStage.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 import { actionBarFor } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
@@ -158,6 +159,14 @@ interface CaseSession {
   outcome: FixitOutcome | undefined;
   /** The as-built run the four figures are measurements of — cached per case, once it lands. */
   asBuilt: VizRecording | undefined;
+  /**
+   * Whether the player has watched the as-built run to its end or skipped it — GitHub issue #348.
+   * The four figures are stated only after; a case re-opened later opens on the figures, because
+   * the sight was seen once and a mode that replayed it on every visit would be a toll.
+   */
+  asBuiltSeen: boolean;
+  /** The mounted as-built stage, kept across redraws so a toggled repair does not restart it. */
+  asBuiltStage: AsBuiltStage | undefined;
 }
 
 interface LoadedFixit {
@@ -248,6 +257,8 @@ function ensureRestored(): void {
       fixed: true,
       outcome: undefined,
       asBuilt: undefined,
+      asBuiltSeen: false,
+      asBuiltStage: undefined,
     });
   }
 }
@@ -275,7 +286,14 @@ function keepSolved(): void {
 function sessionOf(entry: FixitCase): CaseSession {
   let session = sessions.get(entry.id);
   if (session === undefined) {
-    session = { state: emptyFixitState(), fixed: false, outcome: undefined, asBuilt: undefined };
+    session = {
+      state: emptyFixitState(),
+      fixed: false,
+      outcome: undefined,
+      asBuilt: undefined,
+      asBuiltSeen: false,
+      asBuiltStage: undefined,
+    };
     sessions.set(entry.id, session);
   }
   return session;
@@ -597,7 +615,29 @@ function mountFixit(
     }
     main.append(asBuilt);
 
-    /* -- 3. the four figures, measured on the as-built run -- */
+    /*
+     * -- 2b. the as-built run, played, before the figures are stated — GitHub issue #348, PM-FB1.
+     * Mounted once per case on the recording the figures are read from, re-appended on every
+     * redraw so a toggled repair does not restart it, and gone once watched or skipped.
+     */
+    if (session.asBuilt !== undefined && !session.asBuiltSeen) {
+      const recording = session.asBuilt;
+      session.asBuiltStage ??= mountAsBuiltStage(doc, {
+        recording,
+        speedSimPerRealS: everydayProfileStore().defaultSpeed(),
+        copy: { eyebrow: COPY.asBuiltStageEyebrow, note: COPY.asBuiltStageNote, skip: COPY.asBuiltStageSkip },
+        onDone: () => {
+          const current = sessionOf(entry);
+          current.asBuiltSeen = true;
+          current.asBuiltStage?.dispose();
+          current.asBuiltStage = undefined;
+          live?.redraw();
+        },
+      });
+      main.append(session.asBuiltStage.root);
+    }
+
+    /* -- 3. the four figures, measured on the as-built run — stated after the run is seen -- */
     const figures = el(doc, 'div', 'everyday-fixit-figures');
     figures.style.cssText = [
       'display:grid',
@@ -628,7 +668,7 @@ function mountFixit(
       figures.append(measuring);
     }
     for (const figure of
-      session.asBuilt === undefined ? [] : figureValuesOf(entry, session.asBuilt)) {
+      session.asBuilt === undefined || !session.asBuiltSeen ? [] : figureValuesOf(entry, session.asBuilt)) {
       const card = el(doc, 'div', 'everyday-fixit-figure');
       card.style.cssText = [
         `border:1px solid ${C.rule}`,

@@ -708,11 +708,14 @@ change — making the player guess the fault — is refused.
 
 **The mode already holds a complete recording of the building failing, and draws a diagram instead.**
 
-`everyday/fixitScreen.ts:335-343` runs the as-built configuration **when the case opens** —
-`session.asBuilt = recordRun(plan.asBuilt, { recordDecisions: false })`, synchronously, at the
-~0.5–1.5 s the module's own docstring prices it at — because `fixit/run.ts#figureValuesOf` computes
-the four opening figures from that run's legs. The docstring says it outright: *"The four figures —
-computed from the as-built run, never authored."*
+`everyday/fixitScreen.ts#measureAsBuilt` runs the as-built configuration **when the case opens**
+— *asynchronously*, on the off-thread runner (`runner.start({ … onDone })`), landing the recording
+on `sessionOf(entry).asBuilt` — because `fixit/run.ts#figureValuesOf` computes the four opening
+figures from that run's legs. The docstring says it outright: *"The four figures — computed from
+the as-built run, never authored."* *(This paragraph used to quote `:335-343` and call the run
+**synchronous**; GitHub issue #348's routing found the code had moved and the adverb was wrong,
+and it is corrected here on the commit that built the row — § 4.1's own lesson, cited by symbol
+rather than by a line number.)*
 
 **So a full `VizRecording` of the failing morning exists on the screen, and four numbers are read out
 of it before it is dropped.** Constraint 2 for this mode costs a renderer mount and a transport, not
@@ -1073,7 +1076,7 @@ of work rather than by section. Every row names the rule that asks for it.
 
 | # | rule | change | where | size |
 |---|---|---|---|---|
-| 1 | `PM-FB1` | Mount a stage over `session.asBuilt.recording` on the fix-case screen, above the four figures | `everyday/fixitScreen.ts` | **Small.** The recording already exists at `:343`; this is a renderer mount and a transport, not a simulation |
+| 1 | `PM-FB1` | ~~Mount a stage over `session.asBuilt.recording` on the fix-case screen, above the four figures~~ — **built 2026-09-06**, GitHub issue #348: `everyday/asBuiltStage.ts` plays the recording on the stage's own painter (`everyday/cutaway.ts`, moved out of the stage for it), skippable, and the figures are stated after | `everyday/fixitScreen.ts`, `everyday/asBuiltStage.ts` | **Small.** The recording already exists on the session; this is a renderer mount and a transport, not a simulation |
 | 2 | `PM-TT1` | Move the *How hard this looks* plate off the pre-run position, or reword it as configuration | `everyday/today.ts` and its caller | **Small**, and it is a copy-and-ordering change rather than a deletion |
 | 3 | `PM-TT5` | ~~A **provided ghost port** on `EverydayHost`~~ — **built 2026-09-05**, GitHub issue #226, [§ D482](../DECISIONS.md). `EverydayHost.ghostRace`/`raceAgainst`, the stage's picker, and `STAGE_NO_GHOST` deleted on the same commit with both register entries it was half of | `everyday/`, `live/raceStrip.ts`, `dev/main.ts` | Was **small–medium**; the wire was the work, and `dev/ghostRun.ts` is unchanged |
 | 4 | `PM-FB3` | ~~`fixit/parse.ts` refuses a repair patch carrying `floorPopulations`, with the reason attached~~ — **built narrower, 2026-09-06** ([§ D497](../DECISIONS.md)): refused on the three fabric roles, permitted on the diagnosed repair, and the pair's basis line then says the crowd changed | `fixit/parse.ts`, `fixit/engine.ts`, `fixit/run.ts` | **Small**, and the premise was wrong: three shipped diagnosed repairs already patch population |

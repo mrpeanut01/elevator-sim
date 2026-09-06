@@ -46,6 +46,16 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
     'put it right, and the tenants stop writing letters.',
   complaintEyebrow: 'THE COMPLAINT',
   asBuiltEyebrow: 'THE BUILDING AS IT STANDS',
+  /*
+   * The as-built run, played before the four figures — GitHub issue #348, `docs/35` PM-FB1. Three
+   * strings: the block's eyebrow, the sentence that says the figures below are read off this very
+   * run, and the one press. Here rather than in `asBuiltStage.ts` so the corpus sweeps them with the
+   * rest of this screen's words.
+   */
+  asBuiltStageEyebrow: 'WATCH IT AS IT STANDS',
+  asBuiltStageNote:
+    'The morning the letter is about, as the building runs today. The four figures below are read from this run and no other.',
+  asBuiltStageSkip: 'Skip to the figures',
   diagnosisEyebrow: 'THE DIAGNOSIS',
   repairsEyebrow: 'RECONFIGURE IT YOURSELF',
   repairsHint:
