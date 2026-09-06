@@ -1510,7 +1510,7 @@ type DecisionReservation = {
  * than holes, because only a number written below the highest is a hole. The charter row
  * reconciles to D507 on this same commit.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'W', from: 514, to: 530 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
