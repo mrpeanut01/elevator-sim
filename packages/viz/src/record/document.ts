@@ -116,6 +116,8 @@ export function readRecordingDocument(text: string): RecordingLoad {
       },
     };
   }
+  // GitHub issue #246: a file from another build says which build, when it knows.
+  const madeBy = typeof record['buildVersion'] === 'string' ? `, build ${record['buildVersion']}` : '';
   if (version > VIZ_SCHEMA_VERSION) {
     return {
       ok: false,
@@ -124,7 +126,7 @@ export function readRecordingDocument(text: string): RecordingLoad {
         found: version,
         supported: VIZ_SCHEMA_VERSION,
         message:
-          `this recording was made by a newer viewer (schema ${String(version)}); ` +
+          `this recording was made by a newer viewer (schema ${String(version)}${madeBy}); ` +
           `this build reads schema ${String(VIZ_SCHEMA_VERSION)}. Update the viewer, or re-record from the seed.`,
       },
     };
@@ -137,7 +139,7 @@ export function readRecordingDocument(text: string): RecordingLoad {
         found: version,
         supported: VIZ_SCHEMA_VERSION,
         message:
-          `this recording was made by an older viewer (schema ${String(version)}); ` +
+          `this recording was made by an older viewer (schema ${String(version)}${madeBy}); ` +
           `this build reads schema ${String(VIZ_SCHEMA_VERSION)}. Re-record it from its seed rather than drawing it — ` +
           'the fields this viewer needs were not in that shape.',
       },

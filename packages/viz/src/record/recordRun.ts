@@ -58,6 +58,7 @@ import {
   type SimulationResult,
 } from '@elevator-sim/core/browser';
 
+import { BUILD_VERSION } from '../build/version.js';
 import { StepSeriesBuilder, constantSeries } from '../contract/series.js';
 import {
   VIZ_SCHEMA_VERSION,
@@ -377,6 +378,7 @@ function describeRun(
     -readonly [K in keyof VizRecording]: VizRecording[K];
   } = {
     schemaVersion: VIZ_SCHEMA_VERSION,
+    buildVersion: BUILD_VERSION,
     runId: result.runId,
     seed: result.seed,
     buildingId: building.id,

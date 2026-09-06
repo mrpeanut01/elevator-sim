@@ -74,6 +74,7 @@
  * too.
  */
 
+import { BUILD_VERSION, buildVersionLineOf } from '../build/version.js';
 import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import { DESIGNER_ABSENCES } from './designerModel.js';
 import { RUSH_ABSENCES } from './rushScreenModel.js';
@@ -239,6 +240,8 @@ export interface BuildNotesSection {
 export interface BuildNotesView {
   readonly heading: string;
   readonly lede: string;
+  /** Which build this is, in a sentence — GitHub issue #246; `src/build/version.ts`'s. */
+  readonly build: string;
   readonly sections: readonly BuildNotesSection[];
   /** How many entries the panel is carrying, so the summary row can say it without counting twice. */
   readonly entryCount: number;
@@ -295,6 +298,7 @@ export function buildNotesViewOf(): BuildNotesView {
       'This game is being built in the open, and this is the list of what is missing. Every line ' +
       'here is written in the code rather than in a document, so a thing that gets built leaves ' +
       'this list on the day it works rather than whenever somebody remembers.',
+    build: buildVersionLineOf(BUILD_VERSION),
     sections,
     entryCount: sections.reduce((total, section) => total + section.entries.length, 0),
   };

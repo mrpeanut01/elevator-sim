@@ -160,6 +160,9 @@ jobs:
           # with no origin, the build stops here with a message naming the six issues, rather than
           # producing a site that loads and does nothing.
           ELEVATOR_SIM_API_ORIGIN_REQUIRED: ${{ vars.AZURE_SWA_NAME != '' }}
+          # GitHub issue #246: the bundle carries the commit it was built from, and the panel and
+          # every recording say so. `vite.config.ts#buildVersion` reads this and falls back to git.
+          ELEVATOR_SIM_BUILD_VERSION: ${{ github.sha }}
         run: npm run build:web -w @elevator-sim/viz
 
       # Proves the emitter ran *in this build*, on this runner, against this checkout — the artifact

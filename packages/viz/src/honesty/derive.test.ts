@@ -125,6 +125,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'everyday/shell.ts#mountEverydayShell',
         /*
+         * GitHub issue #348's as-built stage on the fix-it screen and the painter it shares with
+         * § 7's stage. `mountAsBuiltStage` builds a canvas and a transport, so it cannot run
+         * without a document; every word it draws is `everyday/fixitScreenModel.ts`'s copy table,
+         * which the FIXIT adapter iterates. `drawCutaway` paints geometry and floor labels onto a
+         * canvas context and authors no sentence — it is derived because a floor label is a word
+         * beside a word — and the labels it draws are the recording's own.
+         */
+        'everyday/asBuiltStage.ts#mountAsBuiltStage',
+        'everyday/cutaway.ts#drawCutaway',
+        /*
          * § 14's two-tabbed board screen, on the settings screen's split exactly: `BOARD_SCREEN` is
          * a registry row whose `mount` builds tab cards, a table and a `<details>`, so it cannot
          * run without a document. Every **word** it draws is authored elsewhere and driven by the
@@ -727,6 +737,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'scope/runIdentity.ts#EXPRESSIBLE_IN_A_SELECTION',
         'scope/runIdentity.ts#fieldsAnsweredFor',
+        /*
+         * GitHub issue #338's tuple of the intervention kinds the wire carries — `park-cars-lobby`,
+         * `spread-cars`, `switch-dispatcher` — derived because a hyphen reads as a word break, and
+         * asserted against `submission.ts`'s own source by `runIdentity.test.ts` rather than swept.
+         */
+        'scope/runIdentity.ts#CARRIED_INTERVENTION_KINDS',
       ],
     },
     {
@@ -769,7 +785,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'this module’s docstring claimed and did not have. Every string in it is returned by ' +
         '`runIdentityIssues` and by nothing else, so it reaches a reader by exactly the route above ' +
         'and is accounted for by exactly the same limitation.',
-      ids: ['scope/runIdentity.ts#runIdentityIssues', 'scope/runIdentity.ts#CARRY_CHECKS'],
+      ids: [
+        'scope/runIdentity.ts#runIdentityIssues',
+        'scope/runIdentity.ts#CARRY_CHECKS',
+        /*
+         * GitHub issue #338's permanent refusal for the incident answer, one more of the same
+         * sentences: returned by `runIdentityIssues` and by nothing else, so it reaches a reader by
+         * exactly the route above.
+         */
+        'scope/runIdentity.ts#ANSWER_INCIDENT_STAYS_REFUSED',
+      ],
     },
     {
       reason:
@@ -983,6 +1008,27 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'record/decisionLog.ts#DecisionCollector',
         'record/decisionLog.ts#recordingPolicyFactory',
         'record/decisionLog.ts#wrapPolicy',
+      ],
+    },
+    {
+      reason:
+        'Assertions that two runs met the same crowd — GitHub issue #350 — and the three sites ' +
+        'that make them. `crowdDifferencesOf` returns sentences naming the first legs that differ, ' +
+        '`sameCrowd` is the predicate over it, `assertSameCrowd` throws with the pair’s own name in ' +
+        'front, and `assertPairMatchesRepairs` is the fix-it press’s call. Every one of those ' +
+        'sentences is a developer diagnostic in `recordRun`’s own class: it reports that a surface ' +
+        'paired two recordings it had no right to pair, fires before anything is drawn from the ' +
+        'pair, and is pinned by `record/crowd.test.ts` and `fixit/run.test.ts` on fabricated ' +
+        'recordings rather than swept as player copy. `wireInterventionsOf` is the same shape one ' +
+        'module over — GitHub issue #338 — throwing on a log entry that `runIdentityIssues` should ' +
+        'have refused first; the sentence a player reads about that state is ' +
+        '`switchUnpostableReasonOf`’s, which the EVERYDAY_STAGE adapter drives.',
+      ids: [
+        'record/crowd.ts#crowdDifferencesOf',
+        'record/crowd.ts#sameCrowd',
+        'record/crowd.ts#assertSameCrowd',
+        'fixit/run.ts#assertPairMatchesRepairs',
+        'scope/switchWire.ts#wireInterventionsOf',
       ],
     },
     {
@@ -1203,7 +1249,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'preference are `everyday/units.ts#UNITS_ROW_COPY`’s, driven by `EVERYDAY_SETTINGS`, and ' +
         'the figures it switches are `speedFigure`’s and `lengthFigure`’s, driven by ' +
         '`EVERYDAY_STANDALONE_SCREENS` in both preferences.',
-      ids: ['everyday/profile.ts#loadProfile', 'everyday/profile.ts#loadUnits'],
+      ids: [
+        'everyday/profile.ts#loadProfile',
+        'everyday/profile.ts#loadUnits',
+        /*
+         * GitHub issue #229's default speed, the same case a third time: read through the same
+         * `readEnvelope` under the same key, returning a number no screen prints as a sentence. The
+         * words a player reads for it are `everyday/settingsView.ts#DEFAULT_SPEED_ROW_COPY`’s,
+         * driven by `EVERYDAY_SETTINGS`.
+         */
+        'everyday/profile.ts#loadDefaultSpeed',
+      ],
     },
     {
       reason:

@@ -6537,6 +6537,21 @@ const FIXIT_COVERS: readonly string[] = [
   'fixit/engine.ts#repairRowOf',
   'fixit/engine.ts#STANDING_EXTRAS',
   'fixit/engine.ts#BASIS_LINE',
+  /*
+   * GitHub issue #350's second basis line and the choice between the two: the outcome's `basis`
+   * is `DEMAND_BASIS_LINE` on a selection that changes the crowd, and the adapter renders that
+   * arm by classifying a measurement whose `sameCrowd` is false. `selectionKeepsTheCrowd` is the
+   * predicate the screen asks before it draws the pair, and its only string is the one of these two
+   * it selects.
+   */
+  'fixit/engine.ts#DEMAND_BASIS_LINE',
+  'fixit/engine.ts#selectionKeepsTheCrowd',
+  /*
+   * GitHub issue #351's demand disclosure, derived from the case's rate against the building's
+   * authored band and rendered below in both arms — busier and quieter — because a declaration
+   * that is only ever swept on one side is half a surface.
+   */
+  'fixit/parse.ts#demandDisclosureOf',
   // Driven through the rows above: `repairRowOf` asks `affordabilityOf`, which sums `spendOf`,
   // and the states the adapter renders are built by the two toggles rather than written by hand.
   'fixit/engine.ts#spendOf',
@@ -8233,6 +8248,15 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * mentions.
      */
     'everyday/settingsView.ts#NAME_NOTE',
+    /*
+     * GitHub issue #229's two rows. The default-speed row's copy and the clear row's three stages
+     * are all reached below: the `armed` and `cleared` cases carry the clear arc's other two
+     * states and a default speed moved off the stage's own, so neither row is swept in one state
+     * only.
+     */
+    'everyday/settingsView.ts#DEFAULT_SPEED_ROW_COPY',
+    'everyday/settingsView.ts#CLEAR_PROGRESS_COPY',
+    'everyday/settingsView.ts#clearRowOf',
   ],
   render(context) {
     void context;
@@ -8973,6 +8997,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
+    /*
+     * GitHub issue #338: the sentence a handover row carries when its target cannot travel to a
+     * board, drawn before the press. Rendered below on a hand-tuned target, which is the one
+     * arm that produces it.
+     */
+    'scope/switchWire.ts#switchUnpostableReasonOf',
     'everyday/stageScreenModel.ts#STAGE_RACE_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
@@ -10069,6 +10099,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
     'everyday/briefView.ts#raceAgainstCard',
     'everyday/briefView.ts#lockedForScore',
+    /* GitHub issue #225's door into the sandbox, drawn on the brief once the tuner is built. */
+    'everyday/briefView.ts#SANDBOX_DOOR_LABEL',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
     'everyday/world.ts#percentileLine',
@@ -10966,6 +10998,8 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     'everyday/buildNotes.ts#buildNotesViewOf',
     'everyday/buildNotes.ts#buildNotesSummaryOf',
     'everyday/buildNotes.ts#BUILD_NOTES_POINTER',
+    /* GitHub issue #246's build line, reached through `view.build`; under the corpus, the unbuilt arm. */
+    'build/version.ts#buildVersionLineOf',
     'everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES',
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
     'everyday/stageScreenModel.ts#STAGE_ABSENCES',
@@ -10981,6 +11015,8 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     seeds.push({ field: 'buildNotes.heading', text: view.heading, role: 'label' });
     seeds.push({ field: 'buildNotes.summary', text: buildNotesSummaryOf(view), role: 'label' });
     seeds.push({ field: 'buildNotes.lede', text: view.lede, role: 'prose' });
+    // GitHub issue #246: the build line, which under the corpus reads the unbuilt arm.
+    seeds.push({ field: 'buildNotes.build', text: view.build, role: 'prose' });
     /*
      * The front door's one remaining sentence about all this. It is drawn on the menu rather than
      * on the panel, and it is seeded here because it is the panel's constant and the menu is a DOM

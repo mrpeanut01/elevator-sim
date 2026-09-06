@@ -27,6 +27,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { BUILD_VERSION, buildVersionLineOf } from '../build/version.js';
+
 import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import {
   BUILD_NOTES_POINTER,
@@ -73,6 +75,12 @@ describe('the build-information panel', () => {
     // settings rows the register used to refuse: a register whose entries only ever fall is what
     // § D370's queue reading predicts, so the floor follows it down rather than standing over it.
     expect(view.entryCount).toBeGreaterThan(15);
+  });
+
+  it('says which build it is, in a sentence the corpus sweeps — GitHub issue #246', () => {
+    const view = buildNotesViewOf();
+    expect(view.build).toBe(buildVersionLineOf(BUILD_VERSION));
+    expect(view.build.length).toBeGreaterThan(20);
   });
 
   it('gives every section a heading and a placing line, so a heading is not the only cue', () => {

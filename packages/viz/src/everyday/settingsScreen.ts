@@ -119,6 +119,11 @@ function buildNotesPanel(doc: Document): HTMLElement {
   lede.style.cssText = `margin:10px 0 0;font-size:12.5px;line-height:1.5;color:${C.warmGrey};max-width:74ch`;
   panel.append(lede);
 
+  // GitHub issue #246: the build this copy is, first, because it is the line a bug report needs.
+  const build = el(doc, 'p', 'everyday-build-version', notes.build);
+  build.style.cssText = `margin:8px 0 0;font-size:12.5px;line-height:1.5;color:${C.ink};max-width:74ch`;
+  panel.append(build);
+
   for (const section of notes.sections) {
     const block = el(doc, 'section', 'everyday-settings-build-notes-section');
     block.style.cssText = 'margin-top:18px';
