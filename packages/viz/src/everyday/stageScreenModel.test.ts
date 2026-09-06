@@ -791,7 +791,7 @@ describe('§ 3.3 — the stage row, refined', () => {
 describe('§ 6.4 — where *Close the day* leaves the player', () => {
   const filed = { dayClosed: true, hasReport: true } as const;
 
-  it('opens the report in the two flows whose report § 3.3 numbers, and in no other', () => {
+  it('opens the report in the flows whose report row carries a timeline, and in no other', () => {
     /*
      * Every context the product has, from the value the tree derives its sweeps from — a fifth
      * added to `RUN_CONTEXTS` arrives here rather than being quietly omitted. `rush` presses this
@@ -804,6 +804,8 @@ describe('§ 6.4 — where *Close the day* leaves the player', () => {
     expect(landing).toEqual({
       daily: 'report',
       campaign: 'report',
+      /* § 6.1's replay is the daily flow over a parked week, and its report row carries the daily timeline — § D517. */
+      replay: 'report',
       rush: undefined,
       watch: undefined,
     });

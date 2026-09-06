@@ -1513,3 +1513,36 @@ measurement nobody had made. Made, it excludes the building the campaign opens o
 - **#346** (a service event that moves a car's range and load) and **#159** (the wrinkle library)
   stand as written, and the dock's coach party is expressed as a day's demand until #346 lands.
 - **#220** (Endless rush) is the largest front-door promise still unkept.
+
+## Wave W closed
+
+**Six issues and items closed, seven decisions taken (D514 to D520), one push.** One worker,
+serial, opened in a worktree while wave V's pull request was open, which merged mid-wave and became
+the base the branch was restarted from.
+
+**The suite, on the integrated tree**: `tsc -b` clean; core 112 files / 2 558 tests; server 17 / 382;
+cli 10 / 158; viz 247 files, 5 247 passing with six reds in four guard files on the first run (the
+annotation census, the dev-server registry over three new browser files, a landing pin that had to
+learn the fifth context, and the browser-tier file count), every one this wave's own and rerun green;
+experiments and the browser tier ⟨PENDING⟩.
+
+**The corpus, once after integration**: Both tiers in one sitting, with the base at `4111655` re-measured first in a detached worktree,
+where it reproduced wave V's row exactly: 609 249 always-on and 759 296 deep, the thirteenth
+consecutive wave that has held.** Wave W: always-on **623 363** strings (+14 114, 288.04 a case),
+deep **776 588** (+17 292, 288.20 a case); cases, simulations and failing cases unmoved; surfaces
+**57 / 58**, exactly one added in each tier and the diff names it, `everyday/rush.ts#rushResultViewOf`.
+The first case decomposes the 288 to the string across eight adapters (the door's third render
++132, the rush sheet +62, two offer cards +38, the replay context's rail and bar +30, the menu's
+sentence +23, the designer's copy +6, the report +4, seven register rows −7); the fraction above 288
+is the door's third render being conditional on the case's week having a day to hand back. The
+full table and the decomposition are in `CLAUDE.md`'s Phase 9 row.
+
+| issue | outcome |
+|---|---|
+| #208 | **closed**, § D514; the first session opens on a legible tower, and the plate is configuration |
+| #220 | **closed**, § D515; Endless rush runs, holds, and reads its own trend test |
+| #178 item 1 | **closed**, § D516; the affordance model, and S7 as a checked clause |
+| #177 item 1 | **closed**, § D517; a past day handed back over a parked week |
+| #177 item 5 | **two of three built**, § D518; escalator rows and the folded document; the class per shaft stays a stated absence |
+| #169 item 4 | **closed**, § D519; both complexities authored with the measurement beside them |
+| #234 | **the sweep built and tiered**, § D520; the register names the three stages still clearing, and the rebalance is the debt it holds |
