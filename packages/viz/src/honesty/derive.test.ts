@@ -745,6 +745,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * asserted against `submission.ts`'s own source by `runIdentity.test.ts` rather than swept.
          */
         'scope/runIdentity.ts#CARRIED_INTERVENTION_KINDS',
+        /*
+         * GitHub issue #213's route table — lever ids to screens, derived because `add-a-car` and
+         * `zone-the-tower` read as words. The strings a card draws from it, the button label and
+         * the caveat, are `everydayReportViewOf`'s and the `EVERYDAY_DAILY_LOOP` adapter seeds both.
+         */
+        'everyday/reportView.ts#EVERYDAY_LEVER_ROUTES',
       ],
     },
     {

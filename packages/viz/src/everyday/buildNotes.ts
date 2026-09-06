@@ -210,7 +210,17 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * primary, `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL`) is named rather than left for a reader to
    * discover.
    */
-  'The report’s third piece of advice does not open the tuner — two of the report’s four advice cards hand you to the simulator panel that carries the change out, and the other two are a dispatcher recommendation one day is not enough evidence to make, which each of those cards says on its own face. The tuner has two doors in the design and only the brief’s *Take it to the sandbox* is built here.',
+  /*
+   * **The report's lever entry is deleted, not reworded** — GitHub issue #213, § D503. It read:
+   * *"The report’s third piece of advice does not open the tuner — two of the report’s four advice
+   * cards hand you to the simulator panel that carries the change out, and the other two are a
+   * dispatcher recommendation one day is not enough evidence to make, which each of those cards
+   * says on its own face. The tuner has two doors in the design and only the brief’s *Take it to
+   * the sandbox* is built here."* Every card routes now (`everyday/reportView.ts#EVERYDAY_LEVER_ROUTES`):
+   * *Add a car* opens the tuner, which is the second door the sentence said was missing, and the
+   * dispatcher pair open the workshop with the honesty kept on the card as a caveat rather than a
+   * refusal. That also closes GitHub issue #177's item 2.
+   */
   'Endless rush — the setup screen draws, and the climbing stream of arrivals behind it does not exist, so its start button refuses. The rush’s own stage and its own result screen are unbuilt.',
 ]);
 

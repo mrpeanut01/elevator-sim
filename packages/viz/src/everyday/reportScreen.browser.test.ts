@@ -202,8 +202,16 @@ describe.skipIf(!HAS_BROWSER)('the report’s lever opens what it names — issu
     const page = await coldLoad();
     try {
       await openTheReport(page);
-      const go = page.locator('.everyday-report-lever-go').first();
-      expect(await go.count()).toBe(1);
+      /*
+       * The Engineer-routed lever, when the day's sheet emits one — GitHub issue #213 routes the
+       * other levers inside this shell (`[data-screen]`), and this case is about the hand-off. A
+       * sheet with no Engineer lever is not a failure of the hand-off; it is asserted below.
+       */
+      const go = page.locator('.everyday-report-lever-go:not([data-screen])').first();
+      if ((await go.count()) === 0) {
+        expect(await page.locator('.everyday-report-lever-go[data-screen]').count()).toBeGreaterThan(0);
+        return;
+      }
       const label = flat((await go.textContent()) ?? '');
       expect(label).toMatch(/^Open the simulator’s .+ panel$/u);
 
@@ -239,7 +247,9 @@ describe.skipIf(!HAS_BROWSER)('the report’s lever opens what it names — issu
     const page = await coldLoad();
     try {
       await openTheReport(page);
-      await page.locator('.everyday-report-lever-go').first().click();
+      const go = page.locator('.everyday-report-lever-go:not([data-screen])').first();
+      if ((await go.count()) === 0) return;
+      await go.click();
       await page.waitForFunction(
         () => document.querySelector<HTMLElement>('.everyday')?.style.visibility === 'hidden',
         undefined,
@@ -262,26 +272,33 @@ describe.skipIf(!HAS_BROWSER)('the report’s lever opens what it names — issu
     }
   }, 180_000);
 
-  it('gives the dispatcher levers no button at all, and says why on the card', async () => {
+  it('gives every lever a button, and opens an Everyday route inside the shell — the owner’s ruling on #213', async () => {
     const page = await coldLoad();
     try {
       await openTheReport(page);
       /*
-       * `LEVER_SURFACES` names two of the four **by argued decision** (`dev/reportPanel.ts:231-237`):
-       * a card that navigated to the dispatcher editor would be this sheet recommending a dispatch
-       * strategy off one replication — `docs/10` R2 and CLAUDE.md's paired-interval rule. #213's
-       * own criterion, taken literally, would have shipped that. So the count is asserted from
-       * both ends: every card that routes, and every card that refuses, adds up to the cards drawn.
+       * Every card routes (GitHub issue #213, the owner's ruling): the count is asserted from both
+       * ends, and the refusal note is drawn for nothing on the shipped sheet. A dispatcher lever
+       * carries its caveat beside the button rather than a refusal instead of one.
        */
       const cards = await page.locator('.everyday-report-lever').count();
       const buttons = await page.locator('.everyday-report-lever-go').count();
       const refusals = await page.locator('.everyday-report-lever-note').count();
       expect(cards).toBeGreaterThan(0);
-      expect(buttons + refusals).toBe(cards);
-      expect(refusals).toBeGreaterThan(0);
-      expect(flat((await page.locator('.everyday-report-lever-note').first().textContent()) ?? '')).toContain(
-        'one day is not evidence',
-      );
+      expect(buttons).toBe(cards);
+      expect(refusals).toBe(0);
+      const caveats = page.locator('.everyday-report-lever-caveat');
+      if ((await caveats.count()) > 0) {
+        expect(flat((await caveats.first().textContent()) ?? '')).toContain('One day is not evidence');
+      }
+
+      const inside = page.locator('.everyday-report-lever-go[data-screen]').first();
+      if ((await inside.count()) === 0) return;
+      const screen = await inside.getAttribute('data-screen');
+      await inside.click();
+      /* Inside this shell: the Everyday root keeps the page and the named screen is mounted. */
+      await page.waitForSelector(screen === 'tuner' ? '.everyday-tuner' : '.everyday-workshop', { timeout: 15_000 });
+      expect(await page.evaluate(() => document.querySelector<HTMLElement>('.everyday')?.style.visibility)).toBe('');
     } finally {
       await page.close();
     }

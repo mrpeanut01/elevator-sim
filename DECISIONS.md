@@ -33435,3 +33435,44 @@ is one case at 131.7 s whose last assertion runs over all thirteen profiles, so 
 change what it asserts. The largest file's share fell from 31.8 % to 16.4 % and the implied
 concurrency ceiling rose from 3.1 to 6.1; every one of the 262 campaign cases moved verbatim, none
 dropped, none added.
+
+## D503 — every report lever opens the surface that changes it, the dispatcher pair included, and the statistical honesty moves from a refusal to a caveat on the card
+
+**Date: 2026-09-06 · Owner: the integrator, on the owner's ruling of 2026-08-26 · Rules on: GitHub
+issue #213 and #177 item 2, GAMEPLAY § 6.5, `everyday/reportView.ts#EVERYDAY_LEVER_ROUTES`,
+`everyday/reportScreen.ts`, `everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES`,
+`dev/reportPanel.ts#LEVER_SURFACES` (unchanged).**
+
+The report named four levers and routed two. The dispatcher pair, *Weight fairness up* and *Ask
+where they're going*, carried a refusal on the card: a sheet that pointed at the control which would
+make one profile beat another would be recommending a dispatch strategy off one replication, which
+`docs/10` R2 forbids. Two verifications upheld the refusal and narrowed the issue's criterion around
+it. The owner then ruled on the issue: focus on the player finding the levers from the report's
+findings, make the game work for the user first, and document the approach second.
+
+### The ruling
+
+Every lever routes, and where it routes is GAMEPLAY § 6.5's own answer: a dispatcher change is a
+live handoff into the workshop, and a building change routes to the tuner. *Add a car* opens the
+sandbox tuner, whose Shafts row is the control. *Zone the tower* opens the simulator's Building
+panel, because the tuner has no zoning control and a card must not name a surface that cannot do
+what it says. The dispatcher pair open the dispatcher workshop.
+
+R2 forbids the comparative claim, not the door. The card still makes no comparative claim; the
+sentence the refusal used to carry is kept on the card as a caveat beside the button: one day is
+not evidence that a different dispatcher is better, try it, run tomorrow, and the bench settles it.
+The caveat is seeded in the honesty corpus as a refusal-class string, which is the one class
+entitled to name a dispatcher ordering, and the button labels are seeded as labels, which is the
+class that once let a button promising the wrong panel ship unswept.
+
+### What stays
+
+The Engineer sheet's `LEVER_SURFACES` keeps its two entries and its argument. It is the enthusiast's
+surface, and the restraint there is still the honest one. The two sheets now differ on this point
+by decision rather than by drift, and this entry is where the difference is recorded.
+
+### What it closes
+
+The shell register's entry that the report's third piece of advice does not open the tuner is
+deleted rather than reworded, because *Add a car* opens it. That entry was the tuner's second door,
+which is #177's item 2, so that item closes here too.

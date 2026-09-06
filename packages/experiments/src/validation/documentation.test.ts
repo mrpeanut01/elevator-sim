@@ -1504,7 +1504,13 @@ type DecisionReservation = {
  * Six of the thirteen issues reached past their own module and took a number; the other seven are
  * recorded in their docstrings under § D405.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/**
+ * **Wave U's block: D503 to D510, opened on the first decision the wave took.** One worker again,
+ * so the block is a courtesy to the charter row's arithmetic rather than a dispatch: numbers are
+ * taken in order as issues reach past their module, and whatever is unreached at close is returned
+ * as free, never as a hole.
+ */
+const OPEN_RESERVATION = { wave: 'U', from: 503, to: 510 } as DecisionReservation | null;
 /*
  * **Wave S reserved D489–D498, and it was opened four lanes late — which is wave Q's error
  * repeated by the person who wrote it down.**

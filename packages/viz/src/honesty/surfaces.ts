@@ -10410,6 +10410,18 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seeds.push({ field: `${where}.pointer`, text: view.honesty.pointer.why, role: 'prose' });
         }
         for (const lever of view.levers) {
+          /*
+           * The button's label and the dispatcher levers' caveat — GitHub issue #213. The label is
+           * the claim about what a press does that once shipped wrong because nothing swept it;
+           * the caveat is the one string on the card entitled to name a dispatcher ordering,
+           * because it refuses one.
+           */
+          if (lever.goLabel !== undefined) {
+            seeds.push({ field: `${where}.lever(${lever.title}).go`, text: lever.goLabel, role: 'label' });
+          }
+          if (lever.caveat !== undefined) {
+            seeds.push({ field: `${where}.lever(${lever.title}).caveat`, text: lever.caveat, role: 'reason' });
+          }
           if (lever.noSurfaceNote === undefined) continue;
           seeds.push({ field: `${where}.lever.refusal`, text: lever.noSurfaceNote, role: 'reason' });
         }

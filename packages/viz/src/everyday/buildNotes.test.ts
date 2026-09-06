@@ -195,7 +195,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * is the same defect as a register naming a closed absence, one level up.
    */
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Putting your run on the daily board', issue: 221 },
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'third piece of advice does not open the tuner', issue: 177 },
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Endless rush', issue: 220 },
 
   /*
