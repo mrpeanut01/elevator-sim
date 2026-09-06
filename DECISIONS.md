@@ -33831,3 +33831,40 @@ and publishes the run.
 #208's build, and this entry hands it a table rather than a ruling; and whether the campaign's `c1`
 should stay Garden Apartments, which #270 measured from the other direction and is not reopened
 here.
+
+---
+
+## D513 — Phase 5's deadband and rate sweeps ship as entry points, both pinned
+
+**Date: 2026-09-06 · Owner: the integrator, wave V · Rules on: GitHub issue #178 item 6,
+`packages/experiments/src/benchmark/deadbandSweep.ts`, `published.ts#STUDY_ENTRY_POINTS`,
+`PINNED_ESTIMATES['deadband-sweep']` and `['rate-sweep']`, `regeneratePins.ts`, `docs/05` § Phase 5.**
+
+`docs/05`'s Phase 5 verdict quotes a deadband sweep — eight paired differences against `stay` on
+Garden Apartments, *"an interior optimum at 2 s"* — and a rate sweep — *"inert at 2, 4, 8 and 16 %
+… 300/300 bit-identical at 4 %"* — and its own entry-point table said of both: *no entry point
+ships*. That is this repository's rule about published numbers broken in the verdict that states
+it: a figure nobody can regenerate in one call is a figure that goes stale in silence.
+
+1. **`runDeadbandSweep` is the eight treatments the verdict swept**, `predicted-demand` at 8, 6,
+   5, 4, 3, 2, 1 and 0 seconds against `stay`, on the pre-positioning study's own arms and
+   vocabulary so the deadband it varies is the field that study isolates. It publishes intervals,
+   so it is a `PublishedStudyId`, `regeneratePins.ts` is its non-test caller, and
+   `deadbandSweep.test.ts` compares the pins against a fresh run at the published budget.
+2. **`runRateSweep` is the same pairing at 2, 4, 8 and 16 % of population per five minutes, and
+   it publishes intervals too**, pinned under `rate-sweep` with `regeneratePins.ts` as its caller.
+   Each rate carries the paired-t interval and, beside it, the count of `n` paired differences
+   that are exactly zero, because the verdict quotes both (*"300/300 bit-identical at 4 %"*) and a
+   pin holds only the interval. *Inert at every rate* is defined as no rate coming back BETTER or
+   WORSE — **not** every rate IDENTICAL, which a first draft of the module wrote and the n = 300
+   run refused: only 4 % is 300/300, and 2, 8 and 16 % are 298, 297 and 299 of 300 with intervals
+   containing zero, exactly the verdict's own table. The draft's `no-intervals` classification is
+   withdrawn with it; a study whose rows each carry a standard error is a study a pin can hold.
+3. **The published figures are re-measured, not transcribed.** The pins are whatever the run
+   produces on this tree, and `docs/05`'s paragraph is corrected to them where they moved, with the
+   verdict's original figures left standing as the dated record they are. A figure that
+   reproduces is a figure; one that does not is a finding about what changed underneath it.
+
+**What this does not decide.** Whether `predictive-balanced` should ship at the optimum deadband
+rather than the authored 8 s — the verdict left the profile as authored and named the dimension
+for Phase 7 to search, and this entry makes the curve reproducible rather than moving the profile.

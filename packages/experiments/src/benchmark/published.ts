@@ -78,6 +78,7 @@ import type { MatrixCellResult } from './matrix.js';
 import type { MixedUseStudy } from './mixedUseHighRise.js';
 import type { Phase7AcceptanceStudy } from './phase7Acceptance.js';
 import type { CaseResult } from './suite.js';
+import type { DeadbandSweep, RateSweep } from './deadbandSweep.js';
 import type { PrepositioningStudy } from './prepositioning.js';
 import type { Stage5Study } from './capacityReassignment.js';
 import type { ForecastCausalityAudit } from './predictorLag.js';
@@ -115,6 +116,8 @@ export const PUBLISHED_STUDY_IDS = Object.freeze([
   'selection-sweep',
   'lunch-two-way-selection',
   'double-deck',
+  'deadband-sweep',
+  'rate-sweep',
 ] as const);
 
 export type PublishedStudyId = (typeof PUBLISHED_STUDY_IDS)[number];
@@ -322,6 +325,20 @@ export function prepositioningFigures(
       figures.set(`${arm.armId}/${cell.metric}`, estimateOf(cell.estimate));
     }
   }
+  return figures;
+}
+
+/** The deadband sweep's figures, keyed `t<deadband>/awtS` — GitHub issue #178 item 6, § D513. */
+export function deadbandSweepFigures(study: DeadbandSweep): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const row of study.rows) figures.set(`t${String(row.thresholdS)}/awtS`, estimateOf(row.awt.estimate));
+  return figures;
+}
+
+/** The rate sweep's figures, keyed `r<rate>/awtS` — the same item, the same decision. */
+export function rateSweepFigures(study: RateSweep): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const row of study.rows) figures.set(`r${String(row.ratePctPop5min)}/awtS`, estimateOf(row.awt.estimate));
   return figures;
 }
 
@@ -800,78 +817,6 @@ export const UNPINNED_INTERVALS: readonly UnpinnedInterval[] = Object.freeze([
       'inventing an `n` to justify a bound.',
   }),
   Object.freeze({
-    text: '−0.006 [−0.031, +0.019]',
-    file: 'benchmark/index.ts',
-    count: 2,
-    reason:
-      '§ 4 deadband sweep and rate sweep, both n = 300 — `runBenchmarkCase("garden-residential", ' +
-      '{ baseline: "park-stay", arms: park-predicted-demand-t{8,6,5,4,3,2,1,0} })`. That call ' +
-      'exists in c237d95\'s commit message and nowhere in the tree, so there is no entry point to ' +
-      'pin it against. The SAME literal at n = 500 was review finding #4 and is now corrected to ' +
-      '`−0.006 [−0.021, +0.010]`, which the `prepositioning` pins do derive — which is why this ' +
-      'entry declares a count of exactly 2.',
-  }),
-  Object.freeze({
-    text: '−0.021 [−0.087, +0.045]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 deadband sweep, 6 s, n = 300. Same missing entry point.',
-  }),
-  Object.freeze({
-    text: '−0.217 [−0.378, −0.055]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 deadband sweep, 5 s, n = 300. Same missing entry point.',
-  }),
-  Object.freeze({
-    text: '−0.430 [−0.727, −0.133]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 deadband sweep, 4 s, n = 300. Same missing entry point.',
-  }),
-  Object.freeze({
-    text: '−0.792 [−1.182, −0.402]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 deadband sweep, 3 s, n = 300. Same missing entry point.',
-  }),
-  Object.freeze({
-    text: '−1.110 [−1.550, −0.670]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 deadband sweep, 2 s — the interior optimum, n = 300. Same missing entry point.',
-  }),
-  Object.freeze({
-    text: '−0.881 [−1.348, −0.414]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 deadband sweep, 1 s, n = 300. Same missing entry point.',
-  }),
-  Object.freeze({
-    text: '−0.623 [−1.138, −0.108]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 deadband sweep, 0 s, n = 300. Same missing entry point.',
-  }),
-  Object.freeze({
-    text: '−1.11 [−1.55, −0.67]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 deadband sweep, 2 s, quoted at 2 dp in the § 0 summary. n = 300, same sweep.',
-  }),
-  Object.freeze({
-    text: '−0.014 [−0.035, +0.006]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 rate sweep, 8 % of population per 5 min, n = 300. Same missing entry point.',
-  }),
-  Object.freeze({
-    text: '−0.010 [−0.030, +0.010]',
-    file: 'benchmark/index.ts',
-    count: 1,
-    reason: '§ 4 rate sweep, 16 % of population per 5 min, n = 300. Same missing entry point.',
-  }),
-  Object.freeze({
     text: '−0.007 [−0.032, +0.018]',
     file: 'benchmark/index.ts',
     count: 2,
@@ -880,6 +825,19 @@ export const UNPINNED_INTERVALS: readonly UnpinnedInterval[] = Object.freeze([
       '`createPredictor: () => undefined`, n = 300. Built by hand from `new Simulation(...)`; no ' +
       'study function performs it.',
   }),
+  /*
+   * **Eleven entries came out on 2026-09-06, and the guard is what took them out.** The § 4 deadband
+   * sweep's eight figures — `−0.006 [−0.031, +0.019]` through `−0.623 [−1.138, −0.108]` — plus the
+   * 2 s row quoted at two places in § 0, and the rate sweep's `−0.014 [−0.035, +0.006]` at 8 % and
+   * `−0.010 [−0.030, +0.010]` at 16 %, were declared here as *kind 1, no entry point* since c237d95.
+   * `runDeadbandSweep()` and `runRateSweep()` ship now (GitHub issue #178 item 6, § D513), their
+   * pins reproduce every one of them to the printed digit, and `published.test.ts`'s partition
+   * refused the entries the moment a pin could derive them: *"If a pin now reproduces it, delete
+   * the entry — the gap has closed."* It has. The rate sweep's 2 % row is the deadband sweep's 8 s
+   * row — the same cell, pinned under both ids — and its 4 % row is `0.000 [0.000, 0.000]`, 300/300
+   * exactly zero, which no entry ever declared because a zero interval is not a figure the guard
+   * looks for.
+   */
 ]);
 
 /**
@@ -977,6 +935,13 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // published before the machinery existed. Its output is a threshold in seconds, not an
     // interval.
     runDeadbandKnownAnswer: 'no-intervals',
+    // Phase 5's two sweeps, shipped as entry points (GitHub issue #178 item 6, § D513): eight
+    // paired-t intervals against `stay` over the deadband, and four over the arrival rate with a
+    // count of exactly-zero differences beside each. Both publish intervals, so `regeneratePins.ts`
+    // is the non-test caller of both and `deadbandSweep.test.ts` compares each set of pins
+    // against a fresh run at the published budget.
+    runDeadbandSweep: 'deadband-sweep',
+    runRateSweep: 'rate-sweep',
     // Categorical by construction: sample counts against the fleet's own odometers, a count of
     // samples outside the emitted window, and a sign on a difference in mean energy. A liveness
     // proof that published a confidence interval would invite a resolution question to be read
@@ -1995,6 +1960,22 @@ export const PINNED_ESTIMATES: Readonly<
     "midtown-lunch-two-way-1.5pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 4.443549783624212, standardError: 0.5830506682747879, lower: 3.293799202689362, upper: 5.593300364559061 },
     "midtown-lunch-two-way-1.5pct/learned/cost/wt95S": { n: 200, mean: 0.8087805158646946, standardError: 0.23605125713104458, lower: 0.3432976945862684, upper: 1.2742633371431207 },
     "midtown-lunch-two-way-1.5pct/learned/gate/ttdMeanS": { n: 200, mean: -0.1701872278619276, standardError: 0.11887551599771772, lower: -0.4046045795849358, upper: 0.0642301238610806 },
+  }),
+  "deadband-sweep": Object.freeze({
+    "t0/awtS": { n: 300, mean: -0.6230477193303771, standardError: 0.26148216826541404, lower: -1.1376262361914988, upper: -0.10846920246925529 },
+    "t1/awtS": { n: 300, mean: -0.8811115740965481, standardError: 0.23722726069771669, lower: -1.3479581387347537, upper: -0.41426500945834255 },
+    "t2/awtS": { n: 300, mean: -1.1098714218541692, standardError: 0.22369907061101338, lower: -1.5500954598519916, upper: -0.6696473838563468 },
+    "t3/awtS": { n: 300, mean: -0.7923184414121527, standardError: 0.1981161724524759, lower: -1.1821971351031044, upper: -0.4024397477212009 },
+    "t4/awtS": { n: 300, mean: -0.4302578912917206, standardError: 0.15084125614988633, lower: -0.7271028745882115, upper: -0.1334129079952296 },
+    "t5/awtS": { n: 300, mean: -0.21650393403828683, standardError: 0.082220611163085, lower: -0.37830831415483124, upper: -0.054699553921742444 },
+    "t6/awtS": { n: 300, mean: -0.021244946733199162, standardError: 0.03360128450199254, lower: -0.08736991142338571, upper: 0.04488001795698738 },
+    "t8/awtS": { n: 300, mean: -0.0057001133786848315, standardError: 0.012679081340823132, lower: -0.03065165372578721, upper: 0.019251426968417543 },
+  }),
+  "rate-sweep": Object.freeze({
+    "r2/awtS": { n: 300, mean: -0.0057001133786848315, standardError: 0.012679081340823132, lower: -0.03065165372578721, upper: 0.019251426968417543 },
+    "r4/awtS": { n: 300, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "r8/awtS": { n: 300, mean: -0.014119948442288054, standardError: 0.010369221624176457, lower: -0.03452584732162189, upper: 0.00628595043704578 },
+    "r16/awtS": { n: 300, mean: -0.01005904201305467, standardError: 0.010059042013054673, lower: -0.029854529232922703, upper: 0.009736445206813365 },
   }),
   "double-deck": Object.freeze({
     "up-peak-1.5pct/collective−collective@single-deck/awtS": { n: 200, mean: -0.022699645774283052, standardError: 0.11551671390513416, lower: -0.2504935857299745, upper: 0.2050942941814084 },
