@@ -183,12 +183,13 @@ describe('the list', () => {
 });
 
 describe('an empty database', () => {
-  it('records both migrations, in order, on the injected clock', async () => {
+  it('records every migration, in order, on the injected clock', async () => {
     const sql = await emptyDatabase();
     await Store.open({ sql, now: () => CLOCK });
     expect(await register(sql)).toEqual([
       { version: 0, appliedAtMs: CLOCK },
       { version: 1, appliedAtMs: CLOCK },
+      { version: 2, appliedAtMs: CLOCK },
     ]);
   });
 
@@ -210,6 +211,7 @@ describe('an empty database', () => {
     expect(await register(sql)).toEqual([
       { version: 0, appliedAtMs: CLOCK },
       { version: 1, appliedAtMs: CLOCK },
+      { version: 2, appliedAtMs: CLOCK },
     ]);
   });
 
@@ -218,7 +220,7 @@ describe('an empty database', () => {
     const sql = new InterceptingSql(inner, AS_IS);
     await Store.open({ sql, now: () => CLOCK });
     const migrations = sql.execs.filter((text) => text.includes('INSERT INTO schema_migrations'));
-    expect(migrations).toHaveLength(2);
+    expect(migrations).toHaveLength(3);
     for (const text of migrations) {
       // A loser's batch has to abort on the primary key before its DDL runs. If the migration ever
       // moves in front of the row that claims it, that stops being true and this fails.
@@ -250,7 +252,7 @@ describe('a database created before `entries.legs`', () => {
   it('applies exactly the missing migrations and adds the column nullable', async () => {
     const sql = await databaseBeforeLegs();
     await Store.open({ sql, now: () => CLOCK });
-    expect((await register(sql)).map((r) => r.version)).toEqual([0, 1]);
+    expect((await register(sql)).map((r) => r.version)).toEqual([0, 1, 2]);
     // Nullable here and `NOT NULL` on a database created today. The divergence is real, it is the
     // price of applying migration 0 unchanged, and it is measured rather than left to be found:
     // this is the only kind of database that can hold a row with no count.
@@ -301,6 +303,7 @@ describe('a database at a recorded version', () => {
       // Untouched: a recorded version is never re-applied and never restamped.
       { version: 0, appliedAtMs: CLOCK - 1 },
       { version: 1, appliedAtMs: CLOCK },
+      { version: 2, appliedAtMs: CLOCK },
     ]);
     expect(await legsColumn(sql)).toEqual({ present: true, nullable: true });
   });
@@ -311,8 +314,12 @@ describe('a database at a recorded version', () => {
     // run" means, and this test exists so that the behaviour is a decision rather than a surprise.
     const sql = await emptyDatabase();
     await sql.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at_ms BIGINT NOT NULL);');
-    await sql.query('INSERT INTO schema_migrations (version, applied_at_ms) VALUES ($1, $2), ($3, $4)', [0, CLOCK, 1, CLOCK]);
-    await Store.open({ sql, now: () => CLOCK });
+    await sql.query('INSERT INTO schema_migrations (version, applied_at_ms) VALUES ($1, $2), ($3, $4), ($5, $6)', [0, CLOCK, 1, CLOCK, 2, CLOCK]);
+    // The runner applies nothing — and then the open fails, loudly, on the house (§ D521): the first
+    // thing the store does after migrating is insert the house's user row, and there is no `users`
+    // table to insert it into. That is the right answer for a database whose register lies: a
+    // server that booted on it would fail its first request instead of its first second.
+    await expect(Store.open({ sql, now: () => CLOCK })).rejects.toMatchObject({ code: '42P01' });
     expect(await legsColumn(sql)).toEqual({ present: false, nullable: false });
   });
 });
@@ -345,6 +352,7 @@ describe('a migration that fails', () => {
     expect(await register(inner)).toEqual([
       { version: 0, appliedAtMs: CLOCK },
       { version: 1, appliedAtMs: CLOCK + 60_000 },
+      { version: 2, appliedAtMs: CLOCK + 60_000 },
     ]);
     expect(await legsColumn(inner)).toEqual({ present: true, nullable: true });
   });
@@ -385,7 +393,7 @@ describe('two openers racing', () => {
     expect(raced).toBe(true);
     // One row per version. The loser's `INSERT` hit the primary key, its batch rolled back, it
     // asked whether the version was recorded, and it was.
-    expect((await register(inner)).map((r) => r.version)).toEqual([0, 1]);
+    expect((await register(inner)).map((r) => r.version)).toEqual([0, 1, 2]);
     // And the store the loser handed back is usable, which is the point of recovering rather than
     // failing: a container that lost a startup race must still serve.
     expect(await store.board('daily:2026-09-01', 'awtS', 10)).toEqual([]);
@@ -410,7 +418,7 @@ describe('two openers racing', () => {
     expect(raced).toBe(true);
     const marker = await inner.query(`SELECT to_regclass('loser_marker') AS present`);
     expect(marker.rows[0]?.['present'] ?? null).toBeNull();
-    expect((await register(inner)).map((r) => r.version)).toEqual([0, 1]);
+    expect((await register(inner)).map((r) => r.version)).toEqual([0, 1, 2]);
   });
 });
 
@@ -429,7 +437,7 @@ describe('the register', () => {
       return text;
     });
     await Store.open({ sql: refusing, now: () => CLOCK });
-    expect((await register(inner)).map((r) => r.version)).toEqual([0, 1]);
+    expect((await register(inner)).map((r) => r.version)).toEqual([0, 1, 2]);
   });
 
   it('rethrows when the table really is not there, rather than pressing on blind', async () => {
