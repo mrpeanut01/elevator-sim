@@ -1524,7 +1524,11 @@ the base the branch was restarted from.
 cli 10 / 158; viz 247 files, 5 247 passing with six reds in four guard files on the first run (the
 annotation census, the dev-server registry over three new browser files, a landing pin that had to
 learn the fifth context, and the browser-tier file count), every one this wave's own and rerun green;
-experiments and the browser tier ⟨PENDING⟩.
+experiments 108 / 1 411 (11 skipped) with two reds in `contentPlan.test.ts` on the first run, the
+template count the plan states moving 7 → 8 for the rush's unselectable stream, re-derived and rerun
+green; viz-browser 40 / 230 on the shipped bundle, with two reds on the first run, both cases pinning
+behaviour this wave replaced (the door's replay refusal, the plate outside its fold), repointed and
+rerun green.
 
 **The corpus, once after integration**: Both tiers in one sitting, with the base at `4111655` re-measured first in a detached worktree,
 where it reproduced wave V's row exactly: 609 249 always-on and 759 296 deep, the thirteenth
