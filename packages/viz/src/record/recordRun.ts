@@ -627,7 +627,7 @@ function loadSeries(result: SimulationResult): ReadonlyMap<string, CarLoadSeries
 /**
  * The per-leg projection the fold cannot give back.
  *
- * Ten fields of `PassengerRecord`, not fifteen: see {@link VizLeg} for what is left out and
+ * Twelve fields of `PassengerRecord`, not fifteen: see {@link VizLeg} for what is left out and
  * why. Sorted by `(arrivedAt, passengerId)` so the array's order is total and reproducible —
  * `result.record.passengers` is in generation order, which is deterministic but is not an order
  * anything downstream may binary-search or compare against.
@@ -649,6 +649,10 @@ function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[]
       destinationFloorId: passenger.destinationFloorId,
       direction: passenger.direction,
       arrivedAt: passenger.arrivedAt,
+      // Written on every leg, `0` and the direct case included — version 11, and `record/crowd.ts`
+      // is the reader of both.
+      legIndex: passenger.legIndex,
+      finalDestinationFloorId: passenger.finalDestinationFloorId,
     };
     if (passenger.boardedAt !== undefined) leg.boardedAt = passenger.boardedAt;
     if (passenger.alightedAt !== undefined) leg.alightedAt = passenger.alightedAt;

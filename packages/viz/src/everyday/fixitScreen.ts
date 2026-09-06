@@ -107,6 +107,7 @@ import {
 } from '../fixit/engine.js';
 import {
   FIXIT_RUN_SWITCHES,
+  assertPairMatchesRepairs,
   figureValuesOf,
   fixitRunPlanOf,
   measuredOf,
@@ -583,6 +584,17 @@ function mountFixit(
     const aSymptom = el(doc, 'div', 'everyday-fixit-symptom', entry.symptom);
     aSymptom.style.cssText = `${MONO(11.5, C.terracotta)};margin-top:7px`;
     asBuilt.append(aEyebrow, aNote, aSymptom);
+    /*
+     * § D478's declaration, on the case's own face — beside the note that describes the building
+     * as it stands, because that is the sentence a reader is calibrating the four figures against.
+     * Derived by `fixit/parse.ts#demandDisclosureOf`, so a case inside its band has no element
+     * here rather than an empty one.
+     */
+    if (entry.demandDisclosure !== undefined) {
+      const aDemand = el(doc, 'p', 'everyday-fixit-demand', entry.demandDisclosure);
+      aDemand.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.warmGrey};margin:8px 0 0`;
+      asBuilt.append(aDemand);
+    }
     main.append(asBuilt);
 
     /* -- 3. the four figures, measured on the as-built run -- */
@@ -992,6 +1004,8 @@ function mountFixit(
         running = false;
         if (before === undefined || after === undefined) return;
         session.asBuilt = before;
+        // GitHub issue #350: the claim the basis line will make, checked on the legs first.
+        assertPairMatchesRepairs(entry, session.state, before, after);
         session.outcome = classifyOutcome(entry, measuredOf(entry, before, after), spend);
         /*
          * The FIXED badge follows the **latest** run, in both directions — never a high-water mark.

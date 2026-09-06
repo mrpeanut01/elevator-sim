@@ -31,7 +31,7 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 import { restrictedFloorIds } from '../access/zoning.js';
 import { parseCampaign } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
-import { parseFixitCases } from '../fixit/parse.js';
+import { fixitContextOf, parseFixitCases } from '../fixit/parse.js';
 import type { FixitCases } from '../fixit/types.js';
 import { parseProofCases, type ProofCaseSet } from '../gauntlet/proofCases.js';
 import { validatePublishedGoalRates, type PublishedGoalRates } from '../scenario/published.js';
@@ -285,16 +285,14 @@ export async function loadReferenceRuns(
 
 export async function loadFixitCases(resources: BrowserResources): Promise<FixitCases> {
   const raw = await fetchJson('/fixit-cases.json');
-  return parseFixitCases(raw, {
-    floorIdsByBuilding: new Map(
-      resources.buildings.map((building) => [building.id, building.floors.map((floor) => floor.id)]),
-    ),
-    profileIds: new Set(resources.dispatcherProfiles.profiles.map((profile) => profile.id)),
-    engineIds: [
-      ...resources.buildings.map((building) => building.id),
-      ...resources.dispatcherProfiles.profiles.map((profile) => profile.id),
-    ],
-  });
+  return parseFixitCases(
+    raw,
+    fixitContextOf({
+      buildings: resources.buildings,
+      trafficProfiles: resources.trafficProfiles,
+      dispatcherProfiles: resources.dispatcherProfiles,
+    }),
+  );
 }
 
 /**

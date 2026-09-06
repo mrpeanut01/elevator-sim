@@ -46,7 +46,8 @@ import {
 } from '@elevator-sim/core/browser';
 
 import type { VizLeg, VizRecording } from '../contract/types.js';
-import type { FixitMeasurement } from './engine.js';
+import { assertSameCrowd, crowdDifferencesOf, sameCrowd } from '../record/crowd.js';
+import { selectionKeepsTheCrowd, type FixitMeasurement } from './engine.js';
 import type { ComplaintMeasure, ComplaintScope, FigureSpec, FixitCase, FixitPatch, FixitState } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -408,7 +409,37 @@ export function measuredOf(
     restBoardedAfter: a.restBoarded,
     restDeltaPoints:
       b.restAwayPct === null || a.restAwayPct === null ? null : a.restAwayPct - b.restAwayPct,
+    sameCrowd: sameCrowd(before, after),
   };
+}
+
+/**
+ * Hold the pair's **claim** and its **legs** to each other — GitHub issue #350's fix-it site.
+ *
+ * The claim is the patch: a selection with no crowd-changing repair claims the same crowd on both
+ * sides (§ 10.4's basis), and one carrying a demand-side repair claims a different one. The legs
+ * are the fact. Asserted in **both** directions, because each is a real defect: a pair that stopped
+ * sharing its crowd with no population patch means something other than population reached the
+ * trace, and a population patch that left every leg in place means the repair the player bought
+ * moved nobody. Called at both press sites on the commit the pair lands, before the outcome is
+ * classified, so a red names the fix-it pair and the case.
+ */
+export function assertPairMatchesRepairs(
+  entry: FixitCase,
+  state: FixitState,
+  before: VizRecording,
+  after: VizRecording,
+): void {
+  const pair = `the fix-it pair on case "${entry.id}"`;
+  if (selectionKeepsTheCrowd(entry, state)) {
+    assertSameCrowd(before, after, pair);
+    return;
+  }
+  if (crowdDifferencesOf(before, after).length === 0) {
+    throw new Error(
+      `${pair} selected a repair that patches floorPopulations, and the two runs met the same crowd anyway — the repair moved nobody, so the sentence the outcome prints about it would be false.`,
+    );
+  }
 }
 
 /* -------------------------------------------------------------------------- *

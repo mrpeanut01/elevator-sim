@@ -58,7 +58,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { emptyFixitState, toggleRepair } from '../fixit/engine.js';
-import { parseFixitCases } from '../fixit/parse.js';
+import { fixitContextOf, parseFixitCases } from '../fixit/parse.js';
 import { fixitRunPlanOf } from '../fixit/run.js';
 import type { FixitCase, FixitState } from '../fixit/types.js';
 import { recordRun } from '../record/recordRun.js';
@@ -125,19 +125,14 @@ function timed<T>(body: () => T): { readonly ms: number; readonly value: T } {
 }
 
 function shippedCases(): readonly FixitCase[] {
-  return parseFixitCases(dataFile('fixit-cases.json'), {
-    floorIdsByBuilding: new Map(
-      RESOURCES.entries.map((entry) => [
-        entry.resolved.id,
-        entry.resolved.floors.map((floor) => floor.id),
-      ]),
-    ),
-    profileIds: new Set(RESOURCES.dispatcherProfiles.profiles.map((profile) => profile.id)),
-    engineIds: [
-      ...RESOURCES.entries.map((entry) => entry.resolved.id),
-      ...RESOURCES.dispatcherProfiles.profiles.map((profile) => profile.id),
-    ],
-  }).cases;
+  return parseFixitCases(
+    dataFile('fixit-cases.json'),
+    fixitContextOf({
+      buildings: RESOURCES.entries.map((entry) => entry.resolved),
+      trafficProfiles: RESOURCES.trafficProfiles,
+      dispatcherProfiles: RESOURCES.dispatcherProfiles,
+    }),
+  ).cases;
 }
 
 /** The state a player presses `Run the day` in: the diagnosed repair selected, as the tier does. */

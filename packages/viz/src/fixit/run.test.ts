@@ -41,7 +41,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { recordRun, type RecordedRun } from '../record/recordRun.js';
 
 import { emptyFixitState, toggleRepair } from './engine.js';
-import { parseFixitCases } from './parse.js';
+import { fixitContextOf, parseFixitCases } from './parse.js';
 import { fixitRunPlanOf, type FixitResources } from './run.js';
 import type { FixitCase, FixitState } from './types.js';
 
@@ -80,19 +80,14 @@ let cases: readonly FixitCase[];
 
 beforeAll(() => {
   resources = resourcesFromDisk();
-  cases = parseFixitCases(dataFile('fixit-cases.json'), {
-    floorIdsByBuilding: new Map(
-      resources.entries.map((entry) => [
-        entry.resolved.id,
-        entry.resolved.floors.map((floor) => floor.id),
-      ]),
-    ),
-    profileIds: new Set(resources.dispatcherProfiles.profiles.map((profile) => profile.id)),
-    engineIds: [
-      ...resources.entries.map((entry) => entry.resolved.id),
-      ...resources.dispatcherProfiles.profiles.map((profile) => profile.id),
-    ],
-  }).cases;
+  cases = parseFixitCases(
+    dataFile('fixit-cases.json'),
+    fixitContextOf({
+      buildings: resources.entries.map((entry) => entry.resolved),
+      trafficProfiles: resources.trafficProfiles,
+      dispatcherProfiles: resources.dispatcherProfiles,
+    }),
+  ).cases;
 }, TIMEOUT_MS);
 
 /** The state a player presses `Run the day` in, so the as-repaired arm is a real second config. */

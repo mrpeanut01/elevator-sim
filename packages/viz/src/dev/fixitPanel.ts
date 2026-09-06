@@ -53,7 +53,7 @@ import {
   toggleRepair,
   type FixitOutcome,
 } from '../fixit/engine.js';
-import { FIXIT_RUN_SWITCHES, figureValuesOf, fixitRunPlanOf, measuredOf } from '../fixit/run.js';
+import { FIXIT_RUN_SWITCHES, assertPairMatchesRepairs, figureValuesOf, fixitRunPlanOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
 import type { VizRecording } from '../contract/types.js';
 
@@ -323,6 +323,10 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
             text: entry.symptom,
             style: { color: BAD, margin: '0' },
           }),
+          // § D478's derived declaration, where the Everyday screen draws it too.
+          ...(entry.demandDisclosure === undefined
+            ? []
+            : [el(doc, 'p', { text: entry.demandDisclosure, style: { color: MUTED, margin: '0.5rem 0 0' } })]),
         ]),
         card(
           figures === undefined
@@ -567,6 +571,8 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
           ask = undefined;
           if (before === undefined || after === undefined) return;
           session.asBuilt = before;
+          // GitHub issue #350: the claim the basis line will make, checked on the legs first.
+          assertPairMatchesRepairs(entry, session.state, before, after);
           const outcome = classifyOutcome(entry, measuredOf(entry, before, after), spend);
           session.outcome = outcome;
           // The badge follows the latest run, in both directions — `fixit/engine.ts#fixedBadgeAfter`

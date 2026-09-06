@@ -28,6 +28,9 @@ import {
   toggleRepair,
   type FixitMeasurement,
   type FixitSpend,
+  DEMAND_BASIS_LINE,
+  repairChangesTheCrowd,
+  selectionKeepsTheCrowd,
 } from './engine.js';
 import type { FixitCase, FixitState } from './types.js';
 
@@ -74,6 +77,7 @@ const MEASURED: FixitMeasurement = {
   restBoardedBefore: 100,
   restBoardedAfter: 100,
   restDeltaPoints: -1,
+  sameCrowd: true,
 };
 
 describe('spend and the editor prices', () => {
@@ -151,6 +155,33 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
     expect(outcome.basis).toBe(
       'one run before, one run after — enough to see a repair this size; not enough to split hairs.',
     );
+  });
+
+  /*
+   * GitHub issues #349 and #350: the basis follows the **measured** crowd, so a pair whose repair
+   * changed who arrives never prints the same-crowd sentence, whatever the outcome kind.
+   */
+  it('prints the demand basis when the legs say the crowd changed, on every outcome kind', () => {
+    const changed = { ...MEASURED, sameCrowd: false };
+    expect(classifyOutcome(CASE, changed, spendOf(CASE, emptyFixitState())).basis).toBe(DEMAND_BASIS_LINE);
+    expect(
+      classifyOutcome(CASE, { ...changed, restAwayAfterPct: 90, restDeltaPoints: -6 }, spendOf(CASE, emptyFixitState())).basis,
+    ).toBe(DEMAND_BASIS_LINE);
+    expect(DEMAND_BASIS_LINE).toContain('changed who arrives');
+    expect(DEMAND_BASIS_LINE).not.toBe(BASIS_LINE);
+  });
+
+  it('reads a crowd-changing repair off its patch, and a selection off its repairs', () => {
+    const population = { building: { floorPopulations: [{ floorIds: ['3'], population: 10 }] } };
+    const demand: FixitCase = {
+      ...CASE,
+      repairs: [{ ...(CASE.repairs[0] as FixitCase['repairs'][number]), patch: population }, ...CASE.repairs.slice(1)],
+    };
+    expect(repairChangesTheCrowd(demand.repairs[0] as FixitCase['repairs'][number])).toBe(true);
+    expect(repairChangesTheCrowd(CASE.repairs[0] as FixitCase['repairs'][number])).toBe(false);
+    expect(selectionKeepsTheCrowd(demand, emptyFixitState())).toBe(true);
+    expect(selectionKeepsTheCrowd(demand, { ...emptyFixitState(), selectedRepairIds: ['free-fix'] })).toBe(false);
+    expect(selectionKeepsTheCrowd(demand, { ...emptyFixitState(), selectedRepairIds: ['dear-fix'] })).toBe(true);
   });
 
   it('complaint fixed, building worse — somebody else is paying for it', () => {

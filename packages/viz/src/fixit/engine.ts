@@ -213,6 +213,36 @@ export const REST_DROP_LIMIT_POINTS = 2;
 export const BASIS_LINE =
   'one run before, one run after — enough to see a repair this size; not enough to split hairs.';
 
+/**
+ * The basis line for a pair whose repair **changed the crowd** — GitHub issue #349.
+ *
+ * Three shipped cases diagnose the crowd rather than the kit: staggered tenancy starts, appointment
+ * letters reprinted for half past nine, a staggered-starts lease clause invoked. Each of those
+ * repairs patches `floorPopulations`, so its after-run meets fewer people than its before-run by
+ * design, and {@link BASIS_LINE}'s implied *same crowd, twice* would be false under it. This line
+ * says what the pair actually is. Chosen from the **measurement** ({@link FixitMeasurement.sameCrowd},
+ * read off the legs) rather than from the patch, so the sentence cannot claim a crowd the runs did
+ * not have; `run.ts#assertPairMatchesRepairs` then holds the patch and the legs to each other.
+ */
+export const DEMAND_BASIS_LINE =
+  'one run before, one run after — and the repair changed who arrives, so the second run meets a different crowd. Enough to see a repair this size; not enough to split hairs.';
+
+/**
+ * Whether a repair changes **who arrives** rather than what carries them — the one patch field that
+ * reaches the passenger trace. `fixit/parse.ts` permits it on the diagnosed repair alone (a
+ * purchase cannot move people), so on a shipped case this is true of at most the diagnosed one.
+ */
+export function repairChangesTheCrowd(repair: FixitRepair): boolean {
+  return (repair.patch.building?.floorPopulations ?? []).length > 0;
+}
+
+/** Whether the repairs a state has selected leave the crowd alone — what the pair *claims*. */
+export function selectionKeepsTheCrowd(entry: FixitCase, state: FixitState): boolean {
+  return !entry.repairs.some(
+    (repair) => state.selectedRepairIds.includes(repair.id) && repairChangesTheCrowd(repair),
+  );
+}
+
 /** What the pair of runs measured, as the outcome needs it. Produced by `run.ts#measuredOf`. */
 export interface FixitMeasurement {
   /** The complaint figure on each run, in the measure's own unit. */
@@ -230,6 +260,11 @@ export interface FixitMeasurement {
   readonly restBoardedAfter: number;
   /** After minus before, in points. Negative is worse. `null` when either side is unmeasured. */
   readonly restDeltaPoints: number | null;
+  /**
+   * Whether the two runs met the same crowd, **measured on the legs** by `record/crowd.ts` — GitHub
+   * issue #350. Decides which basis line the outcome prints; see {@link DEMAND_BASIS_LINE}.
+   */
+  readonly sameCrowd: boolean;
 }
 
 export type FixitOutcomeKind = 'fixed' | 'building-worse' | 'over-budget' | 'not-enough';
@@ -309,6 +344,11 @@ export function fixedBadgeAfter(outcome: FixitOutcome): boolean {
  * distinction only the copy draws. The head is what a reader reads, and it is the head that was
  * lying.
  */
+/** Which basis the pair earned — read off the measurement, never off the patch. */
+function basisOf(measurement: FixitMeasurement): string {
+  return measurement.sameCrowd ? BASIS_LINE : DEMAND_BASIS_LINE;
+}
+
 export function classifyOutcome(
   entry: FixitCase,
   measurement: FixitMeasurement,
@@ -324,7 +364,7 @@ export function classifyOutcome(
         'This is a repair budget. What you have specified is a capital project, and the owner ' +
         'will want a business case rather than a work order.',
       rows,
-      basis: BASIS_LINE,
+      basis: basisOf(measurement),
     };
   }
   if (complaintRow.passed && restRow.passed) {
@@ -333,7 +373,7 @@ export function classifyOutcome(
       head: entry.result.head,
       body: `${entry.result.body}${spentAnywayClause(entry, spend)}`,
       rows,
-      basis: BASIS_LINE,
+      basis: basisOf(measurement),
     };
   }
   if (complaintRow.passed) {
@@ -344,7 +384,7 @@ export function classifyOutcome(
         'Everyone else waits longer than they did this morning, which is a second letter you ' +
         'have not received yet.',
       rows,
-      basis: BASIS_LINE,
+      basis: basisOf(measurement),
     };
   }
   // *Better* is a claim about the measurement in the row above it. See the docstring.
@@ -359,7 +399,7 @@ export function classifyOutcome(
       : 'Nothing you changed reached the thing the letter is about. Change something else and run ' +
         'it again.',
     rows,
-    basis: BASIS_LINE,
+    basis: basisOf(measurement),
   };
 }
 

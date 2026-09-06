@@ -244,6 +244,7 @@ import {
   toggleRepair,
   type FixitMeasurement,
 } from '../fixit/engine.js';
+import { demandDisclosureOf } from '../fixit/parse.js';
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
@@ -6625,6 +6626,17 @@ const FIXIT: SurfaceAdapter = {
       complaint: { ...entry.complaint, measure: { ...entry.complaint.measure, kind: 'mean-wait' } },
     };
 
+    /* ---- § D478's derived declaration, both directions it can point (GitHub issue #351) ---- */
+    for (const [name, rate, band] of [
+      ['busier', 9.5, { min: 3, max: 7 }],
+      ['quieter', 2, { min: 11, max: 15 }],
+    ] as const) {
+      const disclosure = demandDisclosureOf(rate, band);
+      if (disclosure !== undefined) {
+        seeds.push({ field: `demand.disclosure.${name}`, text: disclosure, role: 'prose' });
+      }
+    }
+
     /* ---- affordability and the budget notes, on states the reducers themselves build ---- */
     const empty = emptyFixitState();
     let spent = toggleRepair(entry, empty, 's-costly');
@@ -6679,7 +6691,7 @@ const FIXIT: SurfaceAdapter = {
     }
 
     /* ---- the three outcomes a green pair cannot produce, worded against fabricated measures ---- */
-    const flat: FixitMeasurement = {
+    const flatSameCrowd = (): FixitMeasurement => ({
       complaintBefore: 10,
       complaintAfter: 1,
       scopeBoardedBefore: 40,
@@ -6690,7 +6702,16 @@ const FIXIT: SurfaceAdapter = {
       restBoardedBefore: 120,
       restBoardedAfter: 120,
       restDeltaPoints: -5,
-    };
+      sameCrowd: true,
+    });
+    const flat = flatSameCrowd();
+    /* ---- the basis a demand-side repair earns — a fixed outcome on a pair that changed crowd ---- */
+    seeds.push({
+      field: 'outcome.demand.basis',
+      text: classifyOutcome(entry, { ...flatSameCrowd(), sameCrowd: false }, spendOf(entry, empty)).basis,
+      role: 'reason',
+      provenance: 'authored',
+    });
     const worse = classifyOutcome(entry, flat, spendOf(entry, empty));
     const short = classifyOutcome(
       entry,

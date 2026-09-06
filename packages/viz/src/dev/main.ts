@@ -165,6 +165,7 @@ import {
 import { systemClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
 import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
+import { assertSameCrowd } from '../record/crowd.js';
 import { recordRun } from '../record/recordRun.js';
 import {
   DEFAULT_THEME,
@@ -4269,6 +4270,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       onDone: (recording) => {
         ghostInFlight = false;
         if (state.recording !== primaryRecording) return; // a later day superseded this race
+        // GitHub issue #350 — the race's claim: *the same crowd, which is the whole of CRN*. The
+        // strip draws the two on one scale, and this is the assertion behind that.
+        assertSameCrowd(primaryRecording, recording, 'the race');
         ghostRecording = recording;
         lastRaceKey = '';
         renderAll();
@@ -5269,6 +5273,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // The template's own hour, moved on by the window when the run is a part of a day. Absent for
     // `constant-iso`, which declares none — omission means *this has no hour*, never *midnight*.
     runStartOfDayS = startOfDayS;
+    /*
+     * GitHub issue #350 — the intervention pair's claim, asserted rather than argued. An
+     * intervention re-simulates the day from t = 0 with the log grown by one entry, and every
+     * surface that draws the result says the prefix is bit-identical; that is only true if the
+     * re-run met the same crowd. The previous recording is the unpressed run, this one is the
+     * pressed run, and the legs are compared here, where the two are last both in hand. Guarded
+     * on the same seed and building, because a run that changed either is a new day and not this
+     * claim's subject.
+     */
+    if (
+      runCause === 'intervention' &&
+      state.recording !== undefined &&
+      state.recording.seed === recording.seed &&
+      state.recording.buildingId === recording.buildingId
+    ) {
+      assertSameCrowd(state.recording, recording, 'the intervention pair');
+    }
     // The run this shell simulated — GitHub issue #136, and the only place it is written. See
     // {@link simulatedRecording}.
     simulatedRecording = recording;
