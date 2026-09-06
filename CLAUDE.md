@@ -8,6 +8,14 @@ An elevator traffic simulator for designing and benchmarking smart dispatch algo
 Read [`docs/00-project-brief.md`](docs/00-project-brief.md) first, then
 [`docs/01-architecture.md`](docs/01-architecture.md).
 
+**If you are about to touch the game layer, read [`docs/38-what-the-game-is.md`](docs/38-what-the-game-is.md)
+and [`docs/39-decisions-in-force.md`](docs/39-decisions-in-force.md) before anything below.** The product owner
+re-declared the game on 2026-09-06 — three modes with Scenario first, one currency earned by playing, everything
+playing live, and a model that carries a Burj-class building ([§ D497](DECISIONS.md), [§ D498](DECISIONS.md),
+[§ D499](DECISIONS.md)) — and several paragraphs below describe the four-tile front door and the mode names
+that ruling retires. `docs/39` says which decisions are in force and which are superseded; nothing in
+`DECISIONS.md` is deleted or renumbered, and this file's status section has not yet been rewritten to match.
+
 **Current status: Phases 0–5 and 7–9 are landed and accepted, plus a six-command CLI. Phase 6 is
 partially complete.** Read the three that need care precisely — and **Phase 9's tick is the one that
 must never travel alone**, because it is *accepted with named gaps* and the gaps are part of the
