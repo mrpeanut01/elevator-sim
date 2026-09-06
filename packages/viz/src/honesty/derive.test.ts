@@ -727,6 +727,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scope/types.ts#PLAY_MODES',
         'scope/surface.ts#SCOPE_OF',
         'scope/permits.ts#permits',
+        /*
+         * GitHub issue #178 item 1's two id-only exports beside it. `permittedScopes` returns
+         * members of `CHANGE_SCOPES` and authors nothing; `MODE_OF_SCREEN` maps screen ids to
+         * `PLAY_MODES` members or `null`. Both are derived only because a hyphen reads as a word
+         * break — `stage-campaign`, `free-play` — which is `commitmentOf`'s case below. The
+         * sentence the model draws is `permittedLineFor`, driven by the menu adapter.
+         */
+        'scope/permits.ts#permittedScopes',
+        'menu/affordances.ts#MODE_OF_SCREEN',
         'scope/commitment.ts#COMMITMENTS',
         'scope/commitment.ts#commitmentOf',
         /*

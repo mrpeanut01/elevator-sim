@@ -27,7 +27,6 @@ import {
   rushOutcomeOf,
   rushPatchOf,
   rushRestorePatchOf,
-  rushResultStrings,
   rushResultViewOf,
   rushStageHeaderOf,
   rushTopArrivalsPerMinute,
@@ -133,7 +132,7 @@ describe('the hold line â€” forty past two minutes at once, read at the streamâ€
         RUSH_RESULT_COPY.carried,
         RUSH_RESULT_COPY.longest,
       ]);
-      for (const text of rushResultStrings(view)) expect(text).not.toMatch(/\bbetter\b|\bworse\b|\bbeats?\b/iu);
+      for (const text of [view.eyebrow, view.head, view.lede, ...view.account, ...view.figures.flatMap((f) => [f.label, f.value, f.note ?? '']), view.footer, view.disclosure ?? '']) expect(text).not.toMatch(/\bbetter\b|\bworse\b|\bbeats?\b/iu);
     }
     const brokeView = rushResultViewOf(broke, undefined);
     expect(brokeView.head).toBe(`Wave ${String(broke.wave)} is where it stopped draining`);

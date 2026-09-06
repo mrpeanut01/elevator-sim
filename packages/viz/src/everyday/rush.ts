@@ -343,16 +343,3 @@ export function rushResultViewOf(outcome: RushOutcome, disclosure: string | unde
     outcome: outcome.kind,
   };
 }
-
-/** Every string a result draws, for the corpus. */
-export function rushResultStrings(view: RushResultView): readonly string[] {
-  return [
-    view.eyebrow,
-    view.head,
-    view.lede,
-    ...view.account,
-    ...view.figures.flatMap((figure) => [figure.label, figure.value, ...(figure.note === undefined ? [] : [figure.note])]),
-    view.footer,
-    ...(view.disclosure === undefined ? [] : [view.disclosure]),
-  ];
-}

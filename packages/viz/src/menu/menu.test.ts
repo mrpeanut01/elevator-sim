@@ -423,9 +423,12 @@ describe('the catalogue is derived from data/, in both directions', () => {
     expect(catalogue.dispatchers.map((entry) => entry.id)).toEqual(
       config.dispatcherProfiles.profiles.map((profile) => profile.id),
     );
+    // Every template that lets itself be offered, and none that does not: `endless-rush` declares
+    // `selectable: false` (GitHub issue #220) and is the one shipped record the menu may not list.
     expect(catalogue.demandTemplates.map((entry) => entry.id)).toEqual(
-      config.trafficProfiles.demandTemplates.map((template) => template.id),
+      config.trafficProfiles.demandTemplates.filter((template) => template.selectable !== false).map((template) => template.id),
     );
+    expect(config.trafficProfiles.demandTemplates.some((template) => template.selectable === false)).toBe(true);
 
     // Non-vacuous: a catalogue derived from an empty config would satisfy the equalities above.
     expect(catalogue.buildings.length).toBeGreaterThanOrEqual(8);

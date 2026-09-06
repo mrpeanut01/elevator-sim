@@ -170,6 +170,10 @@ is showing a run its own screen does not describe.
 **S7 — A control a mode forbids is not offered.** Not offered-and-refused. A disabled control with a
 reason is correct where the *combination* is wrong (`freePlayIssues`' cross-field rule is the right
 shape); a control that this mode can never permit is chrome that teaches a player a wrong model.
+Since [§ D516](../DECISIONS.md) this clause has a chokepoint: `menu/affordances.ts` maps each menu
+screen to the mode it serves, `menu/screens.ts#screenOf` withholds the rows that mode forbids and
+appends `permits.ts#permittedLineFor`'s sentence, and `menu/affordances.test.ts` asserts the
+withheld set is empty on every shipped screen.
 
 **S8 — A control that says anything enters the honesty sweep, or carries a reasoned exclusion.**
 `honesty/surfaces.ts` is the chokepoint. An exclusion is a sentence long enough to be one, in

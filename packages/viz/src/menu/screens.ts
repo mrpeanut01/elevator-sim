@@ -34,7 +34,10 @@
  * not optional.
  */
 
+import { permittedLineFor } from '../scope/permits.js';
 import type { ChangeScope } from '../scope/types.js';
+
+import { MODE_OF_SCREEN, offeredIn } from './affordances.js';
 
 import {
   FREE_PLAY_RATES,
@@ -449,6 +452,14 @@ export interface MenuScreenView {
    * guide asks nothing of the shell: the panel discloses it in place.
    */
   readonly guide: MenuGuide | undefined;
+  /**
+   * The ids of rows this screen's mode forbids and the view therefore withheld — `docs/16` S7,
+   * decided by `menu/affordances.ts`. Never drawn: a panel that listed them would be offering-and-
+   * refusing, which is the thing S7 rules out. Carried so `affordances.test.ts` can assert the set
+   * is empty on every shipped screen, which is what makes S7 a checked clause rather than a
+   * remembered one.
+   */
+  readonly withheld: readonly string[];
 }
 
 /** One headed run of paragraphs in {@link MenuGuide}. */
@@ -679,12 +690,23 @@ const BACK: MenuAffordance = Object.freeze({
 export function screenOf(input: MenuViewInput): MenuScreenView {
   const screen = input.state.screen;
   const view = bodyOf(input, screen);
+  /*
+   * The affordance model, applied once, here. A screen inside a mode offers only the rows that mode
+   * permits and says in one sentence what it never offers; a door between modes (`null`) offers
+   * whatever its builder built. `BACK` is appended after the split because it is `presentation`,
+   * which every mode permits (`permits.test.ts`), so it could never be withheld — and a Back row
+   * that the model could remove would be a screen with no way out.
+   */
+  const mode = MODE_OF_SCREEN[screen];
+  const split = mode === null ? { offered: view.rows, withheld: [] } : offeredIn(mode, view.rows);
+  const notices = mode === null ? view.notices : Object.freeze([...view.notices, permittedLineFor(mode)]);
   return Object.freeze({
     screen,
     title: titleOf(screen),
-    notices: view.notices,
+    notices,
     issues: view.issues,
-    rows: screen === 'main' ? view.rows : Object.freeze([...view.rows, BACK]),
+    rows: screen === 'main' ? split.offered : Object.freeze([...split.offered, BACK]),
+    withheld: Object.freeze(split.withheld.map((row) => row.id)),
     /*
      * The root only. A guide repeated under every screen would be six copies of one explanation
      * competing with the screen the player already chose, and the one place a player who does not

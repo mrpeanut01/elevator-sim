@@ -103,7 +103,11 @@ export function configFor(
   const template = resources.trafficProfiles.demandTemplates.find(
     (entry) => entry.id === run.demandTemplateId,
   );
-  if (template === undefined) return 'unknown-template';
+  // A template that declares itself unselectable (`endless-rush`, GitHub issue #220) is one the
+  // board does not know: no shipped list offers it, so a submission naming it was built by hand,
+  // and a run under a stream that leaves every profile's declared band is not a run this board
+  // ranks. Refused on the same code, because to the board the two are the same fact.
+  if (template === undefined || template.selectable === false) return 'unknown-template';
 
   // The player's rules over the **server's** profile. Never a profile the submission carried.
   const dispatcherProfile = profileWithRules(shipped, run.ruleRows ?? []);

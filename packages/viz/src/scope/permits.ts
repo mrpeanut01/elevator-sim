@@ -71,16 +71,55 @@ export function permits(mode: PlayMode, scope: ChangeScope): boolean {
   }
 }
 
+/* -------------------------------------------------------------------------- *
+ * The two exports that were deleted for want of a caller, and now have one
+ * -------------------------------------------------------------------------- */
+
 /*
- * ## What is deliberately not here yet
- *
- * S7 also asks for the **sentence** a surface shows in place of a control its mode forbids, and for
- * the list of scopes a mode permits so a surface can draw them. Both were written here, and both
- * were deleted before this file landed, because `viz/deadCode.test.ts` reported them as exports with
- * no non-test caller — in the directory whose whole subject is that defect, on its first run.
- *
- * The roadmap's standing requirement is *"name the non-test caller"*, and the fix it prescribes is a
- * caller rather than an allowlist entry. The caller is the menu's affordance model, which does not
- * exist yet. So they arrive with it, and until then this module exports exactly the one function
- * something calls.
+ * Both of these were written here and deleted before this file first landed, because
+ * `viz/deadCode.test.ts` reported them as exports with no non-test caller — in the directory whose
+ * whole subject is that defect, on its first run. The roadmap's standing requirement is *name the
+ * non-test caller*, and the fix it prescribes is a caller rather than an allowlist entry. The caller
+ * is `menu/affordances.ts`, the menu's affordance model (GitHub issue #178 item 1, § D516): it asks
+ * {@link permits} row by row through `offeredIn`, and draws {@link permittedLineFor} as the one
+ * sentence a screen shows in place of the controls its mode never offers.
  */
+
+/** The scopes `mode` lets move, in {@link CHANGE_SCOPES}' order. Derived from {@link permits}. */
+export function permittedScopes(mode: PlayMode): readonly ChangeScope[] {
+  return CHANGE_SCOPES.filter((scope) => permits(mode, scope));
+}
+
+/**
+ * Each scope in the words a player reads. The ids are `docs/16`'s and are not player-facing; the
+ * phrase is what a scope *means* on a screen, and it is kept beside the matrix so the sentence
+ * below is pinned to the table it describes rather than authored screen by screen (§ D227's rule
+ * that a refusal is pinned by the thing it is about, never by another sentence).
+ */
+export const SCOPE_WORDS: Readonly<Record<ChangeScope, string>> = Object.freeze({
+  presentation: 'how the run is drawn',
+  'within-day': 'the run while it plays',
+  'between-days': 'the building between days',
+  'between-games': 'the run’s own setup',
+});
+
+function listOf(words: readonly string[], joiner: 'and' | 'or'): string {
+  if (words.length <= 1) return words[0] ?? '';
+  return `${words.slice(0, -1).join(', ')} ${joiner} ${words[words.length - 1] ?? ''}`;
+}
+
+/**
+ * S7's sentence: what a mode lets a control move, and what it never offers a control for.
+ *
+ * Composed from {@link permittedScopes} rather than written per mode, so re-scoping a row in
+ * {@link permits} changes this sentence on the same commit. A mode that permits everything gets the
+ * first clause alone — there is nothing it withholds, and a second clause naming nothing would be
+ * a refusal with no subject.
+ */
+export function permittedLineFor(mode: PlayMode): string {
+  const permitted = permittedScopes(mode);
+  const forbidden = CHANGE_SCOPES.filter((scope) => !permitted.includes(scope));
+  const may = `In this mode a control may move ${listOf(permitted.map((scope) => SCOPE_WORDS[scope]), 'and')}.`;
+  if (forbidden.length === 0) return may;
+  return `${may} Nothing moves ${listOf(forbidden.map((scope) => SCOPE_WORDS[scope]), 'or')}, so no such control is offered.`;
+}

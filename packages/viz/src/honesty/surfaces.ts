@@ -5344,6 +5344,13 @@ const MENU: SurfaceAdapter = {
     'menu/screens.ts#titleOf',
     'menu/screens.ts#applyIntent',
     /*
+     * `docs/16` S7's sentence — GitHub issue #178 item 1. `screenOf` appends it as the last notice
+     * on every screen `menu/affordances.ts#MODE_OF_SCREEN` puts inside a mode, composed from the
+     * matrix and the scope words, so both are driven wherever the screens below are.
+     */
+    'scope/permits.ts#permittedLineFor',
+    'scope/permits.ts#SCOPE_WORDS',
+    /*
      * GitHub issue #93's three sentences about a board, and every one of them is a claim about a run
      * this browser did not make. The reveal names the dispatcher that produced somebody's figures;
      * the refusal says why it cannot; the detail line promises a reproduction. Driven below on a

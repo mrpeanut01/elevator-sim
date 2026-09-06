@@ -241,7 +241,9 @@ describe('a template that declares no directional mix generates exactly the trac
           (entry.phases ?? []).some((phase) => phase.startSplit !== undefined),
       )
       .map((entry) => entry.id);
-    expect(varying).toEqual(['lunch-two-way', 'office-day']);
+    // `endless-rush` (GitHub issue #220) declares the contract's fixed 0.62 incoming on every knot
+    // of its phase list — a mix it *states* rather than varies, in the second form above.
+    expect(varying).toEqual(['lunch-two-way', 'office-day', 'endless-rush']);
 
     // Every id this module can build **with no record to read** has a record. The converse stopped
     // holding at § D274 and stopping was the point: `DEMAND_TEMPLATE_IDS` is the *fallback shape*
@@ -252,7 +254,7 @@ describe('a template that declares no directional mix generates exactly the trac
     const shipped = config.trafficProfiles.demandTemplates.map((entry) => entry.id);
     expect(shipped).toEqual(expect.arrayContaining([...DEMAND_TEMPLATE_IDS]));
     expect(shipped.filter((id) => !(DEMAND_TEMPLATE_IDS as readonly string[]).includes(id))).toEqual(
-      ['office-day'],
+      ['office-day', 'endless-rush'],
     );
     // And each of those really does carry its own phases, or it would be a record nothing builds.
     for (const entry of config.trafficProfiles.demandTemplates) {

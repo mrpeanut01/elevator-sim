@@ -33954,3 +33954,45 @@ its band says so. This entry is the four things a lane had to decide to build it
 the shell's own rush absence leave with the engine; the standings stay #177's. Where the rush sits
 in the player's path — the bench, or minute one — is the half of `docs/35` Q3 § D477 left open, and
 this entry does not take it: the tile is where it was.
+
+## D516 — The menu's affordance model: a screen inside a mode offers only the rows the mode permits, and says once what it never offers
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #178 item 1**, `docs/16` S7.
+
+**Context.** `docs/16` S7 says *a control a mode forbids is not offered. Not offered-and-refused.*
+`scope/permits.ts` has answered *may this scope move in this mode* since § D216, and `scope/permits.ts`
+and `scope/commitment.ts` both recorded, in their own docstrings, that the surface which should ask
+it — the menu's affordance model — did not exist. Two exports written for it were deleted on the
+file's first run because `deadCode.test.ts` found no caller, which was the right call: a
+`refusalSentenceFor` with no surface is a sentence nobody reads. So the matrix could say what a mode
+forbids and every screen's rows went from their builder to the panel unasked.
+
+**Decision.**
+
+1. **`menu/affordances.ts` is the model, and it decides three things.** `MODE_OF_SCREEN` names the
+   play mode each of the eight menu screens serves, or `null` for a door between modes; it is a
+   `Record` over `MenuScreen`, so a ninth screen does not compile until somebody answers. `offeredIn`
+   splits a screen's rows into the ones the mode permits and the ones it withholds. And
+   `permits.ts#permittedLineFor` is the one sentence a screen shows in place of the controls it
+   never offers, composed from `permittedScopes` and `SCOPE_WORDS` rather than authored per mode,
+   so re-scoping a row in the matrix rewrites the sentence on the same commit (§ D227's rule that a
+   refusal is pinned by the thing it is about).
+2. **The model is applied once, in `screenOf`.** A screen inside a mode offers `offeredIn`'s
+   `offered`, records the withheld ids on the view, and appends the sentence as its last notice. A
+   door offers whatever its builder built and says nothing. `BACK` is appended after the split
+   because `presentation` is permitted everywhere, and a Back row the model could remove would be a
+   screen with no way out.
+3. **A door is not an unscoped screen.** The campaign screen's scenario pick and calendar select are
+   `between-games` rows on the way *into* `stage-campaign`, a mode that forbids `between-games`
+   once entered. Mapping that screen to the mode it opens would withhold the row that opens it. So
+   `main`, `campaign`, `settings` and `account` are doors, and the rooms are Free Play
+   (`free-play`), the challenge and the leaderboard (`ranked`) and commissioning (`commissioning`).
+4. **S7 is met by construction and checked, and those are two claims.** On every shipped screen,
+   over every state `affordances.test.ts` drives, the withheld set is empty. The filter is what makes
+   a future forbidden row disappear rather than ship; the guard is what makes it fail the build
+   rather than disappear silently. Neither alone is the clause.
+
+**Consequences.** `permittedScopes` and `SCOPE_WORDS` join `permits` in `scope/permits.ts` with the
+caller the file was waiting for. The sentence enters the honesty corpus through the menu adapter on
+four screens. `scope/commitment.ts`'s docstring stops describing the model as unbuilt. Item 2 of
+#178, `showEnergyAxis`, was closed on 2026-09-02 and is not part of this entry; `GAPS.md` § 3 says so.

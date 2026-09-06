@@ -316,6 +316,16 @@ export interface DemandTemplate extends Commented {
   readonly durationMin: number;
   readonly reportWindow?: string | undefined;
   readonly shape?: string | undefined;
+  /**
+   * Whether a player may pick this template from a list. **Absent means yes.**
+   *
+   * `false` on a stream a mode owns — `endless-rush` (GitHub issue #220, § D515), which exists to be
+   * run by that mode's own setup and is not a shape a run may be chosen or posted under. Declared
+   * on the record rather than known by id in the menu, because a list built by naming the members
+   * to skip is § D213's defect; the menu's catalogue reads this field and offers nothing that
+   * declares it. Nothing in the simulation reads it.
+   */
+  readonly selectable?: boolean | undefined;
   /** Warm-up to discard, minutes. */
   readonly discardFirstMin?: number | undefined;
   /** Cool-down to discard, minutes. */
