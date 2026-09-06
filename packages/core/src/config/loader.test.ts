@@ -1,5 +1,6 @@
 /// <reference types="node" />
 
+import { HARD_CONSTRAINT_WORDS } from '../dispatch/types.js';
 import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
@@ -176,6 +177,26 @@ describe('loadConfig against the real data/ directory', () => {
     }
     // No two shipped profiles share one — the derived line's own rule, kept for the authored one.
     expect(blurbs.size).toBe(config.dispatcherProfiles.profiles.length);
+  });
+
+  it('gives every hard constraint a shipped profile declares its player-facing words', () => {
+    /*
+     * GitHub issue #177 item 6 asked which constraints reach the surfaces' fallback — *a filter no
+     * weight can buy past*. Measured: none. `HARD_CONSTRAINT_WORDS` is a `Record` over
+     * `HardConstraintId`, so an id without words is a compile error, and this case holds the other
+     * direction — an id the *data* declares that the type does not know would reach the fallback
+     * through the `as HardConstraintId` cast the surfaces make, and it is red here first.
+     */
+    const declared = new Set(
+      config.dispatcherProfiles.profiles.flatMap((profile) => profile.hardConstraints ?? []),
+    );
+    expect(declared.size).toBeGreaterThan(0);
+    for (const id of declared) {
+      expect(Object.hasOwn(HARD_CONSTRAINT_WORDS, id), id).toBe(true);
+      const words = HARD_CONSTRAINT_WORDS[id as keyof typeof HARD_CONSTRAINT_WORDS];
+      expect(words.name.length, id).toBeGreaterThan(3);
+      expect(words.effect.length, id).toBeGreaterThan(20);
+    }
   });
 
   it('loads every shipped building, in filename order', () => {
