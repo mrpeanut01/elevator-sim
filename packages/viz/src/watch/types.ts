@@ -223,7 +223,34 @@ export interface PostedResult {
  * is: § 14.1's no-first-person rule and § 20.11's no-inventing-people rule pull in the same
  * direction, and what satisfies both is naming the **day** rather than a person.
  */
-export type WatchSource = 'filed-day' | 'reference';
+/**
+ * `'posted-run'` is another player's run, read off a board row — GitHub issue #337, § 14.1's own
+ * subject. It is the one source whose label **is** a person, because the row is a person's and the
+ * server verified their run by replay before ranking it (`ENGINE_CONTRACT.md` § 1.4); naming them
+ * is § 14.1's *"their name at 19 px"* rather than § 20.11's invented player. What it carries where
+ * the other two carry a {@link PostedResult} is a {@link PostedClaim}: the four figures the server
+ * measured and ranked on, so the reproduction gate compares what the board says with what this
+ * device gets, rather than a count the wire never carried.
+ */
+export type WatchSource = 'filed-day' | 'reference' | 'posted-run';
+
+/**
+ * What a board row claims — the server's measurement of the run, as `menu/client.ts#BoardEntry`
+ * carries it. Restated rather than imported so this module owns its own shape, on
+ * `ruleRows`' precedent below; `watch/posted.ts` is the one writer and copies field by field.
+ *
+ * `legs` is the `n` behind `awtS`, and `undefined` from a server too old to send it — in which
+ * case the view withholds the mean rather than printing it bare (R13 clause one), exactly as the
+ * board row does.
+ */
+export interface PostedClaim {
+  readonly awtS: number;
+  readonly wt95S: number;
+  readonly ttdMeanS: number;
+  readonly pctOverLongWait: number;
+  readonly awtIsValid: boolean;
+  readonly legs: number | undefined;
+}
 
 /** Why a row cannot be watched — § 1.5's *"loses its `Watch it` button rather than replaying something approximate"*. */
 export interface WatchBlocked {
@@ -266,6 +293,14 @@ export interface WatchableRun {
   /** One line placing the run — `Tuesday · day 2`, or the reference run's own note. */
   readonly subtitle: string;
   readonly record: WatchRecord | null;
-  readonly posted: PostedResult;
+  /**
+   * What the record was filed with, for a day this device filed or a reference row. `undefined`
+   * for a {@link PostedClaim} row, whose figures live in {@link claim} instead — a board never
+   * carried these four counts, and a zero standing in for them would be R3's blank where a number
+   * should be. Exactly one of the two is defined; `watch/library.ts` asserts it at the gate.
+   */
+  readonly posted: PostedResult | undefined;
+  /** The server's figures for a `posted-run` row. `undefined` for the other two sources. */
+  readonly claim?: PostedClaim | undefined;
   readonly blocked: WatchBlocked | null;
 }

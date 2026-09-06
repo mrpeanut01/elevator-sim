@@ -117,8 +117,8 @@ describe('the daily board tab', () => {
       rows: [entry('Ada', 21.44), entry('Grace', 29.5)],
     });
     expect(view.rows).toEqual([
-      { place: '1', displayName: 'Ada', figure: '21.4 s', count: 'over 312 rides' },
-      { place: '2', displayName: 'Grace', figure: '29.5 s', count: 'over 312 rides' },
+      { id: 'row-Ada', watch: 'watch', place: '1', displayName: 'Ada', figure: '21.4 s', count: 'over 312 rides' },
+      { id: 'row-Grace', watch: 'watch', place: '2', displayName: 'Grace', figure: '29.5 s', count: 'over 312 rides' },
     ]);
   });
 
@@ -154,6 +154,14 @@ describe('the daily board tab', () => {
       'over 88 rides',
     ]);
     expect(view.rows.map((row) => row.figure)).toEqual(['21.4 s', 'no count', '33.1 s']);
+  });
+
+  it('gives every row a Watch it, and the signed-in player’s own row the inert your run — GitHub issue #337', () => {
+    const board = { kind: 'board' as const, date: '2026-09-06', note: 'n', rows: [entry('A. Turing', 21.4), entry('Nadia R.', 29.5)] };
+    expect(dailyBoardViewOf(board).rows.map((row) => row.watch)).toEqual(['watch', 'watch']);
+    expect(dailyBoardViewOf(board, 'Nadia R.').rows.map((row) => row.watch)).toEqual(['watch', 'yours']);
+    expect(dailyBoardViewOf(board, 'Nadia R.').rows.map((row) => row.id)).toEqual(['row-A. Turing', 'row-Nadia R.']);
+    expect(BOARD_SCREEN_COPY.dailyRowYours).toBe('your run');
   });
 
   it('does not draw dataHash as though it were a score', () => {

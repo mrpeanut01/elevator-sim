@@ -183,6 +183,7 @@ import type {
 } from '../shift/types.js';
 import { nextDay } from '../shift/week.js';
 import { checkedRun, filedDayRuns } from '../watch/library.js';
+import { postedRunOf } from '../watch/posted.js';
 import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
@@ -958,6 +959,14 @@ export interface EverydayHost {
   watchRun(run: WatchableRun): WatchableRun;
 
   /**
+   * A daily-board row as a spectator's row — GitHub issue #337, § 14.1's *"a board row is a run,
+   * and a run can be watched"*. Pure over the row and this build's `data/` (`watch/posted.ts`), so
+   * the press is {@link watchRun} on its answer, exactly as a filed day's row is pressed; the gate
+   * compares the server's four ranked figures with this build's replay rather than four counts.
+   */
+  postedRun(entry: BoardEntry, place: number): WatchableRun;
+
+  /**
    * Whose run is on the stage and § 14.1's view of it, or `undefined` when the player's own is.
    *
    * The **view** rather than only the row, so the Everyday stage and the Engineer chrome draw one
@@ -1724,6 +1733,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       const references = await b.loadReferenceRuns().catch(() => []);
       return Object.freeze([...filed, ...references]);
     },
+    postedRun: (entry, place) => postedRunOf(entry, place, b.resources),
     watchRun: (run) => {
       const checked = checkedRun(run, b.resources, b.state(), b.simulateRecord);
       if (checked.run.blocked !== null || checked.recording === undefined) return checked.run;

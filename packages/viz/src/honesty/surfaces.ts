@@ -296,7 +296,8 @@ import {
 } from '../live/raceStrip.js';
 import { DAY_HAS_NO_RECORD, refusalForDay } from '../watch/library.js';
 import { recordUnreadableReason } from '../watch/record.js';
-import { postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
+import { claimOf, claimRefusalFor, postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
+import { postedLogOf, postedRunOf } from '../watch/posted.js';
 import type { WatchableRun } from '../watch/types.js';
 import {
   PLAYER_SHELL_COPY,
@@ -7222,6 +7223,21 @@ const WATCH: SurfaceAdapter = {
      */
     'watch/record.ts#recordRefusalFor',
     'watch/reproduce.ts#reproductionRefusalFor',
+    /*
+     * GitHub issue #337's third source — a board row. The view's arm and its three claimed figures
+     * are rendered below in both states a row can be in (a quotable mean with its `n`, and a mean
+     * the server withheld); the builder's subtitle and its two refusals are rendered through the
+     * builder on a row fixture, so the sentence a spectator meets over a handover this build cannot
+     * replay is swept in the wording the board draws it.
+     */
+    'watch/view.ts#claimedFiguresOf',
+    'watch/view.ts#POSTED_RUN_LINE',
+    'watch/posted.ts#postedRunOf',
+    'watch/posted.ts#postedSubtitleOf',
+    'watch/posted.ts#postedLogOf',
+    'watch/reproduce.ts#claimRefusalFor',
+    /* The figure labels the refusal above is composed from; reached through it and nothing else. */
+    'watch/reproduce.ts#claimDrift',
     'watch/record.ts#recordUnreadableReason',
     /*
      * The shell's own spectator surfaces — `docs/20` defect 7. They are covered **here**, beside
@@ -7243,17 +7259,50 @@ const WATCH: SurfaceAdapter = {
     const seeds: TextSeed[] = [];
     const posted = postedResultOf(context.recording);
 
-    for (const source of ['filed-day', 'reference'] as const) {
-      const run: WatchableRun = {
-        id: `watch-${source}`,
-        source,
-        label: source === 'reference' ? 'The house baseline' : 'Tuesday \u00b7 day 2',
-        buildingName: context.building.name,
-        subtitle: 'day 2 of this week',
-        record: null,
-        posted,
-        blocked: null,
-      };
+    /*
+     * A board row over this case's own run — GitHub issue #337 — so the posted arm's figures are
+     * the run's rather than a literal's, and the builder is the shipped one. Two rows: one whose
+     * mean the server vouched for with its count, one whose mean it withheld.
+     */
+    const rowClaim = claimOf(context.recording);
+    const rowOf = (id: string, legs: number | undefined, awtIsValid: boolean): BoardEntry => ({
+      id,
+      displayName: 'Nadia R.',
+      run: {
+        buildingId: context.case.buildingId,
+        dispatcherProfileId: context.case.baselineProfileId,
+        demandTemplateId: context.recording.trafficProfileId ?? 'office-day',
+        arrivalRatePctPop5min: null,
+        durationS: Math.round(context.recording.endedAt - context.recording.startedAt),
+        windowStartS: null,
+        seed: context.recording.seed,
+      },
+      dataHash: 'sha256:corpus',
+      measured: { ...rowClaim, awtIsValid },
+      legs,
+      submittedAtMs: 0,
+    });
+    const postedRuns: readonly WatchableRun[] = [
+      postedRunOf(rowOf('row-quotable', context.recording.summary.waitCount, true), 2, browserResourcesOf(context)),
+      postedRunOf(rowOf('row-withheld', undefined, false), 5, browserResourcesOf(context)),
+    ];
+    const runs: readonly WatchableRun[] = [
+      ...(['filed-day', 'reference'] as const).map(
+        (source): WatchableRun => ({
+          id: `watch-${source}`,
+          source,
+          label: source === 'reference' ? 'The house baseline' : 'Tuesday \u00b7 day 2',
+          buildingName: context.building.name,
+          subtitle: 'day 2 of this week',
+          record: null,
+          posted,
+          blocked: null,
+        }),
+      ),
+      ...postedRuns,
+    ];
+    for (const run of runs) {
+      const source = run.id;
       const view = watchingViewOf(run, context.case.baselineProfileId);
       /*
        * Through the view's own enumeration, so a cell added to `WatchingView` enters this corpus
@@ -7331,6 +7380,30 @@ const WATCH: SurfaceAdapter = {
     });
     if (drifted !== null) {
       seeds.push({ field: 'watch.blocked(does-not-reproduce)', text: drifted, role: 'reason' });
+    }
+    /*
+     * GitHub issue #337's two refusals, each a real derivation: a board claim two figures off this
+     * run's own, and a row whose handover names a dispatcher this build does not ship.
+     */
+    const claimDrifted = claimRefusalFor(
+      { ...rowClaim, awtS: rowClaim.awtS + 0.75, wt95S: rowClaim.wt95S + 3, legs: 400 },
+      context.recording,
+    );
+    if (claimDrifted !== null) {
+      seeds.push({ field: 'watch.blocked(claim-does-not-reproduce)', text: claimDrifted, role: 'reason' });
+    }
+    const unshippedHandover = postedLogOf(
+      {
+        ...rowOf('row-handover', 400, true),
+        run: {
+          ...rowOf('row-handover', 400, true).run,
+          interventions: [{ atS: 300, change: { kind: 'switch-dispatcher', toProfileId: 'no-such-dispatcher' } }],
+        },
+      },
+      browserResourcesOf(context).dispatcherProfiles.profiles,
+    );
+    if (typeof unshippedHandover === 'string') {
+      seeds.push({ field: 'watch.blocked(unshipped-handover)', text: unshippedHandover, role: 'reason' });
     }
     return singleRun(this.id, seeds);
   },

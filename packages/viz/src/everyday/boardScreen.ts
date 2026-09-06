@@ -71,9 +71,12 @@ import { RATING_BASIS } from '../gauntlet/rating.js';
 import { runGauntlet, type GauntletHandle, type GauntletWorker } from '../gauntlet/run.js';
 
 import { DAILY_BOARD_METRIC, type EverydayDailyBoard } from './host.js';
+import { everydayAccount } from './accountPort.js';
 import { everydayProgressWith } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
-import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
+import { WATCH_IT_LABEL } from './watchStage.js';
+import type { EverydayScreenHandle, EverydayScreenModule } from './screens.js';
+import type { EverydayScreenShellContext } from './shell.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as G,
@@ -117,6 +120,13 @@ export const BOARD_SCREEN_COPY = Object.freeze({
     'The server answered but did not say which day is running. That is a server too old to name ' +
     'one rather than a day with no board, so there is nothing to show rather than an empty table.',
   dailyEmpty: 'Nobody has posted to today’s board yet. It resets tomorrow.',
+  /*
+   * § 14.1: *"Your own row cannot be watched. Its button reads `your run` and does nothing."* The
+   * one first-person string on this screen, and it is the handoff's own: the row is the player's,
+   * so the pronoun is true. Applied on the signed-in display name, which is the only identity a
+   * board row carries — GitHub issue #337.
+   */
+  dailyRowYours: 'your run',
   /*
    * A row whose server sent no `n`. Short, and in the figure's own place rather than a footnote,
    * because the thing a reader wants to know is why *this* row has no number while its neighbours
@@ -219,7 +229,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 const NOTE = `font-size:13px;line-height:1.55;color:${C.warmGrey};margin:${String(G.row)}px 0 0;max-width:70ch;text-wrap:pretty`;
 
-function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScreenHandle {
+function mount(host: HTMLElement, context: EverydayScreenShellContext): EverydayScreenHandle {
   const doc = host.ownerDocument;
   // Before the first draw reads RATINGS — a restored ladder must be there on the first paint.
   ensureRestored();
@@ -235,6 +245,8 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   let disposed = false;
   /** `undefined` while the read is in flight — the fifth thing this tab can be drawing. */
   let board: EverydayDailyBoard | undefined;
+  /** Rows whose press the gate refused, by the server's row id, with the reason — GitHub issue #337. */
+  const watchRefused = new Map<string, string>();
 
   const status = el(doc, 'div', BOARD_SCREEN_COPY.loading);
   status.style.cssText = NOTE;
@@ -565,7 +577,11 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
    * more, which is the same split `dev/reportPanel.ts` uses for the same reason.
    */
   function dailyBlock(): HTMLElement {
-    const view = dailyBoardViewOf(board);
+    const account = everydayAccount();
+    const view = dailyBoardViewOf(
+      board,
+      account?.token !== undefined ? account.user?.displayName : undefined,
+    );
     const wrap = el(doc, 'div');
     wrap.style.cssText = `margin-top:${String(G.section)}px`;
     for (const line of view.lines) {
@@ -596,6 +612,41 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
         count.className = 'everyday-board-row-count';
         count.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label}`;
         row.append(count);
+      }
+      /*
+       * § 14.1's `Watch it` — GitHub issue #337. The press is `weekScreen.ts`'s, in the one order
+       * that is safe: the gate first, and the spectator state only on its `blocked: null`. A row it
+       * refused is redrawn with the reason where the button stood, so a run this build's data
+       * cannot reproduce is a labelled refusal rather than a blank.
+       */
+      const refusal = watchRefused.get(entry.id);
+      if (refusal !== undefined) {
+        const why = el(doc, 'span', refusal);
+        why.className = 'everyday-board-row-refused';
+        why.style.cssText = `font-size:11.5px;color:${C.label};flex-basis:100%`;
+        row.style.flexWrap = 'wrap';
+        row.append(why);
+      } else {
+        const button = el(doc, 'button', entry.watch === 'yours' ? BOARD_SCREEN_COPY.dailyRowYours : WATCH_IT_LABEL);
+        button.type = 'button';
+        button.className = entry.watch === 'yours' ? 'everyday-board-row-yours' : 'everyday-board-row-watch';
+        button.disabled = entry.watch === 'yours';
+        button.style.cssText = `border:1px solid ${C.rule};border-radius:${String(R.control)}px;background:transparent;padding:3px 9px;font-size:11.5px;color:${C.ink};cursor:${entry.watch === 'yours' ? 'default' : 'pointer'}`;
+        if (entry.watch === 'watch') {
+          const place = Number(entry.place);
+          const source = board !== undefined && board.kind === 'board' ? board.rows.find((candidate) => candidate.id === entry.id) : undefined;
+          button.addEventListener('click', () => {
+            if (source === undefined) return;
+            const checked = context.host.watchRun(context.host.postedRun(source, place));
+            if (checked.blocked !== null) {
+              watchRefused.set(entry.id, checked.blocked.reason);
+              redraw();
+              return;
+            }
+            context.enterWatch();
+          });
+        }
+        row.append(button);
       }
       rows.append(row);
     }
@@ -737,6 +788,14 @@ export interface DailyBoardLine {
 
 /** One posted run, ranked. Both strings are pre-formatted so the renderer decides nothing. */
 export interface DailyBoardRowView {
+  /** The server's row id — what a press hands back to `EverydayHost.postedRun`. */
+  readonly id: string;
+  /**
+   * Which button the row carries — GitHub issue #337. `'watch'` is § 14.1's `Watch it`;
+   * `'yours'` is the inert `your run` a player's own row draws instead, decided on the signed-in
+   * display name because that is the only identity a board row carries.
+   */
+  readonly watch: 'watch' | 'yours';
   readonly place: string;
   readonly displayName: string;
   /** The mean wait, or the withholding sentence when this row carries no count. */
@@ -774,7 +833,10 @@ export interface DailyBoardView {
  * Pure and exported so `boardScreen.test.ts` can drive every state without a document, and so the
  * shape of the decision is readable without reading a renderer.
  */
-export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBoardView {
+export function dailyBoardViewOf(
+  board: EverydayDailyBoard | undefined,
+  ownDisplayName: string | undefined = undefined,
+): DailyBoardView {
   const only = (text: string, className: string, role: 'reason' | 'note' = 'reason'): DailyBoardView => ({
     lines: [{ text, className, role }],
     rows: [],
@@ -834,6 +896,8 @@ export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBo
          * denominator this client could honestly supply — and it withholds rather than inventing.
          */
         rows: board.rows.map((entry, index) => ({
+          id: entry.id,
+          watch: ownDisplayName !== undefined && entry.displayName === ownDisplayName ? 'yours' : 'watch',
           place: String(index + 1),
           displayName: entry.displayName,
           figure:
@@ -853,5 +917,6 @@ export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBo
 /** The registry row — one import and one line in `screens.ts`, plus its refusal sentence deleted. */
 export const BOARD_SCREEN: EverydayScreenModule = {
   key: 'board',
-  mount,
+  /* `benchScreen.ts`'s cast, for its reason: every context the shell constructs is the shell's. */
+  mount: (host, context) => mount(host, context as EverydayScreenShellContext),
 };

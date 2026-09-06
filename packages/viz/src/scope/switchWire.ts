@@ -112,6 +112,21 @@ export function switchUnpostableReasonOf(
   );
 }
 
+/**
+ * The wire's switch, back as the profile `core`'s arm carries — the server's `verify.ts#interventionsFor`
+ * done on this end, for a board row a spectator is about to replay (GitHub issue #337). The same
+ * two writes `profileWithRules` makes on both ends, over this build's shipped profile; `undefined`
+ * for an id this build does not ship, which is the row's `unreadable-record` refusal.
+ */
+export function switchTargetFromWire(
+  wire: SwitchOnTheWire,
+  shipped: readonly DispatcherProfile[],
+): DispatcherProfile | undefined {
+  const base = shipped.find((profile) => profile.id === wire.toProfileId);
+  if (base === undefined) return undefined;
+  return withRows(base, wire.ruleRows ?? []);
+}
+
 /** One entry of the log as the wire carries it — `menu/client.ts#SubmittedIntervention`'s shape. */
 export type WireIntervention =
   | { readonly atS: number; readonly change: { readonly kind: 'park-cars-lobby' } }

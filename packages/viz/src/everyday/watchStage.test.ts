@@ -131,8 +131,10 @@ describe('the Everyday watching surface', () => {
     /* § 16 rule 2: the lede states the basis, which is the substitution § D407 argues. */
     expect(WATCH_ROWS_LEDE).toContain('re-simulates');
     expect(WATCH_ROWS_LEDE).toContain('no longer reproduces');
-    /* And the third source is named as absent rather than left for a reader to infer. */
-    expect(WATCH_ROWS_LEDE).toContain('server');
+    /* And the third source is named, and where it lives — today's board — rather than left for a
+       reader to infer (GitHub issue #337; until then the sentence said it needed a server). */
+    expect(WATCH_ROWS_LEDE).toContain("today's board");
+    expect(WATCH_ROWS_LEDE).not.toContain('there is none');
   });
 });
 

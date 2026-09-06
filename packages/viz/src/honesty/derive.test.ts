@@ -1031,6 +1031,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'record/crowd.ts#assertSameCrowd',
         'fixit/run.ts#assertPairMatchesRepairs',
         'scope/switchWire.ts#wireInterventionsOf',
+        /*
+         * GitHub issue #337's inverse of the wire form: returns a profile or `undefined` and authors
+         * no sentence; derived only because a hyphenated id reads as two words. The sentence a
+         * spectator reads about an unresolvable handover is `watch/posted.ts#postedLogOf`'s, driven.
+         */
+        'scope/switchWire.ts#switchTargetFromWire',
       ],
     },
     {
