@@ -260,6 +260,12 @@ export function raceAgainstCard(): BriefRefusalCard {
  * history, one directory over and already paid for once. Read at call time, the registry is
  * initialised and the two surfaces agree.
  */
+/**
+ * The door's label — what pressing it does, in the state's own words. Exported so the site test
+ * and the browser tier can name the control by it rather than by a copy of it.
+ */
+export const SANDBOX_DOOR_LABEL = 'Change it anyway — the day stops counting';
+
 export function lockedForScore(): BriefRefusalCard {
   const built = isScreenBuilt('tuner');
   return {
@@ -267,12 +273,24 @@ export function lockedForScore(): BriefRefusalCard {
     what:
       'The tower, the machines and the crowd are the same for everyone today. You can change all ' +
       'of them — the run just stops counting.',
+    /*
+     * **The door names a state, never a destination** — GitHub issue #225,
+     * [§ D496](../../../../DECISIONS.md). It read *Take it to the sandbox*, a verb and a place, which
+     * is the reading under which Sandbox is a mode with a screen; the ruling is that it is a
+     * **state** a week is in once anything scored has been changed, arrived at and never chosen, and
+     * four other surfaces already say so in those terms (`shift/weekLabel.ts`, the tuner's own strip
+     * and stamp, `everyday/actionBar.ts`'s note). So the door says what changing *does* — the day
+     * stops counting — and names the state the way the strip on the far side will name it. No
+     * honesty property can see this class: the ten are predicates over strings and
+     * `surfaces-disagree` compares figures, not vocabulary, so `briefView.test.ts` holds it at the
+     * site.
+     */
     why: built
-      ? 'Take it to the sandbox: the day still runs with whatever you change, and it stops ' +
-        'counting on today’s board.'
-      : `Take it to the sandbox: ${unbuiltReasonFor('tuner')}.`,
+      ? 'Change anything you like: the day still runs with what you changed, it just stops ' +
+        'counting on today’s board — a sandbox day, not a scored one.'
+      : `Change it here: ${unbuiltReasonFor('tuner')}.`,
     caveat: 'Everything you can change from here changes the dispatcher, and nothing else.',
-    door: built ? { label: 'Take it to the sandbox', screen: 'tuner' } : undefined,
+    door: built ? { label: SANDBOX_DOOR_LABEL, screen: 'tuner' } : undefined,
   };
 }
 

@@ -189,7 +189,7 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    *
    * It read: *"Tune the tower is registered and routable, and no shipped control opens it: the
    * guide forbids a rail row (*a thing you do to a day, not a place you live*) and names its two
-   * doors as the brief's *Take it to the sandbox* and the report's third lever, neither of which is
+   * doors as the brief's locked-for-score card and the report's third lever, neither of which is
    * built"*. That was true on the lane that wrote it and false the moment it met a tree carrying
    * the brief: the first of those two doors exists here, and `briefView.ts#lockedForScore` now
    * carries the route through it. The rail-row prohibition is unchanged and still asserted

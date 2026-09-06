@@ -108,9 +108,17 @@ suspected rather than announcing something they never saw.
 
 **Refusal test.** *Where on the stage would a player have seen this?* If the report's headline has
 no visible antecedent during the run, either the stage is missing a cue or the report is asserting
-something the run did not show. **This is the pillar the build currently fails outright**
-([`MULTI_AGENT_PLAN.md`](../MULTI_AGENT_PLAN.md) § 1, goal 4), and it is why M2 carries a stage
-issue as a P0.
+something the run did not show. **This was the pillar the build failed outright** when this
+document was written ([`MULTI_AGENT_PLAN.md`](../MULTI_AGENT_PLAN.md) § 1, goal 4), and it is why
+M2 carried a stage issue as a P0. **Re-adjudicated 2026-09-06 on GitHub issue #277's landing**
+([§ D470](../DECISIONS.md)): the Everyday stage draws the five goals the report grades, at its own
+playhead, as readings and never as verdicts (`everyday/stageScreenModel.ts`, § D371), so the
+report's five headline rows now each have a visible antecedent during the run. The pillar is no
+longer failed outright. It is not yet **met**: the refusal test still fires on a campaign day whose
+event writes a visible engine change and is announced by the brief before the building shows it
+(GitHub issue #353), and on the first session presenting no problem at all (GitHub issue #208).
+Both are named here rather than the sentence being quietly left, because the issue this sentence
+used to cite, #212, closed having fixed something else.
 
 ### P4 — One change, measured
 

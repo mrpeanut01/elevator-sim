@@ -10,7 +10,7 @@
  *    re-derived on every edit, so moving *Shafts* must move the printed interval — the standing
  *    requirement, checked on the drawn figure rather than on an internal field.
  * 3. **The tuner is reached from the brief and from nowhere else.** § 3.2 forbids a rail row and
- *    names its two doors as the brief's *Take it to the sandbox* and the report's third lever; the
+ *    names its two doors as the brief's locked-for-score door and the report's third lever; the
  *    first is drawn here (`briefView.ts#lockedForScore`) and the second is not, so what this tier
  *    says is the § 3.2 rule in both of its halves — the row and the tile that must not exist, and
  *    the card that must. Its seven controls are driven without a document in `tunerModel.test.ts`.
@@ -548,7 +548,7 @@ describe.skipIf(!HAS_BROWSER)('Tune the tower', () => {
     await page.close();
   });
 
-  it('opens from the brief’s *Take it to the sandbox* card — its one shipped door', async () => {
+  it('opens from the brief’s locked-for-score card — its one shipped door', async () => {
     /*
      * **The case the two above needed.** Without it this section asserts only where the tuner is
      * *not* reachable from, which a screen nothing can open would pass just as well — and did, on

@@ -622,7 +622,7 @@ function mountStage(
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
    *
-   * The charter names P3 as the pillar this build fails outright, and its refusal test is *where on
+   * The charter named P3 as the pillar this build failed outright — re-adjudicated on GitHub issue #277's landing, `docs/22` § 2 — and its refusal test is *where on
    * the stage would a player have seen this?* The day asks five things, the brief lists them, the
    * report grades them, and until this element the stage the player actually watches said none of
    * them. Everything drawn into it is decided by `stageScreenModel.ts#stageGoalsOf`; nothing here

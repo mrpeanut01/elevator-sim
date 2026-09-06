@@ -1326,7 +1326,7 @@ describe('stageCarRestBarOf — where the mark lands and how big it gets', () =>
 /**
  * **The goal strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
  *
- * The charter names P3 as the pillar this build fails outright, and its refusal test is *where on
+ * The charter named P3 as the pillar this build failed outright — re-adjudicated on GitHub issue #277's landing, `docs/22` § 2 — and its refusal test is *where on
  * the stage would a player have seen this?* Before this strip the answer was nowhere: the day asks
  * five things, the brief lists them, the report grades them, and `grep -ni "goal"` over the stage's
  * two files returned nothing at all.
