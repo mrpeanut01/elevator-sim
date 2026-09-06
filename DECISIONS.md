@@ -34072,3 +34072,44 @@ building, so a picker on each shaft would be five controls writing one field —
 **Consequences.** Two rows leave `DESIGNER_ABSENCES` on the commit that made them false, and the
 build-information panel's floor follows them down. The words are `DESIGNER_COPY`'s, driven by the
 designer's adapter where the rest of that board's are.
+
+## D519 — Secure Tower is a 3 and Mixed-Use High-Rise a 4: authored, with the measurement that places them beside the six the contract authored
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #169 item 4**, GAMEPLAY § 8.5.
+
+**Context.** § 8.5 gives seven buildings a complexity and this repository ships six of them; the
+seventh, Ashgate, is nobody's. `secure-tower` and `mixed-use-high-rise` therefore read
+`complexity —`, were not offered under § 8.8, and could not be renewed at a rate: a stated gap,
+kept rather than defaulted because a 3 nobody measured would have priced a renewal from nothing.
+The issue calls that *correct, and a content gap*.
+
+**What was measured first, and what it refused.** `docs/33` § 4.6's 400-day cell is the one
+measurement that covers all eight contracts on one instrument: each contract's day 1 under
+`collective`, seeds `20 260 824 + 7 919 n`, with days cleared and work per delivered leg per
+contract. The authored six are not monotone in either figure. Midtown Office clears 0 of 50 days
+and is a 3; Vertical City clears every goal on every seed and is a 5; Garden Apartments clears 49
+and is a 1. So complexity is the contract's judgement of the fabric a player has to understand,
+and a number fitted to a clear rate would have been an invention with a decimal point. § D256's
+rule against a plausible sentence in place of a measurement cuts the other way here too: the
+measurement exists, and it says the axis is not the one being asked for.
+
+**Decision.** The two are **authored**, with the two measured figures used only to say which
+authored neighbours each sits between, and the fabric used to say which side.
+
+- **Secure Tower — 3.** Days cleared 24/50 against Crown Hotel's 25/50 (a 3); work per ride
+  60.1 kJ against Chancery House's 57.4 (a 2). Two banks off one lobby and five access zones — the
+  only shipped building whose credentials bite (§ D265) — is more to understand than either, so it
+  takes the higher neighbour.
+- **Mixed-Use High-Rise — 4.** Days cleared 0/50 like Midtown Office (a 3); work per ride 131.8 kJ,
+  the most of any shipped building and above Vertical City's 82.8 (a 5). Three banks and a sky lobby
+  sit between those two fabrics, so it takes the step between them, and Vertical City keeps the 5
+  the contract gave it.
+- **Fees follow § D510's rule**, complexity plus two: 5 u and 6 u a day. Every shipped contract is
+  now offerable, and `offersUnpriced` leaves `TOWERS_COPY` on the commit that made it false
+  (§ D227). `career.ts#offerRefusalOf`'s `unpriced` arm stays, because the function is total over
+  ids and a building no table names must still be refused rather than defaulted.
+
+**Consequences.** `economy.test.ts` pins the placements as relations to their neighbours rather
+than as two integers, so a change to either table has to re-argue them. Both figures are an
+assumption with its reasoning attached — the footing `data/traffic-profiles.json`'s badge share
+sits on — and are said to be, in the table's own docstring.

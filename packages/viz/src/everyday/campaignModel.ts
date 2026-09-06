@@ -387,7 +387,8 @@ export const TOWERS_COPY = Object.freeze({
   offersNone: 'Every building the agency offers is one you already hold.',
   offersNoSlot: 'No free slot — {n} more standing opens the next one.',
   offersAtRisk: 'A tower is one miss from ending. Fix that before adding another.',
-  offersUnpriced: 'complexity unpublished — not offered until somebody measures one',
+  /* `offersUnpriced` (*complexity unpublished — not offered until somebody measures one*) left on
+     the commit that priced the last two buildings — GitHub issue #169 item 4, § D519, § D227. */
   offersFreshWeek: 'taking it starts a fresh week on this building; the week you are on is parked, not lost',
   incidentsHeading: 'WHAT HAS HAPPENED LATELY',
   incidentsSub: 'none of it was your doing',
@@ -561,10 +562,11 @@ export interface OffersView {
  * § 8.8's offers, per snapshot — GitHub issue #169 item 3, § D510.
  *
  * Every shipped contract whose building the career does not hold and whose complexity and fee are
- * published, each with the gate `career.ts#offerRefusalOf` decides. The two unpriced buildings are
- * absent rather than drawn with a refusal, because *offered on a complexity and a fee* is the
- * definition of an offer and they have neither; `economy.ts#COMPLEXITY` says why. The caption counts
- * the rows actually rendered.
+ * published, each with the gate `career.ts#offerRefusalOf` decides. A building with neither would
+ * be absent rather than drawn with a refusal, because *offered on a complexity and a fee* is the
+ * definition of an offer; since § D519 every shipped building has both, and the arm is kept because
+ * the function is total over ids rather than over the shipped set. The caption counts the rows
+ * actually rendered.
  */
 export function offersView(career: CampaignCareer, buildingNameOf: (id: string) => string | undefined): OffersView {
   const rows: OfferRowView[] = [];
