@@ -1550,3 +1550,34 @@ full table and the decomposition are in `CLAUDE.md`'s Phase 9 row.
 | #177 item 5 | **two of three built**, § D518; escalator rows and the folded document; the class per shaft stays a stated absence |
 | #169 item 4 | **closed**, § D519; both complexities authored with the measurement beside them |
 | #234 | **the sweep built and tiered**, § D520; the register names the three stages still clearing, and the rebalance is the debt it holds |
+
+## Wave X closed
+
+**Three issues closed, four decisions taken (D521 to D524), one push.** One worker, serial, in the
+worktree wave W closed in, based on wave W's merge.
+
+**The suite, on the integrated tree**: `tsc -b` clean; core 113 files / 2 573 tests, one red on the
+first run (the fs-free module list learning `config/serviceEvent.ts`), rerun green; server 18 / 390
+with twelve reds in two guard files on the first run (the migrations register pinning two versions
+against a third, and the concurrency table asked to state the house insert's two risks), every one
+this wave's own and rerun green; cli 10 / 158; experiments 108 / 1 413 (11 skipped); viz 247 files,
+5 257 passing (7 skipped) with one red on the first run, the annotation census moving by the one
+timeout the derate legs test added, rerun green; viz-browser 40 / 230 on the shipped bundle, green
+first time.
+
+**The corpus, once after integration**: both tiers in one sitting, with the base at `5358c05`
+re-measured first in a detached worktree, where it reproduced wave W's row exactly: 623 363
+always-on and 776 588 deep, the fourteenth consecutive wave that has held. Wave X: always-on
+**624 294** strings (+931, 19.0 a case), deep **777 728** (+1 140, 19.0 a case); cases,
+simulations, failing cases and surfaces all unmoved at 49 / 60, 606 / 4 710, 0 and 57 / 58, the
+surface sets diffed and identical. The first case decomposes the nineteen to the string, all of it
+on `gauntlet/ladder.ts#ladderRowsOf`: two copy keys and the daily board's seventeen-string `house`
+state. Nothing this wave changed in `core` renders a player-facing string, and the stranded count
+is drawn by no screen yet. The table is in `CLAUDE.md`'s Phase 9 row.
+
+| issue | outcome |
+|---|---|
+| #222 | **closed**, § D521; the house posts one replayable run per shipped dispatcher, marked on the row, counted by no ladder |
+| #328 | **closed**, § D522; a scheduled workflow calls the authenticated seed route, refusing to run unconfigured |
+| #346 | **closed**, § D523 and § D524; three service-event shapes, a car finishes its leg, the stranded rider is a fifth outcome beside AWT, and the technician is the derate's first writer |
+

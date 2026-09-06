@@ -2578,3 +2578,17 @@ test rather than a quiet widening.
   stage activity; no Everyday screen draws it yet, because no shipped building or day schedules a
   range change for a screen to draw it about.
 
+## X.4 The corpus, once after integration
+
+**Both tiers in one sitting, with the base at `5358c05` re-measured first in a detached worktree,
+where it reproduced wave W's row exactly: 623 363 always-on and 776 588 deep, the fourteenth
+consecutive wave that has held.** Wave X: always-on **624 294** strings (+931, 19.0 a case), deep
+**777 728** (+1 140, 19.0 a case); cases, simulations, failing cases and surfaces all unmoved, the
+surface sets diffed and identical in both tiers. The first case decomposes the nineteen to the
+string and every one of them is `gauntlet/ladder.ts#ladderRowsOf`: two `BOARD_SCREEN_COPY` keys and
+the daily board's `house` state, seventeen strings over two house rows and two player rows. The
+technician's new sentence is a substitution, the beat label's house form is on no seeded state, and
+`core`'s fifth outcome renders no player-facing string, so a wave that moved the outcome model moved
+the corpus by a board state. Third wave to land on nineteen a case (O, R at twenty, X); the
+coincidence is named in `CLAUDE.md` so nobody reads it as a copied row.
+
