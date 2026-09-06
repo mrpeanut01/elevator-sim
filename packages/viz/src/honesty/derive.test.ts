@@ -137,6 +137,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/asBuiltStage.ts#mountAsBuiltStage',
         'everyday/cutaway.ts#drawCutaway',
         /*
+         * The brief's elevation painter, shared with the campaign's tower screen since GitHub
+         * issue #353. It paints wells and slabs onto a canvas and authors three floor marks and a
+         * car id's tail; the words beside it — the outage strip, the works strip — are
+         * `today.ts`'s and `campaignModel.ts`'s, both driven.
+         */
+        'everyday/elevation.ts#drawElevation',
+        /*
          * § 14's two-tabbed board screen, on the settings screen's split exactly: `BOARD_SCREEN` is
          * a registry row whose `mount` builds tab cards, a table and a `<details>`, so it cannot
          * run without a document. Every **word** it draws is authored elsewhere and driven by the
@@ -745,6 +752,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * asserted against `submission.ts`'s own source by `runIdentity.test.ts` rather than swept.
          */
         'scope/runIdentity.ts#CARRIED_INTERVENTION_KINDS',
+        /*
+         * GitHub issue #353's works writer: returns the run's car ids, derived only because the
+         * private `${bankId}-${carId}` composer reads as a phrase — `shift/events.ts#carRuntimeId`'s
+         * own case, kept private there for the same reason. The words a player reads about the held
+         * car are `campaignModel.ts#BUILDING_COPY`'s, driven.
+         */
+        'campaign/works.ts#worksHeldCarsOf',
         /*
          * GitHub issue #213's route table — lever ids to screens, derived because `add-a-car` and
          * `zone-the-tower` read as words. The strings a card draws from it, the button label and

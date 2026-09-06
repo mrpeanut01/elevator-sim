@@ -141,6 +141,7 @@ import {
 } from '../campaign/career.js';
 import { DIFFICULTIES } from '../campaign/economy.js';
 import { fitOutOf } from '../campaign/fitOut.js';
+import { worksHeldCarsOf } from '../campaign/works.js';
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -1608,10 +1609,18 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     runCampaignDay: (towerId) => {
       const tower = towerById(career, towerId);
       if (tower === undefined) return;
-      if (!b.resources.buildings.some((building) => building.id === tower.buildingId)) return;
+      const towerBuilding = b.resources.buildings.find((building) => building.id === tower.buildingId);
+      if (towerBuilding === undefined) return;
       b.applyPatch({
         buildingId: tower.buildingId,
         dispatcherId: tower.dispatcherId,
+        /*
+         * **And the car today's works hold** — GitHub issue #353, `docs/32` GD11's first half,
+         * § D504. `campaign/works.ts` is the one derivation; the tower's screen draws the same
+         * answer before this press. A day no booking occupies writes `[]`, which is what every
+         * other path through the shell leaves here.
+         */
+        outOfServiceCarIds: worksHeldCarsOf(tower, towerBuilding),
         /*
          * **And the kit the tower has actually had fitted** — GitHub issue #181's first clause.
          *

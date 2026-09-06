@@ -283,6 +283,8 @@ const EVERYDAY_SHELL_FILES = new Set([
    * are the model's, pinned by `stageScreen.test.ts` against this file.
    */
   'everyday/cutaway.ts',
+  /* The brief's elevation painter, shared with the campaign's tower screen since GitHub issue #353; it sizes a canvas. */
+  'everyday/elevation.ts',
   /* The § 11 workshop's DOM half — its words and decisions stay pure in workshopModel.ts. */
   'everyday/workshopScreen.ts',
   /* The § 12 bench's DOM half — its words stay pure in benchModel.ts, and it owns a batch Worker. */

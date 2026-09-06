@@ -8733,6 +8733,10 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
             seeds.push({ field: `${at}.effect`, text: option.effect, role: 'prose' });
           }
         }
+        if (desk.worksToday !== undefined) {
+          seeds.push({ field: `${label}.desk.works.badge`, text: desk.worksToday.badge, role: 'label' });
+          seeds.push({ field: `${label}.desk.works.sentence`, text: desk.worksToday.sentence, role: 'prose' });
+        }
         if (desk.quiet !== undefined) {
           seeds.push({ field: `${label}.desk.quiet.heading`, text: desk.quiet.heading, role: 'label' });
           seeds.push({ field: `${label}.desk.quiet.body`, text: desk.quiet.body, role: 'prose' });

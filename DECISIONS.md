@@ -33476,3 +33476,43 @@ by decision rather than by drift, and this entry is where the difference is reco
 The shell register's entry that the report's third piece of advice does not open the tuner is
 deleted rather than reworded, because *Add a car* opens it. That entry was the tuner's second door,
 which is #177's item 2, so that item closes here too.
+
+## D504 — a works night takes one car out of passenger service on every day it occupies, and the campaign day opens on the building with that hole drawn
+
+**Date: 2026-09-06 · Owner: the integrator, wave U · Rules on: GitHub issue #353 (`docs/35` PM-CA1
+and PM-CA3), `docs/32` GD11 break 1, `campaign/works.ts`, `everyday/host.ts#runCampaignDay`,
+`everyday/elevation.ts`, `everyday/campaignScreens.ts`, `everyday/campaignModel.ts`, and the sentences
+GitHub issues #264 and #272 withdrew.**
+
+GD11 says spending must make the near days harder, and the ordering that makes a purchase a decision
+is take capacity away first and give it back later. § D427 built the giving back. This entry builds
+the taking away, in the shape `docs/32` wrote down before the code existed.
+
+### The ruling
+
+On every day one of a tower's bookings occupies, the run holds one car out of passenger service. One
+car whatever the tier, because the shop's nights already scale with the tier and a per-tier count
+would be a second lever the design does not draw. The car is `carsToDerate`'s first choice, the same
+chooser the day's event uses, so the two readers pick from the biggest bank first and the picture
+and the run agree. The writer is `runCampaignDay`, which is the one path a campaign day runs on.
+
+The sentences #264 withdrew come back narrower than they left: one car, on the days the works
+occupy, back the day the kit goes live. They are on the month grid's works cells, the career
+calendar's, the works cost line where the player meets the cost, and the tower screen's strip. The
+test that held the writer's absence from disk now holds its presence, so the sentences cannot go
+stale silently in either direction.
+
+### The sight before the words
+
+PM-CA1 asks that the day open on the building with today's hole in it. The brief already drew the
+elevation with the event's held car as a dashed well; that painter now lives in `everyday/elevation.ts`
+and the campaign's tower screen draws it above every word, with the works car held. Today's event,
+when a campaign day has one, holds its car through the run's own schedule and appears on the stage
+the moment the run lands; the works are what the tower screen can know before the press, and it
+says so in its own comment rather than drawing a hole it cannot yet know.
+
+### What this does not decide
+
+Whether a works night should hold more than one car for a shafts tier, and whether the held car
+should be the one being refitted rather than the chooser's. Both are content decisions with a
+measurement attached, and neither is needed for the ordering GD11 asks for.

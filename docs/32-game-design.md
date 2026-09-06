@@ -404,14 +404,15 @@ false three ways. **The second of the three has since been closed** ([§ D427](.
 is left standing below with its correction, because a break that was recorded and then fixed must
 stop reading as open without the record of it disappearing:
 
-1. **No campaign day takes a car out of passenger service.**
-   `RecordRunOptions.outOfServiceCarIds` has no writer under `packages/viz/src/campaign/`, none in
-   any `everyday/campaign*` module, and none in `everyday/host.ts#runCampaignDay` — which writes a
-   tower's `buildingId` and `dispatcherId`, presses run, and reads no booking at all. This is the
-   same claim GitHub issues **#264** and **#272** withdrew from `everyday/campaignModel.ts`'s
-   calendar tip and from `campaign/economy.ts`'s `shafts` tier ([§ D364](../DECISIONS.md)); the
-   `shafts` L1 line that this document quoted as *"eight nights with two cars out"* now reads only
-   `'The tower stops being one car short.'`
+1. ~~**No campaign day takes a car out of passenger service.**~~ **CLOSED** — GitHub issue **#353**,
+   [§ D504](../DECISIONS.md). `campaign/works.ts#worksHeldCarsOf` is the writer this break named:
+   on every day a booking occupies, `everyday/host.ts#runCampaignDay` writes one car — `shift/incidents.ts#carsToDerate`'s
+   first choice, the same chooser the day's event uses — into `RecordRunOptions.outOfServiceCarIds`,
+   and `campaign/works.test.ts` pins it in the shape this section asked for, *compared on the legs*.
+   The sentences #264 and #272 withdrew are back narrower than they left: one car, on the days the
+   works occupy, back the day the kit goes live (`everyday/campaignModel.ts`'s works cost, both grids'
+   works tips, and the tower screen's `UNDER WORKS` strip). The `shafts` L1 line is unchanged: the
+   works take one car whatever the tier, so a per-tier count would be a second lever.
 2. ~~**The other half is unbuilt too**, so *gives it back later* is not a survivor of the
    correction. Nothing bought reaches a run: `fittedLevel` is read only by
    `everyday/campaignModel.ts`'s contract and shop screens, and the day a player then watches is
@@ -432,13 +433,14 @@ stop reading as open without the record of it disappearing:
 What is built is the ledger — the purse moves, the month grid fills, the tier's nights gate when it
 reads as fitted, and a late purchase is refused — **and now the giving back**: once the nights are
 past, the kit is in the building the run is built on. That is a real cost and a real reward, and it
-is still **not** GD11's ordering, because the ordering is *take away first*. The difference is the
-whole of the rule — a delay is not a subtraction. Building the missing half means giving a live
-booking a writer for `RecordRunOptions.outOfServiceCarIds` on the path `runCampaignDay` takes, and it
-is pinned in the repository's standing shape when it lands: *move the control and require the run to
-change, compared on the legs*. A works day whose legs match an ordinary one has not taken a car out.
-[§ D427](../DECISIONS.md) deliberately did not reinstate the withdrawn sentence while building the
-reward half, which is why break 1's two mechanised guards below are unchanged.
+was, until 2026-09-06, still **not** GD11's ordering, because the ordering is *take away first* and
+a delay is not a subtraction. **Both halves are built now.** Break 1's writer landed exactly where
+this paragraph said it would — a live booking writing `RecordRunOptions.outOfServiceCarIds` on the
+path `runCampaignDay` takes — and it is pinned in the repository's standing shape: *move the control
+and require the run to change, compared on the legs* (`campaign/works.test.ts`). A works day whose
+legs match an ordinary one has not taken a car out, and the test says so before it says anything
+else. [§ D427](../DECISIONS.md) deliberately did not reinstate the withdrawn sentence while building
+the reward half; § D504 reinstated it narrower, on the commit that made it true.
 
 **What holds the three sentences above true, stated because the answer is uncomfortable.** No test
 reads this file — `docs/32-game-design.md` is cited by `docs/33`, `docs/34` and
@@ -446,10 +448,11 @@ reads this file — `docs/32-game-design.md` is cited by `docs/33`, `docs/34` an
 nobody re-reading them, which is how the withdrawn claim survived here for a wave after it was struck
 from the product. What *is* mechanised is the product side of the same claim, in two places, and
 either going red is the signal that this passage is owed a rewrite:
-`campaign/economy.test.ts` § *no shop tier promises a car the works never take* sweeps every tier of
-every category for the claim, and `everyday/campaignModel.test.ts` § *has no writer for
-outOfServiceCarIds on the path a campaign day runs* derives the writer set from disk and says the
-withdrawn sentences are owed back on the day one appears.
+`campaign/economy.test.ts` § *no shop tier promises a car the works never take* still sweeps every
+tier's prose, because a tier's line is about the kit and not about the nights, and
+`everyday/campaignModel.test.ts` § *a works day takes one car out of service* now holds the writer's
+**presence** from disk — the day `runCampaignDay` stops writing the field, the sentences above are a
+stale assertion again and that suite says so.
 
 ### 3.2 What a unit means
 

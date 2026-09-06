@@ -107,6 +107,7 @@ import {
   nextLineOf,
   openTowerOf,
 } from '../campaign/career.js';
+import { worksTodayOf } from '../campaign/works.js';
 
 /* -------------------------------------------------------------------------- *
  * What the screens are given
@@ -667,7 +668,7 @@ function tipSuffix(mark: CalendarCell['mark']): string {
     case 'due':
       return ' · a decision is due';
     case 'works':
-      return ' · works are booked';
+      return ' · works are booked, one car out for the day';
     case 'flagged':
       return ' · a crowd is booked';
     case 'cleared':
@@ -817,6 +818,14 @@ export const BUILDING_COPY = Object.freeze({
   testsNote:
     'every one this run can read, or the day is missed — and a day it could not read is not filed at all',
   asBuilt: 'as built',
+  /**
+   * The badge and the sentence over today's works — GitHub issue #353. Not first-person about the
+   * car and not a count of peaks: one car, today, back when the nights are done.
+   */
+  worksBadge: 'UNDER WORKS',
+  worksToday:
+    'Works are on today, so one car is out of service for the whole day. It comes back the day ' +
+    'the kit goes live; the building you run today is a car short.',
 } as const);
 
 /** § 8.3's three wear heads, in the design file's own words. */
@@ -868,6 +877,14 @@ export interface BuildingView {
     | { readonly eyebrow: string; readonly note: string; readonly purse: string; readonly rows: readonly NeedOptionView[] }
     | undefined;
   readonly quiet: { readonly heading: string; readonly body: string; readonly next: string } | undefined;
+  /**
+   * Today's works, or `undefined` on a day no booking occupies — GitHub issue #353, `docs/32`
+   * GD11's first half. The sentence is the claim GitHub issue #264 withdrew, back narrower than it
+   * left: one car, on the days the works occupy, and it comes back when they are done. The screen
+   * draws the held car's own id on the elevation beside it, from `campaign/works.ts` — the same
+   * derivation `runCampaignDay` writes into the run.
+   */
+  readonly worksToday: { readonly badge: string; readonly sentence: string } | undefined;
   readonly order: {
     readonly heading: string;
     readonly sub: string;
@@ -1014,6 +1031,9 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
             body: BUILDING_COPY.quietBody,
             next: nextLineOf(tower),
           },
+    worksToday: worksTodayOf(tower)
+      ? { badge: BUILDING_COPY.worksBadge, sentence: BUILDING_COPY.worksToday }
+      : undefined,
     order: {
       heading: BUILDING_COPY.orderHeading,
       sub: BUILDING_COPY.orderSub,
@@ -1352,7 +1372,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
         ? `book ${pendingTier.name} — ${String(pendingTier.nights)} ${pendingTier.nights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, live on day ${String(index + 1 + pendingTier.nights)}`
         : `day ${String(index + 1)}${
             state === 'works'
-              ? ' · works are booked'
+              ? ' · works are booked, one car out for the day'
               : state === 'missed'
                 ? ' · missed'
                 : state === 'cleared'
@@ -1403,16 +1423,17 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       cancel: CONTRACT_COPY.cancel,
       booked,
       /*
-       * **The absence is stated here, where the player meets the cost — issue #264.** This line
-       * used to read *"N peaks run a car short"*, which was the claim's most concrete form: a count
-       * of peaks, each said to be a car down, on days that run with every lift. The count is real
-       * and the money is real; the car is not, and § D227's first direction — *a control that
-       * writes nothing must say so* — is why the sentence says so rather than going quiet.
+       * **The cost is stated here, where the player meets it.** Issue #264 withdrew *"N peaks run a
+       * car short"* because no run held a car; GitHub issue #353 (`docs/32` GD11's first half,
+       * § D504) gave `runCampaignDay` the writer, so the sentence is back in the narrower form the
+       * run now makes true: one car out on each day the works occupy, back the day the kit is live.
+       * `campaignModel.test.ts` holds the writer's presence from disk the way it once held its
+       * absence.
        */
       worksCost:
         worksDays.length === 0
           ? undefined
-          : `${String(worksDays.length)} ${worksDays.length === 1 ? 'night' : 'nights'} of works booked, for ${String(committedUnits(tower))} units of kit that stays with the building. The works take no car out of service — a booking moves the purse and this grid, not the day you run.`,
+          : `${String(worksDays.length)} ${worksDays.length === 1 ? 'night' : 'nights'} of works booked, for ${String(committedUnits(tower))} units of kit that stays with the building. On each of those days one car is out of service for the works, and it is back the day the kit goes live.`,
       legend: MONTH_LEGEND,
     },
     purse: {
