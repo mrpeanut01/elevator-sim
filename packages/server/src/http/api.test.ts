@@ -861,6 +861,34 @@ describe('a board', () => {
     expect((bodyOf(board)['entries'] as unknown[]).length).toBeGreaterThan(0);
   }, 60_000);
 
+  it('serves the board’s distribution: a count, a withholding below the floor, and no interval — GitHub issue #327', async () => {
+    const account = await signIn();
+    const posted = await call('POST', '/api/scores', { token: account.token, body: honest() });
+    const board_ = String(bodyOf(posted)['boardKey']);
+
+    const spread = await call('GET', '/api/board-distribution', { query: { board: board_ } });
+    expect(spread.status).toBe(200);
+    const body = bodyOf(spread);
+    expect(body['boardKey']).toBe(board_);
+    // One player has posted here, so the count is published and the ladder is not: § D484's floor.
+    expect(Number(body['n'])).toBeGreaterThan(0);
+    expect(typeof body['withheld']).toBe('string');
+    const ladders = body['ladders'] as { axis: string; n: number; rungs: unknown }[];
+    expect(ladders.map((ladder) => ladder.axis).sort()).toEqual(['awtS', 'pctOverLongWait', 'ttdMeanS', 'wt95S']);
+    for (const ladder of ladders) expect(ladder.rungs).toBeUndefined();
+    // Energy is named as absent with the reason, rather than left as a column that is not there.
+    expect((body['absent'] as { axis: string }[]).map((entry) => entry.axis)).toEqual(['energy']);
+    // The note refuses an interval by name; nothing on the wire carries one.
+    expect(String(body['note'])).toMatch(/No interval is published/u);
+    expect(JSON.stringify(body)).not.toMatch(/±|ci95|lower|upper|halfWidth/iu);
+  }, 60_000);
+
+  it('refuses a distribution for no board', async () => {
+    const response = await call('GET', '/api/board-distribution');
+    expect(response.status).toBe(400);
+    expect(bodyOf(response)['error']).toBe('no-board');
+  });
+
   it('refuses a metric that is not one of the four', async () => {
     const response = await call('GET', '/api/board', { query: { board: 'x', metric: 'energyKJ' } });
     expect(response.status).toBe(400);

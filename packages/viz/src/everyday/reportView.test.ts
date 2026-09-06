@@ -109,7 +109,7 @@ function sheetOf(over: Partial<WeekDayReport> = {}): WeekDayReport {
     levers: [
       { id: 'add-a-car', title: 'Add a car', body: 'A fourth shaft would absorb the peak.' },
       {
-        id: 'weight-fairness-up',
+        id: 'weight-fairness',
         title: 'Weight fairness up',
         body: 'The longest waits are all on one landing.',
       },
@@ -262,16 +262,19 @@ describe('what this screen adds on top of the sheet', () => {
     expect(view.emptyLede).not.toContain('Run this shift');
   });
 
-  it('keeps `LEVER_SURFACES`’ restraint — a dispatcher lever gets no button, and says why', () => {
+  it('gives a dispatcher lever a button into the workshop, and keeps R2’s honesty on the card', () => {
     const view = viewOf();
     const fabric = view.levers.find((lever) => lever.title === 'Add a car');
     const dispatcher = view.levers.find((lever) => lever.title === 'Weight fairness up');
-    expect(fabric?.surface).toBe('building');
+    expect(fabric?.route).toEqual({ kind: 'everyday', screen: 'tuner' });
     expect(fabric?.noSurfaceNote).toBeUndefined();
-    // R2: a sheet may say what today showed and may not point at the control that would make one
-    // profile beat another. The card keeps its words and loses its button, and says so.
-    expect(dispatcher?.surface).toBeUndefined();
-    expect(dispatcher?.noSurfaceNote).toMatch(/one day is not evidence/);
+    expect(fabric?.caveat).toBeUndefined();
+    // R2: a sheet may say what today showed and may not claim one profile beats another. The card
+    // opens the control the advice is about and says, beside the button, that one day is not
+    // evidence — the owner's ruling on #213 kept the honesty and removed the refusal.
+    expect(dispatcher?.route).toEqual({ kind: 'everyday', screen: 'workshop' });
+    expect(dispatcher?.noSurfaceNote).toBeUndefined();
+    expect(dispatcher?.caveat).toMatch(/One day is not evidence/u);
   });
 
   it('offers one button into tomorrow on a filed week-day sheet, and none on an empty one', () => {
@@ -463,12 +466,14 @@ describe('§ 6.5’s closing block is layered rather than one wall — issue #21
 describe('the lever button says what it does — issue #213', () => {
   const labelFor = (panelNames?: Partial<Record<TabName, string>>): string | undefined =>
     everydayReportViewOf({
-      report: sheetOf(),
+      report: sheetOf({
+        levers: [{ id: 'zone-the-tower', title: 'Zone the tower', body: 'Split the bank during the peak.' }],
+      }),
       previous: undefined,
       overnight: undefined,
       newerRunOnStage: false,
       ...(panelNames === undefined ? {} : { panelNames }),
-    }).levers.find((lever) => lever.title === 'Add a car')?.goLabel;
+    }).levers.find((lever) => lever.title === 'Zone the tower')?.goLabel;
 
   it('names the panel when the document has one, and claims less when it does not', () => {
     /*
@@ -499,8 +504,8 @@ describe('the lever button says what it does — issue #213', () => {
   });
 });
 
-describe('only a fabric lever may ever route — `docs/10` R2', () => {
-  it('routes the two building cards and refuses the two dispatcher cards, in both directions', () => {
+describe('every lever routes, and a dispatcher lever keeps its honesty on the card — the owner’s ruling on #213', () => {
+  it('routes all four: the tuner, the Building panel, and the workshop twice, with the caveat on the workshop pair', () => {
     const view = viewOf({
       report: sheetOf({
         levers: [
@@ -511,22 +516,39 @@ describe('only a fabric lever may ever route — `docs/10` R2', () => {
         ],
       }),
     });
-    const surfaces = Object.fromEntries(view.levers.map((lever) => [lever.title, lever.surface]));
-    expect(surfaces).toEqual({
-      'Add a car': 'building',
-      'Zone the tower': 'building',
-      'Weight fairness up': undefined,
-      'Ask where they’re going': undefined,
+    const routes = Object.fromEntries(view.levers.map((lever) => [lever.title, lever.route]));
+    expect(routes).toEqual({
+      'Add a car': { kind: 'everyday', screen: 'tuner' },
+      'Zone the tower': { kind: 'engineer', tab: 'building' },
+      'Weight fairness up': { kind: 'everyday', screen: 'workshop' },
+      'Ask where they’re going': { kind: 'everyday', screen: 'workshop' },
+    });
+    const labels = Object.fromEntries(view.levers.map((lever) => [lever.title, lever.goLabel]));
+    expect(labels).toEqual({
+      'Add a car': 'Open the sandbox',
+      'Zone the tower': 'Open the simulator',
+      'Weight fairness up': 'Open the dispatcher workshop',
+      'Ask where they’re going': 'Open the dispatcher workshop',
     });
     /*
-     * And the refusal is on the card rather than only in a docstring. #213's stated criterion —
-     * *every lever named on the report opens the surface that changes it* — would have routed all
-     * four; the sheet says out loud why two of them do not, which is the difference between *we
-     * did not wire it* and *a sheet may not send you there*.
+     * The honesty the old refusal carried is on the card beside the button, and only on the
+     * dispatcher pair: `docs/10` R2 forbids the comparative claim, not the door.
      */
     for (const lever of view.levers) {
-      expect(lever.surface === undefined, lever.title).toBe(lever.noSurfaceNote !== undefined);
+      expect(lever.route === undefined, lever.title).toBe(lever.noSurfaceNote !== undefined);
+      expect(lever.route === undefined, lever.title).toBe(lever.goLabel === undefined);
+      expect(lever.caveat !== undefined, lever.title).toBe(lever.route?.kind === 'everyday' && lever.route.screen === 'workshop');
+      expect(lever.caveat ?? '').not.toMatch(/\bbetter than\b/u);
     }
-    expect(view.levers.filter((lever) => lever.noSurfaceNote !== undefined)).toHaveLength(2);
+    expect(view.levers.filter((lever) => lever.noSurfaceNote !== undefined)).toHaveLength(0);
+  });
+
+  it('draws the no-surface note only for a lever this build cannot route', () => {
+    const view = viewOf({
+      report: sheetOf({ levers: [{ id: 'fifth-lever', title: 'Something new', body: 'Not routed.' }] }),
+    });
+    expect(view.levers[0]?.route).toBeUndefined();
+    expect(view.levers[0]?.goLabel).toBeUndefined();
+    expect(view.levers[0]?.noSurfaceNote).toContain('does not know');
   });
 });

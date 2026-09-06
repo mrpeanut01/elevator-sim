@@ -40,7 +40,7 @@ import type { VizRecording } from '../contract/types.js';
 import { observationsAt } from '../live/observations.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 
-import type { PostedResult } from './types.js';
+import type { PostedClaim, PostedResult } from './types.js';
 
 /**
  * The four figures a finished run posts — the one derivation, so the file-time write and the
@@ -110,6 +110,70 @@ export function reproductionRefusalFor(
   return (
     `this record no longer reproduces the result it was filed with — ${listOf(clauses)} — so it ` +
     'cannot be watched, because a replay that does not reproduce is a different run'
+  );
+}
+
+/**
+ * The server's own tolerance for *reproduced*, transcribed from
+ * `packages/server/src/leaderboard/verify.ts#METRIC_EPSILON` — GitHub issue #337. Transcribed rather
+ * than imported because `viz` may not depend on the server package, and it is a constant the test
+ * beside this module pins against that source text so the two cannot drift. The server's argument
+ * for it holds here unchanged: the engine is deterministic from its seed, so this is a floating-point
+ * courtesy nine orders of magnitude below anything that could change a ranking, never a budget.
+ */
+export const CLAIM_EPSILON = 1e-9;
+
+/**
+ * The four figures a board row was ranked on, read off a replay — the same summary fields
+ * `menu/client.ts#claimedMetricsOf` posts, so the check compares like with like.
+ */
+export function claimOf(recording: VizRecording): Omit<PostedClaim, 'legs'> {
+  const summary = recording.summary;
+  return {
+    awtS: summary.meanWaitS,
+    wt95S: summary.wait95S,
+    ttdMeanS: summary.meanTimeToDestinationS,
+    pctOverLongWait: summary.pctOverLongWait ?? Number.NaN,
+    awtIsValid: summary.awtIsValid,
+  };
+}
+
+/**
+ * Every figure the replay disagrees with the board about, GitHub issue #337's arm of
+ * {@link reproductionDrift}: the same list shape, over the server's four figures and its tolerance.
+ */
+export function claimDrift(claim: PostedClaim, replayed: Omit<PostedClaim, 'legs'>): readonly Drift[] {
+  const rows: Drift[] = [];
+  const compare = (label: string, a: number, b: number): void => {
+    const agree = (Number.isNaN(a) && Number.isNaN(b)) || Math.abs(a - b) <= CLAIM_EPSILON;
+    if (!agree) rows.push({ label, posted: a, replayed: b });
+  };
+  compare('the mean wait (s)', claim.awtS, replayed.awtS);
+  compare('the 95th-percentile wait (s)', claim.wt95S, replayed.wt95S);
+  compare('the mean time to destination (s)', claim.ttdMeanS, replayed.ttdMeanS);
+  compare('the share waiting past the long-wait line (%)', claim.pctOverLongWait, replayed.pctOverLongWait);
+  if (claim.awtIsValid !== replayed.awtIsValid) {
+    rows.push({ label: 'whether the mean is quotable (1 yes, 0 no)', posted: Number(claim.awtIsValid), replayed: Number(replayed.awtIsValid) });
+  }
+  return rows;
+}
+
+/**
+ * `null` when this device's replay reproduced what the board ranked, else the sentence the row
+ * shows instead of the affordance. The server said this run reproduced on its machine; a refusal
+ * here means this build's `data/` has moved since, which is the ordinary case for a posted run
+ * rather than the exotic one, and the sentence says so rather than accusing anybody.
+ */
+export function claimRefusalFor(claim: PostedClaim, recording: VizRecording): string | null {
+  const drift = claimDrift(claim, claimOf(recording));
+  if (drift.length === 0) return null;
+  const clauses = drift.map(
+    (row) => `${row.label} was posted as ${String(row.posted)} and replays here as ${String(row.replayed)}`,
+  );
+  return (
+    `this build does not reproduce the result the board ranked — ${listOf(clauses)} — so the run ` +
+    'cannot be watched here. The server verified it against its own data; this build carries ' +
+    'different data, and a replay that does not reproduce is a different run'
   );
 }
 

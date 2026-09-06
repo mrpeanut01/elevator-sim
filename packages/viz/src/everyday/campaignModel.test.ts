@@ -8,7 +8,7 @@
  * three views read one record and cannot disagree.
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -563,60 +563,31 @@ describe('one record, three screens (§ 16 rule 14)', () => {
 });
 
 /* -------------------------------------------------------------------------- *
- * The works day takes no car out — GitHub issue #264
+ * The works day takes one car out — GitHub issue #353, after #264 and #272
  * -------------------------------------------------------------------------- */
 
 /**
- * **A campaign works day takes no car out of service, and the screens no longer say it does.**
+ * **A campaign works day takes one car out of service, and the screens say so again.**
  *
- * `RecordRunOptions.outOfServiceCarIds` is this repository's one instrument for *this car is not in
- * the building today*, and it has **no writer anywhere on the path a campaign day runs**: nothing
- * under `campaign/` names it, no `everyday/campaign*` module names it, and
- * `everyday/host.ts#runCampaignDay` — the only function that turns a tower into a run — patches
- * `buildingId` and `dispatcherId` and nothing else. A booking moves the purse and the month grid,
- * and the day the player then watches has its full complement of lifts.
+ * GitHub issue #264 withdrew seven sentences claiming a works day ran a car short, because
+ * `RecordRunOptions.outOfServiceCarIds` had no writer on the path a campaign day runs, and this
+ * suite held that absence from disk so the day a writer appeared the sentences would be owed back,
+ * *pinned by a legs comparison rather than by prose*. GitHub issue #353 is that day: `docs/32`
+ * GD11's first half, `campaign/works.ts`, written into the run by `everyday/host.ts#runCampaignDay`
+ * and pinned on the legs in `campaign/works.test.ts`.
  *
- * Seven player-facing sentences said otherwise, and this is the **dangerous** direction of § D227's
- * class rather than the familiar one. A stale refusal tells a reader not to touch a control; a stale
- * *assertion* changes how they read every figure that follows. A worse day gets attributed to a
- * missing car rather than to the dispatcher, which is the one diagnosis this game exists to teach —
- * and § 8.4's whole shaft decision is priced off it, so a player reasoning correctly from *"you hand
- * back two cars for eight days"* declines the purchase the month is built around.
- *
- * **Withdrawn rather than qualified.** A caption saying a car *may* be out on a run where none ever
- * is has the same defect with more words. What replaces each sentence is the part that is true and
- * asserted elsewhere in this suite: the money leaves the purse, the nights are spoken for, and the
- * kit is live the day after the last of them.
- *
- * The tests below are the register the issue asks for. The first two hold the words; the third holds
- * the **absence of the writer**, from disk, so the day a works day genuinely takes a car out it turns
- * red and the sentence is owed back rather than quietly missing.
+ * So this register flips rather than disappears. The sentences are back **narrower than they
+ * left** — one car, on the days the works occupy, back the day the kit goes live — and the guard
+ * now holds the writer's presence: the day `runCampaignDay` stops writing the field, these words
+ * are a stale assertion again, which is § D227's dangerous direction, and this is what says so.
  */
-describe('a works day takes no car out of service (issue #264)', () => {
-  /**
-   * A car-availability **claim**: a lift named in the same sentence as it going away, un-negated.
-   *
-   * Deliberately not a list of the seven withdrawn strings. A list would pass the moment somebody
-   * rephrased one of them, which is how the claim survived this long — it is § 8.4's design copy,
-   * and design copy gets rewritten.
-   *
-   * The `no ` lookbehind is what lets the withdrawal be **stated in the player's own words** rather
-   * than in a euphemism: § D227's first direction requires a control that writes nothing to say so,
-   * and *"the works take no car out of service"* is a denial rather than an assertion. It is held
-   * accountable below — the exemption cannot be used to smuggle the claim back, because the denial
-   * itself is asserted present.
-   */
+describe('a works day takes one car out of service (issue #353, after #264)', () => {
+  /** A car-availability claim, un-negated — the same pattern #264 used to sweep the claim out. */
   const CAR_IS_AWAY = /(?<!\bno )\b(?:car|cars|lift|lifts)\b[^.]*\b(?:out|short|down)\b|\bhand back\b/i;
 
   /**
-   * A tower on its third day with two nights of works booked from its sixth.
-   *
-   * **The start day is chosen so the works land inside *both* grids**, and that is not a detail: the
-   * career calendar shows `careerToday − 23 … careerToday + 6` (§ 8.6's `CAL_FROM`, `CALENDAR_SPAN`),
-   * so a booking eleven days out — the natural fixture, and the one this file's booking test uses —
-   * is drawn only by § 8.4's month. A first draft used it and the sweep below passed with
-   * `tipSuffix`'s works arm reverted to the false sentence, because no cell it authored was ever
-   * read. The count assertions in the test are what keep that honest.
+   * A tower on its third day with two nights of works booked from its sixth. The start day lands
+   * the works inside both grids — see the previous version of this fixture for why that matters.
    */
   function withWorksBooked(): CampaignCareer {
     const base = openingCareer('eta');
@@ -630,48 +601,38 @@ describe('a works day takes no car out of service (issue #264)', () => {
     return applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 5 });
   }
 
-  it('says nothing about a car being out on any surface a booked works day reaches', () => {
+  it('says a car is out on every works cell of both grids, and where the player meets the cost', () => {
     const booked = withWorksBooked();
     const contract = contractView(inputOf(booked))!;
     const calendar = calendarView(inputOf(booked));
 
-    /*
-     * Both grids are swept, because the claim was in both and they are different functions:
-     * `tipSuffix` for § 8.6's career calendar and `contractView`'s own `cellFor` for § 8.4's month.
-     * A fix applied to one of them is a fix applied to neither.
-     */
     const careerTips = calendar.rows
       .flatMap((row) => row.cells.filter((cell) => cell.glyph === CALENDAR_GLYPHS.works))
       .map((cell) => cell.tip);
     const monthTips = contract.month.weeks
       .flatMap((week) => week.cells.filter((cell) => cell.state === 'works'))
       .map((cell) => cell.tip);
-    // Both counts, separately: one of them being zero is a whole grid this sweep never read.
     expect(careerTips, 'the career calendar drew no works cell').toHaveLength(2);
     expect(monthTips, 'the month grid drew no works cell').toHaveLength(2);
-    const worksTips = [...careerTips, ...monthTips];
+    for (const tip of [...careerTips, ...monthTips]) expect(tip, tip).toMatch(CAR_IS_AWAY);
 
-    const words = [
-      ...worksTips,
-      ...MONTH_LEGEND,
-      contract.month.worksCost ?? '',
-      CONTRACT_COPY.shopSub,
-      CONTRACT_COPY.shaftBody,
-    ];
-    for (const line of words) expect(line, line).not.toMatch(CAR_IS_AWAY);
+    expect(contract.month.worksCost).toMatch(CAR_IS_AWAY);
+    expect(contract.month.worksCost).not.toContain('take no car out of service');
+  });
 
-    /*
-     * And the absence is **stated where the player meets the cost**, rather than left as a silence
-     * a reader would fill in themselves. This is the other half of the lookbehind above: without
-     * it the exemption would be a hole, and without the exemption this sentence could not be
-     * written in the words a player would use.
-     */
-    expect(contract.month.worksCost).toContain('take no car out of service');
+  it('draws the works strip on the desk only on a day the works occupy', () => {
+    const booked = withWorksBooked();
+    const off = buildingView(inputOf(booked))!;
+    expect(off.worksToday).toBeUndefined();
+    const onDay = { ...booked, towers: [{ ...booked.towers[0]!, day: 6 }] };
+    const on = buildingView(inputOf(onDay))!;
+    expect(on.worksToday?.badge).toBe('UNDER WORKS');
+    expect(on.worksToday?.sentence).toMatch(CAR_IS_AWAY);
   });
 
   it('says nothing about a car being out while the night is still being picked', () => {
-    // The moment of the purchase, which is the moment the claim is acted on. `pick-start` has not
-    // happened, so this is the prompt and the `+` tips rather than the booked ones.
+    // The moment of the purchase: `pick-start` has not happened, so no day is occupied yet and
+    // the `+` tips name the day the kit goes live rather than a car.
     const base = openingCareer('eta');
     const pressed = applyCampaignAction(
       { ...base, towers: [{ ...base.towers[0]!, day: 3, carry: 100 }] },
@@ -685,59 +646,18 @@ describe('a works day takes no car out of service (issue #264)', () => {
     }
   });
 
-  it('has no writer for outOfServiceCarIds on the path a campaign day runs, and owes the sentence back when it gets one', () => {
+  it('has a writer for outOfServiceCarIds on the path a campaign day runs, from disk', () => {
     /*
-     * The register the issue asks for, derived from disk rather than listed. When a works day
-     * genuinely holds a car this turns red, and the message is the instruction: the sentences
-     * withdrawn above are owed back, pinned by a legs comparison rather than by prose.
+     * The inverse of the register #264 kept. Comments are stripped so a docstring naming the field
+     * is not mistaken for the writer, and the writer has to be the one `campaign/works.ts` exports
+     * reaching `runCampaignDay`, not any mention of the field.
      */
     const here = fileURLToPath(new URL('./', import.meta.url));
-    const campaignDir = fileURLToPath(new URL('../campaign/', import.meta.url));
-    const files = [
-      ...readdirSync(campaignDir)
-        .filter((name) => name.endsWith('.ts') && !name.includes('.test'))
-        .map((name) => join(campaignDir, name)),
-      ...readdirSync(here)
-        .filter((name) => /^campaign.*\.ts$/.test(name) && !name.includes('.test'))
-        .map((name) => join(here, name)),
-      join(here, 'host.ts'),
-    ];
-    expect(files.length, 'the campaign directory was not read').toBeGreaterThan(5);
-
-    /*
-     * Comments are stripped before the scan, because the withdrawal itself has to be able to name
-     * the field it is about: `campaignModel.ts`'s own docstrings say *"`outOfServiceCarIds` has no
-     * writer here"*, and a scan that read those as writers would make the register unwritable. It
-     * errs toward a **false red** rather than a false green — a `//` inside a string literal would
-     * truncate a line and could only ever hide code from a check that wants to find none.
-     */
     const withoutComments = (source: string): string =>
       source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
-
-    for (const file of files) {
-      expect(
-        withoutComments(readFileSync(file, 'utf8')).includes('outOfServiceCarIds'),
-        `${file} names outOfServiceCarIds in code — if a works day now takes a car out, the sentences issue #264 withdrew from campaignModel.ts are owed back, pinned by a legs comparison`,
-      ).toBe(false);
-    }
+    const host = withoutComments(readFileSync(join(here, 'host.ts'), 'utf8'));
+    expect(host).toContain('outOfServiceCarIds: worksHeldCarsOf(');
   });
-
-  /*
-   * **The register entry that stood here is deleted — GitHub issue #272.**
-   *
-   * It held `campaign/economy.ts`'s `shafts` level 1, whose prose made this same claim one directory
-   * over: *"Eight nights with two cars out."* The lane that found it could not fix it and registered
-   * it instead, with a ghost check failing in both directions — when the sentence was fixed, and
-   * when a second tier acquired it.
-   *
-   * The sentence is withdrawn and the entry is gone with it, because **a registered finding that
-   * has been fixed must stop being registered or the register becomes decoration.** What replaced
-   * it is not a second register but a sweep: `campaign/economy.test.ts` § *no shop tier promises a
-   * car the works never take* reads every tier of every category, so the next line copied out of the
-   * design handoff by hand fails there rather than being noticed by somebody. The check above — the
-   * one that says nothing under `campaign/` or `everyday/campaign*` writes `outOfServiceCarIds` — is
-   * still what decides whether either sentence may come back.
-   */
 });
 
 

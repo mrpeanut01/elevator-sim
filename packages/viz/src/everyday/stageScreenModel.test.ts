@@ -881,6 +881,27 @@ describe('the cutaway’s geometry', () => {
     for (const row of g.rows) expect(row.y).toBeCloseTo(g.yForHeight(row.heightM), 9);
   });
 
+  it('fits the camera’s window to the plot and leaves the rest of the tower outside it — GitHub issue #324', () => {
+    const tall = Array.from({ length: 60 }, (_unused, index) => ({
+      ...syntheticFloor(`L${String(index)}`, index),
+      heightM: index * 3.2,
+    }));
+    const whole = stageGeometryOf({ width: 800, height: 340, floors: tall, shafts });
+    const band = stageGeometryOf({ width: 800, height: 340, floors: tall, shafts, window: { fromIndex: 10, toIndex: 30 } });
+    /* Moving the control changes what the stage draws: the pitch, and which rows are in the picture. */
+    expect(band.rowPitch).toBeGreaterThan(whole.rowPitch * 2);
+    expect(band.rows.filter((row) => row.visible).map((row) => row.floorId)).toEqual(
+      tall.slice(10, 31).map((floor) => floor.id),
+    );
+    expect(whole.rows.every((row) => row.visible)).toBe(true);
+    /* Every row still has a y on the band's scale, so a car between hidden floors is still placed. */
+    expect(band.rows).toHaveLength(60);
+    expect(band.rows[0]!.y).toBeGreaterThan(band.plot.y + band.plot.height);
+    expect(band.rows[59]!.y).toBeLessThan(band.plot.y);
+    /* And the band's own labels are all legible, which is the whole point of a band. */
+    expect(band.rows.filter((row) => row.visible).every((row) => row.labelled)).toBe(true);
+  });
+
   it('keeps every row and thins only labels, never the entrance', () => {
     const tall = Array.from({ length: 60 }, (_unused, index) => ({
       ...syntheticFloor(`L${String(index)}`, index),
@@ -1547,5 +1568,121 @@ describe('the § 7 goal strip', () => {
     for (const at of [0, 200, 400, 599.9]) {
       expect(valueOf(stripAt(recording, at), 'energy'), `@${String(at)}s`).toBe(PENDING_DISPLAY);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § 7.3's camera — GitHub issue #324, § D505
+ * -------------------------------------------------------------------------- */
+
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseBuilding, resolveBuilding } from '@elevator-sim/core/browser';
+import { DATA_DIR } from '../fixtures.test-helper.js';
+import { RESOURCES } from '../scope/probes.test-helper.js';
+import {
+  STAGE_CAMERAS,
+  legibleFloorCount,
+  stageCameraChipsOf,
+  stageCameraWindowOf,
+  wholeTowerIsLegible,
+} from './stageScreenModel.js';
+
+describe('the camera, measured per tower — GitHub issue #324', () => {
+  /** The stage's own box: 60 vh of a 720 px viewport, and of a 1080 px one. */
+  const HEIGHTS = { laptop: Math.round(720 * 0.6), desktop: Math.round(1080 * 0.6) } as const;
+
+  /** Every shipped tower, resolved so `floorRanges` count as the floors they author. */
+  function shippedTowers(): readonly { readonly id: string; readonly floors: VizRecording['floors'] }[] {
+    const dir = join(DATA_DIR, 'buildings');
+    return readdirSync(dir)
+      .filter((name) => name.endsWith('.json'))
+      .map((name) => {
+        const config = parseBuilding(JSON.parse(readFileSync(join(dir, name), 'utf8')) as unknown);
+        const resolved = resolveBuilding(config, RESOURCES.elevatorSpecs);
+        return {
+          id: config.id,
+          floors: resolved.floors.map((floor, index) => ({
+            ...syntheticFloor(floor.id, index, floor.label ?? floor.id),
+            heightM: floor.heightM,
+            isEntrance: floor.isEntrance ?? index === 0,
+          })),
+        };
+      })
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  it('is offered on exactly the towers whose whole-tower read thins labels, at the stage’s own height', () => {
+    /*
+     * The entry's reason — *"the cutaway draws the whole building at once, so there is nothing to
+     * pan and nothing to follow"* — was a claim about today's canvas, and the issue asked for it to
+     * be measured per tower before anything was built. This is that measurement, pinned: which
+     * shipped towers thin their labels at 60 vh of a laptop viewport, which is where a camera buys
+     * reaching a floor. The list is asserted so a new tower, or a moved pitch, moves it here.
+     *
+     * Measured: two of the eight. `secure-tower`'s thirty floors fit a 432 px box at the 13 px
+     * label pitch with two to spare, which the first draft of this list had wrong — it was written
+     * from the floor count before the measurement ran, which is the mistake the issue warned about.
+     */
+    const cramped = shippedTowers()
+      .filter((tower) => !wholeTowerIsLegible(tower.floors, HEIGHTS.laptop))
+      .map((tower) => tower.id);
+    expect(cramped).toEqual(['mixed-use-high-rise', 'vertical-city']);
+    for (const tower of shippedTowers()) {
+      const chips = stageCameraChipsOf(tower.floors, HEIGHTS.laptop);
+      expect(chips.length === 0, tower.id).toBe(!cramped.includes(tower.id));
+    }
+  });
+
+  it('offers a chip exactly when the window it selects differs from the whole tower', () => {
+    for (const tower of shippedTowers()) {
+      for (const height of Object.values(HEIGHTS)) {
+        const chips = stageCameraChipsOf(tower.floors, height);
+        for (const chip of STAGE_CAMERAS) {
+          const window = stageCameraWindowOf({ camera: chip.id, floors: tower.floors, height });
+          if (chip.id === 'whole') {
+            expect(window).toBeUndefined();
+            continue;
+          }
+          /* A chip is drawn iff its window is a real band; a band on a legible tower would be inert. */
+          expect(window !== undefined, `${tower.id} ${chip.id} at ${String(height)}`).toBe(chips.length > 0);
+          if (window !== undefined) {
+            const inside = tower.floors.filter((floor) => floor.index >= window.fromIndex && floor.index <= window.toIndex);
+            expect(inside.length).toBe(Math.min(tower.floors.length, legibleFloorCount(height)));
+          }
+        }
+      }
+    }
+  });
+
+  it('follows the fullest car, and falls back to the lobby when nobody is aboard', () => {
+    const tall = Array.from({ length: 60 }, (_unused, index) => ({
+      ...syntheticFloor(`L${String(index)}`, index),
+      heightM: index * 3.2,
+      isEntrance: index === 0,
+    }));
+    const height = HEIGHTS.laptop;
+    const lobby = stageCameraWindowOf({ camera: 'lobby', floors: tall, height });
+    expect(lobby?.fromIndex).toBe(0);
+    const empty = stageCameraWindowOf({ camera: 'follow', floors: tall, height, cars: [{ heightM: 150, occupants: 0 }] });
+    expect(empty).toEqual(lobby);
+    const high = stageCameraWindowOf({
+      camera: 'follow',
+      floors: tall,
+      height,
+      cars: [{ heightM: 3.2 * 5, occupants: 2 }, { heightM: 3.2 * 45, occupants: 7 }],
+    });
+    expect(high).toBeDefined();
+    expect(high!.fromIndex).toBeLessThanOrEqual(45);
+    expect(high!.toIndex).toBeGreaterThanOrEqual(45);
+    expect(high).not.toEqual(lobby);
+    /* And it moves with the car — the same crowd, the fullest car elsewhere, a different window. */
+    const moved = stageCameraWindowOf({
+      camera: 'follow',
+      floors: tall,
+      height,
+      cars: [{ heightM: 3.2 * 25, occupants: 7 }],
+    });
+    expect(moved).not.toEqual(high);
   });
 });

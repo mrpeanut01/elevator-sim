@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { RESOURCES } from './probes.test-helper.js';
-import { switchUnpostableReasonOf, switchWireOf } from './switchWire.js';
+import { switchTargetFromWire, switchUnpostableReasonOf, switchWireOf } from './switchWire.js';
 
 const SHIPPED = RESOURCES.dispatcherProfiles.profiles;
 const ROWS = [{ when: 'call-waited', whenValue: 60, then: 'jump-queue' }] as const;
@@ -45,6 +45,24 @@ describe('switchWireOf', () => {
     expect(reason).toContain('Tuned');
     expect(reason).not.toContain('saved-tuned-v2');
     expect(reason).toContain('cannot be posted');
+  });
+
+  it('inverts on this end what the server inverts on its own — GitHub issue #337', () => {
+    const base = SHIPPED[2] as DispatcherProfile;
+    const saved: DispatcherProfile = {
+      ...base,
+      id: 'saved-mine',
+      rules: { rows: [...ROWS] },
+      selection: { ...(base.selection ?? {}), policy: 'rules' },
+    };
+    const wire = switchWireOf(saved, SHIPPED);
+    if (wire === undefined) throw new Error('expressible');
+    const back = switchTargetFromWire(wire, SHIPPED);
+    expect(back?.id).toBe(base.id);
+    expect(back?.rules?.rows).toEqual([...ROWS]);
+    expect(back?.selection?.policy).toBe('rules');
+    expect(switchTargetFromWire({ toProfileId: 'no-such' }, SHIPPED)).toBeUndefined();
+    expect(switchTargetFromWire({ toProfileId: base.id }, SHIPPED)).toBe(base);
   });
 
   it('is not fooled by identity fields, and is not fooled by a run field either', () => {

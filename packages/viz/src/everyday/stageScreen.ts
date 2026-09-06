@@ -99,7 +99,11 @@ import {
   STAGE_INTERVENTIONS,
   STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
+  STAGE_CAMERAS,
   STAGE_SPEEDS,
+  stageCameraChipsOf,
+  stageCameraWindowOf,
+  type StageCameraId,
   STAGE_SWITCH_PICKER_LABEL,
   type StageFigure,
   type StageInterventionRow,
@@ -267,6 +271,8 @@ function mountStage(
   let playback: Playback | undefined;
   let adopted: VizRecording | undefined;
   let speedIndex = defaultSpeedIndex();
+  /** § 7.3's camera — GitHub issue #324. A view over the recording; it writes nothing to the run. */
+  let camera: StageCameraId = 'whole';
   let started = false;
   let pendingFrame: number | undefined;
   /**
@@ -383,7 +389,50 @@ function mountStage(
   });
   speeds.append(...speedButtons);
 
-  header.append(clock, phase, nextPhase, driving, figures, playButton, speeds);
+  /*
+   * § 7.3's camera — GitHub issue #324, § D505. Drawn only on a tower the camera can help
+   * (`stageCameraChipsOf` measures it against the canvas each paint), which is the honest form of
+   * *a control that writes nothing must say so* for a view control: on a short tower the three
+   * positions are one picture, and a chip that changed nothing would be a lie in a strip.
+   */
+  const cameras = el(doc, 'div', 'everyday-stage-cameras');
+  /*
+   * Never `hidden`: the strip is a flex box whose whole content is the chips, so with none in it
+   * the box has no height, and `hiddenBox.test.ts` refuses an inline `display` on anything the
+   * `hidden` attribute is asked to hide, because the inline value outranks `[hidden]`.
+   */
+  cameras.style.cssText = `display:flex;gap:${String(GAP.tight)}px`;
+  const cameraButtons = STAGE_CAMERAS.map((chip) => {
+    const button = el(doc, 'button', 'everyday-stage-camera', chip.label);
+    button.type = 'button';
+    button.dataset['camera'] = chip.id;
+    button.addEventListener('click', () => {
+      camera = chip.id;
+      syncCamera();
+      requestFrame();
+    });
+    return button;
+  });
+  /* Empty until a laid-out paint offers the chips — see the paint below for why absent, not hidden. */
+
+  function syncCamera(): void {
+    for (const button of cameraButtons) {
+      const on = button.dataset['camera'] === camera;
+      button.setAttribute('aria-pressed', String(on));
+      button.style.cssText = [
+        `background:${on ? C.ink : 'transparent'}`,
+        `border:1px solid ${on ? C.ink : C.rule}`,
+        `border-radius:${String(R.control)}px`,
+        'padding:5px 9px',
+        `font:500 11px ${TYPE.mono}`,
+        `color:${on ? C.paper : C.warmGrey}`,
+        'cursor:pointer',
+      ].join(';');
+    }
+  }
+  syncCamera();
+
+  header.append(clock, phase, nextPhase, driving, figures, playButton, speeds, cameras);
 
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -1135,9 +1184,25 @@ function mountStage(
     const ctx = sizeCanvas(canvas);
     if (ctx !== undefined) {
       const rect = canvas.getBoundingClientRect();
+      const frame = frameAt(recording, simTimeS);
+      /*
+       * The camera chips exist exactly where a window would change the picture — GitHub issue #324.
+       * Decided only over a laid-out canvas: a box with no height yet (the first paint before layout,
+       * a covered world) would read as a plot nothing fits, and offer three chips over a tower they
+       * cannot help. Until then the strip keeps whatever the last laid-out paint decided.
+       */
+      if (rect.height > 0) {
+        /*
+         * Absent from the document rather than hidden in it: `viewportGates.browser.test.ts`
+         * measures every control the DOM holds, and a hidden chip is a zero-sized control to it.
+         */
+        const offered = stageCameraChipsOf(recording.floors, rect.height).length > 0;
+        if (offered && cameras.childElementCount === 0) cameras.replaceChildren(...cameraButtons);
+        if (!offered && cameras.childElementCount > 0) cameras.replaceChildren();
+      }
       drawCutaway(ctx, {
         recording,
-        frame: frameAt(recording, simTimeS),
+        frame,
         queues: queueAt(recording, simTimeS),
         geometry: stageGeometryOf({
           width: rect.width,
@@ -1145,6 +1210,7 @@ function mountStage(
           floors: recording.floors,
           shafts: recording.shafts,
           outOfServiceCarIds: recording.outOfServiceCarIds,
+          window: stageCameraWindowOf({ camera, floors: recording.floors, height: rect.height, cars: frame.cars }),
         }),
         floorLabelOf: labelOf,
       });

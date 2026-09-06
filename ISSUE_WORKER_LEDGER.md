@@ -2143,6 +2143,8 @@ integrated tree is green: **24 files, 236 passed, 6 skipped, exit 0**. A lane th
 integrator's failure and declines to fix it from inside its own branch is the division of labour
 § D343 asks for, arriving on a lane rather than being imposed on one.
 
+# Wave T — 2026-09-06: one worker, thirteen issues, and a probe that found three strings the guards had passed
+
 ## T.1 The wave's shape: one worker, thirteen issues, one push
 
 Wave T ran differently from every wave since H. There was no dispatch, no lane board and no
@@ -2235,3 +2237,96 @@ first pass was red in three of them, every red a guard catching this wave's own 
 The three fixes are three commits after the records, and each is a literal or a list that a
 guard derives from disk catching a hand-written claim, which is this repository's oldest lesson
 and the reason the full suite runs before the one push rather than after it.
+
+# Wave U — 2026-09-06: one worker, six issues, two umbrella items, and a move no per-case integer describes
+
+## U.1 The wave's shape: one worker, six issues and two items, one push
+
+Wave U ran as wave T did: one integrator, no lanes, serial on one branch, opened the same hour wave
+T merged. Six issues closed and two items of two umbrella issues, four decisions taken, one push.
+
+| issue | what landed | decision |
+|---|---|---|
+| #325 | `gapsRegister.test.ts`: every open GAPS.md § 3 row oracled, read elsewhere, or named unguarded, in both directions; the tuning-seeds row struck by the guard's own first run | R44's mitigation |
+| #337 | a daily-board row can be watched: `watch/posted.ts`, the server's four figures as the claim, the gate at the server's tolerance, `your run` on the player's own row | docstring, § D405 |
+| #213 | every report lever opens the surface that changes it; the dispatcher pair open the workshop with the honesty kept on the card as a caveat | § D503, the owner's ruling |
+| #353 | a works night takes one car out on every day it occupies, pinned on the legs; the tower screen opens on the elevation with the hole drawn | § D504 |
+| #324 | a camera on the stage, measured per tower and drawn only on the two towers where a band differs from the whole | § D505 |
+| #327 | a quantile ladder per axis for a board, withheld below twenty, no interval, energy named absent; the daily tab draws the middle under the rows | § D506 |
+| #178 item 4 | closed by #325's row strike: the campaign judges on the holdout and the brief says so | |
+| #177 item 2 | closed by #213: *Add a car* opens the tuner, which was the second door | |
+
+## U.2 Three claims the code refuted, and one the measurement did
+
+**The tuning-seeds row.** R44 said a human sweep had walked past it. The guard's oracle was written
+as the row's own claim and failed on the first run, which is the mutation fixture the issue asked
+for; the row is struck with the refutation attached.
+
+**"The works take no car out of service."** Two tests held that sentence and the writer's absence
+from disk. GD11's first half is built now, so the guard flipped: it holds the writer's presence, and
+the sentences #264 withdrew came back narrower than they left.
+
+**"The cutaway draws the whole building at once, so there is nothing to follow."** Measured at the
+stage's own height, two of the eight towers thin their labels; the first draft of that list, written
+from the floor counts, had three, and the measurement corrected it before anything was built.
+
+**The lever refusal.** Two verifications upheld it. The owner ruled the other way on the issue, and
+the honest reading of R2 turned out to be the one the ruling implied: the rule forbids the
+comparative claim, not the door. The Engineer sheet keeps the refusal by decision.
+
+## U.3 What the guards caught
+
+- `boundaries.test.ts` refused `watch/posted.ts` for naming the leaderboard client; the row shape is
+  restated inside `watch/` and arrives as data, which is the rule's own remedy.
+- The same guard refused `everyday/elevation.ts` and `everyday/stageScreenModel.ts`: the first sizes a
+  canvas and is exempted beside `cutaway.ts`; the second had a local named `window`.
+- `viewportGates.browser.test.ts` counted the camera's three chips at 360×800 on a six-floor tower.
+  They were hidden, and a hidden control is a zero-sized control to that register; unoffered chips
+  are now absent from the document rather than hidden in it.
+- `derive.test.ts` found five unclassified producers across the wave; each is classified with its
+  reason.
+- `campaignModel.test.ts`'s writer-absence register went red on the commit that built the writer,
+  which is what it was for.
+
+## U.4 The corpus, measured once after integration
+
+Both tiers in one sitting on the integrated tree, with the base at `51cd1ff` re-measured first in a
+detached worktree. The base reproduced wave T's published row exactly in both tiers, the eleventh
+consecutive wave that has held.
+
+| | base `51cd1ff` | wave U | move | per case |
+|---|---|---|---|---|
+| always-on strings | 589 825 | **594 598** | **+4 773** | **97.41** |
+| deep strings | 735 583 | **741 367** | **+5 784** | **96.40** |
+| surfaces | 56 / 57 | **56 / 57** | **0** | |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | |
+
+The first corpus case was rendered on each tree and diffed by producer: +99, of which
+`watch/view.ts#watchingViewOf` +50 (#337), `everyday/today.ts#todayOf` +24 (#213, state-dependent),
+`gauntlet/ladder.ts#ladderRowsOf` +24 (#327), `everyday/stageScreenModel.ts#stageHeaderOf` +3
+(#324, present only where the camera is offered) and `everyday/buildNotes.ts#buildNotesViewOf` −2.
+Two conditional terms, so no per-case integer exists and the two tiers' quotients differ. Surface
+sets diffed, identical in both tiers; the deep tier's lead is still exactly
+`campaign/judge.ts#judgeStage`. The row in `CLAUDE.md` carries the same figures.
+
+## U.5 The suite, in one sitting on the integrated tree
+
+`tsc -b` exit 0. All six vitest projects, each to completion:
+
+| project | files | tests |
+|---|---|---|
+| core | 112 passed | 2 556 passed |
+| experiments | 107 passed | 1 409 passed, 11 skipped |
+| server | 17 passed | 381 passed |
+| cli | 10 passed | 158 passed |
+| viz | 239: 234 passed, 3 skipped, **2 failed on the first run** | 5 171 passed, 5 skipped, 2 failed |
+| viz-browser | 37 passed | 224 passed |
+
+The two viz reds were both this wave's and both fixed on one commit before the push.
+`hiddenBox.test.ts` refuses an inline `display` on an element the `hidden` attribute is asked to
+hide, because the inline value outranks `[hidden]`; the camera strip carried both, and since its
+chips were already absent from the document when unoffered the `hidden` writes simply came out.
+`testCost.test.ts` derives the timeout-annotation census from the tree, and the four annotated
+tests this wave added moved it (425 → 429 in the viz project, 560 → 564 in the directory); the
+figures in `vitest.config.ts` were re-read from the run. The three tests were rerun green, and the
+two stage browser files were rerun green on the fixed tree.

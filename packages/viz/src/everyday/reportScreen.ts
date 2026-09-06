@@ -286,7 +286,7 @@ function mountReportScreen(
         const body = el(doc, 'p', undefined, lever.body);
         body.style.cssText = `${QUIET};margin:0`;
         card.append(title_, body);
-        const surface = lever.surface;
+        const route = lever.route;
         const goLabel = lever.goLabel;
         /*
          * The two are `undefined` together — `reportView.ts` decides both from one branch and
@@ -294,11 +294,40 @@ function mountReportScreen(
          * asserted, because a screen that threw on the impossible arm would be a screen that goes
          * blank on a defect a note could survive.
          */
-        if (surface === undefined || goLabel === undefined) {
+        if (route === undefined || goLabel === undefined) {
           const note = el(doc, 'p', 'everyday-report-lever-note', lever.noSurfaceNote ?? '');
           note.style.cssText = `${QUIET};margin:0;color:${C.terracotta}`;
           card.append(note);
+        } else if (route.kind === 'everyday') {
+          /*
+           * GitHub issue #213, the owner's ruling: the lever opens the Everyday screen that carries
+           * it out, inside this shell, so the loop stands behind it. The caveat beside a dispatcher
+           * lever's button is the statistical honesty the old refusal carried, kept on the card.
+           */
+          if (lever.caveat !== undefined) {
+            const caveat = el(doc, 'p', 'everyday-report-lever-caveat', lever.caveat);
+            caveat.style.cssText = `${QUIET};margin:0;color:${C.terracotta}`;
+            card.append(caveat);
+          }
+          const button = el(doc, 'button', 'everyday-report-lever-go', goLabel);
+          button.type = 'button';
+          button.dataset['screen'] = route.screen;
+          button.style.cssText = [
+            'cursor:pointer',
+            'justify-self:start',
+            `border:1px solid ${C.ink}`,
+            `border-radius:${String(R.pill)}px`,
+            `background:${C.card}`,
+            `color:${C.ink}`,
+            'padding:6px 13px',
+            'font-size:12.5px',
+          ].join(';');
+          button.addEventListener('click', () => {
+            context.go(route.screen);
+          });
+          card.append(button);
         } else {
+          const surface = route.tab;
           const button = el(doc, 'button', 'everyday-report-lever-go', goLabel);
           button.type = 'button';
           button.style.cssText = [

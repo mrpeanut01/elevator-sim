@@ -1504,6 +1504,12 @@ type DecisionReservation = {
  * Six of the thirteen issues reached past their own module and took a number; the other seven are
  * recorded in their docstrings under § D405.
  */
+/**
+ * **Wave U's block, D503 to D510, is closed: four spent, four returned.** § D503 (#213), § D504
+ * (#353), § D505 (#324) and § D506 (#327); D507 to D510 were never written and are free rather
+ * than holes, because only a number written below the highest is a hole. The charter row
+ * reconciles to D507 on this same commit.
+ */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave S reserved D489–D498, and it was opened four lanes late — which is wave Q's error

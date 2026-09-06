@@ -77,15 +77,56 @@ verdict:
   of those were already wrong in the published row — the deep tier's surface count is **31**, not 30,
   because `campaign/judge.ts#judgeStage` speaks in no other tier, and *0 violations* had stopped
   being true of the deep half the day the temporal axis landed. The current figures, **measured on the
-  integrated tree after wave T** against a base that was re-measured first (the habit § D442 set);
+  integrated tree after wave U** against a base that was re-measured first (the habit § D442 set);
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **589 825** | **606** | **56** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **735 583** | **4 710** | **57** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **594 598** | **606** | **56** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **741 367** | **4 710** | **57** | **0** | **green**, and the register is empty |
+
+  **Wave U's move is not a per-case constant, and the probe that decomposed wave T's says why before
+  anybody has to guess.** Measured on the integrated tree after wave U, both tiers in one sitting,
+  with the base at `51cd1ff` re-measured first in a detached worktree — where it reproduced wave T's
+  published row **exactly in both tiers**, the **eleventh** consecutive wave that has held.
+
+  | | base `51cd1ff` | wave U | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 589 825 | **594 598** | **+4 773** | **97.41** |
+  | deep strings | 735 583 | **741 367** | **+5 784** | **96.40** |
+  | surfaces | 56 / 57 | **56 / 57** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **Two of the five terms are conditional, which is why the two quotients differ and neither is an
+  integer.** Rendered on the first corpus case on each tree and diffed by producer, the move there
+  is **+99**, and it sums to the string:
+
+  - `watch/view.ts#watchingViewOf` — **+50**: GitHub issue #337's two posted rows and two refusals,
+    with the board's figures, their counts and the source line on each.
+  - `everyday/today.ts#todayOf` — **+24**: #213's lever routes, a go-label and a caveat per card,
+    which is the first conditional term — the report draws as many lever cards as the day earned.
+  - `gauntlet/ladder.ts#ladderRowsOf` — **+24**: #327's world lines under the daily rows, the
+    board adapter's `ladder` state and the withheld arm beside it.
+  - `everyday/stageScreenModel.ts#stageHeaderOf` — **+3**: #324's three camera chips, the second
+    conditional term, present only on the two towers where a band differs from the whole and
+    absent from the document everywhere else, which is what § D505 said the honest control looks
+    like.
+  - `everyday/buildNotes.ts#buildNotesViewOf` — **−2**: the tuner-door absence (#177 item 2) and
+    the camera absence (#324) leaving the register, each on the commit that made it false.
+
+  50 + 24 + 24 + 3 − 2 = 99. A first case at 99 against a tier average of 97.41 is the two
+  conditional terms varying across the corpus, and the gap between the tiers' quotients is the
+  deep tier drawing a different mix of towers and days. No lane forecast this move, because there
+  were no lanes; the decomposition is a probe rather than a prediction, wave T's method kept.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical,
+  nothing added, nothing removed, on a wave that put a watch route on the daily board, a camera
+  on the stage, a works elevation on the campaign screen and a world ladder under the rows. Every
+  one of them went into an adapter that already existed. The deep tier's one-surface lead survives
+  and the diff names it: `campaign/judge.ts#judgeStage` is the only surface in deep and not in
+  always-on, and nothing is in always-on and not in deep.
 
   **Wave T's move is 114 strings a case in both tiers, it was decomposed by a probe rather than by
   a forecast, and the probe found three strings the guards had passed.** Measured on the integrated

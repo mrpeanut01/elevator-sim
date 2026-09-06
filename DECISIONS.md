@@ -33435,3 +33435,147 @@ is one case at 131.7 s whose last assertion runs over all thirteen profiles, so 
 change what it asserts. The largest file's share fell from 31.8 % to 16.4 % and the implied
 concurrency ceiling rose from 3.1 to 6.1; every one of the 262 campaign cases moved verbatim, none
 dropped, none added.
+
+## D503 — every report lever opens the surface that changes it, the dispatcher pair included, and the statistical honesty moves from a refusal to a caveat on the card
+
+**Date: 2026-09-06 · Owner: the integrator, on the owner's ruling of 2026-08-26 · Rules on: GitHub
+issue #213 and #177 item 2, GAMEPLAY § 6.5, `everyday/reportView.ts#EVERYDAY_LEVER_ROUTES`,
+`everyday/reportScreen.ts`, `everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES`,
+`dev/reportPanel.ts#LEVER_SURFACES` (unchanged).**
+
+The report named four levers and routed two. The dispatcher pair, *Weight fairness up* and *Ask
+where they're going*, carried a refusal on the card: a sheet that pointed at the control which would
+make one profile beat another would be recommending a dispatch strategy off one replication, which
+`docs/10` R2 forbids. Two verifications upheld the refusal and narrowed the issue's criterion around
+it. The owner then ruled on the issue: focus on the player finding the levers from the report's
+findings, make the game work for the user first, and document the approach second.
+
+### The ruling
+
+Every lever routes, and where it routes is GAMEPLAY § 6.5's own answer: a dispatcher change is a
+live handoff into the workshop, and a building change routes to the tuner. *Add a car* opens the
+sandbox tuner, whose Shafts row is the control. *Zone the tower* opens the simulator's Building
+panel, because the tuner has no zoning control and a card must not name a surface that cannot do
+what it says. The dispatcher pair open the dispatcher workshop.
+
+R2 forbids the comparative claim, not the door. The card still makes no comparative claim; the
+sentence the refusal used to carry is kept on the card as a caveat beside the button: one day is
+not evidence that a different dispatcher is better, try it, run tomorrow, and the bench settles it.
+The caveat is seeded in the honesty corpus as a refusal-class string, which is the one class
+entitled to name a dispatcher ordering, and the button labels are seeded as labels, which is the
+class that once let a button promising the wrong panel ship unswept.
+
+### What stays
+
+The Engineer sheet's `LEVER_SURFACES` keeps its two entries and its argument. It is the enthusiast's
+surface, and the restraint there is still the honest one. The two sheets now differ on this point
+by decision rather than by drift, and this entry is where the difference is recorded.
+
+### What it closes
+
+The shell register's entry that the report's third piece of advice does not open the tuner is
+deleted rather than reworded, because *Add a car* opens it. That entry was the tuner's second door,
+which is #177's item 2, so that item closes here too.
+
+## D504 — a works night takes one car out of passenger service on every day it occupies, and the campaign day opens on the building with that hole drawn
+
+**Date: 2026-09-06 · Owner: the integrator, wave U · Rules on: GitHub issue #353 (`docs/35` PM-CA1
+and PM-CA3), `docs/32` GD11 break 1, `campaign/works.ts`, `everyday/host.ts#runCampaignDay`,
+`everyday/elevation.ts`, `everyday/campaignScreens.ts`, `everyday/campaignModel.ts`, and the sentences
+GitHub issues #264 and #272 withdrew.**
+
+GD11 says spending must make the near days harder, and the ordering that makes a purchase a decision
+is take capacity away first and give it back later. § D427 built the giving back. This entry builds
+the taking away, in the shape `docs/32` wrote down before the code existed.
+
+### The ruling
+
+On every day one of a tower's bookings occupies, the run holds one car out of passenger service. One
+car whatever the tier, because the shop's nights already scale with the tier and a per-tier count
+would be a second lever the design does not draw. The car is `carsToDerate`'s first choice, the same
+chooser the day's event uses, so the two readers pick from the biggest bank first and the picture
+and the run agree. The writer is `runCampaignDay`, which is the one path a campaign day runs on.
+
+The sentences #264 withdrew come back narrower than they left: one car, on the days the works
+occupy, back the day the kit goes live. They are on the month grid's works cells, the career
+calendar's, the works cost line where the player meets the cost, and the tower screen's strip. The
+test that held the writer's absence from disk now holds its presence, so the sentences cannot go
+stale silently in either direction.
+
+### The sight before the words
+
+PM-CA1 asks that the day open on the building with today's hole in it. The brief already drew the
+elevation with the event's held car as a dashed well; that painter now lives in `everyday/elevation.ts`
+and the campaign's tower screen draws it above every word, with the works car held. Today's event,
+when a campaign day has one, holds its car through the run's own schedule and appears on the stage
+the moment the run lands; the works are what the tower screen can know before the press, and it
+says so in its own comment rather than drawing a hole it cannot yet know.
+
+### What this does not decide
+
+Whether a works night should hold more than one car for a shafts tier, and whether the held car
+should be the one being refitted rather than the chooser's. Both are content decisions with a
+measurement attached, and neither is needed for the ordering GD11 asks for.
+
+## D505 — the stage has a camera, it is measured per tower, and it is drawn only where it changes the picture
+
+**Date: 2026-09-06 · Owner: the integrator, wave U · Rules on: GitHub issue #324, GAMEPLAY § 7.3,
+`everyday/stageScreenModel.ts` (`STAGE_CAMERAS`, `stageCameraWindowOf`, `stageGeometryOf`'s window),
+`everyday/cutaway.ts`, `everyday/stageScreen.ts`, `STAGE_ABSENCES`.**
+
+§ 7.3 lists the camera among what a player can touch, and the stage's register said for three waves
+that the cutaway draws the whole building at once, so there is nothing to pan and nothing to follow.
+The issue asked for that reason to be measured per tower before anything was built, because it was a
+claim about the canvas rather than the design.
+
+### The measurement
+
+At the stage's own box, 60 vh of a 720 px viewport, the geometry labels a floor every 13 px. Two of
+the eight shipped towers have more floors than that pitch can label, `mixed-use-high-rise` and
+`vertical-city`; the other six, `secure-tower`'s thirty floors included, fit with room to spare. The
+first draft of that list was written from the floor counts and had `secure-tower` in it, which is the
+mistake the issue warned about, and the test now pins the measured pair.
+
+### The ruling
+
+The camera is three positions over the recording. Whole tower is what the stage always drew. Lobby is
+the band of legible floors from the entrance up. Follow the fullest car is a band of the same size
+centred on the car carrying the most riders at the playhead, recentred every paint. The band is as
+many floors as the plot can label, so a band never thins its own labels. Every floor keeps a row and a
+y on the band's scale, and the painter clips to the plot, so a car crossing the band's edge leaves
+the picture the way it would leave a window.
+
+The chips are drawn on the two towers where a band differs from the whole and on no other. That is
+the standing requirement applied to a view control: a control that writes nothing must say so, and
+the honest way to say so is not to draw it. The test asserts the pairing both ways, a chip exactly
+when its window is a real band. The camera writes no field of the run, and the register entry is
+deleted rather than reworded.
+
+## D506 — a board publishes a quantile ladder per axis and a real entry at each axis's median, withheld below twenty players, with no interval and energy named as absent
+
+**Date: 2026-09-06 · Owner: the integrator, wave U, building § D484's ruling · Rules on: GitHub
+issue #327, `packages/server/src/leaderboard/distribution.ts`, `store.ts#axisObservations`,
+`GET /api/board-distribution`, `menu/client.ts#distribution`, `everyday/host.ts#dailyBoardOf`,
+`everyday/boardScreen.ts`'s middle-of-the-board block.**
+
+§ D484 settled the statistical shape before any code existed, and this entry records what landed
+and the two places it had to choose. The ladder is Hyndman and Fan's type 7 quantile, linear
+interpolation between order statistics, chosen because every reader's tooling agrees on it and
+because it never publishes a value no run produced except as a weighted pair of two that did. The
+median entry is the lower median on an even count, so it is always a run somebody played. Each axis
+takes one row per player, their best on that axis, through the same distinct-per-user query the
+ranked board uses, so a player who posted twenty times is one observation.
+
+The note travels on the wire and names the interval it refuses. A route docstring alone would leave
+the next client free to compute one from the rungs; a sentence in the body a screen has to carry
+does not. The tests forbid the shape of an interval on the wire rather than the word, because a
+refusal is entitled to name the thing it refuses.
+
+Energy is absent and said so. A submission's claim is the four ranked figures and no energy figure
+reaches the store, so there is nothing to build a ladder from. § D106's rule binds the day an energy
+claim travels, and the wire's absent list is where a client learns that today it does not.
+
+The viewer's consumer is the daily board tab, which draws the middle under the rows, one axis a
+line with its own count, the withholding in the server's words, the note, and the absent axis with
+its reason. The ghost's use of the median entry id is #226's and is not built here; the id is on
+the wire for it.

@@ -53,6 +53,9 @@ import {
 } from './tokens.js';
 import type { EverydayState } from './types.js';
 import { openTowerOf, type BuildId, type CampaignTower } from '../campaign/career.js';
+import { parseBuilding, resolveBuilding } from '@elevator-sim/core/browser';
+import { worksHeldCarRefsOf } from '../campaign/works.js';
+import { drawElevation } from './elevation.js';
 import type { DifficultyId, ShopCategoryId } from '../campaign/economy.js';
 import { observationsAt } from '../live/observations.js';
 
@@ -684,6 +687,49 @@ function mountBuilding(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     const right = el(doc, 'div');
     columns.append(left, right);
     root.append(columns);
+
+    /*
+     * **The day opens on the building, with today's hole in it** — GitHub issue #353, `docs/35`
+     * PM-CA1 and PM-CA3. The elevation is drawn first, above every word, and the dashed well is
+     * the car today's works hold — `campaign/works.ts`'s answer, which is the one `runCampaignDay`
+     * writes into the run, so what the player sees before the press is what the day then does.
+     * Today's event, when the day has one, holds its car through the run's own schedule and appears
+     * on the stage the moment the run lands; the works are what this screen can know before it.
+     */
+    const openTower = openTowerOf(host.campaign());
+    const towerConfig = openTower === undefined ? undefined : host.buildingById(openTower.buildingId);
+    /*
+     * Resolved rather than read raw: a shipped building may author `floorRanges` and no `floors`
+     * list, and an elevation drawn off the literal array would understate it — GitHub issue #324
+     * makes the same point about counting storeys. The specs are the host's, as `dev/state.ts`
+     * resolves them.
+     */
+    const towerBuilding =
+      towerConfig === undefined ? undefined : resolveBuilding(parseBuilding(towerConfig as unknown), host.elevatorSpecs());
+    const frame = el(doc, 'div', 'everyday-building-elevation');
+    frame.style.cssText = `border:1px solid ${C.ruleLight};border-radius:${String(R.well)}px;background:${C.paperDeep};overflow:hidden;margin-bottom:${String(GAP.block)}px`;
+    const canvas = doc.createElement('canvas');
+    canvas.style.cssText = 'width:100%;height:220px;display:block';
+    frame.append(canvas);
+    left.append(frame);
+    if (view.worksToday !== undefined) {
+      const strip = el(doc, 'div', 'everyday-building-works');
+      strip.style.cssText = `display:flex;align-items:center;gap:${String(GAP.row)}px;margin:-${String(GAP.block - 6)}px 0 ${String(GAP.block)}px;padding:9px 12px;border:1px solid ${C.amberEdge};border-radius:${String(R.row)}px;background:${C.amberWash}`;
+      const badge = el(doc, 'span', 'everyday-building-works-badge', view.worksToday.badge);
+      badge.style.cssText = `flex:none;padding:2px 8px;border-radius:${String(R.tight)}px;background:${C.terracotta};color:${C.paper};font:500 12px ${TYPE.mono}`;
+      const sentence = el(doc, 'span', undefined, view.worksToday.sentence);
+      sentence.style.cssText = `font-size:12.5px;line-height:1.45;color:${C.inkSoft}`;
+      strip.append(badge, sentence);
+      left.append(strip);
+    }
+    const heldToday =
+      openTower === undefined || towerBuilding === undefined
+        ? []
+        : worksHeldCarRefsOf(openTower, towerBuilding).map((ref) => ref.carId);
+    const paint = (): void => {
+      drawElevation(canvas, towerBuilding, heldToday);
+    };
+    doc.defaultView?.requestAnimationFrame(paint);
 
     /* ---- the decision, or the quiet building ---- */
     if (view.need !== undefined) {

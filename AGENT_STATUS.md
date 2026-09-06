@@ -1415,3 +1415,44 @@ was written where a single push carried more than a handful.
 - **#242** (error reports) is what would make the build line travel by itself rather than by hand.
 - **`judgeCleared.test.ts`** is now the `viz` project's largest file at about 16 % and was outside
   #356's scope; a split by the batch each case reads would take the ceiling further.
+
+## Wave U closed
+
+**Six issues and two umbrella items closed, four decisions taken, one push.** One worker, serial,
+opened the hour wave T merged.
+
+| issue | outcome |
+|---|---|
+| #325 | **closed**; the GAPS.md § 3 guard, R44's mitigation, its first run failing on the row a sweep walked past |
+| #337 | **closed**; a board row can be watched, at the server's own tolerance |
+| #213 | **closed**, § D503, on the owner's ruling |
+| #353 | **closed**, § D504; GD11's first half |
+| #324 | **closed**, § D505; measured before built |
+| #327 | **closed**, § D506; § D484 as code |
+| #178 item 4, #177 item 2 | closed by #325 and #213 |
+
+**Verified on the integrated tree**: `tsc -b` exit 0, all six vitest projects in one sitting, two viz
+reds found by the full run and fixed before the push (`ISSUE_WORKER_LEDGER.md` § U.5), and the corpus
+measured once in both tiers with the base re-measured first, 594 598 and 741 367 strings (§ U.4).
+
+### U.6 What this wave learned
+
+**1. A rule and its refusal are two different things.** #213's refusal was upheld twice on a rule
+that forbids a claim; the owner's ruling made the door and kept the claim out. Reading a rule for
+what it actually forbids would have found that without a ruling.
+
+**2. A view control says it writes nothing by not being drawn.** The camera exists on two towers.
+That is the standing requirement's honest form for a control over a picture rather than a run.
+
+**3. Registers of absence need a presence arm.** Two registers this wave (the GAPS guard, the
+works writer) were built or flipped to hold both directions. A register that only holds an absence
+becomes a suppression list the day the thing is built.
+
+### U.7 Owed to the next wave
+
+- **#178 item 6** (the Phase 5 sweeps' entry point) needs pinned intervals at n = 300 and 500, which
+  is a compute job before it is a code one.
+- **#169 item 4** (a complexity for `secure-tower` and `mixed-use-high-rise`) is a placement with a
+  measurement attached; nothing here publishes one yet.
+- **#226's `world` ghost** now has its source on the wire (`medianEntryId`) and no consumer.
+- **#346**, **#177 item 5**, **#178 item 9** stand as written.

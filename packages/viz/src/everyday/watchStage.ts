@@ -56,15 +56,17 @@ export const WATCH_ROWS_HEADING = 'RUNS THAT CAN BE WATCHED';
  *
  * It states the substitution `watch/types.ts` argues at length, because the pill downstream says
  * *verified by re-simulation* and a reader meeting that on a stage has nowhere to ask what it means.
- * It also says which two sources there are, so the absence of a third — another player's posted run
- * — is a stated absence rather than a reader's guess.
+ * It also says which two sources sit under it, and where the third is: another player's posted run
+ * is watched from today's board, row by row (GitHub issue #337), rather than from this block. The
+ * sentence used to end *"runs posted by other people would need a server, and there is none"*,
+ * which was a stated absence when written and a stale one from the day the board read.
  */
 export const WATCH_ROWS_LEDE =
   'A run is a record — a seed, a configuration and the changes made during the day. Pressing ' +
   'Watch it re-simulates that record on this machine and replays what comes back, and a record ' +
   'that no longer reproduces the figures it was filed with is not replayed at all. The rows are ' +
-  'the days closed on this device and the reference runs this repository shipped; runs posted by ' +
-  'other people would need a server, and there is none.';
+  "the days closed on this device and the reference runs this repository shipped; other people's " +
+  "posted runs are watched from today's board, beside their place on it.";
 
 /** The affordance, and § 1.5's rule is that a row that cannot be replayed loses it rather than dimming it. */
 export const WATCH_IT_LABEL = 'Watch it';

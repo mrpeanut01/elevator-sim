@@ -128,7 +128,8 @@ export interface EverydayScreenShellContext extends EverydayScreenContext {
    * navigated to (§ 1.5), and a shell that entered the context on a refused row would be showing a
    * spectator chrome over the player's own day.
    *
-   * Its one non-test caller is `everyday/weekScreen.ts`'s `Watch it` row.
+   * Its non-test callers are `everyday/weekScreen.ts`'s `Watch it` row and, since GitHub issue
+   * #337, `everyday/boardScreen.ts`'s, over a daily-board row.
    */
   enterWatch(): void;
 }

@@ -176,6 +176,7 @@ import {
   STAGE_INTERVENTIONS,
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
+  STAGE_CAMERAS,
   STAGE_SPEEDS,
   STAGE_RACE_PICKER_LABEL,
   STAGE_SWITCH_PICKER_LABEL,
@@ -296,7 +297,8 @@ import {
 } from '../live/raceStrip.js';
 import { DAY_HAS_NO_RECORD, refusalForDay } from '../watch/library.js';
 import { recordUnreadableReason } from '../watch/record.js';
-import { postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
+import { claimOf, claimRefusalFor, postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
+import { postedLogOf, postedRunOf } from '../watch/posted.js';
 import type { WatchableRun } from '../watch/types.js';
 import {
   PLAYER_SHELL_COPY,
@@ -7222,6 +7224,21 @@ const WATCH: SurfaceAdapter = {
      */
     'watch/record.ts#recordRefusalFor',
     'watch/reproduce.ts#reproductionRefusalFor',
+    /*
+     * GitHub issue #337's third source — a board row. The view's arm and its three claimed figures
+     * are rendered below in both states a row can be in (a quotable mean with its `n`, and a mean
+     * the server withheld); the builder's subtitle and its two refusals are rendered through the
+     * builder on a row fixture, so the sentence a spectator meets over a handover this build cannot
+     * replay is swept in the wording the board draws it.
+     */
+    'watch/view.ts#claimedFiguresOf',
+    'watch/view.ts#POSTED_RUN_LINE',
+    'watch/posted.ts#postedRunOf',
+    'watch/posted.ts#postedSubtitleOf',
+    'watch/posted.ts#postedLogOf',
+    'watch/reproduce.ts#claimRefusalFor',
+    /* The figure labels the refusal above is composed from; reached through it and nothing else. */
+    'watch/reproduce.ts#claimDrift',
     'watch/record.ts#recordUnreadableReason',
     /*
      * The shell's own spectator surfaces — `docs/20` defect 7. They are covered **here**, beside
@@ -7243,17 +7260,50 @@ const WATCH: SurfaceAdapter = {
     const seeds: TextSeed[] = [];
     const posted = postedResultOf(context.recording);
 
-    for (const source of ['filed-day', 'reference'] as const) {
-      const run: WatchableRun = {
-        id: `watch-${source}`,
-        source,
-        label: source === 'reference' ? 'The house baseline' : 'Tuesday \u00b7 day 2',
-        buildingName: context.building.name,
-        subtitle: 'day 2 of this week',
-        record: null,
-        posted,
-        blocked: null,
-      };
+    /*
+     * A board row over this case's own run — GitHub issue #337 — so the posted arm's figures are
+     * the run's rather than a literal's, and the builder is the shipped one. Two rows: one whose
+     * mean the server vouched for with its count, one whose mean it withheld.
+     */
+    const rowClaim = claimOf(context.recording);
+    const rowOf = (id: string, legs: number | undefined, awtIsValid: boolean): BoardEntry => ({
+      id,
+      displayName: 'Nadia R.',
+      run: {
+        buildingId: context.case.buildingId,
+        dispatcherProfileId: context.case.baselineProfileId,
+        demandTemplateId: context.recording.trafficProfileId ?? 'office-day',
+        arrivalRatePctPop5min: null,
+        durationS: Math.round(context.recording.endedAt - context.recording.startedAt),
+        windowStartS: null,
+        seed: context.recording.seed,
+      },
+      dataHash: 'sha256:corpus',
+      measured: { ...rowClaim, awtIsValid },
+      legs,
+      submittedAtMs: 0,
+    });
+    const postedRuns: readonly WatchableRun[] = [
+      postedRunOf(rowOf('row-quotable', context.recording.summary.waitCount, true), 2, browserResourcesOf(context)),
+      postedRunOf(rowOf('row-withheld', undefined, false), 5, browserResourcesOf(context)),
+    ];
+    const runs: readonly WatchableRun[] = [
+      ...(['filed-day', 'reference'] as const).map(
+        (source): WatchableRun => ({
+          id: `watch-${source}`,
+          source,
+          label: source === 'reference' ? 'The house baseline' : 'Tuesday \u00b7 day 2',
+          buildingName: context.building.name,
+          subtitle: 'day 2 of this week',
+          record: null,
+          posted,
+          blocked: null,
+        }),
+      ),
+      ...postedRuns,
+    ];
+    for (const run of runs) {
+      const source = run.id;
       const view = watchingViewOf(run, context.case.baselineProfileId);
       /*
        * Through the view's own enumeration, so a cell added to `WatchingView` enters this corpus
@@ -7331,6 +7381,30 @@ const WATCH: SurfaceAdapter = {
     });
     if (drifted !== null) {
       seeds.push({ field: 'watch.blocked(does-not-reproduce)', text: drifted, role: 'reason' });
+    }
+    /*
+     * GitHub issue #337's two refusals, each a real derivation: a board claim two figures off this
+     * run's own, and a row whose handover names a dispatcher this build does not ship.
+     */
+    const claimDrifted = claimRefusalFor(
+      { ...rowClaim, awtS: rowClaim.awtS + 0.75, wt95S: rowClaim.wt95S + 3, legs: 400 },
+      context.recording,
+    );
+    if (claimDrifted !== null) {
+      seeds.push({ field: 'watch.blocked(claim-does-not-reproduce)', text: claimDrifted, role: 'reason' });
+    }
+    const unshippedHandover = postedLogOf(
+      {
+        ...rowOf('row-handover', 400, true),
+        run: {
+          ...rowOf('row-handover', 400, true).run,
+          interventions: [{ atS: 300, change: { kind: 'switch-dispatcher', toProfileId: 'no-such-dispatcher' } }],
+        },
+      },
+      browserResourcesOf(context).dispatcherProfiles.profiles,
+    );
+    if (typeof unshippedHandover === 'string') {
+      seeds.push({ field: 'watch.blocked(unshipped-handover)', text: unshippedHandover, role: 'reason' });
     }
     return singleRun(this.id, seeds);
   },
@@ -8660,6 +8734,10 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
             seeds.push({ field: `${at}.effect`, text: option.effect, role: 'prose' });
           }
         }
+        if (desk.worksToday !== undefined) {
+          seeds.push({ field: `${label}.desk.works.badge`, text: desk.worksToday.badge, role: 'label' });
+          seeds.push({ field: `${label}.desk.works.sentence`, text: desk.worksToday.sentence, role: 'prose' });
+        }
         if (desk.quiet !== undefined) {
           seeds.push({ field: `${label}.desk.quiet.heading`, text: desk.quiet.heading, role: 'label' });
           seeds.push({ field: `${label}.desk.quiet.body`, text: desk.quiet.body, role: 'prose' });
@@ -9003,6 +9081,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * Engineer strip needs it as well, and one screen's model is not where both shells can read it.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
+    'everyday/stageScreenModel.ts#STAGE_CAMERAS',
+    /* Returns the chips above or none; the words are theirs, seeded below once per case. */
+    'everyday/stageScreenModel.ts#stageCameraChipsOf',
     /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
@@ -9069,6 +9150,10 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     for (const speed of STAGE_SPEEDS) {
       seeds.push({ field: `stage.speed.${String(speed.simPerRealS)}`, text: speed.label, role: 'label' });
+    }
+    /* § 7.3's camera chips — GitHub issue #324 — seeded once per case, like the speed chips above. */
+    for (const chip of STAGE_CAMERAS) {
+      seeds.push({ field: `stage.camera.${chip.id}`, text: chip.label, role: 'label' });
     }
     /*
      * **Every arm the control can offer, including the one that is built per call** — GitHub issue
@@ -9995,14 +10080,14 @@ const GAUNTLET: SurfaceAdapter = {
       ['noServer', { kind: 'no-server' }],
       ['unreachable', { kind: 'unreachable', detail: 'The board service did not answer.' }],
       ['undeclared', { kind: 'undeclared' }],
-      ['empty', { kind: 'board', date: '2026-09-02', note: BOARD_NOTE, rows: [] }],
+      ['empty', { kind: 'board', date: '2026-09-02', note: BOARD_NOTE, distribution: undefined, distributionDetail: undefined, rows: [] }],
       [
         'rows',
         {
           kind: 'board',
           date: '2026-09-02',
           note: BOARD_NOTE,
-          rows: [
+          distribution: undefined, distributionDetail: undefined, rows: [
             placeholderBoardEntry('A. Turing', 21.4),
             placeholderBoardEntry('G. Hopper', 29.5),
             /*
@@ -10014,12 +10099,55 @@ const GAUNTLET: SurfaceAdapter = {
           ],
         },
       ],
+      /*
+       * The middle of the board with a ladder published — GitHub issue #327 — so every axis line,
+       * the wire's note and the energy absence are swept. Plausible rungs rather than round ones,
+       * and 24 players: the server withholds below twenty.
+       */
+      [
+        'ladder',
+        {
+          kind: 'board',
+          date: '2026-09-02',
+          note: BOARD_NOTE,
+          distribution: {
+            boardKey: 'daily:2026-09-02',
+            n: 24,
+            ladders: [
+              { axis: 'awtS', n: 24, rungs: { p10: 12.4, p25: 14.1, p50: 18.3, p75: 23.0, p90: 30.6 }, medianEntryId: 'e1' },
+              { axis: 'wt95S', n: 24, rungs: { p10: 28.0, p25: 33.5, p50: 41.2, p75: 52.9, p90: 66.1 }, medianEntryId: 'e2' },
+              { axis: 'ttdMeanS', n: 24, rungs: { p10: 40.5, p25: 45.8, p50: 53.0, p75: 61.4, p90: 74.9 }, medianEntryId: 'e3' },
+              { axis: 'pctOverLongWait', n: 24, rungs: { p10: 0.0, p25: 0.8, p50: 2.5, p75: 4.9, p90: 8.7 }, medianEntryId: 'e4' },
+            ],
+            withheld: undefined,
+            absent: [
+              {
+                axis: 'energy',
+                reason:
+                  'A posted run claims its four ranked figures and no energy figure, so no energy ladder can be computed from what the board holds.',
+              },
+            ],
+            note:
+              'Each axis is its own ladder over the players who posted, one best run each. The rungs are not one run; the median entry is. No interval is published, because the players who posted are not a sample of anybody else.',
+          },
+          distributionDetail: undefined,
+          rows: [placeholderBoardEntry('A. Turing', 21.4), placeholderBoardEntry('G. Hopper', 29.5)],
+        },
+      ],
     ];
     for (const [state, board] of dailyStates) {
       const view = dailyBoardViewOf(board);
       view.lines.forEach((line, index) => {
         seeds.push({
           field: `board.daily.${state}.line${String(index)}`,
+          text: line.text,
+          role: line.role === 'note' ? 'observation' : 'reason',
+        });
+      });
+      /* The middle of the board's lines — GitHub issue #327 — in the state's own field space. */
+      view.world.forEach((line, index) => {
+        seeds.push({
+          field: `board.daily.${state}.world${String(index)}`,
           text: line.text,
           role: line.role === 'note' ? 'observation' : 'reason',
         });
@@ -10337,6 +10465,18 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seeds.push({ field: `${where}.pointer`, text: view.honesty.pointer.why, role: 'prose' });
         }
         for (const lever of view.levers) {
+          /*
+           * The button's label and the dispatcher levers' caveat — GitHub issue #213. The label is
+           * the claim about what a press does that once shipped wrong because nothing swept it;
+           * the caveat is the one string on the card entitled to name a dispatcher ordering,
+           * because it refuses one.
+           */
+          if (lever.goLabel !== undefined) {
+            seeds.push({ field: `${where}.lever(${lever.title}).go`, text: lever.goLabel, role: 'label' });
+          }
+          if (lever.caveat !== undefined) {
+            seeds.push({ field: `${where}.lever(${lever.title}).caveat`, text: lever.caveat, role: 'reason' });
+          }
           if (lever.noSurfaceNote === undefined) continue;
           seeds.push({ field: `${where}.lever.refusal`, text: lever.noSurfaceNote, role: 'reason' });
         }

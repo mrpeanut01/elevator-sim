@@ -41,7 +41,7 @@
  * `reference run · not a player`.
  */
 
-import type { PostedResult, WatchableRun } from './types.js';
+import type { PostedClaim, PostedResult, WatchableRun } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * The words
@@ -63,6 +63,14 @@ export const REFERENCE_RUN_LINE = 'reference run · not a player';
 
 /** What a day this device filed says in the same slot. Not first-person — § 14.1. */
 export const FILED_DAY_LINE = 'a day filed on this device · replayed from its record';
+/**
+ * What a board row says in the slot — GitHub issue #337. The rank itself is the subtitle's
+ * (`watch/posted.ts#postedSubtitleOf`), so this line says what kind of thing the row is and who
+ * vouched for it: the server, by its own replay, and then this build by another.
+ */
+export const POSTED_RUN_LINE = "a run posted to today's board · verified by the server, and replayed here";
+/** The mean a board row could not vouch for — the row withheld it, and so does this header. */
+export const CLAIM_WITHHELD = 'withheld';
 
 /** The action that puts the shell back exactly as it was. § 14.1's `⤺ Stop watching`. */
 export const STOP_WATCHING_LABEL = '⤺ Stop watching';
@@ -152,9 +160,11 @@ export function watchingViewOf(
     name,
     dispatcherEyebrow: 'THEIR DISPATCHER',
     dispatcherName,
-    sourceLine: run.source === 'reference' ? REFERENCE_RUN_LINE : FILED_DAY_LINE,
+    sourceLine:
+      run.source === 'reference' ? REFERENCE_RUN_LINE : run.source === 'posted-run' ? POSTED_RUN_LINE : FILED_DAY_LINE,
     subtitle: `${run.buildingName} · ${run.subtitle}`,
-    figures: postedFiguresOf(run.posted),
+    figures:
+      run.claim !== undefined ? claimedFiguresOf(run.claim) : run.posted !== undefined ? postedFiguresOf(run.posted) : [],
     figuresNote: POSTED_FIGURES_NOTE,
     pill: `REPLAY · ${name} · ${REPLAY_PILL_VERB}`,
     /*
@@ -198,6 +208,35 @@ export function postedFiguresOf(posted: PostedResult): readonly PostedFigure[] {
       id: 'arrived',
       value: String(posted.arrived),
       label: 'people turned up',
+    },
+  ];
+}
+
+/**
+ * A board row's three header figures — GitHub issue #337. The board ranks on the mean wait, so
+ * that is first, and it carries the `n` the server counted beside it (R13 clause one) or is
+ * withheld when the server sent none or refused the mean, exactly as the board row does. The other
+ * two are the figures the server also ranked-checked, so the header and the gate describe one run.
+ */
+export function claimedFiguresOf(claim: PostedClaim): readonly PostedFigure[] {
+  const quotable = claim.awtIsValid && claim.legs !== undefined;
+  return [
+    {
+      id: 'awtS',
+      value: quotable ? `${claim.awtS.toFixed(1)} s` : CLAIM_WITHHELD,
+      label: quotable
+        ? `mean wait they posted — over ${String(claim.legs)} rides`
+        : 'mean wait — the server could not vouch for a quotable average on this run',
+    },
+    {
+      id: 'wt95S',
+      value: `${claim.wt95S.toFixed(1)} s`,
+      label: 'their 95th-percentile wait',
+    },
+    {
+      id: 'pctOverLongWait',
+      value: `${claim.pctOverLongWait.toFixed(1)}%`,
+      label: 'of their riders waited past the long-wait line',
     },
   ];
 }
