@@ -174,4 +174,100 @@ describe.skipIf(!HAS_BROWSER)('the Everyday settings screen', () => {
     expect(plate).toContain('lb');
     await page.close();
   });
+
+  /**
+   * **Default speed, end to end — GitHub issue #229.** The pill steps the ladder; the choice lands
+   * in this device's slot as the rung's own value; and **the stage opens at it**, which is the claim
+   * `settingsView.test.ts` cannot see and the reason § 4.6's sentence has a setting to reset to.
+   * Read off the chip row's `aria-pressed`, the same way the stage's own opening-speed case reads it.
+   */
+  it('steps Default speed, keeps the rung in this device’s slot, and the next day opens at it', async () => {
+    const page = await coldLoad();
+    await openSettings(page);
+
+    expect(await page.textContent('.everyday-settings-default-speed')).toBe('30×');
+    await page.click('.everyday-settings-default-speed');
+    const stepped = await page.textContent('.everyday-settings-default-speed');
+    expect(stepped).not.toBe('30×');
+
+    const stored = await page.evaluate(() => {
+      const raw = window.localStorage.getItem('elevator-sim.everyday-profile');
+      if (raw === null) return undefined;
+      return (JSON.parse(raw) as { defaultSpeedSimPerRealS?: unknown }).defaultSpeedSimPerRealS;
+    });
+    expect(typeof stored).toBe('number');
+
+    /* The consumer: § 7's stage, reached the way a player reaches it, opens on the chosen chip. */
+    await page.click('.everyday-rail-menu');
+    await page.waitForSelector('.everyday-mode[data-screen="door"]');
+    await page.click('.everyday-mode[data-screen="door"]');
+    await page.waitForSelector('.everyday-door');
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-brief');
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-stage-speed[aria-pressed="true"]', { timeout: 60_000 });
+    const pressed = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('.everyday-stage-speed')]
+        .filter((button) => button.getAttribute('aria-pressed') === 'true')
+        .map((button) => button.textContent),
+    );
+    expect(pressed).toEqual([stepped]);
+    await page.close();
+  });
+
+  /**
+   * **Clear saved progress, end to end — GitHub issue #229, [§ D500](../../../../DECISIONS.md).**
+   * Two presses; both slots gone; and the page reloads into a first visit. The middle claim is the
+   * one the pure half cannot make, and the third is what stops the sealed shell's week coming back.
+   */
+  it('clears both slots on the second press and reloads into a first visit', async () => {
+    const page = await coldLoad();
+    await openSettings(page);
+    // Put something in both slots first, or the clear proves nothing.
+    await page.click('.everyday-settings-units');
+    await page.click('.everyday-settings-motion');
+    expect(
+      await page.evaluate(() => [
+        window.localStorage.getItem('elevator-sim.session') !== null,
+        window.localStorage.getItem('elevator-sim.everyday-profile') !== null,
+      ]),
+    ).toEqual([true, true]);
+
+    expect(await page.textContent('.everyday-settings-clear-progress')).toBe('Clear');
+    await page.click('.everyday-settings-clear-progress');
+    expect(await page.textContent('.everyday-settings-clear-progress')).toBe('Press again to clear');
+    // Armed, and still nothing gone — the first press must not be the destructive one.
+    expect(await page.evaluate(() => window.localStorage.getItem('elevator-sim.session') !== null)).toBe(true);
+
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'load' }),
+      page.click('.everyday-settings-clear-progress'),
+    ]);
+    await page.waitForFunction(
+      () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+      undefined,
+      { timeout: 30_000 },
+    );
+    /*
+     * After the reload the shell has booted once more and saved what a first visit saves; what
+     * must be gone is the *content* the player asked to forget — the units choice and the reduced
+     * motion — rather than the keys themselves, which a booting shell may legitimately re-mint.
+     */
+    const after = await page.evaluate(() => {
+      const session = window.localStorage.getItem('elevator-sim.session');
+      const profile = window.localStorage.getItem('elevator-sim.everyday-profile');
+      return {
+        reduceMotion:
+          session === null
+            ? null
+            : (JSON.parse(session) as { session?: { settings?: { reduceMotion?: boolean } } }).session?.settings?.reduceMotion ?? null,
+        units: profile === null ? null : (JSON.parse(profile) as { units?: unknown }).units ?? null,
+      };
+    });
+    expect(after.reduceMotion).not.toBe(true);
+    expect(after.units).not.toBe('imperial');
+    await openSettings(page);
+    expect(await page.textContent('.everyday-settings-units')).toBe('metres');
+    await page.close();
+  });
 });

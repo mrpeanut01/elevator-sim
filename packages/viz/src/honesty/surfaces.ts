@@ -8302,6 +8302,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       ],
       /* A store that keeps nothing: the profile is real for this tab and says so. Signed in and named. */
       ['not-durable', { profile: stored, durable: false, reduceMotion: false, account: named, accountServer: true }],
+      /*
+       * GitHub issue #229's two rows in their other states: a default speed moved off the stage's
+       * own rung, and the clear row armed and then cleared. The `ready` and `booting` arms are the
+       * cases above; these are the words a player meets only after pressing.
+       */
+      ['armed', { profile: stored, reduceMotion: false, defaultSpeedSimPerRealS: 90, clearStage: 'armed' }],
+      ['cleared', { profile: undefined, reduceMotion: false, clearStage: 'cleared' }],
     ] as const;
 
     for (const [label, input] of cases) {
@@ -8367,6 +8374,12 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
         seeds.push({ field: `${at}.label`, text: fact.label, role: 'label' });
         seeds.push({ field: `${at}.value`, text: fact.value, role: 'label' });
         seeds.push({ field: `${at}.note`, text: fact.note, role: 'prose' });
+      }
+      /* The clear row — GitHub issue #229 — in whichever of its four states this case is in. */
+      seeds.push({ field: `${label}.device.clear.label`, text: view.device.clear.label, role: 'label' });
+      seeds.push({ field: `${label}.device.clear.note`, text: view.device.clear.note, role: 'prose' });
+      if (view.device.clear.button !== undefined) {
+        seeds.push({ field: `${label}.device.clear.button`, text: view.device.clear.button, role: 'label' });
       }
     }
 

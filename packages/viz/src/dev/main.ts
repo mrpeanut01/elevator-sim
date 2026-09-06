@@ -1752,8 +1752,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let weekNotice: string | undefined;
 
+  /**
+   * **Sealed** once *Clear saved progress* has been pressed — GitHub issue #229, § D500. A sealed
+   * shell writes nothing more for the life of the page: the week in memory is the one the player
+   * asked to forget, and every save site below would otherwise put it straight back. Cleared by a
+   * reload and by nothing else.
+   */
+  let sessionSealed = false;
+
   /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
   function saveSessionNow(): void {
+    if (sessionSealed) return;
     /*
      * **A mode that does not own a week does not write one** — § D231, issue #64's other half.
      *
@@ -2608,6 +2617,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
     reduceMotion: () => menuState.settings.reduceMotion,
     setReduceMotion: (value) => {
       dispatchMenu({ kind: 'set-setting', field: 'reduceMotion', value: value ? 'on' : 'off' });
+    },
+    clearSavedSession: () => {
+      // Seal first, then remove — the order is the whole point; see the port's docstring.
+      sessionSealed = true;
+      return clearSession(sessionStore);
+    },
+    reloadPage: () => {
+      window.location.reload();
     },
   };
   provideEngineerSettings(engineerSettingsBridge);

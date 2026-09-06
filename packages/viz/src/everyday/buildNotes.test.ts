@@ -69,7 +69,10 @@ describe('the build-information panel', () => {
      * disclosure is deciding against a number. Derived, so it cannot be the wrong number: a total
      * typed beside a list is a total that is wrong one merge later.
      */
-    expect(view.entryCount).toBeGreaterThan(20);
+    // A floor rather than a pin, and it moved 20 → 15 when GitHub issue #229 built two of the
+    // settings rows the register used to refuse: a register whose entries only ever fall is what
+    // § D370's queue reading predicts, so the floor follows it down rather than standing over it.
+    expect(view.entryCount).toBeGreaterThan(15);
   });
 
   it('gives every section a heading and a placing line, so a heading is not the only cue', () => {
@@ -232,7 +235,11 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
 
   /* Settings. Two of the six are #229's remainder after its premise was refuted (§ D368). */
   { register: 'SETTINGS_ABSENCES', fragment: 'Sound —', issue: 258 },
-  { register: 'SETTINGS_ABSENCES', fragment: 'Default speed', issue: 229 },
+  /*
+   * `Default speed` and `Clear saved progress` left this table on the commit that built both —
+   * GitHub issue #229. The rows they owned are drawn on the settings screen now, and a triage row
+   * still pointing at a deleted entry is what this table's second assertion exists to refuse.
+   */
   /*
    * `Units` left this table on the commit that built its consumer — GitHub issue #170, § D448.
    * The row it owned is drawn on the settings screen now, so a triage row still pointing at the
@@ -252,7 +259,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * a capability that still does not exist; sign-in does not make it false, posting does, and
    * § D460 corrected that confusion once already.
    */
-  { register: 'SETTINGS_ABSENCES', fragment: 'Clear saved progress', issue: 229 },
 ]);
 
 /** The registers by the name the triage table uses, so a failure names the array a reader can open. */

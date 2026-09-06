@@ -212,12 +212,13 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
  * rather than a constant standing in for one.
  *
  * § 4.6 and § 7.3 say *"speed is not inherited: it resets to the player's `Default speed` setting at
- * the start of each run"*. **There is still no `Default speed` setting in this build** —
- * `everyday/settingsView.ts` ships one Motion switch and six refused rows — and this file will not
- * pretend to read one, because a stage consulting a preference nothing writes is the inert-control
- * defect with its polarity reversed. What changed with GitHub issue **#257** is that the value is no
- * longer a stand-in: it is chosen, for three reasons, and the lane that builds the setting replaces
- * {@link DEFAULT_STAGE_SIM_PER_REAL_S} with a host read and changes nothing else.
+ * the start of each run"*. **The setting exists now** (GitHub issue #229): `everyday/profile.ts`
+ * carries it beside Units, `everyday/settingsView.ts` draws the row, and `stageScreen.ts#adopt`
+ * reads `everydayProfileStore().defaultSpeed()` at the one place speed resets — exactly the
+ * replacement this paragraph promised when it said *the lane that builds the setting replaces this
+ * constant with a store read and changes nothing else*. This value is what that setting
+ * **defaults** to, and what the stage opens at for a player who has never touched the row; it is
+ * chosen, for three reasons, rather than a stand-in (GitHub issue **#257**).
  *
  * **1. It cannot be the honest `1×`, and that is the reason the default needed deciding at all.**
  * At 1:1 the shipped default day — `rise-and-fall`, thirty simulated minutes — is thirty real
@@ -243,7 +244,7 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
  * up: a number and a name kept in two places drift, and the second place is always the one nobody
  * re-reads.
  */
-const DEFAULT_STAGE_SIM_PER_REAL_S = 30;
+export const DEFAULT_STAGE_SIM_PER_REAL_S = 30;
 
 /** Where every run opens — the index of {@link DEFAULT_STAGE_SIM_PER_REAL_S} on the ladder. */
 export const DEFAULT_STAGE_SPEED_INDEX = STAGE_SPEEDS.findIndex(

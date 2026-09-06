@@ -113,6 +113,7 @@ import {
   type StageInterventionView,
   type StageSwitchTarget,
 } from './stageScreenModel.js';
+import { everydayProfileStore } from './profileStore.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as GAP,
@@ -500,7 +501,7 @@ function mountStage(
   let alive = true;
   let playback: Playback | undefined;
   let adopted: VizRecording | undefined;
-  let speedIndex = DEFAULT_STAGE_SPEED_INDEX;
+  let speedIndex = defaultSpeedIndex();
   let started = false;
   let pendingFrame: number | undefined;
   /**
@@ -1096,6 +1097,19 @@ function mountStage(
    * playhead, so the picture does not jump — the prefix is bit-identical, so the instant the player
    * was watching is the same instant it always was.
    */
+  /**
+   * § 4.6's *Default speed*, read at the one place speed resets — GitHub issue #229. The store is
+   * this device's, so the ladder index is looked up from the stored value each time rather than
+   * cached: a player who changes the setting and starts the next day gets the next day at the new
+   * speed. A stored value off the ladder cannot arrive (`profile.ts#loadDefaultSpeed` refuses it),
+   * and the fallback to `DEFAULT_STAGE_SPEED_INDEX` is for the type rather than for a case.
+   */
+  function defaultSpeedIndex(): number {
+    const wanted = everydayProfileStore().defaultSpeed();
+    const index = STAGE_SPEEDS.findIndex((speed) => speed.simPerRealS === wanted);
+    return index === -1 ? DEFAULT_STAGE_SPEED_INDEX : index;
+  }
+
   function adopt(recording: VizRecording): void {
     const resumeAtS = recomputingOver !== undefined ? playback?.simTimeS : undefined;
     const wasPlaying = recomputingOver !== undefined && playback?.state === 'playing';
@@ -1103,7 +1117,7 @@ function mountStage(
     recomputingOver = undefined;
     barFacts.recomputing = false;
     if (resumeAtS === undefined) {
-      speedIndex = DEFAULT_STAGE_SPEED_INDEX;
+      speedIndex = defaultSpeedIndex();
       started = false;
     }
     playback = new Playback(recording, systemClock(), {

@@ -45,6 +45,26 @@ export interface EngineerSettingsBridge {
    * both happen exactly as they would from that menu.
    */
   setReduceMotion(value: boolean): void;
+  /**
+   * **Drop the Engineer shell's saved session and refuse to write it again** — GitHub issue #229's
+   * *Clear saved progress*, [§ D500](../../../../DECISIONS.md).
+   *
+   * The refusal this replaces said *"the running session would write itself straight back on its
+   * next save"*, and that was the one true thing in it: the week on screen is still in memory, and
+   * the next `closeDay` or setting change would have re-saved it over a slot the player had just
+   * asked to empty. So the shell **seals** the session first — every later `saveSessionNow()` is a
+   * no-op until the page reloads — and only then removes the slot. Returns whether the removal
+   * reached storage. The Everyday slot is the settings screen's own to clear; this port reaches the
+   * one the Everyday side may not touch.
+   */
+  clearSavedSession(): boolean;
+  /**
+   * Start again from nothing — `window.location.reload()` in the shell, a no-op in a test
+   * bridge. Called by the settings screen after both slots are cleared, because a sealed shell
+   * holding a week it will never save is a page that has to be left, and leaving it is what the
+   * player asked for.
+   */
+  reloadPage(): void;
 }
 
 let provided: EngineerSettingsBridge | undefined;
