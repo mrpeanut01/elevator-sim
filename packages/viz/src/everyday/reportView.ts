@@ -298,6 +298,37 @@ export type HonestyPart =
 export const SMALL_PRINT_BUDGET = Object.freeze({ open: 110, paragraph: 70 });
 
 /**
+ * **The stated length budget for a figure card's note** — GitHub issue #211's other slot.
+ *
+ * A card's note is `mode/casualDay.ts#casualNoteFor`'s lead plus the engineer's own caption, which
+ * on the stairs card is 70 words under a value of `0`. The budget is the number of words drawn
+ * before a reader presses anything; a note inside it is drawn whole, and a note over it is drawn
+ * as its first sentence with the rest one press away ({@link figureNotePartsOf}). Twenty-four is
+ * two lines of the card's own width at its type size, which is what a reader scans under a figure
+ * before deciding whether to read on.
+ */
+export const FIGURE_NOTE_BUDGET = Object.freeze({ open: 24 });
+
+/** The handle on a folded card note — a verb, because it is a control, and never a summary of the fold. */
+export const FIGURE_NOTE_HANDLE = 'Read the rest';
+
+/**
+ * A card note as a lead and the rest, or the note whole.
+ *
+ * `rest` is `undefined` when the note is inside {@link FIGURE_NOTE_BUDGET} or is one sentence —
+ * a disclosure whose handle is its whole content reveals nothing, `foldOf`'s own rule. Joined with
+ * one space, `lead` and `rest` are the note byte for byte, which `reportView.test.ts` holds over
+ * every card of a real sheet: nothing is deleted or re-ordered, and the corpus keeps reading the
+ * whole string because the split happens at the renderer and the producer is unchanged.
+ */
+export function figureNotePartsOf(note: string): { readonly lead: string; readonly rest: string | undefined } {
+  const sentences = sentencesOf(note);
+  if (sentences.length < 2 || wordsIn(note) <= FIGURE_NOTE_BUDGET.open) return { lead: note, rest: undefined };
+  const [lead, ...tail] = sentences;
+  return { lead: lead ?? note, rest: tail.join(' ') };
+}
+
+/**
  * Sentences, split on the space between them and on nothing else.
  *
  * The lookahead is what keeps `06:05–06:10:` and `“Riders waited twenty-five seconds on average”`

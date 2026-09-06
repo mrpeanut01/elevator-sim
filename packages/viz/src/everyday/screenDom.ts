@@ -127,6 +127,13 @@ export function figureCell(
     readonly note: string;
     readonly colour?: string | undefined;
   },
+  /**
+   * The note as a lead and a folded rest, with the fold's handle — GitHub issue #211. Given by the
+   * report, whose notes carry a Casual lead in front of the engineer's caption; absent elsewhere,
+   * where a note is a caption and drawn whole. Both parts stay in the document: the fold is a
+   * native `<details>`, so nothing a reader could reach is moved off the page.
+   */
+  fold?: { readonly lead: string; readonly rest: string; readonly handle: string } | undefined,
 ): HTMLElement {
   const root = el(doc, 'div', 'everyday-figure');
   root.style.cssText = `${WELL};min-width:0`;
@@ -134,9 +141,22 @@ export function figureCell(
   value.style.cssText = MONO(22, cell.colour ?? C.ink);
   const label = el(doc, 'div', 'everyday-figure-label', cell.label);
   label.style.cssText = `${EYEBROW};margin-top:6px`;
-  const note = el(doc, 'div', 'everyday-figure-note', cell.note);
+  const note = el(doc, 'div', 'everyday-figure-note', fold === undefined ? cell.note : fold.lead);
   note.style.cssText = `${QUIET};margin-top:5px`;
   root.append(value, label, note);
+  if (fold !== undefined) {
+    const more = doc.createElement('details');
+    more.className = 'everyday-figure-note-more';
+    more.style.cssText = `${QUIET};margin-top:4px`;
+    const handle = doc.createElement('summary');
+    handle.className = 'everyday-figure-note-handle';
+    handle.textContent = fold.handle;
+    handle.style.cssText = 'cursor:pointer';
+    const rest = el(doc, 'div', 'everyday-figure-note-rest', fold.rest);
+    rest.style.cssText = 'margin-top:4px';
+    more.append(handle, rest);
+    root.append(more);
+  }
   return root;
 }
 

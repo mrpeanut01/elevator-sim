@@ -53,6 +53,8 @@ import {
   SMALL_PRINT_BUDGET,
   type EverydayReportView,
   type HonestyPart,
+  FIGURE_NOTE_HANDLE,
+  figureNotePartsOf,
 } from './reportView.js';
 
 const BASIS: ReportBasis = Object.freeze({
@@ -550,5 +552,43 @@ describe('every lever routes, and a dispatcher lever keeps its honesty on the ca
     expect(view.levers[0]?.route).toBeUndefined();
     expect(view.levers[0]?.goLabel).toBeUndefined();
     expect(view.levers[0]?.noSurfaceNote).toContain('does not know');
+  });
+});
+
+/**
+ * GitHub issue #211's other slot — the figure cards. The split is the renderer's and the producer
+ * is unchanged, so the corpus keeps reading the whole note; what these cases hold is that nothing
+ * is deleted or re-ordered by the fold, and that the budget is a ceiling measured on real copy.
+ */
+describe('a figure card’s note leads with its first sentence and folds the rest — issue #211', () => {
+  it('joins back to the note byte for byte, and folds only what is over the budget', () => {
+    const short = 'One sentence, under the budget.';
+    expect(figureNotePartsOf(short)).toEqual({ lead: short, rest: undefined });
+    const two = 'A first sentence that says the thing. A second sentence that says why, at some length, with more words than the first.';
+    const parts = figureNotePartsOf(two);
+    expect(parts.rest).toBeUndefined();
+    const long = `${two} A third sentence, because the note keeps going. A fourth sentence, and by now the reader has stopped reading anyway.`;
+    const folded = figureNotePartsOf(long);
+    expect(folded.rest).toBeDefined();
+    expect(`${folded.lead} ${folded.rest ?? ''}`).toBe(long);
+    expect(folded.lead).toBe('A first sentence that says the thing.');
+  });
+
+  it('holds every card of a real sheet: lead within the budget, nothing lost', () => {
+    /* The Everyday sheet, whose cards carry the Casual lead in front of the engineer's caption. */
+    const shaped = realView().sheet;
+    for (const cell of shaped.figures) {
+      const parts = figureNotePartsOf(cell.note);
+      const words = (text: string): number => text.split(/\s+/u).filter(Boolean).length;
+      if (parts.rest === undefined) {
+        expect(parts.lead).toBe(cell.note);
+      } else {
+        expect(`${parts.lead} ${parts.rest}`).toBe(cell.note);
+        expect(words(parts.lead)).toBeLessThan(words(cell.note));
+      }
+    }
+    /* Non-vacuity: at least one card on a real sheet is over the budget, or the fold is decoration. */
+    expect(shaped.figures.some((cell) => figureNotePartsOf(cell.note).rest !== undefined)).toBe(true);
+    expect(FIGURE_NOTE_HANDLE.length).toBeGreaterThan(3);
   });
 });

@@ -156,7 +156,7 @@ import {
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
-import { everydayReportViewOf } from '../everyday/reportView.js';
+import { FIGURE_NOTE_HANDLE, everydayReportViewOf } from '../everyday/reportView.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
@@ -10355,6 +10355,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/briefView.ts#SANDBOX_DOOR_LABEL',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
+    /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
+    'everyday/reportView.ts#FIGURE_NOTE_HANDLE',
     'everyday/world.ts#percentileLine',
     'everyday/world.ts#WORLD_FIGURES_LABEL',
     'everyday/world.ts#WORLD_FIGURES_REASON',
@@ -10564,6 +10566,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         seeds.push({ field: `${where}.figuresHeading`, text: view.headings.figures, role: 'label' });
         seeds.push({ field: `${where}.overnightHeading`, text: view.headings.overnight, role: 'label' });
         seeds.push({ field: `${where}.honesty.title`, text: view.honesty.title, role: 'label' });
+        /* GitHub issue #211: the handle on every folded card note, one string, seeded once per sheet. */
+        seeds.push({ field: `${where}.figure.handle`, text: FIGURE_NOTE_HANDLE, role: 'label' });
         /*
          * `role: 'reason'`, which is what `DAY_REPORT` and `DAY_REPORT_VIEW` classify the same
          * string as — and the classification is load-bearing rather than cosmetic. The small
