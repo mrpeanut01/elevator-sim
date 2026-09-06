@@ -578,6 +578,9 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
         if (offer.refusal !== undefined) {
           const why = el(doc, 'div', 'everyday-towers-offer-refusal', offer.refusal);
           why.style.cssText = `font-size:12px;color:${C.terracotta};line-height:1.5`;
+          /* A dead control says why on the control (GitHub issue #262): the refusal is the button's description. */
+          why.id = `everyday-towers-offer-refusal-${offer.contractId}`;
+          take.setAttribute('aria-describedby', why.id);
           row.append(why);
         }
         card.append(row);

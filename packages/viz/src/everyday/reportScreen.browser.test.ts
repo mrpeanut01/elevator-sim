@@ -225,8 +225,15 @@ describe.skipIf(!HAS_BROWSER)('the figure cards are layered on the page — issu
       const before = await cardNotes(page);
       expect(before.folds).toBeGreaterThan(0);
       expect(wordsIn(before.drawn)).toBeLessThan(wordsIn(before.present));
-      /* The stairs card is the one the issue named at seventy words; its lead is drawn whole. */
-      expect(flat(before.present)).toContain('stairs');
+      /*
+       * The stairs card is the one the issue named at seventy words; its lead is drawn whole. It is
+       * found by its label, because the note's cohort clause names the stairs only on a day somebody
+       * took them, and Garden Apartments at this seed does not always produce one.
+       */
+      const labels = await page.$$eval('.everyday-report-figures .everyday-figure-label', (nodes) =>
+        nodes.map((node) => node.textContent ?? ''),
+      );
+      expect(flat(labels.join(' ')).toLowerCase()).toContain('stairs');
       const handles = page.locator('.everyday-report-figures details.everyday-figure-note-more summary');
       for (let index = 0; index < before.folds; index += 1) await handles.nth(index).click();
       const after = await cardNotes(page);
