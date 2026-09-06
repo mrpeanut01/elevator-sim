@@ -88,6 +88,12 @@ export const ISSUE_CODES = {
   missingPassengerTransfer: 'missing-passenger-transfer',
   /** A `serviceEvents` entry names a car this building does not have, or names one ambiguously. */
   unknownServiceEventCar: 'unknown-service-event-car',
+  /** A `serviceEvents` range entry names a bank this building does not declare. */
+  unknownServiceEventBank: 'unknown-service-event-bank',
+  /** A `serviceEvents` range entry moves a double-deck bank's range, which is not simulated. */
+  unsupportedServiceRange: 'unsupported-service-range',
+  /** A `serviceEvents` derate entry rates a car above its plated `ratedLoadLb`. */
+  serviceLoadAboveRating: 'service-load-above-rating',
   /**
    * **No** journey the demand generator could draw is servable by this building's lifts.
    *
@@ -1155,13 +1161,52 @@ export const bankConfigSchema = z.strictObject({
  * that can never fire is a silently-inert event, which is worse than a rejected one. Which car it
  * names is checked in `resolveBuilding`, where the banks are in view.
  */
-export const serviceEventSchema = z.strictObject({
+export const serviceModeEventSchema = z.strictObject({
   $comment: comment,
   atS: nonNegative,
   carId: identifier,
   bankId: identifier.optional(),
   mode: z.enum(SERVICE_MODES),
 });
+
+/**
+ * One scheduled service-range change. See {@link ServiceRangeEventConfig}.
+ *
+ * `servesFloors` is non-empty here so a bank cannot be authored into serving nothing — a bank with
+ * no floors is a bank with no calls, which is a car out of service wearing a different name. Which
+ * floors exist, and whether the bank is single-deck, are checked in `resolveBuilding`.
+ */
+export const serviceRangeEventSchema = z.strictObject({
+  $comment: comment,
+  atS: nonNegative,
+  bankId: identifier,
+  servesFloors: z.array(identifier).min(1),
+});
+
+/**
+ * One scheduled rated-load change. See {@link ServiceDerateEventConfig}.
+ *
+ * Positive and finite here; *at most the plated rating* is `resolveBuilding`'s, where the car's
+ * resolved `ratedLoadLb` is in view.
+ */
+export const serviceDerateEventSchema = z.strictObject({
+  $comment: comment,
+  atS: nonNegative,
+  carId: identifier,
+  bankId: identifier.optional(),
+  ratedLoadLb: z.number().positive().finite(),
+});
+
+/**
+ * One scheduled service event of any of the three kinds. A union of strict objects rather than one
+ * object with three optional fields, so an entry cannot carry `mode` and `servesFloors` at once and
+ * leave the runner to pick — the kind is the shape (`config/serviceEvent.ts`).
+ */
+export const serviceEventSchema = z.union([
+  serviceModeEventSchema,
+  serviceRangeEventSchema,
+  serviceDerateEventSchema,
+]);
 
 /**
  * One non-lift connection between two floors. See {@link TransportModeConfig}.

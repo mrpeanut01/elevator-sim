@@ -45,7 +45,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseBuilding, resolveBuilding, type BuildingConfig, type DemandTemplateId } from '@elevator-sim/core/browser';
+import {
+  isServiceModeEvent,
+  parseBuilding,
+  resolveBuilding,
+  type BuildingConfig,
+  type DemandTemplateId,
+  type ResolvedServiceModeEvent,
+} from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
 import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
@@ -508,7 +515,9 @@ describe('§ D177 — the period reaches the simulation', () => {
      */
     const reserved = plan.calendar.outOfServiceCarIds;
     expect(reserved.length).toBe(1);
-    const events = plan.config.building.serviceEvents ?? [];
+    const events = (plan.config.building.serviceEvents ?? []).filter(
+      (event): event is ResolvedServiceModeEvent => isServiceModeEvent(event),
+    );
     const derated = events.map((event) => `${event.bankId ?? ''}-${event.carId}`);
     expect(derated.length).toBeGreaterThan(0);
     expect(derated).not.toContain(reserved[0]);
@@ -770,7 +779,9 @@ describe('what a period will not do', () => {
     expect(events.length, 'the day schedules an incident at all').toBeGreaterThan(0);
 
     expect(
-      events.filter((event) => `${event.bankId}-${event.carId}` === reserved),
+      events.filter(
+        (event) => isServiceModeEvent(event) && `${event.bankId}-${event.carId}` === reserved,
+      ),
       `no service event may name the reserved car ${reserved}`,
     ).toEqual([]);
 

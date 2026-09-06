@@ -67,8 +67,9 @@ export interface BankInit<TCar extends CarLike = ResolvedCar> {
 /**
  * A group of cars and the floors they can physically reach.
  *
- * Immutable: a bank's topology is building fabric, fixed for the run. The mutable state of
- * a *car* belongs to the car.
+ * Almost immutable: a bank's topology is building fabric, and the one thing about it that moves
+ * during a run is the *served range*, which a service event may narrow or widen (§ D523) and
+ * {@link setServesFloors} carries. The mutable state of a *car* belongs to the car.
  */
 export class Bank<TCar extends CarLike = ResolvedCar> {
   readonly id: string;
@@ -77,15 +78,23 @@ export class Bank<TCar extends CarLike = ResolvedCar> {
   readonly cars: readonly TCar[];
   /** Resolved hardware specification per car, in the same order as {@link cars}. */
   readonly carSpecs: readonly ResolvedCar[];
-  /** Floor ids served, in declared order. Use {@link servesFloor} for membership tests. */
-  readonly servesFloors: readonly string[];
+  /**
+   * The floors the bank's shafts open onto **as built**, in declared order. Fixed for the run;
+   * {@link servesFloors} is what the bank serves *now*, which a range event may have moved.
+   */
+  readonly declaredFloors: readonly string[];
   /** Floor pairs a double-deck car opens onto simultaneously. Empty for single-deck banks. */
   readonly servesFloorPairs: readonly FloorPair[];
   /** True when any car in the bank is double-deck. */
   readonly isDoubleDeck: boolean;
 
+  /**
+   * The floors served now, in the order the last writer listed them. Equal to
+   * {@link declaredFloors} until a range event moves it (§ D523).
+   */
+  #servesFloors: readonly string[];
   /** O(1) service-zoning lookup; the whole reason a bank exists at eligibility-filter time. */
-  readonly #served: ReadonlySet<string>;
+  #served: ReadonlySet<string>;
   readonly #carsById: ReadonlyMap<string, TCar>;
   readonly #specsById: ReadonlyMap<string, ResolvedCar>;
   readonly #deckByFloorId: ReadonlyMap<string, DeckAssignment>;
@@ -101,7 +110,8 @@ export class Bank<TCar extends CarLike = ResolvedCar> {
     this.name = init.name;
     this.cars = [...init.cars];
     this.carSpecs = [...init.carSpecs];
-    this.servesFloors = [...init.servesFloors];
+    this.declaredFloors = Object.freeze([...init.servesFloors]);
+    this.#servesFloors = this.declaredFloors;
     this.#served = new Set(init.servesFloors);
     this.isDoubleDeck = init.carSpecs.some((car) => car.doubleDeck);
 
@@ -151,6 +161,52 @@ export class Bank<TCar extends CarLike = ResolvedCar> {
 
   get carCount(): number {
     return this.cars.length;
+  }
+
+  /** Floor ids served now, in listed order. Use {@link servesFloor} for membership tests. */
+  get servesFloors(): readonly string[] {
+    return this.#servesFloors;
+  }
+
+  /** Whether a range event has moved this bank off its as-built range. */
+  get rangeMoved(): boolean {
+    return this.#servesFloors !== this.declaredFloors;
+  }
+
+  /**
+   * **A range event lands here** (GitHub issue #346, § D523): the served set is replaced, whole,
+   * by what the event lists. The one writer is `Building.setBankServesFloors`, which also rebuilds
+   * the per-floor index `banksServing` reads — call that, not this, from a run.
+   *
+   * The shafts themselves are unchanged: `Car.shaft` still knows every as-built floor, so a car
+   * already carrying somebody to a floor that has just left the range can still stop there and let
+   * them off. Which is the whole of *finish the leg, then withdraw*.
+   *
+   * Refuses a double-deck bank, whose deck coupling was derived from the as-built range at build
+   * time; `resolveBuilding` refuses the same entry earlier with a path, so this is the model's own
+   * guard rather than the one a reader will meet.
+   */
+  setServesFloors(floorIds: readonly string[]): void {
+    if (this.isDoubleDeck) {
+      throw new ModelError(
+        `Bank "${this.id}" is double-deck; its range is fixed for the run because its deck coupling was derived from it.`,
+      );
+    }
+    if (floorIds.length === 0) {
+      throw new ModelError(`Bank "${this.id}" cannot be set to serve no floors.`);
+    }
+    const next = Object.freeze([...floorIds]);
+    this.#servesFloors =
+      next.length === this.declaredFloors.length && next.every((id, i) => id === this.declaredFloors[i])
+        ? this.declaredFloors
+        : next;
+    this.#served = new Set(next);
+  }
+
+  /** Back to the as-built range, for a new replication. */
+  resetRange(): void {
+    this.#servesFloors = this.declaredFloors;
+    this.#served = new Set(this.declaredFloors);
   }
 
   /**

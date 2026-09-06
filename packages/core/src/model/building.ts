@@ -100,7 +100,7 @@ export class Building<TCar extends CarLike = ResolvedCar> implements FloorTopolo
   readonly #floorsById: ReadonlyMap<string, Floor>;
   readonly #floorsByIndex: ReadonlyMap<number, Floor>;
   readonly #banksById: ReadonlyMap<string, Bank<TCar>>;
-  readonly #banksByFloorId: ReadonlyMap<string, readonly Bank<TCar>[]>;
+  #banksByFloorId: ReadonlyMap<string, readonly Bank<TCar>[]>;
   readonly #zonesByFloorId: ReadonlyMap<string, readonly AccessZone[]>;
   /** Floor id to the union of credential groups permitted there. Absent means unrestricted. */
   readonly #credentialsByFloorId: ReadonlyMap<string, ReadonlySet<CredentialGroup>>;
@@ -138,19 +138,9 @@ export class Building<TCar extends CarLike = ResolvedCar> implements FloorTopolo
     this.transferFloors = this.floors.filter((floor) => floor.isTransferFloor);
 
     const banksById = new Map<string, Bank<TCar>>();
-    const banksByFloorId = new Map<string, Bank<TCar>[]>();
-    for (const bank of this.banks) {
-      banksById.set(bank.id, bank);
-      // Banks are the outer loop, so every floor's list comes out in declared bank order and
-      // `banksServing` is deterministic without sorting anything.
-      for (const floorId of bank.servesFloors) {
-        const serving = banksByFloorId.get(floorId);
-        if (serving === undefined) banksByFloorId.set(floorId, [bank]);
-        else serving.push(bank);
-      }
-    }
+    for (const bank of this.banks) banksById.set(bank.id, bank);
     this.#banksById = banksById;
-    this.#banksByFloorId = banksByFloorId;
+    this.#banksByFloorId = this.#indexBanksByFloor();
 
     const zonesByFloorId = new Map<string, AccessZone[]>();
     const credentialsByFloorId = new Map<string, Set<CredentialGroup>>();
@@ -232,6 +222,46 @@ export class Building<TCar extends CarLike = ResolvedCar> implements FloorTopolo
   /** Every bank whose shafts open onto a floor, in declared bank order. */
   banksServing(floorId: string): readonly Bank<TCar>[] {
     return this.#banksByFloorId.get(floorId) ?? [];
+  }
+
+  /**
+   * **A range event lands here** (GitHub issue #346, § D523): the bank's served set is replaced
+   * and the per-floor index {@link banksServing} answers from is rebuilt, so the two cannot
+   * disagree for even one event. Rebuilt whole rather than patched — the index is a few dozen
+   * entries and a range event fires a handful of times a run at most, so the cost is nothing and
+   * the invariant is worth more than the saving.
+   *
+   * @throws ModelError if no such bank, or the bank refuses (double-deck, or an empty set).
+   */
+  setBankServesFloors(bankId: string, floorIds: readonly string[]): void {
+    const bank = this.#banksById.get(bankId);
+    if (bank === undefined) {
+      throw new ModelError(`Building "${this.id}" declares no bank "${bankId}".`);
+    }
+    for (const floorId of floorIds) {
+      if (!this.#floorsById.has(floorId)) {
+        throw new ModelError(
+          `Bank "${bankId}" cannot be set to serve floor "${floorId}", which building "${this.id}" does not declare.`,
+        );
+      }
+    }
+    bank.setServesFloors(floorIds);
+    this.#banksByFloorId = this.#indexBanksByFloor();
+  }
+
+  /** Floor id to the banks serving it now, in declared bank order. */
+  #indexBanksByFloor(): ReadonlyMap<string, readonly Bank<TCar>[]> {
+    const banksByFloorId = new Map<string, Bank<TCar>[]>();
+    for (const bank of this.banks) {
+      // Banks are the outer loop, so every floor's list comes out in declared bank order and
+      // `banksServing` is deterministic without sorting anything.
+      for (const floorId of bank.servesFloors) {
+        const serving = banksByFloorId.get(floorId);
+        if (serving === undefined) banksByFloorId.set(floorId, [bank]);
+        else serving.push(bank);
+      }
+    }
+    return banksByFloorId;
   }
 
   /* ---------------------------------------------------------------- *
@@ -342,6 +372,12 @@ export class Building<TCar extends CarLike = ResolvedCar> implements FloorTopolo
   reset(): void {
     for (const floor of this.floors) {
       floor.reset();
+    }
+    // A range event is per-run state on the fabric, for the same reason a car's mode is: a
+    // replication that inherited a closed sky lobby would be measuring the previous one's schedule.
+    if (this.banks.some((bank) => bank.rangeMoved)) {
+      for (const bank of this.banks) bank.resetRange();
+      this.#banksByFloorId = this.#indexBanksByFloor();
     }
     const resetCar = this.#resetCar;
     for (const car of this.cars) {

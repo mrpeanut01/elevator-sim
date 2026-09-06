@@ -207,6 +207,7 @@ interface LegState {
     alightedAt: SimTime | undefined;
     abandonedAt: SimTime | undefined;
     refusedAt: SimTime | undefined;
+    strandedAt: SimTime | undefined;
     carId: string | undefined;
     bankId: string | undefined;
     assignedCarId: string | undefined;
@@ -252,6 +253,7 @@ export class MetricsRecorder {
   #alightedCount = 0;
   #abandonedCount = 0;
   #accessRefusedCount = 0;
+  #strandedCount = 0;
   #finishedAt: SimTime | undefined;
 
   constructor(options: MetricsRecorderOptions) {
@@ -341,6 +343,11 @@ export class MetricsRecorder {
     return this.#accessRefusedCount;
   }
 
+  /** Legs stranded by a bank's range moving. Zero on every run that schedules none. */
+  get strandedCount(): number {
+    return this.#strandedCount;
+  }
+
   /** Latest simulated time handed to any method. `finish` must not precede it. */
   get lastEventAt(): SimTime {
     return this.#lastEventAt;
@@ -403,6 +410,7 @@ export class MetricsRecorder {
         alightedAt: undefined,
         abandonedAt: undefined,
         refusedAt: undefined,
+        strandedAt: undefined,
         carId: undefined,
         bankId: undefined,
         assignedCarId: undefined,
@@ -611,6 +619,58 @@ export class MetricsRecorder {
     }
     leg.record.refusedAt = at;
     this.#accessRefusedCount += 1;
+    this.#observe(at);
+  }
+
+  /**
+   * Record the lifts **ceasing to reach where a passenger is going** — a bank's service range
+   * moved under them (GitHub issue #346, § D523).
+   *
+   * The fifth way a wait can end. Filed apart from {@link recordAccessRefusal} although the two look
+   * alike from the landing, because a refusal is about the *rider* and this is about the *fabric*,
+   * and a reader deciding what to fix needs to know which. Filed apart from
+   * {@link recordAbandonment} because nobody gave up: the building stopped. And unlike a refusal it
+   * may come after a wait, so the promise the rider held is cleared here as an abandonment's is.
+   *
+   * @throws MetricsError if the leg never arrived, has already boarded, abandoned, been refused or
+   *   been stranded, or is stranded before it arrived.
+   */
+  recordStranding(passenger: RecordablePassenger | string, at: SimTime): void {
+    this.#assertOpen('recordStranding');
+    const id = typeof passenger === 'string' ? passenger : passenger.id;
+    const leg = this.#require(id, 'strand');
+    if (leg.record.boardedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" boarded at t=${leg.record.boardedAt} and cannot be stranded at t=${at}: a rider in the car finishes the leg.`,
+      );
+    }
+    if (leg.record.abandonedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" abandoned at t=${leg.record.abandonedAt} and cannot be stranded at t=${at}: a rider who had already left was not standing there.`,
+      );
+    }
+    if (leg.record.refusedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" was refused at t=${leg.record.refusedAt} and cannot be stranded at t=${at}: a rider the readers turned away never joined the queue.`,
+      );
+    }
+    if (leg.record.strandedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" was stranded at t=${leg.record.strandedAt} and cannot be stranded again at t=${at}.`,
+      );
+    }
+    if (!Number.isFinite(at) || at < leg.record.arrivedAt) {
+      throw new MetricsError(
+        `Leg "${id}" cannot be stranded at t=${at}: it arrived at t=${leg.record.arrivedAt}.`,
+      );
+    }
+    leg.record.strandedAt = at;
+    if (leg.record.assignedCarId !== undefined) {
+      leg.record.assignedCarId = undefined;
+      leg.record.assignedAt = undefined;
+      this.#releasedCount += 1;
+    }
+    this.#strandedCount += 1;
     this.#observe(at);
   }
 
@@ -912,6 +972,8 @@ function freezeLeg(leg: LegState): PassengerRecord {
     // Omitted on every leg the building did not turn away, by the same rule: a building that
     // declares no access zones writes the record it wrote before this field existed.
     ...(source.refusedAt === undefined ? {} : { refusedAt: source.refusedAt }),
+    // Omitted on every leg no range change stranded, by the same rule (§ D523).
+    ...(source.strandedAt === undefined ? {} : { strandedAt: source.strandedAt }),
     ...(source.carId === undefined ? {} : { carId: source.carId }),
     ...(source.bankId === undefined ? {} : { bankId: source.bankId }),
     // Omitted, not `undefined`, so a conventional run's record is byte-identical to one written
