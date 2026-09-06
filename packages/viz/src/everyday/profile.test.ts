@@ -15,6 +15,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { savedRatingOf, type LadderEntry } from '../gauntlet/ladder.js';
+import { DEFAULT_STAGE_SIM_PER_REAL_S } from './stageScreenModel.js';
 import { ratingOf, type RatedCase } from '../gauntlet/rating.js';
 import { displayNameIssueOf } from '../menu/account.js';
 import type { SessionStore } from '../persist/types.js';
@@ -34,6 +35,7 @@ import {
   saveEveryday,
   solvedCaseSetOf,
   type EverydayProgress,
+  loadDefaultSpeed,
 } from './profile.js';
 
 /** A working backing slot. */
@@ -132,7 +134,7 @@ describe('persistence, both directions', () => {
      */
     backing.slots.set(
       'elevator-sim.everyday-profile',
-      JSON.stringify({ schemaVersion: 4, profile: DEFAULT_EVERYDAY_PROFILE }),
+      JSON.stringify({ schemaVersion: 5, profile: DEFAULT_EVERYDAY_PROFILE }),
     );
     expect(loadProfile(backing)).toBeUndefined();
     // And in the other direction: version 0 is older than anything this build reads.
@@ -324,7 +326,7 @@ describe('the version 1 → 2 migration', () => {
      * what it held. A player who saved a name under version 1 and then solves a building must have
      * both afterwards, and the write that stores the building is the one that could lose the name.
      *
-     * **It is version 3 now and the extra key is asserted rather than allowed in**, which is the
+     * **It is version 4 now and the extra keys are asserted rather than allowed in**, which is the
      * whole reason `toEqual` is used here rather than `toMatchObject`: a v1 envelope that skipped
      * *two* migrations and came out with a `units` key it never held is exactly the failure this
      * case is for, and only an exact shape catches the other direction — a key silently dropped.
@@ -333,10 +335,11 @@ describe('the version 1 → 2 migration', () => {
     const store = createProfileStore(backing);
     expect(store.setProgress({ solvedCaseIds: ['leaky-lobby'], ratings: [] })).toBe(true);
     expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
       progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
       units: 'metric',
+      defaultSpeedSimPerRealS: 30,
     });
     expect(loadProfile(backing)).toEqual({ name: 'Nadia R.', avatarColor: '#4F8A5B' });
   });
@@ -378,10 +381,11 @@ describe('the version 2 → 3 migration, and the units preference beside it', ()
     expect(store.setUnits('imperial')).toBe(true);
     expect(store.units()).toBe('imperial');
     expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
       progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
       units: 'imperial',
+      defaultSpeedSimPerRealS: 30,
     });
     expect(loadUnits(backing)).toBe('imperial');
   });
@@ -447,13 +451,103 @@ describe('the version 2 → 3 migration, and the units preference beside it', ()
   });
 });
 
+describe('the version 3 → 4 migration, the default speed beside it, and the clear — GitHub issue #229', () => {
+  function versionThreeSlot(): SessionStore & { readonly slots: Map<string, string> } {
+    const backing = memoryBacking();
+    backing.slots.set(
+      SLOT,
+      JSON.stringify({
+        schemaVersion: 3,
+        profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
+        progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
+        units: 'imperial',
+      }),
+    );
+    return backing;
+  }
+
+  it('reads a version 3 envelope as a player opening at the stage’s default, keeping the other three', () => {
+    // Before version 4 every run opened at the stage's fixed default, so that is what this player
+    // was watching — `withUnits`'s rule one version up.
+    const backing = versionThreeSlot();
+    expect(loadDefaultSpeed(backing)).toBe(DEFAULT_STAGE_SIM_PER_REAL_S);
+    expect(loadUnits(backing)).toBe('imperial');
+    expect(loadProfile(backing)).toEqual({ name: 'Nadia R.', avatarColor: '#4F8A5B' });
+    expect(loadProgress(backing).progress.solvedCaseIds).toEqual(['leaky-lobby']);
+  });
+
+  it('round-trips a chosen speed, carries the other three payloads, and refuses a rung the ladder lacks', () => {
+    const backing = versionThreeSlot();
+    const store = createProfileStore(backing);
+    expect(store.defaultSpeed()).toBe(DEFAULT_STAGE_SIM_PER_REAL_S);
+    expect(store.setDefaultSpeed(90)).toBe(true);
+    expect(store.defaultSpeed()).toBe(90);
+    expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toEqual({
+      schemaVersion: 4,
+      profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
+      progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
+      units: 'imperial',
+      defaultSpeedSimPerRealS: 90,
+    });
+    expect(loadDefaultSpeed(backing)).toBe(90);
+    // A value off the ladder is not stored — a stage opening at a pace no chip names is the inert
+    // control arriving through storage.
+    expect(store.setDefaultSpeed(31)).toBe(false);
+    expect(store.defaultSpeed()).toBe(90);
+    for (const bad of [31, 'fast', null, {}]) {
+      const slot = memoryBacking();
+      slot.slots.set(
+        SLOT,
+        JSON.stringify({
+          schemaVersion: 4,
+          profile: DEFAULT_EVERYDAY_PROFILE,
+          progress: EMPTY_EVERYDAY_PROGRESS,
+          units: 'metric',
+          defaultSpeedSimPerRealS: bad,
+        }),
+      );
+      expect(loadDefaultSpeed(slot), JSON.stringify(bad)).toBe(DEFAULT_STAGE_SIM_PER_REAL_S);
+    }
+  });
+
+  it('clears the whole slot and resets memory, so the next write starts a new record', () => {
+    const backing = versionThreeSlot();
+    const store = createProfileStore(backing);
+    store.setDefaultSpeed(240);
+    let heard = 0;
+    const stop = store.subscribe(() => {
+      heard += 1;
+    });
+    expect(store.clear()).toBe(true);
+    expect(backing.slots.has(SLOT)).toBe(false);
+    expect(store.current()).toBeUndefined();
+    expect(store.progress()).toEqual(EMPTY_EVERYDAY_PROGRESS);
+    expect(store.units()).toBe('metric');
+    expect(store.defaultSpeed()).toBe(DEFAULT_STAGE_SIM_PER_REAL_S);
+    expect(heard).toBe(1);
+    stop();
+    // A write after the clear is a fresh envelope, not the old one coming back.
+    expect(store.setProgress({ solvedCaseIds: ['new-start'], ratings: [] })).toBe(true);
+    expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toMatchObject({
+      schemaVersion: 4,
+      progress: { solvedCaseIds: ['new-start'], ratings: [] },
+      units: 'metric',
+    });
+    // A memory-only store forgets and says the removal reached nothing.
+    const memory = createProfileStore(undefined);
+    memory.setUnits('imperial');
+    expect(memory.clear()).toBe(false);
+    expect(memory.units()).toBe('metric');
+  });
+});
+
 describe('a store this build cannot read degrades to a labelled refusal', () => {
   /** Every corrupting shape, and the sentence a player meets for it. */
   const CORRUPTIONS: readonly (readonly [string, string, string])[] = [
     ['bytes that are not JSON at all', 'not json', PROGRESS_REFUSALS.parse],
     [
       'a version this build does not read',
-      JSON.stringify({ schemaVersion: 4, profile: DEFAULT_EVERYDAY_PROFILE, progress: {} }),
+      JSON.stringify({ schemaVersion: 5, profile: DEFAULT_EVERYDAY_PROFILE, progress: {} }),
       PROGRESS_REFUSALS.version,
     ],
     [

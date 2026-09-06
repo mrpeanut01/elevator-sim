@@ -118,15 +118,15 @@ export interface SubmittedRun {
    * honest run as `metrics-do-not-reproduce` — spending this product's one accusation on a player
    * who did nothing wrong.
    *
-   * **Two of the three kinds are refused here and the reason is not the same for both**, which is
-   * why {@link SUBMITTABLE_INTERVENTION_KINDS} names the one that travels rather than a list of
-   * exclusions:
+   * **One of the four kinds is refused here, and permanently**, which is why
+   * {@link SUBMITTABLE_INTERVENTION_KINDS} names the ones that travel rather than a list of
+   * exclusions (GitHub issue #338, § D486):
    *
-   * - `switch-dispatcher` carries a whole `DispatcherProfile` **inline**, which is this module's
-   *   founding rule violated exactly: a vector a player supplies, run on a board keyed by a
-   *   dispatcher they only started under. It could only ever travel as a *shipped profile id*
-   *   resolved against this server's `data/`, and that is a different field from the one the viewer
-   *   needs locally (its driving profile is routinely a derived object no id resolves).
+   * - `switch-dispatcher` used to be refused because `core`'s arm carries a whole
+   *   `DispatcherProfile` **inline**. It travels now as {@link SubmittedSwitch} — a shipped id and
+   *   the player's rows — and the server re-derives the vector the way it already re-derives the
+   *   base profile. What a submission still cannot carry is a hand-tuned vector, which is the same
+   *   bound the base profile lives under.
    * - `answer-incident` answers a **campaign incident**, and the incident is not on the wire.
    *   `viz`'s `shift/incidents.ts` writes it onto the building as `serviceEvents` from the week's
    *   day and the calendar; a replay built from ids alone has no incident to answer, so the answer's
@@ -134,12 +134,17 @@ export interface SubmittedRun {
    *   missing *cause*, not a missing field, and carrying the answer without it would be worse than
    *   refusing it.
    *
-   * `park-cars-lobby` carries nothing but its instant, and travels.
+   * `park-cars-lobby` and `spread-cars` carry nothing but their instant, and travel. The incident
+   * refusal is **permanent** rather than a gap: a submission carrying the answer alone would replay
+   * to a different run and this server would verify *that* one as honest, and the two routes out —
+   * deriving the incident server-side from causes that travel, or carrying it as submitted data —
+   * are respectively a move of `shift/incidents.ts` across a package boundary and § D481's cheat
+   * lever exactly.
    *
    * Absent and `[]` are the same run, byte for byte — `core` pins that with a fingerprint
    * (`sim/interventions.test.ts`), and `runDataHashOf` drops the key.
    */
-  readonly interventions?: readonly RunInterventionConfig[] | undefined;
+  readonly interventions?: readonly SubmittedIntervention[] | undefined;
 }
 
 /** The metrics a player claims. Every one is re-derived by the server and compared. */
@@ -390,9 +395,15 @@ const MAX_INTERVENTIONS = 64;
  * Written this way round on `core`'s own precedent for `INTERVENTION_KINDS`: a kind added tomorrow
  * is refused here until somebody decides it can travel, where a deny-list would let it through
  * silently and the first symptom would be an honest player accused of a forgery.
- * {@link SubmittedRun.interventions} carries the reason each of the other two is out.
+ * {@link SubmittedRun.interventions} carries the reason each of the two refused kinds is out.
+ * `spread-cars` joined `park-cars-lobby` when it landed (GitHub issue #352): the same control with
+ * the opposite setting, carrying nothing but its instant.
  */
-export const SUBMITTABLE_INTERVENTION_KINDS: readonly string[] = Object.freeze(['park-cars-lobby']);
+export const SUBMITTABLE_INTERVENTION_KINDS: readonly string[] = Object.freeze([
+  'park-cars-lobby',
+  'spread-cars',
+  'switch-dispatcher',
+]);
 
 /** Everything structurally wrong with a submitted rule list, or nothing. */
 function ruleRowIssues(rows: readonly RuleRowConfig[] | undefined): readonly string[] {
@@ -449,8 +460,28 @@ function valueIsDeclared(
   return values.some((option) => option.value === value);
 }
 
+/**
+ * A `switch-dispatcher` on the wire — GitHub issue #338, § D486. **An id and rows, never a
+ * profile**, on this module's founding rule: the server resolves `toProfileId` against its own
+ * `data/` and writes the rows onto it through `verify.ts#profileWithRules`, exactly as it builds
+ * the run's base profile from `dispatcherProfileId` and `ruleRows`. A hand-tuned vector cannot be
+ * expressed here, and that is the refusal that survives — the same bound the base profile lives
+ * under, applied to the switch arm instead of a category refusal standing over it.
+ */
+export interface SubmittedSwitch {
+  readonly kind: 'switch-dispatcher';
+  readonly toProfileId: string;
+  readonly ruleRows?: readonly RuleRowConfig[] | undefined;
+}
+
+/** One entry of the log as the wire carries it: the two parking kinds bare, the switch as ids. */
+export interface SubmittedIntervention {
+  readonly atS: number;
+  readonly change: { readonly kind: 'park-cars-lobby' } | { readonly kind: 'spread-cars' } | SubmittedSwitch;
+}
+
 /** Everything structurally wrong with a submitted intervention log, or nothing. */
-function interventionIssues(log: readonly RunInterventionConfig[] | undefined): readonly string[] {
+function interventionIssues(log: readonly SubmittedIntervention[] | undefined): readonly string[] {
   if (log === undefined) return [];
   if (!Array.isArray(log)) return ['interventions must be an array'];
   if (log.length > MAX_INTERVENTIONS) {
@@ -471,8 +502,25 @@ function interventionIssues(log: readonly RunInterventionConfig[] | undefined): 
     } else if (!SUBMITTABLE_INTERVENTION_KINDS.includes(kind)) {
       issues.push(
         `interventions[${index}] is a "${kind}", which a submission may not carry — ` +
-          `only ${SUBMITTABLE_INTERVENTION_KINDS.join(', ')} travels, because the others carry a ` +
-          'dispatcher inline or answer an incident this server has no record of',
+          `only ${SUBMITTABLE_INTERVENTION_KINDS.join(', ')} travel, because an incident answer ` +
+          'names an incident this server has no record of, and that refusal is permanent (§ D486)',
+      );
+    } else if (kind === 'switch-dispatcher') {
+      const change = entry.change as Partial<SubmittedSwitch>;
+      if (typeof change.toProfileId !== 'string' || change.toProfileId.length === 0) {
+        issues.push(
+          `interventions[${index}] is a switch-dispatcher with no toProfileId — a switch travels as ` +
+            'a shipped dispatcher id plus rule rows, never as an inline profile',
+        );
+      }
+      if ('profile' in change) {
+        issues.push(
+          `interventions[${index}] carries a dispatcher profile inline; a submission carries ` +
+            'dispatchers by id',
+        );
+      }
+      issues.push(
+        ...ruleRowIssues(change.ruleRows).map((issue) => `interventions[${index}].${issue}`),
       );
     }
   }

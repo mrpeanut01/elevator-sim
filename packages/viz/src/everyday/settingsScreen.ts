@@ -59,6 +59,7 @@ import { buildNotesSummaryOf, buildNotesViewOf } from './buildNotes.js';
 import { engineerSettings, onEngineerSettingsProvided } from './engineerBridge.js';
 import { DEFAULT_EVERYDAY_PROFILE } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
+import { STAGE_SPEEDS } from './stageScreenModel.js';
 import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
 import { settingsScreenViewOf, type SettingsScreenView } from './settingsView.js';
 import {
@@ -118,6 +119,11 @@ function buildNotesPanel(doc: Document): HTMLElement {
   lede.style.cssText = `margin:10px 0 0;font-size:12.5px;line-height:1.5;color:${C.warmGrey};max-width:74ch`;
   panel.append(lede);
 
+  // GitHub issue #246: the build this copy is, first, because it is the line a bug report needs.
+  const build = el(doc, 'p', 'everyday-build-version', notes.build);
+  build.style.cssText = `margin:8px 0 0;font-size:12.5px;line-height:1.5;color:${C.ink};max-width:74ch`;
+  panel.append(build);
+
   for (const section of notes.sections) {
     const block = el(doc, 'section', 'everyday-settings-build-notes-section');
     block.style.cssText = 'margin-top:18px';
@@ -142,6 +148,8 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   let draftName: string | undefined;
   /** The last `set()`'s answer, for the honest sentence about a store that keeps nothing. */
   let durable: boolean | undefined;
+  /** Where *Clear saved progress* is in its two-press arc — GitHub issue #229. */
+  let clearStage: 'ready' | 'armed' | 'cleared' = 'ready';
 
   /**
    * The four account effects, or `undefined` on a build served with no API origin — GitHub issue
@@ -157,6 +165,8 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       durable,
       reduceMotion: engineerSettings()?.reduceMotion(),
       units: store.units(),
+      defaultSpeedSimPerRealS: store.defaultSpeed(),
+      clearStage,
       account: everydayAccount(),
       accountServer: actions !== undefined,
     });
@@ -396,7 +406,76 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     row.append(text, value);
     deviceRegion.append(row);
   }
-  root.append(deviceHeading, deviceRegion);
+  /*
+   * The clear row — GitHub issue #229, § D500 — drawn after the facts and rebuilt whole on every
+   * stage change, the playing region's own idiom, because the row's *button* comes and goes: absent
+   * while the Engineer session port is still booting, then `Clear`, then `Press again to clear`,
+   * then `Cleared` for the instant before the page reloads.
+   */
+  const clearRegion = el(doc, 'div', 'everyday-settings-clear');
+  function redrawClear(): void {
+    view = viewNow();
+    const clear = view.device.clear;
+    clearRegion.replaceChildren();
+    const row = el(doc, 'div', 'everyday-settings-fact');
+    row.style.cssText = [
+      'display:flex',
+      'align-items:center',
+      'gap:14px',
+      'padding:13px 16px',
+      `border:1px solid ${C.rule}`,
+      `border-radius:${String(ROW_RADIUS_PX)}px`,
+      `background:${C.cardSunk}`,
+    ].join(';');
+    const text = el(doc, 'div');
+    text.style.cssText = 'min-width:0';
+    const label = el(doc, 'div', undefined, clear.label);
+    label.style.cssText = 'font-size:14px;font-weight:600';
+    const note = el(doc, 'div', 'everyday-settings-clear-note', clear.note);
+    note.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px;max-width:64ch`;
+    text.append(label, note);
+    row.append(text);
+    if (clear.button !== undefined) {
+      const button = el(doc, 'button', 'everyday-settings-clear-progress', clear.button);
+      button.type = 'button';
+      button.disabled = clear.stage === 'cleared';
+      button.style.cssText = [
+        'margin-left:auto',
+        'flex:none',
+        'cursor:pointer',
+        `border:1.5px solid ${clear.stage === 'armed' ? C.terracotta : C.rule}`,
+        `background:${clear.stage === 'armed' ? C.terracotta : C.cardSunk}`,
+        `color:${clear.stage === 'armed' ? C.card : C.warmGrey}`,
+        `border-radius:${String(R.pill)}px`,
+        'padding:7px 15px',
+        `font:500 12px ${TYPE.mono}`,
+      ].join(';');
+      button.addEventListener('click', () => {
+        const bridge = engineerSettings();
+        if (bridge === undefined) return; // the row is drawn without a button in this window
+        if (clearStage === 'ready') {
+          clearStage = 'armed';
+          redrawClear();
+          return;
+        }
+        if (clearStage !== 'armed') return;
+        /*
+         * Both slots, in this order: the Engineer session is sealed and removed first so nothing
+         * it saves can outlive the press, then this side's own slot. Then the page is left —
+         * a sealed shell holding a week it will never save is not a state to keep playing in.
+         */
+        bridge.clearSavedSession();
+        store.clear();
+        clearStage = 'cleared';
+        redrawClear();
+        bridge.reloadPage();
+      });
+      row.append(button);
+    }
+    clearRegion.append(row);
+  }
+
+  root.append(deviceHeading, deviceRegion, clearRegion);
 
   /* ---- the build-information panel — all six registers, folded away ---- */
   root.append(buildNotesPanel(doc));
@@ -575,6 +654,20 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
           redrawPlaying();
           return;
         }
+        if (rowView.id === 'default-speed') {
+          /*
+           * A press steps to the next rung and wraps — GitHub issue #229. Seven faces on one pill
+           * rather than a select, because the ladder is the stage's own and a player has already
+           * met it as a row of chips; the pill shows the chip's exact label so the two cannot name
+           * one speed two ways. The value comes off the store, never off the pill's text.
+           */
+          const at = STAGE_SPEEDS.findIndex((speed) => speed.simPerRealS === store.defaultSpeed());
+          const next = STAGE_SPEEDS[(at + 1) % STAGE_SPEEDS.length] ?? STAGE_SPEEDS[0];
+          durable = store.setDefaultSpeed(next.simPerRealS);
+          redrawIdentity();
+          redrawPlaying();
+          return;
+        }
         const bridge = engineerSettings();
         /* The row only exists while the bridge does; a vanished one leaves the honest stand-in. */
         if (bridge === undefined) {
@@ -662,8 +755,12 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
 
   redrawIdentity();
   redrawPlaying();
+  redrawClear();
   redrawAccount();
-  const stopWaiting = onEngineerSettingsProvided(redrawPlaying);
+  const stopWaiting = onEngineerSettingsProvided(() => {
+    redrawPlaying();
+    redrawClear();
+  });
   const stopAccountWatch = onEverydayAccount(redrawAccount);
 
   host.append(root);

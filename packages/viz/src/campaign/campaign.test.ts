@@ -17,179 +17,49 @@
  *    count is compared with the count the published table says it scored on those very seeds. This
  *    is the clause that catches a campaign quietly running a different configuration from the one
  *    its goals were measured on.
+ *
+ * ## Where the played stages went — GitHub issue #356
+ *
+ * Claims 1–3 and the load-time half of claim 4 are this file. **Claim 5 and the batch half of
+ * claim 4 are the sibling files**, one per played stage, and the reason is a measurement rather
+ * than taste: with every played stage in here this file was **33.34 % of the `viz` leg's serial
+ * cost** (279.5 s of 838.4 s on 2026-09-05; 285.4 s of 897.1 s the morning it was split), and
+ * vitest runs a file's cases in series, so the leg could not use more than three cores however many
+ * it had. The shared apparatus — the loaded campaign and the play-a-stage path — is
+ * `campaign.test-helper.ts`, so the split duplicates no setup; each file carries only the batch its
+ * own cases read.
+ *
+ * | file | what it plays |
+ * |---|---|
+ * | `countGoalStage.test.ts` | the first stage that carries a count goal, derived — the bar reproduces, standing still clears nothing |
+ * | `stageTwoEdited.test.ts` | stage 2 on an authored weight vector, both seed sets — W6 and the overfitting gate |
+ * | `stageThreeOverwhelmed.test.ts` | stage 3 — Overwhelmed as a result, the refusal reaching the reader |
+ * | `stageFourFront.test.ts` | stage 4 — the front, swept over every shipped profile |
+ * | `stageFiveCredential.test.ts` | stage 5 — the credential named, the lockout cleared |
+ * | `stageFiveClears.test.ts` | stage 5 — whether a stage can be won from the dropdown, swept over every shipped profile on both seed sets |
+ * | `stageSixEscalators.test.ts` | stage 6 — three goals after the escalators, and no profile clears it |
+ *
+ * `documentation.test.ts`'s S5 check reads the `describe('stage N, played` titles off every file in
+ * this directory, so a played stage added or removed still reaches `docs/22`'s charter cell.
  */
 
 import { readFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
 
-import { loadConfig, type DispatcherProfile, type LoadedConfig } from '@elevator-sim/core';
-import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/browser';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { briefingFor } from './brief.js';
+import { useCampaignFixture } from './campaign.test-helper.js';
 import { admitProfile } from './dimensions.js';
-import { evidenceFrom, failStateCounts, failStateReports } from './failStates.js';
-import { judgeStage, type StageReport } from './judge.js';
 import { batchRequestForStage, demonstrationConfigFor, stageReplicationSeed } from './stageRun.js';
-import { runStageToVerdict } from './stageSequence.js';
-import { editableIdsOf, parseCampaign, playerFacingStrings, validateCampaign, type CampaignContext } from './parse.js';
-import { FAIL_STATES, type Campaign, type CampaignStage } from './types.js';
+import { editableIdsOf, parseCampaign, playerFacingStrings, validateCampaign } from './parse.js';
+import { FAIL_STATES } from './types.js';
 import { PROBABILITY_WORDS, playerSafeDescription, probabilityWordIn } from './words.js';
-import { restrictedFloorIds } from '../access/zoning.js';
-import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
-import { batchReport, type BatchReport } from '../batch/report.js';
-import { resolveEditedProfile, type EditedVector } from '../controls/editedProfile.js';
-import { runBatch } from '../batch/runBatch.js';
-import type { BatchResources, BatchResult } from '../batch/types.js';
-import { recordRun } from '../record/recordRun.js';
 import { GOAL_READS, isPerReplicationGoal, type GoalKind } from '../scenario/goals.js';
-import {
-  validatePublishedGoalRates,
-  type PublishedGoalRates,
-  type PublishedScenario,
-} from '../scenario/published.js';
-import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
+import { validatePublishedGoalRates } from '../scenario/published.js';
+import { requireBuilding } from '../fixtures.test-helper.js';
 
-let config: LoadedConfig;
-let published: PublishedGoalRates;
-let raw: unknown;
-let campaign: Campaign;
-let space: SearchSpace;
-let context: CampaignContext;
-let dimensionHelp: ReadonlyMap<string, string>;
-
-beforeAll(async () => {
-  config = await loadConfig(DATA_DIR);
-  published = JSON.parse(
-    await readFile(join(DATA_DIR, 'scenario-goals.json'), 'utf8'),
-  ) as PublishedGoalRates;
-  raw = JSON.parse(await readFile(join(DATA_DIR, 'campaign.json'), 'utf8'));
-  space = collectSearchSpace();
-  const help = new Map<string, string>();
-  for (const parameter of space.parameters) {
-    if (parameter.description !== undefined) help.set(parameter.id, parameter.description);
-  }
-  dimensionHelp = help;
-  context = {
-    published,
-    dimensionIds: space.ids,
-    profileIds: new Set(config.dispatcherProfilesById.keys()),
-    restrictedFloorIdsByBuilding: new Map(
-      [...config.buildingsById.values()].map((building) => [
-        building.id,
-        restrictedFloorIds(
-          building.floors.map((floor) => floor.id),
-          building.accessZones,
-        ),
-      ]),
-    ),
-  };
-  campaign = parseCampaign(raw, context);
-}, 120_000);
-
-function clone(): Campaign {
-  return JSON.parse(JSON.stringify(campaign)) as Campaign;
-}
-
-function stageAt(index: number): CampaignStage {
-  const stage = clone().stages[index];
-  if (stage === undefined) throw new Error(`no stage ${String(index)}`);
-  return stage;
-}
-
-function mutate(change: (campaign: Campaign) => void): readonly string[] {
-  const mutated = clone();
-  change(mutated);
-  return validateCampaign(mutated, context);
-}
-
-function publishedFor(stage: CampaignStage): PublishedScenario {
-  const entry = published.scenarios.find((candidate) => candidate.id === stage.id);
-  if (entry === undefined) throw new Error(`no published entry for ${stage.id}`);
-  return entry;
-}
-
-function resourcesFor(stage: CampaignStage): BatchResources {
-  return {
-    building: requireBuilding(config, stage.building),
-    dispatcherProfiles: config.dispatcherProfiles,
-    trafficProfiles: config.trafficProfiles,
-    elevatorSpecs: config.elevatorSpecs,
-  };
-}
-
-/** The loaded `data/`, as a function so the assertion above can shadow the name `config`. */
-function config_(): LoadedConfig {
-  return config;
-}
-
-function requireProfile(id: string): DispatcherProfile {
-  const profile = config.dispatcherProfilesById.get(id);
-  if (profile === undefined) throw new Error(`no dispatcher profile "${id}"`);
-  return profile;
-}
-
-/**
- * Run a stage: two arms, the stage's own tuning seeds.
- *
- * `edit` is W6's player move — an **edited weight vector** instead of a dropdown choice. It goes
- * through the same `batchRequestForStage` the panel calls, so the suite cannot exercise a second
- * version of what a stage run with an edit is.
- *
- * **This is one half of a judgement and no longer the whole of one.** GitHub issue #255's second
- * half split the judged seed set from the tuning seed set, so a stage is *cleared* only on a
- * holdout batch as well — see {@link playToVerdict} and `judge.ts`'s docstring. Every case below
- * that used to read `verdict.cleared` and meant *"did this batch meet its bars"* now reads
- * `verdict.metOnTuningSeeds`, which is that question with its own name; the cases that meant
- * *"is this stage won"* run both batches.
- */
-function playStage(
-  stage: CampaignStage,
-  candidateProfileId: string,
-  edit?: EditedVector,
-): {
-  result: BatchResult;
-  report: BatchReport;
-  verdict: StageReport;
-} {
-  /*
-   * The **shipped** request constructor, not a second copy of it. A suite that assembled its own
-   * would keep passing while the panel drifted.
-   */
-  const result = runBatch(batchRequestForStage(stage, candidateProfileId, edit), resourcesFor(stage));
-  const report = batchReport(result);
-  return { result, report, verdict: judgeStage({ stage, published: publishedFor(stage), result, report }) };
-}
-
-/**
- * The whole judgement: the tuning batch, and — only when it met every bar — the holdout batch.
- *
- * **The sequence is `campaign/stageSequence.ts`'s, not this file's.** It used to be written out
- * here, which is the same defect `playStage` avoids one level down: a suite carrying its own copy
- * of what the panel does keeps passing while the panel drifts, and it did — `dev/campaignPanel.ts`
- * ran one batch for a whole wave while this function ran two. The skip is stated there too, and it
- * is arithmetic rather than an optimisation with a cost: `cleared` requires **both** halves, so a
- * stage that missed a bar on the runs the player made is refused whatever the holdout says, and
- * running fifty more replications to learn nothing would double the cost of every sweep in this
- * file.
- */
-async function playToVerdict(
-  stage: CampaignStage,
-  candidateProfileId: string,
-  edit?: EditedVector,
-): Promise<{
-  result: BatchResult;
-  report: BatchReport;
-  verdict: StageReport;
-}> {
-  return runStageToVerdict({
-    stage,
-    published: publishedFor(stage),
-    candidateProfileId,
-    edit,
-    run: (request) => runBatch(request, resourcesFor(stage)),
-  });
-}
+const fixture = useCampaignFixture();
+const { stageAt, mutate, publishedFor, requireProfile, playStage, failStatesFor } = fixture;
 
 /* -------------------------------------------------------------------------- *
  * 1 — the shipped campaign
@@ -197,7 +67,7 @@ async function playToVerdict(
 
 describe('the shipped campaign', () => {
   it('parses against the shipped goal table, buildings, profiles and the discovered space', () => {
-    expect(validateCampaign(campaign, context)).toEqual([]);
+    expect(validateCampaign(fixture.campaign, fixture.context)).toEqual([]);
   });
 
   it('is one stage per measured scenario, in order', () => {
@@ -205,6 +75,7 @@ describe('the shipped campaign', () => {
     // level shipped on a goal nobody has taken a rate of, and R12 forbids it. The length is checked
     // against the table rather than against a literal, which had been `7` and is now the campaign's
     // to grow.
+    const { campaign, published } = fixture;
     expect(campaign.stages.map((stage) => stage.id)).toEqual(
       published.scenarios.map((scenario) => scenario.id),
     );
@@ -214,10 +85,11 @@ describe('the shipped campaign', () => {
 
   it('starts from a goal table that is itself valid', () => {
     /* A campaign checked against a malformed table is checked against nothing. */
-    expect(validatePublishedGoalRates(published)).toEqual([]);
+    expect(validatePublishedGoalRates(fixture.published)).toEqual([]);
   });
 
   it('names no dimension the search space does not declare, and never writes the list down', async () => {
+    const { campaign, space } = fixture;
     const declared = new Set(space.ids);
     for (const stage of campaign.stages) {
       for (const id of editableIdsOf(stage.dispatcher.editable, space.ids)) {
@@ -233,6 +105,11 @@ describe('the shipped campaign', () => {
      * **The file list is read off the directory, not written here.** A hand-written list is the
      * shape `src/index.test.ts` had to fix in `experiments`: it covers the files that existed when
      * somebody wrote it, and the next module added to `campaign/` is the one nothing checks.
+     *
+     * `campaign.test-helper.ts` is in that list — it is a `.ts` and not a `.test.ts` — and is held
+     * to the rule on purpose: the filter is the one this guard has always had, and a helper that
+     * needed a dimension literal would be a helper carrying a test's subject. Stage 2's authored
+     * vector stayed in `stageTwoEdited.test.ts` for exactly that reason.
      */
     const files = (await readdir(new URL('.', import.meta.url))).filter(
       (name) => name.endsWith('.ts') && !name.endsWith('.test.ts'),
@@ -256,7 +133,7 @@ describe('the shipped campaign', () => {
 
 describe('what running a stage is, on every stage', () => {
   it('puts the shipped setting first and everything the trace depends on on the request', () => {
-    for (const stage of campaign.stages) {
+    for (const stage of fixture.campaign.stages) {
       const request = batchRequestForStage(stage, 'nearest-car');
       expect(request.buildingId).toBe(stage.building);
       expect(request.seed).toBe(stage.seeds.seed);
@@ -271,19 +148,23 @@ describe('what running a stage is, on every stage', () => {
   it('replays replication 0 at the same seed, horizon and demand — including the override', () => {
     /*
      * The demand-override branch fires on four of the seven stages and on none of the three whose
-     * demonstration runs are asserted elsewhere in this file, so without this the half of
+     * demonstration runs are asserted in the played-stage files, so without this the half of
      * `demonstrationConfigFor` that ships on stages 2, 4, 6 and 7 has no test at all. Asserted
      * over **every** stage rather than a chosen one, which is what makes that impossible again.
+     *
+     * `shippedRunConfig.test.ts` reads this file for the `onTimeout` assertion below, by text,
+     * as the one pre-existing assertion about that property — it stays here, and stays worded so.
      */
     let withOverride = 0;
-    for (const stage of campaign.stages) {
+    const loaded = fixture.config;
+    for (const stage of fixture.campaign.stages) {
       const config = demonstrationConfigFor({
         stage,
-        building: requireBuilding(config_(), stage.building),
+        building: requireBuilding(loaded, stage.building),
         dispatcherProfile: requireProfile(stage.dispatcher.startingProfileId),
-        trafficProfiles: config_().trafficProfiles,
-        elevatorSpecs: config_().elevatorSpecs,
-        dispatcherProfiles: config_().dispatcherProfiles,
+        trafficProfiles: loaded.trafficProfiles,
+        elevatorSpecs: loaded.elevatorSpecs,
+        dispatcherProfiles: loaded.dispatcherProfiles,
       });
       expect(config.seed).toBe(stageReplicationSeed(stage, 0));
       expect(config.durationS).toBe(stage.durationS);
@@ -305,7 +186,7 @@ describe('what running a stage is, on every stage', () => {
 
 describe('every shipped goal came from the measured table', () => {
   it('is a subset of this stage’s "goals" bucket — a goal cannot be added by hand', () => {
-    for (const stage of campaign.stages) {
+    for (const stage of fixture.campaign.stages) {
       const measured = new Set<GoalKind>(publishedFor(stage).goals.map((record) => record.kind));
       for (const goal of stage.goals) {
         expect(measured.has(goal.kind), `${stage.id} declares ${goal.kind}`).toBe(true);
@@ -314,14 +195,14 @@ describe('every shipped goal came from the measured table', () => {
   });
 
   it('is also a superset of it — a measured goal cannot be dropped by hand', () => {
-    for (const stage of campaign.stages) {
+    for (const stage of fixture.campaign.stages) {
       const measured = publishedFor(stage).goals.map((record) => record.kind).sort();
       expect([...stage.goals.map((goal) => goal.kind)].sort()).toEqual(measured);
     }
   });
 
   it('carries no goal whose disposition is anything but "batch" — R12 left no other category', () => {
-    for (const stage of campaign.stages) {
+    for (const stage of fixture.campaign.stages) {
       for (const record of publishedFor(stage).goals) {
         expect(record.disposition).toBe('batch');
       }
@@ -330,7 +211,7 @@ describe('every shipped goal came from the measured table', () => {
 
   it('reads no quantity R1 forbids a score to be computed from', () => {
     const forbidden = new Set(['awtS', 'wt95S', 'ttdMeanS']);
-    for (const stage of campaign.stages) {
+    for (const stage of fixture.campaign.stages) {
       for (const goal of stage.goals) {
         if (!isPerReplicationGoal(goal.kind)) continue;
         for (const metric of GOAL_READS[goal.kind]) {
@@ -341,7 +222,8 @@ describe('every shipped goal came from the measured table', () => {
   });
 
   it('states every constant in the brief instead, and withholds what cannot be judged', () => {
-    for (const stage of campaign.stages) {
+    const { space, dimensionHelp } = fixture;
+    for (const stage of fixture.campaign.stages) {
       const entry = publishedFor(stage);
       const briefing = briefingFor({ stage, published: entry, dimensionIds: space.ids, dimensionHelp });
       expect(briefing.facts).toHaveLength(entry.configurationFacts.length);
@@ -358,7 +240,7 @@ describe('every shipped goal came from the measured table', () => {
 
 describe('the guard fires — negative controls, applied to the shipped campaign', () => {
   it('positive control: the unmutated campaign produces no violation at all', () => {
-    expect(validateCampaign(clone(), context)).toEqual([]);
+    expect(validateCampaign(fixture.clone(), fixture.context)).toEqual([]);
   });
 
   it('catches a goal invented by hand', () => {
@@ -430,6 +312,7 @@ describe('the guard fires — negative controls, applied to the shipped campaign
   });
 
   it('catches a lever pointing at a dial the stage does not open', () => {
+    const { space } = fixture;
     const violations = mutate((mutated) => {
       const stage = mutated.stages[0];
       if (stage === undefined) return;
@@ -505,6 +388,7 @@ describe('the guard fires — negative controls, applied to the shipped campaign
 
 describe('a stage judges only the changes it offered', () => {
   it('admits a profile that stays inside the stage’s dials, and names what it moved', () => {
+    const { space } = fixture;
     const stage = stageAt(0);
     const admission = admitProfile(
       space,
@@ -518,6 +402,7 @@ describe('a stage judges only the changes it offered', () => {
   });
 
   it('refuses one that moves a dial the stage did not open, and names the dial', () => {
+    const { space } = fixture;
     const stage = stageAt(0);
     const admission = admitProfile(
       space,
@@ -531,6 +416,7 @@ describe('a stage judges only the changes it offered', () => {
   });
 
   it('reports an unchanged choice as the control it is', () => {
+    const { space } = fixture;
     const stage = stageAt(0);
     const profile = requireProfile(stage.dispatcher.startingProfileId);
     const admission = admitProfile(space, profile, profile, editableIdsOf(stage.dispatcher.editable, space.ids));
@@ -540,6 +426,7 @@ describe('a stage judges only the changes it offered', () => {
   });
 
   it('opens every declared dimension on the stage that says so, without listing them', () => {
+    const { campaign, space } = fixture;
     const stage = campaign.stages[6];
     expect(stage?.dispatcher.editable.mode).toBe('every-declared-dimension');
     expect(editableIdsOf(stage?.dispatcher.editable ?? { mode: 'listed', ids: [] }, space.ids)).toEqual(
@@ -549,708 +436,8 @@ describe('a stage judges only the changes it offered', () => {
 });
 
 /* -------------------------------------------------------------------------- *
- * 5 — the honesty rules, over real batches
+ * 5 — the honesty rules, over real batches: see the played-stage files named above
  * -------------------------------------------------------------------------- */
-
-/**
- * **The first stage that carries a count goal, derived — and it stopped being stage 1.**
- *
- * This block was *"stage 1, played"* and every clause in it needed a count goal: the bar
- * reproducing, the shipped setting scoring exactly level against its own bar, and the refusal to
- * judge against a bar that does not reproduce. GitHub issue #255 took stage 1's away — with an
- * honest reporting window all five of its per-run kinds measure `50/50, 50/50`, so R12 makes every
- * one of them a fact for the briefing and `data/campaign.json` declares `beat-the-baseline` alone
- * there.
- *
- * Repointed at a **derived** stage rather than at stage 2 by name, for this file's own reason: a
- * subject written down is a subject that goes stale silently, and the three clauses below would
- * have gone on passing over an empty loop. The derivation is asserted to find one, so a campaign
- * with no count goal anywhere reds this rather than skipping it.
- */
-function firstStageWithCountGoals(): CampaignStage {
-  const found = campaign.stages.find((candidate) =>
-    candidate.goals.some((goal) => goal.kind !== 'beat-the-baseline'),
-  );
-  if (found === undefined) throw new Error('no shipped stage declares a count goal');
-  return found;
-}
-
-describe('a stage played — the bar reproduces and standing still clears nothing', () => {
-  let stage: CampaignStage;
-  let unchanged: ReturnType<typeof playStage>;
-
-  beforeAll(() => {
-    stage = firstStageWithCountGoals();
-    unchanged = playStage(stage, stage.dispatcher.startingProfileId);
-  }, 300_000);
-
-  it('has a count goal to be about — the premise, asserted rather than assumed', () => {
-    /*
-     * Three cases below iterate the count goals, and an empty list would make all three pass
-     * without measuring anything. That is the shape this file keeps finding, so the premise is a
-     * case of its own.
-     */
-    expect(stage.goals.filter((goal) => goal.kind !== 'beat-the-baseline').length).toBeGreaterThan(0);
-  });
-
-  it('reproduces the published bar by running the shipped setting as its own arm', () => {
-    for (const goal of unchanged.verdict.goals) {
-      if (goal.reproduced === null) continue;
-      expect(goal.reproduced, goal.sentence).toBe(true);
-    }
-  });
-
-  it('clears nothing when nothing was changed — W3’s liveness control, on a scoreboard', () => {
-    /*
-     * `metOnTuningSeeds` rather than `cleared`, and the difference matters here more than
-     * anywhere else in this file: `cleared` is `false` on an unvalidated batch whatever the goals
-     * said, so asserting it would have made this control pass without measuring anything. What is
-     * being controlled is that an unchanged setting does not meet its own bars, and that is the
-     * field with that meaning.
-     */
-    expect(unchanged.verdict.metOnTuningSeeds).toBe(false);
-    expect(unchanged.verdict.cleared).toBe(false);
-    const comparison = unchanged.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
-    expect(comparison?.met).toBe(false);
-    expect(comparison?.sentence).toContain('not ordered');
-  });
-
-  it('scores every count goal exactly level against its own bar', () => {
-    for (const goal of unchanged.verdict.goals) {
-      if (goal.kind === 'beat-the-baseline') continue;
-      expect(goal.met).toBe(true);
-      expect(goal.sentence).toMatch(/passed (\d+) of 50 runs; the shipped setting passed \1 of 50/);
-    }
-  });
-
-  it('R7 — the seed is on the report and replays the whole batch', () => {
-    expect(unchanged.verdict.seed).toBe(stage.seeds.seed);
-    const briefing = briefingFor({
-      stage,
-      published: publishedFor(stage),
-      dimensionIds: space.ids,
-      dimensionHelp,
-    });
-    expect(briefing.seedNote).toContain(stage.seeds.seed);
-    expect(briefing.seedNote).toContain(stage.holdoutSeeds.seed);
-  });
-
-  it('R13 — every goal sentence carries the count it was computed from', () => {
-    for (const goal of unchanged.verdict.goals) {
-      expect(goal.sentence, goal.sentence).toMatch(/\b50\b/);
-    }
-    expect(unchanged.verdict.headline).toMatch(/\b50 runs\b/);
-  });
-
-  it('R2 — no sentence claims a dispatcher is better, only what happened over runs', () => {
-    const texts = [
-      unchanged.verdict.headline,
-      ...unchanged.verdict.goals.flatMap((goal) => [goal.sentence, goal.note]),
-    ];
-    for (const text of texts) {
-      expect(text).not.toMatch(/\bis (?:the )?better dispatcher\b/i);
-      expect(text).not.toMatch(/\bbest dispatcher\b/i);
-    }
-    expect(unchanged.verdict.headline).toContain('not a ranking of dispatchers');
-  });
-
-  it('R11 — no energy row can decide a goal, however its interval fell', () => {
-    const rows = unchanged.report.comparisons[0]?.rows ?? [];
-    const axis = rows.filter((row) => row.metricClass === 'axis');
-    expect(axis.length).toBeGreaterThan(0);
-    for (const row of axis) expect(row.favours).toBeNull();
-    for (const goal of unchanged.verdict.goals) {
-      expect(goal.sentence).not.toContain('drive work');
-    }
-  });
-
-  it('refuses to judge against a bar it cannot reproduce — the clause that makes "reproduced" real', () => {
-    /*
-     * Without this the `reproduced` assertions above could pass because nothing can ever set the
-     * flag to `false`. A stage run on a seed set the table was not measured on is exactly the
-     * mistake the flag exists for, so it is made here and the refusal is asserted.
-     */
-    const wrongSeeds: CampaignStage = {
-      ...stage,
-      seeds: { ...stage.seeds, seed: '424242' },
-    };
-    const played = playStage(wrongSeeds, wrongSeeds.dispatcher.startingProfileId);
-    const counted = played.verdict.goals.filter((goal) => goal.kind !== 'beat-the-baseline');
-    expect(counted.length).toBeGreaterThan(0);
-    for (const goal of counted) {
-      expect(goal.reproduced).toBe(false);
-      expect(goal.met).toBeNull();
-      expect(goal.sentence).toContain('not judged');
-      expect(goal.note).toContain('a bar that does not reproduce is not a bar');
-    }
-    expect(played.verdict.metOnTuningSeeds).toBe(false);
-    expect(played.verdict.cleared).toBe(false);
-  }, 120_000);
-
-  it('judges a changed setting, and says what moved', () => {
-    const changed = playStage(stage, 'nearest-car');
-    const comparison = changed.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
-    expect(comparison?.met === true || comparison?.met === false).toBe(true);
-    expect(comparison?.sentence).toMatch(/\b50 runs\b/);
-    for (const goal of changed.verdict.goals) {
-      if (goal.reproduced === null) continue;
-      expect(goal.reproduced).toBe(true);
-    }
-  });
-});
-
-describe('stage 3, played — Overwhelmed is a result, and the refusal reaches the reader', () => {
-  let stage: CampaignStage;
-  let played: ReturnType<typeof playStage>;
-
-  beforeAll(() => {
-    stage = stageAt(2);
-    played = playStage(stage, stage.dispatcher.startingProfileId);
-  }, 300_000);
-
-  it('keeps exactly one live count goal, which is what the measurement licensed', () => {
-    const counted = stage.goals.filter((goal) => goal.kind !== 'beat-the-baseline');
-    expect(counted.map((goal) => goal.kind)).toEqual(['nobody-abandoned']);
-  });
-
-  it('R3 — every suppressed estimate row states its reason and shows no number', () => {
-    const rows = played.report.comparisons[0]?.rows ?? [];
-    const suppressed = rows.filter((row) => row.verdict === 'suppressed');
-    expect(suppressed.length).toBeGreaterThan(0);
-    for (const row of suppressed) {
-      expect(row.estimate).toBeNull();
-      expect(row.sentence).toContain('there is no');
-      expect(row.note.trim()).not.toBe('');
-      expect(row.sentence).not.toMatch(/\b0\.00 s\b/);
-    }
-  });
-
-  it('says the suppression happened in the goal that would otherwise have used it', () => {
-    const comparison = played.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
-    expect(comparison?.note).toContain('could not be compared at all');
-  });
-
-  it('is Overwhelmed on most of its runs, as a frequency with its denominator', () => {
-    const counts = failStateCounts(played.result.arms[1]?.replications ?? []);
-    const overwhelmed = counts.find((count) => count.state === 'overwhelmed');
-    expect(overwhelmed?.n).toBe(50);
-    expect(overwhelmed?.runs ?? 0).toBeGreaterThan(0);
-  });
-
-  it('refuses to count locked-out calls rather than reporting zero of them', () => {
-    const counts = failStateCounts(played.result.arms[1]?.replications ?? []);
-    const locked = counts.find((count) => count.state === 'locked-out');
-    expect(locked?.runs).toBeNull();
-  });
-
-  it('diagnoses the deepest landing by name, from one replayed run', () => {
-    const reports = failStatesFor(stage, played.result, stage.dispatcher.startingProfileId);
-    const overwhelmed = reports.find((report) => report.state === 'overwhelmed');
-    expect(overwhelmed?.occurredInDemonstration).toBe(true);
-    expect(overwhelmed?.diagnosis).toMatch(/^Run 1, seed \d+: the deepest landing was \S+, with \d+ people on it \d+ s into the run/);
-    expect(overwhelmed?.lever).toContain('never the answer');
-  });
-
-  it('attaches no hint to a fail state that did not arise, and does attach one where it did', () => {
-    /*
-     * Found by driving: a row reading *"in 50 runs, 0 ended this way"* was printing a dial to try,
-     * which is furniture rather than advice. The gate is asserted in both directions here so it
-     * cannot be removed silently.
-     */
-    const reports = failStatesFor(stage, played.result, stage.dispatcher.startingProfileId);
-    const counts = failStateCounts(played.result.arms[1]?.replications ?? []);
-    for (const report of reports) {
-      const count = counts.find((entry) => entry.state === report.state);
-      const arose = report.occurredInDemonstration || (count?.runs ?? 0) > 0;
-      if (arose) expect(report.lever, report.state).not.toBe('');
-      else if (stage.levers[report.state] !== null) expect(report.lever, report.state).toBe('');
-    }
-    expect(reports.some((report) => report.lever !== '')).toBe(true);
-    expect(reports.some((report) => report.lever === '')).toBe(true);
-  });
-
-  it('suggests no credential lever on a building with no credentials', () => {
-    const reports = failStatesFor(stage, played.result, stage.dispatcher.startingProfileId);
-    const locked = reports.find((report) => report.state === 'locked-out');
-    expect(locked?.lever).toContain('declares no access-controlled floor');
-  });
-});
-
-describe('stage 5, played — the credential is named, and the lesson is that it is not congestion', () => {
-  let stage: CampaignStage;
-  let played: ReturnType<typeof playStage>;
-
-  beforeAll(() => {
-    stage = stageAt(4);
-    played = playStage(stage, stage.dispatcher.startingProfileId);
-  }, 300_000);
-
-  it('diagnoses locked-out landings by floor and by credential', () => {
-    const reports = failStatesFor(stage, played.result, stage.dispatcher.startingProfileId);
-    const locked = reports.find((report) => report.state === 'locked-out');
-    expect(locked?.occurredInDemonstration).toBe(true);
-    expect(locked?.diagnosis).toMatch(/holding [a-z-]+/);
-    expect(locked?.sentence).toContain('It is not congestion');
-  });
-
-  it('clears the lockout when the call carries the credential', () => {
-    const reports = failStatesFor(stage, played.result, 'destination-eta');
-    const locked = reports.find((report) => report.state === 'locked-out');
-    expect(locked?.occurredInDemonstration).toBe(false);
-    expect(locked?.diagnosis).toContain('could legally be answered');
-  });
-
-  /**
-   * **The answer to "is this playable?", and § D265 moved it here from stage 4.**
-   *
-   * This was stage 4's case — *a measured clear, from a profile `data/` already ships, inside the
-   * dimensions the stage opens*. It has to live somewhere, because a campaign whose every stage is
-   * unwinnable from the dropdown is a product claim nobody is re-deriving; and it has to live where
-   * the measurement puts it, not where it was written. Swept over the thirteen shipped profiles at
-   * the stage's own seeds, stage 4 now clears on **none** and stage 5 clears on **several**, so the
-   * two cases swapped buildings. § D254 is what moved them: it changed what every conventional arm
-   * on every access-zoned building does, and `beat-the-baseline` is a comparison against the
-   * stage's own starting profile.
-   *
-   * Written as a **search with a stated floor** rather than a pinned profile id: which profile
-   * clears is a measurement that will move again, and a test naming one would be re-pinned every
-   * time without anybody re-reading the claim. What may not move is that at least one does.
-   *
-   * ## The clear now has to survive the holdout, and that moved which profile it is
-   *
-   * Issue #255's second half. Judged on the tuning batch alone, **six** of the thirteen meet every
-   * bar here — `eta`, `energy-aware`, `fairness-first`, `capacity-aware`, `predictive-balanced`,
-   * `auction`. Run again on the stage's declared holdout seeds, **one** survives:
-   * `predictive-balanced`. Every one of the other five is beaten on a count goal it met on the
-   * seeds it was measured on — `eta` loses `deliver-everyone`, `no-divergence` *and*
-   * `answer-the-demand` there.
-   *
-   * That is what the holdout is for and it is the case for the split in one line: five of six
-   * apparent clears on this stage were a fit to fifty passenger populations. It also means the
-   * measurement `docs/33` § 3.1 publishes — *stage 5 clears under `eta`* — was taken under the old
-   * judge and no longer names the same profile; that table is a published number pinned to a run,
-   * and this is the run that moved it.
-   *
-   * Still a search with a floor, for the reason above, and still expressed as *at least one*. The
-   * floor is what makes DC-3's question — *is this campaign winnable at all?* — a measurement.
-   */
-  it('clears from the dropdown, on the holdout seeds too — whether a stage can be won', async () => {
-    const clears = [];
-    const metOnTuning = [];
-    for (const profile of config.dispatcherProfiles.profiles) {
-      const attempt = await playToVerdict(stage, profile.id);
-      const rows = attempt.report.comparisons[0]?.rows ?? [];
-      if (attempt.verdict.metOnTuningSeeds) metOnTuning.push(profile.id);
-      if (!attempt.verdict.cleared) continue;
-      clears.push(profile.id);
-      // The clear is the shape `beat-the-baseline` describes and not an accident of an empty
-      // comparison: something resolved ahead, and nothing resolved against.
-      expect(rows.filter((row) => row.favours === 'candidate').length).toBeGreaterThan(0);
-      expect(rows.filter((row) => row.favours === 'baseline')).toEqual([]);
-      for (const goal of attempt.verdict.goals) expect(goal.met, goal.sentence).toBe(true);
-      // And the same again on the runs it was not tuned against, which is what cleared it.
-      expect(attempt.verdict.holdout?.held).toBe(true);
-      for (const goal of attempt.verdict.holdout?.goals ?? []) {
-        expect(goal.met, goal.sentence).toBe(true);
-      }
-      /* R2 survives the good news: the headline still says what the number is about. */
-      expect(attempt.verdict.headline).toContain('not a ranking of dispatchers');
-    }
-    expect(clears.length, 'no shipped profile clears stage 5 from the dropdown').toBeGreaterThan(0);
-    /*
-     * The gate is measured rather than asserted to be free: if the holdout ever stopped removing
-     * anybody, the split would have become decoration on this stage and the sentence above would
-     * be describing a rule that no longer bites.
-     */
-    expect(clears.length).toBeLessThan(metOnTuning.length);
-  }, 3_000_000);
-
-  it('opens the dial the lesson needs and refuses a profile that changes anything else', () => {
-    const editable = editableIdsOf(stage.dispatcher.editable, space.ids);
-    expect(editable).toContain('dispatch.callType');
-    expect(
-      admitProfile(space, requireProfile('collective'), requireProfile('destination-eta'), editable)
-        .admissible,
-    ).toBe(true);
-    expect(
-      admitProfile(space, requireProfile('collective'), requireProfile('predictive-balanced'), editable)
-        .admissible,
-    ).toBe(false);
-  });
-});
-
-describe('stage 4, played — a setting that buys one thing by spending another', () => {
-  /**
-   * **The other end of the `beat-the-baseline` clause, and § D265 moved it here from stage 5.**
-   *
-   * This describe used to be *"a stage that can actually be cleared"*. It is not one any more:
-   * swept over the thirteen shipped profiles at the stage's own seeds, **not one clears stage 4** —
-   * `zoned-uppeak` comes closest at 2 metrics for and 1 against — and the measured clear has moved
-   * to stage 5, where it is asserted. § D254 is what moved it, by changing what every conventional
-   * arm on an access-zoned building does.
-   *
-   * What stage 4 has instead is the **front**: a profile that resolves ahead on one measure and
-   * behind on another, which is the case R11 is about and the case that makes the *"and nothing
-   * resolved against it"* half of `beat-the-baseline` falsifiable. Without a witness somewhere that
-   * clause could be deleted and every other assertion in this file would still pass.
-   *
-   * A search rather than a pinned profile id, for the reason stage 5's clear is one.
-   */
-  it('calls a setting ahead on one measure and behind on another a move along the front', () => {
-    const stage = stageAt(3);
-    let witnesses = 0;
-    for (const profile of config.dispatcherProfiles.profiles) {
-      const played = playStage(stage, profile.id);
-      const rows = played.report.comparisons[0]?.rows ?? [];
-      const ahead = rows.filter((row) => row.favours === 'candidate').length;
-      const behind = rows.filter((row) => row.favours === 'baseline').length;
-      // Nothing clears this stage from the dropdown any more, and that is asserted rather than
-      // assumed: the day something does, this fails and the claim above gets re-read.
-      expect(played.verdict.metOnTuningSeeds, `${profile.id} meets every bar on stage 4`).toBe(false);
-      if (ahead === 0 || behind === 0) continue;
-      witnesses += 1;
-      const comparison = played.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
-      expect(comparison?.met).toBe(false);
-      expect(comparison?.sentence).toContain('ahead on');
-      expect(comparison?.sentence).toContain('behind on');
-      expect(comparison?.sentence).toContain('a move along the front rather than a win');
-    }
-    expect(witnesses, 'no shipped profile lands on the front on stage 4').toBeGreaterThan(0);
-  }, 3_000_000);
-});
-
-/* -------------------------------------------------------------------------- *
- * Stage 2, played on an **edited** weight vector — W6, and § D161's known limit
- * -------------------------------------------------------------------------- */
-
-describe('stage 2, played on an edited weight vector — the thing a dropdown could not do', () => {
-  /**
-   * The vector, and it is not a shipped profile.
-   *
-   * [§ D161](../../../../DECISIONS.md) measured that **three** of the seven stages clear from the
-   * dispatcher dropdown alone — 3, 4 and 7 — and named the reason the other four do not:
-   * *"the player's move is a shipped profile, not a live weight editor … so four stages need an
-   * authored weight vector to clear."* Stage 2 is one of the four. This is that vector.
-   *
-   * Two dimensions, both inside the sixteen stage 2 declares editable. Found by sweeping
-   * `weights.loadFactor` on the stage's own tuning seeds, which is exactly the thing the second
-   * test below is about.
-   */
-  const EDIT: EditedVector = {
-    baseProfileId: 'collective',
-    profileId: 'collective-edited',
-    values: { 'weights.waitTime': 1, 'weights.loadFactor': 2.25 },
-  };
-
-  it('meets every bar on the seeds it was tuned on — three goals, two measures ahead', () => {
-    /*
-     * **`metOnTuningSeeds`, and this case is the reason that field has a name.** It used to read
-     * `cleared`, and what it was measuring was never *"this stage is won"*: it was *"this vector,
-     * swept on these fifty traces, wins on these fifty traces"*. Issue #255's second half made the
-     * difference visible by making it decide something, and the case below is the other half of
-     * the same measurement.
-     */
-    const stage = stageAt(1);
-    const played = playStage(stage, stage.dispatcher.startingProfileId, EDIT);
-    expect(played.verdict.metOnTuningSeeds).toBe(true);
-    for (const goal of played.verdict.goals) {
-      expect(goal.met, goal.sentence).toBe(true);
-    }
-    const rows = played.report.comparisons[0]?.rows ?? [];
-    expect(rows.filter((row) => row.favours === 'candidate').length).toBeGreaterThan(0);
-    expect(rows.filter((row) => row.favours === 'baseline')).toEqual([]);
-    /* R2 survives the good news, as it does on stage 4. */
-    expect(played.verdict.headline).toContain('not a ranking of dispatchers');
-  }, 300_000);
-
-  /**
-   * **The exploit, and the gate that closes it — `docs/33` § 7 O7, GitHub issue #255.**
-   *
-   * This vector was found by sweeping `weights.loadFactor` on stage 2's **tuning** seeds until the
-   * stage cleared, which is the shortcut the difficulty curve names as its largest open question:
-   * *"a curve whose intended solution is `tune until the judged seeds clear` is a curve with a
-   * shortcut in it, and the shortcut is invisible to every rule above."* It is the only measured
-   * witness of that shortcut in the tree, and it is the one this gate has to stop.
-   *
-   * Played through the shipped constructors, both batches, exactly as `dev/campaignPanel.ts` will
-   * once it grows the second run: it meets every bar on the seeds it was tuned against, and the
-   * stage is **not cleared**, because on fifty passenger populations it has never seen it loses
-   * `long-waits-under` (41 against a bar of 45) and is beaten on three measures.
-   *
-   * The two halves are asserted separately on purpose. *Not cleared* alone would also be produced
-   * by a gate that refused everything — by a holdout batch that failed to reproduce its bars, say,
-   * or by an input nobody supplied — so the case pins that the holdout half was **judged**
-   * (`reproduced` is `true` on every count goal there) and that what refused it is a goal it
-   * actually missed.
-   */
-  it('**is refused on the holdout seeds**, which is the overfitting gate doing its job', async () => {
-    const stage = stageAt(1);
-    const played = await playToVerdict(stage, stage.dispatcher.startingProfileId, EDIT);
-
-    expect(played.verdict.metOnTuningSeeds).toBe(true);
-    expect(played.verdict.cleared).toBe(false);
-
-    const holdout = played.verdict.holdout;
-    expect(holdout, 'the holdout batch was never run, so nothing was validated').toBeDefined();
-    if (holdout === undefined || holdout === null) return;
-    expect(holdout.seed).toBe(stage.holdoutSeeds.seed);
-    expect(holdout.held).toBe(false);
-
-    // Judged, not refused: every count goal's bar reproduced on the holdout half of the table.
-    const counts = holdout.goals.filter((goal) => goal.kind !== 'beat-the-baseline');
-    expect(counts.length).toBeGreaterThan(0);
-    for (const goal of counts) expect(goal.reproduced, goal.sentence).toBe(true);
-
-    // And it is a goal it missed rather than a goal nobody could answer.
-    const missed = holdout.goals.filter((goal) => goal.met === false);
-    expect(missed.map((goal) => goal.kind).sort()).toEqual(['beat-the-baseline', 'long-waits-under']);
-    expect(holdout.goals.filter((goal) => goal.met === null)).toEqual([]);
-
-    // The player is told which of the two seed sets refused it, in the headline, in words.
-    expect(played.verdict.headline).toContain('Not cleared');
-    expect(played.verdict.headline).toContain(stage.holdoutSeeds.name);
-    expect(played.verdict.headline).toContain('not a ranking of dispatchers');
-
-    /*
-     * **And the same batch judged with no holdout at all is refused too, with the other reason.**
-     *
-     * Free — it is the tuning batch that has already run, judged a second time — and it is the
-     * only place in this suite where *met every bar, and no second batch was supplied* can be
-     * reached, because reaching it needs an arm that actually meets every bar. Without it the
-     * unvalidated branch would be asserted nowhere and could be deleted with every other case
-     * still green.
-     */
-    const unvalidated = judgeStage({
-      stage,
-      published: publishedFor(stage),
-      result: played.result,
-      report: played.report,
-    });
-    expect(unvalidated.metOnTuningSeeds).toBe(true);
-    expect(unvalidated.holdout).toBeNull();
-    expect(unvalidated.cleared).toBe(false);
-    expect(unvalidated.headline).toContain('Not cleared');
-    expect(unvalidated.headline).toContain('the runs this setting was tuned against');
-  }, 600_000);
-
-  it('runs a profile `data/` does not contain, and the report names the thing that ran', () => {
-    // The claim W6 actually makes. `data/dispatcher-profiles.json` has no `collective-edited`, so
-    // a batch that resolved arms by id alone could not have run this at all — which is precisely
-    // what § D161 recorded as the limitation.
-    expect(config.dispatcherProfilesById.has('collective-edited')).toBe(false);
-    const stage = stageAt(1);
-    const played = playStage(stage, stage.dispatcher.startingProfileId, EDIT);
-    /*
-     * The **resolved** id on the result, and the base id on the request. Found by driving: with
-     * the request's id on the result the comparison rows read *"the difference between collective
-     * and collective"* on a batch whose two arms were a shipped profile and an edit of it, so the
-     * one surface whose job is telling two arms apart could not.
-     */
-    expect(played.result.arms[0]?.dispatcherProfileId).toBe('collective');
-    expect(played.result.arms[1]?.dispatcherProfileId).toBe('collective-edited');
-    const rows = played.report.comparisons[0]?.rows ?? [];
-    expect(rows.some((row) => row.sentence.includes('collective-edited'))).toBe(true);
-  }, 300_000);
-
-  it('**does not survive the holdout seed set**, and the suite carries that half too', () => {
-    /*
-     * CLAUDE.md § Tuning discipline, arriving as a measurement rather than as a caution: *"Hold
-     * out traffic seeds. Tune on one seed set, validate on a disjoint one, or you overfit the
-     * weight vector to specific passenger traces and the gain vanishes on new traffic."*
-     *
-     * It vanished, and worse than vanished. On stage 2's declared holdout seeds the same vector is
-     * beaten by the shipped setting on **three** measures, and `beat-the-baseline` resolves
-     * against it. The sensitivity is visible in the sweep that found it: `2.2`, `2.25` and `2.3`
-     * clear and `2.35` does not.
-     *
-     * This is asserted rather than mentioned because the alternative — a suite that records the
-     * clear and not the failure to generalise — would be publishing the flattering half of a
-     * measurement, and § 11 W6's *"a stage cleared on an edited vector"* would read as a stronger
-     * result than it is.
-     *
-     * **What this case is now, and what it stopped being.** Its closing sentence used to be *"the
-     * campaign judges on the tuning seeds, so a live weight editor makes overfitting them the
-     * dominant strategy, and nothing in the shipped surface says so"* — a finding about the
-     * campaign, and `docs/33` § 7's **O7**. Issue #255's second half closed it, and the closure is
-     * the case above, which plays this vector through both batches and watches the gate refuse it.
-     *
-     * What survives here is a different and still-live claim: **a batch run on the wrong seed set
-     * is refused rather than scored.** The stage below has its two sets swapped, so the runs are
-     * the holdout's and the published counts read are the tuning set's — and every count goal comes
-     * back `null` with `reproduced: false`. That is the guard that catches a campaign quietly
-     * running a different configuration from the one its goals were measured on, and it is checked
-     * on the field that has that meaning rather than on `cleared`, which an unvalidated batch
-     * makes `false` whatever the goals said.
-     */
-    const stage = stageAt(1);
-    const onHoldout: CampaignStage = {
-      ...stage,
-      seeds: stage.holdoutSeeds,
-      holdoutSeeds: stage.seeds,
-    };
-    const played = playStage(onHoldout, stage.dispatcher.startingProfileId, EDIT);
-    expect(played.verdict.metOnTuningSeeds).toBe(false);
-    expect(played.verdict.cleared).toBe(false);
-    const rows = played.report.comparisons[0]?.rows ?? [];
-    expect(rows.filter((row) => row.favours === 'baseline').length).toBeGreaterThan(0);
-    /*
-     * And the count goals are `null` there rather than failed, which is `judge.ts` refusing to
-     * judge against a bar that does not reproduce — the published counts are the tuning set's.
-     * Stated so a reader does not mistake a refusal for a defeat.
-     */
-    const counts = played.verdict.goals.filter((goal) => goal.kind !== 'beat-the-baseline');
-    expect(counts.length).toBeGreaterThan(0);
-    for (const goal of counts) {
-      expect(goal.met).toBeNull();
-      expect(goal.reproduced).toBe(false);
-    }
-  }, 300_000);
-
-  it('refuses an edited vector that leaves the dimensions this stage opened', () => {
-    // `idle.parkingStrategy` is a real dimension and stage 2 does not declare it editable. The
-    // refusal is `admitProfile`'s, on the **resolved** dispatcher, so an edit is held to exactly
-    // the rule a shipped profile is.
-    const stage = stageAt(1);
-    const outOfScope = resolveEditedProfile(space, requireProfile('collective'), {
-      baseProfileId: 'collective',
-      profileId: 'collective-edited',
-      values: { 'idle.parkingStrategy': 'lobby' },
-    });
-    expect(outOfScope.ok, outOfScope.ok ? '' : outOfScope.reason).toBe(true);
-    if (!outOfScope.ok) return;
-    const admission = admitProfile(
-      space,
-      requireProfile(stage.dispatcher.startingProfileId),
-      outOfScope.profile,
-      editableIdsOf(stage.dispatcher.editable, space.ids),
-    );
-    expect(admission.admissible).toBe(false);
-    expect(admission.sentence).toContain('idle.parkingStrategy');
-  });
-});
-
-/**
- * **Stage 6, after `vertical-city` declared an escalator at every one of its two-level lobbies.**
- *
- * The building's numbers moved twice: once when it declared the ground-lobby escalator — which took
- * `long-waits-under` out of this stage's `goals` bucket, because 49/50 tuning against 50/50 holdout
- * is a classification that does not survive the holdout — and again when it declared the three
- * sky-lobby ones. The second move was smaller: **one cell**, `answer-the-demand` from 7 of 50 to 6
- * of 50 on the holdout set, still a variable and still a batch goal. **No goal returned**, and none
- * was authored to replace the one that left; § D160 selects goals from the measured table and this
- * lane did not touch that rule.
- *
- * So the question *"is stage 6 still playable?"* is answered here the way stage 4's is: by playing
- * it. Four live goals, three of them counts whose bar is the shipped setting's own count, and the
- * comparison goal that no stage clears by standing still.
- */
-describe('stage 6, played — three goals survive the escalators, and the bars still reproduce', () => {
-  let stage: CampaignStage;
-  let unchanged: ReturnType<typeof playStage>;
-
-  beforeAll(() => {
-    stage = stageAt(5);
-    unchanged = playStage(stage, stage.dispatcher.startingProfileId);
-  }, 300_000);
-
-  /**
-   * **Three, not four, and the missing one is `no-divergence`.**
-   *
-   * § D254 made this building serviceable and `no-divergence` went to `50/50, 50/50` — a constant,
-   * which R12 makes a fact for the briefing rather than a goal, so it left the `goals` bucket and
-   * issue #88 recorded the drop. § D265 puts `deliver-everyone` back: the credential gap turns a
-   * declared share of in-building journeys away, so *"everybody who arrived was carried"* is a
-   * question again — `40/50` on the tuning seeds and `46/50` on the holdout, published in
-   * `data/scenario-goals.json` beside the goal, which is R12's whole requirement.
-   *
-   * So the count went 4 → 2 → 3, and each move is a measurement rather than an edit. The list is
-   * asserted rather than the length, because *which* three is the part that would go stale.
-   */
-  it('carries three live goals — the two counts and the comparison', () => {
-    expect(stage.goals.map((goal) => goal.kind)).toEqual([
-      'deliver-everyone',
-      'answer-the-demand',
-      'beat-the-baseline',
-    ]);
-  });
-
-  it('reproduces every published bar on the changed building', () => {
-    /*
-     * The clause that would have caught the goal table going stale against the escalators: the
-     * bars in `data/scenario-goals.json` are re-derived by running the stage, and a bar that no
-     * longer reproduces is refused rather than judged.
-     */
-    let checked = 0;
-    for (const goal of unchanged.verdict.goals) {
-      if (goal.reproduced === null) continue;
-      checked += 1;
-      expect(goal.reproduced, goal.sentence).toBe(true);
-    }
-    expect(checked).toBe(2);
-  });
-
-  it('meets its two count goals at the shipped setting and clears on none of them', () => {
-    // Standing still scores every count goal exactly level against its own bar — so the low
-    // absolute rates (4 of 50 on `deliver-everyone`) are a **bar**, not a difficulty. What is
-    // not cleared is the comparison, which is the whole of what this stage asks a player for.
-    for (const goal of unchanged.verdict.goals) {
-      if (goal.kind === 'beat-the-baseline') continue;
-      expect(goal.met, goal.sentence).toBe(true);
-    }
-    const comparison = unchanged.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
-    expect(comparison?.met).toBe(false);
-    expect(unchanged.verdict.metOnTuningSeeds).toBe(false);
-    expect(unchanged.verdict.cleared).toBe(false);
-  });
-
-  /**
-   * **Not clearable from the dropdown any more, and that is a measurement rather than a gap.**
-   *
-   * This case asserted that `destination-eta` clears stage 6, and it was true when it was written.
-   * It is not true now, and the change is § D254's rather than § D265's: making this building
-   * serviceable moved every conventional arm's numbers, and `beat-the-baseline` is a comparison
-   * against the stage's own starting profile. Swept over **all thirteen shipped profiles** at the
-   * stage's own seeds, not one of them resolves ahead on a metric without also resolving behind on
-   * one — `zoned-uppeak` comes closest at 1 for and 4 against — so `beat-the-baseline` is met by
-   * none and `cleared` is `false` for all thirteen.
-   *
-   * The claim is therefore **inverted rather than deleted**, which is the only honest option: a
-   * case that stopped asking would leave the published *"three stages clear from the dropdown"*
-   * count with nothing re-deriving it, which is the exact failure this case was added to fix. What
-   * it now pins is the negative, with the witness that comes closest named — so the day a profile
-   * does clear it, this fails and says so.
-   *
-   * **Stage 6 is still playable**, and by the mechanism § D161 already documents for the four
-   * stages that never cleared from the dropdown: an edited weight vector. That is stage 2's
-   * apparatus and it is not re-run here.
-   */
-  it('is not clearable from the dropdown by any shipped profile, and names the closest', () => {
-    const outcomes = config.dispatcherProfiles.profiles.map((profile) => {
-      const played = playStage(stage, profile.id);
-      const rows = played.report.comparisons[0]?.rows ?? [];
-      return {
-        id: profile.id,
-        /*
-         * `metOnTuningSeeds`, not `cleared`: `cleared` is `false` on an unvalidated batch whatever
-         * the goals said, so this sweep would have gone on passing without measuring anything.
-         * What it asserts is that no shipped profile *meets stage 6's bars at all*, which is the
-         * stronger of the two claims and the one that was true when this case was written.
-         */
-        cleared: played.verdict.metOnTuningSeeds,
-        for: rows.filter((row) => row.favours === 'candidate').length,
-        against: rows.filter((row) => row.favours === 'baseline').length,
-      };
-    });
-    for (const outcome of outcomes) {
-      expect(outcome.cleared, `${outcome.id} meets every bar on stage 6`).toBe(false);
-    }
-    // Not vacuous: somebody does resolve ahead on something, so the refusal is `beat-the-baseline`
-    // asking for a dominating move rather than the comparison being dead.
-    const ahead = outcomes.filter((outcome) => outcome.for > 0);
-    expect(ahead.length).toBeGreaterThan(0);
-    for (const outcome of ahead) expect(outcome.against).toBeGreaterThan(0);
-  }, 3_000_000);
-});
 
 describe('the decoder refuses rather than dropping', () => {
   it('throws on a structurally broken stage instead of quietly shipping six', () => {
@@ -1260,9 +447,9 @@ describe('the decoder refuses rather than dropping', () => {
      * this repository keeps finding. `parseCampaign` composes the two passes so it cannot happen;
      * this is the assertion that composition is what ships.
      */
-    const broken = JSON.parse(JSON.stringify(raw)) as { stages: Record<string, unknown>[] };
+    const broken = JSON.parse(JSON.stringify(fixture.raw)) as { stages: Record<string, unknown>[] };
     delete broken.stages[0]?.['seeds'];
-    expect(() => parseCampaign(broken, context)).toThrow(/seeds/);
+    expect(() => parseCampaign(broken, fixture.context)).toThrow(/seeds/);
   });
 });
 
@@ -1272,7 +459,7 @@ describe('the decoder refuses rather than dropping', () => {
 
 describe('R10 — no probability word reaches a player-facing string', () => {
   it('holds over every authored string in data/campaign.json', () => {
-    for (const stage of campaign.stages) {
+    for (const stage of fixture.campaign.stages) {
       for (const [label, text] of playerFacingStrings(stage)) {
         expect(probabilityWordIn(text), `${stage.id} ${label}: ${text}`).toBeNull();
       }
@@ -1280,7 +467,8 @@ describe('R10 — no probability word reaches a player-facing string', () => {
   });
 
   it('holds over every generated briefing sentence', () => {
-    for (const stage of campaign.stages) {
+    const { space, dimensionHelp } = fixture;
+    for (const stage of fixture.campaign.stages) {
       const briefing = briefingFor({
         stage,
         published: publishedFor(stage),
@@ -1369,51 +557,13 @@ describe('R10 — no probability word reaches a player-facing string', () => {
 });
 
 /* -------------------------------------------------------------------------- *
- * Shared: the fail-state path, exactly as the panel runs it
- * -------------------------------------------------------------------------- */
-
-function failStatesFor(stage: CampaignStage, result: BatchResult, candidateProfileId: string) {
-  const building = requireBuilding(config, stage.building);
-  const profile = requireProfile(candidateProfileId);
-  const replication = result.arms[1]?.replications ?? [];
-  const seed = stageReplicationSeed(stage, 0).toString();
-  /* The batch's own replication-0 seed, asserted rather than assumed to be the same number. */
-  expect(replication[0]?.seed).toBe(seed);
-  const { recording } = recordRun(
-    demonstrationConfigFor({
-      stage,
-      building,
-      dispatcherProfile: profile,
-      trafficProfiles: config.trafficProfiles,
-      elevatorSpecs: config.elevatorSpecs,
-      dispatcherProfiles: config.dispatcherProfiles,
-    }),
-  );
-  return failStateReports({
-    stage,
-    counts: failStateCounts(replication),
-    evidence: evidenceFrom({
-      recording,
-      replication: 0,
-      seed,
-      restrictedFloorIds: restrictedFloorIds(
-        building.floors.map((floor) => floor.id),
-        building.accessZones,
-      ),
-      carriesCredential: credentialCapabilityOf(profile).carriesCredential,
-    }),
-    dimensionHelp,
-  });
-}
-
-/* -------------------------------------------------------------------------- *
  * The four fail states are all four, always
  * -------------------------------------------------------------------------- */
 
 describe('the fail states', () => {
   it('are R4’s four, in R4’s order of preference, on every stage', () => {
     expect([...FAIL_STATES]).toEqual(['overwhelmed', 'abandoned', 'stranded', 'locked-out']);
-    for (const stage of campaign.stages) {
+    for (const stage of fixture.campaign.stages) {
       expect(Object.keys(stage.levers).sort()).toEqual([...FAIL_STATES].sort());
     }
   });

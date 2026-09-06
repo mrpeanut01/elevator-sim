@@ -1365,3 +1365,53 @@ had four of four; this wave had six of seven, and the briefs were the integrator
   cause was a stop hook requiring committed work to be pushed while lanes were still in flight. It
   cost six spurious CI envelopes and no correctness, and the run went green the moment pushing
   stopped — which is the agreement's arithmetic demonstrated rather than argued.
+
+## Wave T closed
+
+**Thirteen issues closed, six decisions taken, one push.** One worker rather than a dispatch: the
+owner asked for a batch of ten to twenty committed, one pull request, one merge, and then more. Two
+pieces were delegated to worktree lanes (#329 and #356) and merged by hand; everything else was
+built serially on the branch.
+
+| issue | outcome |
+|---|---|
+| #349, #350, #351 | **closed** together, § D497 to § D499; each issue's premise refuted by running the requested check once |
+| #352 | **closed**; a fourth intervention on both shells, the wire and the server |
+| #146 | **closed**; the cost line's Basic register, § D495's ruling built |
+| #225, #277 | **closed**; Sandbox is a state, § D496's ruling built, P3 re-adjudicated |
+| #229 | **closed**, § D500 |
+| #338 | **closed**; § D486's ruling built |
+| #329 | **closed**; § D485's ruling built, scheduled daily |
+| #348 | **closed**; the as-built run plays before the figures |
+| #246 | **closed**, § D501 |
+| #356 | **closed**, § D502; the largest `viz` file's share fell from 31.8 % to 16.4 % |
+
+**Verified on the integrated tree rather than per lane**: `tsc -b` exit 0, all six vitest projects
+run in one sitting with the figures in `ISSUE_WORKER_LEDGER.md` § T.5, and the corpus measured once
+in both tiers with the base re-measured first (§ T.4).
+
+### T.6 What this wave learned
+
+**1. A guard that classifies is not a guard that sweeps.** Nineteen producers were unclassified and
+the derive guard said so; three copy keys were classified as covered and were swept by nothing, and
+only a probe that diffed the seeded fields between two trees said so. The corpus's `covers` list is a
+claim, and the probe (a scratch test rendering one case on each tree) is the cheapest way this wave
+found to check it. Worth keeping as a habit rather than as a file.
+
+**2. Serial integration is cheaper than it looks when the issues share a screen.** #349, #350 and
+#351 all touch `fixit/`, and #348 touches the same screen; as lanes they would have needed a
+conflict map and four merges. As one worker they needed none, and the refutations of #349 and #350
+each fed the next issue's design directly.
+
+**3. The push agreement held with seventeen commits behind it**, which is the first wave since it
+was written where a single push carried more than a handful.
+
+### T.7 Owed to the next wave
+
+- **#325** (a staleness guard over GAPS.md's checkable rows) was in scope and was not started; it is
+  the next small build.
+- **#353** (the works-night pairing) is where `record/crowd.ts`'s fourth call site goes; the module
+  says so and owes that sentence's deletion to that commit.
+- **#242** (error reports) is what would make the build line travel by itself rather than by hand.
+- **`judgeCleared.test.ts`** is now the `viz` project's largest file at about 16 % and was outside
+  #356's scope; a split by the batch each case reads would take the ceiling further.

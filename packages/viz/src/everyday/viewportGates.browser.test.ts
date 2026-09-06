@@ -597,6 +597,11 @@ function failuresOf(cell: Cell): readonly string[] {
  * rather than *the product regressed*. The lines are #240's like every other entry: the same row, at
  * the same two viewports, for the same reason.
  *
+ * **And `everyday-stage-intervene` moved again, ×2 → ×3** — GitHub issue **#352**, the
+ * `spread-cars` arm beside the park arm. The same class as #171's move: a control count on a row
+ * that was already unreachable at both viewports, so the product grew and nothing about the layout
+ * changed. #240's, like every other entry.
+ *
  * **And one more line joined at both viewports for the same reason** — GitHub issue **#226**,
  * [§ D482](../../../../DECISIONS.md), which put § 7.4's ghost picker on the stage's race card.
  * `everyday-stage-ghost ×1` is a control that is genuinely under § 2 clause 3's minimum on a phone,
@@ -621,7 +626,7 @@ const OUTSTANDING: readonly string[] = Object.freeze([
   '360×800 · stage · clause 3 · everyday-bar-primary ×1',
   '360×800 · stage · clause 3 · everyday-bar-timeline > button ×2',
   '360×800 · stage · clause 3 · everyday-stage-ghost ×1',
-  '360×800 · stage · clause 3 · everyday-stage-intervene ×2',
+  '360×800 · stage · clause 3 · everyday-stage-intervene ×3',
   '360×800 · stage · clause 3 · everyday-stage-speed ×7',
   '360×800 · stage · clause 3 · everyday-stage-start ×1',
   '360×800 · stage · clause 3 · everyday-stage-switch-pick ×1',
@@ -632,7 +637,7 @@ const OUTSTANDING: readonly string[] = Object.freeze([
   '375×667 · stage · clause 3 · everyday-bar-primary ×1',
   '375×667 · stage · clause 3 · everyday-bar-timeline > button ×2',
   '375×667 · stage · clause 3 · everyday-stage-ghost ×1',
-  '375×667 · stage · clause 3 · everyday-stage-intervene ×2',
+  '375×667 · stage · clause 3 · everyday-stage-intervene ×3',
   '375×667 · stage · clause 3 · everyday-stage-speed ×6',
   '375×667 · stage · clause 3 · everyday-stage-start ×1',
   '375×667 · stage · clause 3 · everyday-stage-switch-pick ×1',

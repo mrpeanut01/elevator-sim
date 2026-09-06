@@ -29,6 +29,8 @@
 import { loadConfig, runSimulation, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { BUILD_VERSION } from '../release/version.js';
+
 import {
   BUILDING_IDS,
   DATA_DIR,
@@ -135,6 +137,8 @@ describe('a recording', () => {
   it('carries its seed, its identity and the run window', () => {
     const { recording, result } = recordRun(fixtureConfig(config));
     expect(recording.schemaVersion).toBe(VIZ_SCHEMA_VERSION);
+    // GitHub issue #246: every recording says which build made it; under vitest, the unbuilt one.
+    expect(recording.buildVersion).toBe(BUILD_VERSION);
     expect(recording.seed).toBe(FIXTURE_SEED.toString());
     expect(recording.seed).toBe(result.record.seed);
     expect(recording.runId).toBe(result.runId);

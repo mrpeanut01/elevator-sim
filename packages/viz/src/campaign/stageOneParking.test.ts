@@ -118,7 +118,7 @@ beforeAll(async () => {
 /**
  * The stage under test: **the first one**, which is the whole of why it is this one.
  *
- * Taken by position rather than by id — `campaign.test.ts`'s own idiom — because the subject of
+ * Taken by position rather than by id — `campaign.test-helper.ts#stageAt`'s idiom — because the subject of
  * this file is *the stage a new player meets first*, and that is a property of the progression
  * rather than of a name. Its building is asserted below, so a reordering arrives as a red here
  * rather than as a case that quietly measures a different stage.

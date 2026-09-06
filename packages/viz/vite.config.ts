@@ -56,6 +56,7 @@
  * inside what the browser was told was JavaScript. Two hosts, one 404 policy.
  */
 
+import { execSync } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -151,8 +152,26 @@ function buildingsManifest() {
   };
 }
 
+/**
+ * Which build the bundle says it is — GitHub issue #246, read by `src/release/version.ts`. The
+ * deploy workflow sets `ELEVATOR_SIM_BUILD_VERSION` to the commit it is building; a local build
+ * asks git; a tree with neither says `unbuilt`, which the panel explains rather than hides.
+ */
+function buildVersion(): string {
+  const declared = process.env['ELEVATOR_SIM_BUILD_VERSION'];
+  if (declared !== undefined && declared.length > 0) return declared.slice(0, 10);
+  try {
+    return execSync('git rev-parse --short=10 HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return 'unbuilt';
+  }
+}
+
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
+  define: {
+    __BUILD_VERSION__: JSON.stringify(buildVersion()),
+  },
   // No `resolve.alias`. There used to be one: `@elevator-sim/core` published a single entry
   // point that re-exported `loadConfig`, so importing the package pulled `node:fs/promises` and
   // `node:path` into the browser graph, and Vite's externalisation stub for a Node builtin throws

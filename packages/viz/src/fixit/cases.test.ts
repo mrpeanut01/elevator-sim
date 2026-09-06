@@ -80,13 +80,15 @@ import {
   emptyFixitState,
   spendOf,
   toggleRepair,
+  selectionKeepsTheCrowd,
 } from './engine.js';
-import { parseFixitCases } from './parse.js';
+import { fixitContextOf, parseFixitCases } from './parse.js';
 import {
   FIXIT_RUN_SWITCHES,
   figureValuesOf,
   fixitRunPlanOf,
   measuredOf,
+  assertPairMatchesRepairs,
   type FixitResources,
   type FixitRunPlan,
 } from './run.js';
@@ -130,19 +132,14 @@ let cases: FixitCases;
 beforeAll(async () => {
   resources = await resourcesFromDisk();
   const raw = JSON.parse(await readFile(join(DATA_DIR, 'fixit-cases.json'), 'utf8')) as unknown;
-  cases = parseFixitCases(raw, {
-    floorIdsByBuilding: new Map(
-      resources.entries.map((entry) => [
-        entry.resolved.id,
-        entry.resolved.floors.map((floor) => floor.id),
-      ]),
-    ),
-    profileIds: new Set(resources.dispatcherProfiles.profiles.map((profile) => profile.id)),
-    engineIds: [
-      ...resources.entries.map((entry) => entry.resolved.id),
-      ...resources.dispatcherProfiles.profiles.map((profile) => profile.id),
-    ],
-  });
+  cases = parseFixitCases(
+    raw,
+    fixitContextOf({
+      buildings: resources.entries.map((entry) => entry.resolved),
+      trafficProfiles: resources.trafficProfiles,
+      dispatcherProfiles: resources.dispatcherProfiles,
+    }),
+  );
 }, SUITE_TIMEOUT);
 
 function caseOf(id: string): FixitCase {
@@ -608,6 +605,18 @@ describe.each(PINNED)('case $id', (pinned) => {
       const state = diagnosedState(entry);
       const pair = runFixitPair(fixitRunPlanOf(entry, state, resources));
       const measurement = measuredOf(entry, pair.before.recording, pair.after.recording);
+
+      /*
+       * GitHub issues #349 and #350, on real runs and in both directions: a diagnosed repair that
+       * patches population must have changed the crowd, and one that does not must have left every
+       * leg in place. Three shipped cases sit on the first branch, fifteen on the second, and the
+       * shipped press sites throw on the same disagreement.
+       */
+      const claimsSameCrowd = selectionKeepsTheCrowd(entry, state);
+      expect(measurement.sameCrowd, `case ${entry.id} claims ${claimsSameCrowd ? 'the same' : 'a changed'} crowd`).toBe(
+        claimsSameCrowd,
+      );
+      expect(() => assertPairMatchesRepairs(entry, state, pair.before.recording, pair.after.recording)).not.toThrow();
 
       // The two § 9 thresholds, asserted on the measurement itself before the classification.
       expect(measurement.complaintGonePct).not.toBeNull();

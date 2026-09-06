@@ -14,9 +14,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { parseDispatcherProfiles, type DispatcherProfile } from '@elevator-sim/core/browser';
+import { COST_TERMS_BY_ID, parseDispatcherProfiles, type DispatcherProfile } from '@elevator-sim/core/browser';
 
 import {
+  costFunctionLine,
   DEFAULT_LEVERS,
   DWELL_SETTINGS,
   inertTerms,
@@ -153,6 +154,62 @@ describe('term names', () => {
     for (const [term, weight] of Object.entries(profile('energy-aware').weights ?? {})) {
       if (weight > 0) expect(line).toContain(shortTermNameOf(term, TERM_IDS));
     }
+  });
+});
+
+/*
+ * GitHub issue #146, § D495: the cost line grows a Basic arm, Engineer stays byte-identical, and
+ * every one of the four print sites reads the mode — asserted at the site, because no honesty
+ * property reaches the Engineer editor (`PLAYER_FACING_SURFACES` is derived from `everyday/` and
+ * `campaign/` alone) and a briefing once claimed corpus coverage for a string it did not have.
+ */
+describe('the cost line has two registers — GitHub issue #146', () => {
+  it('is byte-identical in Engineer mode, with and without the register named', () => {
+    for (const id of ['collective', 'energy-aware', 'nearest-car']) {
+      const line = vectorLineOf(profile(id), TERM_IDS);
+      expect(vectorLineOf(profile(id), TERM_IDS, 'advanced')).toBe(line);
+      expect(line).toMatch(/^cost = /u);
+      expect(line).toBe(
+        costFunctionLine(specFromProfile(profile(id), profile(id).name), (term) => shortTermNameOf(term, TERM_IDS)),
+      );
+    }
+  });
+
+  it('states the vector in plain words in the Basic register, naming every term by its player name', () => {
+    const line = vectorLineOf(profile('energy-aware'), TERM_IDS, 'basic');
+    expect(line).not.toContain('cost =');
+    expect(line).not.toContain('·');
+    expect(line).toMatch(/^Every car is given a score/u);
+    // The names are core's own player words — the words the sliders beside the line carry.
+    for (const [termId, weight] of Object.entries(profile('energy-aware').weights)) {
+      if (weight <= 0) continue;
+      expect(line).toContain(`${COST_TERMS_BY_ID.get(termId)?.player.name ?? ''} counts`);
+    }
+    // And no abbreviation of an engine id, which is an id at one remove.
+    expect(line).not.toMatch(/\bdist\b|\bstarv\b|\brev\b/u);
+    // No estimate cue beside the numbers — the constraint wave 18 carried and § D495 re-carried.
+    expect(line).not.toMatch(/\b(?:average|mean|awt|typical|95th|wt95|percentile|ttd)\b/iu);
+  });
+
+  it('says so when every weight is zero, in both registers', () => {
+    const zero: DispatcherProfile = { id: 'zero', name: 'Zero', weights: {} };
+    expect(vectorLineOf(zero, TERM_IDS)).toBe('cost = nothing — every term is zero');
+    expect(vectorLineOf(zero, TERM_IDS, 'basic')).toContain('every weight here is zero');
+  });
+
+  it('reads the mode at all four print sites, and at none of them without it', () => {
+    /*
+     * Source-read, this suite's own idiom: weak evidence about behaviour, strong evidence that a
+     * site has not quietly gone back to the mode-blind call. The four are the two list cards
+     * (through `vectorLineOf`), the plain block's echo and the summary.
+     */
+    const code = readFileSync(new URL('./dispatcherEditor.ts', import.meta.url), 'utf8');
+    const mount = code.slice(code.indexOf('export function mountDispatcherEditor'));
+    expect(mount.match(/costFunctionLine\(current, \(id\) => shortTermNameOf\(id, allIds\), state\.mode\)/gu)).toHaveLength(2);
+    expect(mount).toContain('vectorLineOf(profile, allIds, state.mode)');
+    expect(mount).toContain('savedRow(doc, entry.profile, allIds, state.mode, {');
+    expect(mount).not.toMatch(/costFunctionLine\(current, \(id\) => shortTermNameOf\(id, allIds\)\)/u);
+    expect(mount).not.toMatch(/vectorLineOf\(profile, allIds\)/u);
   });
 });
 

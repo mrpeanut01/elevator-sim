@@ -118,7 +118,9 @@ remedy — *"the build-information panel carries the explanation instead"*.
 
 **What is left of the issue is real and is one row.** `SETTINGS_ABSENCES` says of *Default speed*
 that the preference *"is buildable now and is not built"*. A register entry that says a thing is
-buildable is a queue item wearing a refusal.
+buildable is a queue item wearing a refusal. *(Built 2026-09-06, GitHub issue #229: the row is
+drawn, the entry is deleted, and `Clear saved progress` went the same way under
+[§ D500](../DECISIONS.md).)*
 
 **The finding underneath the issue, which is the one worth keeping.** § 20.12 gives two outcomes —
 build the seam, or do not draw the row — and only the second is free. So *not drawing* is a stable

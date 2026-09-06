@@ -529,11 +529,12 @@ describe('§ 7.6 — the intervention control', () => {
 
   it('holds only the arms whose whole content is their kind', () => {
     /*
-     * The constant's claim, checked: parking is the one change that needs nothing beyond its kind,
-     * so it is the one entry that can be a constant at all. The handover carries a whole profile and
-     * is therefore built per call — the case below is the one that checks it exists.
+     * The constant's claim, checked: the two parking kinds are the changes that need nothing beyond
+     * their kind, so they are the entries that can be constants at all (GitHub issue #352 added the
+     * second). The handover carries a whole profile and is therefore built per call — the case
+     * below is the one that checks it exists.
      */
-    expect(STAGE_INTERVENTIONS.map((arm) => arm.change.kind)).toEqual(['park-cars-lobby']);
+    expect(STAGE_INTERVENTIONS.map((arm) => arm.change.kind)).toEqual(['park-cars-lobby', 'spread-cars']);
     for (const arm of STAGE_INTERVENTIONS) {
       expect(arm.label.length).toBeGreaterThan(4);
       expect(arm.explains).toMatch(/re-simulates/);
@@ -557,21 +558,36 @@ describe('§ 7.6 — the intervention control', () => {
     });
 
   it('offers the handover only when the screen names somebody to hand to — GitHub issue #171', () => {
-    expect(armsFor(undefined).rows.map((row) => row.change.kind)).toEqual(['park-cars-lobby']);
+    expect(armsFor(undefined).rows.map((row) => row.change.kind)).toEqual(['park-cars-lobby', 'spread-cars']);
     const offered = armsFor({ target: OTHER, driving: PLAIN });
     expect(offered.rows.map((row) => row.change.kind)).toEqual([
       'park-cars-lobby',
+      'spread-cars',
       'switch-dispatcher',
     ]);
   });
 
   it('carries the whole profile on the row, because that is what the record carries', () => {
-    const [, handover] = armsFor({ target: OTHER, driving: PLAIN }).rows;
+    const handover = armsFor({ target: OTHER, driving: PLAIN }).rows.at(-1);
     expect(handover?.change).toEqual({ kind: 'switch-dispatcher', profile: OTHER });
     /* The name, never the id — a player hands the day to somebody, not to a key in a data file. */
     expect(handover?.label).toContain('Lobby anchor');
     expect(handover?.label).not.toContain('other');
     expect(handover?.refusal).toBeUndefined();
+  });
+
+  it('carries the caller’s unpostable reason onto the row as a note, disabling nothing — #338', () => {
+    const handover = stageInterventionsOf({
+      interventions: [],
+      simTimeS: 0,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      switchTo: { target: OTHER, driving: () => PLAIN, unpostable: 'A day handed to Lobby anchor cannot be posted.' },
+    }).rows.at(-1);
+    expect(handover?.note).toBe('A day handed to Lobby anchor cannot be posted.');
+    expect(handover?.refusal).toBeUndefined();
+    expect(armsFor({ target: OTHER, driving: PLAIN }).rows.at(-1)?.note).toBeUndefined();
   });
 
   it('refuses a handover to the vector already driving, and says why', () => {
@@ -1324,7 +1340,7 @@ describe('stageCarRestBarOf — where the mark lands and how big it gets', () =>
 /**
  * **The goal strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
  *
- * The charter names P3 as the pillar this build fails outright, and its refusal test is *where on
+ * The charter named P3 as the pillar this build failed outright — re-adjudicated on GitHub issue #277's landing, `docs/22` § 2 — and its refusal test is *where on
  * the stage would a player have seen this?* Before this strip the answer was nowhere: the day asks
  * five things, the brief lists them, the report grades them, and `grep -ni "goal"` over the stage's
  * two files returned nothing at all.

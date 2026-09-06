@@ -10,7 +10,8 @@
  * [§ D159](../../../../DECISIONS.md)'s second false-negative variant, and issue #255's holdout
  * split reproduced it immediately at the next level up. When this module was written there were
  * **three** separate statements of *run the tuning batch, and run the holdout batch only if it met
- * every bar* — `campaign.test.ts#playToVerdict`, `judge.test.ts`'s inline sweep, and the one
+ * every bar* — `campaign.test.ts#playToVerdict` (now `campaign.test-helper.ts#playToVerdict`,
+ * since GitHub issue #356 split that file), `judge.test.ts`'s inline sweep, and the one
  * `dev/campaignPanel.ts` did not have, which is the regression this closes. Three copies of a rule
  * that decides whether a player cleared a stage is three places for it to drift.
  *
@@ -32,7 +33,8 @@
  * halves, so a stage that missed a bar on the runs the player made is refused whatever the holdout
  * says. Running fifty more replications to learn nothing would double the cost of the common case,
  * which on this surface is a minute of a player's time and in the suite is every sweep in
- * `campaign.test.ts`. What it costs is stated rather than glossed: on a refused stage nothing is
+ * the played-stage suites beside `campaign.test.ts` — `stageFiveClears.test.ts` above all. What it
+ * costs is stated rather than glossed: on a refused stage nothing is
  * known about the holdout seeds, and {@link StageSequenceOutcome.verdict}'s `holdout` is `null` —
  * which `judge.ts` already defines as a refusal rather than a pass, and which a surface must
  * report as *not run* rather than as *held*.

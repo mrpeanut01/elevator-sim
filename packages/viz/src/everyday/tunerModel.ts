@@ -6,7 +6,7 @@
  * ## It is a thing you do to a day, not a place you live
  *
  * § 3.2 is explicit: **Tune the tower is not a rail item.** It is reached from the brief
- * (*Take it to the sandbox*) and from the report's third lever, and an earlier draft of the guide
+ * (*Change it anyway — the day stops counting*, once *Take it to the sandbox*) and from the report's third lever, and an earlier draft of the guide
  * listed it in the rail — which that section names as its own mistake. `rail.ts` therefore has no
  * row for it and this lane adds none; the screen is registered and routable, and the two doors into
  * it arrive with the brief and the report.

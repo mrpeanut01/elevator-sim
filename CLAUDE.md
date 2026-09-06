@@ -77,15 +77,60 @@ verdict:
   of those were already wrong in the published row — the deep tier's surface count is **31**, not 30,
   because `campaign/judge.ts#judgeStage` speaks in no other tier, and *0 violations* had stopped
   being true of the deep half the day the temporal axis landed. The current figures, **measured on the
-  integrated tree after wave J** against a base that was re-measured first ([§ D442](DECISIONS.md));
+  integrated tree after wave T** against a base that was re-measured first (the habit § D442 set);
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **584 239** | **606** | **56** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **728 743** | **4 710** | **57** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **589 825** | **606** | **56** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **735 583** | **4 710** | **57** | **0** | **green**, and the register is empty |
+
+  **Wave T's move is 114 strings a case in both tiers, it was decomposed by a probe rather than by
+  a forecast, and the probe found three strings the guards had passed.** Measured on the integrated
+  tree after wave T, both tiers in one sitting, with the base at `36255b4` re-measured first in a
+  detached worktree — where it reproduced its published row **exactly in both tiers**, the **tenth**
+  consecutive wave that has held.
+
+  | | base `36255b4` | wave T | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 584 239 | **589 825** | **+5 586** | **114.0** |
+  | deep strings | 728 743 | **735 583** | **+6 840** | **114.0** |
+  | surfaces | 56 / 57 | **56 / 57** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **No lane forecast this move, because there were no lanes**: one worker built thirteen issues
+  serially, so the decomposition was taken after the fact by rendering one corpus case on each tree
+  and diffing the seeded fields by adapter. It sums to the string:
+
+  - `everyday/settingsView.ts#settingsScreenViewOf` — **+95**: GitHub issue #229's default-speed
+    row (three strings) and clear row (three, two while booting) across the six existing account
+    arms, plus two new arms, `armed` and `cleared`, carrying the clear arc's other states.
+  - `everyday/stageScreenModel.ts#stageHeaderOf` — **+13**: #352's *spread the cars* row over the
+    three existing states (two strings each), and #338's `unpostable` state (seven).
+  - `fixit/engine.ts#classifyOutcome` — **+3 then +6**: #351's two disclosure arms and #350's
+    demand basis line, and then #348's three as-built words, seeded after the probe.
+  - `live/bands.ts#moodAt` — **+1**: the Engineer strip's spread button.
+  - `everyday/buildNotes.ts#buildNotesViewOf` — **−1**: #246's build line in, #229's two register
+    entries out.
+
+  95 + 13 + 6 + 1 − 1 = 114.
+
+  **The probe's finding is the part worth keeping.** Its first pass read **111**, and the three
+  missing were `FIXIT_SCREEN_COPY`'s as-built keys: in the FIXIT adapter's `covers`, classified as
+  driven by `derive.test.ts`, and reached by nothing, because their only reader is a mount. The
+  adapter now seeds them by name and the tree was re-measured; the interim 111-a-case figures
+  (589 678 and 735 403) were correct for the tree they were taken on and are not the row. **Being
+  in `covers` is not being swept**, which is wave G's lesson one step along: that wave said seeding
+  is not checking, and this one says a claim of seeding is not seeding.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical, nothing
+  added, nothing removed, on a wave that put a playing canvas on the fix-it screen, two rows on
+  Settings, an intervention on the stage and a build line on the panel. Every one of them went into
+  an adapter that already existed. The deep tier's one-surface lead survives and the diff names it:
+  `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is in
+  always-on and not in deep.
 
   **Wave S's move is the first this row has recorded that is deliberately *not* a per-case constant,
   and the lane forecast it exactly anyway.** Measured on the integrated tree after wave S, both tiers
@@ -708,7 +753,7 @@ verdict:
   the Day report and the live-metrics panel became mode-aware for GitHub issues #110 and #100, and
   both adapters now render **both** registers on every case, which is where the always-on tier's
   string count moved to 278 756. A null is a measurement of a tree, not a property of the axis)*,
-  **33 statically swept DOM entry points** are not driven *(**17** mounts and **16**
+  **34 statically swept DOM entry points** are not driven *(**18** mounts and **16**
   screen-registry rows, derived by `packages/viz/src/honesty/derive.test.ts` rather than
   transcribed, and published in this verdict as three until [§ D421](DECISIONS.md) measured it —
   the screen rows' pure halves **are** driven, so what goes unswept in both groups is only what the

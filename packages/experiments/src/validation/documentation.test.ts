@@ -1177,12 +1177,30 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * And the stages the paired sweep actually plays, by name. The cell used to say "4, 5 and 6
      * only" and `campaign.test.ts` plays five; a cell that undercounts its own coverage is the same
      * defect as one that overcounts it, and only one of the two flatters anybody.
+     *
+     * Read off **every** `*.test.ts` in `campaign/` rather than off `campaign.test.ts` by name:
+     * GitHub issue #356 split the played stages out of that file, one per stage, and a check that
+     * still read the one file would have parsed no `describe` at all and said so — the premise
+     * assertion below is what would have gone red. The directory is the population, so a played
+     * stage added in a new file reaches the cell without this case being edited again. Deduplicated,
+     * because stage 5 is one played stage in two files (`stageFiveCredential.test.ts` and
+     * `stageFiveClears.test.ts`, the second holding the sweep on its own for cost) and both carry
+     * the title.
      */
+    const campaignDir = join(ROOT, 'packages', 'viz', 'src', 'campaign');
     const played = [
-      ...read('packages', 'viz', 'src', 'campaign', 'campaign.test.ts').matchAll(
-        /describe\('stage (\d+), played/gu,
+      ...new Set(
+        readdirSync(campaignDir)
+          .filter((file) => file.endsWith('.test.ts'))
+          .flatMap((file) =>
+            [
+              ...read('packages', 'viz', 'src', 'campaign', file).matchAll(
+                /describe\('stage (\d+), played/gu,
+              ),
+            ].map((match) => Number(match[1])),
+          ),
       ),
-    ].map((match) => Number(match[1]));
+    ];
     expect(played.length, 'no played-stage suites parsed, so this case is checking nothing')
       .toBeGreaterThan(0);
     const listed = /plays stages \*\*([\d, and]+)\*\* by name/u.exec(table);
@@ -1477,6 +1495,14 @@ type DecisionReservation = {
  * though two numbers below the highest were holes. They were unlanded. Three separate lanes
  * reported the resulting red as an integrator action, each computing it from this file's own
  * arithmetic rather than running it, and each was right.
+ */
+/**
+ * **Wave T's block: D497 to D502, six numbers for thirteen issues, and the block is closed on the
+ * same commit that opened it.** One integrator worked the batch serially rather than dispatching
+ * lanes, so the reservation exists only so the charter row's arithmetic is the same as every other
+ * wave's: the row names the floor while the block is open and highest + 1 once it is reconciled.
+ * Six of the thirteen issues reached past their own module and took a number; the other seven are
+ * recorded in their docstrings under § D405.
  */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*

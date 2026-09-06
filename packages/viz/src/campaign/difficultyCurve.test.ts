@@ -41,7 +41,8 @@
  *
  * The stage list is `data/campaign.json`, the rates are `data/scenario-goals.json`, and *which kinds
  * are non-comparative* is `scenario/goals.ts#isPerReplicationGoal` rather than five names written
- * down here — the same reason `campaign.test.ts` derives its subject stage instead of naming it. An
+ * down here — the same reason `countGoalStage.test.ts` derives its subject stage instead of naming it.
+ * An
  * eighth goal kind, a regenerated table or a stage added to the campaign all reach this check
  * without an edit, which is the only way a curve rule stays a measurement.
  *

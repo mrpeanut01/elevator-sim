@@ -244,6 +244,8 @@ import {
   toggleRepair,
   type FixitMeasurement,
 } from '../fixit/engine.js';
+import { demandDisclosureOf } from '../fixit/parse.js';
+import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
@@ -277,6 +279,7 @@ import { honestyAt } from '../live/honesty.js';
 import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
+  SPREAD_CARS_LABEL,
   RECOMPUTING_BEAT,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
@@ -1299,6 +1302,7 @@ const LIVE_RAIL: SurfaceAdapter = {
     'live/timeline.ts#timelineOf',
     'live/timeline.ts#phaseAt',
     'live/interventions.ts#PARK_CARS_LOBBY_LABEL',
+    'live/interventions.ts#SPREAD_CARS_LABEL',
     'live/interventions.ts#switchDispatcherLabelOf',
     'live/interventions.ts#SWITCH_PINS_NOTE',
     'live/interventions.ts#RECOMPUTING_BEAT',
@@ -1327,6 +1331,8 @@ const LIVE_RAIL: SurfaceAdapter = {
      * by a guard in the caller.
      */
     seeds.push({ field: 'interventionButton.label', text: PARK_CARS_LOBBY_LABEL, role: 'label' });
+    // The opposite verb — GitHub issue #352 — derived from the rules vocabulary, swept as a label.
+    seeds.push({ field: 'spreadButton.label', text: SPREAD_CARS_LABEL, role: 'label' });
     /*
      * The strip's other two controls and its beat — the log's second and third change kinds.
      *
@@ -1348,13 +1354,14 @@ const LIVE_RAIL: SurfaceAdapter = {
     seeds.push({ field: 'switchButton.title', text: SWITCH_PINS_NOTE, role: 'observation' });
     seeds.push({ field: 'interventionStamp.recomputing', text: RECOMPUTING_BEAT, role: 'observation' });
     /*
-     * One log carrying all three kinds, stamped across the run, so every stamp sentence enters the
+     * One log carrying all four kinds, stamped across the run, so every stamp sentence enters the
      * corpus at the playheads that can show it — and the deliberate `''` before the first, which is
      * what keeps `interventionStampOf`'s temporal property met by construction.
      */
     const third = (recording.endedAt - recording.startedAt) / 3;
     const interventionLog = [
       { atS: recording.startedAt + third, change: { kind: 'park-cars-lobby' } as const },
+      { atS: recording.startedAt + third * 1.25, change: { kind: 'spread-cars' } as const },
       {
         atS: recording.startedAt + third * 1.5,
         change: {
@@ -6530,6 +6537,21 @@ const FIXIT_COVERS: readonly string[] = [
   'fixit/engine.ts#repairRowOf',
   'fixit/engine.ts#STANDING_EXTRAS',
   'fixit/engine.ts#BASIS_LINE',
+  /*
+   * GitHub issue #350's second basis line and the choice between the two: the outcome's `basis`
+   * is `DEMAND_BASIS_LINE` on a selection that changes the crowd, and the adapter renders that
+   * arm by classifying a measurement whose `sameCrowd` is false. `selectionKeepsTheCrowd` is the
+   * predicate the screen asks before it draws the pair, and its only string is the one of these two
+   * it selects.
+   */
+  'fixit/engine.ts#DEMAND_BASIS_LINE',
+  'fixit/engine.ts#selectionKeepsTheCrowd',
+  /*
+   * GitHub issue #351's demand disclosure, derived from the case's rate against the building's
+   * authored band and rendered below in both arms — busier and quieter — because a declaration
+   * that is only ever swept on one side is half a surface.
+   */
+  'fixit/parse.ts#demandDisclosureOf',
   // Driven through the rows above: `repairRowOf` asks `affordabilityOf`, which sums `spendOf`,
   // and the states the adapter renders are built by the two toggles rather than written by hand.
   'fixit/engine.ts#spendOf',
@@ -6625,6 +6647,17 @@ const FIXIT: SurfaceAdapter = {
       complaint: { ...entry.complaint, measure: { ...entry.complaint.measure, kind: 'mean-wait' } },
     };
 
+    /* ---- § D478's derived declaration, both directions it can point (GitHub issue #351) ---- */
+    for (const [name, rate, band] of [
+      ['busier', 9.5, { min: 3, max: 7 }],
+      ['quieter', 2, { min: 11, max: 15 }],
+    ] as const) {
+      const disclosure = demandDisclosureOf(rate, band);
+      if (disclosure !== undefined) {
+        seeds.push({ field: `demand.disclosure.${name}`, text: disclosure, role: 'prose' });
+      }
+    }
+
     /* ---- affordability and the budget notes, on states the reducers themselves build ---- */
     const empty = emptyFixitState();
     let spent = toggleRepair(entry, empty, 's-costly');
@@ -6679,7 +6712,7 @@ const FIXIT: SurfaceAdapter = {
     }
 
     /* ---- the three outcomes a green pair cannot produce, worded against fabricated measures ---- */
-    const flat: FixitMeasurement = {
+    const flatSameCrowd = (): FixitMeasurement => ({
       complaintBefore: 10,
       complaintAfter: 1,
       scopeBoardedBefore: 40,
@@ -6690,7 +6723,16 @@ const FIXIT: SurfaceAdapter = {
       restBoardedBefore: 120,
       restBoardedAfter: 120,
       restDeltaPoints: -5,
-    };
+      sameCrowd: true,
+    });
+    const flat = flatSameCrowd();
+    /* ---- the basis a demand-side repair earns — a fixed outcome on a pair that changed crowd ---- */
+    seeds.push({
+      field: 'outcome.demand.basis',
+      text: classifyOutcome(entry, { ...flatSameCrowd(), sameCrowd: false }, spendOf(entry, empty)).basis,
+      role: 'reason',
+      provenance: 'authored',
+    });
     const worse = classifyOutcome(entry, flat, spendOf(entry, empty));
     const short = classifyOutcome(
       entry,
@@ -6722,6 +6764,16 @@ const FIXIT: SurfaceAdapter = {
      * panel's is). The states are built by the engine's own reducers wherever a reducer can reach
      * them, on this adapter's established habit.
      * ================================================================== */
+
+    /*
+     * The as-built stage's three words — GitHub issue #348. Authored in the copy table so they are
+     * sweepable, and seeded here directly because their only reader is `everyday/asBuiltStage.ts`,
+     * a mount, which the search cannot drive; the rail and bar models below reach the table's other
+     * keys, and these three would otherwise be in `covers` and in nothing's output.
+     */
+    seeds.push({ field: 'asBuilt.eyebrow', text: FIXIT_SCREEN_COPY.asBuiltStageEyebrow, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'asBuilt.note', text: FIXIT_SCREEN_COPY.asBuiltStageNote, role: 'prose', provenance: 'authored' });
+    seeds.push({ field: 'asBuilt.skip', text: FIXIT_SCREEN_COPY.asBuiltStageSkip, role: 'label', provenance: 'authored' });
 
     /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
     for (const [where, solvedIds] of [
@@ -8206,6 +8258,15 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * mentions.
      */
     'everyday/settingsView.ts#NAME_NOTE',
+    /*
+     * GitHub issue #229's two rows. The default-speed row's copy and the clear row's three stages
+     * are all reached below: the `armed` and `cleared` cases carry the clear arc's other two
+     * states and a default speed moved off the stage's own, so neither row is swept in one state
+     * only.
+     */
+    'everyday/settingsView.ts#DEFAULT_SPEED_ROW_COPY',
+    'everyday/settingsView.ts#CLEAR_PROGRESS_COPY',
+    'everyday/settingsView.ts#clearRowOf',
   ],
   render(context) {
     void context;
@@ -8276,6 +8337,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       ],
       /* A store that keeps nothing: the profile is real for this tab and says so. Signed in and named. */
       ['not-durable', { profile: stored, durable: false, reduceMotion: false, account: named, accountServer: true }],
+      /*
+       * GitHub issue #229's two rows in their other states: a default speed moved off the stage's
+       * own rung, and the clear row armed and then cleared. The `ready` and `booting` arms are the
+       * cases above; these are the words a player meets only after pressing.
+       */
+      ['armed', { profile: stored, reduceMotion: false, defaultSpeedSimPerRealS: 90, clearStage: 'armed' }],
+      ['cleared', { profile: undefined, reduceMotion: false, clearStage: 'cleared' }],
     ] as const;
 
     for (const [label, input] of cases) {
@@ -8341,6 +8409,12 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
         seeds.push({ field: `${at}.label`, text: fact.label, role: 'label' });
         seeds.push({ field: `${at}.value`, text: fact.value, role: 'label' });
         seeds.push({ field: `${at}.note`, text: fact.note, role: 'prose' });
+      }
+      /* The clear row — GitHub issue #229 — in whichever of its four states this case is in. */
+      seeds.push({ field: `${label}.device.clear.label`, text: view.device.clear.label, role: 'label' });
+      seeds.push({ field: `${label}.device.clear.note`, text: view.device.clear.note, role: 'prose' });
+      if (view.device.clear.button !== undefined) {
+        seeds.push({ field: `${label}.device.clear.button`, text: view.device.clear.button, role: 'label' });
       }
     }
 
@@ -8933,6 +9007,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
+    /*
+     * GitHub issue #338: the sentence a handover row carries when its target cannot travel to a
+     * board, drawn before the press. Rendered below on a hand-tuned target, which is the one
+     * arm that produces it.
+     */
+    'scope/switchWire.ts#switchUnpostableReasonOf',
     'everyday/stageScreenModel.ts#STAGE_RACE_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
@@ -9010,6 +9090,18 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         : ([
             ['offered', { target: elsewhere, driving: () => driving }],
             ['already', { target: driving, driving: () => driving }],
+            /* A hand-tuned target: the arm is offered and its note says the day will not post. */
+            [
+              'unpostable',
+              {
+                target: { ...elsewhere, id: 'saved-tuned', name: 'Tuned by hand', weights: { ...elsewhere.weights, waitTime: 0.61 } },
+                driving: () => driving,
+                unpostable: switchUnpostableReasonOf(
+                  { ...elsewhere, id: 'saved-tuned', name: 'Tuned by hand', weights: { ...elsewhere.weights, waitTime: 0.61 } },
+                  context.dispatcherProfiles.profiles,
+                ),
+              },
+            ],
           ] as const)),
     ];
     for (const [state, switchTo] of switchStates) {
@@ -9036,6 +9128,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           seeds.push({
             field: `stage.intervene(${state}).${arm.change.kind}.refusal`,
             text: arm.refusal,
+            role: 'reason',
+          });
+        }
+        if (arm.note !== undefined) {
+          seeds.push({
+            field: `stage.intervene(${state}).${arm.change.kind}.note`,
+            text: arm.note,
             role: 'reason',
           });
         }
@@ -10010,6 +10109,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
     'everyday/briefView.ts#raceAgainstCard',
     'everyday/briefView.ts#lockedForScore',
+    /* GitHub issue #225's door into the sandbox, drawn on the brief once the tuner is built. */
+    'everyday/briefView.ts#SANDBOX_DOOR_LABEL',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
     'everyday/world.ts#percentileLine',
@@ -10907,6 +11008,8 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     'everyday/buildNotes.ts#buildNotesViewOf',
     'everyday/buildNotes.ts#buildNotesSummaryOf',
     'everyday/buildNotes.ts#BUILD_NOTES_POINTER',
+    /* GitHub issue #246's build line, reached through `view.build`; under the corpus, the unbuilt arm. */
+    'release/version.ts#buildVersionLineOf',
     'everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES',
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
     'everyday/stageScreenModel.ts#STAGE_ABSENCES',
@@ -10922,6 +11025,8 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     seeds.push({ field: 'buildNotes.heading', text: view.heading, role: 'label' });
     seeds.push({ field: 'buildNotes.summary', text: buildNotesSummaryOf(view), role: 'label' });
     seeds.push({ field: 'buildNotes.lede', text: view.lede, role: 'prose' });
+    // GitHub issue #246: the build line, which under the corpus reads the unbuilt arm.
+    seeds.push({ field: 'buildNotes.build', text: view.build, role: 'prose' });
     /*
      * The front door's one remaining sentence about all this. It is drawn on the menu rather than
      * on the panel, and it is seeded here because it is the panel's constant and the menu is a DOM

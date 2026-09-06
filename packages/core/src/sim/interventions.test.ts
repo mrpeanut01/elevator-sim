@@ -126,6 +126,70 @@ describe('an intervention changes the future and only the future', () => {
   }, 60_000);
 });
 
+/*
+ * The fourth kind — GitHub issue #352 — is the park arm with the opposite verb, and it is asserted
+ * on the same four properties. `garden-apartments` again: `collective` authors no `idle` section,
+ * so the override replaces `stay` with `zone-center` and every idle car heads for the middle of
+ * its shaft instead of standing where it last stopped.
+ */
+describe('spread-cars changes the future and only the future', () => {
+  const SPREAD: RunInterventionConfig['change'] = { kind: 'spread-cars' };
+  const AT_S = 600;
+  const SEED = 20260726;
+
+  it('keeps every leg boarded before atS byte-identical, and moves the run after it', () => {
+    const baseline = runSimulation(run('garden-apartments', 'collective', SEED));
+    const spread = runSimulation(
+      run('garden-apartments', 'collective', SEED, {
+        interventions: [{ atS: AT_S, change: SPREAD }],
+      }),
+    );
+    expect(spread.record.passengers.length).toBe(baseline.record.passengers.length);
+    const prefix = (result: SimulationResult): string =>
+      JSON.stringify(legsOf(result).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S));
+    expect(legsOf(baseline).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S).length)
+      .toBeGreaterThan(0);
+    expect(prefix(spread)).toBe(prefix(baseline));
+    expect(JSON.stringify(legsOf(spread))).not.toBe(JSON.stringify(legsOf(baseline)));
+  }, 60_000);
+
+  it('is the opposite verb: a spread day and a parked day move different legs', () => {
+    const parked = runSimulation(
+      run('garden-apartments', 'collective', SEED, { interventions: [{ atS: AT_S, change: PARK }] }),
+    );
+    const spread = runSimulation(
+      run('garden-apartments', 'collective', SEED, { interventions: [{ atS: AT_S, change: SPREAD }] }),
+    );
+    expect(JSON.stringify(legsOf(spread))).not.toBe(JSON.stringify(legsOf(parked)));
+  }, 60_000);
+
+  it('the later of the two parking kinds is the one in force — one control, two settings', () => {
+    // Park at 600 s then spread at 900 s must equal spread at 900 s alone from 900 s on; and the
+    // whole run must differ from the park alone, or the second press was inert.
+    const parkThenSpread = runSimulation(
+      run('garden-apartments', 'collective', SEED, {
+        interventions: [
+          { atS: AT_S, change: PARK },
+          { atS: 900, change: SPREAD },
+        ],
+      }),
+    );
+    const parked = runSimulation(
+      run('garden-apartments', 'collective', SEED, { interventions: [{ atS: AT_S, change: PARK }] }),
+    );
+    expect(JSON.stringify(legsOf(parkThenSpread))).not.toBe(JSON.stringify(legsOf(parked)));
+    const prefix = (result: SimulationResult): string =>
+      JSON.stringify(legsOf(result).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < 900));
+    expect(prefix(parkThenSpread)).toBe(prefix(parked));
+  }, 60_000);
+
+  it('replays the same record to the same fingerprint (invariant 5)', () => {
+    const record = (): SimulationConfig =>
+      run('garden-apartments', 'collective', SEED, { interventions: [{ atS: AT_S, change: SPREAD }] });
+    expect(fingerprint(runSimulation(record()))).toBe(fingerprint(runSimulation(record())));
+  }, 60_000);
+});
+
 describe('a run that asked for nothing is the run it was', () => {
   it('is byte-identical with the field absent and with interventions: []', () => {
     // The structural identity the config docstring promises: an empty log schedules nothing,
@@ -479,6 +543,6 @@ describe('an unknown change kind is refused before any event fires', () => {
           interventions: [{ atS: 600, change }],
         }),
       ),
-    ).toThrow(/reverse-gravity.*park-cars-lobby, switch-dispatcher, answer-incident/su);
+    ).toThrow(/reverse-gravity.*park-cars-lobby, switch-dispatcher, answer-incident, spread-cars/su);
   }, 60_000);
 });

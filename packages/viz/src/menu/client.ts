@@ -130,10 +130,11 @@ export interface RunSubmission {
    * and refuses a submission whose metrics do not reproduce. Without this field it re-simulated the
    * seed without the log, got different legs, and refused an honest run as a forgery.
    *
-   * Only `park-cars-lobby` travels. A `switch-dispatcher` carries a whole weight vector inline,
-   * which is the cheat `RunSubmission`'s ids exist to prevent; an `answer-incident` answers a
-   * campaign incident that is on no wire, so a replay would have the answer and not the thing
-   * answered. `scope/runIdentity.ts` still refuses both, naming which.
+   * Three kinds travel: the two parking kinds carry nothing but their instant, and a
+   * `switch-dispatcher` carries the shipped id its target resolves to plus the player's rows
+   * (§ D486). An `answer-incident` answers a campaign incident that is on no wire, so a replay
+   * would have the answer and not the thing answered; `scope/runIdentity.ts` refuses it, and that
+   * refusal is permanent.
    */
   readonly interventions?: readonly SubmittedIntervention[] | undefined;
 }
@@ -153,10 +154,25 @@ export interface SubmittedRuleRow {
   readonly thenValue?: number | string | undefined;
 }
 
-/** One entry of the run record's log — `{ atS, change }`, contract § 1.4. */
+/**
+ * One entry of the run record's log — `{ atS, change }`, contract § 1.4.
+ *
+ * A `switch-dispatcher` travels as **an id plus rows** rather than as the inline profile `core`'s
+ * arm carries (GitHub issue #338, § D486): `scope/switchWire.ts#switchWireOf` is the translation,
+ * and `scope/runIdentity.ts` refuses a state whose switch cannot be translated before it reaches
+ * this shape. The server re-derives the vector through its own `profileWithRules`, exactly as it
+ * does for the run's base profile.
+ */
 export interface SubmittedIntervention {
   readonly atS: number;
-  readonly change: { readonly kind: string };
+  readonly change:
+    | { readonly kind: 'park-cars-lobby' }
+    | { readonly kind: 'spread-cars' }
+    | {
+        readonly kind: 'switch-dispatcher';
+        readonly toProfileId: string;
+        readonly ruleRows?: readonly SubmittedRuleRow[] | undefined;
+      };
 }
 
 export interface ClaimedMetrics {

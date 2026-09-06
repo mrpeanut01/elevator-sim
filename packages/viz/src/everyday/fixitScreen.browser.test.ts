@@ -97,6 +97,14 @@ async function openFixit(page: Page): Promise<void> {
    * last thing the open produces. The screen's own busy state is asserted by the cases that watch
    * a **second** case being opened, where the transient is the subject rather than the wait.
    */
+  /*
+   * GitHub issue #348: the case opens on the as-built run **played**, and the four figures are
+   * stated only once it has been watched or skipped. This walk skips it, so the cases below start
+   * where they always did — on the figures. The case that is *about* the stage is the one that
+   * does not skip.
+   */
+  await page.waitForSelector('.everyday-fixit-skip', { timeout: 120_000 });
+  await page.click('.everyday-fixit-skip');
   await page.waitForFunction(
     () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
     undefined,
@@ -192,6 +200,53 @@ async function primaryStates(page: Page): Promise<readonly PrimaryState[]> {
 }
 
 describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () => {
+  /**
+   * **PM-FB1, GitHub issue #348 — the as-built run plays before the four figures are stated.** Three
+   * claims: the stage is up and painting before any figure exists; the skip lands on exactly four
+   * figures rather than on nothing; and a case re-opened later opens on the figures, because the
+   * sight was seen once. The figures being read from the same recording the stage played is
+   * `fixitScreen.ts`'s construction — one `session.asBuilt` — and a run count would be the test of
+   * it if the screen could run twice; the worker is asked once per case and the timeline asserts
+   * that in the *keeps painting* case below.
+   */
+  it('plays the as-built run on a stage before the figures, and Skip lands on the figures', async () => {
+    const page = await coldLoad();
+    try {
+      await page.locator('.everyday-mode[data-screen="fixit"]').click();
+      await page.waitForSelector('.everyday-fixit-stage-canvas', { timeout: 120_000 });
+      // Painting, and no figure yet: the problem arrives as a sight before it is a number.
+      await page.waitForFunction(
+        () => {
+          const canvas = document.querySelector<HTMLCanvasElement>('.everyday-fixit-stage-canvas');
+          return canvas !== null && canvas.width > 0 && canvas.height > 0;
+        },
+        undefined,
+        { timeout: 30_000 },
+      );
+      expect(await page.locator('.everyday-fixit-figure').count()).toBe(0);
+      expect(await page.textContent('.everyday-fixit-stage')).toContain('WATCH IT AS IT STANDS');
+      await page.click('.everyday-fixit-skip');
+      await page.waitForFunction(
+        () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
+        undefined,
+        { timeout: 30_000 },
+      );
+      expect(await page.locator('.everyday-fixit-stage').count()).toBe(0);
+      // Away and back: the figures, not the stage — seen once is seen.
+      await page.click('.everyday-rail-menu');
+      await page.waitForSelector('.everyday-mode[data-screen="fixit"]');
+      await page.locator('.everyday-mode[data-screen="fixit"]').click();
+      await page.waitForFunction(
+        () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
+        undefined,
+        { timeout: 30_000 },
+      );
+      expect(await page.locator('.everyday-fixit-stage').count()).toBe(0);
+    } finally {
+      await page.close();
+    }
+  });
+
   it('draws the case rail, the complaint, the figures and the diagnosis inside the shell', async () => {
     const page = await coldLoad();
     try {

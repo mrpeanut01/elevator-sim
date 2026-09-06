@@ -32240,7 +32240,8 @@ difference between reading the next excursion off a log and re-deriving it from 
 
 **The second finding is the same error committed in prose.** `vitest.config.ts` named two cases as
 *"already past this ceiling under load"* at 490 s and 348 s against 300 s. Both carry an explicit
-per-test timeout overriding the project default — `campaign/campaign.test.ts:866` closes
+per-test timeout overriding the project default — `campaign/campaign.test.ts:866` (since #356's split,
+`campaign/stageFiveClears.test.ts`; the annotation is unchanged) closes
 `}, 3_000_000);` and `campaign/stageSequence.test.ts:187` closes `}, 900_000);` — so the headroom is
 6.1× and 2.6× and neither can produce the red the paragraph predicts. **It is the third stale
 refusal in that one docstring**, after the `experiments` sentence and the `cli` sentence, and it is
@@ -32872,7 +32873,8 @@ Each of the 89 joined to what it governs in run A: **64** to a case by title, **
 of it.** The only thing an over-annotation costs is *failure latency on a hang* — a hung case at
 600 s takes ten minutes to go red instead of five — which is the same trade `SIMULATING_TIMEOUT_MS`'s
 docstring already makes in the paragraph beginning *"What it costs, stated rather than glossed"*.
-The two annotations doing real work are `campaign/campaign.test.ts:866` and
+The two annotations doing real work are `campaign/campaign.test.ts:866` (`stageFiveClears.test.ts`
+since #356's split) and
 `campaign/stageSequence.test.ts:187`, which are the two the retraction that produced this issue
 names.
 
@@ -33269,3 +33271,167 @@ week, deliberately and by § D382's own argument — while the handoff's Sandbox
 (`:1568`, growth 1). That is a product judgement about what Free Play is **for**, it is not what #225
 asks, and answering it here would be settling a second question inside the first. It is named so the
 next reader finds it named rather than discovering it.
+
+## D497 — a purchase may not change the crowd, the diagnosed repair may, and the pair's basis line says which it did
+
+**Date: 2026-09-06 · Owner: the integrator, wave T · Rules on: GitHub issue #349, `docs/35` PM-FB3,
+`fixit/parse.ts`, `fixit/engine.ts#DEMAND_BASIS_LINE`, `fixit/run.ts#assertPairMatchesRepairs`.**
+
+#349 asked `fixit/parse.ts` to refuse any repair whose patch carries `floorPopulations`, because the
+fix-it pair's basis line promises that both runs met the same crowd and a population patch would make
+that promise false. The refusal was written as asked and run once over `data/fixit-cases.json`, and it
+refused three shipped cases: `one-start-time`, `every-letter-says-nine` and `let-faster-than-the-lifts`.
+Each of the three is the case's diagnosed repair, and each is the whole lesson of its case. Staggering
+tenancy start times is a change to who arrives when; it cannot be expressed as fabric.
+
+### The ruling
+
+The refusal stands on the three fabric roles (`costly-fix`, `cheap-fix`, `new-shaft`), because a
+purchase cannot move a person out of the peak and a purchase that claimed to would be a lie the pair
+could not measure. It is lifted for the diagnosed repair. When a selected repair changes the crowd,
+the outcome's basis line is `DEMAND_BASIS_LINE` rather than `BASIS_LINE`; it says the crowd changed
+and that the figures compare two different days rather than one day under two buildings.
+`assertPairMatchesRepairs` runs at both press sites and throws if the recorded pair disagrees with what
+the selection promised, in either direction. So the claim is asserted per press rather than argued
+per file.
+
+### Why not a blanket refusal with three exemptions
+
+An allowlist of case ids is a register that goes stale the day a fourth case is authored. Keying the
+permission on the role reads the rule off the data the case already carries, and § 10.6's rule that
+there is exactly one diagnosed repair per case makes the permitted set exactly one repair wide.
+
+## D498 — the crowd is the first legs, keyed on where the journey ends, and the recording grew two fields to say so
+
+**Date: 2026-09-06 · Owner: the integrator, wave T · Rules on: GitHub issue #350, `docs/35` PM5,
+`record/crowd.ts`, `contract/types.ts` schema version 11 (`VizLeg.legIndex`,
+`VizLeg.finalDestinationFloorId`), `dev/main.ts#applyShift`, `dev/main.ts#scheduleGhost`.**
+
+Three surfaces say two runs met the same crowd: the fix-it pair, the intervention pair and the race.
+#350 asked for one shared assertion over `(passengerId, arrivedAt, originFloorId, destinationFloorId)`
+on every leg. Written that way and run over the shipped fix-it cases, it reported *different* on all
+seven cases set in `secure-tower`, `vertical-city` and `mixed-use-high-rise`, while the repairs on those
+cases touched no population.
+
+### What was actually different
+
+Two things, and neither is the crowd. A transfer leg's `arrivedAt` is the instant the first car dropped
+its rider at the sky lobby, so it is the dispatcher's doing; keying on it compares two dispatchers and
+calls the answer a crowd. And a zoning repair turns a direct `3 → 21` ride into `3 → G` then `G → 21`,
+so the first leg's own destination moves while the person, the instant, the origin and where they
+were going do not.
+
+### The ruling
+
+The crowd is the set of **first** legs, keyed on `(passengerId, arrivedAt, originFloorId,
+finalDestinationFloorId)`, compared in both directions, and two empty recordings are not the same
+crowd. The recording carries `legIndex` and `finalDestinationFloorId` from schema version 11, both
+projections of fields `core` already held. The assertion is called from the three sites the issue
+named. The works-night pairing `docs/35` § 8 describes is #353's and is not built; `crowd.ts` says so
+and owes the sentence's deletion to that commit.
+
+## D499 — the demand declaration is derived from the rate and the band, never authored, and fourteen of eighteen cases needed it
+
+**Date: 2026-09-06 · Owner: the integrator, wave T · Rules on: GitHub issue #351, `docs/35` PM-FB2,
+§ D478, `fixit/parse.ts#demandDisclosureOf`, `data/fixit-cases.json`.**
+
+#351 asked two things of the fix-it cases: that a symptom be written as a sight rather than a figure,
+and that a case set outside its building's declared demand band carry § D478's declaration. The first
+is a rule in `parse.ts` now (`symptomFigureIn`: a numeral, or the words mean, average, median or
+percentile, fails the load), and two shipped symptoms were rewritten to pass it.
+
+The second had a premise to check first. Measured at load time, fourteen of the eighteen shipped
+cases run outside their profile's band, thirteen of them below it. A hand-authored `demandDisclosure`
+key over that many cases is a register that goes stale on the next rate change, and an authored key
+on a case inside its band is a false declaration. So the declaration is derived: `demandDisclosureOf`
+builds it from the rate and the band when the case loads, an authored key is refused, and the
+sentence says busier or quieter and by how much against the band's edges. Both arms are seeded in the
+honesty corpus so neither is swept in one state only.
+
+## D500 — Clear saved progress clears both slots on a second press, seals the Engineer session first, and the two refusals it replaces are deleted rather than reworded
+
+**Date: 2026-09-06 · Owner: the integrator, wave T · Rules on: GitHub issue #229, `docs/34` § 20.12,
+`everyday/settingsView.ts#CLEAR_PROGRESS_COPY`, `everyday/settingsScreen.ts`,
+`everyday/engineerBridge.ts#clearSavedSession`, `dev/main.ts` (`sessionSealed`),
+`everyday/profile.ts` schema version 4.**
+
+Two `SETTINGS_ABSENCES` entries said a thing was buildable and not built. Under § 20.12 a register
+entry that says that is a queue item wearing a refusal, so both rows are built and both entries are
+deleted.
+
+### Default speed
+
+A `defaultSpeedSimPerRealS` field on the profile (schema 4, migrated from 3 by adding the field) and a
+pill on Settings that cycles the stage's own ladder. The stage reads it when it opens. Nothing else
+reads it, and the entry that said the preference *"is buildable now"* is gone because it is.
+
+### Clear saved progress
+
+Two presses rather than a dialog: the first arms the row, the second clears. It clears both slots,
+the Everyday profile and the Engineer session, and then reloads the page. Before the reload the
+Engineer shell seals its session so that no save site can write it back, which is what the old
+refusal was afraid of and what a sentence could never have prevented. The row has four states
+(booting, ready, armed, cleared) and each has its words; the cleared sentence says what survives,
+which is nothing, and what happens to the run on screen, which is that it finishes and is not kept.
+
+### Why deletion rather than rewording
+
+A refusal standing over a control that works tells the player not to press something that does
+something. That is § D227's stale-refusal defect in the direction that costs the player, and the fix
+for it is to remove the sentence on the commit that makes it false.
+
+## D501 — the bundle carries the commit it was built from, the panel and every recording say so, and the release notes are keyed by it
+
+**Date: 2026-09-06 · Owner: the integrator, wave T · Rules on: GitHub issue #246,
+`packages/viz/src/release/version.ts`, `packages/viz/vite.config.ts`, `.github/workflows/deploy-viz.yml`,
+`contract/types.ts#VizRecording.buildVersion`, `record/document.ts`, `everyday/buildNotes.ts`,
+`RELEASE_NOTES.md`.**
+
+A bug report against the deployed site could not say which build it was about. The site carried no
+version, a saved recording carried a schema number and nothing else, and the reader guessed from the
+date.
+
+### The ruling
+
+The build is identified by a commit and not by a version number, because nothing in this tree bumps a
+number and a commit is a fact the repository already holds. The deploy workflow passes the commit it
+is building; a local build asks git; a tree with neither says `unbuilt`, which is a value rather than
+an absence, because a recording stamped `unbuilt` was made outside any shipped bundle and that is a
+fact about where a report came from. The Settings build-information panel draws it as its first line,
+every recording carries it in `buildVersion`, and a recording refused for its schema names the build
+that wrote it. `RELEASE_NOTES.md` is keyed by the same commit, newest first, with a shape guard in
+`validation/releaseNotes.test.ts`.
+
+### What it does not do
+
+Error reports are unbuilt (GitHub issue #242), so the build line is quoted by hand. A schema version
+is still the field that decides whether a file can be read; the build is what a reader quotes, and
+the two are kept separate so that neither has to carry the other's meaning.
+
+## D502 — the annotation census reads test helpers as well as tests, because a moved hook keeps its bound
+
+**Date: 2026-09-06 · Owner: the integrator, on lane #356's argument · Rules on: GitHub issue #356,
+§ D492's deriver, `packages/viz/src/testCost.test-helper.ts`, `campaign/campaign.test-helper.ts`.**
+
+#356 split `campaign/campaign.test.ts`, whose one file was 31.8 % of the `viz` project's serial wall
+clock, into eight files keyed on which batch each case reads, and moved its fixture hook, a
+`beforeAll` bounded at 120 000 ms, into a helper every one of them calls. Read over `*.test.ts`
+alone, § D492's census would have reported that annotation gone: a real bound on a real hook,
+uncounted, which is the class the census exists to stop.
+
+### The ruling
+
+The census population is every file `deadCode.test-helper.ts#isTest` calls a test, which includes
+`*.test-helper.ts`. Measured before the change, no helper in any package carried an annotation of the
+shape the scanner reads, so widening the population moved no figure except by keeping that one. A
+helper is attributed to its package's ordinary project, which is right for the one helper that
+carries an annotation and is stated as a limit rather than a rule.
+
+### What the split found about the issue's own target
+
+The issue's bar, no single file above roughly 15 %, is not reachable by splitting this file.
+`judgeCleared.test.ts` sits at about 16 % on its own and was not in scope, and stage 5's holdout sweep
+is one case at 131.7 s whose last assertion runs over all thirteen profiles, so splitting it would
+change what it asserts. The largest file's share fell from 31.8 % to 16.4 % and the implied
+concurrency ceiling rose from 3.1 to 6.1; every one of the 262 campaign cases moved verbatim, none
+dropped, none added.

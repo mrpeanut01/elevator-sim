@@ -23,6 +23,8 @@ function fakeBridge(): EngineerSettingsBridge & { readonly writes: boolean[] } {
       writes.push(next);
       value = next;
     },
+    clearSavedSession: () => true,
+    reloadPage: () => undefined,
   };
 }
 

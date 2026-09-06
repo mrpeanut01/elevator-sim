@@ -138,8 +138,18 @@ export interface FixitCase {
     readonly complainer: string;
     readonly measure: ComplaintMeasure;
   };
-  /** Printed on the failing band of the schematic (§ 10.1 item 2). */
+  /**
+   * Printed on the failing band of the schematic (§ 10.1 item 2). A **sight**, never a figure —
+   * `parse.ts#symptomFigureIn` is the rule (GitHub issue #351).
+   */
   readonly symptom: string;
+  /**
+   * § D478's declaration, present only on a case whose authored rate falls outside its building's
+   * declared arrival-rate band, and **derived at parse time rather than authored** —
+   * `parse.ts#demandDisclosureOf` says why. Drawn beside the as-built note on both fix-it surfaces,
+   * and swept as player-facing copy.
+   */
+  readonly demandDisclosure?: string | undefined;
   readonly figures: readonly FigureSpec[];
   readonly diagnosis: { readonly text: string; readonly reasoning: string };
   readonly budgetUnits: number;

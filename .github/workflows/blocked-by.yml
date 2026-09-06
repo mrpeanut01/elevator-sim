@@ -1,0 +1,97 @@
+# The blocker check — GitHub issue #329, RISKS.md R45, DECISIONS.md § D485.
+#
+# ## What this exists to stop
+#
+# R45: *a blocker that clears is not an event anything watches for, so work that could have started
+# does not.* #179 closed and five issues stayed labelled *blocked on a server* against a server that
+# was complete and deployed; #280 merged hours after a comment named it as #275's blocker, and #275
+# sat blocked for a week. A resolved blocker produces no event on the issue that named it. This job
+# is that event.
+#
+# ## Why a scheduled workflow and not a test
+#
+# § D485's first constraint: whether an issue is still open needs the network, and the test tiers
+# have none — `everyday/buildNotes.test.ts` says so in its own words. `deep-tiers.yml` is the
+# precedent that scheduled workflows run here, and `review.yml`'s gates job is the shape: a plain
+# Node script with no dependencies, under narrow permissions, so it cannot fail for a reason
+# unrelated to what it checks. No `npm ci` for the same reason as that job.
+#
+# ## What it does and does not do
+#
+# It lists open issues, reads every `Blocked by #N` line from their bodies, asks GitHub whether each
+# named blocker is closed, and comments once on each issue whose blocker has — once, by a marker in
+# the comment body, so a daily run does not nag. It writes the result into the run summary.
+#
+# **It does not fail on an unblocked issue.** That is not a defect in the tree, and a red run over a
+# backlog condition would be R40 wearing a different hat. **It does fail below ten declarations**
+# across all open issues — § D485's vacuity floor — because a parser that matches nothing reports
+# *nothing is unblocked* forever and looks green permanently. A red here means the parser or the
+# backlog has changed shape; read the summary, never the issue list, to find out which.
+#
+# `scripts/blocked-by.mjs` carries the grammar it accepts and the argument for each of those rules;
+# `packages/experiments/src/validation/blockedBy.test.ts` drives its pure half against fixtures,
+# including the direction #329's AC3 names (an issue whose blocker is still open is not reported).
+#
+# ## Permissions, and the one thing this container could not verify
+#
+# `issues: write` is what commenting needs; `contents: read` is what checkout needs; nothing else is
+# granted. § D485 wrote `issues: read` because it had not yet decided the job would comment rather
+# than only report. **Whether this account permits a workflow's `GITHUB_TOKEN` to write issues was
+# not verified from the container that wrote this file** — it had no network and no token — so the
+# first scheduled run is the check. `deep-tiers.yml`'s `report` job carries the same grant, so if
+# that job has ever commented, this one can; if the POST comes back 403 the script fails naming the
+# status rather than reporting the issue as handled. Dispatch it with `dry_run` first if you would
+# rather see what it would post before it posts anything.
+#
+# ## Cadence
+#
+# Daily. The cost is a handful of API calls, and R45's trigger is *an issue is found unblocked by
+# something that closed more than a day earlier* — a weekly run would leave that trigger reachable
+# six days out of seven. 06:00 UTC, after the deep tiers' Sunday slot and before a working day in
+# any of the time zones this repository's waves have run from.
+#
+# The aliveness note from `deep-tiers.yml` applies here word for word: GitHub disables scheduled
+# workflows after 60 days of repository inactivity, silently, and no test can see whether the cron
+# has fired. `gh run list --workflow=blocked-by.yml --limit 5` is the check.
+name: Blocked by
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print what would be commented without posting it'
+        required: false
+        default: false
+        type: boolean
+
+# Two firings racing would double-comment before either had read the other's marker. One at a time,
+# and a firing that arrives while one runs waits rather than cancels — a cancelled check reports
+# nothing, which is the failure mode this workflow exists to close.
+concurrency:
+  group: blocked-by
+
+jobs:
+  check:
+    name: blockers that have closed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+
+      # `inputs.dry_run` is empty on a scheduled firing and the script reads only the exact string
+      # `1`, so the schedule posts and only an explicit dispatch can ask not to.
+      - name: Blockers that have closed
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          BLOCKED_BY_DRY_RUN: ${{ inputs.dry_run == true && '1' || '0' }}
+        run: node scripts/blocked-by.mjs
