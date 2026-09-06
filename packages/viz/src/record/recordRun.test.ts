@@ -29,7 +29,7 @@
 import { loadConfig, runSimulation, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { BUILD_VERSION } from '../build/version.js';
+import { BUILD_VERSION } from '../release/version.js';
 
 import {
   BUILDING_IDS,

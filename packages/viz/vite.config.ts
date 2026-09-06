@@ -153,7 +153,7 @@ function buildingsManifest() {
 }
 
 /**
- * Which build the bundle says it is — GitHub issue #246, read by `src/build/version.ts`. The
+ * Which build the bundle says it is — GitHub issue #246, read by `src/release/version.ts`. The
  * deploy workflow sets `ELEVATOR_SIM_BUILD_VERSION` to the commit it is building; a local build
  * asks git; a tree with neither says `unbuilt`, which the panel explains rather than hides.
  */

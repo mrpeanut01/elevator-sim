@@ -58,7 +58,7 @@ import {
   type SimulationResult,
 } from '@elevator-sim/core/browser';
 
-import { BUILD_VERSION } from '../build/version.js';
+import { BUILD_VERSION } from '../release/version.js';
 import { StepSeriesBuilder, constantSeries } from '../contract/series.js';
 import {
   VIZ_SCHEMA_VERSION,

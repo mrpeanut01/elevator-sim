@@ -33383,7 +33383,7 @@ for it is to remove the sentence on the commit that makes it false.
 ## D501 — the bundle carries the commit it was built from, the panel and every recording say so, and the release notes are keyed by it
 
 **Date: 2026-09-06 · Owner: the integrator, wave T · Rules on: GitHub issue #246,
-`packages/viz/src/build/version.ts`, `packages/viz/vite.config.ts`, `.github/workflows/deploy-viz.yml`,
+`packages/viz/src/release/version.ts`, `packages/viz/vite.config.ts`, `.github/workflows/deploy-viz.yml`,
 `contract/types.ts#VizRecording.buildVersion`, `record/document.ts`, `everyday/buildNotes.ts`,
 `RELEASE_NOTES.md`.**
 

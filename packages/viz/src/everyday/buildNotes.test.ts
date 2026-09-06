@@ -27,7 +27,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BUILD_VERSION, buildVersionLineOf } from '../build/version.js';
+import { BUILD_VERSION, buildVersionLineOf } from '../release/version.js';
 
 import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import {

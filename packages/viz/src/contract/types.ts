@@ -802,7 +802,7 @@ export interface VizRecording {
   /**
    * The commit of the bundle that made this recording, ten characters, or `unbuilt` for a run
    * outside any shipped bundle — GitHub issue #246, written by `recordRun` from
-   * `src/build/version.ts`. Optional because a fixture predates it; `record/document.ts` quotes it
+   * `src/release/version.ts`. Optional because a fixture predates it; `record/document.ts` quotes it
    * in a refusal when it is there, so a file from another build says which build.
    */
   readonly buildVersion?: string | undefined;

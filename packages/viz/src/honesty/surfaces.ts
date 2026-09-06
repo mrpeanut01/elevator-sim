@@ -11009,7 +11009,7 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     'everyday/buildNotes.ts#buildNotesSummaryOf',
     'everyday/buildNotes.ts#BUILD_NOTES_POINTER',
     /* GitHub issue #246's build line, reached through `view.build`; under the corpus, the unbuilt arm. */
-    'build/version.ts#buildVersionLineOf',
+    'release/version.ts#buildVersionLineOf',
     'everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES',
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
     'everyday/stageScreenModel.ts#STAGE_ABSENCES',

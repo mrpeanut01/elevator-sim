@@ -74,7 +74,7 @@
  * too.
  */
 
-import { BUILD_VERSION, buildVersionLineOf } from '../build/version.js';
+import { BUILD_VERSION, buildVersionLineOf } from '../release/version.js';
 import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import { DESIGNER_ABSENCES } from './designerModel.js';
 import { RUSH_ABSENCES } from './rushScreenModel.js';
@@ -240,7 +240,7 @@ export interface BuildNotesSection {
 export interface BuildNotesView {
   readonly heading: string;
   readonly lede: string;
-  /** Which build this is, in a sentence — GitHub issue #246; `src/build/version.ts`'s. */
+  /** Which build this is, in a sentence — GitHub issue #246; `src/release/version.ts`'s. */
   readonly build: string;
   readonly sections: readonly BuildNotesSection[];
   /** How many entries the panel is carrying, so the summary row can say it without counting twice. */
