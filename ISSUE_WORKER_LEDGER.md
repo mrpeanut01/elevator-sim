@@ -2143,6 +2143,8 @@ integrated tree is green: **24 files, 236 passed, 6 skipped, exit 0**. A lane th
 integrator's failure and declines to fix it from inside its own branch is the division of labour
 § D343 asks for, arriving on a lane rather than being imposed on one.
 
+# Wave T — 2026-09-06: one worker, thirteen issues, and a probe that found three strings the guards had passed
+
 ## T.1 The wave's shape: one worker, thirteen issues, one push
 
 Wave T ran differently from every wave since H. There was no dispatch, no lane board and no
@@ -2236,7 +2238,7 @@ The three fixes are three commits after the records, and each is a literal or a 
 guard derives from disk catching a hand-written claim, which is this repository's oldest lesson
 and the reason the full suite runs before the one push rather than after it.
 
-# Wave U
+# Wave U — 2026-09-06: one worker, six issues, two umbrella items, and a move no per-case integer describes
 
 ## U.1 The wave's shape: one worker, six issues and two items, one push
 
