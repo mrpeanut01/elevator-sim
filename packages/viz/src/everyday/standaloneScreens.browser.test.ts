@@ -19,7 +19,10 @@
  */
 
 import { chromium, type Browser, type Page, type ViewportSize } from 'playwright-core';
-import { openScenarioEntry } from '../dev/browserTier.test-helper.js';
+import {
+  leaveTutorialIfOffered,
+  openScenarioEntry,
+} from '../dev/browserTier.test-helper.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
@@ -71,6 +74,7 @@ async function railRow(page: Page, label: string): Promise<void> {
 
 /** Open § 9.1 from the menu tile — the door a player uses, not a URL. */
 async function openRush(page: Page): Promise<void> {
+  await leaveTutorialIfOffered(page);
   await page.click('.everyday-mode[data-screen="rush"]');
   await page.waitForSelector('.everyday-rush');
 }
@@ -217,6 +221,7 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
   it('draws `Start the rush` live, with § 3.3’s own note beside it and no timeline', async () => {
     const page = await coldLoad();
     await page.setViewportSize({ width: 1280, height: 720 });
+    await leaveTutorialIfOffered(page);
     await page.click('.everyday-mode[data-screen="rush"]');
     await page.waitForSelector('.everyday-rush');
 

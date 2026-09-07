@@ -479,6 +479,45 @@ export async function openEverydayRail(page: Page): Promise<void> {
 }
 
 /**
+ * **Get past § D529's tutorial, if this visit is the one that is offered it** — GitHub issue #380.
+ *
+ * `everyday/shell.ts#offerTutorial` runs once per session, the moment the host publishes, and it
+ * takes the page to the walkthrough whenever `tutorialModel.ts#tutorialIsDue` answers `true` — an
+ * empty week, no case solved, no dispatcher rated. Every page this tier opens is a fresh context,
+ * so **every one of them is a first visit** and meets that screen instead of the menu. Ninety-eight
+ * of 241 browser cases went red the day the tutorial landed, and 87 of those were one sentence:
+ * waiting thirty seconds for a mode tile behind a screen nobody had told the tier about.
+ *
+ * ## Why the leave row rather than the skip button
+ *
+ * `tutorialScreens.ts#leave` — both *Skip the tutorial* and *Start playing* — **files the day**,
+ * because § D476 requires skipping to advance the state the gate reads. That is right for a player
+ * and wrong for a tier: it would run a whole shift on a worker before every one of those cases, and
+ * it would hand each of them a week with a day already in it, which is a different fixture from the
+ * one they were written against. § 3.3's `leave` row is the other way out — `⌂ Modes`, live on this
+ * screen, a plain `go('menu')` that runs nothing and files nothing.
+ *
+ * The gate does not re-arm behind it: `offerTutorial` sets its own latch **before** it tests
+ * anything, so a session that has been offered the tutorial once is never offered it again. That is
+ * what makes this safe to call at the top of a route rather than before every press.
+ *
+ * ## Why one wait over two selectors rather than a poll
+ *
+ * The offer is a race against the host arriving, so *the menu is up* is not evidence that the
+ * tutorial is not coming. Waiting for **either** the walkthrough or a mode tile settles it in one
+ * wait with no timeout burned on the common path; and the losing arm of that race is harmless,
+ * because `offerTutorial`'s other guard refuses to move a player who has already left the menu.
+ *
+ * Idempotent, so a caller may run it twice, and a no-op on a visit that is not a first one.
+ */
+export async function leaveTutorialIfOffered(page: Page): Promise<void> {
+  await page.waitForSelector('.everyday-tutorial, .everyday-mode[data-screen]', { timeout: 30_000 });
+  if ((await page.locator('.everyday-tutorial').count()) === 0) return;
+  await page.locator('.everyday-bar-leave').click();
+  await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+}
+
+/**
  * Open one of the Scenario hub's entries from the main menu — § D525's route, GitHub issue #364.
  *
  * The two presses a player makes: the Scenario tile, then the entry. Shared because five browser
@@ -486,6 +525,7 @@ export async function openEverydayRail(page: Page): Promise<void> {
  * for the next re-homing to be missed.
  */
 export async function openScenarioEntry(page: Page, entry: 'today' | 'fix-a-building'): Promise<void> {
+  await leaveTutorialIfOffered(page);
   await page.locator('.everyday-mode[data-screen="scenario"]').click();
   await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
   await page.locator(`.everyday-scenario-entry[data-entry="${entry}"]`).click();

@@ -10,7 +10,15 @@
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CHROMIUM, HAS_BROWSER, openEverydayDoor, openPage, startShippedSite, type ShippedSite } from '../dev/browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  leaveTutorialIfOffered,
+  openEverydayDoor,
+  openPage,
+  startShippedSite,
+  type ShippedSite,
+} from '../dev/browserTier.test-helper.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -44,6 +52,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
   it('starts from the setup screen, plays on a held-time stage, ends by hand on its own result, and leaves the week as it was', async () => {
     const page = await coldLoad();
     try {
+      await leaveTutorialIfOffered(page);
       await page.locator('.everyday-mode[data-screen="rush"]').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
       /* § D478 on the setup screen: the stream leaves this building's band, and the screen says so. */
@@ -95,6 +104,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await page.locator('.everyday-bar-wayout').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
       await page.locator('.everyday-bar-leave').click();
+      await leaveTutorialIfOffered(page);
       await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
       await openEverydayDoor(page);
       const seedLine = await page.textContent('.everyday-door-seed');

@@ -37,7 +37,10 @@
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
-import { openScenarioEntry } from '../dev/browserTier.test-helper.js';
+import {
+  leaveTutorialIfOffered,
+  openScenarioEntry,
+} from '../dev/browserTier.test-helper.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
@@ -83,6 +86,7 @@ async function coldLoad(): Promise<Page> {
 
 /** Press the Campaign tile — the player's own path, not a scripted navigation. */
 async function enterCampaign(page: Page): Promise<void> {
+  await leaveTutorialIfOffered(page);
   await page.locator('.everyday-mode[data-screen="towers"]').first().click();
   await page.waitForSelector('.everyday-towers');
 }

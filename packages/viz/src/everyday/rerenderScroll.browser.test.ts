@@ -54,9 +54,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   CHROMIUM,
   HAS_BROWSER,
-  SKIP_REASON,
+  leaveTutorialIfOffered,
   openEverydayRail,
   openPage,
+  SKIP_REASON,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -250,6 +251,7 @@ describe.skipIf(!HAS_BROWSER)('an in-screen toggle keeps the scroll offset (issu
      */
     const page = await openPage(browser, { viewport: SHORTEST_SUPPORTED });
     await page.goto(site.origin, { waitUntil: 'load' });
+    await leaveTutorialIfOffered(page);
     await page.waitForSelector('[data-screen="rush"]', { timeout: 30_000 });
 
     await page.evaluate(() => {

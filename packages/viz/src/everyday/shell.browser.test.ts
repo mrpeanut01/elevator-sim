@@ -26,7 +26,10 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
-import { openScenarioEntry } from '../dev/browserTier.test-helper.js';
+import {
+  leaveTutorialIfOffered,
+  openScenarioEntry,
+} from '../dev/browserTier.test-helper.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
@@ -200,6 +203,7 @@ async function coldLoad(): Promise<Page> {
 describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
   it('draws the menu, the rail and the three mode tiles — not the Engineer menu', async () => {
     const page = await coldLoad();
+    await leaveTutorialIfOffered(page);
     try {
       const front = await page.evaluate(() => ({
         shells: document.querySelectorAll('.everyday').length,
@@ -259,6 +263,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
 
   it('leaves no mode tile refusing, and every one of the three takes a click', async () => {
     const page = await coldLoad();
+    await leaveTutorialIfOffered(page);
     try {
       const tiles = await page.evaluate(() =>
         [...document.querySelectorAll('.everyday-mode')]
@@ -324,6 +329,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
 
   it('draws § 3.3’s menu row in the bar: ⌂ Modes inert, one named primary, the note', async () => {
     const page = await coldLoad();
+    await leaveTutorialIfOffered(page);
     try {
       const bar = await page.evaluate(() => ({
         leave: (() => {
@@ -353,6 +359,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
 
   it('enters the picked mode through the bar’s primary — the player’s second way in', async () => {
     const page = await coldLoad();
+    await leaveTutorialIfOffered(page);
     try {
       /*
        * § 3.3's menu row: the primary follows the selected card, and the selected card is
@@ -667,6 +674,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
        */
       await page.locator('.everyday-rail-menu').click();
       await page.locator('.everyday-bar-confirm-leave').click();
+      await leaveTutorialIfOffered(page);
       await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
 
       const back = await page.evaluate(() => ({
@@ -847,6 +855,7 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
 
   it('survives a round trip on the menu too, and does not remember the world across a reload', async () => {
     const page = await coldLoad();
+    await leaveTutorialIfOffered(page);
     try {
       await enterEngineerStage(page);
       await returnToEverydayMode(page);
@@ -872,6 +881,8 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
         undefined,
         { timeout: 30_000 },
       );
+      /* The reload is a fresh session, so § D529's one-shot offer is armed again. */
+      await leaveTutorialIfOffered(page);
       const reloaded = await page.evaluate(() => ({
         tiles: document.querySelectorAll('.everyday-mode').length,
         visibility: document.querySelector<HTMLElement>('.everyday')?.style.visibility,
