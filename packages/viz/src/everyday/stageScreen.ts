@@ -361,8 +361,16 @@ function mountStage(
   drivingName.style.cssText = 'font-size:13px;font-weight:600';
   driving.append(drivingEyebrow, drivingDot, drivingName);
 
+  /*
+   * **Every strip in this header wraps, and that is one answer to GitHub issue #240 rather than
+   * four.** The header itself has wrapped since it was written; its *children* did not, and a
+   * `display:flex` row that cannot wrap has a min-content width equal to the sum of its items —
+   * which is what propagates up a whole screen. Measured at 360 px before the change, the § 7
+   * stage's min-content was **485 px** against a 360 px viewport, and the speed strip's seven chips
+   * were 302 of it. A wrapping strip's min-content is its widest single item instead.
+   */
   const figures = el(doc, 'div', 'everyday-stage-figures');
-  figures.style.cssText = `display:flex;gap:${String(GAP.section)}px;margin-left:auto`;
+  figures.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.section)}px;margin-left:auto`;
 
   const playButton = el(doc, 'button', 'everyday-stage-play');
   playButton.type = 'button';
@@ -381,7 +389,7 @@ function mountStage(
   });
 
   const speeds = el(doc, 'div', 'everyday-stage-speeds');
-  speeds.style.cssText = `display:flex;gap:${String(GAP.tight)}px`;
+  speeds.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.tight)}px`;
   const speedButtons = STAGE_SPEEDS.map((speed, index) => {
     const button = el(doc, 'button', 'everyday-stage-speed', speed.label);
     button.type = 'button';
@@ -405,7 +413,7 @@ function mountStage(
    * the box has no height, and `hiddenBox.test.ts` refuses an inline `display` on anything the
    * `hidden` attribute is asked to hide, because the inline value outranks `[hidden]`.
    */
-  cameras.style.cssText = `display:flex;gap:${String(GAP.tight)}px`;
+  cameras.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.tight)}px`;
   const cameraButtons = STAGE_CAMERAS.map((chip) => {
     const button = el(doc, 'button', 'everyday-stage-camera', chip.label);
     button.type = 'button';
@@ -519,7 +527,7 @@ function mountStage(
   watchSource.style.cssText = 'font-size:11.5px;opacity:.8';
   watchWho.append(watchName, watchSource);
   const watchFigures = el(doc, 'div', 'everyday-stage-watching-figures');
-  watchFigures.style.cssText = `display:flex;gap:${String(GAP.section)}px;margin-left:auto`;
+  watchFigures.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.section)}px;margin-left:auto`;
   const watchNote = el(doc, 'p', 'everyday-stage-watching-note');
   watchNote.style.cssText = 'margin:0;flex-basis:100%;font-size:11px;opacity:.75';
   watchBand.append(watchDisc, watchWho, watchFigures, watchNote);

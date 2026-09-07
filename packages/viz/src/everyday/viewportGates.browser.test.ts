@@ -65,22 +65,24 @@
  *
  * ## The register, and what it means when this file goes red
  *
- * **The product fails clauses 1 and 3 at 360 px today, and this file is green.** Clause 2 was in
- * that sentence until 2026-08-29 and is not any more (#303, § D391) — it now passes at all three
- * viewports, including the two narrow ones, because a `vh` height is not a width question. That is
- * deliberate, and it is `honesty.test.ts`'s `OUTSTANDING` precedent: the check runs, the failures
- * are measured, each is registered, and the case fails **when the set changes in either
- * direction** — a new failure is unregistered and goes red, and a failure that stops reproducing
- * goes red as *delete this entry*. A register of ghosts is a suppression list; a register nothing
- * re-derives is decoration.
+ * **The product failed clauses 1 and 3 at 360 px from the day this file was written until GitHub
+ * issue #240 landed, and it was green the whole time.** Clause 2 left that sentence on 2026-08-29
+ * (#303, § D391) — a `vh` height is not a width question — and clauses 1 and 3 left it when the
+ * rail stopped being a 212 px column at every width. That arrangement was `honesty.test.ts`'s
+ * `OUTSTANDING` precedent: the check runs, the failures are measured, each is registered, and the
+ * case fails **when the set changes in either direction** — a new failure is unregistered and goes
+ * red, and a failure that stops reproducing goes red as *delete this entry*. A register of ghosts
+ * is a suppression list; a register nothing re-derives is decoration.
  *
- * The layout work is **#240** — open, unassigned, no linked pull request, milestone M4. It does not
- * restate these three clauses; it incorporates them, by *"Build to the support matrix decided in
- * pre-production"* and by its fourth criterion, *"journey tests run at the minimum viewport as well
- * as at desktop width"*, which is what this file now does. So when #240 lands, this file is
- * **supposed** to go red, once, with a diff naming every entry that stopped reproducing. Deleting those entries is part of landing #240, and
- * an empty {@link OUTSTANDING} is what turns this file from a record into a gate. Nothing else about
- * the file changes on that day.
+ * The layout work was **#240**, milestone M4. It does not restate these three clauses; it
+ * incorporates them, by *"Build to the support matrix decided in pre-production"* and by its fourth
+ * criterion, *"journey tests run at the minimum viewport as well as at desktop width"*, which is
+ * what this file and `everyday/smallScreen.browser.test.ts` now do between them. This file was
+ * **supposed** to go red on that day, once, with a diff naming every entry that stopped
+ * reproducing, and it did: all twenty-two came back as *only the register has this*, and deleting
+ * them was part of landing the issue. An empty {@link OUTSTANDING} is what turned this file from a
+ * record into a gate, and nothing else about it changed — the instrument, the calibration and the
+ * four cases are the ones that measured the defect.
  *
  * ## Measured 2026-08-27, `55f2bca` + this commit, Chromium headless shell r1194
  *
@@ -118,12 +120,14 @@
  * Three things in the original table are worth reading rather than skimming.
  *
  * 1. **§ 3.2's column is 0 in every row, including the four that fail.** That is the issue.
- * 2. **The five controls at 360×800 are the whole main menu.** All four mode tiles — § 4's four
+ * 2. **The five controls at 360×800 were the whole main menu.** All four mode tiles — § 4's four
  *    modes, the only way into any of them — plus § 3.3's primary, `Play today's tower`, which at
- *    360 px is drawn at `left: 360` and is **100 % outside the viewport** before any scroll is
- *    attempted. The rail is `RAIL_WIDTH_PX = 212` at every width (`everyday/shell.ts:129`, inline,
- *    no breakpoint), against `grid-template-columns: 212px minmax(0,1fr)`, which leaves the screen
- *    region 148 px at 360 and 163 px at 375 for content that lays out at 241 px.
+ *    360 px was drawn at `left: 360` and was **100 % outside the viewport** before any scroll was
+ *    attempted. The rail was `RAIL_WIDTH_PX = 212` at every width, inline and with no breakpoint,
+ *    against `grid-template-columns: 212px minmax(0,1fr)`, which left the screen region 148 px at
+ *    360 and 163 px at 375 for content that lays out at 241 px. **That is the constant #240
+ *    moved**: `everyday/tokens.ts#EVERYDAY_RAIL_DRAWER_MAX_PX` now makes the rail a drawer below
+ *    720 px, and the same measurement reports 360 px of screen region and nothing out of reach.
  * 3. **The 1280×800 stage failed clause 2 as well**, and that was not a small-screen defect:
  *    `everyday/stageScreen.ts` wrote `height:340px` as a literal, so the Everyday stage canvas was
  *    340 px at *every* viewport height. § 2's clause is scoped *"360 px and above"*, so 1280×800 is
@@ -566,82 +570,48 @@ function failuresOf(cell: Cell): readonly string[] {
 }
 
 /**
- * **What the product fails today, and #240 is the fix.**
+ * **What the product fails today. It is empty, and that is #240 landing.**
  *
- * Landing #240 turns entries in this list into red lines saying *this stopped reproducing*.
- * Deleting them then is part of landing it — a finding that has been fixed must stop being
- * registered, or the register becomes decoration. When this list is empty, the four cases below
- * stop being a record and start being the gate § 2 has named since it was written on 2026-08-24.
+ * This list held **twenty-two** entries — eleven at 360×800 and eleven at 375×667, across § 2's
+ * clauses 1 and 3 — from the day this file was written until GitHub issue **#240** was built. The
+ * paragraph that stood here said that landing #240 *"turns entries in this list into red lines
+ * saying this stopped reproducing"*, that deleting them then is part of landing it, and that an
+ * empty list is what turns this file from a record into a gate. All three happened, in that order,
+ * on one commit: the layout changed, every one of the twenty-two came back as *only the register
+ * has this*, and they were deleted here.
  *
- * **Every entry left in this list is #240's, and that became true on 2026-08-29.** The three that
- * were not — the clause-2 rows at all three viewports — were `everyday/stageScreen.ts`'s literal
- * `height:340px`, which failed at 1280×800 as well and was therefore outside #240's stated subject.
- * They were filed as **#303**, fixed with a `60vh` height, and **deleted here on the commit that
- * made them stop reproducing** (§ D391), which is what the paragraph above asks of #240 and what
- * this register would be decoration without. The both-directions assertion is what forced it: with
- * the literal put back, all three reappear as unregistered lines and this file goes red.
+ * **The register is kept rather than deleted, and the both-directions assertion below is why.** An
+ * empty `OUTSTANDING` is not a rule that has been satisfied and can be thrown away; it is a state
+ * that has to keep being checked. The next commit that puts a control outside a 360 px viewport
+ * produces a line only the product has, and this file goes red naming it — which is the direction
+ * a commitment should fail in and the whole reason the list was ever a list rather than a comment.
  *
- * **The narrowest margin in this list, named because it is the one that could move under another
- * Chromium**: `everyday-stage-speed ×7` at 360×800 against `×6` at 375×667. The seventh is the `1×`
- * chip, which overruns by **9 px** at 360 and fits at 375 — every other finding here overruns by
- * between 33 and 321 px. A build whose text metrics differ by more than 9 px across a chip row would
- * flip that one entry to `×6`, and the failure would read as a layout change rather than as a font.
- * If this file goes red on exactly that line and on nothing else, measure before believing it.
+ * ## What was measured after, on the same instrument
  *
- * **Two counts moved and one line is new, and none of the three is a new defect** — GitHub issue
- * **#171**, which put § 7.6's second arm on the stage. The intervention row was *already* wholly
- * unreachable at both viewports; it now holds a picker and a second button, so
- * `everyday-stage-intervene` reads **×2** and `everyday-stage-switch-pick ×1` joins it. The register
- * counts controls rather than rows, so a row that grows moves its number without anything about the
- * layout having changed — which is the one way this list can go red that means *the product grew*
- * rather than *the product regressed*. The lines are #240's like every other entry: the same row, at
- * the same two viewports, for the same reason.
+ * | viewport | screen | § 3.2's metric | clipped | controls no gesture reaches | stage canvas |
+ * |---|---|---|---|---|---|
+ * | 360×800 | main menu | 0 px | **0 px** | **0** | — |
+ * | 360×800 | stage | 0 px | **0 px** | **0** | **60.0 %** |
+ * | 375×667 | main menu | 0 px | **0 px** | **0** | — |
+ * | 375×667 | stage | 0 px | **0 px** | **0** | **60.0 %** |
+ * | 1280×800 | main menu | 0 px | 0 px | 0 | — |
+ * | 1280×800 | stage | 0 px | 0 px | 0 | 60.0 % |
  *
- * **And `everyday-stage-intervene` moved again, ×2 → ×3** — GitHub issue **#352**, the
- * `spread-cars` arm beside the park arm. The same class as #171's move: a control count on a row
- * that was already unreachable at both viewports, so the product grew and nothing about the layout
- * changed. #240's, like every other entry.
+ * **Read the `controlsSeen` column of a run beside it, because it is the honest half.** At 360 px
+ * the front door draws **7** controls where 1280 px draws 14, and the stage **20** where 1280 draws
+ * 27. The difference is not controls going missing: `everyday/tokens.ts#EVERYDAY_RAIL_DRAWER_MAX_PX`
+ * puts the rail's eight rows behind a toggle below 720 px, so at a phone width they are **not
+ * drawn** until the toggle is pressed, and one toggle is drawn in their place. Clause 3 is
+ * *"drawn but unreachable"*, so a closed drawer is outside it by construction — which is exactly
+ * the kind of reading that can turn a gate into decoration, and the reason it is written down here
+ * rather than left for somebody to notice.
  *
- * **And one more line joined at both viewports for the same reason** — GitHub issue **#226**,
- * [§ D482](../../../../DECISIONS.md), which put § 7.4's ghost picker on the stage's race card.
- * `everyday-stage-ghost ×1` is a control that is genuinely under § 2 clause 3's minimum on a phone,
- * so it is registered rather than argued away; it is **not** a new defect class, and the register
- * says which is which by the company it keeps. `everyday-stage-switch-pick ×1` — the *other* picker
- * on this stage, added by #171 — is already here at both widths with the same count, on the same
- * card, for the same reason. A `<select>` this build puts on the stage does not meet the target size
- * at 360 or 375 px, twice over now.
- *
- * **Registered rather than fixed, deliberately.** #240 owns the small-screen layout, and a lane that
- * resized this one control in passing would take a row out of #240's inventory without taking the
- * row's *cause* out of the product — the issue would then close against a smaller problem than the
- * one it was opened for. The register's own rule cuts the other way too and is why this is two lines
- * and not a paragraph: only what reproduces goes in, because a line the product does not produce is
- * a ghost and a register of ghosts is a suppression list.
+ * That is checked rather than asserted, and not by this file: `everyday/smallScreen.browser.test.ts`
+ * drives the toggle at 360×800, measures the **open** drawer with this file's own clauses, and
+ * plays a journey end to end at that width. A drawer nothing opened would be § D236's lockout with
+ * a better excuse.
  */
-const OUTSTANDING: readonly string[] = Object.freeze([
-  '360×800 · main menu · clause 1 · content clipped horizontally',
-  '360×800 · main menu · clause 3 · everyday-bar-primary ×1',
-  '360×800 · main menu · clause 3 · everyday-mode ×4',
-  '360×800 · stage · clause 1 · content clipped horizontally',
-  '360×800 · stage · clause 3 · everyday-bar-primary ×1',
-  '360×800 · stage · clause 3 · everyday-bar-timeline > button ×2',
-  '360×800 · stage · clause 3 · everyday-stage-ghost ×1',
-  '360×800 · stage · clause 3 · everyday-stage-intervene ×3',
-  '360×800 · stage · clause 3 · everyday-stage-speed ×7',
-  '360×800 · stage · clause 3 · everyday-stage-start ×1',
-  '360×800 · stage · clause 3 · everyday-stage-switch-pick ×1',
-  '375×667 · main menu · clause 1 · content clipped horizontally',
-  '375×667 · main menu · clause 3 · everyday-bar-primary ×1',
-  '375×667 · main menu · clause 3 · everyday-mode ×4',
-  '375×667 · stage · clause 1 · content clipped horizontally',
-  '375×667 · stage · clause 3 · everyday-bar-primary ×1',
-  '375×667 · stage · clause 3 · everyday-bar-timeline > button ×2',
-  '375×667 · stage · clause 3 · everyday-stage-ghost ×1',
-  '375×667 · stage · clause 3 · everyday-stage-intervene ×3',
-  '375×667 · stage · clause 3 · everyday-stage-speed ×6',
-  '375×667 · stage · clause 3 · everyday-stage-start ×1',
-  '375×667 · stage · clause 3 · everyday-stage-switch-pick ×1',
-]);
+const OUTSTANDING: readonly string[] = Object.freeze([]);
 
 /* -------------------------------------------------------------------------- *
  * The cases
@@ -751,8 +721,8 @@ describe.skipIf(!HAS_BROWSER)('§ 2 at 360 px and above — the three clauses, m
     const cells = await sweep();
     /*
      * The published row and the corrected one, side by side on the product itself. § 3.2's number
-     * is 0 in all six cells — including the four where content is clipped — and that is the row
-     * being corrected rather than a coincidence of this run.
+     * is 0 in all six cells, and it was 0 in the four where content used to be clipped — which is
+     * the row being corrected rather than a coincidence of this run.
      */
     for (const cell of cells) {
       expect(
@@ -761,12 +731,27 @@ describe.skipIf(!HAS_BROWSER)('§ 2 at 360 px and above — the three clauses, m
           'not while the Everyday root is position:fixed with overflow:hidden. Re-read the header.',
       ).toBe(0);
     }
-    const clipping = cells.filter((cell) => cell.reading.clippedPx > 0);
-    expect(
-      clipping.length,
-      'no cell clips anything, so this file has nothing to say about § 3.2 being blind. If #240 ' +
-        'has landed, that is correct and this case belongs to the calibration above.',
-    ).toBeGreaterThan(0);
+    /*
+     * **This assertion is the inverse of the one that stood here, and the file said in advance
+     * that it would be** — GitHub issue #240. It read *"at least one cell clips"*, with the
+     * message *"If #240 has landed, that is correct and this case belongs to the calibration
+     * above."* #240 landed, no cell clips, and the demonstration that § 3.2's metric is blind is
+     * the calibration case's — which injects a clip, reads 0 from the document scroll box and
+     * ≥ 240 px from this one, on the same page in the same evaluation, and is independent of
+     * whether the product has a defect.
+     *
+     * So the quantity is now asserted **at zero across all six cells**, which is strictly more
+     * than the old case asked for: it is clause 1 itself, on every cell, rather than evidence that
+     * a blind instrument was blind. A weaker assertion here would have been the register's own
+     * failure mode moved into a case body.
+     */
+    for (const cell of cells) {
+      expect(
+        cell.reading.clippedPx,
+        `${cell.at} ${cell.screen} clips horizontally, which is docs/31-support-matrix.md § 2's ` +
+          `first clause failing: ${cell.reading.clippers.join(' | ')}`,
+      ).toBe(0);
+    }
   }, 600_000);
 
   it('measures clause 2 against the 60 % floor § 2 names', async () => {

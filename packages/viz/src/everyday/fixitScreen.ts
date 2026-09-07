@@ -117,6 +117,7 @@ import type { VizRecording } from '../contract/types.js';
 import { mountAsBuiltStage, type AsBuiltStage } from './asBuiltStage.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 import { actionBarFor } from './actionBar.js';
+import { sideBySide } from './screenDom.js';
 import type { ActionBarModel } from './actionBar.js';
 import {
   buildingLineOf,
@@ -389,6 +390,15 @@ const MONO = (size: number, color: string): string =>
  * The mount
  * ------------------------------------------------------------------------- */
 
+/**
+ * § 10.1's case rail, in pixels — the width the prototype gives the list of cases beside the file.
+ *
+ * A constant rather than a literal because `screenDom.ts#sideBySide` takes it as an argument now,
+ * so the number appears once and the width at which the row stacks is derived from it (GitHub
+ * issue #240). It was inline in a `grid-template-columns` before, which is why nothing could stack.
+ */
+const CASE_RAIL_PX = 288;
+
 function mountFixit(
   host: HTMLElement,
   context: EverydayScreenShellContext,
@@ -399,12 +409,16 @@ function mountFixit(
   ensureRestored();
 
   const root = el(doc, 'div', 'everyday-fixit');
-  root.style.cssText = [
-    'display:grid',
-    `grid-template-columns:288px minmax(0,1fr)`,
-    `gap:${String(GAP.wide)}px`,
-    'align-items:start',
-  ].join(';');
+  /*
+   * The two columns' widths are `screenDom.ts#sideBySide`'s from here — GitHub issue #240. This
+   * read `grid-template-columns:288px minmax(0,1fr)`, a fixed track with no breakpoint, which at
+   * 360 px left the main column **16 px** wide and clipped 125 px out of the machinery card.
+   *
+   * `render` writes the row itself on every draw that has two columns to draw, beside the two
+   * children it sizes. This is the shape before the first one and for the three single-child
+   * states — a plain column, which is what a lone status line wants anyway.
+   */
+  root.style.cssText = 'display:flex;flex-direction:column;min-width:0';
   host.append(root);
 
   /*
@@ -429,24 +443,27 @@ function mountFixit(
       // Mount status text, the one sentence this file authors — see the module docstring.
       const failed = el(doc, 'p', 'everyday-fixit-failure');
       failed.textContent = `The case file could not be loaded: ${loadFailure}`;
-      failed.style.cssText = `grid-column:1/-1;color:${C.alarm};font-size:13px;max-width:70ch`;
+      failed.style.cssText = `color:${C.alarm};font-size:13px;max-width:70ch`;
       root.append(failed);
       return;
     }
     if (loaded === undefined) {
       const loading = el(doc, 'p', 'everyday-fixit-loading', COPY.loading);
-      loading.style.cssText = `grid-column:1/-1;color:${C.warmGrey};font-size:13px`;
+      loading.style.cssText = `color:${C.warmGrey};font-size:13px`;
       root.append(loading);
       return;
     }
     const entry = currentEntry();
     if (entry === undefined) {
       const empty = el(doc, 'p', 'everyday-fixit-empty', COPY.emptyFile);
-      empty.style.cssText = `grid-column:1/-1;color:${C.warmGrey};font-size:13px`;
+      empty.style.cssText = `color:${C.warmGrey};font-size:13px`;
       root.append(empty);
       return;
     }
-    root.append(caseRail(loaded, entry), mainColumn(loaded, entry));
+    const rail = caseRail(loaded, entry);
+    const main = mainColumn(loaded, entry);
+    root.append(rail, main);
+    sideBySide(root, { fixed: rail, fluid: main, fixedPx: CASE_RAIL_PX, gapPx: GAP.wide });
   }
 
   function towerLineOf(loadedFixit: LoadedFixit) {

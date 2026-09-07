@@ -77,7 +77,17 @@ const config = readFileSync(VITEST_CONFIG, 'utf8');
 const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly totalMs: number }> =
   new Map([
     ['viz', { count: 91, totalMs: 75_900_000 }],
-    ['viz-browser', { count: 67, totalMs: 16_620_000 }],
+    /*
+     * **67 → 70, and the three are named** — GitHub issue #240's
+     * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this
+     * tier's ceiling rather than above it, and the three that do not are the three cases that enter
+     * the § 7 stage or cross four screens: `browserTier.test-helper.ts#enterEverydayStage` alone
+     * waits up to 120 000 ms for the canvas to draw, so a case that calls it and then plays a day
+     * cannot honestly be annotated at the ceiling — the annotation would be shorter than the helper
+     * it contains. Raised here, with that reason, on the commit that added them, which is what the
+     * ratchet's own message asks for. Nothing existing was raised to make room.
+     */
+    ['viz-browser', { count: 70, totalMs: 17_520_000 }],
   ]);
 
 /**

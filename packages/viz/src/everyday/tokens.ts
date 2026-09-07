@@ -135,3 +135,43 @@ export const EVERYDAY_GAPS = Object.freeze({
   row: 8,
   tight: 5,
 } as const);
+
+/**
+ * **The width at or below which the Everyday rail stops being a column and becomes a drawer** —
+ * GitHub issue **#240**, `docs/31-support-matrix.md` § 2.
+ *
+ * A token rather than a `shell.ts` constant so that a test can drive the breakpoint without
+ * importing the mount, which is the whole of that shell's dependency graph. `shell.ts` is its one
+ * non-test reader; `everyday/smallScreen.browser.test.ts` is what asserts the number against the
+ * behaviour, in both directions, the way `dev/surfaces.test.ts` asserts `DRAWER_BREAKPOINT_PX`
+ * against `index.html`'s own rule.
+ *
+ * ## What the number is answering
+ *
+ * `shell.ts#RAIL_WIDTH_PX` was a literal with no breakpoint, and § 2 commits the product to laying
+ * out *"at 360 px of CSS width and above … without horizontal overflow, [keeping] the stage canvas at
+ * 60 % or more of the viewport height, and [exposing] no control that is drawn but unreachable."*
+ * A 212 px column against a 360 px viewport leaves the screen region **148 px** for content whose
+ * min-content width is 241 px on the front door and 485 px on the § 7 stage, so most of the
+ * twenty-two findings in `everyday/viewportGates.browser.test.ts`'s register were downstream of it.
+ *
+ * **720 rather than 767 or 899**, and the reason is arithmetic rather than taste: `index.html`'s
+ * narrowest Engineer block is 720, so the two shells change shape at the same width and a reader
+ * has one number to hold. At 720 itself the column still leaves 508 px, which is more than either
+ * screen's min-content, so the breakpoint is not load-bearing at its own edge — it is where the
+ * *drawer* becomes the better shape rather than where the column stops fitting.
+ *
+ * ## Why a drawer rather than a narrower column
+ *
+ * The rail is a nav with a brand, a live subline, three groups of prose rows, an identity card and
+ * the Engineer door. There is no width between 0 and about 190 px at which those read; an icon rail
+ * would need every one of those labels redesigned, which is art direction this issue does not
+ * carry. Hiding it behind a toggle is the shape `index.html` already uses on the other shell —
+ * `dev/surfaces.ts#DRAWER_BREAKPOINT_PX = 1340` turns the Engineer right rail into an overlay
+ * drawer on exactly this argument — so it is precedent in this tree rather than a new idea.
+ *
+ * **It is not § D236's lockout.** That defect was `display:none` on a control with no other way to
+ * reach it. Every rail row here is reachable through `rail.ts#RAIL_DRAWER_COPY`'s toggle, which is
+ * drawn in the shell's own narrow header at every width below this one and is never itself hidden.
+ */
+export const EVERYDAY_RAIL_DRAWER_MAX_PX = 720;
