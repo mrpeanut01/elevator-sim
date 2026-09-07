@@ -152,7 +152,16 @@ function mountDoor(
     /* ---- the seven-chip week strip ---- */
     const strip = section(document_, view.weekHeading);
     strip.body.className = 'everyday-door-strip';
-    strip.body.style.cssText = `display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:${String(GAP.row)}px`;
+    /*
+     * **`auto-fit` rather than a literal seven** — GitHub issue #240, `docs/31-support-matrix.md`
+     * § 2. Seven equal columns of a 332 px screen region are **30 px each**, which is not a week
+     * strip; it is seven ellipses. `auto-fit` collapses the tracks it has no chip for, so at a
+     * desktop width the seven still share the row exactly as `repeat(7,…)` drew them, and at a
+     * phone width the strip becomes three columns of a hundred-odd pixels over three rows.
+     * 84 px is the width at which the shortest weekday, the score and a truncated tower name all
+     * still read.
+     */
+    strip.body.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:${String(GAP.row)}px`;
     for (const chip of view.chips) {
       const button = el(document_, 'button', 'everyday-door-chip');
       button.type = 'button';
