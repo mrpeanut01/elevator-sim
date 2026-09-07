@@ -50,8 +50,11 @@
  * none of them is authored here.
  *
  * This screen used to draw one of those six, its own, in a block of its own. That block is gone:
- * `SETTINGS_ABSENCES` is a section of the panel now, so the six rows this screen does not draw are
- * read in the same place as the twenty-one the rest of the build does not.
+ * `SETTINGS_ABSENCES` is a section of the panel now, so whatever rows this screen does not draw are
+ * read in the same place as everything else the build does not do yet. **How many that is is
+ * deliberately not written here**: the register has fallen from six to one as `Units`,
+ * `Default speed`, `Clear saved progress`, `Switch to Engineer`, `Sign out` and now `Sound` were
+ * built, and a count in prose beside a shrinking array is this repository's oldest stale figure.
  */
 
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
@@ -168,6 +171,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       reduceMotion: engineerSettings()?.reduceMotion(),
       units: store.units(),
       defaultSpeedSimPerRealS: store.defaultSpeed(),
+      soundOn: store.soundOn(),
       clearStage,
       account: everydayAccount(),
       accountServer: actions !== undefined,
@@ -652,6 +656,17 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       pill.addEventListener('click', () => {
         if (rowView.id === 'units') {
           durable = store.setUnits(store.units() === 'imperial' ? 'metric' : 'imperial');
+          redrawIdentity();
+          redrawPlaying();
+          return;
+        }
+        if (rowView.id === 'sound') {
+          /*
+           * A press flips it — GitHub issue #258. The value comes off the store rather than off
+           * the pill's face, the Units row's rule: a control that read its own label would be one
+           * rename away from writing the opposite of what it says.
+           */
+          durable = store.setSoundOn(!store.soundOn());
           redrawIdentity();
           redrawPlaying();
           return;

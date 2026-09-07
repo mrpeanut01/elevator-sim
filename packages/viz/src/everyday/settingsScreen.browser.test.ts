@@ -221,6 +221,51 @@ describe.skipIf(!HAS_BROWSER)('the Everyday settings screen', () => {
   });
 
   /**
+   * **Sound, end to end — GitHub issue #258, [§ D344](../../../../DECISIONS.md).** The pill flips;
+   * the choice lands in this device's slot; and **the stage still plays a day with it off**, which
+   * is the claim `audio.test.ts` cannot make and the one the acceptance criterion is written as:
+   * *the build is fully playable muted*. The context is built lazily, so a muted run reaches the
+   * stage without a `AudioContext` ever existing — asserted here rather than argued, because the
+   * failure it guards against is a page that throws on a machine with no audio device.
+   */
+  it('flips Sound, keeps the choice in this device’s slot, and plays a day with it off', async () => {
+    const page = await coldLoad();
+    await openSettings(page);
+
+    expect(await page.textContent('.everyday-settings-sound')).toBe('on');
+    await page.click('.everyday-settings-sound');
+    expect(await page.textContent('.everyday-settings-sound')).toBe('off');
+    expect(
+      await page.evaluate(() => {
+        const raw = window.localStorage.getItem('elevator-sim.everyday-profile');
+        if (raw === null) return undefined;
+        return (JSON.parse(raw) as { soundOn?: unknown }).soundOn;
+      }),
+    ).toBe(false);
+
+    /*
+     * Muted, the day still runs: the stage reaches its transport and its speed chips.
+     *
+     * **No private `pageerror` collector**, deliberately — `openPage` attaches the shared one and
+     * `browserTier.test.ts` refuses a second answer to the same question (GitHub issue #268). A
+     * page that threw on its way here fails through that gate, which is the point: the claim is
+     * *the build is fully playable muted*, and a stage that reached its chips without throwing is
+     * what that reduces to on this tier.
+     */
+    await page.click('.everyday-rail-menu');
+    await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
+    /* § D525: the front door is a Scenario entry now — the tile, then the entry. */
+    await page.click('.everyday-mode[data-screen="scenario"]');
+    await page.click('.everyday-scenario-entry[data-entry="today"]');
+    await page.waitForSelector('.everyday-door');
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-brief');
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-stage-speed[aria-pressed="true"]', { timeout: 60_000 });
+    await page.close();
+  });
+
+  /**
    * **Clear saved progress, end to end — GitHub issue #229, [§ D500](../../../../DECISIONS.md).**
    * Two presses; both slots gone; and the page reloads into a first visit. The middle claim is the
    * one the pure half cannot make, and the third is what stops the sealed shell's week coming back.

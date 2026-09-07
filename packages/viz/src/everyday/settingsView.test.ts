@@ -17,6 +17,7 @@ import {
   type AccountState,
 } from '../menu/account.js';
 
+import { SOUND_ROW_COPY } from './audio.js';
 import { AVATAR_SWATCHES } from './profile.js';
 import { railFooter } from './rail.js';
 import {
@@ -26,6 +27,7 @@ import {
   SIGN_IN_COPY,
   settingsScreenViewOf,
   type SettingsSignInStage,
+  type SettingsToggleView,
 } from './settingsView.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
 
@@ -180,7 +182,7 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
 
   it('draws the Motion row’s absence — not the row — while the Engineer surface is booting', () => {
     const view = settingsScreenViewOf({ profile: undefined, reduceMotion: undefined });
-    expect(view.playing.rows.map((row) => row.id)).toEqual(['default-speed', 'units']);
+    expect(view.playing.rows.map((row) => row.id)).toEqual(['sound', 'default-speed', 'units']);
     expect(view.playing.absentNote).toContain('still loading');
     // And never both: a sentence about a missing switch beside the switch would be a contradiction.
     expect(settingsScreenViewOf(BASE).playing.absentNote).toBeUndefined();
@@ -189,21 +191,42 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
      * of its own — it reads the Engineer's — so before the bridge arrives a press would land
      * nowhere. Units holds this device's own preference, so it is drawable from the first paint,
      * and hiding it while an unrelated surface booted would be a control withheld for no reason a
-     * player could act on.
+     * player could act on. **Sound and Default speed are on Units's side of that line** for the
+     * same reason: both are slots in this device's own profile envelope, so both survive a boot
+     * that has not happened yet (GitHub issues #229 and #258).
      */
   });
 
-  it('offers no Sound or posting toggle — those seams do not exist', () => {
+  it('offers no posting toggle — that seam does not exist', () => {
     /*
-     * The roster rule, asserted as a negative — and **Units and Default speed have left this
-     * list**, which is the half worth reading. The evidence for the two that remain is the module
-     * docstring's greps: no audio machinery, no `settings.noPost` flag in this tree
-     * (`honesty/generate.ts` says so outright). Units and Default speed were here on exactly that
-     * footing until each acquired the reader its refusal said did not exist (GitHub issues #170 and
-     * #229).
+     * The roster rule, asserted as a negative — and **Units, Default speed and now Sound have left
+     * this list**, which is the half worth reading. The evidence for the one that remains is the
+     * module docstring's grep: no `settings.noPost` flag in this tree (`honesty/generate.ts` says
+     * so outright). The other three were here on exactly that footing until each acquired the
+     * reader its refusal said did not exist (GitHub issues #170, #229 and #258).
      */
     const ids = settingsScreenViewOf(BASE).playing.rows.map((row) => row.id);
-    expect(ids).toEqual(['motion', 'default-speed', 'units']);
+    expect(ids).toEqual(['motion', 'sound', 'default-speed', 'units']);
+  });
+
+  /**
+   * **Sound — GitHub issue #258, [§ D344](../../../../DECISIONS.md).** The row is total: a caller
+   * that passes nothing draws the shipped default rather than an absent arm, and the pill fills
+   * while there is a sound to hear. What this case cannot see is whether anything is audible —
+   * `audio.test.ts` drives the cues, the tiers and the bed against a real recording.
+   */
+  it('draws Sound in both faces, and defaults to on for a caller that passes nothing', () => {
+    const rowOf = (input: Parameters<typeof settingsScreenViewOf>[0]): SettingsToggleView => {
+      const row = settingsScreenViewOf(input).playing.rows.find((candidate) => candidate.id === 'sound');
+      if (row === undefined) throw new Error('the Sound row is not drawn');
+      return row;
+    };
+    expect(rowOf(BASE).value).toBe(SOUND_ROW_COPY.face.on);
+    expect(rowOf(BASE).on).toBe(true);
+    expect(rowOf({ ...BASE, soundOn: false }).value).toBe(SOUND_ROW_COPY.face.off);
+    expect(rowOf({ ...BASE, soundOn: false }).on).toBe(false);
+    expect(rowOf(BASE).label).toBe(SOUND_ROW_COPY.label);
+    expect(rowOf(BASE).note).toBe(SOUND_ROW_COPY.note);
   });
 
   /**
@@ -287,7 +310,6 @@ describe('This device — statements of fact, and the register of refusals besid
     const entries = SETTINGS_ABSENCES;
     expect(settingsScreenViewOf(BASE)).not.toHaveProperty('absences');
     for (const label of [
-      'Sound',
       'Post runs to the board',
       /*
        * `Switch to Engineer` was the seventh and is deliberately absent — the rail's § 3.2 row
@@ -320,10 +342,18 @@ describe('This device — statements of fact, and the register of refusals besid
       entries.filter((entry) => entry.startsWith('Sign out')),
       'the Sign out refusal outlived the control it refused',
     ).toEqual([]);
-    // § 20.12's own sentence rides with the Sound entry.
-    expect(entries.find((entry) => entry.startsWith('Sound'))).toContain(
-      'a toggle that toggles nothing is a lie',
-    );
+    /*
+     * **`Sound` is asserted gone, in the same direction and for the same reason** — GitHub issue
+     * #258, [§ D344](../../../../DECISIONS.md). Its entry carried § 20.12's own sentence, *a toggle
+     * that toggles nothing is a lie in a settings panel*, which stopped describing this build the
+     * moment `everyday/audioEngine.ts` landed and the row above started writing the preference the
+     * stage reads. Asserted rather than merely dropped from the list above, because a list that
+     * stopped naming it would pass just as well if somebody re-added the entry tomorrow.
+     */
+    expect(
+      entries.filter((entry) => entry.startsWith('Sound')),
+      'the Sound refusal outlived the sound',
+    ).toEqual([]);
   });
 
   /**

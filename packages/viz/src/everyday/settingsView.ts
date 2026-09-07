@@ -18,18 +18,17 @@
  *   `set-setting` intent, so the two surfaces cannot disagree. While the Engineer surface is
  *   still booting the bridge is absent and the row is **absent too**, with a sentence in its
  *   place: a toggle whose write would land nowhere is § 20.12's lie with a race for an excuse.
- * - **Sound — not drawn, and now not drawn *yet*.** `grep -rn "mute\|Audio\|chime"
- *   packages/viz/src --include='*.ts'` finds no audio machinery anywhere in the tree; the
- *   prototype's own build note (§ 15.1) says this row had nothing behind it *there* either. Named
- *   in {@link SETTINGS_ABSENCES} instead. **§ 20.12 offered two ways out and the choice has been
- *   made**: [§ D344](../../../../DECISIONS.md) is a product-owner ruling that audio **ships**,
- *   speed-tiered, overruling the written cut `docs/29-audio-direction.md` recommended — so this
- *   row gains a consumer rather than losing its label. What was blocking it was the speed ladder
- *   having no 1:1 rung for a discrete cue to play at, and § D354 closed that. The entry below is
- *   therefore a **queue item with an owner** (`buildNotes.test.ts#ABSENCE_TRIAGE`, § D370) rather
- *   than a holding position, and it is deleted on the commit that makes a sound play and not
- *   before. [§ D447](../../../../DECISIONS.md) records that reading and the correction it owed the
- *   design guide, whose § 20.12 and § 15.1 both still put the choice as open.
+ * - **Sound — shipped, and it is the newest of the wired rows** (GitHub issue #258,
+ *   [§ D344](../../../../DECISIONS.md)). It was refused here for as long as the grep behind the
+ *   refusal was true — `grep -rn "mute\|Audio\|chime" packages/viz/src` found no audio machinery
+ *   anywhere in the tree — and the refusal named the one thing that had to change first: the speed
+ *   ladder had no 1:1 rung for a discrete cue to play at. § D354 built the rung and this row's
+ *   consumer is `everyday/audio.ts`, whose crossover is computed from the building's own doors
+ *   rather than chosen. **§ 20.12 offered two ways out and the owner took the first**: audio ships,
+ *   speed-tiered, overruling the written cut `docs/29-audio-direction.md` recommended, and
+ *   [§ D447](../../../../DECISIONS.md) records that reading. Presentation only — the run is
+ *   byte-identical either way, which `audio.test.ts` asserts rather than promises — so the row
+ *   lives in the Everyday slot beside Units for Units's reason.
  * - **Default speed — shipped** (GitHub issue #229). It used to be refused here on the ground
  *   that the day a player runs was the Engineer stage, whose ×-chips mean *how fast to watch a
  *   recording*; § 7's stage has been the Everyday stage since § D335, its ladder is
@@ -126,6 +125,11 @@ import {
  * it was keeping, and the arrow runs one way: that module has never imported this one.
  */
 import { DEFAULT_STAGE_SIM_PER_REAL_S, STAGE_SPEEDS } from './stageScreenModel.js';
+/*
+ * The Sound row's words, authored beside the mechanism they describe rather than here — § D227's
+ * rule, and `everyday/units.ts#UNITS_ROW_COPY`'s placement one row down.
+ */
+import { DEFAULT_SOUND_ON, SOUND_ROW_COPY, type SoundPreference } from './audio.js';
 import {
   DEFAULT_EVERYDAY_UNITS,
   UNITS_ROW_COPY,
@@ -389,7 +393,7 @@ function signInViewOf(input: SettingsScreenInput): SettingsSignInView {
 
 /** One shipped toggle row — label, one-clause effect, and the pill's two faces. */
 export interface SettingsToggleView {
-  readonly id: 'motion' | 'units' | 'default-speed';
+  readonly id: 'motion' | 'units' | 'default-speed' | 'sound';
   readonly label: string;
   /** § 16's register: what the row does, in one clause. */
   readonly note: string;
@@ -497,7 +501,17 @@ export interface SettingsScreenView {
  * been this defect again with a fresher number.
  */
 export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
-  'Sound — nothing in this build plays a sound, and a toggle that toggles nothing is a lie in a settings panel',
+  /*
+   * **`Sound` was the first entry and it is deleted, not reworded** — GitHub issue #258,
+   * [§ D344](../../../../DECISIONS.md). It read *"nothing in this build plays a sound, and a
+   * toggle that toggles nothing is a lie in a settings panel"*, which was the design guide's own
+   * § 20.12 sentence carried onto the screen it is about. **Both halves stopped being true on the
+   * same commit**: `everyday/audio.ts` decides the cues and the bed, `everyday/audioEngine.ts`
+   * plays them, and the row above writes `everydayProfileStore().setSoundOn()`, which the stage
+   * reads on every frame. The triage row that owned it goes on the same commit
+   * (`buildNotes.test.ts#ABSENCE_TRIAGE`), and `settingsView.test.ts` asserts in the inverted
+   * direction that no entry starting `Sound` comes back.
+   */
   /*
    * **`Default speed` was the second entry and it is deleted, not reworded** — GitHub issue #229.
    * It read *"the stage has its own N speeds and resets to the same one on every run, so the
@@ -594,6 +608,12 @@ export interface SettingsScreenInput {
    * absent, which is the same window the Motion row has. Optional for the corpus's convenience and
    * read as `'ready'` when the bridge is present and nothing has been pressed.
    */
+  /**
+   * `everydayProfileStore().soundOn()` — whether a run makes a noise (GitHub issue #258). Optional
+   * on {@link units}'s footing: the store is total in it, so `undefined` means *a caller did not
+   * pass it* and the shipped default is drawn. This row never has an absent arm.
+   */
+  readonly soundOn?: SoundPreference | undefined;
   readonly clearStage?: SettingsClearStage | undefined;
   /**
    * `everyday/accountPort.ts#everydayAccount()` — `undefined` while the Engineer surface is
@@ -688,6 +708,19 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
                 on: input.reduceMotion !== true,
               },
             ] as const)),
+        {
+          /*
+           * § 15.1's *Sound* row — GitHub issue #258. Above the speed row because the two are
+           * about the same thing from opposite ends: the ladder decides which tier of sound a
+           * player is in, and this decides whether they hear it at all.
+           */
+          id: 'sound',
+          label: SOUND_ROW_COPY.label,
+          note: SOUND_ROW_COPY.note,
+          value: (input.soundOn ?? DEFAULT_SOUND_ON) ? SOUND_ROW_COPY.face.on : SOUND_ROW_COPY.face.off,
+          /* Filled while there is a sound to hear — the Motion row's reading, not the Units one. */
+          on: input.soundOn ?? DEFAULT_SOUND_ON,
+        },
         {
           id: 'default-speed',
           label: DEFAULT_SPEED_ROW_COPY.label,

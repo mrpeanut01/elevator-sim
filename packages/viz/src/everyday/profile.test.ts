@@ -36,7 +36,9 @@ import {
   solvedCaseSetOf,
   type EverydayProgress,
   loadDefaultSpeed,
+  loadSound,
 } from './profile.js';
+import { DEFAULT_SOUND_ON } from './audio.js';
 
 /** A working backing slot. */
 function memoryBacking(): SessionStore & { readonly slots: Map<string, string> } {
@@ -125,16 +127,16 @@ describe('persistence, both directions', () => {
     backing.slots.set('elevator-sim.everyday-profile', 'not json');
     expect(loadProfile(backing)).toBeUndefined();
     /*
-     * **Version 4, not version 3 and not version 2** — and the change is the point rather than an
-     * edit to keep a case green. This assertion read `schemaVersion: 2` from the day it was
-     * written, because 2 was the first unknown shape; issue #224 made 2 the shape this build
-     * *writes*, and issue #170's Units half made 3. Each time, the unreadable one moves up by one
-     * and the claim is unchanged: a version outside `PROFILE_SCHEMA_VERSIONS_READ` is refused
-     * rather than guessed at.
+     * **Version 6, not 5 and not 4** — and the change is the point rather than an edit to keep a
+     * case green. This assertion read `schemaVersion: 2` from the day it was written, because 2
+     * was the first unknown shape; issue #224 made 2 the shape this build *writes*, issue #170's
+     * Units half made 3, issue #229's Default speed made 4 and issue #258's Sound made 5. Each
+     * time, the unreadable one moves up by one and the claim is unchanged: a version outside
+     * `PROFILE_SCHEMA_VERSIONS_READ` is refused rather than guessed at.
      */
     backing.slots.set(
       'elevator-sim.everyday-profile',
-      JSON.stringify({ schemaVersion: 5, profile: DEFAULT_EVERYDAY_PROFILE }),
+      JSON.stringify({ schemaVersion: 6, profile: DEFAULT_EVERYDAY_PROFILE }),
     );
     expect(loadProfile(backing)).toBeUndefined();
     // And in the other direction: version 0 is older than anything this build reads.
@@ -335,11 +337,12 @@ describe('the version 1 → 2 migration', () => {
     const store = createProfileStore(backing);
     expect(store.setProgress({ solvedCaseIds: ['leaky-lobby'], ratings: [] })).toBe(true);
     expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toEqual({
-      schemaVersion: 4,
+      schemaVersion: 5,
       profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
       progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
       units: 'metric',
       defaultSpeedSimPerRealS: 30,
+      soundOn: true,
     });
     expect(loadProfile(backing)).toEqual({ name: 'Nadia R.', avatarColor: '#4F8A5B' });
   });
@@ -381,11 +384,12 @@ describe('the version 2 → 3 migration, and the units preference beside it', ()
     expect(store.setUnits('imperial')).toBe(true);
     expect(store.units()).toBe('imperial');
     expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toEqual({
-      schemaVersion: 4,
+      schemaVersion: 5,
       profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
       progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
       units: 'imperial',
       defaultSpeedSimPerRealS: 30,
+      soundOn: true,
     });
     expect(loadUnits(backing)).toBe('imperial');
   });
@@ -483,11 +487,12 @@ describe('the version 3 → 4 migration, the default speed beside it, and the cl
     expect(store.setDefaultSpeed(90)).toBe(true);
     expect(store.defaultSpeed()).toBe(90);
     expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toEqual({
-      schemaVersion: 4,
+      schemaVersion: 5,
       profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
       progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
       units: 'imperial',
       defaultSpeedSimPerRealS: 90,
+      soundOn: true,
     });
     expect(loadDefaultSpeed(backing)).toBe(90);
     // A value off the ladder is not stored — a stage opening at a pace no chip names is the inert
@@ -529,9 +534,10 @@ describe('the version 3 → 4 migration, the default speed beside it, and the cl
     // A write after the clear is a fresh envelope, not the old one coming back.
     expect(store.setProgress({ solvedCaseIds: ['new-start'], ratings: [] })).toBe(true);
     expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 5,
       progress: { solvedCaseIds: ['new-start'], ratings: [] },
       units: 'metric',
+      soundOn: true,
     });
     // A memory-only store forgets and says the removal reached nothing.
     const memory = createProfileStore(undefined);
@@ -541,13 +547,91 @@ describe('the version 3 → 4 migration, the default speed beside it, and the cl
   });
 });
 
+describe('the version 4 → 5 migration, and the Sound preference beside it — GitHub issue #258', () => {
+  function versionFourSlot(): SessionStore & { readonly slots: Map<string, string> } {
+    const backing = memoryBacking();
+    backing.slots.set(
+      SLOT,
+      JSON.stringify({
+        schemaVersion: 4,
+        profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
+        progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
+        units: 'imperial',
+        defaultSpeedSimPerRealS: 90,
+      }),
+    );
+    return backing;
+  }
+
+  it('reads a version 4 envelope as a player who never chose, keeping the other four', () => {
+    /*
+     * **The one migration in this file where *the absence determines the value* points at the
+     * shipped default rather than at what the earlier build produced**, and the case exists to pin
+     * that rather than to exercise the spread. Every build before version 5 was silent — but it
+     * was silent because it had no sound, not because anybody asked it to be quiet, and restoring
+     * silence as a preference would be inventing a choice this player never made.
+     */
+    const backing = versionFourSlot();
+    expect(loadSound(backing)).toBe(DEFAULT_SOUND_ON);
+    expect(loadDefaultSpeed(backing)).toBe(90);
+    expect(loadUnits(backing)).toBe('imperial');
+    expect(loadProfile(backing)).toEqual({ name: 'Nadia R.', avatarColor: '#4F8A5B' });
+    expect(loadProgress(backing).progress.solvedCaseIds).toEqual(['leaky-lobby']);
+  });
+
+  it('round-trips a chosen silence, and carries the other four payloads with it', () => {
+    const backing = versionFourSlot();
+    const store = createProfileStore(backing);
+    expect(store.soundOn()).toBe(DEFAULT_SOUND_ON);
+    expect(store.setSoundOn(false)).toBe(true);
+    expect(store.soundOn()).toBe(false);
+    expect(JSON.parse(backing.slots.get(SLOT) ?? '{}')).toEqual({
+      schemaVersion: 5,
+      profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
+      progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
+      units: 'imperial',
+      defaultSpeedSimPerRealS: 90,
+      soundOn: false,
+    });
+    expect(loadSound(backing)).toBe(false);
+  });
+
+  it('reads a stored value that is not a boolean as the default, never as silence', () => {
+    // Neither a missing key nor a corrupted one is a player asking for quiet — `withSound`'s rule,
+    // asserted rather than argued.
+    for (const bad of [0, 'off', null, {}]) {
+      const slot = memoryBacking();
+      slot.slots.set(
+        SLOT,
+        JSON.stringify({
+          schemaVersion: 5,
+          profile: DEFAULT_EVERYDAY_PROFILE,
+          progress: EMPTY_EVERYDAY_PROGRESS,
+          units: 'metric',
+          defaultSpeedSimPerRealS: 30,
+          soundOn: bad,
+        }),
+      );
+      expect(loadSound(slot), JSON.stringify(bad)).toBe(DEFAULT_SOUND_ON);
+    }
+  });
+
+  it('resets to the default on a clear, so the slot leaks nothing the player set', () => {
+    const backing = versionFourSlot();
+    const store = createProfileStore(backing);
+    expect(store.setSoundOn(false)).toBe(true);
+    store.clear();
+    expect(store.soundOn()).toBe(DEFAULT_SOUND_ON);
+  });
+});
+
 describe('a store this build cannot read degrades to a labelled refusal', () => {
   /** Every corrupting shape, and the sentence a player meets for it. */
   const CORRUPTIONS: readonly (readonly [string, string, string])[] = [
     ['bytes that are not JSON at all', 'not json', PROGRESS_REFUSALS.parse],
     [
       'a version this build does not read',
-      JSON.stringify({ schemaVersion: 5, profile: DEFAULT_EVERYDAY_PROFILE, progress: {} }),
+      JSON.stringify({ schemaVersion: 6, profile: DEFAULT_EVERYDAY_PROFILE, progress: {} }),
       PROGRESS_REFUSALS.version,
     ],
     [

@@ -62,7 +62,7 @@ import type { DispatcherProfile } from '@elevator-sim/core/browser';
 import { drawCutaway, sizeCanvas } from './cutaway.js';
 import { Playback } from '../playback/playback.js';
 import { systemClock } from '../playback/clock.js';
-import type { VizRecording } from '../contract/types.js';
+import type { Frame, VizRecording } from '../contract/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { queueAt } from '../frame/overlay.js';
 import { observationsAt } from '../live/observations.js';
@@ -112,6 +112,18 @@ import {
   type StageSwitchTarget,
 } from './stageScreenModel.js';
 import { everydayProfileStore } from './profileStore.js';
+/*
+ * § D344's sound — GitHub issue #258. The decisions are `audio.ts`', the graph is
+ * `audioEngine.ts`', and this file holds the two frames, the limiter's memory and the context.
+ */
+import {
+  audioCrossoverOf,
+  audioPlanFor,
+  NO_AUDIO_YET,
+  type AudioCrossover,
+  type AudioDirectorState,
+} from './audio.js';
+import { createAudioSink, type AudioSink } from './audioEngine.js';
 import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import {
   EVERYDAY_COLORS as C,
@@ -275,6 +287,15 @@ function mountStage(
   let playback: Playback | undefined;
   let adopted: VizRecording | undefined;
   let speedIndex = defaultSpeedIndex();
+  /* ---- § D344's sound — GitHub issue #258. Four cells, none of which a leg can read. ---- */
+  /** The synthesised sink, built on the first frame that has something to play. */
+  let audioSink: AudioSink | undefined;
+  /** This building's discrete-cue ceiling and its lobbies. Recomputed on `adopt`, never per frame. */
+  let audioCrossover: AudioCrossover | undefined;
+  /** The frame the last cue check compared against — the transition detector's other half. */
+  let audioBefore: Frame | undefined;
+  /** The chime rate limiter's memory. */
+  let audioState: AudioDirectorState = NO_AUDIO_YET;
   /** § 7.3's camera — GitHub issue #324. A view over the recording; it writes nothing to the run. */
   let camera: StageCameraId = 'whole';
   let started = false;
@@ -913,6 +934,12 @@ function mountStage(
     if (playback.state === 'playing') playback.pause();
     else {
       started = true;
+      /*
+       * The one place a player gesture reaches the sound — GitHub issue #258. A browser suspends
+       * an `AudioContext` built outside a gesture, so Play is where it is let out; a stage that
+       * never gets pressed makes no noise, which is also the honest answer.
+       */
+      audioSink?.wake();
       playback.play();
     }
     syncTransport();
@@ -1167,6 +1194,13 @@ function mountStage(
       speedIndex = defaultSpeedIndex();
       started = false;
     }
+    /*
+     * A new recording is a new building — GitHub issue #258. The crossover is the old tower's
+     * doors and the remembered frame is the old tower's cars, so both are dropped rather than
+     * carried; a stale `audioBefore` would announce every car in the new lobby at once.
+     */
+    audioCrossover = undefined;
+    audioBefore = undefined;
     playback = new Playback(recording, systemClock(), {
       speed: stageSpeedAt(speedIndex).simPerRealS,
       ...(resumeAtS === undefined ? {} : { startAtS: resumeAtS }),
@@ -1363,12 +1397,75 @@ function mountStage(
     return (watching === undefined ? undefined : SPECTATOR_MAKES_NO_CHANGES) ?? view.refusal;
   }
 
+  /**
+   * **One frame of sound** — § D344's design, driven from the same playhead the picture is.
+   *
+   * Every judgement is `everyday/audio.ts`', and this function makes none of them: it holds the
+   * two frames the cue detector compares, the limiter's memory and the context, and hands them
+   * over. `docs/16` S2's *"the sink must be the shipped decision"* is why there is no arithmetic
+   * here to get wrong.
+   *
+   * **The context is built lazily and only when there is something to play**, which is what makes
+   * *the build is fully playable muted* a fact about the code rather than a claim: a player with
+   * Sound off never causes an `AudioContext` to exist, so there is nothing to fail, suspend or
+   * leak. The `typeof` guard is for the node tier, where `stageScreen.test.ts` drives this mount
+   * against a document that has no Web Audio at all.
+   */
+  function sound(recording: VizRecording, frame: Frame, observations: LiveObservations): void {
+    const soundOn = everydayProfileStore().soundOn();
+    if (!soundOn && audioSink === undefined) {
+      /* Nothing exists and nothing should; keep the frame so unmuting does not fire a backlog. */
+      audioBefore = frame;
+      return;
+    }
+    if (soundOn && audioSink === undefined) {
+      if (typeof AudioContext === 'undefined') {
+        audioBefore = frame;
+        return;
+      }
+      audioSink = createAudioSink(new AudioContext());
+      /*
+       * Woken on creation as well as from Play, because the two orders both happen. A stage
+       * mounted and then played builds the context on the frame before the press and is woken by
+       * it; a stage whose first frame is already playing builds it *after* the press, and would
+       * otherwise sit suspended until the player pressed pause and play again. By this point the
+       * document has sticky user activation — a run is reached through several presses — so this
+       * is a resume rather than an attempt to make a noise nobody asked for.
+       */
+      audioSink.wake();
+    }
+    const sink = audioSink;
+    if (sink === undefined) return;
+    audioCrossover ??= audioCrossoverOf(recording);
+    const planned = audioPlanFor({
+      crossover: audioCrossover,
+      simPerRealS: stageSpeedAt(speedIndex).simPerRealS,
+      before: audioBefore,
+      now: frame,
+      observations,
+      realTimeS: sink.now(),
+      soundOn,
+      state: audioState,
+    });
+    audioState = planned.state;
+    audioBefore = frame;
+    sink.play(planned.plan);
+  }
+
   /** One paint: the header, the cutaway, the alarm, the strip. */
   function draw(): void {
     const recording = adopted;
     if (recording === undefined || playback === undefined) return;
     const simTimeS = playback.simTimeS;
     const observations: LiveObservations = observationsAt(recording, simTimeS);
+    /*
+     * Hoisted out of the canvas branch below for GitHub issue #258. It was computed only over a
+     * laid-out canvas, which is correct for a picture and wrong for a sound: the cues are the
+     * building's own doors and they do not stop happening because a box has no height yet. The
+     * function is pure, so this is the same value the branch used to make for itself.
+     */
+    const frame = frameAt(recording, simTimeS);
+    sound(recording, frame, observations);
     const labelOf = (id: string): string =>
       recording.floors.find((floor) => floor.id === id)?.label ?? id;
 
@@ -1421,7 +1518,6 @@ function mountStage(
     const ctx = sizeCanvas(canvas);
     if (ctx !== undefined) {
       const rect = canvas.getBoundingClientRect();
-      const frame = frameAt(recording, simTimeS);
       /*
        * The camera chips exist exactly where a window would change the picture — GitHub issue #324.
        * Decided only over a laid-out canvas: a box with no height yet (the first paint before layout,
@@ -1847,6 +1943,12 @@ function mountStage(
       unsubscribe();
       playback = undefined;
       adopted = undefined;
+      /* The graph and its context go with the mount — GitHub issue #258. */
+      audioSink?.close();
+      audioSink = undefined;
+      audioBefore = undefined;
+      audioCrossover = undefined;
+      audioState = NO_AUDIO_YET;
       /*
        * {@link watchFacts} is module state and outlives this mount, so it is cleared here rather
        * than left for the next one to overwrite: a refusal about somebody else's record, still

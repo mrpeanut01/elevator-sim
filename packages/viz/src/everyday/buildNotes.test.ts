@@ -83,8 +83,9 @@ describe('the build-information panel', () => {
     // GitHub issue #177 item 1 handed a past day back over a replay week (§ D517), and 8 → 6 when
     // item 5 wrote the designer's escalator rows and folded its document (§ D518) — and 6 → 5 when
     // GitHub issue #375 persisted the career and deleted the session-only entry that said it did
-    // not (§ D227, § D525).
-    expect(view.entryCount).toBeGreaterThan(5);
+    // not (§ D227, § D525) — and 5 → 4 when GitHub issue #258 built the sound the settings
+    // register had been refusing since the screen shipped (§ D344).
+    expect(view.entryCount).toBeGreaterThan(4);
   });
 
   it('says which build it is, in a sentence the corpus sweeps — GitHub issue #246', () => {
@@ -261,7 +262,12 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   { register: 'CAMPAIGN_ABSENCES', fragment: 'nothing files on', issue: 223 },
 
   /* Settings. Two of the six are #229's remainder after its premise was refuted (§ D368). */
-  { register: 'SETTINGS_ABSENCES', fragment: 'Sound —', issue: 258 },
+  /*
+   * `Sound` left this table on the commit that built it — GitHub issue #258, § D344. The row it
+   * owned is drawn on the settings screen now and the sound behind it is `everyday/audio.ts`'s, so
+   * a triage row still pointing at a deleted entry is what this table's second assertion exists to
+   * refuse.
+   */
   /*
    * `Default speed` and `Clear saved progress` left this table on the commit that built both —
    * GitHub issue #229. The rows they owned are drawn on the settings screen now, and a triage row
