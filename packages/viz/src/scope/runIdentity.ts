@@ -165,6 +165,7 @@ import {
 } from '../shift/calendar.js';
 
 import { permits } from './permits.js';
+import { switchWireOf } from './switchWire.js';
 import { SCOPE_OF } from './surface.js';
 import type { PlayMode, ScopeIssue, SurfaceKey } from './types.js';
 
@@ -246,6 +247,31 @@ type CarryCheck = (state: ViewerState, resources: BrowserResources) => string | 
  * arrangement: the table is exported, the module that needs it consumes it, and the test settles
  * whether the two agree.
  */
+/**
+ * The intervention kinds the wire carries — `packages/server`'s `SUBMITTABLE_INTERVENTION_KINDS`,
+ * restated here because `viz` may not import the server, and asserted equal to it by
+ * `runIdentity.test.ts` so the two cannot drift. Both parking kinds carry nothing but their instant.
+ */
+export const CARRIED_INTERVENTION_KINDS: readonly string[] = Object.freeze([
+  'park-cars-lobby',
+  'spread-cars',
+  'switch-dispatcher',
+]);
+
+/**
+ * `answer-incident`'s refusal, and it is **permanent** — GitHub issue #338,
+ * [§ D486](../../../../DECISIONS.md). Not a missing field: `shift/incidents.ts` writes the incident
+ * onto the *building* as `serviceEvents` from the week's day and the calendar, and a replay built
+ * from ids would hold the answer and not the thing answered — the option's own service events would
+ * be the only mode changes in the run, the legs would differ, and the server would verify **that**
+ * run as honest. A refusal that prevents a verified-but-wrong replay is a feature, and it stops
+ * being tracked as a gap. The route out is named and not recommended: the incident would have to be
+ * derivable server-side from causes that travel, or carried as submitted data, which is § D481's
+ * cheat lever exactly — a player who picks their own incident picks their own difficulty.
+ */
+export const ANSWER_INCIDENT_STAYS_REFUSED =
+  'an incident answer names service events for an incident no selection or submission carries, so a replay would hold the answer and not the thing answered — and that stays so by design, because a replay that verified the answer alone would verify a different day as this one';
+
 export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze({
   week: (state) => weekCarries(state),
 
@@ -270,10 +296,11 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
    *    3 %, where the log moves `awtS` from 23.0038 to 26.2945. So this ground is out, exactly as it
    *    said it would be.
    * 2. **A `switch-dispatcher` entry carries a whole weight vector inline**, and `submission.ts`'s
-   *    founding rule is *ids rather than inline objects*. That ground was called structural and it
-   *    is: the wire could only ever carry a switch as a *shipped profile id*, which is a different
-   *    field from the one the arm needs locally, because the viewer's driving profile is routinely a
-   *    derived object no id resolves. It stands.
+   *    founding rule is *ids rather than inline objects*. That ground was called structural, and
+   *    **§ D486 overturned it**: every clause of it is equally true of the run's base profile, and
+   *    the base profile posts — as a shipped id plus the player's rows, re-derived by the server.
+   *    A switch travels the same way (`scope/switchWire.ts`), and what stays refused is the narrow
+   *    case the base already lives under: a target no shipped profile plus rows can express.
    *
    * **And a third has been found, which is why this is not simply ground 2.** An `answer-incident`
    * answers a campaign incident, and `shift/incidents.ts` writes that incident onto the *building*
@@ -290,24 +317,40 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
    * The message names only the kinds actually present, because a refusal citing a cheat the player
    * did not make is the accusation-shaped defect this module exists to avoid.
    */
-  interventions: (state) => {
-    const refused = [...new Set(state.interventions.map((entry) => entry.change.kind))]
-      .filter((kind) => kind !== 'park-cars-lobby')
+  interventions: (state, resources) => {
+    /*
+     * Two questions, kept apart because their answers have different lifetimes (GitHub issue #338,
+     * § D486). A kind the wire does not carry — `answer-incident` — is refused by kind, and that
+     * refusal is permanent. A `switch-dispatcher` **is** carried, as the shipped id it resolves to
+     * plus the player's rows, so it is refused only per entry, and only when its target is a vector
+     * no shipped profile plus rows can express: the narrow, consistent bound the base profile
+     * already lives under, rather than the category refusal that stood here for two waves.
+     */
+    const kinds = [...new Set(state.interventions.map((entry) => entry.change.kind))];
+    const refusedKinds = kinds
+      .filter((kind) => !CARRIED_INTERVENTION_KINDS.includes(kind))
       .sort((left, right) => left.localeCompare(right));
-    if (refused.length === 0) return undefined;
-    const clauses = refused.map((kind) =>
-      kind === 'switch-dispatcher'
-        ? 'a mid-run dispatcher switch carries its weight vector inline, which a submission of ids may never hold'
-        : 'an incident answer names service events for an incident no selection or submission carries, so a replay would hold the answer and not the thing answered',
-    );
+    const clauses: string[] = refusedKinds.map(() => ANSWER_INCIDENT_STAYS_REFUSED);
+    const shipped = resources.dispatcherProfiles.profiles;
+    const unpostable = new Set<string>();
+    for (const entry of state.interventions) {
+      if (entry.change.kind !== 'switch-dispatcher') continue;
+      if (switchWireOf(entry.change.profile, shipped) === undefined) unpostable.add(entry.change.profile.name);
+    }
+    if (unpostable.size > 0) {
+      clauses.push(
+        `a mid-run handover to ${listOf([...unpostable].map((name) => `“${name}”`))} names a hand-tuned dispatcher that no shipped one plus your rules can express, and a submission carries dispatchers by id`,
+      );
+    }
+    if (clauses.length === 0) return undefined;
     /*
      * `an intervention of kind` / `interventions of kind`, rather than an article before each name:
      * *a “answer-incident”* is the shape a template produces when it puts an article in front of a
      * value it does not know the first letter of, and this string is read by a player.
      */
-    const noun = refused.length === 1 ? 'an intervention of kind' : 'interventions of kind';
-    const kinds = listOf(refused.map((kind) => `“${kind}”`));
-    return `this day's record holds ${noun} ${kinds}, and ${listOf(clauses)}`;
+    const named = [...refusedKinds, ...(unpostable.size > 0 ? ['switch-dispatcher'] : [])];
+    const noun = named.length === 1 ? 'an intervention of kind' : 'interventions of kind';
+    return `this day's record holds ${noun} ${listOf(named.map((kind) => `“${kind}”`))}, and ${listOf(clauses)}`;
   },
 
   /**
@@ -393,6 +436,23 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
         'doors, a landing panel or a tenant negotiation — and neither a selection nor a submission ' +
         'carries any of it, so this run would be replayed against the building and the dispatcher ' +
         'the data ships',
+
+  /**
+   * § 8's campaign event — `campaignFitOut`'s footing, one field over (GitHub issues #171 and
+   * #169 item 1, § D507).
+   *
+   * Asked as *is the field set?* rather than *is the event ordinary?*, and unlike the fabric arm
+   * that is the right question here: a submission of ids replays under the **week's** calendar,
+   * so even a campaign day whose event is `ordinary` would be replayed under whatever the week's
+   * rota says for that day, and a breakdown or a coach party would be replayed against a run that
+   * never had one. `undefined` is the only value that carries, and it is what every non-campaign
+   * path leaves here.
+   */
+  campaignEventId: (state) =>
+    state.campaignEventId === undefined
+      ? undefined
+      : 'this is a § 8 campaign day running under the campaign’s own event, and a submission ' +
+        'carries no event — a replay would run the week’s calendar instead',
 
   /**
    * The patience curve — the field the UI readiness audit's B4 made reachable.

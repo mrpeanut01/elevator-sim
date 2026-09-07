@@ -16,6 +16,7 @@
  *    silently rewrote a building it was handed nothing for.
  */
 
+import { isServiceModeEvent, type ResolvedServiceModeEvent } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
 import { recordRun } from '../record/recordRun.js';
@@ -167,7 +168,9 @@ describe('the incident reaches the simulation', () => {
      * `2/3 × 1800 = 1200 s` and must board somebody after it.
      */
     const plan = shiftRunConfigOf(RESOURCES, moveInDay());
-    const events = plan.building.serviceEvents ?? [];
+    const events = (plan.building.serviceEvents ?? []).filter(
+      (event): event is ResolvedServiceModeEvent => isServiceModeEvent(event),
+    );
     expect(events.length, 'the grown building carries the incident').toBe(2);
 
     const out = events.find((event) => event.mode === 'out-of-service');

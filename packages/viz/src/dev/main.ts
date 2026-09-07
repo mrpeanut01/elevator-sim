@@ -139,6 +139,7 @@ import type { WaitBandDefinition, WaitBands } from '../live/types.js';
 import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
+  SPREAD_CARS_LABEL,
   RECOMPUTING_BEAT,
   switchChangesNothing,
   SWITCH_PINS_NOTE,
@@ -165,6 +166,8 @@ import {
 import { systemClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
 import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
+import { assertSameCrowd } from '../record/crowd.js';
+import { wireInterventionsOf } from '../scope/switchWire.js';
 import { recordRun } from '../record/recordRun.js';
 import {
   DEFAULT_THEME,
@@ -263,6 +266,7 @@ import {
   disclosureOf,
   drivingProfileOf,
   initialState,
+  withFirstSession,
   profileById,
   resolvedBuildingOf,
   shiftRunConfigOf,
@@ -1701,6 +1705,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       loadedWithNothingRestored = restored.failure.kind === 'absent';
       if (restored.failure.kind !== 'absent') clearSession(sessionStore);
+      /*
+       * The first-ever load, and the third consumer of the same read — GitHub issue #208, § D475.
+       * A device with no session draws its first tower from the legible set on a named stream off
+       * the seed it was just given, unless the address named a building, which is the player's own
+       * choice and wins. Nothing is stored: a reload that finds a session finds the week the draw
+       * opened, and one that finds none draws again from a fresh seed, which is § D476's shape.
+       */
+      else if (!new URLSearchParams(window.location.search).has('building')) {
+        state = withFirstSession(state, resources);
+      }
       return;
     }
     menuState = {
@@ -1750,8 +1764,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let weekNotice: string | undefined;
 
+  /**
+   * **Sealed** once *Clear saved progress* has been pressed — GitHub issue #229, § D500. A sealed
+   * shell writes nothing more for the life of the page: the week in memory is the one the player
+   * asked to forget, and every save site below would otherwise put it straight back. Cleared by a
+   * reload and by nothing else.
+   */
+  let sessionSealed = false;
+
   /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
   function saveSessionNow(): void {
+    if (sessionSealed) return;
     /*
      * **A mode that does not own a week does not write one** — § D231, issue #64's other half.
      *
@@ -2566,7 +2589,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * kind the wire may not carry.
          */
         ...(state.ruleRows.length === 0 ? {} : { ruleRows: state.ruleRows }),
-        ...(state.interventions.length === 0 ? {} : { interventions: state.interventions }),
+        ...(state.interventions.length === 0
+          ? {}
+          : { interventions: wireInterventionsOf(state.interventions, resources.dispatcherProfiles.profiles) }),
       },
       claimed: claim.claimed,
     });
@@ -2606,6 +2631,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
     reduceMotion: () => menuState.settings.reduceMotion,
     setReduceMotion: (value) => {
       dispatchMenu({ kind: 'set-setting', field: 'reduceMotion', value: value ? 'on' : 'off' });
+    },
+    clearSavedSession: () => {
+      // Seal first, then remove — the order is the whole point; see the port's docstring.
+      sessionSealed = true;
+      return clearSession(sessionStore);
+    },
+    reloadPage: () => {
+      window.location.reload();
     },
   };
   provideEngineerSettings(engineerSettingsBridge);
@@ -3314,6 +3347,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
   });
   /*
+   * The opposite verb — GitHub issue #352. The same mechanism as the park press with
+   * `zone-center` where that one writes `lobby`, so the two are one control with two settings and
+   * the later press is the one in force (`Simulation.#idleOverrideAt`). Here as well as on the
+   * Everyday stage, because § D299 § 1 says the Engineer surface may not say less.
+   */
+  const spreadButton = el(document, 'button', {
+    className: 'chip',
+    text: SPREAD_CARS_LABEL,
+    attrs: {
+      type: 'button',
+      title:
+        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
+        'everything before this moment is unchanged, and playback resumes here',
+    },
+  });
+  /*
    * The second intervention — § 20.12's own ordering (*start with park the cars in the lobby,
    * then dispatcher switching*). The target is the plain baseline through `plainBaselineOf`, the
    * § D134 resolution the ghost already uses, so the driver this hands the day to and the rival
@@ -3336,7 +3385,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   setHidden(switchButton, switchTarget === undefined);
   const interventionStrip = el(document, 'div', {
     style: { display: 'flex', 'align-items': 'center', gap: '10px', margin: '0 0 8px' },
-    children: [interventionButton, switchButton, interventionStamp],
+    children: [interventionButton, spreadButton, switchButton, interventionStamp],
   });
   {
     // `.stage-wrap` is the canvas's own wrapper; the strip goes immediately before it.
@@ -3383,6 +3432,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (state.recording === undefined || playback === undefined) return;
     interveneAt(playback.simTimeS, { kind: 'park-cars-lobby' });
   });
+  spreadButton.addEventListener('click', () => {
+    if (state.recording === undefined || playback === undefined) return;
+    interveneAt(playback.simTimeS, { kind: 'spread-cars' });
+  });
   switchButton.addEventListener('click', () => {
     if (state.recording === undefined || playback === undefined) return;
     if (switchTarget === undefined) return;
@@ -3421,6 +3474,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // Disabled rather than hidden while no run is on screen: a control that cannot act now says
     // so (`docs/design` § 7.6's rule), and the title carries what pressing it will do.
     interventionButton.disabled = !hasRun;
+    spreadButton.disabled = !hasRun;
     // Also disabled when the press would genuinely change nothing — a handover to the vector
     // already driving is a control that moves nothing, which § D177 ranks below no control at all.
     switchButton.disabled = !hasRun || switchWouldChangeNothing(view.state);
@@ -3814,7 +3868,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     dailyBoard:
       client === undefined
         ? undefined
-        : () => dailyBoardOf(() => client.boards(), (key, metric) => client.board(key, metric)),
+        : () =>
+            dailyBoardOf(
+              () => client.boards(),
+              (key, metric) => client.board(key, metric),
+              (key) => client.distribution(key),
+            ),
     /*
      * § D489's asking half, as four calls — GitHub issue #332. `undefined` on a build served with
      * no API origin, which is what lets the Everyday settings screen say *there is nowhere to sign
@@ -4269,6 +4328,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       onDone: (recording) => {
         ghostInFlight = false;
         if (state.recording !== primaryRecording) return; // a later day superseded this race
+        // GitHub issue #350 — the race's claim: *the same crowd, which is the whole of CRN*. The
+        // strip draws the two on one scale, and this is the assertion behind that.
+        assertSameCrowd(primaryRecording, recording, 'the race');
         ghostRecording = recording;
         lastRaceKey = '';
         renderAll();
@@ -5269,6 +5331,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // The template's own hour, moved on by the window when the run is a part of a day. Absent for
     // `constant-iso`, which declares none — omission means *this has no hour*, never *midnight*.
     runStartOfDayS = startOfDayS;
+    /*
+     * GitHub issue #350 — the intervention pair's claim, asserted rather than argued. An
+     * intervention re-simulates the day from t = 0 with the log grown by one entry, and every
+     * surface that draws the result says the prefix is bit-identical; that is only true if the
+     * re-run met the same crowd. The previous recording is the unpressed run, this one is the
+     * pressed run, and the legs are compared here, where the two are last both in hand. Guarded
+     * on the same seed and building, because a run that changed either is a new day and not this
+     * claim's subject.
+     */
+    if (
+      runCause === 'intervention' &&
+      state.recording !== undefined &&
+      state.recording.seed === recording.seed &&
+      state.recording.buildingId === recording.buildingId
+    ) {
+      assertSameCrowd(state.recording, recording, 'the intervention pair');
+    }
     // The run this shell simulated — GitHub issue #136, and the only place it is written. See
     // {@link simulatedRecording}.
     simulatedRecording = recording;

@@ -58,6 +58,7 @@ import {
   type SimulationResult,
 } from '@elevator-sim/core/browser';
 
+import { BUILD_VERSION } from '../release/version.js';
 import { StepSeriesBuilder, constantSeries } from '../contract/series.js';
 import {
   VIZ_SCHEMA_VERSION,
@@ -371,12 +372,18 @@ function describeRun(
   });
 
   const { landings, progress } = foldPassengers(result.record.passengers);
-  const legs = describeLegs(result.record.passengers);
+  /* GitHub issue #178 item 9, § D511: the structural refusal `core` joined to each undelivered leg. */
+  const refusals = new Map<string, string>();
+  for (const journey of result.undelivered) {
+    if (journey.structuralRefusal !== undefined) refusals.set(`${journey.journeyId}#${String(journey.legIndex)}`, journey.structuralRefusal);
+  }
+  const legs = describeLegs(result.record.passengers, refusals);
 
   const recording: {
     -readonly [K in keyof VizRecording]: VizRecording[K];
   } = {
     schemaVersion: VIZ_SCHEMA_VERSION,
+    buildVersion: BUILD_VERSION,
     runId: result.runId,
     seed: result.seed,
     buildingId: building.id,
@@ -513,6 +520,17 @@ function describeSummary(result: SimulationResult): VizSummary {
   const { waiting, handlingCapacity, achievedInterval, serviceLevel, energy } = summary;
   return {
     saturated: summary.saturation.saturated,
+    /* Version 13: the diagnosis itself, so a sheet can quote the test rather than re-run one. */
+    saturation: {
+      verdict: summary.saturation.verdict,
+      windowStartS: summary.saturation.windowStartS,
+      windowEndS: summary.saturation.windowEndS,
+      sampleCount: summary.saturation.sampleCount,
+      slopePersonsPerMinute: summary.saturation.slopePersonsPerMinute,
+      projectedGrowthPersons: summary.saturation.projectedGrowthPersons,
+      meanQueueLength: summary.saturation.meanQueueLength,
+      maxQueueLength: summary.saturation.maxQueueLength,
+    },
     awtIsValid: summary.awtIsValid,
     awtInvalidReason: summary.awtInvalidReason,
     /*
@@ -627,7 +645,7 @@ function loadSeries(result: SimulationResult): ReadonlyMap<string, CarLoadSeries
 /**
  * The per-leg projection the fold cannot give back.
  *
- * Ten fields of `PassengerRecord`, not fifteen: see {@link VizLeg} for what is left out and
+ * Twelve fields of `PassengerRecord`, not fifteen: see {@link VizLeg} for what is left out and
  * why. Sorted by `(arrivedAt, passengerId)` so the array's order is total and reproducible —
  * `result.record.passengers` is in generation order, which is deterministic but is not an order
  * anything downstream may binary-search or compare against.
@@ -639,7 +657,10 @@ function loadSeries(result: SimulationResult): ReadonlyMap<string, CarLoadSeries
  * `undefined`s would not equal itself after the trip. `recordRun.test.ts` § *survives a JSON
  * round trip unchanged* is the test that says so.
  */
-function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[] {
+function describeLegs(
+  passengers: readonly PassengerRecord[],
+  refusals: ReadonlyMap<string, string> = new Map(),
+): readonly VizLeg[] {
   const legs = passengers.map((passenger): VizLeg => {
     const leg: {
       -readonly [K in keyof VizLeg]: VizLeg[K];
@@ -649,6 +670,10 @@ function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[]
       destinationFloorId: passenger.destinationFloorId,
       direction: passenger.direction,
       arrivedAt: passenger.arrivedAt,
+      // Written on every leg, `0` and the direct case included — version 11, and `record/crowd.ts`
+      // is the reader of both.
+      legIndex: passenger.legIndex,
+      finalDestinationFloorId: passenger.finalDestinationFloorId,
     };
     if (passenger.boardedAt !== undefined) leg.boardedAt = passenger.boardedAt;
     if (passenger.alightedAt !== undefined) leg.alightedAt = passenger.alightedAt;
@@ -658,6 +683,9 @@ function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[]
     if (passenger.credentialGroup !== undefined) leg.credentialGroup = passenger.credentialGroup;
     // Absent on every leg the building did not turn away, by the same rule the five above keep.
     if (passenger.refusedAt !== undefined) leg.refusedAt = passenger.refusedAt;
+    // Version 12: joined by journey and leg index, absent on every leg `core` did not name.
+    const structural = refusals.get(`${passenger.journeyId}#${String(passenger.legIndex)}`);
+    if (structural !== undefined) leg.structuralRefusal = structural;
     return leg;
   });
   legs.sort((a, b) => a.arrivedAt - b.arrivedAt || a.passengerId.localeCompare(b.passengerId));

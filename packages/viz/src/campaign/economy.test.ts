@@ -73,6 +73,7 @@ function tower(patch: Partial<TowerEconomy> = {}): TowerEconomy {
     difficultyId: 'standard',
     fitted: {},
     bookings: [],
+    spends: [],
     trips: 0,
     serviceAt: 45_000,
     refit: 0,
@@ -417,12 +418,19 @@ describe('§ 8.5’s renewal pricing', () => {
     expect(renewalOffer(tower({ day: 20, missed: 9, rate: 2 })).offered).toBe(2);
   });
 
-  it('publishes a complexity only for the buildings § 8.5 names', () => {
+  it('publishes § 8.5’s six as authored, and the two it does not name between the neighbours § D519 placed them by', () => {
     expect(complexityOf('garden-apartments')).toBe(1);
     expect(complexityOf('vertical-city')).toBe(COMPLEXITY_MAX);
-    // § 8.5's table names no complexity for these two, and none is invented for them.
-    expect(complexityOf('secure-tower')).toBeUndefined();
-    expect(complexityOf('mixed-use-high-rise')).toBeUndefined();
+    // GitHub issue #169 item 4: authored with the measurement attached, not fitted. Secure Tower
+    // sits with Crown Hotel on days cleared and with Chancery House on work per ride, one step up
+    // for its two banks and its credential gate; Mixed-Use High-Rise sits with Midtown on days
+    // cleared and above Vertical City on work per ride, one step below the 5 Vertical City keeps.
+    expect(complexityOf('secure-tower')).toBe(complexityOf('crown-hotel'));
+    expect(complexityOf('secure-tower')).toBe((complexityOf('chancery-house') ?? 0) + 1);
+    expect(complexityOf('mixed-use-high-rise')).toBe((complexityOf('midtown-office') ?? 0) + 1);
+    expect(complexityOf('mixed-use-high-rise')).toBe((complexityOf('vertical-city') ?? 0) - 1);
+    // And an id no table names is still refused rather than defaulted.
+    expect(complexityOf('nowhere-tower')).toBeUndefined();
   });
 });
 

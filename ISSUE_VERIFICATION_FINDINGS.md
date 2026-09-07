@@ -1329,7 +1329,9 @@ there it says **four of *seven***.
 
 - **The denominator is stale.** `docs/10:918-936` lists a seven-stage progression; `data/campaign.json`
   and `data/scenario-goals.json` both ship **ten**.
-- **The numerator is stale, and the tree already says so.** `campaign/campaign.test.ts:1023` now
+- **The numerator is stale, and the tree already says so.** `campaign/campaign.test.ts:1023` — the
+  three line citations in this bullet are `stageSixEscalators`, `stageFourFront` and
+  `stageFiveClears.test.ts` since GitHub issue #356 split the file — now
   asserts **stage 6 is not clearable** by any shipped profile and `:791-797` asserts **nothing clears
   stage 4** — both attributed to § D254 — while `:740` asserts stage **5 now does**. Two of the
   doc's four named clearers have flipped and one new one appeared since 2026-07-29.
@@ -1816,7 +1818,7 @@ and the instructive part is that a blanket correction would have introduced two 
 
 | site | why it is safe |
 |---|---|
-| `campaign/campaign.test.ts` ×4 | its three sweeps iterate `config.dispatcherProfiles.profiles` (`:742`, `:792`, `:1024`), so they already covered thirteen; only the words lagged |
+| `campaign/campaign.test.ts` ×4 | its three sweeps iterate `config.dispatcherProfiles.profiles` (`:742`, `:792`, `:1024` — `stageFourFront`, `stageFiveClears` and `stageSixEscalators.test.ts` since #356 split the file), so they already covered thirteen; only the words lagged |
 | `campaign/failStates.ts:276` | prose about those sweeps |
 | `campaign/judge.test.ts:165` | prose about those sweeps |
 | `dev/rightRail.ts:146` | *"eight of the twelve carry a `role`"* — **re-measured**: 13 profiles, **8** carry one, so the ratio's numerator survives and only its denominator was wrong |

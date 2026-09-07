@@ -94,7 +94,7 @@ describe('the stage’s entry rule', () => {
   it('does not ask for a day on the way into a watch', () => {
     const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
     expect(source).toContain(
-      "if (context.ctx !== 'watch' && stageEntryStartsARun(host.runState())) host.startRun();",
+      "if (context.ctx !== 'watch' && context.ctx !== 'rush' && stageEntryStartsARun(host.runState())) host.startRun();",
     );
     /* The unguarded shape, by its own text — either half alone passes over a file that does both. */
     expect(source).not.toContain('if (stageEntryStartsARun(host.runState())) host.startRun();');
@@ -111,7 +111,19 @@ describe('the stage’s entry rule', () => {
  * call sites, because a pixel case that never ran — no Chromium on the machine — is a silent skip.
  */
 describe('what the cutaway paints', () => {
-  const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+  /*
+   * The painter moved to `cutaway.ts` for GitHub issue #348, so the fix-it screen's as-built stage
+   * paints with the same one; the call sites this pins moved with it, and the stage's own file must
+   * still ask that painter rather than growing a second one.
+   */
+  const source = readFileSync(fileURLToPath(new URL('./cutaway.ts', import.meta.url)), 'utf8');
+  const stageSource = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+
+  it('paints the stage through the shared painter and not a copy of it', () => {
+    expect(stageSource).toContain("from './cutaway.js'");
+    expect(stageSource).toContain('drawCutaway(');
+    expect(stageSource).not.toContain('ctx.fillRect(');
+  });
 
   it('asks the model for the car’s rectangles rather than computing leaves itself', () => {
     expect(source).toContain('stageCarPaintOf({');
@@ -145,21 +157,21 @@ describe('what the cutaway paints', () => {
      * swept by `watch/view.test.ts`. Neither is a literal in this file, which is what this case has
      * always been about.
      */
-    expect(source).toContain('watching?.dispatcherEyebrow ?? head.drivingLabel;');
-    expect(source).toContain('STAGE_DRIVING_LABEL');
+    expect(stageSource).toContain('watching?.dispatcherEyebrow ?? head.drivingLabel;');
+    expect(stageSource).toContain('STAGE_DRIVING_LABEL');
     /* `stageHeaderOf` already publishes this word and the corpus already sweeps it. */
-    expect(source).not.toContain("el(doc, 'span', undefined, 'DRIVING')");
+    expect(stageSource).not.toContain("el(doc, 'span', undefined, 'DRIVING')");
     /* And § 14.1's, likewise — it is the view's cell, never re-typed here. */
-    expect(source).not.toContain("'THEIR DISPATCHER'");
+    expect(stageSource).not.toContain("'THEIR DISPATCHER'");
   });
 
   it('takes the overlay’s three sentences from the model too', () => {
-    expect(source).toContain('stageOpeningLineOf({');
-    expect(source).toContain('STAGE_RECOMPUTING');
-    expect(source).toContain('STAGE_AWAITING_RUN');
+    expect(stageSource).toContain('stageOpeningLineOf({');
+    expect(stageSource).toContain('STAGE_RECOMPUTING');
+    expect(stageSource).toContain('STAGE_AWAITING_RUN');
     /* The mount had re-typed this one as a literal beside the constant it already imported. */
-    expect(source).not.toContain("'recomputing the day from the start…'");
-    expect(source).not.toContain("'Paused at the start of the day. Nothing has happened yet.'");
+    expect(stageSource).not.toContain("'recomputing the day from the start…'");
+    expect(stageSource).not.toContain("'Paused at the start of the day. Nothing has happened yet.'");
   });
 
   /**
@@ -171,8 +183,8 @@ describe('what the cutaway paints', () => {
    * defect before anybody measured it. Pinned so the correction cannot be tidied back out.
    */
   it('does not tell a reader the stage opens at 06:00', () => {
-    expect(source).not.toContain('which is 06:00 on the clock');
-    expect(source).toContain("the hour is the run's own");
+    expect(stageSource).not.toContain('which is 06:00 on the clock');
+    expect(stageSource).toContain("the hour is the run's own");
   });
 });
 

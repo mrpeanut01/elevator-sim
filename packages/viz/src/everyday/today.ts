@@ -31,36 +31,28 @@
  * - the **seed line** is `ViewerState.seed`, printed so two players can confirm they had the same
  *   morning (§ 6's own reason for the line existing).
  *
- * ## The one derivation this module owns, and its citation
+ * ## The plate is configuration, and it stopped grading the day on 2026-09-06
  *
- * The load reading — § 6.2's *Busy · 590 people per working car this morning. Comfortable is
- * around 400.* The **figure** is arithmetic over facts (`totalPopulation ÷ working cars`). The
- * **comparison** is the prototype's authored sentence (`docs/design/elevator-sim-casual.dc.html`,
- * `loadNote`), and it is the only number in this file that is neither measured nor derived. It is
- * carried as {@link COMFORTABLE_PER_CAR} with that citation rather than inlined, and it buys
- * exactly **two** words — at or under it reads *Comfortable*, above it reads *Busy* — because a
- * third band would need a second boundary this repository has not measured, and inventing one
- * would be a claim wearing a threshold. The prototype's own example lands on *Busy* at 590, which
- * is the check that the two-band rule reproduces the design rather than replacing it.
+ * § 6.2's tinted panel used to read *Busy · 590 people per working car this morning. Comfortable is
+ * around 400*, with the 400 a citation to the prototype (`docs/design/elevator-sim-casual.dc.html`,
+ * `loadNote`) rather than a measurement. `docs/35` `PM-TT1` names what that is: a whole-day verdict
+ * drawn at `t = 0`, on a screen whose whole point is that the day has not run yet — and § D514 took
+ * the row's second option, *reword it as configuration*. The **figure** is still arithmetic over
+ * facts (`totalPopulation ÷ working cars`); the **comparison** is gone, and the plate says in its
+ * own words that whether the crowd is comfortable is the day's to show. GitHub issue #208.
  */
 
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
+import { FIRST_SESSION_LINE } from '../shift/firstSession.js';
 import { carsToDerate } from '../shift/incidents.js';
 import type { GoalReading, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { countFigure, EM_DASH, groupThousands } from './figures.js';
 import { speedFigure, type EverydayUnits } from './units.js';
-
-/**
- * People per working car at which § 6.2's tinted panel stops saying *Busy* — the prototype's
- * *"Comfortable is around 400"*, and the module docstring's argument for why it is a citation
- * rather than a measurement.
- */
-export const COMFORTABLE_PER_CAR = 400;
 
 /** § 6.2's out-of-service strip: the lettered badge, and the sentence beside it. */
 export interface OutOfServiceStrip {
@@ -75,11 +67,11 @@ export interface TodayFact {
   readonly value: string;
 }
 
-/** § 6.2's tinted load panel. */
+/** § 6.2's tinted load panel, as configuration rather than a verdict — see the module docstring. */
 export interface TodayLoad {
-  /** *Comfortable* or *Busy* — see the module docstring for why there is no third word. */
+  /** *60 per working car* — the figure, and no word beside it. */
   readonly word: string;
-  /** *590 people per working car this morning. Comfortable is around 400.* */
+  /** *120 people and 2 working cars today, as the building is configured. …* */
   readonly note: string;
 }
 
@@ -111,6 +103,11 @@ export interface TodayRecord {
   readonly asks: readonly string[];
   /** `tower chancery-house · crowd 424242 · everyone identical`. */
   readonly seedLine: string;
+  /**
+   * `shift/firstSession.ts`'s line on a first day nobody has played on a legible tower, or
+   * `undefined` on every other day — GitHub issue #208, § D514.
+   */
+  readonly firstSessionLine: string | undefined;
   /** Who drives, by name — or the em dash when the standing selection resolves to nothing. */
   readonly driver: string;
 }
@@ -127,6 +124,12 @@ export interface TodayInput {
    * thing that cost was four surfaces disagreeing with the simulation for a whole release.
    */
   readonly calendar: CalendarPeriod | null;
+  /**
+   * Whether this is a first day nobody has played on one of § D475's legible towers —
+   * `shift/firstSession.ts#isFirstDayOnALegibleTower` over the week, asked by the caller because
+   * it is a fact about the week rather than about today. Required, `calendar`'s own reason.
+   */
+  readonly firstSession: boolean;
   /** `dev/state.ts#resolvedBuildingOf` — `undefined` when the id names no document this build has. */
   readonly building: ResolvedBuilding | undefined;
   /** The standing selection's id, so the seed line can name a building the document lookup missed. */
@@ -244,17 +247,21 @@ function factsOf(
   ];
 }
 
-/** § 6.2's tinted panel. `undefined` with no building, or with no car left to divide by. */
+/**
+ * § 6.2's tinted panel, as configuration. `undefined` with no building, or with no car left to
+ * divide by. The sentence says what the plate is not: a grade of a day that has not run.
+ */
 function loadOf(building: ResolvedBuilding | undefined, held: number): TodayLoad | undefined {
   if (building === undefined) return undefined;
   const working = Math.max(0, carCountOf(building) - held);
   if (working === 0) return undefined;
   const perCar = Math.round(building.totalPopulation / working);
   return {
-    word: perCar <= COMFORTABLE_PER_CAR ? 'Comfortable' : 'Busy',
+    word: `${countFigure(perCar)} per working car`,
     note:
-      `${countFigure(perCar)} people per working car today. Comfortable is around ` +
-      `${countFigure(COMFORTABLE_PER_CAR)}.`,
+      `${groupThousands(building.totalPopulation)} people and ${String(working)} working ` +
+      `${working === 1 ? 'car' : 'cars'} today, as the building is configured. The day shows ` +
+      'whether that is comfortable; this plate does not grade it.',
   };
 }
 
@@ -307,6 +314,7 @@ export function todayOf(input: TodayInput): TodayRecord {
     load: loadOf(building, held),
     asks: input.goals.map((reading) => reading.goal.label),
     seedLine: `tower ${input.buildingId} · crowd ${input.seed.toString()} · everyone identical`,
+    firstSessionLine: input.firstSession ? FIRST_SESSION_LINE : undefined,
     driver: input.dispatcherName ?? EM_DASH,
   };
 }

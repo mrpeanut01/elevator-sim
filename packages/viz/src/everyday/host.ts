@@ -115,7 +115,7 @@ import type {
  * of `menu/client.js` are exactly `dev/main.ts` and `honesty/surfaces.ts`, and it exempts type
  * imports by name. The row shape crosses this façade; the transport does not.
  */
-import type { BoardEntry, BoardPage, BoardsPage, Result } from '../menu/client.js';
+import type { BoardDistribution, BoardEntry, BoardPage, BoardsPage, Result } from '../menu/client.js';
 
 import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
 import {
@@ -138,9 +138,19 @@ import {
   towerById,
   type CampaignAction,
   type CampaignCareer,
+  type CampaignTower,
 } from '../campaign/career.js';
-import { DIFFICULTIES } from '../campaign/economy.js';
+import { DIFFICULTIES, purseOf } from '../campaign/economy.js';
 import { fitOutOf } from '../campaign/fitOut.js';
+import {
+  answerChangeOf,
+  campaignEventFor,
+  campaignIncidentOf,
+  type CampaignIncident,
+} from '../campaign/incidents.js';
+import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
+import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
+import { switchWeek } from '../shift/week.js';
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -183,8 +193,13 @@ import type {
 } from '../shift/types.js';
 import { nextDay } from '../shift/week.js';
 import { checkedRun, filedDayRuns } from '../watch/library.js';
+import { postedRunOf } from '../watch/posted.js';
 import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
+
+import type { DemandBand } from '../fixit/parse.js';
+import { rushBeforeOf, rushDisclosureOf, rushHoldAt, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, type RushBefore } from './rush.js';
+import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 
 import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
 
@@ -222,6 +237,14 @@ export type EverydayDailyBoard =
       readonly date: string;
       readonly note: string;
       readonly rows: readonly BoardEntry[];
+      /**
+       * The board's distribution — GitHub issue #327 — or `undefined` when that read failed after
+       * the board itself was read, with the client's sentence in {@link distributionDetail}. A
+       * board with rows and no ladder is still a board; the two reads are kept apart so a ranked
+       * page never waits on, or is refused for, a second question.
+       */
+      readonly distribution: BoardDistribution | undefined;
+      readonly distributionDetail: string | undefined;
     };
 
 /**
@@ -241,6 +264,7 @@ export type EverydayDailyBoard =
 export async function dailyBoardOf(
   list: () => Promise<Result<BoardsPage>>,
   read: (boardKey: string, metric: string) => Promise<Result<BoardPage>>,
+  distribution?: (boardKey: string) => Promise<Result<BoardDistribution>>,
 ): Promise<EverydayDailyBoard> {
   const listed = await list();
   if (!listed.ok) return { kind: 'unreachable', detail: listed.detail };
@@ -251,10 +275,23 @@ export async function dailyBoardOf(
    * which is why this is its own state rather than an empty board.
    */
   if (today === undefined) return { kind: 'undeclared' };
-  const page = await read(`daily:${today.date}`, DAILY_BOARD_METRIC);
-  return page.ok
-    ? { kind: 'board', date: today.date, note: page.value.note, rows: page.value.entries }
-    : { kind: 'unreachable', detail: page.detail };
+  const key = `daily:${today.date}`;
+  const page = await read(key, DAILY_BOARD_METRIC);
+  if (!page.ok) return { kind: 'unreachable', detail: page.detail };
+  /*
+   * The third read, after the second and never instead of it — GitHub issue #327. Optional so a
+   * caller without the route (an older client binding, the honesty corpus) gets a board with a
+   * stated absence rather than a rejection.
+   */
+  const spread = distribution === undefined ? undefined : await distribution(key);
+  return {
+    kind: 'board',
+    date: today.date,
+    note: page.value.note,
+    rows: page.value.entries,
+    distribution: spread?.ok === true ? spread.value : undefined,
+    distributionDetail: spread === undefined || spread.ok ? undefined : spread.detail,
+  };
 }
 
 /** What the daily board is ranked on. The Engineer board list asks for the same one. */
@@ -344,6 +381,37 @@ export interface EverydayWatchSession {
  * What an Everyday screen may know and do. The exact method list is the contract the six screen
  * lanes build against; the module docstring carries what is deliberately absent.
  */
+/**
+ * An Endless rush in progress — GitHub issue #220, § D515. The run itself is the shell's, read
+ * through {@link EverydayHost.recording} as any run is; what this carries is what the rush knows
+ * that a day does not: the rate the stream was converted to, § D478's line about it, where the
+ * recording crosses the hold line, and whether the player ended it first.
+ */
+export interface EverydayRushSession {
+  readonly topRatePctPop5min: number;
+  readonly disclosure: string | undefined;
+  /** The first two-second bucket with forty people past two minutes, or `undefined` before the run lands or if it never crosses. */
+  readonly holdAtS: number | undefined;
+  /** Where the player pressed *End the rush*, or where the stage stopped at the line; `undefined` while it plays. */
+  readonly endedAtS: number | undefined;
+}
+
+/** § 6.1's replay in progress — which day of the parked week is being played again (GitHub issue #177 item 1). */
+export interface EverydayReplaySession {
+  readonly day: number;
+}
+
+/** What § 7.5's dock reads — see {@link EverydayHost.campaignDay}. */
+export interface CampaignDayFacts {
+  readonly tower: CampaignTower;
+  readonly buildingName: string;
+  /** The day's incident, or `undefined` on a day nothing is happening. */
+  readonly incident: CampaignIncident | undefined;
+  readonly runLengthS: number;
+  /** Whether the run's log already carries an answer. */
+  readonly answered: boolean;
+}
+
 export interface EverydayHost {
   /* ---------------------------------------------------------------- reads */
 
@@ -868,6 +936,31 @@ export interface EverydayHost {
   runCampaignDay(towerId: string): void;
 
   /**
+   * § 7.5's dock — the campaign day on the stage, or `undefined` when the day on the stage is not
+   * one (GitHub issue #171, § D507).
+   *
+   * The tower is read from the career on every call, so the purse the dock draws is the purse the
+   * desk would show; the incident is the one `runCampaignDay` described when it pressed the run,
+   * held beside the latch and cleared with it. `answered` is read off the run's own intervention
+   * log rather than latched, because the log is the record and a second flag is a second place to
+   * be wrong.
+   */
+  campaignDay(): CampaignDayFacts | undefined;
+
+  /**
+   * Answer the open incident at the stage's playhead — § 7.5, *"stamped with the simulated time it
+   * was given"*, as one press that moves the purse and the record together.
+   *
+   * Returns the reason it could not, in the dock's own words, or `undefined` when it did. Refused
+   * before the incident is true of the run, on the purse (§ 8.5: *the dock and the desk read the
+   * same purse*), on a second answer, and on a return the day would end before — every one a
+   * sentence rather than a bare disabled button (§ 7.6's fourth rule). The run half is
+   * {@link intervene} with `core`'s `answer-incident` arm, so the stamp and the report's line are
+   * `live/interventions.ts`'s exactly as for a parked car.
+   */
+  answerIncident(atS: number, optionId: string): string | undefined;
+
+  /**
    * Save a drawn building **and stand the next run on it**, answering the id it took.
    *
    * The exact two presses the Engineer building editor's *Save* and *Run it* make, in one call:
@@ -958,6 +1051,14 @@ export interface EverydayHost {
   watchRun(run: WatchableRun): WatchableRun;
 
   /**
+   * A daily-board row as a spectator's row — GitHub issue #337, § 14.1's *"a board row is a run,
+   * and a run can be watched"*. Pure over the row and this build's `data/` (`watch/posted.ts`), so
+   * the press is {@link watchRun} on its answer, exactly as a filed day's row is pressed; the gate
+   * compares the server's four ranked figures with this build's replay rather than four counts.
+   */
+  postedRun(entry: BoardEntry, place: number): WatchableRun;
+
+  /**
    * Whose run is on the stage and § 14.1's view of it, or `undefined` when the player's own is.
    *
    * The **view** rather than only the row, so the Everyday stage and the Engineer chrome draw one
@@ -977,6 +1078,34 @@ export interface EverydayHost {
    * so a rail row that navigates away and a bar button that leaves cannot end it differently.
    */
   stopWatching(): void;
+
+  /**
+   * § 9's *Start the rush* — GitHub issue #220, § D515. Parks the player's week, opens the rush
+   * week on the standing building and dispatcher, and presses the same latching run press a day
+   * uses. Returns the refusal when no building is resolved, `undefined` when the run was asked for;
+   * the recording lands as a `subscribe` notification, as every run does. Pressed again inside a
+   * rush it re-runs the same waves, which is § 9.3's *Run the rush again*.
+   */
+  startRush(): string | undefined;
+  /** The rush in progress, or `undefined` — see {@link EverydayRushSession}. */
+  rush(): EverydayRushSession | undefined;
+  /** Record where the rush ended: the hold line the stage reached, or the player's hand. */
+  endRush(atS: number): void;
+  /** Leave the rush, putting the parked week and the run it interrupted back. A no-op outside one. */
+  leaveRush(): void;
+  /** § D478's line for a rush on the standing building, before one starts; `undefined` inside the band or with no building. */
+  rushDisclosure(): string | undefined;
+
+  /**
+   * § 6.1's replay: park the week and stand a replay week on `day` — `everyday/replay.ts`, GitHub
+   * issue #177 item 1, § D517. The run is the brief's to start, as on any day. Returns the reason it
+   * cannot, or `undefined` when the replay week is standing.
+   */
+  startReplay(day: number): string | undefined;
+  /** The replay in progress, or `undefined`. */
+  replay(): EverydayReplaySession | undefined;
+  /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
+  leaveReplay(): void;
 
   /**
    * § 14.1's primary — drop the spectator state and set the same crowd up to be played.
@@ -1238,6 +1367,20 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
   const notifyCampaign = (): void => {
     for (const listener of [...campaignListeners]) listener();
   };
+  /** The rush in progress — GitHub issue #220. Host-scoped like the career: a rush is not a day. */
+  let replaySession: { readonly day: number; readonly before: ReplayBefore } | undefined;
+  let rushSession:
+    | {
+        readonly before: RushBefore;
+        readonly topRatePctPop5min: number;
+        readonly disclosure: string | undefined;
+        readonly hold: { readonly recording: VizRecording; readonly atS: number | undefined } | undefined;
+        readonly endedAtS: number | undefined;
+      }
+    | undefined;
+  /** The building's profile band, for § D478's line — `fixit/parse.ts#fixitContextOf`'s own lookup. */
+  const bandOf = (building: ResolvedBuilding): DemandBand | undefined =>
+    b.resources.trafficProfiles.profiles.find((profile) => profile.id === building.trafficProfile)?.arrivalRatePctPop5min;
 
   /**
    * Which tower the run on the stage is a day of, or `undefined` — GitHub issue **#223**.
@@ -1268,6 +1411,24 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
    * press the run, so a third run press cannot acquire the campaign by forgetting to.
    */
   let campaignDayTowerId: string | undefined;
+  /** The day's incident for the dock — `campaignIncidentOf`'s answer, held beside the latch. */
+  let campaignDayIncident: CampaignIncident | undefined;
+
+  /** {@link EverydayHost.campaignDay}, as a local so `answerIncident` reads the same fold. */
+  const campaignDayFacts = (): CampaignDayFacts | undefined => {
+    const towerId = campaignDayTowerId;
+    if (towerId === undefined) return undefined;
+    const tower = towerById(career, towerId);
+    if (tower === undefined) return undefined;
+    const building = b.resources.buildings.find((entry) => entry.id === tower.buildingId);
+    return {
+      tower,
+      buildingName: building?.name ?? tower.buildingId,
+      incident: campaignDayIncident,
+      runLengthS: shiftLengthForContract(tower.id),
+      answered: b.state().interventions.some((entry) => entry.change.kind === 'answer-incident'),
+    };
+  };
 
   /**
    * The one fold behind {@link EverydayHost.goalsAt} and {@link EverydayHost.goalsToday}.
@@ -1462,11 +1623,14 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
        * doing work a player could see for a change nobody made.
        */
       const kitToClear = b.state().campaignFitOut === undefined ? {} : { campaignFitOut: undefined };
-      const patch = { ...(day === undefined ? {} : wholeDayRun(day)), ...kitToClear };
+      // And the campaign's event, on the same ground one field over — § D507.
+      const eventToClear = b.state().campaignEventId === undefined ? {} : { campaignEventId: undefined };
+      const patch = { ...(day === undefined ? {} : wholeDayRun(day)), ...kitToClear, ...eventToClear };
       if (Object.keys(patch).length > 0) b.applyPatch(patch);
       // § 6's day is not a campaign day — see {@link campaignDayTowerId} for what a stale latch
       // here would file, and against which building.
       campaignDayTowerId = undefined;
+      campaignDayIncident = undefined;
       b.startRun();
     },
     /**
@@ -1502,6 +1666,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       b.closeDay();
       if (towerId === undefined || closedBefore || !b.dayClosed()) return;
       campaignDayTowerId = undefined;
+      campaignDayIncident = undefined;
       const state = b.state();
       const tower = towerById(career, towerId);
       const recording = state.recording;
@@ -1555,10 +1720,12 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
         ...openTomorrowPatch(state.week),
         ...dayPatchFor(b),
         campaignFitOut: undefined,
+        campaignEventId: undefined,
       });
       b.openRunTab();
       // § 6's tomorrow, for the same reason `startRun` clears it — {@link campaignDayTowerId}.
       campaignDayTowerId = undefined;
+      campaignDayIncident = undefined;
       b.startRun();
     },
     setDispatcher: (dispatcherId) => {
@@ -1594,15 +1761,45 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
          would repaint a screen mid-interaction for no reason a player could see. */
       if (next === career) return;
       career = next;
+      /*
+       * **§ 8.8: taking an offer moves a week between assignments** — GitHub issue #169 item 3,
+       * § D510. The record above is the campaign's; the week is `ViewerState`'s, and it moves the
+       * way `dev/scenariosPanel.ts`'s *take* moves it: the destination restarts (the card's own
+       * promise — a fresh week on this building) and the week being left is **parked**, not lost.
+       * The length is the contract's, for `runCampaignDay`'s reason.
+       */
+      if (action.kind === 'take-offer') {
+        const contract = contractById(action.contractId);
+        if (contract !== undefined) {
+          const state = b.state();
+          const moved = switchWeek(state.week, state.parkedWeeks, contract.id, 'restart');
+          b.applyPatch({
+            week: moved.week,
+            parkedWeeks: moved.parked,
+            buildingId: contract.buildingId,
+            shiftLengthS: shiftLengthForContract(contract.id),
+            windowStartS: null,
+          });
+        }
+      }
       notifyCampaign();
     },
     runCampaignDay: (towerId) => {
       const tower = towerById(career, towerId);
       if (tower === undefined) return;
-      if (!b.resources.buildings.some((building) => building.id === tower.buildingId)) return;
+      const towerBuilding = b.resources.buildings.find((building) => building.id === tower.buildingId);
+      if (towerBuilding === undefined) return;
+      const event = campaignEventFor({ tower, seed: b.state().seed });
       b.applyPatch({
         buildingId: tower.buildingId,
         dispatcherId: tower.dispatcherId,
+        /*
+         * **And the car today's works hold** — GitHub issue #353, `docs/32` GD11's first half,
+         * § D504. `campaign/works.ts` is the one derivation; the tower's screen draws the same
+         * answer before this press. A day no booking occupies writes `[]`, which is what every
+         * other path through the shell leaves here.
+         */
+        outOfServiceCarIds: worksHeldCarsOf(tower, towerBuilding),
         /*
          * **And the kit the tower has actually had fitted** — GitHub issue #181's first clause.
          *
@@ -1644,11 +1841,57 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
         shiftLengthS: shiftLengthForContract(tower.id),
         /* A contract declares a length and not a part of a day — `scenariosPanel`'s own line. */
         windowStartS: null,
+        /*
+         * **And what happens today** — GitHub issues #171 and #169 item 1, § D507. The contract's
+         * calendar first, then § 8.3's odds on a stream derived from the day's seed, and never the
+         * week's rota; `campaign/incidents.ts` is the one chooser. Written on this press for the
+         * same reason the kit is.
+         */
+        campaignEventId: event.id,
       });
       b.openRunTab();
       // The one place this is armed. See {@link campaignDayTowerId}.
       campaignDayTowerId = towerId;
+      /*
+       * The dock's incident, described from the building the run is built on: the car a breakdown
+       * names is `eventCarChoice`'s over the same bank list `shiftRunConfigOf` hands the derate, so
+       * the caption names the car the run loses. Held beside the latch and cleared with it.
+       */
+      campaignDayIncident = campaignIncidentOf({
+        event,
+        building: towerBuilding,
+        runLengthS: shiftLengthForContract(tower.id),
+        heldCars: worksHeldCarRefsOf(tower, towerBuilding),
+      });
       b.startRun();
+    },
+    campaignDay: campaignDayFacts,
+    answerIncident: (atS, optionId) => {
+      const facts = campaignDayFacts();
+      if (facts === undefined || facts.incident === undefined) return CAMPAIGN_DOCK_COPY.refusedNoIncident;
+      if (facts.answered) return CAMPAIGN_DOCK_COPY.refusedAnswered;
+      const option = facts.incident.options.find((entry) => entry.id === optionId);
+      if (option === undefined) return CAMPAIGN_DOCK_COPY.refusedUnknownOption;
+      if (option.units > purseOf(facts.tower)) return purseRefusalOf(option.units);
+      const composed = answerChangeOf(facts.incident, option, atS, facts.runLengthS);
+      if (composed.kind === 'refused') return composed.reason;
+      if (b.state().recording === undefined) return CAMPAIGN_DOCK_COPY.refusedNoRun;
+      /*
+       * Money first, then the record — and both on one press, which is the whole reason this
+       * method exists rather than two. The reducer refuses on the purse it just checked, so a
+       * refusal there is a race with the desk and the answer must not land on the run either.
+       */
+      const before = career;
+      career = applyCampaignAction(career, {
+        kind: 'answer-incident',
+        towerId: facts.tower.id,
+        units: option.units,
+        label: option.label,
+      });
+      if (option.units > 0 && career === before) return CAMPAIGN_DOCK_COPY.refusedPurse;
+      notifyCampaign();
+      b.intervene(atS, composed.change);
+      return undefined;
     },
     applyBuildingSpec: (spec) => {
       const state = b.state();
@@ -1724,6 +1967,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       const references = await b.loadReferenceRuns().catch(() => []);
       return Object.freeze([...filed, ...references]);
     },
+    postedRun: (entry, place) => postedRunOf(entry, place, b.resources),
     watchRun: (run) => {
       const checked = checkedRun(run, b.resources, b.state(), b.simulateRecord);
       if (checked.run.blocked !== null || checked.recording === undefined) return checked.run;
@@ -1757,6 +2001,73 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     watching: () => b.watching(),
     stopWatching: () => {
       b.stopWatching();
+    },
+    startRush: () => {
+      const state = b.state();
+      const building = resolvedBuildingOf(b.resources, state);
+      if (building === undefined) return 'no building is standing, so there is nothing for the stream to arrive at';
+      if (rushSession === undefined) {
+        rushSession = {
+          before: rushBeforeOf(state),
+          topRatePctPop5min: rushTopRatePctPop5min(building.totalPopulation),
+          disclosure: rushDisclosureOf(building, bandOf(building)),
+          hold: undefined,
+          endedAtS: undefined,
+        };
+        b.applyPatch(rushPatchOf(state, building.totalPopulation));
+      } else {
+        rushSession = { ...rushSession, hold: undefined, endedAtS: undefined };
+      }
+      b.startRun();
+      notifyCampaign();
+      return undefined;
+    },
+    rush: () => {
+      if (rushSession === undefined) return undefined;
+      const recording = b.state().recording;
+      /* The hold line is read once per recording, keyed on identity — the stage asks every frame. */
+      if (recording !== undefined && rushSession.hold?.recording !== recording) {
+        rushSession = { ...rushSession, hold: { recording, atS: rushHoldAt(recording) } };
+      }
+      return {
+        topRatePctPop5min: rushSession.topRatePctPop5min,
+        disclosure: rushSession.disclosure,
+        holdAtS: rushSession.hold?.atS,
+        endedAtS: rushSession.endedAtS,
+      };
+    },
+    endRush: (atS) => {
+      if (rushSession === undefined) return;
+      rushSession = { ...rushSession, endedAtS: atS };
+      notifyCampaign();
+    },
+    leaveRush: () => {
+      if (rushSession === undefined) return;
+      const before = rushSession.before;
+      rushSession = undefined;
+      b.applyPatch(rushRestorePatchOf(b.state(), before));
+      notifyCampaign();
+    },
+    rushDisclosure: () => {
+      const building = resolvedBuildingOf(b.resources, b.state());
+      return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building));
+    },
+    startReplay: (day) => {
+      const state = b.state();
+      if (replaySession !== undefined) return 'a replay is already standing; leave it before opening another';
+      if (!replayableDay(state.week, day)) return REPLAY_COPY.beforeTheWeek;
+      replaySession = { day, before: replayBeforeOf(state) };
+      b.applyPatch(replayPatchOf(state, day));
+      notifyCampaign();
+      return undefined;
+    },
+    replay: () => (replaySession === undefined ? undefined : { day: replaySession.day }),
+    leaveReplay: () => {
+      if (replaySession === undefined) return;
+      const before = replaySession.before;
+      replaySession = undefined;
+      b.applyPatch(replayRestorePatchOf(b.state(), before));
+      notifyCampaign();
     },
     playThisCrowd: (run) => {
       b.playThisCrowd(run);

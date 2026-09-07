@@ -67,6 +67,7 @@ const TODAY: TodayRecord = {
   load: undefined,
   asks: [],
   seedLine: 'tower chancery-house · crowd 424242 · everyone identical',
+  firstSessionLine: undefined,
   driver: 'Steady hand',
 };
 
@@ -151,7 +152,7 @@ describe('the stepper', () => {
   });
 });
 
-describe('the § 3.3 primary, and the replay this build refuses', () => {
+describe('the § 3.3 primary, and the replay a past day earns — § D517', () => {
   it('is pressable at today and carries § 3.3’s own note', () => {
     const view = viewAt(0, false);
     expect(view.primary.label).toBe('Set up today');
@@ -165,13 +166,21 @@ describe('the § 3.3 primary, and the replay this build refuses', () => {
     expect(view.primary.note).toMatch(/another attempt/);
   });
 
-  it('is inert on every past day, and names the day it cannot re-open', () => {
+  it('is pressable on a past day inside the week, names the day, and says it never counts', () => {
     const view = viewAt(-2, false);
     expect(view.primary.label).toBe('Set up the replay');
-    expect(view.primary.inert).toBe(true);
-    // § 16 rule 6: it always says what it is short by, and names the day rather than gesturing.
+    expect(view.primary.inert).toBe(false);
+    // § 16 rule 6: it names the day rather than gesturing, and § 6.1: the note says what a replay does to the record.
     expect(view.primary.note).toContain('Day 3');
-    expect(view.primary.note).toMatch(/cannot be re-opened/);
+    expect(view.primary.note).toMatch(/never counts/);
+  });
+
+  it('is inert on a chip from before this week began, and says so', () => {
+    const view = viewAt(-6, false);
+    expect(view.chips.find((chip) => chip.selected)?.day).toBeUndefined();
+    expect(view.primary.label).toBe('Set up the replay');
+    expect(view.primary.inert).toBe(true);
+    expect(view.primary.note).toMatch(/before this week/);
   });
 });
 

@@ -306,7 +306,8 @@ describe('the plate, the capacity line and the register', () => {
   });
 
   it('names what the board does not do, in sentences rather than in gaps', () => {
-    expect(DESIGNER_ABSENCES.length).toBeGreaterThanOrEqual(3);
+    // Three until GitHub issue #177 item 5 wrote the escalator rows and folded the document (§ D518).
+    expect(DESIGNER_ABSENCES.length).toBeGreaterThanOrEqual(1);
     for (const absence of DESIGNER_ABSENCES) expect(absence.trim().length).toBeGreaterThan(30);
   });
 });

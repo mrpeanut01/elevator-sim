@@ -25,6 +25,7 @@
  */
 
 import {
+  type RunInterventionConfig,
   runSimulation,
   type RuleRowConfig,
   type RunSummary,
@@ -102,10 +103,18 @@ export function configFor(
   const template = resources.trafficProfiles.demandTemplates.find(
     (entry) => entry.id === run.demandTemplateId,
   );
-  if (template === undefined) return 'unknown-template';
+  // A template that declares itself unselectable (`endless-rush`, GitHub issue #220) is one the
+  // board does not know: no shipped list offers it, so a submission naming it was built by hand,
+  // and a run under a stream that leaves every profile's declared band is not a run this board
+  // ranks. Refused on the same code, because to the board the two are the same fact.
+  if (template === undefined || template.selectable === false) return 'unknown-template';
 
   // The player's rules over the **server's** profile. Never a profile the submission carried.
   const dispatcherProfile = profileWithRules(shipped, run.ruleRows ?? []);
+  // And the log's handovers the same way — a switch to an id this server does not ship is refused
+  // exactly as an unshipped base profile is.
+  const log = interventionsFor(run, resources);
+  if (log === 'unknown-dispatcher') return 'unknown-dispatcher';
 
   // Derived from the id, never read off the wire — the argument is at the spread below.
   const reportWindow = reportWindowForBuilding(run.buildingId);
@@ -195,8 +204,35 @@ export function configFor(
      * with a fingerprint, so an empty log has to carry *no key at all* rather than an empty array.
      * That is what lets every score posted before this field re-verify unchanged.
      */
-    ...((run.interventions ?? []).length === 0 ? {} : { interventions: run.interventions }),
+    ...(log.length === 0 ? {} : { interventions: log }),
   } as SimulationConfig;
+}
+
+/**
+ * The wire's log as `core` runs it — GitHub issue #338, § D486. A switch arrives as a shipped id
+ * plus rows and leaves here as the profile `core`'s arm carries, built **from this server's own
+ * `data/`** through the same {@link profileWithRules} the base profile goes through; an id this
+ * server does not ship is the same rejection the base profile gets. The two parking kinds pass
+ * through unchanged.
+ */
+function interventionsFor(
+  run: SubmittedRun,
+  resources: VerificationResources,
+): readonly RunInterventionConfig[] | 'unknown-dispatcher' {
+  const log: RunInterventionConfig[] = [];
+  for (const entry of run.interventions ?? []) {
+    if (entry.change.kind === 'switch-dispatcher') {
+      const shipped = resources.dispatcherProfilesById.get(entry.change.toProfileId);
+      if (shipped === undefined) return 'unknown-dispatcher';
+      log.push({
+        atS: entry.atS,
+        change: { kind: 'switch-dispatcher', profile: profileWithRules(shipped, entry.change.ruleRows ?? []) },
+      });
+    } else {
+      log.push({ atS: entry.atS, change: { kind: entry.change.kind } });
+    }
+  }
+  return log;
 }
 
 /**
@@ -262,21 +298,30 @@ export function metricsAgree(left: ClaimedMetrics, right: ClaimedMetrics): boole
  * a player whose queue diverged should be told that — not told their arithmetic disagrees with the
  * server's, which it does not.
  */
-export function verifySubmission(
-  submission: Submission,
+/**
+ * The server's own replay of a run, measured — the half of {@link verifySubmission} that has no
+ * claim in it, and the whole of what a **baseline** row needs (GitHub issue #222, § D521): the
+ * house does not claim, it measures.
+ *
+ * Same three refusals as the submission path, in the same words, so a seeded row and a posted row
+ * are refused on identical grounds. The fourth refusal — the claim not reproducing — has no
+ * subject here.
+ */
+export function measureRun(
+  run: SubmittedRun,
   resources: VerificationResources,
-): Verification {
-  const config = configFor(submission.run, resources);
+): { readonly ok: true; readonly measured: ClaimedMetrics; readonly legs: number } | VerificationRejected {
+  const config = configFor(run, resources);
   if (typeof config === 'string') {
     return {
       ok: false,
       code: config,
       detail:
         config === 'unknown-building'
-          ? `This server does not ship a building "${submission.run.buildingId}".`
+          ? `This server does not ship a building "${run.buildingId}".`
           : config === 'unknown-dispatcher'
-            ? `This server does not ship a dispatcher "${submission.run.dispatcherProfileId}".`
-            : `This server does not ship a demand template "${submission.run.demandTemplateId}".`,
+            ? `This server does not ship a dispatcher "${run.dispatcherProfileId}".`
+            : `This server does not ship a demand template "${run.demandTemplateId}".`,
     };
   }
 
@@ -306,7 +351,17 @@ export function verifySubmission(
     };
   }
 
-  if (!metricsAgree(submission.claimed, measured)) {
+  return { ok: true, measured, legs: summary.waiting.count };
+}
+
+export function verifySubmission(
+  submission: Submission,
+  resources: VerificationResources,
+): Verification {
+  const replayed = measureRun(submission.run, resources);
+  if (!replayed.ok) return replayed;
+
+  if (!metricsAgree(submission.claimed, replayed.measured)) {
     return {
       ok: false,
       code: 'metrics-do-not-reproduce',
@@ -316,5 +371,5 @@ export function verifySubmission(
     };
   }
 
-  return { ok: true, measured, legs: summary.waiting.count };
+  return { ok: true, measured: replayed.measured, legs: replayed.legs };
 }

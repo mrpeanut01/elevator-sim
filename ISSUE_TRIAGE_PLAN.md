@@ -17,6 +17,16 @@ That the header had to say so is this file's own subject arriving on the file. `
 
 This file is the orchestration record. The GitHub issue remains the public source of truth.
 
+**Every snapshot in this file carries its date and its commit sha, and a reader may not treat one as
+current state** ([§ D485](DECISIONS.md)). A snapshot is a dated record of the tree it was taken on —
+`RISKS.md` R45's third instance was a snapshot that said a sibling wave had not merged, three hours
+before it did, and no check can separate *this snapshot is stale* from *this snapshot is a dated
+record* without this agreement. It binds the next snapshot; the ones already here are left as written,
+and the ones that name no sha are read as older than the agreement rather than corrected in place.
+Issue dependencies are the half that **is** mechanised — a `Blocked by #N` line in an issue body,
+watched by `scripts/blocked-by.mjs` on a daily schedule — and a wave's merge state is the half that
+is not.
+
 ---
 
 ## 1. The one thing to read first

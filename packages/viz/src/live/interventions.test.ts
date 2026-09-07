@@ -9,7 +9,7 @@
  * shape changes.
  */
 
-import type { DispatcherProfile } from '@elevator-sim/core/browser';
+import { RULE_ACTION_WORDS, type DispatcherProfile } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -17,6 +17,7 @@ import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
   RECOMPUTING_BEAT,
+  SPREAD_CARS_LABEL,
   switchChangesNothing,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
@@ -35,6 +36,21 @@ const ANSWER = {
   option: 'call the fitter out now',
   serviceEvents: [],
 } as const;
+
+describe('SPREAD_CARS_LABEL — GitHub issue #352', () => {
+  it('is the rules vocabulary’s own sentence, about the whole fleet, capitalised for a button', () => {
+    // Derived from `RULE_ACTION_WORDS['spread-out'].template` rather than authored beside it, so a
+    // rule row and this control cannot come to mean two things by *spread*.
+    expect(SPREAD_CARS_LABEL).toBe('Spread the cars across the tower');
+    expect(RULE_ACTION_WORDS['spread-out'].template).toBe('spread the other cars across the tower');
+  });
+
+  it('stamps in the same sentence, past tense', () => {
+    expect(interventionStampOf([{ atS: AT_0914, change: { kind: 'spread-cars' } }], AT_0914)).toBe(
+      '09:14 · spread the cars across the tower',
+    );
+  });
+});
 
 describe('interventionStampOf', () => {
   it('stamps the design’s own sentence, in the shell’s own clock', () => {

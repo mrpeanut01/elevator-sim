@@ -61,7 +61,7 @@ beforeAll(async () => {
   site = await startShippedSite({ preview: { port: 5283, strictPort: false } });
   browser = await chromium.launch({ executablePath: CHROMIUM });
   page = await openPage(browser, { viewport: { width: 1600, height: 1000 } });
-  await page.goto(site.origin, { waitUntil: 'load' });
+  await page.goto(`${site.origin}?building=garden-apartments`, { waitUntil: 'load' });
   await enterEngineerStage(page);
 }, 180_000);
 

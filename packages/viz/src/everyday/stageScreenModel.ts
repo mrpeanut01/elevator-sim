@@ -72,11 +72,12 @@
  *
  * ## What the stage does not have, and why the absences are named rather than mimed
  *
- * {@link STAGE_ABSENCES}. One is structural — § 7.5's campaign dock needs a `ctx` no route in this
- * build can produce — and one is a control that exists behind a screen nobody has built. (The § 7.4
- * ghost lane was a third until GitHub issue #226 gave this screen a second recording to draw.) Each
- * is a sentence a player reads on the build-information panel (`everyday/buildNotes.ts`), which is the shell
- * register's own precedent applied one screen down: a register nothing renders is read by nobody.
+ * {@link STAGE_ABSENCES} — **empty since GitHub issue #171 (§ D507)**, and kept. It held § 7.5's
+ * dock and § 7.6's third arm until `everyday/campaignDock.ts` and `campaign/incidents.ts` built
+ * both, and the § 7.4 ghost lane before that until issue #226. Each entry was a sentence a player
+ * read on the build-information panel (`everyday/buildNotes.ts`), which is the shell register's own
+ * precedent applied one screen down: a register nothing renders is read by nobody. An empty one is
+ * a state that keeps being checked rather than a rule that can be deleted.
  */
 
 import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
@@ -86,6 +87,7 @@ import { WAIT_BANDS } from '../live/bands.js';
 import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
+  SPREAD_CARS_LABEL,
   switchChangesNothing,
   switchDispatcherLabelOf,
   SWITCH_PINS_NOTE,
@@ -211,12 +213,13 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
  * rather than a constant standing in for one.
  *
  * § 4.6 and § 7.3 say *"speed is not inherited: it resets to the player's `Default speed` setting at
- * the start of each run"*. **There is still no `Default speed` setting in this build** —
- * `everyday/settingsView.ts` ships one Motion switch and six refused rows — and this file will not
- * pretend to read one, because a stage consulting a preference nothing writes is the inert-control
- * defect with its polarity reversed. What changed with GitHub issue **#257** is that the value is no
- * longer a stand-in: it is chosen, for three reasons, and the lane that builds the setting replaces
- * {@link DEFAULT_STAGE_SIM_PER_REAL_S} with a host read and changes nothing else.
+ * the start of each run"*. **The setting exists now** (GitHub issue #229): `everyday/profile.ts`
+ * carries it beside Units, `everyday/settingsView.ts` draws the row, and `stageScreen.ts#adopt`
+ * reads `everydayProfileStore().defaultSpeed()` at the one place speed resets — exactly the
+ * replacement this paragraph promised when it said *the lane that builds the setting replaces this
+ * constant with a store read and changes nothing else*. This value is what that setting
+ * **defaults** to, and what the stage opens at for a player who has never touched the row; it is
+ * chosen, for three reasons, rather than a stand-in (GitHub issue **#257**).
  *
  * **1. It cannot be the honest `1×`, and that is the reason the default needed deciding at all.**
  * At 1:1 the shipped default day — `rise-and-fall`, thirty simulated minutes — is thirty real
@@ -242,7 +245,7 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
  * up: a number and a name kept in two places drift, and the second place is always the one nobody
  * re-reads.
  */
-const DEFAULT_STAGE_SIM_PER_REAL_S = 30;
+export const DEFAULT_STAGE_SIM_PER_REAL_S = 30;
 
 /** Where every run opens — the index of {@link DEFAULT_STAGE_SIM_PER_REAL_S} on the ladder. */
 export const DEFAULT_STAGE_SPEED_INDEX = STAGE_SPEEDS.findIndex(
@@ -799,23 +802,42 @@ export interface StageInterventionRow {
    * no control at all, and it says so while the arm beside it is still pressable.
    */
   readonly refusal?: string | undefined;
+  /**
+   * A fact about this arm the player is owed **before** pressing, drawn beside the button and
+   * disabling nothing — GitHub issue #338, § D486's fourth criterion: a handover that cannot be
+   * posted says so while the day is still being played, not at the moment they try to post. A
+   * refusal stops a press; a note lets it through with its consequence stated.
+   */
+  readonly note?: string | undefined;
 }
+
+/** What either parking press does to the record — one sentence for the two settings of one control. */
+const PARKING_ARM_EXPLAINS =
+  'appends to today’s record at the playhead and re-simulates the day from the start — ' +
+  'everything before this moment is unchanged, and playback resumes here';
 
 /**
  * The arms that need nothing from the run to construct.
  *
- * One entry, and that is now a statement about **arity of data** rather than about what this build
- * ships: parking is the only change whose whole content is its kind. The handover arm is real and is
- * assembled per call, because its content is a profile this constant cannot know. Read
- * {@link stageInterventionsOf} for the rows a player actually meets.
+ * Two entries, and that is a statement about **arity of data** rather than about what this build
+ * ships: the two parking kinds are the changes whose whole content is their kind. They are one
+ * control with two settings — *in the lobby* and *across the tower* — and the second exists
+ * because the first is the wrong verb for two of the three shipped parking faults (GitHub issue
+ * #352, `docs/35` PM-TT4): a sky lobby whose shuttles sleep at the street is cured by sending the
+ * idle cars *away* from it. The handover arm is real and is assembled per call, because its
+ * content is a profile this constant cannot know. Read {@link stageInterventionsOf} for the rows
+ * a player actually meets.
  */
 export const STAGE_INTERVENTIONS: readonly StageInterventionRow[] = Object.freeze([
   Object.freeze({
     change: Object.freeze({ kind: 'park-cars-lobby' as const }),
     label: PARK_CARS_LOBBY_LABEL,
-    explains:
-      'appends to today’s record at the playhead and re-simulates the day from the start — ' +
-      'everything before this moment is unchanged, and playback resumes here',
+    explains: PARKING_ARM_EXPLAINS,
+  }),
+  Object.freeze({
+    change: Object.freeze({ kind: 'spread-cars' as const }),
+    label: SPREAD_CARS_LABEL,
+    explains: PARKING_ARM_EXPLAINS,
   }),
 ]);
 
@@ -898,6 +920,12 @@ export interface StageSwitchTarget {
   readonly target: DispatcherProfile;
   /** The vector **actually driving**, derived. See the interface docstring for the thunk. */
   readonly driving: () => DispatcherProfile;
+  /**
+   * Why a day handed to this target could not be posted, or `undefined` when it could —
+   * `scope/switchWire.ts#switchUnpostableReasonOf`, decided by the caller that knows the shipped
+   * shelf. Drawn as the row's {@link StageInterventionRow.note}.
+   */
+  readonly unpostable?: string | undefined;
 }
 
 /** § 7.6's `recomputing` beat, so a re-simulation is a state rather than a freeze. */
@@ -942,6 +970,7 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
       label: switchDispatcherLabelOf(switchTo.target.name),
       explains: STAGE_SWITCH_EXPLAINS,
       ...(changesNothing ? { refusal: STAGE_SWITCH_NO_CHANGE } : {}),
+      ...(switchTo.unpostable === undefined ? {} : { note: switchTo.unpostable }),
     }),
   ]);
 }
@@ -1023,9 +1052,25 @@ export const STAGE_RACE_PICKER_LABEL = 'Race against';
  * entry rather than re-taking it, is [§ D451](../../../../DECISIONS.md).
  */
 export const STAGE_ABSENCES: readonly string[] = Object.freeze([
-  'no campaign dock — a campaign day reaches this stage, and the money-and-incident panel that belongs beside it is not drawn',
-  'no camera — the cutaway draws the whole building at once, so there is nothing to pan and nothing to follow',
-  'no answer to a live incident — a day can carry one, stamped with the moment it was given, and this screen offers none: the answer comes from the money-and-incident panel above, which is not drawn, over an incident this build does not raise while a day is running',
+  /*
+   * **The dock entry and the answer entry are deleted, not reworded** — GitHub issue #171,
+   * § D507. They read *"no campaign dock — a campaign day reaches this stage, and the
+   * money-and-incident panel that belongs beside it is not drawn"* and *"no answer to a live
+   * incident — … over an incident this build does not raise while a day is running"*. Both stopped
+   * being true on one commit: `everyday/campaignDock.ts` is the panel, `stageScreen.ts` draws it
+   * beside the picture when `ctx === 'campaign'`, and `campaign/incidents.ts` raises the incident
+   * the second sentence said nobody raised. The register is empty now, and like
+   * `screens.ts#UNBUILT_REASONS` it stays — an empty table is a state that keeps being checked
+   * rather than a rule that can be deleted (`stageScreenModel.test.ts`).
+   */
+  /*
+   * **The camera entry is deleted, not reworded** — GitHub issue #324, § D505. It read *"no camera
+   * — the cutaway draws the whole building at once, so there is nothing to pan and nothing to
+   * follow"*. The reason was measured per tower and was true of the short ones and false of the
+   * tall ones, where labels thin below legibility; the camera is built for exactly those
+   * (`STAGE_CAMERAS`, `stageCameraWindowOf`) and absent on the others, which is what the measurement
+   * said the honest control looks like.
+   */
 ]);
 
 /* -------------------------------------------------------------------------- *
@@ -1221,6 +1266,12 @@ export interface StageFloorRow {
   readonly isEntrance: boolean;
   /** Whether this row's label is legible at the current pitch. Every row is still drawn. */
   readonly labelled: boolean;
+  /**
+   * Whether the row is inside the camera's window — GitHub issue #324. `true` for every row when
+   * the camera is the whole tower; a row outside the window still has its `y` (a car between two
+   * hidden floors is still placed by the same line) and the painter clips it.
+   */
+  readonly visible: boolean;
 }
 
 /** One shaft's well, in pixels. */
@@ -1259,11 +1310,143 @@ export interface StageGeometryInput {
   readonly floors: readonly VizFloor[];
   readonly shafts: readonly VizShaft[];
   readonly outOfServiceCarIds?: readonly string[] | undefined;
+  /**
+   * The camera's window, as a band of floors by `VizFloor.index` (inclusive) — GitHub issue #324.
+   * Absent, the whole tower fills the plot. Present, the band fills it and every other floor's row
+   * falls outside the plot at the same scale, so a car crossing the band's edge leaves the picture
+   * the way it would leave a window.
+   */
+  readonly window?: StageCameraWindow | undefined;
+}
+
+/** A band of floors, by `VizFloor.index`, inclusive both ends. */
+export interface StageCameraWindow {
+  readonly fromIndex: number;
+  readonly toIndex: number;
 }
 
 const PAD = 14;
 const GUTTER = 74;
 const MIN_LABEL_PITCH_PX = 13;
+
+/* -------------------------------------------------------------------------- *
+ * § 7.3 — the camera. GitHub issue #324.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The stage has a camera, and it is drawn only where it changes the picture** — GAMEPLAY § 7.3
+ * lists *the camera* among what a player can touch, and `STAGE_ABSENCES` said for three waves that
+ * the cutaway *"draws the whole building at once, so there is nothing to pan and nothing to
+ * follow"*. That reason was a claim about the canvas rather than the design, and GitHub issue #324
+ * asked for it to be measured before anything was built. It was, per tower, at the stage's own
+ * height (`stageScreen.ts`'s 60 vh on a 720 px viewport, then 1080), in
+ * `stageScreenModel.test.ts` § *the camera, measured per tower*: on the short towers every floor's
+ * label is legible and a camera would draw the same picture; on the tall ones `stageGeometryOf`
+ * thins labels below {@link MIN_LABEL_PITCH_PX} and a reader cannot tell floor 31 from 32. **So a
+ * camera buys reaching a floor band legibly, and following a car, on exactly the towers where the
+ * whole-building read fails** — and nothing on the towers where it holds.
+ *
+ * ## Three positions, and why the chips are absent rather than inert on a short tower
+ *
+ * *Whole tower* is the picture the stage always drew. *Lobby* is the band of legible floors from
+ * the entrance up, where the morning's crowd stands. *Follow the fullest car* is the same-sized band
+ * centred on the car carrying the most riders at the playhead, re-centred every paint, which is
+ * what following means. The band is {@link legibleFloorCount} floors — as many as the plot can
+ * label at {@link MIN_LABEL_PITCH_PX} — so a band never thins its own labels.
+ *
+ * On a tower whose every floor is already legible, all three positions are one picture. This
+ * repository's standing requirement binds both ways — *a control that writes nothing must say so* —
+ * and the honest form of saying so for a view control is not drawing it: {@link stageCameraChipsOf}
+ * returns no chip there, and `stageScreenModel.test.ts` asserts that a chip is offered exactly when
+ * the window it selects differs from the whole tower.
+ *
+ * ## What the camera does not touch
+ *
+ * The run. A camera is a view over a recording and writes no field of the state; pause and the
+ * speed chips are the precedent (*they are not interventions*), and this joins them. The legs are
+ * identical with the camera anywhere, which is not a claim that needs a test because no path from
+ * this module reaches `ViewerState`.
+ */
+export type StageCameraId = 'whole' | 'lobby' | 'follow';
+
+export interface StageCameraChip {
+  readonly id: StageCameraId;
+  readonly label: string;
+}
+
+/** The three positions, in the order the strip draws them. `whole` is the default. */
+export const STAGE_CAMERAS: readonly [StageCameraChip, ...StageCameraChip[]] = Object.freeze([
+  Object.freeze({ id: 'whole', label: 'Whole tower' }),
+  Object.freeze({ id: 'lobby', label: 'Lobby' }),
+  Object.freeze({ id: 'follow', label: 'Follow the fullest car' }),
+]);
+
+/** The plot height a stage box of `height` pixels yields — `stageGeometryOf`'s own padding. */
+function plotHeightOf(height: number): number {
+  return Math.max(height, 2 * PAD + 40) - 2 * PAD;
+}
+
+/**
+ * How many floors the plot can label at once without thinning — the band's size. At least two,
+ * because a one-floor window has no pitch to speak of.
+ */
+export function legibleFloorCount(height: number): number {
+  return Math.max(2, Math.floor(plotHeightOf(height) / MIN_LABEL_PITCH_PX) + 1);
+}
+
+/** Whether every floor of `floors` is legible in a box of `height` — the case with no camera. */
+export function wholeTowerIsLegible(floors: readonly VizFloor[], height: number): boolean {
+  return floors.length <= legibleFloorCount(height);
+}
+
+/**
+ * The chips to draw — all three on a tower the camera can help, none on a tower it cannot. See the
+ * module note above for why absence is the honest form of *this control writes nothing*.
+ */
+export function stageCameraChipsOf(floors: readonly VizFloor[], height: number): readonly StageCameraChip[] {
+  return wholeTowerIsLegible(floors, height) ? [] : STAGE_CAMERAS;
+}
+
+/**
+ * The window a camera position selects, or `undefined` for the whole tower — the value
+ * `stageGeometryOf` takes. `follow` reads the frame's cars; with no car aboard anybody it is the
+ * lobby band, which is where the fullest car will be found next.
+ */
+export function stageCameraWindowOf(input: {
+  readonly camera: StageCameraId;
+  readonly floors: readonly VizFloor[];
+  readonly height: number;
+  readonly cars?: readonly { readonly heightM: number; readonly occupants: number }[] | undefined;
+}): StageCameraWindow | undefined {
+  const { floors, height } = input;
+  if (input.camera === 'whole' || wholeTowerIsLegible(floors, height)) return undefined;
+  const ordered = [...floors].sort((a, b) => a.heightM - b.heightM);
+  const size = legibleFloorCount(height);
+  const lowest = ordered[0];
+  const highest = ordered[ordered.length - 1];
+  if (lowest === undefined || highest === undefined) return undefined;
+  const bandFrom = (startOrdinal: number): StageCameraWindow => {
+    const start = Math.max(0, Math.min(startOrdinal, ordered.length - size));
+    const from = ordered[start];
+    const to = ordered[Math.min(ordered.length - 1, start + size - 1)];
+    return { fromIndex: from?.index ?? lowest.index, toIndex: to?.index ?? highest.index };
+  };
+  if (input.camera === 'lobby') {
+    const entrance = ordered.findIndex((floor) => floor.isEntrance);
+    return bandFrom(entrance < 0 ? 0 : entrance);
+  }
+  const fullest = [...(input.cars ?? [])].sort((a, b) => b.occupants - a.occupants)[0];
+  if (fullest === undefined || fullest.occupants === 0) {
+    const entrance = ordered.findIndex((floor) => floor.isEntrance);
+    return bandFrom(entrance < 0 ? 0 : entrance);
+  }
+  /* The floor the car is at or just above, then the band centred on it. */
+  let at = 0;
+  for (const [ordinal, floor] of ordered.entries()) {
+    if (floor.heightM <= fullest.heightM) at = ordinal;
+  }
+  return bandFrom(at - Math.floor(size / 2));
+}
 
 /**
  * The cutaway's geometry.
@@ -1289,18 +1472,27 @@ export function stageGeometryOf(input: StageGeometryInput): StageGeometry {
     height: height - 2 * PAD,
   };
 
-  const heights = input.floors.map((floor) => floor.heightM);
+  /*
+   * The floors the plot is fitted to — the camera's window when there is one (GitHub issue #324),
+   * else every floor. Every floor still gets a row and a `y`; only the scale is the band's.
+   */
+  const band = input.window;
+  const inWindow = (floor: VizFloor): boolean =>
+    band === undefined || (floor.index >= band.fromIndex && floor.index <= band.toIndex);
+  const fitted = input.floors.filter(inWindow);
+  const fittedTo = fitted.length === 0 ? input.floors : fitted;
+  const heights = fittedTo.map((floor) => floor.heightM);
   const lowest = heights.length === 0 ? 0 : Math.min(...heights);
   const highest = heights.length === 0 ? 1 : Math.max(...heights);
   const span = highest - lowest;
   /* One floor is a legal building; a zero span would divide by nothing, so it draws mid-plot. */
-  const inset = Math.min(22, plot.height / Math.max(2, input.floors.length + 1));
+  const inset = Math.min(22, plot.height / Math.max(2, fittedTo.length + 1));
   const top = plot.y + inset;
   const bottom = plot.y + plot.height - inset;
   const yForHeight = (heightM: number): number =>
     span <= 0 ? (top + bottom) / 2 : bottom - ((heightM - lowest) / span) * (bottom - top);
 
-  const rowPitch = input.floors.length < 2 ? bottom - top : (bottom - top) / (input.floors.length - 1);
+  const rowPitch = fittedTo.length < 2 ? bottom - top : (bottom - top) / (fittedTo.length - 1);
   const labelled = rowPitch >= MIN_LABEL_PITCH_PX;
 
   const rows: readonly StageFloorRow[] = input.floors.map((floor) => ({
@@ -1311,6 +1503,7 @@ export function stageGeometryOf(input: StageGeometryInput): StageGeometry {
     isEntrance: floor.isEntrance,
     /* Entrance floors are never thinned out — it is the row a reader orients by (`RV-09`). */
     labelled: labelled || floor.isEntrance,
+    visible: fitted.length === 0 || inWindow(floor),
   }));
 
   const outOfService = new Set(input.outOfServiceCarIds ?? []);

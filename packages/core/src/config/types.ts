@@ -316,6 +316,16 @@ export interface DemandTemplate extends Commented {
   readonly durationMin: number;
   readonly reportWindow?: string | undefined;
   readonly shape?: string | undefined;
+  /**
+   * Whether a player may pick this template from a list. **Absent means yes.**
+   *
+   * `false` on a stream a mode owns — `endless-rush` (GitHub issue #220, § D515), which exists to be
+   * run by that mode's own setup and is not a shape a run may be chosen or posted under. Declared
+   * on the record rather than known by id in the menu, because a list built by naming the members
+   * to skip is § D213's defect; the menu's catalogue reads this field and offers nothing that
+   * declares it. Nothing in the simulation reads it.
+   */
+  readonly selectable?: boolean | undefined;
   /** Warm-up to discard, minutes. */
   readonly discardFirstMin?: number | undefined;
   /** Cool-down to discard, minutes. */
@@ -680,6 +690,16 @@ export interface AuctionStageConfig extends Commented {
 export interface DispatcherProfile extends Commented {
   readonly id: string;
   readonly name: string;
+  /**
+   * The authored player-facing line, 1–160 characters — GitHub issue #178 item 5, § D508.
+   *
+   * Present on every shipped profile and absent on nothing the schema refuses: a saved or edited
+   * profile is a player's, and `dev/rightRail.ts#authoredBlurbOf` draws this only beside the exact
+   * shipped vector it was written for, so a searched or moved vector never wears a sentence about
+   * a different one. That guard is what answers the objection that authored prose beside a
+   * searched vector goes stale — it is never beside one.
+   */
+  readonly blurb?: string | undefined;
   /** e.g. `baseline`. Free-form; used for reporting, not behaviour. */
   readonly role?: string | undefined;
   readonly engine?: string | undefined;
@@ -1443,7 +1463,7 @@ export interface AccessZone extends Commented {
  * total order is `(time, sequence)` and the sequence follows the order the runner scheduled them
  * in, which is the order they appear in the array (invariant 4).
  */
-export interface ServiceEventConfig extends Commented {
+export interface ServiceModeEventConfig extends Commented {
   /** Simulated seconds from the start of the run. */
   readonly atS: number;
   /** The car's id within its bank. */
@@ -1456,6 +1476,75 @@ export interface ServiceEventConfig extends Commented {
   /** The mode to switch to. Switching to the mode the car is already in is a no-op. */
   readonly mode: ServiceMode;
 }
+
+/**
+ * **A bank's service range changes at a simulated instant** — GitHub issue #346,
+ * [§ D523](../../../../DECISIONS.md). *A sky lobby closed from 11:00* is this entry with the
+ * lobby's id left out of `servesFloors`; the same lobby reopening is a second entry with it put
+ * back.
+ *
+ * `servesFloors` **replaces** the bank's served set rather than patching it, so an entry reads as
+ * the whole of what the bank serves from `atS` onward and two entries cannot leave the set in a
+ * state neither of them wrote. Every id must be a floor the building declares; the set must be
+ * non-empty; and the bank must be single-deck — a double-deck bank's floor pairs are derived from
+ * its range at build time, and `resolveBuilding` refuses to move the range under them
+ * (`unsupported-service-range`) rather than simulate a coupling the pairs no longer describe.
+ *
+ * What the change does to the run is `sim/simulation.ts#onRangeChange`'s: a car finishes the leg
+ * it is carrying — anybody aboard alights where they were going, inside the new range or not — and
+ * the bank stops answering calls the new range cannot serve. A rider standing at a landing whom no
+ * bank can now carry, and every later arrival in that position, is **stranded**: a fifth outcome,
+ * neither delivered nor waiting nor abandoned nor refused, published beside AWT as
+ * `ConservationAudit.stranded` and never folded into the mean.
+ */
+export interface ServiceRangeEventConfig extends Commented {
+  /** Simulated seconds from the start of the run. */
+  readonly atS: number;
+  /** The bank whose range moves. Required: a range is a fact about a bank, never about a car. */
+  readonly bankId: string;
+  /** The floors the bank serves from `atS`, in the order the bank should list them. Non-empty. */
+  readonly servesFloors: readonly string[];
+}
+
+/**
+ * **A car's rated load changes at a simulated instant** — GitHub issue #346,
+ * [§ D523](../../../../DECISIONS.md). *Capacity derated from 11:00* is this entry; the car
+ * returning to its plated rating is a second entry at the plated figure.
+ *
+ * `ratedLoadLb` is what the controller's load-weighing device is set to from `atS`: the design
+ * load (`× designLoadFactor`, the boarding gate), the hall-call bypass and the overload alarm all
+ * move with it, so a derated car fills to fewer people and says so. It may not exceed the car's
+ * plated `ratedLoadLb` — a controller cannot rate a machine above its hardware, and
+ * `resolveBuilding` refuses the attempt (`service-load-above-rating`). **The counterweight does
+ * not move**: `Car#completeArrival`'s energy sample balances against the plated rating, because a
+ * derate is a setting on the controller and not lighter machinery in the shaft.
+ *
+ * A car already carrying more than the new design load admits nobody until somebody alights; one
+ * already past the new overload threshold has its doors held at its next stop exactly as a car
+ * loaded past the alarm does today, and the alarm's own remedy applies.
+ */
+export interface ServiceDerateEventConfig extends Commented {
+  /** Simulated seconds from the start of the run. */
+  readonly atS: number;
+  /** The car's id within its bank. */
+  readonly carId: string;
+  /** Which bank the car is in; required only when the car id is not unique across the building. */
+  readonly bankId?: string | undefined;
+  /** The rated load the controller runs the car at from `atS`, pounds. Positive, at most plated. */
+  readonly ratedLoadLb: number;
+}
+
+/**
+ * One scheduled mid-run change to the building's lift service: a car's **mode**, a bank's
+ * **range**, or a car's **rated load**. The three are told apart structurally — `mode`,
+ * `servesFloors` and `ratedLoadLb` each appear on exactly one shape — so an entry authored before
+ * the second and third existed still parses as the first. See {@link ServiceModeEventConfig},
+ * {@link ServiceRangeEventConfig} and {@link ServiceDerateEventConfig}.
+ */
+export type ServiceEventConfig =
+  | ServiceModeEventConfig
+  | ServiceRangeEventConfig
+  | ServiceDerateEventConfig;
 
 /** One file in `data/buildings/`. Floors come from `floors`, `floorRanges`, or both. */
 export interface BuildingConfig extends Commented {
@@ -1566,12 +1655,39 @@ export interface ResolvedCar {
  * `ConfigError` with a path — the same treatment a bank serving an undeclared floor gets — rather
  * than a silently-skipped event that makes a run quietly not test what it says it tests.
  */
-export interface ResolvedServiceEvent {
+export interface ResolvedServiceModeEvent {
   readonly atS: number;
   readonly bankId: string;
   readonly carId: string;
   readonly mode: ServiceMode;
 }
+
+/** A {@link ServiceRangeEventConfig} with its bank and every floor located. */
+export interface ResolvedServiceRangeEvent {
+  readonly atS: number;
+  readonly bankId: string;
+  readonly servesFloors: readonly string[];
+}
+
+/**
+ * A {@link ServiceDerateEventConfig} with its car located and the load in the model's own unit:
+ * `ratedLoadKg` is `ratedLoadLb` converted the way `resolveCar` converts the plated figure, so a
+ * derate written at the plate is the plate.
+ */
+export interface ResolvedServiceDerateEvent {
+  readonly atS: number;
+  readonly bankId: string;
+  readonly carId: string;
+  /** As authored, kept so a resolved building is still a valid `BuildingConfig` structurally. */
+  readonly ratedLoadLb: number;
+  readonly ratedLoadKg: number;
+}
+
+/** The resolved form of {@link ServiceEventConfig}; told apart structurally, as the config is. */
+export type ResolvedServiceEvent =
+  | ResolvedServiceModeEvent
+  | ResolvedServiceRangeEvent
+  | ResolvedServiceDerateEvent;
 
 /** A bank with its cars resolved. */
 export interface ResolvedBank {

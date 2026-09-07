@@ -47,6 +47,8 @@ import {
   WELL,
 } from './screenDom.js';
 import { everydayProfileStore } from './profileStore.js';
+import { drawElevation } from './elevation.js';
+import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
 import { todayOf, type TodayRecord } from './today.js';
 import {
   EVERYDAY_COLORS as C,
@@ -56,11 +58,8 @@ import {
 } from './tokens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 
-/** The drawing's aspect. The prototype's card is a tall panel; this is its ratio. */
+/** The drawing's aspect. The prototype's card is a tall panel; this is its ratio — `elevation.ts` paints it. */
 const ELEVATION_HEIGHT_PX = 300;
-
-/** ENGINE_CONTRACT § 14: *multiply by `min(2, devicePixelRatio)`*. */
-const MAX_PIXEL_RATIO = 2;
 
 function mountBrief(
   host: HTMLElement,
@@ -87,6 +86,9 @@ function mountBrief(
     const { host: data } = context;
     const selection = data.selection();
     const dispatchers = data.dispatchers();
+    /* The reader's saved copies, by id — § D508's guard needs the shipped list without them. */
+    const savedIds = new Set(data.savedDispatchers().map((entry) => entry.profile.id));
+    const shipped = dispatchers.filter((profile) => !savedIds.has(profile.id));
     const today = todayOf({
       week: data.week(),
       calendar: data.calendarPeriod(),
@@ -95,6 +97,7 @@ function mountBrief(
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
       goals: data.goalsToday(),
       seed: data.seed(),
+      firstSession: isFirstDayOnALegibleTower(data.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),
     });
@@ -107,16 +110,16 @@ function mountBrief(
           name: profile.name,
           /*
            * The Engineer's own player-facing sentence for this profile, in its Casual register —
-           * `dev/rightRail.ts#dispatcherCardOf(profile, cards, 'basic').sub`. Read rather than
-           * authored, and it is not a shortcut: `dispatcherBlurbOf`'s docstring argues at length
-           * that a per-dispatcher sentence may not be authored *anywhere*, because a weight vector
-           * is the one object in this repository a search writes and authored prose beside a
-           * searched vector is stale on the first round that improves it. A second sentence here
-           * would be that mistake with a Casual accent.
+           * `dev/rightRail.ts#dispatcherCardOf(profile, cards, 'basic', shipped).sub`. Read rather
+           * than authored here: since § D508 that is the profile's authored line when the card is
+           * the shipped vector it was written for, and the derived behaviour sentence otherwise —
+           * a saved copy or an edited vector never wears a sentence about a different one. The
+           * shipped list is passed separately so a copy on the reader's shelf cannot vouch for
+           * itself. A second sentence authored here would be the mistake with a Casual accent.
            */
-          description: dispatcherCardOf(profile, dispatchers, 'basic').sub,
+          description: dispatcherCardOf(profile, dispatchers, 'basic', shipped).sub,
         })),
-        savedIds: data.savedDispatchers().map((entry) => entry.profile.id),
+        savedIds: [...savedIds],
         selectedId: selection.dispatcherId,
       }),
     };
@@ -130,7 +133,7 @@ function mountBrief(
     briefDriver = today.driver;
     root.replaceChildren();
     root.append(leftColumn(view), rightColumn(view));
-    drawElevation(canvas, context.host.resolvedBuilding(), today);
+    drawTodaysElevation(canvas, context.host.resolvedBuilding(), today);
     context.refreshBar();
   }
 
@@ -410,7 +413,7 @@ function mountBrief(
   render();
   const stopListening = context.host.subscribe(render);
   const onResize = (): void => {
-    drawElevation(canvas, context.host.resolvedBuilding(), factsNow().today);
+    drawTodaysElevation(canvas, context.host.resolvedBuilding(), factsNow().today);
   };
   const view = canvas.ownerDocument.defaultView;
   view?.addEventListener('resize', onResize);
@@ -449,129 +452,15 @@ function mountBrief(
 }
 
 /**
- * The cutaway elevation — § 6.2's list, drawn from the building.
- *
- * Every shape is derived: one well per car in bank order, storeys at `floors.length`, and the
- * dashed well is `carsToDerate`'s own choice for today. A building the shell could not resolve
- * draws nothing rather than a stand-in tower, on `everyday/host.ts#buildingById`'s rule that a
- * substituted answer is a false statement about the thing asked after.
+ * The elevation with today's held cars — `carsToDerate`'s own choice, which is the same call the
+ * run makes. The painter is `elevation.ts`'s, shared with the campaign's tower screen.
  */
-function drawElevation(
-  canvas: HTMLCanvasElement,
-  building: ResolvedBuilding | undefined,
-  today: TodayRecord,
-): void {
-  const box = canvas.getBoundingClientRect();
-  const view = canvas.ownerDocument.defaultView;
-  const ratio = Math.min(MAX_PIXEL_RATIO, view?.devicePixelRatio ?? 1);
-  const width = Math.max(1, Math.round(box.width * ratio));
-  const height = Math.max(1, Math.round(ELEVATION_HEIGHT_PX * ratio));
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  // No 2D context — a node tier, or a browser that refused one. The rest of the brief is unaffected.
-  if (ctx === null) return;
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  const w = box.width;
-  const h = ELEVATION_HEIGHT_PX;
-  ctx.clearRect(0, 0, w, h);
-  if (building === undefined || w <= 0) return;
-
-  const storeys = Math.max(1, building.floors.length);
-  const cars = building.banks.flatMap((bank) => bank.cars.map((car) => car.id));
-  const held = new Set(
-    carsToDerate(building, heldCountOf(today)).held.map((ref) => ref.carId),
+function drawTodaysElevation(canvas: HTMLCanvasElement, building: ResolvedBuilding | undefined, today: TodayRecord): void {
+  drawElevation(
+    canvas,
+    building,
+    building === undefined ? [] : carsToDerate(building, heldCountOf(today)).held.map((ref) => ref.carId),
   );
-
-  const pad = 16;
-  const roofH = 10;
-  const groundH = 18;
-  const bodyTop = pad + roofH;
-  const bodyBottom = h - pad - groundH;
-  const bodyH = Math.max(1, bodyBottom - bodyTop);
-  const bodyLeft = pad;
-  const bodyRight = w - pad;
-  const bodyW = Math.max(1, bodyRight - bodyLeft);
-  const storeyH = bodyH / storeys;
-
-  /* the slab */
-  ctx.fillStyle = C.warmGrey;
-  ctx.fillRect(bodyLeft - 4, pad, bodyW + 8, roofH);
-
-  /* the body */
-  ctx.fillStyle = C.paperDeeper;
-  ctx.fillRect(bodyLeft, bodyTop, bodyW, bodyH);
-
-  /* storeys, and windows on the half that is not shafts */
-  ctx.strokeStyle = C.rule;
-  ctx.lineWidth = 1;
-  for (let index = 0; index <= storeys; index += 1) {
-    const y = Math.round(bodyTop + index * storeyH) + 0.5;
-    ctx.beginPath();
-    ctx.moveTo(bodyLeft, y);
-    ctx.lineTo(bodyRight, y);
-    ctx.stroke();
-  }
-
-  /* the shaft wells: one per car, right-hand two thirds, dark voids */
-  const wellCount = Math.max(1, cars.length);
-  const wellsLeft = bodyLeft + bodyW * 0.42;
-  const wellsW = bodyRight - wellsLeft - 8;
-  const wellW = Math.max(4, (wellsW - 6 * (wellCount - 1)) / wellCount);
-  cars.forEach((carId, index) => {
-    const x = wellsLeft + index * (wellW + 6);
-    const out = held.has(carId);
-    ctx.fillStyle = out ? C.paperDeep : C.ink;
-    ctx.fillRect(x, bodyTop + 2, wellW, bodyH - 4);
-    if (out) {
-      ctx.save();
-      ctx.strokeStyle = C.terracotta;
-      ctx.setLineDash([4, 3]);
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(x + 0.75, bodyTop + 2.75, wellW - 1.5, bodyH - 5.5);
-      ctx.restore();
-    } else {
-      /* a car parked in the well, one storey up from the ground */
-      const carH = Math.min(storeyH * 0.8, 18);
-      const carY = bodyBottom - storeyH * 1.5;
-      ctx.fillStyle = C.sun;
-      ctx.fillRect(x + 2, carY, Math.max(2, wellW - 4), carH);
-    }
-    /* the lettered badge */
-    ctx.fillStyle = out ? C.terracotta : C.label;
-    ctx.font = `500 9px ${TYPE.mono}`;
-    ctx.textAlign = 'center';
-    ctx.fillText(carId.slice(-3), x + wellW / 2, bodyTop - 3);
-  });
-
-  /* windows on the left third */
-  ctx.fillStyle = C.sky;
-  for (let index = 0; index < storeys; index += 1) {
-    const y = bodyTop + index * storeyH + storeyH * 0.28;
-    const wh = Math.max(2, storeyH * 0.4);
-    for (let column = 0; column < 3; column += 1) {
-      ctx.fillRect(bodyLeft + 10 + column * 22, y, 13, wh);
-    }
-  }
-
-  /* the ground and the entrance canopy */
-  ctx.fillStyle = C.warmGrey;
-  ctx.fillRect(pad - 6, bodyBottom, bodyW + 12, 3);
-  ctx.fillStyle = C.sun;
-  ctx.fillRect(bodyLeft + 8, bodyBottom - 8, 58, 5);
-
-  /* floor numbers: top, middle, ground */
-  ctx.fillStyle = C.label;
-  ctx.font = `500 9px ${TYPE.mono}`;
-  ctx.textAlign = 'right';
-  const marks: readonly [number, string][] = [
-    [0, String(storeys)],
-    [Math.floor(storeys / 2), String(Math.max(1, storeys - Math.floor(storeys / 2)))],
-    [storeys - 1, 'G'],
-  ];
-  for (const [index, label] of marks) {
-    ctx.fillText(label, bodyLeft - 3, bodyTop + index * storeyH + storeyH * 0.72);
-  }
 }
 
 /** How many cars today holds — read off the day record's own strip rather than recomputed. */

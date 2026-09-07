@@ -82,7 +82,7 @@ function runOf(overrides: Partial<WatchableRun> = {}): WatchableRun {
 
 describe('the watching view', () => {
   it('says none of you, your or yours on any surface it draws', () => {
-    for (const source of ['filed-day', 'reference'] as const) {
+    for (const source of ['filed-day', 'reference', 'posted-run'] as const) {
       const view = watchingViewOf(runOf({ source }), 'Steady hand');
       for (const text of watchingStrings(view)) {
         expect(firstPersonWordsIn(text), `“${text}” is first-person on a watched run`).toEqual([]);
@@ -103,7 +103,7 @@ describe('the watching view', () => {
    * being checked when the defect shipped.
    */
   it('says none of you, your or yours on the shell surfaces either', () => {
-    for (const source of ['filed-day', 'reference'] as const) {
+    for (const source of ['filed-day', 'reference', 'posted-run'] as const) {
       const view = watchingViewOf(runOf({ source }), 'Steady hand');
       for (const text of shellWatchingStrings(shellWatchingCopyOf(view))) {
         expect(firstPersonWordsIn(text), `“${text}” is first-person on a watched shell`).toEqual([]);

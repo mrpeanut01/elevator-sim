@@ -77,6 +77,9 @@ import type {
  * | 8 | {@link VizSummary.awtInvalidGround} added — the machine-readable half of a refused mean, beside the sentence {@link VizSummary.awtInvalidReason} has carried since version 1. `core` publishes it on `RunSummary` from `metrics/awtValidity.ts`'s ground table (`the root DECISIONS.md` § D183), and **the consumer landed one commit before the transport**: `src/mode/disclosure.ts` already words a Basic suppression lead per ground and, without this field, fell back to the ground-free sentence on every recording this build produced. So this is the reverse of the usual order and the reason is stated rather than implied — a field arriving before its reader is this repository's dead seam, a reader arriving before its field is a fallback that fires. Not derivable from version 7: which of the four grounds fired is a decision `diagnoseAwtValidity` makes in its own precedence order, and re-deriving it here from `saturated`, `waitCount`, `unservedCount` and `serviceLevel` would be a second answer to a question `core` has already answered — wrong in exactly the case the fourth ground exists for. |
  * | 9 | {@link VizRecording.patternSwitches} added — the weight-set selector's pattern-in-force over time, sampled from the policy's own `activePattern` accessor during the run (Everyday Mode slice 4b, `docs/18` § Slice 4). Until this version the detector classified, switched weight vectors, and told nobody: `dispatch/policy.ts` has exposed `activePattern` since the selector landed and its only readers were in `packages/experiments`, so the one thing a player could not see about a selecting run was the selection. Its consumers land in the same change — the stage header's pattern pill (`dev/main.ts`, deriving through `live/patternReadout.ts#patternReadoutAt`) — because a field with no consumer is this repository's signature defect. Not derivable from version 8: the arm in force is the policy's own deterministic state, discarded when `run()` returns, and re-deriving it here would mean re-implementing the detector over the recording — a second answer that drifts the day a ramp is recalibrated. |
  * | 10 | {@link VizRecording.loadedDepartures} added — the instants the fleet's **loaded** moves ended, so `ENGINE_CONTRACT.md` § 5's `trips` (*count of car departures under load*) can be folded at a playhead. `core`'s `metrics/summarize.ts#loadedDepartureTimes` derives them from the travel samples it already takes; `live/observations.ts` cuts them at the playhead and `shift/goals.ts` grades the campaign's fourth daily test off the result (GitHub issues #169, #313). Its consumers land in the same change, because a field with no consumer is this repository's signature defect. **Not derivable from version 9**: a loaded move is a `(load, distance)` pair the run holds and the recording drops — `VizShaft.motions` carries no load and `VizShaft.occupants` is a fold of the load samples, so joining the two here would be a second answer to a question `core` has already answered, and it would disagree the first time a car levelled between two load samples. **Optional, and absent is not empty**: absent means a recording that carries no travel record at all — a hand-built fixture, since `record/document.ts` refuses a file below this version outright — and present-and-empty is the honest record of a fleet that never once moved with somebody aboard. |
+ * | 11 | {@link VizLeg.legIndex} and {@link VizLeg.finalDestinationFloorId} added — and, in the same version because it was never a shape change, {@link VizRecording.buildVersion}, the commit of the bundle that wrote the file (GitHub issue #246), which `record/document.ts` quotes when it refuses a file from another build so the report says which build rather than which schema. Optional, absent on a fixture, and read by nothing that decides a frame. The two leg fields are — which leg of its journey a leg is, and where the whole journey ends. `legIndex` is `0` for the arrival the traffic generator issued and `n` for the leg minted at the n-th sky-lobby transfer. A projection of `PassengerRecord.legIndex`, which `core` has carried since transfers existed. **Its consumer lands in the same change**: `src/record/crowd.ts` decides whether two recordings met the same crowd (GitHub issue #350), and measured on the shipped fix-it cases the naive answer — every leg's `(passengerId, arrivedAt, origin, destination)` — came back *different* on all seven cases set in the three transfer buildings while the generator's own arrivals were identical. A transfer leg's `arrivedAt` is the instant the first car dropped its rider, which is the dispatcher's doing and not the crowd's; without this field a recording cannot tell the two apart, and the same-crowd check would either refuse every transfer building or compare nothing. The second field is the same finding one repair over: a **zoning** repair on `secure-tower` turned a direct `3 → 21` ride into `3 → G` then `G → 21`, so the first leg's `destinationFloorId` moved while the person, the instant and where they were going did not — a route is the building's doing, and the crowd is who arrives, when, from where, wanting to reach where. A projection of `PassengerRecord.finalDestinationFloorId`. **Both optional, and absent is a first leg going where it says**: `recordRun` writes them on every leg, and a recording without them is a hand-built fixture, since `record/document.ts` refuses a file below this version outright. |
+ * | 13 | {@link VizSummary.saturation} added — `core`'s own trend test over the report window, carried as {@link VizSaturation} (GitHub issue #220, § D515). The rush's result screen names where the queue stopped draining and `docs/35` `PM-RU3` forbids a second definition of *when it broke* computed in the viewer, so the diagnosis travels rather than being re-derived from `saturated`. Optional, because a version-12 recording carries only the boolean; a reader that quotes the slope says the record predates the field rather than inventing one. |
+ * | 12 | {@link VizLeg.structuralRefusal} added — the structural reason every car refused a waiting rider's call, joined to the leg by `core` at reconcile time (GitHub issue #178 item 9, § D511). Optional and absent on every leg that boarded, so a version-11 recording reads as a version-12 one with no rider refused structurally; the bump is because a reader that draws the reason must know a recording without the field is *older* rather than *clean*. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -109,7 +112,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 10;
+export const VIZ_SCHEMA_VERSION = 13;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -283,6 +286,23 @@ export interface VizLeg {
   readonly direction: Direction;
   /** When the wait began. The window membership key, exactly as in `PassengerRecord`. */
   readonly arrivedAt: SimTime;
+  /**
+   * Which leg of its journey this is — `0` for the arrival the traffic generator issued, `n` for
+   * the leg minted at the n-th sky-lobby transfer (`PassengerRecord.legIndex`). Version 11, and the
+   * version table says why it exists: a transfer leg's {@link arrivedAt} is when the previous car
+   * dropped its rider, so it belongs to the dispatcher and not to the crowd, and `record/crowd.ts`
+   * has to leave it out to say whether two runs met the same people. Absent only on a hand-built
+   * fixture, and read as `0` there.
+   */
+  readonly legIndex?: number | undefined;
+  /**
+   * Where the **whole journey** ends — equal to {@link destinationFloorId} on a leg that does not
+   * transfer, the far side of the transfer on one that does (`PassengerRecord.finalDestinationFloorId`).
+   * Version 11, beside {@link legIndex} and for the same reader: a zoning change turns a direct ride
+   * into two legs, and the crowd did not change when the route did. Absent only on a hand-built
+   * fixture, and read as {@link destinationFloorId} there.
+   */
+  readonly finalDestinationFloorId?: string | undefined;
   /** When the wait ended. `undefined` for a leg nobody ever served. */
   readonly boardedAt?: SimTime | undefined;
   /**
@@ -320,6 +340,14 @@ export interface VizLeg {
    * the building turns them away, and `access/lockedOut.ts` is where they are named instead.
    */
   readonly refusedAt?: SimTime | undefined;
+  /**
+   * Why every car refused the call this leg stood on, when the refusal was structural and the leg
+   * never boarded — version 12, GitHub issue #178 item 9, § D511. `core` joins it to the leg at
+   * reconcile time from the call the leg's own landing, direction and destination name, so the
+   * sentence `Simulation` warns with per call is readable per rider here. Absent on every leg that
+   * boarded and on every waiting leg whose call was merely late.
+   */
+  readonly structuralRefusal?: string | undefined;
   /**
    * The car the **landing panel promised** this passenger, written once at arrival.
    *
@@ -695,8 +723,30 @@ export interface VizEnergy {
  * `awtIsValid: true`, computed over **five** legs. It is a legitimately quotable mean by this
  * project's own rule and it is not a mean anybody should read without knowing the `n`.
  */
+/**
+ * `core`'s saturation diagnosis, the fields a reader may quote — `metrics/types.ts#SaturationDiagnosis`
+ * without its thresholds and its intercept, which are the instrument's and not the sheet's.
+ */
+export interface VizSaturation {
+  readonly verdict: 'diverging-queue' | 'stable' | 'insufficient-samples';
+  /** The window the trend was fitted over, simulated seconds. */
+  readonly windowStartS: number;
+  readonly windowEndS: number;
+  readonly sampleCount: number;
+  readonly slopePersonsPerMinute: number;
+  /** `slope × window`: the growth the verdict was decided on. */
+  readonly projectedGrowthPersons: number;
+  readonly meanQueueLength: number;
+  readonly maxQueueLength: number;
+}
+
 export interface VizSummary {
   readonly saturated: boolean;
+  /**
+   * The trend test behind `saturated`, version 13 — see the table above. Present on every recording
+   * this build produces; absent on one made before the field existed.
+   */
+  readonly saturation?: VizSaturation | undefined;
   readonly awtIsValid: boolean;
   readonly awtInvalidReason?: string | undefined;
   /**
@@ -781,6 +831,13 @@ export interface VizSummary {
  */
 export interface VizRecording {
   readonly schemaVersion: number;
+  /**
+   * The commit of the bundle that made this recording, ten characters, or `unbuilt` for a run
+   * outside any shipped bundle — GitHub issue #246, written by `recordRun` from
+   * `src/release/version.ts`. Optional because a fixture predates it; `record/document.ts` quotes it
+   * in a refusal when it is there, so a file from another build says which build.
+   */
+  readonly buildVersion?: string | undefined;
   readonly runId: string;
   /** Master seed as a decimal string, matching `RunRecord.seed`. Invariant 5. */
   readonly seed: string;

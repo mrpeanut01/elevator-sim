@@ -1056,7 +1056,8 @@ was**.
   same shape one file over; at the measured 4.5× amplification that is **490 s against a 300 s
   ceiling**. `campaign/stageSequence.test.ts` behind it at 77 363 ms. Neither fixed.
   **Corrected 2026-09-05 — the ceiling in that sentence is the wrong ceiling.** Both cases carry an
-  explicit per-test timeout overriding the project default: `campaign.test.ts:866` closes
+  explicit per-test timeout overriding the project default: `campaign.test.ts:866` (since #356's
+  split, `stageFiveClears.test.ts`; the annotation is unchanged) closes
   `}, 3_000_000);` and `stageSequence.test.ts:187` closes `}, 900_000);`. At the same 4.5×, that is
   490 s against 3 000 s and 348 s against 900 s, so neither can time out. The claim was inherited
   verbatim from `vitest.config.ts`, where it has been retracted in place; what survives is a
@@ -2141,3 +2142,453 @@ hit**, and named the fix as the integrator opening `OPEN_RESERVATION`. That was 
 integrated tree is green: **24 files, 236 passed, 6 skipped, exit 0**. A lane that predicts the
 integrator's failure and declines to fix it from inside its own branch is the division of labour
 § D343 asks for, arriving on a lane rather than being imposed on one.
+
+# Wave T — 2026-09-06: one worker, thirteen issues, and a probe that found three strings the guards had passed
+
+## T.1 The wave's shape: one worker, thirteen issues, one push
+
+Wave T ran differently from every wave since H. There was no dispatch, no lane board and no
+conflict map, because one integrator worked the batch serially on one branch, with two lanes
+(#329 and #356) delegated to worktrees and merged by hand. The owner's brief was *"get a batch of
+10 to 20 committed, and execute a single PR and merge, then continue"*, and the push agreement was
+kept: seventeen commits, one push.
+
+| issue | what landed | decision |
+|---|---|---|
+| #349 | `fixit/parse.ts` refuses a population patch on the three fabric roles, permits it on the diagnosed repair, and the pair's basis line says the crowd changed | § D497 |
+| #350 | `record/crowd.ts`: the crowd is the first legs on `(passengerId, arrivedAt, originFloorId, finalDestinationFloorId)`, asserted at three sites; schema 11 | § D498 |
+| #351 | a symptom is a sight (two cases rewritten); the demand declaration is derived from the rate and the band, never authored | § D499 |
+| #352 | a fourth intervention, *spread the cars*, on both shells, the wire and the server | docstring, § D405 |
+| #146 | the Engineer editor's cost line has a Basic register, read at all four print sites | § D495 (wave S) |
+| #225, #277 | Sandbox is a state: the door label, `docs/12` § 4.13, the GAPS row deleted, P3 re-adjudicated | § D496 (wave S) |
+| #229 | Default speed is a row; Clear saved progress clears both slots on a second press and seals the session first | § D500 |
+| #338 | a handover travels to the board as a shipped id plus rule rows; the incident answer stays refused | § D486 (wave S) |
+| #329 | the blocker check, scheduled daily and asserted without the network | § D485 (wave S) |
+| #348 | Fix a building opens on the as-built run, played, before the four figures | docstring, § D405 |
+| #246 | the bundle carries its commit; the panel and every recording say it; `RELEASE_NOTES.md` | § D501 |
+| #356 | `campaign.test.ts` split by the batch each case reads; the census reads helpers | § D502 |
+
+## T.2 Three issue premises that were false, found by building the thing as asked
+
+The pattern wave S named as its lesson held three more times, and each time the refutation came
+from running the requested check once rather than from reading the code.
+
+**#349** asked for a blanket refusal of `floorPopulations` in a repair patch. Written and run over
+the shipped cases, it refused three, and each was the case's diagnosed repair and its whole lesson.
+The refusal is narrowed to the roles that are purchases.
+
+**#350** asked for a four-field key over every leg. It came back *different* on all seven cases in
+the three transfer buildings while the repairs touched no population. A transfer leg's `arrivedAt`
+is the dispatcher's, and a zoning repair moves a first leg's destination without moving the
+journey's. The key is the first legs on the journey's end, and the recording grew two fields to
+carry that.
+
+**#351** asked for an authored declaration on cases outside their band. Fourteen of eighteen are
+outside it, thirteen below. An authored key on that many cases is a register that goes stale on the
+next rate change, so the declaration is derived at load time and an authored one is refused.
+
+## T.3 What the guards caught, and what the probe caught that the guards did not
+
+`honesty/derive.test.ts` flagged nineteen unclassified string producers across the wave's lanes and
+the dead-code audit flagged the new `build/` directory, both on the integrator's first full run of
+the touched projects rather than on any lane. The DOM entry-point figure moved from 33 to 34 at six
+sites because the as-built stage is a mount, and `stageScreen.test.ts`'s painter assertions had to
+follow the painter into `cutaway.ts`.
+
+**The one the guards did not catch.** The corpus probe (§ T.4) showed the fix-it screen's three
+as-built words moving the count by nothing. They were in the FIXIT adapter's `covers` and in
+nothing's output, because their only reader is a mount. The adapter now seeds them by name, which
+is the same shape as wave G's speed chips, and the derive exclusion that had claimed the adapter
+*iterates* the copy table was corrected to say what it does.
+
+## T.4 The corpus: 114 a case in both tiers, and the probe that found the last three
+
+Measured once, after integration, both tiers in one sitting, with the base at `36255b4` re-measured
+first in a detached worktree. The base reproduced its published row exactly in both tiers, the
+tenth consecutive wave that has held.
+
+| | base `36255b4` | wave T | move | per case |
+|---|---|---|---|---|
+| always-on strings | 584 239 | **589 825** | +5 586 | **114.0** |
+| deep strings | 728 743 | **735 583** | +6 840 | **114.0** |
+| surfaces | 56 / 57 | 56 / 57 | 0 | |
+| cases, simulations, failing cases | 49 / 60, 606 / 4 710, 0 | unmoved | 0 | |
+
+The decomposition is in `CLAUDE.md`'s row and was taken by a probe rather than forecast: a scratch
+test rendered the first corpus case on each tree and diffed the seeded fields by adapter. The first
+pass read 111, and the three missing strings were the as-built stage's copy keys, in `covers` and
+reached by nothing. Seeded, re-measured, 114. The interim figures (589 678 and 735 403) were correct
+for the tree they were taken on and are not published as the row.
+
+## T.5 Verified on the integrated tree, and what the first full run found
+
+`tsc -b` exit 0. All six vitest projects were run in one sitting on the integrated tree, and the
+first pass was red in three of them, every red a guard catching this wave's own work:
+
+| project | first pass | what it was | second pass |
+|---|---|---|---|
+| `core` | 111 / 112 files | `moduleTree.test.ts`: `docs/01` did not name `viz/build` | green |
+| `experiments` | 107 files, 1 409 passed, 11 skipped | | |
+| `server` | 16 files, 370 passed | | |
+| `cli` | 10 files, 158 passed | | |
+| `viz` | 232 / 236 files, 5 139 passed | `boundaries.test.ts`: `cutaway.ts` reads the DOM and was not exempt | green |
+| `viz-browser` | 35 / 37 files, 221 passed | two literals #229 moved (schema 3 → 4, register floor 20 → 15) | green |
+
+The three fixes are three commits after the records, and each is a literal or a list that a
+guard derives from disk catching a hand-written claim, which is this repository's oldest lesson
+and the reason the full suite runs before the one push rather than after it.
+
+# Wave U — 2026-09-06: one worker, six issues, two umbrella items, and a move no per-case integer describes
+
+## U.1 The wave's shape: one worker, six issues and two items, one push
+
+Wave U ran as wave T did: one integrator, no lanes, serial on one branch, opened the same hour wave
+T merged. Six issues closed and two items of two umbrella issues, four decisions taken, one push.
+
+| issue | what landed | decision |
+|---|---|---|
+| #325 | `gapsRegister.test.ts`: every open GAPS.md § 3 row oracled, read elsewhere, or named unguarded, in both directions; the tuning-seeds row struck by the guard's own first run | R44's mitigation |
+| #337 | a daily-board row can be watched: `watch/posted.ts`, the server's four figures as the claim, the gate at the server's tolerance, `your run` on the player's own row | docstring, § D405 |
+| #213 | every report lever opens the surface that changes it; the dispatcher pair open the workshop with the honesty kept on the card as a caveat | § D503, the owner's ruling |
+| #353 | a works night takes one car out on every day it occupies, pinned on the legs; the tower screen opens on the elevation with the hole drawn | § D504 |
+| #324 | a camera on the stage, measured per tower and drawn only on the two towers where a band differs from the whole | § D505 |
+| #327 | a quantile ladder per axis for a board, withheld below twenty, no interval, energy named absent; the daily tab draws the middle under the rows | § D506 |
+| #178 item 4 | closed by #325's row strike: the campaign judges on the holdout and the brief says so | |
+| #177 item 2 | closed by #213: *Add a car* opens the tuner, which was the second door | |
+
+## U.2 Three claims the code refuted, and one the measurement did
+
+**The tuning-seeds row.** R44 said a human sweep had walked past it. The guard's oracle was written
+as the row's own claim and failed on the first run, which is the mutation fixture the issue asked
+for; the row is struck with the refutation attached.
+
+**"The works take no car out of service."** Two tests held that sentence and the writer's absence
+from disk. GD11's first half is built now, so the guard flipped: it holds the writer's presence, and
+the sentences #264 withdrew came back narrower than they left.
+
+**"The cutaway draws the whole building at once, so there is nothing to follow."** Measured at the
+stage's own height, two of the eight towers thin their labels; the first draft of that list, written
+from the floor counts, had three, and the measurement corrected it before anything was built.
+
+**The lever refusal.** Two verifications upheld it. The owner ruled the other way on the issue, and
+the honest reading of R2 turned out to be the one the ruling implied: the rule forbids the
+comparative claim, not the door. The Engineer sheet keeps the refusal by decision.
+
+## U.3 What the guards caught
+
+- `boundaries.test.ts` refused `watch/posted.ts` for naming the leaderboard client; the row shape is
+  restated inside `watch/` and arrives as data, which is the rule's own remedy.
+- The same guard refused `everyday/elevation.ts` and `everyday/stageScreenModel.ts`: the first sizes a
+  canvas and is exempted beside `cutaway.ts`; the second had a local named `window`.
+- `viewportGates.browser.test.ts` counted the camera's three chips at 360×800 on a six-floor tower.
+  They were hidden, and a hidden control is a zero-sized control to that register; unoffered chips
+  are now absent from the document rather than hidden in it.
+- `derive.test.ts` found five unclassified producers across the wave; each is classified with its
+  reason.
+- `campaignModel.test.ts`'s writer-absence register went red on the commit that built the writer,
+  which is what it was for.
+
+## U.4 The corpus, measured once after integration
+
+Both tiers in one sitting on the integrated tree, with the base at `51cd1ff` re-measured first in a
+detached worktree. The base reproduced wave T's published row exactly in both tiers, the eleventh
+consecutive wave that has held.
+
+| | base `51cd1ff` | wave U | move | per case |
+|---|---|---|---|---|
+| always-on strings | 589 825 | **594 598** | **+4 773** | **97.41** |
+| deep strings | 735 583 | **741 367** | **+5 784** | **96.40** |
+| surfaces | 56 / 57 | **56 / 57** | **0** | |
+| cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | |
+
+The first corpus case was rendered on each tree and diffed by producer: +99, of which
+`watch/view.ts#watchingViewOf` +50 (#337), `everyday/today.ts#todayOf` +24 (#213, state-dependent),
+`gauntlet/ladder.ts#ladderRowsOf` +24 (#327), `everyday/stageScreenModel.ts#stageHeaderOf` +3
+(#324, present only where the camera is offered) and `everyday/buildNotes.ts#buildNotesViewOf` −2.
+Two conditional terms, so no per-case integer exists and the two tiers' quotients differ. Surface
+sets diffed, identical in both tiers; the deep tier's lead is still exactly
+`campaign/judge.ts#judgeStage`. The row in `CLAUDE.md` carries the same figures.
+
+## U.5 The suite, in one sitting on the integrated tree
+
+`tsc -b` exit 0. All six vitest projects, each to completion:
+
+| project | files | tests |
+|---|---|---|
+| core | 112 passed | 2 556 passed |
+| experiments | 107 passed | 1 409 passed, 11 skipped |
+| server | 17 passed | 381 passed |
+| cli | 10 passed | 158 passed |
+| viz | 239: 234 passed, 3 skipped, **2 failed on the first run** | 5 171 passed, 5 skipped, 2 failed |
+| viz-browser | 37 passed | 224 passed |
+
+The two viz reds were both this wave's and both fixed on one commit before the push.
+`hiddenBox.test.ts` refuses an inline `display` on an element the `hidden` attribute is asked to
+hide, because the inline value outranks `[hidden]`; the camera strip carried both, and since its
+chips were already absent from the document when unoffered the `hidden` writes simply came out.
+`testCost.test.ts` derives the timeout-annotation census from the tree, and the four annotated
+tests this wave added moved it (425 → 429 in the viz project, 560 → 564 in the directory); the
+figures in `vitest.config.ts` were re-read from the run. The three tests were rerun green, and the
+two stage browser files were rerun green on the fixed tree.
+
+# Wave V — 2026-09-06: one worker, six issues, six umbrella items, and a rate sweep that refuted its own draft
+
+## V.1 The wave's shape: one worker, six issues and six items, one push
+
+Wave V ran as waves T and U did: one integrator, no lanes, serial on one branch, opened in a
+worktree while wave U's suite finished and its pull request was open. Decisions D507 to D513 were
+allocated from the reservation opened before the first commit.
+
+| issue | what landed | decision |
+|---|---|---|
+| #171, #169 item 1 | § 7.5's dock beside the campaign stage, and a campaign day that is the campaign's own: the contract's calendar first, then a breakdown drawn against § 8.3's odds on a stream derived from the seed; an answer moves the purse and the record on one press | § D507 |
+| #178 item 5 | an authored sentence on all thirteen dispatchers, drawn only beside the exact shipped vector it was written for | § D508 |
+| #252 | ratings never reset and boards reset by their date, said on the ladder tab before a rating is earned | § D509 |
+| #93 | the daily board names who drove each row and tells the player their distance from the top, in the one gap sentence both Engineer boards already said | docstring, § D405 |
+| #211 | a figure card leads with its first sentence and folds the rest on a stated budget; the closing block was already layered | docstring, § D405 |
+| #177 item 6 | measured rather than built: no shipped constraint reaches the fallback, and a run holds it | docstring, § D405 |
+| #169 item 3 | § 8.8's offers, priced by a fee table beside the complexity table and gated by the economy's own arithmetic; a take parks the week being left | § D510 |
+| #178 item 9 | a structural refusal joined to the leg by `core` at reconcile time, carried as `VizLeg.structuralRefusal`, version 12 | § D511 |
+| #354 | a day is legible when a landing holds somebody in the third band for two minutes, and the sweep over `docs/33` § 4.6's 400 days says which buildings ever are | § D512 |
+| #178 item 6 | the deadband and rate sweeps as entry points, both pinned; all twelve published differences reproduced to the printed digit, and eleven un-derivable interval entries came out of the register | § D513 |
+
+## V.2 What the code refuted, and what the measurement did
+
+**The technician's forty-five minutes.** The first draft of the breakdown's call-out was 45 minutes,
+the design file's multi-day scale scaled down by feel. The test that pins the option on the legs
+found it unreachable on every shipped contract length: the car goes at three tenths of the day, and
+on `c1`'s hour the earliest answer landed the car back after the day ended. A paid option that can
+never take effect is § D219's defect priced in units; the figure is twenty minutes, which the
+shipped contracts can hold.
+
+**"A campaign day runs the campaign's event."** It did not. `shiftRunConfigOf` read the week's
+calendar for every run, so a contract's third day ran a move-in because the player's week stood on
+its third. Found while giving the day an event of its own, corrected on the same commit.
+
+**Garden Apartments presents no problem to solve.** #208 filed it by playing; the legibility arm
+measured it at 0 of 50 seeds, with Chancery House at 2 and St Jude's at 1. § D475's *eligible* set
+is a table now rather than a word, and the building the campaign opens on is not in it.
+
+**The deadband curve reproduced to the digit, and the rate sweep refuted its own first draft.**
+Eight paired differences quoted by hand in the Phase 5 verdict, re-measured through the entry point
+at the same budget and seed: every one of them the same to three decimals. That is the case where
+shipping the entry point changed nothing about the figures and everything about whether they could
+be trusted. The rate sweep's first draft classified it a count with no intervals and defined *inert
+at every rate* as every rate bit-identical; a twelve-replication run agreed, and the n = 300 run did
+not: only 4 % is 300 of 300, and 2, 8 and 16 % are 298, 297 and 299 with intervals containing zero,
+which is what the verdict's own table had said all along. So the sweep is pinned rather than
+counted, *inert* means no rate BETTER or WORSE, and the four rows reproduced the table too.
+
+## V.3 What the guards caught
+
+- `hiddenBox.test.ts` and `testCost.test.ts` caught wave U's two reds on the full run, fixed before
+  the push; the same rule carried into this wave, where the camera strip's `hidden` writes came out.
+- `boundaries.test.ts` refused `campaign/incidents.ts` reaching `core` through the wrong subpath.
+- `derive.test.ts` found nine unclassified producers across the wave — the calendar's and the
+  stream's identifiers, the offer table, the gap sentence, the emptied register's line — each
+  classified with its reason or covered by the adapter that drives it.
+- `persist.test.ts`, `surface.test.ts` and `runIdentity.test.ts` each required the new
+  `campaignEventId` field to say what it is, both ways.
+- `campaignModel.test.ts`'s risk fixture was wrong before it was right: standing seven with three
+  misses blocks on the slot, not the risk, and the card names the first thing that blocks.
+- `published.test.ts` refused a study in the domain with no pins, which is what forced the sweep to
+  be run before it was registered; it then refused eleven `UNPINNED_INTERVALS` entries the moment a
+  pin could derive them, and `documentation.test.ts` refused the roadmap naming two entry points the
+  package did not export.
+
+## V.4 The corpus, measured once after integration
+
+Both tiers in one sitting on the integrated tree, with the base at `f60e816` re-measured first in a
+detached worktree, where it reproduced wave U's row exactly in both tiers, the twelfth consecutive
+wave that has held. Always-on 594 598 → **609 249** (+14 651, exactly 299.0 a case); deep 741 367 →
+**759 296** (+17 929, 298.82 a case). Cases, simulations, surfaces and failing cases unmoved; the
+surface sets diffed identical in both tiers, and the deep tier's one-surface lead is still
+`campaign/judge.ts#judgeStage`.
+
+The first corpus case decomposes the 299 to the string: +185 the dock over nine seeded states, +95
+the offers, +8 the figure-card handles, +8 the board's driver, gap and policy lines, +5 the two
+events and the coach party's withheld line, −2 the register. The deep tier's eleven missing strings
+were located by rendering all sixty cases on both trees: eleven cases at 298, each with the dock at
+184, and the one string is the technician option's refusal on the seeded breakdown, drawn only
+where the day ends before the car would be back. `CLAUDE.md`'s row carries the arithmetic.
+
+## V.5 The suite, and what the first push cost
+
+Typecheck clean. Core 112 files / 2 558 tests, experiments 108 / 1 413 with 11 skipped, server
+17 / 381, cli 10 / 158, viz-browser 37 / 226, all green on the integrated tree. Viz ran 243 files
+with 5 214 passing and three reds in two files, the annotation census and the honesty tier, both of
+which ran before the fixes below landed and were rerun green on the fixed tree together with the
+three guards that ran after.
+
+**The first push went up before the suite had finished, and CI found eight reds in it, every one
+this wave's.** Three in the browser tier: the offers' disabled *Not yet* button said nothing about
+why on the control, the report test asserted the word *stairs* inside a note whose cohort clause
+names the stairs only on a day somebody took them, and the build-notes floor was one row too high
+after the registers emptied. Five in the viz project: `viewer.campaignEventId` declared with no
+scope-note reason, `eta`'s authored sentence ordering two dispatchers on a single-run surface
+(*hard to beat*, where *beat* contains the id), two instruments with no non-test caller, the
+legibility sweep's gate missing from the deep-tier table, and the annotation census. Each was fixed
+where it was found and rerun green before its push. The cost was two cancelled CI runs and the
+knowledge, again, that the wave rule about one push exists for a reason.
+
+# Wave W — 2026-09-06: one worker, six issues and items, a replay stood on a parked week, and a sweep that put its own findings in a register
+
+## W.1 The wave's shape: one worker, six issues and items, one push
+
+Wave W ran as waves T to V did: one integrator, no lanes, serial on one branch, opened in a
+worktree while wave V's pull request was open and merged on its way. Decisions D514 to D520 were
+allocated from the reservation opened before the first commit, and the block's other ten went
+unspent.
+
+| issue | what landed | decision |
+|---|---|---|
+| #208 | the first session opens on one of the five legible towers, drawn on a named stream from § D512's table, and the brief's load plate is configuration rather than a grade | § D514 |
+| #220 | Endless rush runs as a week of its own on the contract's climbing stream, ends on the hold line, and quotes the recording's own trend test; `saturation` travels on the wire at contract version 13 | § D515 |
+| #178 item 1 | the menu's affordance model: a screen inside a mode offers only the rows the mode permits, records what it withheld, and says once what it never offers; `permits.ts`'s two deleted exports arrive with their caller | § D516 |
+| #177 item 1 | § 6.1's replay: a past day handed back over a `replay` sentinel week standing on that day, the same crowd on the legs, closed as any day is and counting for nothing | § D517 |
+| #177 item 5 | escalator rows and the folded document on the designer; the class per shaft stays a stated absence | § D518 |
+| #169 item 4 | Secure Tower a 3, Mixed-Use High-Rise a 4, authored with the 400-day measurement that places them beside the contract's six; every shipped contract is now an offer | § D519 |
+| #234 | the dropdown sweep, DC-2b always on and DC-2 as a weekly deep tier, with a register that names the three stages still clearing from the dropdown | § D520 |
+
+## W.2 What the measurement refused, and what the code found
+
+**No single axis reproduces § 8.5's complexities.** The one instrument covering all eight contracts
+(`docs/33` § 4.6's 400 days) was consulted before anything was authored, and it refused to fit:
+Midtown clears no day and is a 3, Vertical City clears every goal and is a 5. So the two missing
+complexities are authored, with the measurement used only to name the neighbours each sits between.
+A fitted number would have been an invention with a decimal point.
+
+**The rush stream leaked into three lists.** `endless-rush` is a template, so the Free Play
+catalogue offered it, the day-part derivation put a ninety-minute "morning rush" on the office day
+from its 08:00, and the guide test asked to name it. A `selectable: false` field on the record now
+says what the template is for, the catalogue and `partsOfDay` honour it, and the server refuses a
+submission naming it on the code it uses for a template it does not ship.
+
+**Two template-set pins and a day-start pin named the new record.** Each was a guard that lists
+what ships; each was widened by one row with the reason, which is what those guards are for.
+
+**The rush's dead button had three browser cases pinning it, and #220 made all three false.** They
+asserted a disabled primary, a reason on the control and its geometry above the fold. The reason
+left with the engine (§ D227); the cases now pin a live button, § 3.3's note and no timeline.
+
+**The dropdown sweep re-derived the published count.** 45 admitted cells, 217 s: stage 3 under
+`fairness-first`, stage 5 under `eta`, stage 7 under `destination-panel`, nothing else. Those are
+§ 3.1's three, and the register holds them so the rebalance has to empty it row by row.
+
+## W.3 What was not built, and is said on the issues
+
+- **#177 item 4**, the two bench shapes: `BatchRequest` carries no fabric, so *a lift out of
+  service* would need an out-of-service axis threaded to `recordRun`, and *a sky lobby transfer at
+  35* needs a floor-focused demand option core does not declare. Neither is a bench change.
+- **#177 item 5's class per shaft**: a per-car class in `BuildingSpec` and in `buildingFromSpec`'s
+  car writer. Authoring-model work; the register row stays.
+- **#234's rebalance** of stages 3, 5 and 7 by demand or fabric, each re-measured on the new
+  instrument. The register is where the debt is held.
+- **#222** (board seeding) and **#346** (a service event that moves range and load) were planned
+  for this wave and not started; both go to the next.
+
+## W.4 The corpus, once after integration
+
+**Both tiers in one sitting, with the base at `4111655` re-measured first in a detached worktree,
+where it reproduced wave V's row exactly: 609 249 always-on and 759 296 deep, the thirteenth
+consecutive wave that has held.** Wave W: always-on **623 363** strings (+14 114, 288.04 a case),
+deep **776 588** (+17 292, 288.20 a case); cases, simulations and failing cases unmoved; surfaces
+**57 / 58**, exactly one added in each tier and the diff names it, `everyday/rush.ts#rushResultViewOf`.
+The first case decomposes the 288 to the string across eight adapters (the door's third render
++132, the rush sheet +62, two offer cards +38, the replay context's rail and bar +30, the menu's
+sentence +23, the designer's copy +6, the report +4, seven register rows −7); the fraction above 288
+is the door's third render being conditional on the case's week having a day to hand back. The
+full table and the decomposition are in `CLAUDE.md`'s Phase 9 row.
+
+# Wave X — 2026-09-06: one worker, three issues, a house on the board, and a service event that can close a lobby
+
+## X.1 The wave's shape: one worker, three issues, one push
+
+Wave X ran as waves T to W did: one integrator, no lanes, serial on one branch, opened in the same
+worktree wave W closed in and based on wave W's merge. Decisions D521 to D524 were allocated from the
+reservation opened before the first commit (`documentation.test.ts#OPEN_RESERVATION`, D521 to D530),
+and the block's other six went unspent.
+
+| issue | what landed | decision |
+|---|---|---|
+| #222 | the house: a reserved `house` account posts one replayable run per shipped dispatcher on the day's fixture, marked on the row and on the board, counted by no ladder, idempotent by the store's own conflict key; the verifier's replay is the seeder's measurement | § D521 |
+| #328 | a scheduled workflow calls an authenticated `POST /api/boards/seed` at 00:10 UTC and on dispatch, gated twice, refusing to run at all when the origin or the token is unset, failing on a non-200 or an empty report | § D522 |
+| #346 | a service event is one of three shapes: a car's mode, a bank's range, a car's rated load; a car finishes the leg it is carrying; the rider the change leaves without a bank is stranded, a fifth outcome published beside AWT and never folded into it | § D523 |
+| #346 | the campaign technician brings a red-tagged car back rated to three quarters of its plate, which is the derate event's first shipped writer | § D524 |
+
+## X.2 What the code found, and what the measurement decided
+
+**The board had no column for who did not play.** Every entry requires a user, so the house is a
+reserved account and a nullable `baseline_profile_id` on the row: both, because the constraint is
+worth keeping and a display name a player could choose is not an identity. The board's `DISTINCT ON`
+now groups by `(user_id, baseline_profile_id)`, so thirteen house rows survive a query that keeps one
+row a player, and the ladders exclude them by the column rather than by the name.
+
+**One replay of the daily fixture is 1.2 to 1.6 s**, measured on one worker, which is what made the
+seed route synchronous: thirteen are about twenty seconds, inside any ingress timeout, and a route
+that answers when it is done is one whose failure the caller sees. `nearest-car` is skipped by the
+verifier on the fixture with `awt-not-quotable`, and the report says so by name rather than posting a
+row with a mean the run refuses.
+
+**The range change's design question was answered before the code, and the answer is *finish the
+leg*.** A car carrying somebody to a floor that has just left the range still stops there: the shaft
+is hardware, the car call stands, and nothing in `#onRangeChange` touches either. What the bank stops
+doing is answering. The other two candidates were weighed on the stage rather than on paper: one
+carries a rider past their floor, the other makes a scheduled closure conditional on traffic.
+
+**Stranded is the fifth outcome, and it is not the fourth wearing a new name.** A refusal is about
+the rider's credential and a stranding is about the fabric, and a reader deciding what to fix needs
+to know which; a stranding can also land after a real wait, so the promise the rider held is voided
+and counted where a revocation is. The key is absent rather than `0` when nobody was stranded, for
+the reason every such key on the audit is: `structuralDigestOfResult` hashes every key.
+
+**No route is re-planned, on purpose.** The trace is fixed and the run is what varies; re-routing a
+stranded rider through a bank the planner did not choose would make the trace a function of the
+schedule and break common random numbers between two arms of a paired comparison. The count beside
+the mean is the honest measure of what a closure cost.
+
+**The derate's control had to be shown where it bites.** Garden Apartments at `c1`'s hour never
+fills a car to three quarters of its plate, so the technician's derated return there is bit-identical
+to a return at the plate; the legs test moved to Midtown Office, where the same answer is a different
+day from the instant the car comes back and the car carries fewer people at its peak.
+
+**A resolved building had to stay a `BuildingConfig`.** Three viz sites hand one to the other, and
+the first draft of the resolved derate event carried kilograms alone; keeping the authored pounds
+beside them is what let every one of them keep typechecking without a cast.
+
+**Two consumers had to learn the union.** The fuzz shrinker's draft copied service events field by
+field and would have silently dropped a range or derate entry a hand-written case carried in; it
+copies whole now. Its resolvability check and the generator's test narrow on the mode guard, and the
+test asserts the generator still authors mode events only, so a generator change arrives as a red
+test rather than a quiet widening.
+
+## X.3 What was not built, and is said on the issues
+
+- **The range event's shipped writer.** § D523 built it, tested it on the legs, and named the
+  question of where #159's library reaches a run as #159's rather than answering it here.
+  `EventEffect` gained no field, because nothing in `shift/` writes a range or a derate yet, and a
+  field nothing writes is the dead seam `shift/types.ts` warns about. A building document authored
+  through the Engineer's fabric editor reaches the range event today, which is a route rather than
+  a writer, and the ledger says so rather than counting it.
+- **A stranding ground on the awt-validity table.** A stranding rate large enough to bias the mean
+  is caught by `censored` with the wrong sentence, the same named limitation § D266 recorded for the
+  refusal; widening `AwtInvalidGround` widens every total `Record` over it in `packages/viz`, and is
+  its own lane.
+- **A stranded count on a player surface.** Core publishes it beside the mean in the audit and the
+  stage activity; no Everyday screen draws it yet, because no shipped building or day schedules a
+  range change for a screen to draw it about.
+
+## X.4 The corpus, once after integration
+
+**Both tiers in one sitting, with the base at `5358c05` re-measured first in a detached worktree,
+where it reproduced wave W's row exactly: 623 363 always-on and 776 588 deep, the fourteenth
+consecutive wave that has held.** Wave X: always-on **624 294** strings (+931, 19.0 a case), deep
+**777 728** (+1 140, 19.0 a case); cases, simulations, failing cases and surfaces all unmoved, the
+surface sets diffed and identical in both tiers. The first case decomposes the nineteen to the
+string and every one of them is `gauntlet/ladder.ts#ladderRowsOf`: two `BOARD_SCREEN_COPY` keys and
+the daily board's `house` state, seventeen strings over two house rows and two player rows. The
+technician's new sentence is a substitution, the beat label's house form is on no seeded state, and
+`core`'s fifth outcome renders no player-facing string, so a wave that moved the outcome model moved
+the corpus by a board state. Third wave to land on nineteen a case (O, R at twenty, X); the
+coincidence is named in `CLAUDE.md` so nobody reads it as a copied row.
+

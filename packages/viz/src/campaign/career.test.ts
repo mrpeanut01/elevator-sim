@@ -172,8 +172,14 @@ describe('the opening career', () => {
   });
 
   it('says out loud what this build does not do', () => {
-    expect(CAMPAIGN_ABSENCES.length).toBeGreaterThan(2);
+    /*
+     * Two, since GitHub issues #171 and #169 item 1 (§ D507) deleted the incidents entry on the
+     * commit that built the draw and the calendar it said did not exist. Pinned at exactly two so
+     * the next deletion or addition is a deliberate edit here rather than a count drifting.
+     */
+    expect(CAMPAIGN_ABSENCES.length).toBe(2);
     for (const entry of CAMPAIGN_ABSENCES) expect(entry.length).toBeGreaterThan(40);
+    expect(CAMPAIGN_ABSENCES.join(' ')).not.toContain('draws this build cannot make');
   });
 });
 

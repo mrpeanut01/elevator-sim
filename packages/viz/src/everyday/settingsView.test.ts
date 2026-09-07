@@ -20,6 +20,7 @@ import {
 import { AVATAR_SWATCHES } from './profile.js';
 import { railFooter } from './rail.js';
 import {
+  clearRowOf,
   NAME_NOTE,
   SETTINGS_ABSENCES,
   SIGN_IN_COPY,
@@ -179,7 +180,7 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
 
   it('draws the Motion row’s absence — not the row — while the Engineer surface is booting', () => {
     const view = settingsScreenViewOf({ profile: undefined, reduceMotion: undefined });
-    expect(view.playing.rows.map((row) => row.id)).toEqual(['units']);
+    expect(view.playing.rows.map((row) => row.id)).toEqual(['default-speed', 'units']);
     expect(view.playing.absentNote).toContain('still loading');
     // And never both: a sentence about a missing switch beside the switch would be a contradiction.
     expect(settingsScreenViewOf(BASE).playing.absentNote).toBeUndefined();
@@ -192,16 +193,72 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
      */
   });
 
-  it('offers no Sound, Default speed or posting toggle — those seams do not exist', () => {
+  it('offers no Sound or posting toggle — those seams do not exist', () => {
     /*
-     * The roster rule, asserted as a negative — and **Units has left this list**, which is the half
-     * worth reading. The evidence for the three that remain is the module docstring's greps: no
-     * audio machinery, no Everyday `run.speed`, no `settings.noPost` flag in this tree
-     * (`honesty/generate.ts` says so outright). Units was here on exactly that footing until
-     * `everyday/units.ts` became the reader its refusal said did not exist.
+     * The roster rule, asserted as a negative — and **Units and Default speed have left this
+     * list**, which is the half worth reading. The evidence for the two that remain is the module
+     * docstring's greps: no audio machinery, no `settings.noPost` flag in this tree
+     * (`honesty/generate.ts` says so outright). Units and Default speed were here on exactly that
+     * footing until each acquired the reader its refusal said did not exist (GitHub issues #170 and
+     * #229).
      */
     const ids = settingsScreenViewOf(BASE).playing.rows.map((row) => row.id);
-    expect(ids).toEqual(['motion', 'units']);
+    expect(ids).toEqual(['motion', 'default-speed', 'units']);
+  });
+
+  /**
+   * **Default speed — GitHub issue #229.** The pill shows the ladder's own label for the stored
+   * value, fills once the player has moved it off the stage's default, and falls back to the
+   * default's label for a caller that passes nothing. What this case cannot see is whether the
+   * stage opens at it — `settingsScreen.browser.test.ts` drives that on the built page.
+   */
+  it('draws Default speed in the ladder’s own words, filled once moved off the default', () => {
+    const untouched = settingsScreenViewOf(BASE).playing.rows.find((row) => row.id === 'default-speed');
+    expect(untouched).toEqual({
+      id: 'default-speed',
+      label: 'Default speed',
+      note: 'the speed every run opens at — the chips on the stage still change it for the day',
+      value: '30×',
+      on: false,
+    });
+    const moved = settingsScreenViewOf({ ...BASE, defaultSpeedSimPerRealS: 90 }).playing.rows.find(
+      (row) => row.id === 'default-speed',
+    );
+    expect(moved).toMatchObject({ value: '90×', on: true });
+    // Every face is a rung: the label is the chip's, never composed here.
+    for (const speed of STAGE_SPEEDS) {
+      const row = settingsScreenViewOf({ ...BASE, defaultSpeedSimPerRealS: speed.simPerRealS }).playing.rows.find(
+        (one) => one.id === 'default-speed',
+      );
+      expect(row?.value, String(speed.simPerRealS)).toBe(speed.label);
+    }
+  });
+});
+
+describe('Clear saved progress — the one control in This device (GitHub issue #229, § D500)', () => {
+  it('draws its absence, not a button, while the Engineer session port is booting', () => {
+    const clear = settingsScreenViewOf({ profile: undefined, reduceMotion: undefined }).device.clear;
+    expect(clear.stage).toBe('booting');
+    expect(clear.button).toBeUndefined();
+    expect(clear.note).toContain('still loading');
+  });
+
+  it('walks ready → armed → cleared, and every note says what the press does', () => {
+    const ready = settingsScreenViewOf(BASE).device.clear;
+    expect(ready).toMatchObject({ stage: 'ready', label: 'Clear saved progress', button: 'Clear' });
+    expect(ready.note).toContain('Press twice');
+    // Everything both slots hold is named, because a clear that says less than it does is the
+    // stale refusal's defect one step along.
+    for (const kept of ['week', 'dispatchers', 'buildings', 'solved cases', 'ratings', 'name and picture']) {
+      expect(ready.note, kept).toContain(kept);
+    }
+    const armed = settingsScreenViewOf({ ...BASE, clearStage: 'armed' }).device.clear;
+    expect(armed).toMatchObject({ stage: 'armed', button: 'Press again to clear' });
+    expect(armed.note).toContain('no undo');
+    const cleared = settingsScreenViewOf({ ...BASE, clearStage: 'cleared' }).device.clear;
+    expect(cleared).toMatchObject({ stage: 'cleared', button: 'Cleared' });
+    expect(cleared.note).toContain('reloads');
+    expect(clearRowOf('ready')).toEqual(ready);
   });
 });
 
@@ -231,9 +288,7 @@ describe('This device — statements of fact, and the register of refusals besid
     expect(settingsScreenViewOf(BASE)).not.toHaveProperty('absences');
     for (const label of [
       'Sound',
-      'Default speed',
       'Post runs to the board',
-      'Clear saved progress',
       /*
        * `Switch to Engineer` was the seventh and is deliberately absent — the rail's § 3.2 row
        * opens the Engineer surface now, so a register still refusing it would be § D227's stale
@@ -272,41 +327,17 @@ describe('This device — statements of fact, and the register of refusals besid
   });
 
   /**
-   * **The `Default speed` entry counts the ladder; it does not state a number** — GitHub issue
-   * #286, `RISKS.md` R38.
-   *
-   * It said *five* for two waves after [§ D354](../../../../DECISIONS.md) made the ladder seven,
-   * on a string a player reads, and nothing went red — the sentence was in the honesty corpus the
-   * whole time (`surfaces.ts#EVERYDAY_BUILD_NOTES` seeds this array) and **no property compares a
-   * written count against the structure it counts**. So this case is the instrument, and it is
-   * written to survive the next ladder change rather than to pin today's seven: it asserts the
-   * shipped sentence carries `STAGE_SPEEDS.length`, whatever that becomes.
-   *
-   * The second half is what makes it a guard rather than a tautology. A count restated **in words**
-   * beside the derived one would read as authoritative and drift on its own, so a spelled number
-   * anywhere in the entry is a failure — which is exactly the shape the old string had.
-   *
-   * The row itself belongs to GitHub issue **#229**; only its count belongs here.
+   * **`Default speed` and `Clear saved progress` are asserted gone** — GitHub issue #229, the
+   * direction `Units` and `Sign out` are asserted in above and for the same reason. The Default
+   * speed entry used to carry a case of its own here (GitHub issue #286: it counted the ladder from
+   * `STAGE_SPEEDS.length` rather than writing a number down); that case went with the entry, as its
+   * own failure message said it should, rather than standing guard over nothing.
    */
-  it('counts the stage’s speeds from `STAGE_SPEEDS` rather than writing the number down', () => {
-    const entry = SETTINGS_ABSENCES.find((one) => one.startsWith('Default speed'));
+  it('has withdrawn the Default speed and Clear saved progress refusals with the rows they refused', () => {
     expect(
-      entry,
-      'the `Default speed` entry has gone. #229 owns whether the row is refused at all; if the ' +
-        'refusal was withdrawn, delete this case with it rather than leaving a guard over nothing.',
-    ).toBeDefined();
-    expect(
-      entry,
-      'the count in this sentence is not the ladder’s. Interpolate `STAGE_SPEEDS.length`; a ' +
-        'corrected literal is the same defect with a fresher number.',
-    ).toContain(`its own ${String(STAGE_SPEEDS.length)} speeds`);
-    for (const word of ['two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']) {
-      expect(
-        entry,
-        `“${word}” is a count written in words where one is already derived — two counts in one ` +
-          'sentence is the drift this case exists to stop.',
-      ).not.toContain(word);
-    }
+      SETTINGS_ABSENCES.filter((entry) => entry.startsWith('Default speed') || entry.startsWith('Clear saved progress')),
+      'a refusal outlived the control it refused',
+    ).toEqual([]);
   });
 
   /**

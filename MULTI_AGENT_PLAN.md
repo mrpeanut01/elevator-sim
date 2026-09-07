@@ -74,7 +74,9 @@ Two halves, both load-bearing, and they are the tie-breakers for every disagreem
    deleting a single claim. (#207)
 3. Make the first session present a problem worth solving. (#208, #209)
 4. Make the stage show what the report will later say — pillar 3, and the only pillar the build
-   currently fails outright. (#212)
+   failed outright when this was written. (#212 landed and fixed something else; **#277** is the
+   issue that carried it, and its goals-as-readings landed 2026-09-05. What the stage still withholds
+   is #353's event and #208's problem — `docs/22` § 2 P3 is the re-adjudication.)
 5. Reach a measured vertical-slice verdict, on ten first-time testers, not on opinion. (#218)
 6. Do all of it without moving a pin, weakening a refusal, or adding a control that writes nothing.
 

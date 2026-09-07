@@ -167,6 +167,14 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
     reason: 'the 200-replication census every declared matrix ceiling and spread derives from',
     scheduled: true,
   },
+  'packages/viz/src/campaign/difficultyCurve.test.ts': {
+    gates: ['ELEVATOR_SIM_DEEP'],
+    reason:
+      'docs/33 § 6’s campaign arm, DC-2: every admitted stage × profile cell played to a verdict ' +
+      'and matched against the register of measured dropdown clears in both directions — ' +
+      'GitHub issue #234, § D520. § 6.4 measured the arm at 198 s on one worker',
+    scheduled: true,
+  },
   'packages/experiments/src/fuzz/deep.test.ts': {
     gates: ['ELEVATOR_SIM_FUZZ'],
     reason:
@@ -271,6 +279,15 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
    * a `.github/` change, which was outside the scope of the lane that wrote the deriver, and it is
    * GitHub issue #344's remaining piece of work.
    */
+  'packages/viz/src/shift/legibility.sweep.test.ts': {
+    gates: ['LEGIBILITY_SWEEP'],
+    reason:
+      '§ D512’s instrument — the legibility arm over docs/33 § 4.6’s 400 days, eight buildings by ' +
+      'fifty seeds at day 1, which produced docs/33 § 6.4b’s table. Not scheduled because the table ' +
+      'is pinned by legibility.test.ts’s ten-seed slice on every run, and a nightly re-derivation ' +
+      'would write a figure nothing reads; it is re-run by hand when a building or a band moves',
+    scheduled: false,
+  },
   'packages/viz/src/testCost.test.ts': {
     gates: ['TEST_COST_OUT'],
     reason:

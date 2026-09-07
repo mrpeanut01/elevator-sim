@@ -43,6 +43,7 @@ import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { EM_DASH, percentFigure } from './figures.js';
+import { REPLAY_COPY, replayableDay } from './replay.js';
 import type { TodayRecord } from './today.js';
 import {
   WORLD_FIGURES_ABSENT,
@@ -91,7 +92,7 @@ export interface DoorPrimaryView {
   readonly label: string;
   /** The § 3.3 note, and on a past day the reason the button cannot act. */
   readonly note: string;
-  /** True on every past day. See the module docstring. */
+  /** True only on a chip from before this week began; a past day inside the week is pressable — § D517. */
   readonly inert: boolean;
 }
 
@@ -120,6 +121,8 @@ export interface DoorScreenView {
   /** Who is driving as things stand, and where it is changed. */
   readonly driver: { readonly heading: string; readonly name: string; readonly note: string };
   readonly seedLine: string;
+  /** Why this tower, on a first day nobody has played on a legible one; `undefined` otherwise. */
+  readonly firstSessionLine: string | undefined;
   readonly sameForEveryone: string;
   readonly primary: DoorPrimaryView;
 }
@@ -235,8 +238,9 @@ function noteFor(state: {
 /**
  * § 3.3's primary for the selected day.
  *
- * Today is pressable and goes on to the brief. A past day is not, and the note says why in the
- * terms the player can check: the week is standing somewhere else, and nothing here moves it back.
+ * Today is pressable and goes on to the brief. A past day inside the week is pressable too since
+ * § D517 and goes on to the same brief over a replay week; only a chip from before the week began
+ * is inert, and its note says why in terms the player can check.
  */
 function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorPrimaryView {
   if (input.dayOffset === 0) {
@@ -249,16 +253,16 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
       inert: false,
     };
   }
+  /*
+   * § 6.1's *every past day stays playable* — GitHub issue #177 item 1, § D517. A chip inside this
+   * week hands its day back; a chip from before the week began has no day to hand, and says so.
+   * `everyday/replay.ts` is the mechanism and owns both sentences.
+   */
   const chip = chips.find((entry) => entry.offset === input.dayOffset);
-  const which = chip?.day === undefined ? 'That day' : `Day ${String(chip.day)}`;
-  return {
-    label: 'Set up the replay',
-    note:
-      `${which} cannot be re-opened here. A week moves forward one day at a time and this build ` +
-      'has no way to stand it back up on a day it has already left, so the strip above reads your ' +
-      'week rather than replaying it.',
-    inert: true,
-  };
+  if (chip?.day !== undefined && replayableDay(input.week, chip.day)) {
+    return { label: 'Set up the replay', note: REPLAY_COPY.doorNote(chip.day), inert: false };
+  }
+  return { label: 'Set up the replay', note: REPLAY_COPY.beforeTheWeek, inert: true };
 }
 
 /** § 6.1, resolved. Total: every arm answers something a player can read. */
@@ -295,6 +299,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
       note: 'Change it on the brief, which is the next screen.',
     },
     seedLine: input.today.seedLine,
+    firstSessionLine: input.today.firstSessionLine,
     sameForEveryone: SAME_FOR_EVERYONE,
     primary: primaryOf(clamped, chips),
   };

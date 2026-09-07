@@ -9,7 +9,8 @@
  * and the caller that had to grow that second run — `dev/campaignPanel.ts` — did not. So the
  * Engineer Campaign tab reported **nothing** as cleared: an honest refusal, and a regression.
  *
- * `judge.test.ts` and `campaign.test.ts` already assert that `judgeStage` refuses a stage handed
+ * `judge.test.ts` and `stageTwoEdited.test.ts` (`campaign.test.ts` until GitHub issue #356 split it)
+ * already assert that `judgeStage` refuses a stage handed
  * one batch, and neither of them could have caught this, because both hand it two by hand. That is
  * the shape [§ D159](../../../../DECISIONS.md) names — a suite measuring a reimplementation of the
  * call site rather than the call site — so the cases below drive the sequence the panel runs,
@@ -21,7 +22,7 @@
  * would let the tuning half be *declared* met rather than measured, and *"met every bar"* is
  * precisely the condition that decides whether a second batch happens at all — a fixture standing
  * in for it would be the test choosing its own answer. The cost is minutes, which is
- * `campaign.test.ts`'s cost for the same reason.
+ * the campaign suites' cost for the same reason — `stageFiveClears.test.ts` alone is two of them.
  *
  * ## What is counted, and why counting is the assertion
  *

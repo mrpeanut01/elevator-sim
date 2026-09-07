@@ -54,6 +54,11 @@
 import { displayNameIssueOf, type AccountState } from '../menu/account.js';
 import { savedRatingIssue, type SavedRating } from '../gauntlet/ladder.js';
 import type { SessionStore } from '../persist/types.js';
+/*
+ * The stage's pure half, for the ladder and its default — the arrow runs one way, as it does for
+ * `settingsView.ts`: `stageScreenModel.ts` has never imported this module.
+ */
+import { DEFAULT_STAGE_SIM_PER_REAL_S, STAGE_SPEEDS } from './stageScreenModel.js';
 import {
   DEFAULT_EVERYDAY_UNITS,
   isEverydayUnits,
@@ -234,7 +239,7 @@ export function everydayProgressWith(
 const PROFILE_KEY = 'elevator-sim.everyday-profile';
 
 /** The envelope's shape number — refused in both directions, `persist/`'s rule. */
-const PROFILE_SCHEMA_VERSION = 3;
+const PROFILE_SCHEMA_VERSION = 4;
 
 /**
  * The shapes this build will read, as against the one it writes.
@@ -246,7 +251,7 @@ const PROFILE_SCHEMA_VERSION = 3;
  * added a second sibling the same way ({@link withUnits}), which is why both migrations are one
  * line each and neither touches a payload it did not add.
  */
-const PROFILE_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3]);
+const PROFILE_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4]);
 
 /**
  * Version 3: the version, the profile, the progress and the units preference — four siblings.
@@ -263,6 +268,15 @@ interface ProfileEnvelope {
   readonly profile: EverydayProfile;
   readonly progress: EverydayProgress;
   readonly units: EverydayUnits;
+  /**
+   * Version 4: the speed every run opens at, as **simulated seconds per real second** — § 4.6 and
+   * § 7.3's *Default speed* setting, GitHub issue #229. A sibling for the same reason `units` is:
+   * a presentation preference that must not ride along with a posted run. Stored as the rung's
+   * value rather than its index so a ladder that gains or loses a rung cannot silently move a
+   * player's choice onto a different speed; a value the ladder does not carry is read as the
+   * default ({@link loadDefaultSpeed}).
+   */
+  readonly defaultSpeedSimPerRealS: number;
 }
 
 /**
@@ -342,6 +356,7 @@ type EnvelopeRead =
       readonly profile: unknown;
       readonly progress: unknown;
       readonly units: unknown;
+      readonly defaultSpeedSimPerRealS: unknown;
     }
   | { readonly ok: false; readonly reason: EnvelopeRefusal };
 
@@ -389,13 +404,25 @@ function readEnvelope(store: SessionStore): EnvelopeRead {
     // merely newer than they are.
     return { ok: false, reason: 'version' };
   }
-  const completed = withUnits(withProgress(record, version), version);
+  const completed = withDefaultSpeed(withUnits(withProgress(record, version), version), version);
   return {
     ok: true,
     profile: completed['profile'],
     progress: completed['progress'],
     units: completed['units'],
+    defaultSpeedSimPerRealS: completed['defaultSpeedSimPerRealS'],
   };
+}
+
+/**
+ * A version 1, 2 or 3 envelope, given the one key version 4 added — GitHub issue #229's Default
+ * speed half. The absence determines the value, `withUnits`'s own rule one version up: before
+ * version 4 every run opened at the stage's fixed default, so that is the speed the player was
+ * watching, and the only ground on which a migration may invent a value at all.
+ */
+function withDefaultSpeed(record: Record<string, unknown>, version: number): Record<string, unknown> {
+  if (version >= 4) return record;
+  return { ...record, defaultSpeedSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S };
 }
 
 /**
@@ -443,6 +470,24 @@ export function loadUnits(store: SessionStore): EverydayUnits {
   const envelope = readEnvelope(store);
   if (!envelope.ok) return DEFAULT_EVERYDAY_UNITS;
   return isEverydayUnits(envelope.units) ? envelope.units : DEFAULT_EVERYDAY_UNITS;
+}
+
+/**
+ * The stored default speed, or {@link DEFAULT_STAGE_SIM_PER_REAL_S} — total, on `loadUnits`'s
+ * argument. A value the ladder does not carry is refused to the default rather than restored,
+ * because a stage opening at a speed no chip names is the inert-control shape arriving through
+ * storage: the player would be watching a pace they could not press.
+ */
+export function loadDefaultSpeed(store: SessionStore): number {
+  const envelope = readEnvelope(store);
+  if (!envelope.ok) return DEFAULT_STAGE_SIM_PER_REAL_S;
+  const value = envelope.defaultSpeedSimPerRealS;
+  return isStageSpeedValue(value) ? value : DEFAULT_STAGE_SIM_PER_REAL_S;
+}
+
+/** Whether a stored value is a rung of the stage's own ladder. */
+function isStageSpeedValue(value: unknown): value is number {
+  return typeof value === 'number' && STAGE_SPEEDS.some((speed) => speed.simPerRealS === value);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -602,6 +647,7 @@ export function saveEveryday(
   profile: EverydayProfile,
   progress: EverydayProgress,
   units: EverydayUnits,
+  defaultSpeedSimPerRealS: number = DEFAULT_STAGE_SIM_PER_REAL_S,
 ): EverydaySave {
   let progressText: string;
   try {
@@ -623,6 +669,7 @@ export function saveEveryday(
     profile,
     progress,
     units,
+    defaultSpeedSimPerRealS,
   };
   try {
     store.write(PROFILE_KEY, JSON.stringify(envelope));
@@ -671,6 +718,22 @@ export interface EverydayProfileStore {
    */
   setUnits(units: EverydayUnits): boolean;
   /**
+   * The speed every run opens at, simulated seconds per real second — § 4.6's *Default speed*,
+   * GitHub issue #229. Total, like {@link units}: the stage's own default is a value, not an
+   * absence. `everyday/stageScreen.ts` reads it when a recording is adopted, which is the one
+   * place speed resets; nothing about a run changes, only how fast it is watched.
+   */
+  defaultSpeed(): number;
+  /** Set it, and hear whether it survives the tab. A value off the ladder is not stored. */
+  setDefaultSpeed(simPerRealS: number): boolean;
+  /**
+   * **Forget everything this slot holds** — the profile, the progress, the preferences — GitHub
+   * issue #229's *Clear saved progress*. The slot is removed and memory reset to the defaults, so
+   * the next write starts a new career rather than re-saving the old one. Returns whether the
+   * removal reached storage; a memory-only store answers `false` and forgets anyway.
+   */
+  clear(): boolean;
+  /**
    * The sentence the fix screen and the ladder draw about kept progress, or `null`.
    *
    * It is the *latest* thing the player is owed, not the oldest: the restore's refusal until a
@@ -711,6 +774,7 @@ export function createProfileStore(backing: SessionStore | undefined): EverydayP
   let progress = restored.progress;
   let notice = restored.notice;
   let units = backing === undefined ? DEFAULT_EVERYDAY_UNITS : loadUnits(backing);
+  let defaultSpeed = backing === undefined ? DEFAULT_STAGE_SIM_PER_REAL_S : loadDefaultSpeed(backing);
   const listeners = new Set<() => void>();
   const announce = (): void => {
     for (const listener of [...listeners]) listener();
@@ -722,7 +786,7 @@ export function createProfileStore(backing: SessionStore | undefined): EverydayP
    */
   const persist = (): boolean => {
     if (backing === undefined) return false;
-    const written = saveEveryday(backing, current ?? DEFAULT_EVERYDAY_PROFILE, progress, units);
+    const written = saveEveryday(backing, current ?? DEFAULT_EVERYDAY_PROFILE, progress, units, defaultSpeed);
     notice = written.notice;
     return written.ok;
   };
@@ -746,6 +810,32 @@ export function createProfileStore(backing: SessionStore | undefined): EverydayP
       const durable = persist();
       announce();
       return durable;
+    },
+    defaultSpeed: () => defaultSpeed,
+    setDefaultSpeed: (next) => {
+      if (!isStageSpeedValue(next)) return false;
+      defaultSpeed = next;
+      const durable = persist();
+      announce();
+      return durable;
+    },
+    clear: () => {
+      current = undefined;
+      progress = EMPTY_EVERYDAY_PROGRESS;
+      units = DEFAULT_EVERYDAY_UNITS;
+      defaultSpeed = DEFAULT_STAGE_SIM_PER_REAL_S;
+      let removed = false;
+      if (backing !== undefined) {
+        try {
+          backing.remove(PROFILE_KEY);
+          removed = true;
+          notice = null;
+        } catch {
+          notice = STORE_REFUSED;
+        }
+      }
+      announce();
+      return removed;
     },
     progress: () => progress,
     progressNotice: () => notice,

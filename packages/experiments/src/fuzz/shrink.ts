@@ -34,7 +34,12 @@
  * shrunk case in full: a counterexample nobody can replay is a rumour.
  */
 
-import { ConfigError } from '@elevator-sim/core';
+import {
+  ConfigError,
+  isServiceModeEvent,
+  isServiceRangeEvent,
+  type ServiceEventConfig,
+} from '@elevator-sim/core';
 
 import { minDurationFor, reparse, resolveCase } from './generate.js';
 import { evaluateCase, generateOptionsFrom, isFailure, type RunOptions } from './run.js';
@@ -81,7 +86,7 @@ interface DraftBuilding {
    * on purpose**, so that "the schedule was not needed" is a measured reduction rather than an
    * accident of the draft shape.
    */
-  serviceEvents: { atS: number; carId: string; bankId?: string; mode: string }[];
+  serviceEvents: ServiceEventConfig[];
 }
 
 function draftOf(fuzzCase: FuzzCase): DraftBuilding {
@@ -109,12 +114,10 @@ function draftOf(fuzzCase: FuzzCase): DraftBuilding {
       floors: [...zone.floors],
       credentialGroups: [...zone.credentialGroups],
     })),
-    serviceEvents: (building.serviceEvents ?? []).map((event) => ({
-      atS: event.atS,
-      carId: event.carId,
-      ...(event.bankId === undefined ? {} : { bankId: event.bankId }),
-      mode: event.mode,
-    })),
+    // Copied whole: a service event is one of three shapes (§ D523), and the generator only ever
+    // authors the mode kind, so a field-by-field copy would silently drop a range or derate entry
+    // a hand-written case carried in.
+    serviceEvents: (building.serviceEvents ?? []).map((event) => ({ ...event })),
   };
 }
 
@@ -126,6 +129,9 @@ function draftOf(fuzzCase: FuzzCase): DraftBuilding {
  * when there is one.
  */
 function eventIsResolvable(draft: DraftBuilding, event: DraftBuilding['serviceEvents'][number]): boolean {
+  // A range entry names a bank alone (§ D523); the generator never authors one, but a hand-written
+  // case may, and it stays resolvable while its bank survives the shrink.
+  if (isServiceRangeEvent(event)) return draft.banks.some((bank) => bank.id === event.bankId);
   return draft.banks.some(
     (bank) =>
       (event.bankId === undefined || bank.id === event.bankId) &&
@@ -163,6 +169,9 @@ function everyBankAlwaysServes(draft: DraftBuilding): boolean {
   if (short()) return false;
 
   for (const event of draft.serviceEvents) {
+    // Only a mode change moves a car in or out of hall-call service; a range or derate entry
+    // leaves the count of accepting cars where it was.
+    if (!isServiceModeEvent(event)) continue;
     for (const bank of draft.banks) {
       if (event.bankId !== undefined && bank.id !== event.bankId) continue;
       if (!bank.cars.some((car) => car['id'] === event.carId)) continue;
@@ -489,8 +498,12 @@ export function formatFuzzCase(fuzzCase: FuzzCase): string {
       .filter((car) => car.mode !== undefined && car.mode !== 'in-service')
       .map((car) => `${bank.id}/${car.id}=${String(car.mode)}`),
   );
-  const schedule = (fuzzCase.building.serviceEvents ?? []).map(
-    (event) => `${String(event.atS)}s ${event.bankId === undefined ? '' : `${event.bankId}/`}${event.carId}→${event.mode}`,
+  const schedule = (fuzzCase.building.serviceEvents ?? []).map((event) =>
+    isServiceModeEvent(event)
+      ? `${String(event.atS)}s ${event.bankId === undefined ? '' : `${event.bankId}/`}${event.carId}→${event.mode}`
+      : isServiceRangeEvent(event)
+        ? `${String(event.atS)}s ${event.bankId} serves ${event.servesFloors.join(',')}`
+        : `${String(event.atS)}s ${event.bankId === undefined ? '' : `${event.bankId}/`}${event.carId}@${String(event.ratedLoadLb)}lb`,
   );
   const lines = [
     `case      ${fuzzCase.caseId}`,

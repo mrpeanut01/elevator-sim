@@ -290,6 +290,21 @@ export interface PassengerRecord {
    * (`ConservationAudit.accessRefused`).
    */
   readonly refusedAt?: SimTime | undefined;
+  /**
+   * When the lifts **stopped being able to take this rider where they were going** — a bank's
+   * service range moved (a scheduled `serviceEvents` range entry, GitHub issue #346, § D523) and no
+   * bank serving their landing reaches their destination any more. Absent on every leg of every
+   * run whose building schedules no range change, so a record written before the field existed
+   * parses unchanged.
+   *
+   * A fifth outcome, the same shape {@link refusedAt} is and filed apart from it because the two
+   * have different fixes: a refusal is a credential, a stranding is the fabric. Unlike a refusal it
+   * may land **after** a wait — the rider was standing at the landing when the lobby closed — so the
+   * seconds between {@link arrivedAt} and this are a real wait that ended in nothing, and they are
+   * excluded from the mean exactly as an abandonment's are, with the count published beside it
+   * (`ConservationAudit.stranded`).
+   */
+  readonly strandedAt?: SimTime | undefined;
   /** The car that served this leg, when known. */
   readonly carId?: string | undefined;
   /** The bank that served this leg, when known. */

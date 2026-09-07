@@ -18,8 +18,9 @@
  * 2. **Reference runs**, from `data/reference-runs.json`, labelled `reference run · not a player`
  *    by construction (`watch/reference.ts`).
  *
- * A third source is *named rather than implied*: another player's posted run, which is what § 14.1
- * is actually about, and which needs a board first.
+ * 3. **Posted runs**, read off a daily-board row — `watch/posted.ts`, GitHub issue #337. The
+ *    source § 14.1 is actually about, and the one whose label is a person: the server verified the
+ *    run by replay before ranking it, so the name is the row's own rather than an invented one.
  *
  * ## Why the gate takes a `simulate` function
  *
@@ -45,7 +46,7 @@ import { WEEKDAYS, type DayOutcome } from '../shift/types.js';
 import type { WeekState } from '../shift/types.js';
 
 import { recordUnreadableReason, watchRunConfigOf } from './record.js';
-import { postedResultOf, reproductionRefusalFor } from './reproduce.js';
+import { claimRefusalFor, postedResultOf, reproductionRefusalFor } from './reproduce.js';
 import type { WatchableRun } from './types.js';
 
 /**
@@ -273,7 +274,17 @@ export function watchGateBefore(
  * record's, and the player would be told their own day does not reproduce.
  */
 export function watchGateAfter(run: WatchableRun, recording: VizRecording): CheckedRun {
-  const refusal = reproductionRefusalFor(run.posted, postedResultOf(recording));
+  /*
+   * Which claim the row made decides which check it gets — GitHub issue #337. A board row claims
+   * the server's four figures; a filed day or a reference row claims four counts. A row claiming
+   * neither is a defect in whoever built it, and it is refused rather than passed vacuously.
+   */
+  const refusal =
+    run.claim !== undefined
+      ? claimRefusalFor(run.claim, recording)
+      : run.posted !== undefined
+        ? reproductionRefusalFor(run.posted, postedResultOf(recording))
+        : 'this row carries neither a filed result nor a posted claim, so nothing can be checked and it cannot be watched';
   if (refusal !== null) {
     return {
       run: { ...run, blocked: { ground: 'does-not-reproduce', reason: refusal } },

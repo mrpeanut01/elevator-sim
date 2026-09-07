@@ -729,9 +729,20 @@ export function diagnoseServiceLevel(
      * as. `refusedAt` is absent on every leg of every building that declares no `accessZones`, so
      * this term is inert on three of the eight shipped buildings.
      */
-    const endedAtS = leg.boardedAt ?? leg.abandonedAt ?? leg.refusedAt ?? censoredAtS;
+    /*
+     * **A stranded leg's wait is known for the abandonment's reason** (§ D523): it ended, exactly,
+     * when the bank's range moved and nobody could carry them any more. Reading it as censored
+     * would put the rest of the run against somebody who had left the landing, and `starved`
+     * would fire on a range change rather than on congestion. `strandedAt` is absent on every leg
+     * of every run whose building schedules no range change.
+     */
+    const endedAtS =
+      leg.boardedAt ?? leg.abandonedAt ?? leg.refusedAt ?? leg.strandedAt ?? censoredAtS;
     const censored =
-      leg.boardedAt === undefined && leg.abandonedAt === undefined && leg.refusedAt === undefined;
+      leg.boardedAt === undefined &&
+      leg.abandonedAt === undefined &&
+      leg.refusedAt === undefined &&
+      leg.strandedAt === undefined;
     // A leg that arrived after the censoring instant (a record whose horizon precedes its last
     // arrival) would otherwise contribute a negative wait and drag the maximum down; clamp at 0
     // rather than let a malformed record understate the tail.

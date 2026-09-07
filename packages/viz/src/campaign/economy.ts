@@ -579,6 +579,21 @@ export interface WorksBooking {
 }
 
 /**
+ * Units an incident's answer cost, on the day it was given — § 7.5's *spent today*.
+ *
+ * A row rather than a running total, for the same reason {@link WorksBooking} is: the purse is
+ * derived from the record and never counted, and *spent today* is a sum over the rows whose `day`
+ * is today. `label` is the option's own words, so the contract sheet can say what the money went
+ * on without a second vocabulary.
+ */
+export interface IncidentSpend {
+  /** 1-based contract day the answer was given on. */
+  readonly day: number;
+  readonly units: number;
+  readonly label: string;
+}
+
+/**
  * What the economy needs to know about one building. `career.ts` holds the whole record; this is
  * the subset every formula below reads, named separately so a formula cannot reach for a field it
  * has no business in.
@@ -603,6 +618,8 @@ export interface TowerEconomy {
   readonly fitted: Readonly<Partial<Record<ShopCategoryId, number>>>;
   /** Every tier bought this month, live or still under works. */
   readonly bookings: readonly WorksBooking[];
+  /** Every incident answered for money this month — § 7.5's dock is the only writer. */
+  readonly spends: readonly IncidentSpend[];
   /** Loaded car departures since the last service window. */
   readonly trips: number;
   /** Trips at which a service window falls due — § 8.3's `serviceAt`, ≈ 45 000. */
@@ -661,7 +678,15 @@ export function carriedIn(tower: TowerEconomy): number {
  * is why this sums the bookings rather than the tiers that have gone live.
  */
 export function committedUnits(tower: TowerEconomy): number {
-  return tower.bookings.reduce((total, booking) => total + booking.units, 0);
+  return (
+    tower.bookings.reduce((total, booking) => total + booking.units, 0) +
+    tower.spends.reduce((total, spend) => total + spend.units, 0)
+  );
+}
+
+/** § 7.5's *spent today* — the incident answers paid for on the tower's current day. */
+export function spentTodayUnits(tower: TowerEconomy): number {
+  return tower.spends.filter((spend) => spend.day === tower.day).reduce((total, spend) => total + spend.units, 0);
 }
 
 /** § 8.1's `purse = max(0, carriedIn + earnedSoFar − committed)`. */
@@ -964,27 +989,84 @@ export function contractIsLost(tower: TowerEconomy): boolean {
  * shipped building answers to it, and mapping it onto `mixed-use-high-rise` would be a complexity
  * authored by this file rather than by the contract.
  *
- * `secure-tower` and `mixed-use-high-rise` are therefore absent, and {@link complexityOf} answers
- * `undefined` for them: the campaign does not offer a building whose complexity nothing published.
- * That is a stated gap rather than a silent default, because a defaulted 3 would price a renewal
- * from a number nobody measured.
+ * ## The two the contract does not name — GitHub issue #169 item 4, § D519
+ *
+ * `secure-tower` and `mixed-use-high-rise` read `complexity —` until 2026-09-06, because a
+ * defaulted 3 would have priced a renewal from a number nobody measured. They are now **authored,
+ * with the measurement that places them beside the six the contract authored**, and the first
+ * thing to say is what the measurement did *not* do: no single measured axis reproduces the
+ * contract's six. On `docs/33` § 4.6's 400-day cell (each contract's day 1 under `collective`,
+ * seeds `20 260 824 + 7 919 n`) Midtown Office clears 0 of 50 days and is a 3, while Vertical City
+ * clears every goal on every seed and is a 5, so complexity is the designer's judgement of the
+ * *fabric* a player has to understand rather than a clear rate, and a fitted number would have been
+ * an invention wearing a decimal point. What the cell can do is say which authored neighbours each
+ * building sits between, on the two figures it measured for all eight:
+ *
+ * | building | days cleared, day 1 | work per delivered leg, median | fabric | complexity |
+ * |---|---|---|---|---|
+ * | `chancery-house` (2) | 42/50 | 57.4 kJ | one bank, 6 cars, no credentials | — |
+ * | **`secure-tower`** | **24/50** | **60.1 kJ** | two banks off one lobby, five access zones, the only shipped building whose credentials bite | **3** |
+ * | `crown-hotel` (3) | 25/50 | 43.3 kJ | one bank, 5 cars, a coach party | — |
+ * | `midtown-office` (3) | 0/50 | 10.4 kJ | one bank, 4 cars, 1 710 people | — |
+ * | **`mixed-use-high-rise`** | **0/50** | **131.8 kJ** | three banks, 16 cars, a sky lobby; the most work per ride of any shipped building | **4** |
+ * | `vertical-city` (5) | 30/30 goals | 82.8 kJ | seven banks, double-deck shuttles, four escalators | — |
+ *
+ * Secure Tower clears the day exactly as often as Crown Hotel and costs what Chancery House costs
+ * per ride, and it carries two banks and a credential gate neither of them has; it is a **3**.
+ * Mixed-Use High-Rise is unclearable at day 1 like Midtown and costs more per ride than Vertical
+ * City, on a sky-lobby fabric between the two; it is a **4**, and Vertical City stays the 5 the
+ * contract gave it. Both are an assumption with its reasoning attached rather than a citation —
+ * `data/traffic-profiles.json`'s badge-share footing — and `economy.test.ts` pins the neighbours
+ * they were placed between so a change to either table has to re-argue the placement.
  */
 export const COMPLEXITY: Readonly<Record<string, number>> = Object.freeze({
   'garden-apartments': 1,
   'chancery-house': 2,
   'crown-hotel': 3,
   'midtown-office': 3,
+  'secure-tower': 3,
+  'mixed-use-high-rise': 4,
   'st-jude-hospital': 4,
   'vertical-city': 5,
 });
 
-/** The complexity of a shipped building, or `undefined` — see {@link COMPLEXITY}. */
+/** The complexity of a shipped building, or `undefined` for one no table names — see {@link COMPLEXITY}. */
 export function complexityOf(buildingId: string): number | undefined {
   return COMPLEXITY[buildingId];
 }
 
 /** The highest complexity the table publishes — the denominator in `complexity 3 of 5`. */
 export const COMPLEXITY_MAX = 5;
+
+/**
+ * § 8.8's fee for a building offered fresh, in units a day, keyed by shipped building id —
+ * GitHub issue #169 item 3, § D510.
+ *
+ * § 8.9 prices a *renewal* from the rate the building already pays plus the record; an *offer* has
+ * no record, and the contract publishes no formula for it. The design file's fixtures give three
+ * fees — Garden Apartments 3 u, Chancery House 4 u, Crown Hotel 3 u — and those three are used as
+ * given. The other three priced buildings follow the one rule the fixtures share for the two that
+ * are not Crown Hotel, complexity plus two, which is an assumption with its reasoning attached
+ * rather than a citation: a harder building pays more because it will cost more days (§ 8.9's own
+ * sentence), and a flat two over complexity keeps Garden Apartments' 3 u where `openingCareer`
+ * has always put it. `secure-tower` and `mixed-use-high-rise` joined on the same rule when § D519
+ * gave them a complexity (GitHub issue #169 item 4), so every shipped contract is now offerable.
+ */
+export const OFFER_FEES: Readonly<Record<string, number>> = Object.freeze({
+  'garden-apartments': 3,
+  'chancery-house': 4,
+  'crown-hotel': 3,
+  'midtown-office': 5,
+  'secure-tower': 5,
+  'mixed-use-high-rise': 6,
+  'st-jude-hospital': 6,
+  'vertical-city': 7,
+});
+
+/** The fee an offer on a shipped building pays, or `undefined` for one the campaign does not offer. */
+export function offerFeeOf(buildingId: string): number | undefined {
+  return OFFER_FEES[buildingId];
+}
 
 export interface RenewalOffer {
   /** § 8.5's `clearRate = cleared / (day − 1)`, or `0` on a contract's first day. */

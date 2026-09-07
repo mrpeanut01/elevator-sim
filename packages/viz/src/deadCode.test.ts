@@ -126,6 +126,7 @@ const AUDITED_MODULES = [
   'viz/src/access',
   'viz/src/authoring',
   'viz/src/batch',
+  'viz/src/release',
   'viz/src/campaign',
   'viz/src/commissioning',
   'viz/src/contract',
@@ -275,6 +276,22 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    */
   'scenario/measureScenario':
     'the instrument that produced data/scenario-goals.json; its caller is the regeneration driver',
+  /*
+   * -- The legibility instrument (GitHub issue #354, § D512), the same shape one step along:
+   * legibility.sweep.test.ts under LEGIBILITY_SWEEP=1 is the driver that produced docs/33 § 6.4b's
+   * table over the 400 days of § 4.6, and legibility.test.ts's pinned ten-seed slice is the guard
+   * that re-derives a tenth of it on every run. What reads the verdict in the product is #208's
+   * build, which this scanner will see when it lands.
+   */
+  'shift/legibilityOf':
+    'the instrument behind docs/33 § 6.4b; its driver is the gated sweep and its guard the pinned slice',
+  /*
+   * -- The campaign dock's string walk. Its consumer is campaignDock.test.ts's first-person sweep
+   * over every dock state; the corpus reaches the same strings through stageScreenModel.ts's
+   * stage header, which is why nothing in honesty/ calls this one.
+   */
+  'everyday/campaignDockStrings':
+    'every string of a dock view, for the first-person sweep that reads all nine states',
   'scenario/publishedScenarioFor': 'same instrument, same driver, same reason',
   'scenario/CANDIDATE_SCENARIOS':
     'the driver’s and the guard’s shared scenario list (goalReport imports only CANDIDATE_GOALS)',

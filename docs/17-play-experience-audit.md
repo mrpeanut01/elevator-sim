@@ -345,8 +345,11 @@ Each is a real thing found by walking the product, left with an owner rather tha
    banked* on a building that scenario has nothing to do with, and `closeDay` banked against it:
    **two clean days on an invented tower cleared Scenario 2**, driven with the negative control
    beside it. Closed with a third sentinel, deliberately not the endless one — endless is *chosen*
-   and the sandbox is *arrived at*. What is still undecided is whether the state deserves a screen.
-   Endless is built — § 3.6.
+   and the sandbox is *arrived at*. ~~What is still undecided is whether the state deserves a
+   screen.~~ **Decided 2026-09-05, [§ D496](../DECISIONS.md): it does not.** Sandbox is a state and
+   never a mode — no ninth `PlayMode`, no toggle, no screen — and the handoff's mode is shipped in
+   halves, its selection half as Free play and its unscored half as this sentinel; `docs/12` § 4.13
+   records the deviation. Endless is built — § 3.6.
 6. ~~**The weight-set selector has no surface**~~ — **closed, and mounting it found that half the
    seam did not exist.** A profile's `selection` block already reached a run; `patternSwitching` was
    loaded, carried, and writable by nothing in the viewer, so an arm-map editor over it would have

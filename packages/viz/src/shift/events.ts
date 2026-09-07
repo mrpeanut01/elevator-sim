@@ -112,6 +112,29 @@ const CONFERENCE_SPLIT: DirectionalSplit = Object.freeze({
   interfloor: 0.5,
 });
 
+/**
+ * The mix while a coach party unloads: the lobby fills with people going up.
+ *
+ * The up-peak's own shape — `data/traffic-profiles.json` authors the office morning at roughly this
+ * incoming share — so the coach party is *the morning rush arriving at a hotel* rather than a mix
+ * this file made up. Not `1.0` incoming, because the guests already upstairs do not stop moving.
+ */
+const COACH_SPLIT: DirectionalSplit = Object.freeze({
+  incoming: 0.8,
+  outgoing: 0.1,
+  interfloor: 0.1,
+});
+
+/**
+ * Where in the run the red-tagged car goes, as a fraction of its length — *"this morning"*.
+ *
+ * Three tenths rather than the start, so the player sees the building whole before it loses a car
+ * and the loss is a thing that happens on the stage rather than a fact about the day's fabric. A
+ * fraction for `EventEffect.derate`'s own reason: a shift is 15 to 120 minutes and a clock time
+ * would name an hour most shifts do not contain.
+ */
+export const BREAKDOWN_AT_FRACTION = 0.3;
+
 /** No effect, said out loud. See {@link EventEffect.changesNothing}. */
 const NO_EFFECT: EventEffect = Object.freeze({
   changesNothing: true,
@@ -123,7 +146,8 @@ const NO_EFFECT: EventEffect = Object.freeze({
 });
 
 /**
- * The five events, keyed by id. Names and notes are the design's own (`design.html` :1419–1426),
+ * The seven events, keyed by id — five the week's rota draws and two the campaign's. Names and
+ * notes of the five are the design's own (`design.html` :1419–1426),
  * verbatim **except** where a caption named something the run does not contain: the fire drill's
  * *"14:00"* (§ D175), the ordinary day's *"Tuesday"*, and the ordinary day's second person. Each
  * deviation is argued at its own entry, and `events.test.ts` holds the weekday rule against every
@@ -236,6 +260,53 @@ export const SHIFT_EVENTS: Readonly<Record<ShiftEventId, ShiftEvent>> = Object.f
       writes: Object.freeze(['demand.arrivalRatePctPop5min']),
     }),
   }),
+  /*
+   * **A lift failing its safety check** — the campaign's drawn incident (GitHub issue #169 item 1,
+   * § D507). The design file's `outage` need reads *"The inspector red-tagged car B this morning"*,
+   * so the car goes at a fixed point in the morning rather than at a drawn one: what § 8.3's odds
+   * decide is *whether*, and `campaign/incidents.ts#campaignEventFor` makes that draw on a stream
+   * derived from the day's own seed. `toFraction: 1` is `shift/incidents.ts`'s *it does not come
+   * back* — the only thing that brings it back is the answer the dock composes (§ 7.5), which
+   * travels on the run's intervention log as an in-service event of its own.
+   *
+   * The car is `events.ts#eventCarChoice`'s, the same total order every other derate uses, so the
+   * dock's caption names the car the run actually loses.
+   */
+  breakdown: Object.freeze({
+    id: 'breakdown',
+    name: 'A lift failed its safety check',
+    note: 'The inspector red-tagged a car this morning. It stays out until somebody brings it back.',
+    effect: Object.freeze({
+      changesNothing: false,
+      arrivalRateMultiplier: null,
+      directionalSplit: null,
+      carsOutOfService: 0,
+      derate: Object.freeze({ cars: 1, fromFraction: BREAKDOWN_AT_FRACTION, toFraction: 1 }),
+      writes: Object.freeze(['serviceEvents']),
+    }),
+  }),
+  /*
+   * **A coach party booked in** — the campaign's calendared incident (GitHub issue #169 item 1,
+   * § D507). The design's Crown Hotel quirk is *"Coaches arrive at 11 with forty people and
+   * luggage"* and its `event` need is *"Sixty guests and their luggage arrive inside twenty
+   * minutes"*. The engine has no timed burst — `docs/37` § 5.1 records that a burst is authored by
+   * lowering the baseline, and a campaign day has one baseline — so the honest expression is the
+   * day's: more people, and nearly all of them arriving at the lobby wanting to go up. The split is
+   * the up-peak's shape rather than a number invented here.
+   */
+  'coach-party': Object.freeze({
+    id: 'coach-party',
+    name: 'Coaches booked in',
+    note: 'Forty people and their luggage arrive at the front door together, and every one of them is going up.',
+    effect: Object.freeze({
+      changesNothing: false,
+      arrivalRateMultiplier: 1.5,
+      directionalSplit: COACH_SPLIT,
+      carsOutOfService: 0,
+      derate: null,
+      writes: Object.freeze(['demand.arrivalRatePctPop5min', 'demand.directionalSplit']),
+    }),
+  }),
 });
 
 /**
@@ -247,6 +318,8 @@ export const SHIFT_EVENTS: Readonly<Record<ShiftEventId, ShiftEvent>> = Object.f
  * dayIdx)` and therefore replayable, which is the same property CLAUDE.md invariant 5 asks of a run.
  */
 export function eventFor(day: number, dayIdx: number): ShiftEvent {
+  // The rota reaches five of the seven; `breakdown` and `coach-party` are the campaign's alone —
+  // `SHIFT_EVENT_IDS` says why beside them, and `campaign/incidents.ts` is their only chooser.
   if (dayIdx >= 5) return SHIFT_EVENTS.weekend;
   const slot = ((day % 5) + 5) % 5;
   if (slot === 3) return SHIFT_EVENTS['move-in'];

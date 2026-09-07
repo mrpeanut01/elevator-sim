@@ -34,10 +34,13 @@
  * kinds are **derivable from the record** and are derived here — a renewal falls due in the last
  * days of a contract (§ 8.9), and a service window falls due when the wear clock says so (§ 8.3).
  * The other two — a lift failing its safety check, a coach party booked in — are **draws against
- * the daily failure odds and against an authored event schedule**, and neither exists: there is no
- * named RNG stream for a campaign day (CLAUDE.md invariant 2 forbids a global one) and no event
- * calendar keyed to a contract. So this build's incidents are the two the state implies, and
- * {@link CAMPAIGN_ABSENCES} says so where a player reads it rather than only here.
+ * the daily failure odds and against an authored event schedule**, and since GitHub issues #171
+ * and #169 (§ D507) both exist one module over: `campaign/incidents.ts#campaignEventFor` draws the
+ * breakdown on a stream derived from the day's seed (CLAUDE.md invariant 2 — a named stream, never
+ * a global one) and reads the coach party off `campaign/calendar.ts`. Those two are *the run's*
+ * incidents rather than the desk's: they happen inside a day and are answered from § 7.5's dock,
+ * so this record carries only the money their answers cost (`economy.ts#IncidentSpend`) and never the
+ * incident itself.
  *
  * ## The career is this session's
  *
@@ -60,16 +63,23 @@ import {
   type ShopCategoryId,
   type TowerEconomy,
   type WorksBooking,
+  atRiskTowers,
   bookingFor,
   clearedDays,
+  complexityOf,
   contractIsLost,
   dayIndexOf,
+  nextSlot,
+  offerFeeOf,
   purseOf,
+  slotsOpen,
+  standingOf,
   renewalOffer,
   shopTierAt,
   startIsLegal,
   wearHeadOf,
 } from './economy.js';
+import { contractById } from '../shift/contracts.js';
 
 /* -------------------------------------------------------------------------- *
  * The record
@@ -216,7 +226,16 @@ export const SERVICE_AT_TRIPS = 45_000;
  * that is absent must be named.
  */
 export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
-  'Incidents here are the two the building implies — a renewal falling due, and a service window the wear clock has reached. A lift failing its safety check and a coach party booked in are draws this build cannot make: there is no seeded stream for a campaign day and no event calendar behind a contract.',
+  /*
+   * **The incidents entry is deleted, not reworded** — GitHub issues #171 and #169 item 1, § D507.
+   * It read *"A lift failing its safety check and a coach party booked in are draws this build
+   * cannot make: there is no seeded stream for a campaign day and no event calendar behind a
+   * contract."* Both halves stopped being true on the commit that built them:
+   * `campaign/incidents.ts#campaignEventFor` draws against § 8.3's odds on a stream derived from the
+   * day's seed, and `campaign/calendar.ts` is the calendar. A refusal that has stopped being true is
+   * worse than a missing one (§ D227), so the sentence comes out with the mechanism that made it
+   * false, which is what `campaignModel.test.ts`'s register exists to force.
+   */
   /*
    * **This entry is unchanged, and issue #223 is why that is a decision rather than an oversight.**
    *
@@ -288,6 +307,7 @@ export function freshTower(input: {
     difficultyId: input.difficultyId ?? 'standard',
     fitted: {},
     bookings: [],
+    spends: [],
     trips: 0,
     serviceAt: SERVICE_AT_TRIPS,
     refit: 0,
@@ -526,6 +546,19 @@ export type CampaignAction =
   /** § 8.2's desk decision. */
   | { readonly kind: 'answer-need'; readonly towerId: string; readonly optionId: string }
   /**
+   * § 8.8 — take an offer. The building's contract id, because an offer *is* a contract
+   * (`shift/contracts.ts`); the reducer applies § 8.8's gate and refuses otherwise. The week
+   * switch that goes with it is `everyday/host.ts#campaignAct`'s, since the week is not this
+   * record's to move.
+   */
+  | { readonly kind: 'take-offer'; readonly contractId: string }
+  /**
+   * § 7.5's dock decision — the money half. `units` and `label` are the option's own, carried
+   * rather than looked up because the incident is the *run's* (`everyday/host.ts` holds it beside
+   * the day it belongs to) and this record deliberately does not know which day is on the stage.
+   */
+  | { readonly kind: 'answer-incident'; readonly towerId: string; readonly units: number; readonly label: string }
+  /**
    * § 6.4 step 4 — *"In a campaign run, evaluate the four tests and mark the day cleared or
    * missed"*, as the one thing that moves a contract forward. See {@link fileDay}.
    *
@@ -576,6 +609,7 @@ export function applyCampaignAction(
         missed: 0,
         carry: undefined,
         bookings: [],
+        spends: [],
       }));
     case 'press-tier':
       return pressTier(career, action.towerId, action.categoryId, action.level);
@@ -585,6 +619,10 @@ export function applyCampaignAction(
       return { ...career, pendingBooking: undefined };
     case 'answer-need':
       return answerNeed(career, action.towerId, action.optionId);
+    case 'answer-incident':
+      return answerIncident(career, action.towerId, action.units, action.label);
+    case 'take-offer':
+      return takeOffer(career, action.contractId);
     case 'file-day':
       return fileDay(career, action.towerId, action.verdict, action.trips);
   }
@@ -854,11 +892,93 @@ function answerNeed(career: CampaignCareer, towerId: string, optionId: string): 
                     },
                   ]
                 : [],
+            /* The month's answers are paid: `carry` above already read the purse they left. */
+            spends: [],
             trips: option.id === 'refurbish' ? 0 : entry.trips,
             refit: option.id === 'refurbish' ? 0 : entry.refit,
           },
     ),
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * § 8.8 — offers, and the gate on ambition
+ * -------------------------------------------------------------------------- */
+
+/** Why an offer cannot be taken now, in the card's own words, or `undefined` when it can. */
+export type OfferRefusal =
+  | { readonly kind: 'held' }
+  | { readonly kind: 'unpriced' }
+  | { readonly kind: 'no-slot'; readonly standingShort: number }
+  | { readonly kind: 'at-risk'; readonly towerName: string };
+
+/**
+ * § 8.8's gate for one contract — GitHub issue #169 item 3, § D510.
+ *
+ * *"An offer is takeable only when `slotsOpen > towersHeld` and `atRisk === 0`."* Both conditions
+ * are the economy's own arithmetic read here, never restated: `slotsOpen(standingOf(...))` and
+ * `atRiskTowers(...)`. A building already held is not an offer at all (§ 8.8: *"exclude buildings
+ * you already hold"*), and one whose complexity or fee nothing published is not offered rather
+ * than priced by guesswork. Checked in the order the card names them, so the sentence a player
+ * reads is the first thing that blocks them.
+ */
+export function offerRefusalOf(career: CampaignCareer, contractId: string): OfferRefusal | undefined {
+  const contract = contractById(contractId);
+  if (contract === undefined) return { kind: 'unpriced' };
+  if (career.towers.some((tower) => tower.id === contractId || tower.buildingId === contract.buildingId)) {
+    return { kind: 'held' };
+  }
+  if (complexityOf(contract.buildingId) === undefined || offerFeeOf(contract.buildingId) === undefined) {
+    return { kind: 'unpriced' };
+  }
+  const standing = standingOf(career.carry, career.towers);
+  if (slotsOpen(standing) <= career.towers.length) {
+    const next = nextSlot(standing);
+    return { kind: 'no-slot', standingShort: next === undefined ? 0 : next.standing - standing };
+  }
+  const risk = atRiskTowers(career.towers)[0];
+  if (risk !== undefined) return { kind: 'at-risk', towerName: risk.buildingId };
+  return undefined;
+}
+
+/**
+ * § 8.8's press, applied — a fresh tower on the offered contract, opened on the desk.
+ *
+ * The dispatcher is the career's standing one — the open tower's, or the first held tower's — so
+ * the new building runs under a dispatcher the player already chose rather than a default they did
+ * not; the desk's own select moves it from there. Refused on {@link offerRefusalOf}'s own answer,
+ * so the reducer and the card cannot disagree about what blocks a take.
+ */
+function takeOffer(career: CampaignCareer, contractId: string): CampaignCareer {
+  if (offerRefusalOf(career, contractId) !== undefined) return career;
+  const contract = contractById(contractId);
+  const fee = contract === undefined ? undefined : offerFeeOf(contract.buildingId);
+  if (contract === undefined || fee === undefined) return career;
+  const standing = openTowerOf(career) ?? career.towers[0];
+  const dispatcherId = standing?.dispatcherId ?? 'collective';
+  const tower = freshTower({ contractId, buildingId: contract.buildingId, dispatcherId, rate: fee });
+  return { ...career, towers: [...career.towers, tower], openTowerId: tower.id, pendingBooking: undefined };
+}
+
+/**
+ * § 7.5's dock decision, applied to the purse — GitHub issue #171, § D507.
+ *
+ * The **run** half of an answer travels on the day's intervention log as an `answer-incident` entry
+ * (`core`'s own arm, stamped at `runIncidentClock`); this is the **money** half, and the two are
+ * pressed together by `everyday/host.ts#answerIncident` so neither can land without the other.
+ * Refused on the same fact the dock dims the row on — § 8.5: *"An option you cannot afford is not
+ * selectable in the dock either. The dock and the desk read the same purse."* A refusal returns the
+ * same career object, which is the façade's convention for *nothing moved*.
+ */
+function answerIncident(career: CampaignCareer, towerId: string, units: number, label: string): CampaignCareer {
+  const tower = towerById(career, towerId);
+  if (tower === undefined) return career;
+  if (!Number.isFinite(units) || units < 0) return career;
+  if (units > purseOf(tower)) return career;
+  return mapTower(career, towerId, (current) => ({
+    ...current,
+    spends: [...current.spends, { day: current.day, units, label }],
+  }));
 }
 
 /**

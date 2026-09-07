@@ -57,6 +57,8 @@ export interface CatalogueTemplate {
   readonly id: string;
   readonly name: string;
   readonly recommended?: boolean | undefined;
+  /** The record's own declaration that no list may offer it. Absent is yes; see `catalogueOf`. */
+  readonly selectable?: boolean | undefined;
   /** The template record's own minimum period, minutes. Surfaced, because the kernel enforces it. */
   readonly durationMin?: number | undefined;
   /**
@@ -128,7 +130,15 @@ export function catalogueOf(source: CatalogueSource): MenuCatalogue {
     ...(profile.role === undefined ? {} : { detail: profile.role }),
   }));
 
-  const demandTemplates: CatalogueEntry[] = source.trafficProfiles.demandTemplates.map((template) => ({
+  /*
+   * A template that declares itself unselectable is a stream a mode owns — `endless-rush`, which
+   * `everyday/rush.ts` runs from its own setup and which no scored run may be chosen under (GitHub
+   * issue #220's PM-RU2). It is left out of the list *and* out of the day's parts, because a
+   * template's hour offers a part of another template's day (`partsOfDay`), and a rush that opens
+   * at 08:00 would otherwise put a ninety-minute "morning rush" on the office day.
+   */
+  const selectable = source.trafficProfiles.demandTemplates.filter((template) => template.selectable !== false);
+  const demandTemplates: CatalogueEntry[] = selectable.map((template) => ({
     id: template.id,
     name: template.name,
     // `recommended` is the template record's own field and it means something specific: whether the
@@ -143,7 +153,7 @@ export function catalogueOf(source: CatalogueSource): MenuCatalogue {
     // campaign's *shift length* and Free play's *Run length* (§ D286). Derived here rather than in
     // the panel because it is a fact about the loaded records, and because a panel that computed it
     // would be a second answer to *what is offered* beside the one `freePlayIssues` validates.
-    parts: partsOfDay(source.trafficProfiles.demandTemplates, template.id),
+    parts: partsOfDay(selectable, template.id),
   }));
 
   return Object.freeze({

@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
-import { rushBarModel, RUSH_PRIMARY_REFUSAL } from './rushScreenModel.js';
+import { rushBarModel } from './rushScreenModel.js';
 import { isScreenBuilt, routeFor, UNBUILT_REASONS } from './screens.js';
 import { ENGINEER_SWAP_NOTE, EVERYDAY_SCREENS, MODE_PICKS } from './types.js';
 
@@ -147,15 +147,13 @@ describe('the availability flags describe this tree, not a remembered one', () =
     const rush = EVERYDAY_MODES.find((mode) => mode.screen === 'rush');
     expect(rush?.unavailable).toBeUndefined();
     expect(existsSync(`${SRC}everyday/rushScreen.ts`)).toBe(true);
-    expect(existsSync(`${SRC}rush`), 'a rush engine exists but the primary still refuses').toBe(
-      false,
-    );
-    expect(RUSH_PRIMARY_REFUSAL).toMatch(/not built/);
-    /* The refusal is *on the control*, which is what this file's own rule says — so the assertion
-       is that the primary carries that sentence, not merely that it is dead (issue #262). */
-    expect(rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' })).primary.inert).toBe(
-      RUSH_PRIMARY_REFUSAL,
-    );
+    /*
+     * The engine exists since GitHub issue #220 (`everyday/rush.ts`, § D515), so the primary is
+     * live: the refusal it carried was deleted on the commit that made it false (§ D227), and the
+     * row is § 3.3's own with nothing substituted over it.
+     */
+    expect(existsSync(`${SRC}everyday/rush.ts`), 'the rush engine').toBe(true);
+    expect(rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' })).primary.inert).toBeUndefined();
   });
 
   it('opens the campaign, now that all three of § 8’s screens exist beside its economy', () => {
@@ -316,8 +314,6 @@ describe('modes.ts’ prose is checked against the tree, not against a reader’
   const RUSH_CLAIMS: readonly { readonly symbol: string; readonly drawnBy: string }[] =
     Object.freeze([
       { symbol: 'RUSH_ABSENCES', drawnBy: 'buildNotes.ts' },
-      /* In-file: `rushBarModel` substitutes it into the § 3.3 bar the shell draws — issue #262. */
-      { symbol: 'RUSH_PRIMARY_REFUSAL', drawnBy: 'rushScreenModel.ts' },
       { symbol: 'RUSH_BESTS_FIXTURE_NOTE', drawnBy: 'rushScreen.ts' },
     ]);
 

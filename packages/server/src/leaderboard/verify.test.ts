@@ -9,11 +9,15 @@
 
 import { describe, expect, it, beforeAll } from 'vitest';
 
-import { loadConfig, runSimulation, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
+import { loadConfig, runSimulation, type LoadedConfig, type SimulationConfig,
+  type RunInterventionConfig,
+} from '@elevator-sim/core';
 import { MATRIX_CELLS } from '@elevator-sim/experiments/browser';
 
 import { runDataHashOf } from './boardKey.js';
-import { digestOf, submissionIssues, type Submission, type SubmittedRun } from './submission.js';
+import { digestOf, submissionIssues, type Submission, type SubmittedRun,
+  type SubmittedIntervention,
+} from './submission.js';
 import {
   METRIC_EPSILON,
   configFor,
@@ -125,6 +129,7 @@ const EVERYDAY_RUN = Object.freeze({
  * other end by reading this package's source text, which is `menu/client.test.ts`'s own method.
  */
 function asTheClientBuildsIt(run: SubmittedRun): SimulationConfig {
+  const clientLog = asTheClientHoldsTheLog(run);
   const building = config.buildingsById.get(run.buildingId);
   const profile = config.dispatcherProfilesById.get(run.dispatcherProfileId);
   if (building === undefined || profile === undefined) throw new Error('fixture does not resolve');
@@ -149,8 +154,34 @@ function asTheClientBuildsIt(run: SubmittedRun): SimulationConfig {
       ? { durationS: run.durationS }
       : { windowStartS: run.windowStartS, windowEndS: run.windowStartS + run.durationS }),
     ...(reportWindow === undefined ? {} : { reportWindow }),
-    ...((run.interventions ?? []).length === 0 ? {} : { interventions: run.interventions }),
+    ...(clientLog.length === 0 ? {} : { interventions: clientLog }),
   } as SimulationConfig;
+}
+
+/**
+ * The log as the **viewer** holds it — `core`'s arms, with a switch carrying the whole profile the
+ * picker handed the day to. Written out here rather than obtained from `verify.ts`, for the reason
+ * `asTheClientBuildsIt` gives: the server's `interventionsFor` is the thing under test, and the
+ * claim has to come from the other end of the wire. The viewer's profile for a shipped style with
+ * rules is `authoring/ruleSpec.ts#profileWithRules`'s two writes, made here by hand.
+ */
+function asTheClientHoldsTheLog(run: SubmittedRun): readonly RunInterventionConfig[] {
+  return (run.interventions ?? []).map((entry): RunInterventionConfig => {
+    if (entry.change.kind !== 'switch-dispatcher') return { atS: entry.atS, change: { kind: entry.change.kind } };
+    const profile = config.dispatcherProfilesById.get(entry.change.toProfileId);
+    if (profile === undefined) throw new Error('fixture does not resolve');
+    const rows = entry.change.ruleRows ?? [];
+    return {
+      atS: entry.atS,
+      change: {
+        kind: 'switch-dispatcher',
+        profile:
+          rows.length === 0
+            ? profile
+            : { ...profile, rules: { rows: [...rows] }, selection: { ...(profile.selection ?? {}), policy: 'rules' } },
+      },
+    };
+  });
 }
 
 /**
@@ -335,6 +366,30 @@ describe('an Everyday run is submittable, and the server reaches the same figure
     expect(verification.ok, JSON.stringify(verification)).toBe(true);
   });
 
+  it('replays a mid-run handover to the client’s own metrics, and the handover moved the day', () => {
+    /*
+     * GitHub issue #338, § D486: the switch travels as a shipped id plus rows, the server rebuilds
+     * the arm's profile from **its own** `data/`, and the figures agree with a client that held
+     * the profile inline. Two arms — a bare style, and a style with the player's rows on it — and a
+     * negative control that the handover changed the run, or agreeing would prove nothing.
+     */
+    const bare: SubmittedRun = {
+      ...EVERYDAY_RUN,
+      interventions: [{ atS: 300, change: { kind: 'switch-dispatcher', toProfileId: 'nearest-car' } }],
+    };
+    const ruled: SubmittedRun = {
+      ...EVERYDAY_RUN,
+      interventions: [{ atS: 300, change: { kind: 'switch-dispatcher', toProfileId: 'nearest-car', ruleRows: RULES } }],
+    };
+    for (const run of [bare, ruled]) {
+      const verification = verifySubmission(claimedByTheClient(run), resources);
+      expect(verification.ok, JSON.stringify(verification)).toBe(true);
+    }
+    const plain = metricsOf(runSimulation(asTheClientBuildsIt(EVERYDAY_RUN)).summary);
+    const handed = metricsOf(runSimulation(asTheClientBuildsIt(bare)).summary);
+    expect(handed.awtS).not.toBe(plain.awtS);
+  });
+
   it('replays both together, because a player who writes rules also plays the day', () => {
     const both: SubmittedRun = { ...EVERYDAY_RUN, ruleRows: RULES, interventions: LOG };
     const verification = verifySubmission(claimedByTheClient(both), resources);
@@ -410,27 +465,66 @@ describe('an Everyday run is submittable, and the server reaches the same figure
  * What the wire still will not carry
  * -------------------------------------------------------------------------- */
 
-describe('the two intervention kinds a submission may not carry', () => {
-  it('refuses a mid-run dispatcher switch, because it carries a weight vector inline', () => {
+describe('the one intervention kind a submission may not carry, and the switch that now travels', () => {
+  it('refuses a mid-run dispatcher switch that carries its profile inline, before anything simulates', () => {
     /*
-     * `submission.ts`'s founding rule — *ids rather than inline objects* — with the object being a
-     * whole `DispatcherProfile` instead of a two-floor tower with sixteen cars. A switch could only
-     * travel as a shipped profile **id** resolved against this server's `data/`, and that is a
-     * different field from the one the viewer needs locally, where the driving profile is routinely
-     * a derived object no id resolves.
-     *
-     * Refused by the **cheap** gate, before anything simulates: a submission that could smuggle a
-     * vector must not be able to command a replay on the way to being refused.
+     * `submission.ts`'s founding rule — *ids rather than inline objects* — is what survives of the
+     * old category refusal (GitHub issue #338, § D486). A switch travels as `{ toProfileId,
+     * ruleRows? }`; one that arrives as `core`'s inline arm is refused by the **cheap** gate, so a
+     * submission that could smuggle a vector cannot command a replay on the way to being refused.
      */
     const profile = config.dispatcherProfilesById.get('eta');
+    const inline = { kind: 'switch-dispatcher', profile: profile! } as unknown as SubmittedIntervention['change'];
+    const issues = submissionIssues({
+      run: { ...RUN, interventions: [{ atS: 300, change: inline }] },
+      claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+    });
+    expect(issues.join(' ')).toMatch(/no toProfileId/u);
+    expect(issues.join(' ')).toMatch(/profile inline/u);
+  });
+
+  it('refuses a switch whose rows are outside the shipped vocabulary, by name', () => {
     const issues = submissionIssues({
       run: {
         ...RUN,
-        interventions: [{ atS: 300, change: { kind: 'switch-dispatcher', profile: profile! } }],
+        interventions: [
+          {
+            atS: 300,
+            change: { kind: 'switch-dispatcher', toProfileId: 'eta', ruleRows: [{ when: 'invent-a-condition' as never, then: 'nearest-car' }] },
+          },
+        ],
       },
       claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
     });
-    expect(issues.join(' ')).toMatch(/switch-dispatcher.*may not carry/u);
+    expect(issues.join(' ')).toMatch(/interventions\[0\]\..*not a declared rule condition/u);
+  });
+
+  it('rejects a switch to an id this server does not ship, as it rejects an unshipped base profile', () => {
+    const verification = verifySubmission(
+      {
+        run: { ...EVERYDAY_RUN, interventions: [{ atS: 300, change: { kind: 'switch-dispatcher', toProfileId: 'saved-on-a-device' } }] },
+        claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+      },
+      resources,
+    );
+    expect(verification.ok).toBe(false);
+    if (!verification.ok) expect(verification.code).toBe('unknown-dispatcher');
+  });
+
+  it('refuses a run under a template no list offers, on the code the board uses for one it does not ship', () => {
+    // `endless-rush` declares `selectable: false` (GitHub issue #220): a mode's own stream, which no
+    // shipped surface lets a player choose or post under. Refused before anything simulates.
+    const rush = config.trafficProfiles.demandTemplates.find((entry) => entry.selectable === false);
+    expect(rush, 'the shipped data carries at least one unselectable template').toBeDefined();
+    const verification = verifySubmission(
+      {
+        run: { ...RUN, demandTemplateId: rush?.id ?? '' },
+        claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+      },
+      resources,
+    );
+    expect(verification.ok).toBe(false);
+    if (!verification.ok) expect(verification.code).toBe('unknown-template');
   });
 
   it('refuses an incident answer, because the incident it answers is not on the wire', () => {
@@ -441,14 +535,18 @@ describe('the two intervention kinds a submission may not carry', () => {
      * service events would be the only mode changes in the run — a different day, accepted as this
      * one. Carrying the answer without its cause would be worse than refusing it.
      */
+    const answer = {
+      kind: 'answer-incident',
+      option: 'Send it back',
+      serviceEvents: [],
+    } as unknown as SubmittedIntervention['change'];
     const issues = submissionIssues({
-      run: {
-        ...RUN,
-        interventions: [{ atS: 300, change: { kind: 'answer-incident', option: 'Send it back', serviceEvents: [] } }],
-      },
+      run: { ...RUN, interventions: [{ atS: 300, change: answer }] },
       claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
     });
     expect(issues.join(' ')).toMatch(/answer-incident.*may not carry/u);
+    // And it says the refusal is permanent, because that is what § D486 ruled and a player reads it.
+    expect(issues.join(' ')).toMatch(/permanent/u);
   });
 
   it('refuses a rule outside the shipped vocabulary before it can command a simulation', () => {

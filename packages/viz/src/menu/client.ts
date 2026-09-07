@@ -130,10 +130,11 @@ export interface RunSubmission {
    * and refuses a submission whose metrics do not reproduce. Without this field it re-simulated the
    * seed without the log, got different legs, and refused an honest run as a forgery.
    *
-   * Only `park-cars-lobby` travels. A `switch-dispatcher` carries a whole weight vector inline,
-   * which is the cheat `RunSubmission`'s ids exist to prevent; an `answer-incident` answers a
-   * campaign incident that is on no wire, so a replay would have the answer and not the thing
-   * answered. `scope/runIdentity.ts` still refuses both, naming which.
+   * Three kinds travel: the two parking kinds carry nothing but their instant, and a
+   * `switch-dispatcher` carries the shipped id its target resolves to plus the player's rows
+   * (§ D486). An `answer-incident` answers a campaign incident that is on no wire, so a replay
+   * would have the answer and not the thing answered; `scope/runIdentity.ts` refuses it, and that
+   * refusal is permanent.
    */
   readonly interventions?: readonly SubmittedIntervention[] | undefined;
 }
@@ -153,10 +154,25 @@ export interface SubmittedRuleRow {
   readonly thenValue?: number | string | undefined;
 }
 
-/** One entry of the run record's log — `{ atS, change }`, contract § 1.4. */
+/**
+ * One entry of the run record's log — `{ atS, change }`, contract § 1.4.
+ *
+ * A `switch-dispatcher` travels as **an id plus rows** rather than as the inline profile `core`'s
+ * arm carries (GitHub issue #338, § D486): `scope/switchWire.ts#switchWireOf` is the translation,
+ * and `scope/runIdentity.ts` refuses a state whose switch cannot be translated before it reaches
+ * this shape. The server re-derives the vector through its own `profileWithRules`, exactly as it
+ * does for the run's base profile.
+ */
 export interface SubmittedIntervention {
   readonly atS: number;
-  readonly change: { readonly kind: string };
+  readonly change:
+    | { readonly kind: 'park-cars-lobby' }
+    | { readonly kind: 'spread-cars' }
+    | {
+        readonly kind: 'switch-dispatcher';
+        readonly toProfileId: string;
+        readonly ruleRows?: readonly SubmittedRuleRow[] | undefined;
+      };
 }
 
 export interface ClaimedMetrics {
@@ -250,6 +266,13 @@ export interface BoardEntry {
    * reads it off its own replay — see `packages/server/src/store/store.ts#EntryRow.legs`.
    */
   readonly legs: number | undefined;
+  /**
+   * The dispatcher this row ran **as the house** — a baseline the server seeded so a new player never
+   * meets an empty board (GitHub issue #222, § D521) — or absent on a row a player posted. On the
+   * wire rather than inferred from a display name, which a player could choose. A screen draws the
+   * marker and the note off this field and never treats the row as the player's own.
+   */
+  readonly baselineProfileId?: string | undefined;
   readonly submittedAtMs: number;
 }
 
@@ -266,6 +289,28 @@ export interface BoardSummary {
   readonly boardKey: string;
   readonly entries: number;
   readonly latestMs: number;
+}
+
+/**
+ * One axis's quantile ladder — `packages/server/src/leaderboard/distribution.ts#AxisLadder`,
+ * restated for the wire (GitHub issue #327, § D484). `rungs` is absent below the server's floor,
+ * with `n` still published; `medianEntryId` is a real entry at this axis's median, never a vector.
+ */
+export interface BoardAxisLadder {
+  readonly axis: string;
+  readonly n: number;
+  readonly rungs: Readonly<Record<'p10' | 'p25' | 'p50' | 'p75' | 'p90', number>> | undefined;
+  readonly medianEntryId: string | undefined;
+}
+
+/** A board's distribution as the server publishes it. No interval, by that module's argument. */
+export interface BoardDistribution {
+  readonly boardKey: string;
+  readonly n: number;
+  readonly ladders: readonly BoardAxisLadder[];
+  readonly withheld: string | undefined;
+  readonly absent: readonly { readonly axis: string; readonly reason: string }[];
+  readonly note: string;
 }
 
 /**
@@ -526,6 +571,8 @@ export interface LeaderboardClient {
    */
   boards(): Promise<Result<BoardsPage>>;
   board(boardKey: string, metric: string): Promise<Result<BoardPage>>;
+  /** `GET /api/board-distribution` — a quantile ladder per axis for one board. GitHub issue #327. */
+  distribution(boardKey: string): Promise<Result<BoardDistribution>>;
   /**
    * The challenge index — **the only answer** to *"which challenge is it today"*.
    *
@@ -583,9 +630,12 @@ function isDailyFixture(value: unknown): value is DailyFixture {
 function withLegs(entry: unknown): BoardEntry {
   const record = entry as Record<string, unknown>;
   const legs = record['legs'];
+  const baseline = record['baselineProfileId'];
   return {
     ...record,
     legs: typeof legs === 'number' && Number.isFinite(legs) ? legs : undefined,
+    // A non-empty string names the house's dispatcher; anything else is a player's row.
+    baselineProfileId: typeof baseline === 'string' && baseline.length > 0 ? baseline : undefined,
   } as unknown as BoardEntry;
 }
 
@@ -751,6 +801,22 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
            */
           const page = { ...record, entries: entries.map(withLegs) };
           return page as unknown as BoardPage;
+        },
+      ),
+    distribution: (boardKey) =>
+      call(
+        {
+          method: 'GET',
+          url: `${base}/api/board-distribution?board=${encodeURIComponent(boardKey)}`,
+          token: undefined,
+          body: undefined,
+        },
+        (body) => {
+          const record = body as Record<string, unknown> | null;
+          // The server's arithmetic, carried as given: nothing here recomputes a rung or a count.
+          return typeof record?.['boardKey'] === 'string' && Array.isArray(record['ladders'])
+            ? (record as unknown as BoardDistribution)
+            : undefined;
         },
       ),
     challenges: () =>

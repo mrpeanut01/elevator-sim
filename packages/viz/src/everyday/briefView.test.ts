@@ -11,7 +11,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS } from './briefView.js';
+import { briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
+  SANDBOX_DOOR_LABEL,
+} from './briefView.js';
 import { GHOST_OPTIONS } from '../live/raceStrip.js';
 import { isScreenBuilt } from './screens.js';
 import type { TodayRecord } from './today.js';
@@ -29,9 +31,10 @@ const TODAY: TodayRecord = {
   } as TodayRecord['wrinkle'],
   outOfService: { badge: 'car-c', sentence: 'Car car-c is out of service today.' },
   facts: [{ label: 'Floors', value: '14 above ground' }],
-  load: { word: 'Busy', note: '590 people per working car today. Comfortable is around 400.' },
+  load: { word: '590 per working car', note: '1,180 people and 2 working cars today, as the building is configured. The day shows whether that is comfortable; this plate does not grade it.' },
   asks: ['Carry 90% of the people who turn up', 'Nobody waits longer than 120 s'],
   seedLine: 'tower chancery-house · crowd 424242 · everyone identical',
+  firstSessionLine: undefined,
   driver: 'Steady hand',
 };
 
@@ -166,9 +169,24 @@ describe('the two cards this build states rather than draws as a live control', 
      */
     const card = lockedForScore();
     expect(isScreenBuilt('tuner')).toBe(true);
-    expect(card.door).toEqual({ label: 'Take it to the sandbox', screen: 'tuner' });
-    expect(card.why).toContain('Take it to the sandbox');
+    expect(card.door).toEqual({ label: SANDBOX_DOOR_LABEL, screen: 'tuner' });
+    expect(card.why).toContain('sandbox day');
     expect(card.why).not.toMatch(/not built/);
+  });
+
+  it('names a state rather than a destination on the door — GitHub issue #225, § D496', () => {
+    /*
+     * Sandbox is a week on no assignment, arrived at and never chosen: no ninth PlayMode, no toggle,
+     * no screen. A door reading *Take it to the sandbox* was the one surface of five that named a
+     * destination, and no honesty property can see that class, so it is held here. The label says
+     * what changing does, and the card's reason names the state in the word the tuner's own strip
+     * uses on the far side of the door.
+     */
+    const card = lockedForScore();
+    expect(card.door?.label).toBe(SANDBOX_DOOR_LABEL);
+    expect(card.door?.label).not.toMatch(/take it to|go to|open the|enter the/iu);
+    expect(card.door?.label).toMatch(/stops counting/u);
+    expect(card.why).toMatch(/sandbox day/u);
   });
 
   it('carries no refusal sentence it could not have produced — the `??` fallback is gone', () => {
@@ -206,7 +224,7 @@ describe('everything else on the card is the day record’s, unedited', () => {
   it('carries the facts, the load reading and the strip straight through', () => {
     const view = viewOf();
     expect(view.facts).toBe(TODAY.facts);
-    expect(view.load?.word).toBe('Busy');
+    expect(view.load?.word).toBe('590 per working car');
     expect(view.outOfService?.badge).toBe('car-c');
     expect(view.seedLine).toBe(TODAY.seedLine);
   });

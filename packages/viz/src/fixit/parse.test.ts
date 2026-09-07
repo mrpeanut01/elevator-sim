@@ -8,12 +8,20 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { parseFixitCases, playerFacingStringsOf, FixitCasesError, type FixitContext } from './parse.js';
+import {
+  demandDisclosureOf,
+  parseFixitCases,
+  playerFacingStringsOf,
+  symptomFigureIn,
+  FixitCasesError,
+  type FixitContext,
+} from './parse.js';
 import type { FixitCase } from './types.js';
 
 const CONTEXT: FixitContext = {
   floorIdsByBuilding: new Map([['tower', ['G', '2', '3', '4']]]),
   profileIds: new Set(['standing-order']),
+  bandByBuilding: new Map([['tower', { min: 3, max: 7 }]]),
   engineIds: ['tower', 'standing-order'],
 };
 
@@ -161,6 +169,110 @@ describe('parseFixitCases', () => {
     );
     expect(violations.join('\n')).toContain('exactly one thing is wrong');
     expect(violations.join('\n')).toContain('no healthy figure');
+  });
+
+  /*
+   * GitHub issue #349 — the paired-run basis is construction rather than luck. Mutation-tested in
+   * the issue's own shape: the fixture repair that patches population turns the check red, and the
+   * as-built patch doing the same stays green because both runs share it.
+   */
+  it('refuses a fabric repair that patches floorPopulations — a purchase cannot change who arrives', () => {
+    for (const [index, id] of [[1, 'r-costly'], [2, 'r-cheap'], [3, 'r-shaft']] as const) {
+      const violations = violationsOf(
+        fileWith((entry) => {
+          ((entry['repairs'] as { patch: unknown }[])[index] as { patch: unknown }).patch = {
+            building: { floorPopulations: [{ floorIds: ['3'], population: 10 }] },
+          };
+        }),
+      );
+      expect(violations.join('\n'), id).toContain(`repair "${id}"`);
+      expect(violations.join('\n'), id).toContain('patches floorPopulations');
+      expect(violations.join('\n'), id).toContain('A purchase cannot change who arrives');
+    }
+  });
+
+  it('lets the diagnosed repair change the crowd — three shipped cases diagnose the crowd, not the kit', () => {
+    const parsed = parseFixitCases(
+      fileWith((entry) => {
+        ((entry['repairs'] as { patch: unknown }[])[0] as { patch: unknown }).patch = {
+          building: { floorPopulations: [{ floorIds: ['3'], population: 10 }] },
+        };
+      }),
+      CONTEXT,
+    );
+    expect(parsed.cases[0]?.repairs[0]?.patch.building?.floorPopulations).toHaveLength(1);
+  });
+
+  it('lets the as-built patch shape the population, because both runs share it', () => {
+    const parsed = parseFixitCases(
+      fileWith((entry) => {
+        (entry['asBuilt'] as { patch: unknown }).patch = {
+          building: { floorPopulations: [{ floorIds: ['3'], population: 400 }] },
+        };
+      }),
+      CONTEXT,
+    );
+    expect(parsed.cases[0]?.asBuilt.patch.building?.floorPopulations).toHaveLength(1);
+  });
+
+  /* GitHub issue #351 — a symptom is a sight, not a figure (PM-FB2). Both directions. */
+  it('refuses a symptom that states a figure, and names the figure', () => {
+    for (const symptom of [
+      'a 341 s mean wait to board, on one car for nine dense floors',
+      'one car for the garage, and a 322 s worst wait beside an empty hoistway',
+      'the average wait on the top floor is long',
+      'waits in the 95th percentile',
+    ]) {
+      const violations = violationsOf(fileWith((entry) => { entry['symptom'] = symptom; }));
+      expect(violations.join('\n'), symptom).toContain('states a figure');
+      expect(violations.join('\n'), symptom).toContain('PM-FB2');
+    }
+    expect(symptomFigureIn('a 341 s mean wait')).toBe('341 s');
+    expect(symptomFigureIn('the average wait')).toBe('average');
+  });
+
+  it('keeps a sight — including one that counts in words', () => {
+    for (const symptom of [
+      'doors held eleven seconds at every stop, on every car',
+      'waits over a minute for a car up, while three cars stand together below',
+      'seven hundred appointment letters, one printed time',
+    ]) {
+      expect(symptomFigureIn(symptom), symptom).toBeNull();
+      expect(violationsOf(fileWith((entry) => { entry['symptom'] = symptom; })), symptom).toEqual([]);
+    }
+  });
+
+  /* § D478's declaration — derived, both directions, and inclusive at the band's edge. */
+  it('derives the demand disclosure for a case outside its band, and none inside it', () => {
+    const above = parseFixitCases(
+      fileWith((entry) => { (entry['run'] as { arrivalRatePctPop5min: number }).arrivalRatePctPop5min = 9.5; }),
+      CONTEXT,
+    ).cases[0];
+    expect(above?.demandDisclosure).toContain('Busier than a building like this is sized for');
+    expect(above?.demandDisclosure).toContain('9.5 %');
+    expect(above?.demandDisclosure).toContain('3–7 %');
+    expect(playerFacingStringsOf(above as FixitCase).map(([label]) => label)).toContain('the demand disclosure');
+
+    const below = parseFixitCases(
+      fileWith((entry) => { (entry['run'] as { arrivalRatePctPop5min: number }).arrivalRatePctPop5min = 2; }),
+      CONTEXT,
+    ).cases[0];
+    expect(below?.demandDisclosure).toContain('Quieter than');
+
+    for (const rate of [3, 5, 7, null]) {
+      const inside = parseFixitCases(
+        fileWith((entry) => { (entry['run'] as { arrivalRatePctPop5min: number | null }).arrivalRatePctPop5min = rate; }),
+        CONTEXT,
+      ).cases[0];
+      expect(inside?.demandDisclosure, String(rate)).toBeUndefined();
+    }
+    expect(demandDisclosureOf(7, { min: 3, max: 7 })).toBeUndefined();
+    expect(demandDisclosureOf(7.5, undefined)).toBeUndefined();
+  });
+
+  it('refuses an authored demandDisclosure — the declaration is derived so it cannot go stale', () => {
+    const violations = violationsOf(fileWith((entry) => { entry['demandDisclosure'] = 'Busy today.'; }));
+    expect(violations.join('\n')).toContain('authors a "demandDisclosure"');
   });
 
   it('lists every player-facing string, so the copy sweep cannot silently narrow', () => {

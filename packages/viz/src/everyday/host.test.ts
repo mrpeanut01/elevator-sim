@@ -21,8 +21,14 @@ import {
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { RUSH_SEED, RUSH_TEMPLATE_ID } from './rush.js';
+import { REPLAY_COPY } from './replay.js';
+import { RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID } from '../shift/week.js';
+
 import { towerById, type CampaignTower } from '../campaign/career.js';
-import { clearedDays, purseOf, type ShopCategoryId } from '../campaign/economy.js';
+import { clearedDays, purseOf, spentTodayUnits, type ShopCategoryId } from '../campaign/economy.js';
+import { TECHNICIAN_UNITS, campaignEventFor } from '../campaign/incidents.js';
+import { CAMPAIGN_DOCK_COPY } from './campaignDock.js';
 import { AS_BUILT } from '../campaign/fitOut.js';
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -880,6 +886,86 @@ describe('filing the campaign day — issue #223', () => {
   const towerOf = (host: ReturnType<typeof createEverydayHost>): CampaignTower =>
     towerById(host.campaign(), 'c1')!;
 
+  /**
+   * § 7.5's dock through the façade — GitHub issue #171, § D507.
+   *
+   * The harness's day is `c1`'s, so `campaignEventFor` draws against a fresh tower's 0.4 % and the
+   * event is almost always ordinary; the cases that need an incident force the latch's incident
+   * through the same press `runCampaignDay` makes, by running a tower whose wear clock is past its
+   * window on a seed the draw lands on. That seed is found rather than assumed: the loop below asks
+   * `campaignEventFor` directly and stops on the first breakdown, which is the honest way to reach a
+   * drawn state deterministically.
+   */
+  describe('the campaign dock — issue #171', () => {
+    it('writes the campaign’s own event on the press, and nothing else does', () => {
+      const h = campaignHarness(CLEAN);
+      const host = createEverydayHost(h.bindings);
+      expect(h.state.campaignEventId).toBeUndefined();
+      host.runCampaignDay('c1');
+      expect(h.state.campaignEventId).toBeDefined();
+      expect(host.campaignDay()?.tower.id).toBe('c1');
+      expect(host.campaignDay()?.runLengthS).toBe(shiftLengthForContract('c1'));
+      /* § 6's press is not a campaign day: the event comes off with the latch. */
+      host.startRun();
+      expect(h.state.campaignEventId).toBeUndefined();
+      expect(host.campaignDay()).toBeUndefined();
+    });
+
+    it('refuses an answer on a day with nothing to answer, in the dock’s words', () => {
+      const h = campaignHarness(CLEAN);
+      const host = createEverydayHost(h.bindings);
+      expect(host.answerIncident(0, 'leave')).toBe(CAMPAIGN_DOCK_COPY.refusedNoIncident);
+      host.runCampaignDay('c1');
+      const facts = host.campaignDay();
+      if (facts?.incident === undefined) {
+        expect(host.answerIncident(0, 'leave')).toBe(CAMPAIGN_DOCK_COPY.refusedNoIncident);
+      }
+    });
+
+    it('answers once, moving the purse and the record together, and refuses the second time', () => {
+      /*
+       * A seed the draw lands on for a worn tower, found rather than assumed. The harness's tower is
+       * worn by pressing the record: `trips` past the window makes § 8.3's odds ≈ 14 %, so a seed
+       * inside the first hundred lands on a breakdown with overwhelming likelihood.
+       */
+      const h = campaignHarness(CLEAN);
+      const pressed: { atS: number; kind: string }[] = [];
+      const host = createEverydayHost({
+        ...h.bindings,
+        intervene: (atS, change) => {
+          pressed.push({ atS, kind: change.kind });
+        },
+      });
+      /* Wear the machines out before the press, through the reducer's own arithmetic. */
+      host.campaignAct({ kind: 'file-day', towerId: 'c1', verdict: 'cleared', trips: 120_000 });
+      let seed = 1n;
+      while (campaignEventFor({ tower: towerOf(host), seed }).id !== 'breakdown' && seed < 400n) seed += 1n;
+      expect(seed).toBeLessThan(400n);
+      h.state = { ...h.state, seed };
+      host.runCampaignDay('c1');
+      const facts = host.campaignDay();
+      expect(facts?.incident?.eventId).toBe('breakdown');
+      const atS = (facts?.incident?.atS ?? 0) + 30;
+      const purseBefore = purseOf(towerOf(host));
+
+      expect(host.answerIncident(atS - 60, 'technician')).toContain('nothing has happened yet');
+      expect(host.answerIncident(atS, 'no-such-option')).toBe(CAMPAIGN_DOCK_COPY.refusedUnknownOption);
+      expect(pressed).toEqual([]);
+
+      expect(host.answerIncident(atS, 'technician')).toBeUndefined();
+      expect(pressed).toEqual([{ atS, kind: 'answer-incident' }]);
+      expect(purseOf(towerOf(host))).toBe(purseBefore - TECHNICIAN_UNITS);
+      expect(spentTodayUnits(towerOf(host))).toBe(TECHNICIAN_UNITS);
+
+      /* The record's own log is what says it was answered; the harness holds none, so the second
+         press is refused on the purse-side fact the host keeps rather than on the log. */
+      h.state = { ...h.state, interventions: [{ atS, change: { kind: 'answer-incident', option: 'x', serviceEvents: [] } }] };
+      expect(host.campaignDay()?.answered).toBe(true);
+      expect(host.answerIncident(atS + 10, 'leave')).toBe(CAMPAIGN_DOCK_COPY.refusedAnswered);
+      expect(pressed).toHaveLength(1);
+    });
+  });
+
   it('runs the day at the length this contract is graded over, whatever the state was left at', () => {
     /*
      * **What this guards, said exactly rather than generously.** `initialState` already seeds `c1`'s
@@ -1365,7 +1451,50 @@ describe('the daily board read', () => {
       date: '2019-04-01',
       note: 'Ranked on average wait.',
       rows: [],
+      distribution: undefined,
+      distributionDetail: undefined,
     });
+  });
+
+  it('asks for the distribution after the board, carries it, and keeps a failed third read from refusing the board — GitHub issue #327', async () => {
+    const asked: string[] = [];
+    const spread = {
+      boardKey: 'daily:2019-04-01',
+      n: 3,
+      ladders: [],
+      withheld: '3 players have posted.',
+      absent: [],
+      note: 'n',
+    };
+    const carried = await dailyBoardOf(
+      () => Promise.resolve(listed(TODAY)),
+      () => Promise.resolve(page('Ranked on average wait.', [])),
+      (key) => {
+        asked.push(key);
+        return Promise.resolve({ ok: true as const, value: spread });
+      },
+    );
+    expect(asked).toEqual(['daily:2019-04-01']);
+    if (carried.kind !== 'board') throw new Error('expected a board');
+    expect(carried.distribution).toEqual(spread);
+    expect(carried.distributionDetail).toBeUndefined();
+
+    const refused = await dailyBoardOf(
+      () => Promise.resolve(listed(TODAY)),
+      () => Promise.resolve(page('Ranked on average wait.', [])),
+      () => Promise.resolve(failed('Older server.')),
+    );
+    if (refused.kind !== 'board') throw new Error('a failed third read is still a board');
+    expect(refused.distribution).toBeUndefined();
+    expect(refused.distributionDetail).toBe('Older server.');
+
+    const unasked = await dailyBoardOf(
+      () => Promise.resolve(listed(TODAY)),
+      () => Promise.resolve(page('Ranked on average wait.', [])),
+    );
+    if (unasked.kind !== 'board') throw new Error('expected a board');
+    expect(unasked.distribution).toBeUndefined();
+    expect(unasked.distributionDetail).toBeUndefined();
   });
 
   it('keeps an empty board apart from a board it could not reach', async () => {
@@ -1416,5 +1545,71 @@ describe('the daily board read', () => {
       () => Promise.resolve(failed('The server refused that request.')),
     );
     expect(board).toEqual({ kind: 'unreachable', detail: 'The server refused that request.' });
+  });
+});
+
+describe('the rush — GitHub issue #220, § D515', () => {
+  it('starts on the standing building: the week parked, the stream selected, the run pressed; and leaves by putting it back', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    expect(host.rush()).toBeUndefined();
+    expect(host.rushDisclosure()).toContain('Busier than a building like this is sized for');
+    expect(host.startRush()).toBeUndefined();
+    expect(h.calls).toEqual(['applyPatch', 'startRun']);
+    const patch = h.patches[0];
+    expect(patch?.week?.contractId).toBe(RUSH_CONTRACT_ID);
+    expect(patch?.freePlay?.demandTemplateId).toBe(RUSH_TEMPLATE_ID);
+    expect(patch?.seed).toBe(RUSH_SEED);
+    /* The harness does not apply patches; the session is the host's own record of the rush. */
+    const session = host.rush();
+    expect(session?.topRatePctPop5min).toBeGreaterThan(100);
+    expect(session?.holdAtS).toBeUndefined();
+    expect(session?.endedAtS).toBeUndefined();
+    host.endRush(300);
+    expect(host.rush()?.endedAtS).toBe(300);
+    /* Pressed again inside the rush, the same waves are asked for and the record is cleared. */
+    expect(host.startRush()).toBeUndefined();
+    expect(h.calls).toEqual(['applyPatch', 'startRun', 'startRun']);
+    expect(host.rush()?.endedAtS).toBeUndefined();
+    host.leaveRush();
+    expect(host.rush()).toBeUndefined();
+    const restore = h.patches[1];
+    expect(restore?.seed).toBe(base().seed);
+    expect(restore?.week?.contractId).toBe(base().week.contractId);
+    /* Leaving twice is a no-op. */
+    host.leaveRush();
+    expect(h.patches).toHaveLength(2);
+  });
+});
+
+describe('the replay — GitHub issue #177 item 1, § D517', () => {
+  it('stands a replay week on the day asked for, parks the player’s, starts no run, and puts the week back on leaving', () => {
+    const start = { ...base(), week: { ...base().week, day: 4, dayIdx: 3, streak: 2, bestMinutePct: 71 } };
+    const h = harnessOf(start);
+    const host = createEverydayHost(h.bindings);
+    expect(host.replay()).toBeUndefined();
+    /* A day the week has not reached, and a day before it began, are both refused before any patch. */
+    expect(host.startReplay(4)).toBe(REPLAY_COPY.beforeTheWeek);
+    expect(host.startReplay(0)).toBe(REPLAY_COPY.beforeTheWeek);
+    expect(h.patches).toHaveLength(0);
+    expect(host.startReplay(2)).toBeUndefined();
+    /* The brief starts the run, exactly as on any day; the host only stands the week up. */
+    expect(h.calls).toEqual(['applyPatch']);
+    const patch = h.patches[0];
+    expect(patch?.week?.contractId).toBe(REPLAY_CONTRACT_ID);
+    expect(patch?.week?.day).toBe(2);
+    expect(patch?.week?.dayIdx).toBe(1);
+    expect(patch?.week?.streak).toBe(0);
+    expect(patch?.playMode).toBe('shift-week');
+    expect(patch?.seed).toBeUndefined();
+    expect(host.replay()?.day).toBe(2);
+    expect(host.startReplay(1)).toContain('already standing');
+    host.leaveReplay();
+    expect(host.replay()).toBeUndefined();
+    const restore = h.patches[1];
+    expect(restore?.week?.contractId).toBe(start.week.contractId);
+    expect(restore?.playMode).toBe(start.playMode);
+    host.leaveReplay();
+    expect(h.patches).toHaveLength(2);
   });
 });

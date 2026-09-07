@@ -127,6 +127,9 @@ describe('parse.ts is fs-free so the browser build can use it', () => {
       'parse.ts',
       'resolveCar.ts',
       'schema.ts',
+      // The three-shape guards for service events (§ D523): type imports from `types.ts` and
+      // three `in` checks, so nothing here either.
+      'serviceEvent.ts',
       'types.ts',
     ]);
     // ...and loader.ts is genuinely the file that holds the fs import, so the assertion
@@ -140,6 +143,7 @@ describe('parse.ts is fs-free so the browser build can use it', () => {
       'expandFloors.ts',
       'resolveCar.ts',
       'schema.ts',
+      'serviceEvent.ts',
       'types.ts',
     ]) {
       const specifiers = await staticSpecifiers(join(CONFIG_DIR, name));

@@ -60,7 +60,7 @@
  * because a client cannot be trusted to remember it and a reader cannot be expected to know it.
  */
 
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 
 import {
   LOGIN_TTL_MS,
@@ -91,7 +91,9 @@ import {
 import { verifyChallengeSubmission } from '../challenge/verify.js';
 import { signInMessage, type Mailer } from '../mail/mailer.js';
 import { BOARD_KEYS, dailyFixtureAt, placeSubmission, runDataHashOf } from '../leaderboard/boardKey.js';
+import { boardDistributionOf, type AxisObservation } from '../leaderboard/distribution.js';
 import { submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
+import { seedDailyBoard } from '../leaderboard/seed.js';
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
 import {
   BOARD_METRICS,
@@ -149,6 +151,14 @@ export interface ApiDeps {
   readonly challengeFactsFor: (config: ChallengeConfig) => ChallengeDataFacts | undefined;
   /** The signing secret. Read from the environment by `requireSecret`; never defaulted. */
   readonly secret: string;
+  /**
+   * The bearer token `POST /api/boards/seed` requires — GitHub issue #328, § D522. `undefined`
+   * means seeding is not configured on this deployment and the route answers 503 to everyone;
+   * `bootstrap.ts` reads it from `ELEVATOR_SIM_SEED_TOKEN` and refuses a short one. A separate
+   * secret from the signing one on purpose: the scheduled workflow that holds it can seed a board
+   * and can do nothing else.
+   */
+  readonly seedToken: string | undefined;
   readonly now: () => number;
   /**
    * Where a sign-in link points. The mail contains this and nothing else clickable.
@@ -342,8 +352,12 @@ export function createApi(deps: ApiDeps): Api {
           status: 200,
           body: { boards: await deps.store.boards(), kinds: BOARD_KEYS, today: dailyFixtureAt(deps.now()) },
         };
+      case 'POST /api/boards/seed':
+        return seedBoards(deps, request);
       case 'GET /api/board':
         return board(deps, request);
+      case 'GET /api/board-distribution':
+        return boardDistribution(deps, request);
       case 'GET /api/challenges':
         return challenges(deps);
       case 'GET /api/challenge':
@@ -894,6 +908,25 @@ async function board(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
   };
 }
 
+/**
+ * A board's quantile ladder per axis — GitHub issue #327, § D484's ruling as a route, § D506.
+ *
+ * What it publishes and refuses is `leaderboard/distribution.ts`'s; this is the wire. No interval
+ * travels, for the reason that module's docstring gives, and a client that computed one from the
+ * rungs would be doing what this route declined to.
+ */
+async function boardDistribution(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const boardKey = request.query.get('board') ?? '';
+  if (boardKey.length === 0) {
+    return { status: 400, body: { error: 'no-board', detail: 'Name a board with ?board=…' } };
+  }
+  const byAxis = new Map<BoardMetric, readonly AxisObservation[]>();
+  for (const metric of BOARD_METRICS) {
+    byAxis.set(metric, await deps.store.axisObservations(boardKey, metric));
+  }
+  return { status: 200, body: boardDistributionOf(boardKey, byAxis) };
+}
+
 /* ----------------------------------------------------------------- challenges */
 
 /**
@@ -1265,6 +1298,56 @@ function publicUser(user: UserRow): Record<string, unknown> {
  * board's rows differ by dispatcher, the personal log's by configuration), and is the only thing a
  * reader can use to tell *"this is the same measurement as mine"* from *"this is a different one"*.
  */
+/**
+ * `POST /api/boards/seed` — seed today's daily board with the house's runs (GitHub issues #222 and
+ * #328, § D521 and § D522).
+ *
+ * Three answers, in the order they are checked. **503** when the deployment holds no seed token:
+ * seeding is a capability an operator turns on, and a route that could be reached with no
+ * configuration would be a route anyone could reach. **401** when the bearer is not the token; the
+ * comparison is the same constant-time one the session tokens use. **200** with the full
+ * {@link SeedReport} otherwise, every row seeded and every one skipped with the verifier's reason,
+ * so the workflow's log is a record rather than a count. An optional `date` in the body
+ * (`YYYY-MM-DD`) names another day's board, which is how a missed night is made good by hand.
+ *
+ * Idempotent: a second call on the same date updates the same rows in place (`seed.ts`). Synchronous
+ * on purpose: thirteen replays of the daily fixture were measured at about twenty seconds on one
+ * worker, well inside any ingress timeout, and a job that answers when it is done is a job whose
+ * failure is a non-200 the caller sees.
+ */
+async function seedBoards(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  if (deps.seedToken === undefined) {
+    return {
+      status: 503,
+      body: {
+        error: 'seeding-not-configured',
+        detail: 'This deployment holds no ELEVATOR_SIM_SEED_TOKEN, so nothing may seed its boards.',
+      },
+    };
+  }
+  if (request.token === undefined || !timingSafeEqualStrings(request.token, deps.seedToken)) {
+    return { status: 401, body: { error: 'unauthorized', detail: 'The seed token did not match.' } };
+  }
+  const body = request.body as Partial<Record<'date', unknown>> | null | undefined;
+  const date = typeof body?.date === 'string' ? body.date : undefined;
+  if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/u.test(date)) {
+    return { status: 400, body: { error: 'invalid-date', detail: 'date must be YYYY-MM-DD.' } };
+  }
+  const report = await seedDailyBoard(
+    { store: deps.store, resources: deps.resources, factsFor: deps.factsFor, now: deps.now },
+    date,
+  );
+  return { status: 200, body: { ...report } };
+}
+
+/** Constant-time equality over two strings of possibly different lengths. */
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  const left = Buffer.from(a, 'utf8');
+  const right = Buffer.from(b, 'utf8');
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
+
 function publicEntry(entry: EntryRow): Record<string, unknown> {
   return {
     id: entry.id,
@@ -1272,6 +1355,10 @@ function publicEntry(entry: EntryRow): Record<string, unknown> {
     run: entry.run,
     dataHash: entry.dataHash,
     measured: entry.measured,
+    // The house's dispatcher on a baseline row, absent on a player's — GitHub issue #222, § D521.
+    // On the wire so the client can draw the marker and the note rather than inferring either from
+    // a display name, which a player could choose.
+    ...(entry.baselineProfileId === undefined ? {} : { baselineProfileId: entry.baselineProfileId }),
     // The `n` behind `measured.awtS`, in the same object as the mean for `publicChallengeEntry`'s
     // stated reason: R13's clause one is that the count travels in the same unit as the figure, and
     // a board row that could not draw one had to draw a bare mean.

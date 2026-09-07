@@ -74,6 +74,7 @@
  * too.
  */
 
+import { BUILD_VERSION, buildVersionLineOf } from '../release/version.js';
 import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import { DESIGNER_ABSENCES } from './designerModel.js';
 import { RUSH_ABSENCES } from './rushScreenModel.js';
@@ -117,22 +118,14 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * refusal — the defect this register exists to prevent — reproduced by the register itself.
    */
   /*
-   * **Narrowed on the commit that made half of it false** — GitHub issue #182,
-   * [§ D436](../../../../DECISIONS.md), and this is the third time this register has had to do
-   * that. It read: *"Replaying a past day — the front door's week strip says what each day did, and
-   * no control opens one again to watch it. A week here only moves forward."*
-   *
-   * The second clause was the half that stopped being true. Your week now carries a `Watch it`
-   * button on every closed day whose record re-simulates to the figures it was filed with, so a
-   * player can open one again and watch it — and an entry telling them no control does is § D227's
-   * stale refusal, the defect this register exists to make findable, reproduced by the register.
-   *
-   * What is still absent is the **other** thing that sentence was reaching for, and it is now said
-   * exactly: a past day cannot be handed back to be *played* as the day it was. That is § 6.1's
-   * replay (GitHub issue #177), and `everyday/watchStage.ts#playThisCrowdRefusalFor` is the
-   * player-facing statement of the same absence on the control that would otherwise promise it.
+   * **The replay row left on the commit that built it** — GitHub issue #177 item 1, § D517. It had
+   * been narrowed once already (issue #182, § D436), from *"no control opens one again"* to *"nothing
+   * hands one back to be played again"*, and that second sentence stopped being true when the front
+   * door's week strip started handing a past day back over a replay week. § D227: a refusal leaves
+   * on the commit that makes it false, and the words that explained the mechanism — a tower grows
+   * through a week, so the same seed on a later day meets a different crowd — are now
+   * `everyday/replay.ts`'s reason for standing the week back on the day.
    */
-  'Replaying a past day as the day it was — Your week opens a closed day and watches its record play, but nothing hands one back to be played again. A tower grows through a week, so the same building and the same seed on a later day meet a different crowd, and Play this crowd yourself says so on any row that is not the day standing now.',
   /*
    * **A sixth row left on the commit that made it false, and it was half of a pair.** It read
    * *"Racing a second dispatcher — no run in this build sends two dispatchers at the same crowd, so
@@ -189,7 +182,7 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    *
    * It read: *"Tune the tower is registered and routable, and no shipped control opens it: the
    * guide forbids a rail row (*a thing you do to a day, not a place you live*) and names its two
-   * doors as the brief's *Take it to the sandbox* and the report's third lever, neither of which is
+   * doors as the brief's locked-for-score card and the report's third lever, neither of which is
    * built"*. That was true on the lane that wrote it and false the moment it met a tree carrying
    * the brief: the first of those two doors exists here, and `briefView.ts#lockedForScore` now
    * carries the route through it. The rail-row prohibition is unchanged and still asserted
@@ -209,8 +202,17 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * primary, `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL`) is named rather than left for a reader to
    * discover.
    */
-  'The report’s third piece of advice does not open the tuner — two of the report’s four advice cards hand you to the simulator panel that carries the change out, and the other two are a dispatcher recommendation one day is not enough evidence to make, which each of those cards says on its own face. The tuner has two doors in the design and only the brief’s *Take it to the sandbox* is built here.',
-  'Endless rush — the setup screen draws, and the climbing stream of arrivals behind it does not exist, so its start button refuses. The rush’s own stage and its own result screen are unbuilt.',
+  /*
+   * **The report's lever entry is deleted, not reworded** — GitHub issue #213, § D503. It read:
+   * *"The report’s third piece of advice does not open the tuner — two of the report’s four advice
+   * cards hand you to the simulator panel that carries the change out, and the other two are a
+   * dispatcher recommendation one day is not enough evidence to make, which each of those cards
+   * says on its own face. The tuner has two doors in the design and only the brief’s *Take it to
+   * the sandbox* is built here."* Every card routes now (`everyday/reportView.ts#EVERYDAY_LEVER_ROUTES`):
+   * *Add a car* opens the tuner, which is the second door the sentence said was missing, and the
+   * dispatcher pair open the workshop with the honesty kept on the card as a caveat rather than a
+   * refusal. That also closes GitHub issue #177's item 2.
+   */
 ]);
 
 /**
@@ -233,12 +235,25 @@ export interface BuildNotesSection {
   /** One line of context, so a heading is not the only thing placing the rows. */
   readonly note: string;
   readonly entries: readonly string[];
+  /**
+   * The sentence drawn where the rows would be when the register is empty — `undefined` while it
+   * holds anything. A register that has emptied is a fact worth a line: a heading over nothing reads
+   * as a rendering fault, and dropping the section would be the editor in front of the register
+   * this module's docstring forbids. `STAGE_ABSENCES` is the first to reach it (GitHub issue #171).
+   */
+  readonly empty?: string | undefined;
 }
+
+/** {@link BuildNotesSection.empty}'s sentence, one for every register that has emptied. */
+export const REGISTER_EMPTY_LINE =
+  'Nothing missing here any more — every absence this part of the game ever named has been built.';
 
 /** The whole panel. Total — every register the build keeps, in the order a reader meets them. */
 export interface BuildNotesView {
   readonly heading: string;
   readonly lede: string;
+  /** Which build this is, in a sentence — GitHub issue #246; `src/release/version.ts`'s. */
+  readonly build: string;
   readonly sections: readonly BuildNotesSection[];
   /** How many entries the panel is carrying, so the summary row can say it without counting twice. */
   readonly entryCount: number;
@@ -267,6 +282,7 @@ export function buildNotesViewOf(): BuildNotesView {
       heading: 'Watching a run',
       note: 'The stage a day plays on.',
       entries: STAGE_ABSENCES,
+      ...(STAGE_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
     {
       heading: 'Endless rush',
@@ -295,6 +311,7 @@ export function buildNotesViewOf(): BuildNotesView {
       'This game is being built in the open, and this is the list of what is missing. Every line ' +
       'here is written in the code rather than in a document, so a thing that gets built leaves ' +
       'this list on the day it works rather than whenever somebody remembers.',
+    build: buildVersionLineOf(BUILD_VERSION),
     sections,
     entryCount: sections.reduce((total, section) => total + section.entries.length, 0),
   };

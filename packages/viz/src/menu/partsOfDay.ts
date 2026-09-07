@@ -165,6 +165,11 @@ export function partsOfDay(
   const parts: DayPart[] = [];
   for (const other of templates) {
     if (other.id === templateId) continue;
+    // A stream a mode owns offers no part of anybody's day: `endless-rush` opens at 08:00 and
+    // would otherwise put a ninety-minute "morning rush" on the office day (GitHub issue #220).
+    // Guarded here as well as in `catalogueOf`, because `dev/main.ts#coachParts` reaches this
+    // function with the whole loaded list.
+    if (other.selectable === false) continue;
     if (other.startOfDayMin === undefined || other.durationMin === undefined) continue;
     const startMin = other.startOfDayMin - record.startOfDayMin;
     const endMin = startMin + other.durationMin;

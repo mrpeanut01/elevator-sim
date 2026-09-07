@@ -35,7 +35,6 @@ import {
   RUSH_BESTS,
   MORNING_RUSH_RATE,
   RUSH_HOLD_LINE,
-  RUSH_PRIMARY_REFUSAL,
   RUSH_SCREEN_COPY,
   RUSH_STREAM,
 } from './rushScreenModel.js';
@@ -195,112 +194,36 @@ describe('what the screen refuses, and where the refusal sits', () => {
    * screen drew the sentence 905 px down a 720 px viewport instead, and this case was green about
    * it. So the three cells it now pins are the three the fix moves.
    */
-  it('marks the § 3.3 primary inert and puts the reason on its own row', () => {
-    const base = actionBarFor({ screen: 'rush', ctx: 'rush' });
-    const refined = rushBarModel(base);
-    /*
-     * **The reason is the cell, and the table's note is left alone.** `shell.ts#drawBar` draws an
-     * inert primary's own sentence *in place of* the note, so this refinement does not have to
-     * overwrite § 3.3's cell to stop *"Nothing to set up. It ends when it ends."* appearing beside
-     * a dead button — which is what GitHub issue #262 measured on the deployed build.
-     */
-    expect(refined.primary.inert).toBe(RUSH_PRIMARY_REFUSAL);
-    expect(refined.primary.label).toBe(base.primary.label);
-    expect(refined.note).toBe(base.note);
-    expect(refined.leave).toEqual(base.leave);
-    // § 3.3: *a rush has no timeline at all*. The row carries none, and the refinement adds none.
-    expect(refined.timeline).toBeUndefined();
-  });
-
-  /**
-   * The substitution is a **refinement**, not an edit to § 3.3's table.
-   *
-   * `ACTION_BAR_ROWS` still ships *Nothing to set up. It ends when it ends.* and *Start the rush*,
-   * and a lane that fixed #262 by rewriting the guide's own row would have changed what the table
-   * transcribes rather than what this state draws. Asserted from the resolved row rather than from
-   * a restated string, so a reworded § 3.3 cell moves this case with it.
-   */
-  it('leaves § 3.3’s own cells alone and substitutes over them', () => {
+  it('leaves § 3.3’s own row alone now that the engine exists — GitHub issue #220, § D515', () => {
     const base = actionBarFor({ screen: 'rush', ctx: 'rush' });
     expect(base.note).toContain('Nothing to set up');
     expect(base.primary.label).toBe('Start the rush');
-    expect(base.primary.inert).toBeUndefined();
-
+    /*
+     * The refusal this refinement carried — *the climbing stream is not built* — was deleted on the
+     * commit that built the stream (§ D227's rule for a refusal that has stopped being true), and
+     * the row is the table's own: a live primary, the table's note, no timeline, since § 3.3 says a
+     * rush has none.
+     */
     const refined = rushBarModel(base);
-    /*
-     * **The model leaves § 3.3's cells alone; the shell substitutes.** This assertion used to read
-     * `expect(refined.note).not.toBe(base.note)`, and it was true of a different fix for the same
-     * defect — one that overwrote the note here. Two sessions closed #262 independently and the
-     * merge is what caught the contradiction: under the resolved design the refusal rides on
-     * `primary.inert`, and `shell.ts#drawBar` draws it *in place of* the note, so a model that
-     * overwrote the cell would be deciding at the wrong layer and every other screen would need
-     * the same edit.
-     *
-     * The half of #262 that is not about geometry still holds, and is checked where it now lives:
-     * *"Nothing to set up. It ends when it ends."* is true of a rush and reads as confirmation
-     * beside a button nobody can press, so the shell prefers the reason over the table's note.
-     */
-    expect(refined.note).toBe(base.note);
-    expect(refined.primary.inert).toBe(RUSH_PRIMARY_REFUSAL);
-    expect(refined.primary.variants).toEqual(base.primary.variants);
+    expect(refined).toEqual(base);
+    expect(refined.primary.inert).toBeUndefined();
+    expect(refined.timeline).toBeUndefined();
   });
 
-  it('names each absence rather than the feeling of one, and puts the reason on the control', () => {
-    expect(RUSH_ABSENCES.length).toBeGreaterThanOrEqual(3);
-    for (const absence of RUSH_ABSENCES) expect(absence.trim().length).toBeGreaterThan(20);
-    expect(RUSH_PRIMARY_REFUSAL).toMatch(/not built/);
+  it('names the one absence the engine did not close, and none the engine did', () => {
+    /*
+     * GitHub issue #220 built the stream, the held-time stage and the result (§ D515), and the
+     * three entries that named them left on that commit. What remains is #177's: the standings are
+     * the handoff's fixtures until a rush posts somewhere, which nothing does yet.
+     */
+    expect(RUSH_ABSENCES).toHaveLength(1);
+    expect(RUSH_ABSENCES[0]).toMatch(/^the standings/);
+    for (const absence of RUSH_ABSENCES) {
+      expect(absence.trim().length).toBeGreaterThan(20);
+      expect(absence).not.toMatch(/climbing stream|stage of its own|result screen/);
+    }
   });
 
-  /*
-   * The three cases below replace a check that asserted only that every entry was longer than
-   * twenty characters. That check passed for two waves over an entry whose subject had expired —
-   * see {@link RUSH_ABSENCES}' docstring — which is the same failure the driving-line case at the
-   * bottom of this file already records: a case that pins a refusal's *form* keeps passing for
-   * exactly as long as its *subject* is wrong. So these pin the subject, and derive it.
-   */
-
-  it('names the ordinary stage as what a run plays on, because that is what the registry routes', () => {
-    /*
-     * **Keyed on the words rather than on a section number, and the re-keying is GitHub issue
-     * #207's doing.** This entry used to open *"§ 9.2's stage"* and this case found it by
-     * `includes('9.2')`. Nothing a player reads may carry a section number now, so the entry says
-     * what it is about in words and the case looks for the same subject in the same way: the row
-     * about the rush's own stage. The claim under test has not moved an inch.
-     */
-    const stage = RUSH_ABSENCES.find((absence) => absence.startsWith('a rush stage of its own'));
-    expect(stage).toBeDefined();
-    /*
-     * Derived, not remembered. `routeFor` answering `'screen'` *is* the fact that § D335's hand-off
-     * is retired and `stage` is an ordinary registered Everyday screen — so the moment that is true,
-     * a register calling the Engineer surface the thing a player watches is making a false statement
-     * about this build. The assertion is conditioned on the registry rather than asserted beside it,
-     * so a future lane that genuinely hands the stage back off does not fail this case for the wrong
-     * reason.
-     */
-    expect(routeFor('stage')).toBe('screen');
-    expect(stage).not.toMatch(/Engineer/);
-    expect(stage).toMatch(/the ordinary stage screen/);
-  });
-
-  it('claims an absence the seam it names actually has — the clock reads the hour', () => {
-    /*
-     * The other half of a register entry: having named the right screen, it must also be right about
-     * what that screen lacks. § 9.2 wants *held time*, and `stageScreenModel.ts#stageHeaderOf` builds
-     * its clock from `clockAt`, which answers a time of day. Forty-two minutes into a run is `06:42`
-     * on the fallback start — an hour, not a duration — so the entry's claim is true of the seam it
-     * cites rather than merely plausible.
-     */
-    expect(clockAt(42 * 60, undefined)).toBe('06:42');
-    const stage = RUSH_ABSENCES.find((absence) => absence.startsWith('a rush stage of its own'));
-    /*
-     * The entry used to name `clockAt` outright. It may not now — a player surface carries no
-     * identifiers — so what is asserted is the *claim* the identifier was evidence for: the clock
-     * on that screen reads a time of day, which the line above measures, and the entry says so in
-     * words.
-     */
-    expect(stage).toMatch(/clock reads the time of day/);
-    expect(stage).toMatch(/time held/);
-  });
 
   it('does not let any entry name the Engineer surface as an Everyday run’s stage', () => {
     /*
@@ -465,14 +388,13 @@ describe('every rush constant names the module that draws it — § D227, GitHub
    * are exempt from the docstring case below, for the reason the suite docstring gives.
    */
   const DRAWN_BY: Readonly<Record<string, string | null>> = Object.freeze({
-    RUSH_STREAM: null,
+    /* Read by the engine since GitHub issue #220 — `rush.ts` turns the stream into a run. */
+    RUSH_STREAM: 'rush.ts',
     MORNING_RUSH_RATE: null,
-    RUSH_HOLD_LINE: null,
-    LAST_GENERATED_WAVE: null,
+    RUSH_HOLD_LINE: 'rush.ts',
+    LAST_GENERATED_WAVE: 'rush.ts',
     /* `rushBandViews` shapes these into the screen's five rows; the raw table is never imported. */
     RUSH_BANDS: 'rushScreenModel.ts',
-    /* `rushBarModel` substitutes it into the § 3.3 bar the shell draws — GitHub issue #262. */
-    RUSH_PRIMARY_REFUSAL: 'rushScreenModel.ts',
     RUSH_SCREEN_COPY: 'rushScreen.ts',
     /*
      * The register moved here on the merge that closed #207. This row is what makes that fact

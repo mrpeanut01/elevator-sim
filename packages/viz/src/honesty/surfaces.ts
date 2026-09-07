@@ -131,8 +131,8 @@ import { railModel, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
   RUSH_BESTS,
+  RUSH_HOLD_LINE,
   RUSH_BESTS_FIXTURE_NOTE,
-  RUSH_PRIMARY_REFUSAL,
   RUSH_SCREEN_COPY,
   rushBandViews,
   rushBarModel,
@@ -156,7 +156,7 @@ import {
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
-import { everydayReportViewOf } from '../everyday/reportView.js';
+import { FIGURE_NOTE_HANDLE, everydayReportViewOf } from '../everyday/reportView.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
@@ -176,12 +176,14 @@ import {
   STAGE_INTERVENTIONS,
   STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
+  STAGE_CAMERAS,
   STAGE_SPEEDS,
   STAGE_RACE_PICKER_LABEL,
   STAGE_SWITCH_PICKER_LABEL,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
+import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
 import {
   ENGINEER_RETURN_LABEL,
   ENGINEER_RETURN_TITLE,
@@ -244,10 +246,15 @@ import {
   toggleRepair,
   type FixitMeasurement,
 } from '../fixit/engine.js';
+import { demandDisclosureOf } from '../fixit/parse.js';
+import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { BOARD_SCREEN_COPY, DAILY_BOARD_ABSENCE, dailyBoardViewOf } from '../everyday/boardScreen.js';
+import { CAMPAIGN_DOCK_COPY, campaignDockViewOf } from '../everyday/campaignDock.js';
+import { campaignIncidentOf } from '../campaign/incidents.js';
+import { carsToDerate } from '../shift/incidents.js';
 import {
   caseNameOf,
   caseNamesOf,
@@ -275,8 +282,10 @@ import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
 import {
+  interventionLogOf,
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
+  SPREAD_CARS_LABEL,
   RECOMPUTING_BEAT,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
@@ -293,7 +302,8 @@ import {
 } from '../live/raceStrip.js';
 import { DAY_HAS_NO_RECORD, refusalForDay } from '../watch/library.js';
 import { recordUnreadableReason } from '../watch/record.js';
-import { postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
+import { claimOf, claimRefusalFor, postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
+import { postedLogOf, postedRunOf } from '../watch/posted.js';
 import type { WatchableRun } from '../watch/types.js';
 import {
   PLAYER_SHELL_COPY,
@@ -1299,6 +1309,7 @@ const LIVE_RAIL: SurfaceAdapter = {
     'live/timeline.ts#timelineOf',
     'live/timeline.ts#phaseAt',
     'live/interventions.ts#PARK_CARS_LOBBY_LABEL',
+    'live/interventions.ts#SPREAD_CARS_LABEL',
     'live/interventions.ts#switchDispatcherLabelOf',
     'live/interventions.ts#SWITCH_PINS_NOTE',
     'live/interventions.ts#RECOMPUTING_BEAT',
@@ -1327,6 +1338,8 @@ const LIVE_RAIL: SurfaceAdapter = {
      * by a guard in the caller.
      */
     seeds.push({ field: 'interventionButton.label', text: PARK_CARS_LOBBY_LABEL, role: 'label' });
+    // The opposite verb — GitHub issue #352 — derived from the rules vocabulary, swept as a label.
+    seeds.push({ field: 'spreadButton.label', text: SPREAD_CARS_LABEL, role: 'label' });
     /*
      * The strip's other two controls and its beat — the log's second and third change kinds.
      *
@@ -1348,13 +1361,14 @@ const LIVE_RAIL: SurfaceAdapter = {
     seeds.push({ field: 'switchButton.title', text: SWITCH_PINS_NOTE, role: 'observation' });
     seeds.push({ field: 'interventionStamp.recomputing', text: RECOMPUTING_BEAT, role: 'observation' });
     /*
-     * One log carrying all three kinds, stamped across the run, so every stamp sentence enters the
+     * One log carrying all four kinds, stamped across the run, so every stamp sentence enters the
      * corpus at the playheads that can show it — and the deliberate `''` before the first, which is
      * what keeps `interventionStampOf`'s temporal property met by construction.
      */
     const third = (recording.endedAt - recording.startedAt) / 3;
     const interventionLog = [
       { atS: recording.startedAt + third, change: { kind: 'park-cars-lobby' } as const },
+      { atS: recording.startedAt + third * 1.25, change: { kind: 'spread-cars' } as const },
       {
         atS: recording.startedAt + third * 1.5,
         change: {
@@ -5330,6 +5344,13 @@ const MENU: SurfaceAdapter = {
     'menu/screens.ts#titleOf',
     'menu/screens.ts#applyIntent',
     /*
+     * `docs/16` S7's sentence — GitHub issue #178 item 1. `screenOf` appends it as the last notice
+     * on every screen `menu/affordances.ts#MODE_OF_SCREEN` puts inside a mode, composed from the
+     * matrix and the scope words, so both are driven wherever the screens below are.
+     */
+    'scope/permits.ts#permittedLineFor',
+    'scope/permits.ts#SCOPE_WORDS',
+    /*
      * GitHub issue #93's three sentences about a board, and every one of them is a claim about a run
      * this browser did not make. The reveal names the dispatcher that produced somebody's figures;
      * the refusal says why it cannot; the detail line promises a reproduction. Driven below on a
@@ -6530,6 +6551,21 @@ const FIXIT_COVERS: readonly string[] = [
   'fixit/engine.ts#repairRowOf',
   'fixit/engine.ts#STANDING_EXTRAS',
   'fixit/engine.ts#BASIS_LINE',
+  /*
+   * GitHub issue #350's second basis line and the choice between the two: the outcome's `basis`
+   * is `DEMAND_BASIS_LINE` on a selection that changes the crowd, and the adapter renders that
+   * arm by classifying a measurement whose `sameCrowd` is false. `selectionKeepsTheCrowd` is the
+   * predicate the screen asks before it draws the pair, and its only string is the one of these two
+   * it selects.
+   */
+  'fixit/engine.ts#DEMAND_BASIS_LINE',
+  'fixit/engine.ts#selectionKeepsTheCrowd',
+  /*
+   * GitHub issue #351's demand disclosure, derived from the case's rate against the building's
+   * authored band and rendered below in both arms — busier and quieter — because a declaration
+   * that is only ever swept on one side is half a surface.
+   */
+  'fixit/parse.ts#demandDisclosureOf',
   // Driven through the rows above: `repairRowOf` asks `affordabilityOf`, which sums `spendOf`,
   // and the states the adapter renders are built by the two toggles rather than written by hand.
   'fixit/engine.ts#spendOf',
@@ -6625,6 +6661,17 @@ const FIXIT: SurfaceAdapter = {
       complaint: { ...entry.complaint, measure: { ...entry.complaint.measure, kind: 'mean-wait' } },
     };
 
+    /* ---- § D478's derived declaration, both directions it can point (GitHub issue #351) ---- */
+    for (const [name, rate, band] of [
+      ['busier', 9.5, { min: 3, max: 7 }],
+      ['quieter', 2, { min: 11, max: 15 }],
+    ] as const) {
+      const disclosure = demandDisclosureOf(rate, band);
+      if (disclosure !== undefined) {
+        seeds.push({ field: `demand.disclosure.${name}`, text: disclosure, role: 'prose' });
+      }
+    }
+
     /* ---- affordability and the budget notes, on states the reducers themselves build ---- */
     const empty = emptyFixitState();
     let spent = toggleRepair(entry, empty, 's-costly');
@@ -6679,7 +6726,7 @@ const FIXIT: SurfaceAdapter = {
     }
 
     /* ---- the three outcomes a green pair cannot produce, worded against fabricated measures ---- */
-    const flat: FixitMeasurement = {
+    const flatSameCrowd = (): FixitMeasurement => ({
       complaintBefore: 10,
       complaintAfter: 1,
       scopeBoardedBefore: 40,
@@ -6690,7 +6737,16 @@ const FIXIT: SurfaceAdapter = {
       restBoardedBefore: 120,
       restBoardedAfter: 120,
       restDeltaPoints: -5,
-    };
+      sameCrowd: true,
+    });
+    const flat = flatSameCrowd();
+    /* ---- the basis a demand-side repair earns — a fixed outcome on a pair that changed crowd ---- */
+    seeds.push({
+      field: 'outcome.demand.basis',
+      text: classifyOutcome(entry, { ...flatSameCrowd(), sameCrowd: false }, spendOf(entry, empty)).basis,
+      role: 'reason',
+      provenance: 'authored',
+    });
     const worse = classifyOutcome(entry, flat, spendOf(entry, empty));
     const short = classifyOutcome(
       entry,
@@ -6722,6 +6778,16 @@ const FIXIT: SurfaceAdapter = {
      * panel's is). The states are built by the engine's own reducers wherever a reducer can reach
      * them, on this adapter's established habit.
      * ================================================================== */
+
+    /*
+     * The as-built stage's three words — GitHub issue #348. Authored in the copy table so they are
+     * sweepable, and seeded here directly because their only reader is `everyday/asBuiltStage.ts`,
+     * a mount, which the search cannot drive; the rail and bar models below reach the table's other
+     * keys, and these three would otherwise be in `covers` and in nothing's output.
+     */
+    seeds.push({ field: 'asBuilt.eyebrow', text: FIXIT_SCREEN_COPY.asBuiltStageEyebrow, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'asBuilt.note', text: FIXIT_SCREEN_COPY.asBuiltStageNote, role: 'prose', provenance: 'authored' });
+    seeds.push({ field: 'asBuilt.skip', text: FIXIT_SCREEN_COPY.asBuiltStageSkip, role: 'label', provenance: 'authored' });
 
     /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
     for (const [where, solvedIds] of [
@@ -7170,6 +7236,21 @@ const WATCH: SurfaceAdapter = {
      */
     'watch/record.ts#recordRefusalFor',
     'watch/reproduce.ts#reproductionRefusalFor',
+    /*
+     * GitHub issue #337's third source — a board row. The view's arm and its three claimed figures
+     * are rendered below in both states a row can be in (a quotable mean with its `n`, and a mean
+     * the server withheld); the builder's subtitle and its two refusals are rendered through the
+     * builder on a row fixture, so the sentence a spectator meets over a handover this build cannot
+     * replay is swept in the wording the board draws it.
+     */
+    'watch/view.ts#claimedFiguresOf',
+    'watch/view.ts#POSTED_RUN_LINE',
+    'watch/posted.ts#postedRunOf',
+    'watch/posted.ts#postedSubtitleOf',
+    'watch/posted.ts#postedLogOf',
+    'watch/reproduce.ts#claimRefusalFor',
+    /* The figure labels the refusal above is composed from; reached through it and nothing else. */
+    'watch/reproduce.ts#claimDrift',
     'watch/record.ts#recordUnreadableReason',
     /*
      * The shell's own spectator surfaces — `docs/20` defect 7. They are covered **here**, beside
@@ -7191,17 +7272,50 @@ const WATCH: SurfaceAdapter = {
     const seeds: TextSeed[] = [];
     const posted = postedResultOf(context.recording);
 
-    for (const source of ['filed-day', 'reference'] as const) {
-      const run: WatchableRun = {
-        id: `watch-${source}`,
-        source,
-        label: source === 'reference' ? 'The house baseline' : 'Tuesday \u00b7 day 2',
-        buildingName: context.building.name,
-        subtitle: 'day 2 of this week',
-        record: null,
-        posted,
-        blocked: null,
-      };
+    /*
+     * A board row over this case's own run — GitHub issue #337 — so the posted arm's figures are
+     * the run's rather than a literal's, and the builder is the shipped one. Two rows: one whose
+     * mean the server vouched for with its count, one whose mean it withheld.
+     */
+    const rowClaim = claimOf(context.recording);
+    const rowOf = (id: string, legs: number | undefined, awtIsValid: boolean): BoardEntry => ({
+      id,
+      displayName: 'Nadia R.',
+      run: {
+        buildingId: context.case.buildingId,
+        dispatcherProfileId: context.case.baselineProfileId,
+        demandTemplateId: context.recording.trafficProfileId ?? 'office-day',
+        arrivalRatePctPop5min: null,
+        durationS: Math.round(context.recording.endedAt - context.recording.startedAt),
+        windowStartS: null,
+        seed: context.recording.seed,
+      },
+      dataHash: 'sha256:corpus',
+      measured: { ...rowClaim, awtIsValid },
+      legs,
+      submittedAtMs: 0,
+    });
+    const postedRuns: readonly WatchableRun[] = [
+      postedRunOf(rowOf('row-quotable', context.recording.summary.waitCount, true), 2, browserResourcesOf(context)),
+      postedRunOf(rowOf('row-withheld', undefined, false), 5, browserResourcesOf(context)),
+    ];
+    const runs: readonly WatchableRun[] = [
+      ...(['filed-day', 'reference'] as const).map(
+        (source): WatchableRun => ({
+          id: `watch-${source}`,
+          source,
+          label: source === 'reference' ? 'The house baseline' : 'Tuesday \u00b7 day 2',
+          buildingName: context.building.name,
+          subtitle: 'day 2 of this week',
+          record: null,
+          posted,
+          blocked: null,
+        }),
+      ),
+      ...postedRuns,
+    ];
+    for (const run of runs) {
+      const source = run.id;
       const view = watchingViewOf(run, context.case.baselineProfileId);
       /*
        * Through the view's own enumeration, so a cell added to `WatchingView` enters this corpus
@@ -7279,6 +7393,30 @@ const WATCH: SurfaceAdapter = {
     });
     if (drifted !== null) {
       seeds.push({ field: 'watch.blocked(does-not-reproduce)', text: drifted, role: 'reason' });
+    }
+    /*
+     * GitHub issue #337's two refusals, each a real derivation: a board claim two figures off this
+     * run's own, and a row whose handover names a dispatcher this build does not ship.
+     */
+    const claimDrifted = claimRefusalFor(
+      { ...rowClaim, awtS: rowClaim.awtS + 0.75, wt95S: rowClaim.wt95S + 3, legs: 400 },
+      context.recording,
+    );
+    if (claimDrifted !== null) {
+      seeds.push({ field: 'watch.blocked(claim-does-not-reproduce)', text: claimDrifted, role: 'reason' });
+    }
+    const unshippedHandover = postedLogOf(
+      {
+        ...rowOf('row-handover', 400, true),
+        run: {
+          ...rowOf('row-handover', 400, true).run,
+          interventions: [{ atS: 300, change: { kind: 'switch-dispatcher', toProfileId: 'no-such-dispatcher' } }],
+        },
+      },
+      browserResourcesOf(context).dispatcherProfiles.profiles,
+    );
+    if (typeof unshippedHandover === 'string') {
+      seeds.push({ field: 'watch.blocked(unshipped-handover)', text: unshippedHandover, role: 'reason' });
     }
     return singleRun(this.id, seeds);
   },
@@ -7850,25 +7988,16 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#RUSH_SCREEN_COPY',
     /*
      * `#RUSH_ABSENCES` and `#DESIGNER_ABSENCES` are the {@link EVERYDAY_BUILD_NOTES} adapter's
-     * since GitHub issue #207 moved both registers off these two screens. `#RUSH_PRIMARY_REFUSAL`
-     * stays here, and the split is the issue's own rule: a refusal that belongs to a control a
-     * player can press is drawn on that control, and a register of what the build does not do is
-     * drawn once, somewhere a reader goes looking.
+     * since GitHub issue #207 moved both registers off these two screens. The primary's refusal
+     * used to stay here on the issue's own rule — a refusal that belongs to a control a player can
+     * press is drawn on that control — and left with the engine GitHub issue #220 built (§ D515);
+     * `rushBarModel` now produces no text, so it is no longer covered here.
      */
-    'everyday/rushScreenModel.ts#RUSH_PRIMARY_REFUSAL',
-    /*
-     * The § 3.3 refinement itself, which this adapter's docstring has claimed to drive since it was
-     * written and did not: while `BarPrimary.inert` was a `boolean` the refinement produced no text
-     * at all, so the derivation never found it and the claim cost nothing. GitHub issue #262 moved
-     * the refusal *onto* the cell the shell draws, which makes the refinement a text producer — so
-     * the sentence is now true, and it is checked.
-     */
-    'everyday/rushScreenModel.ts#rushBarModel',
     'everyday/rushScreenModel.ts#RUSH_BANDS',
     'everyday/rushScreenModel.ts#RUSH_BESTS',
     /*
      * The standings' fixture marker — GitHub issue #293. It belongs on this adapter rather than on
-     * {@link EVERYDAY_BUILD_NOTES} for the same rule that splits `#RUSH_PRIMARY_REFUSAL` from
+     * {@link EVERYDAY_BUILD_NOTES} for the same rule that once split the primary's refusal from
      * `#RUSH_ABSENCES` just above: a refusal drawn on the thing it is about is swept with that
      * thing, and `rushScreen.ts` draws this one directly above the five rows it describes.
      */
@@ -7928,11 +8057,11 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         role: key === 'holdLine' || key === 'lede' || key === 'drivingNote' ? 'prose' : 'label',
       });
     }
-    seeds.push({ field: 'rush.primary.refusal', text: RUSH_PRIMARY_REFUSAL, role: 'reason' });
     /*
-     * The resolved § 3.3 row, as the shell draws it. The reason and the label are seeded from the
-     * refinement rather than from the constant beside it, so a lane that marks this primary dead
-     * with some other sentence is swept on the commit that does it.
+     * The resolved § 3.3 row, as the shell draws it. The label and any reason are seeded from the
+     * refinement rather than from a constant beside it, so a lane that marks this primary dead
+     * with some sentence is swept on the commit that does it — and since GitHub issue #220 the
+     * primary is live, so the reason seed is the empty string the corpus filters.
      */
     {
       const bar = rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' }));
@@ -8206,6 +8335,15 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * mentions.
      */
     'everyday/settingsView.ts#NAME_NOTE',
+    /*
+     * GitHub issue #229's two rows. The default-speed row's copy and the clear row's three stages
+     * are all reached below: the `armed` and `cleared` cases carry the clear arc's other two
+     * states and a default speed moved off the stage's own, so neither row is swept in one state
+     * only.
+     */
+    'everyday/settingsView.ts#DEFAULT_SPEED_ROW_COPY',
+    'everyday/settingsView.ts#CLEAR_PROGRESS_COPY',
+    'everyday/settingsView.ts#clearRowOf',
   ],
   render(context) {
     void context;
@@ -8276,6 +8414,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       ],
       /* A store that keeps nothing: the profile is real for this tab and says so. Signed in and named. */
       ['not-durable', { profile: stored, durable: false, reduceMotion: false, account: named, accountServer: true }],
+      /*
+       * GitHub issue #229's two rows in their other states: a default speed moved off the stage's
+       * own rung, and the clear row armed and then cleared. The `ready` and `booting` arms are the
+       * cases above; these are the words a player meets only after pressing.
+       */
+      ['armed', { profile: stored, reduceMotion: false, defaultSpeedSimPerRealS: 90, clearStage: 'armed' }],
+      ['cleared', { profile: undefined, reduceMotion: false, clearStage: 'cleared' }],
     ] as const;
 
     for (const [label, input] of cases) {
@@ -8342,6 +8487,12 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
         seeds.push({ field: `${at}.value`, text: fact.value, role: 'label' });
         seeds.push({ field: `${at}.note`, text: fact.note, role: 'prose' });
       }
+      /* The clear row — GitHub issue #229 — in whichever of its four states this case is in. */
+      seeds.push({ field: `${label}.device.clear.label`, text: view.device.clear.label, role: 'label' });
+      seeds.push({ field: `${label}.device.clear.note`, text: view.device.clear.note, role: 'prose' });
+      if (view.device.clear.button !== undefined) {
+        seeds.push({ field: `${label}.device.clear.button`, text: view.device.clear.button, role: 'label' });
+      }
     }
 
     return singleRun(this.id, seeds);
@@ -8382,6 +8533,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
   id: 'everyday/campaignModel.ts#towersView',
   covers: [
     'everyday/campaignModel.ts#towersView',
+    /* § 8.8's offers — GitHub issue #169 item 3, § D510 — every row the snapshot renders, seeded below. */
+    'everyday/campaignModel.ts#offersView',
     'everyday/campaignModel.ts#buildingView',
     'everyday/campaignModel.ts#contractView',
     'everyday/campaignModel.ts#calendarView',
@@ -8554,7 +8707,18 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
         role: 'observation',
         declaredCount: towers.rows.length,
       });
-      seeds.push({ field: `${label}.towers.offers`, text: towers.offers.refusal, role: 'reason' });
+      /* § 8.8's offers — GitHub issue #169 item 3, § D510 — every row the snapshot renders. */
+      seeds.push({ field: `${label}.towers.offers.heading`, text: `${towers.offers.heading} · ${towers.offers.caption}`, role: 'label' });
+      if (towers.offers.empty !== undefined) seeds.push({ field: `${label}.towers.offers.empty`, text: towers.offers.empty, role: 'reason' });
+      seeds.push({ field: `${label}.towers.offers.note`, text: towers.offers.note, role: 'prose' });
+      towers.offers.rows.forEach((offer, index) => {
+        const where = `${label}.towers.offers.${String(index)}`;
+        seeds.push({ field: `${where}.name`, text: offer.name, role: 'label' });
+        seeds.push({ field: `${where}.terms`, text: offer.terms, role: 'label' });
+        seeds.push({ field: `${where}.quirk`, text: offer.quirk, role: 'prose' });
+        seeds.push({ field: `${where}.cta`, text: offer.cta, role: 'label' });
+        if (offer.refusal !== undefined) seeds.push({ field: `${where}.refusal`, text: offer.refusal, role: 'reason' });
+      });
       seeds.push({ field: `${label}.towers.lately`, text: towers.lately.refusal, role: 'reason' });
       seeds.push({ field: `${label}.towers.lately.sub`, text: towers.lately.sub, role: 'prose' });
       seeds.push({ field: `${label}.towers.footnote`, text: towers.oddsFootnote, role: 'prose' });
@@ -8585,6 +8749,10 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
             seeds.push({ field: `${at}.when`, text: option.when, role: 'label' });
             seeds.push({ field: `${at}.effect`, text: option.effect, role: 'prose' });
           }
+        }
+        if (desk.worksToday !== undefined) {
+          seeds.push({ field: `${label}.desk.works.badge`, text: desk.worksToday.badge, role: 'label' });
+          seeds.push({ field: `${label}.desk.works.sentence`, text: desk.worksToday.sentence, role: 'prose' });
         }
         if (desk.quiet !== undefined) {
           seeds.push({ field: `${label}.desk.quiet.heading`, text: desk.quiet.heading, role: 'label' });
@@ -8907,6 +9075,78 @@ const FAMILY_CONTROLS: SurfaceAdapter = {
  * the property that would catch a schedule line turning into a preview is the one that has to see
  * it.
  */
+/**
+ * § 9's rush — its held-time header on the stage, its result, and the two refusals around them.
+ * GitHub issue #220, § D515. Both branches of the result are rendered: the case's own recording is
+ * read for the `stopped` arm (an ordinary day rarely crosses the hold line), and a `broke` outcome
+ * is built from the same recording's facts with the line placed at the playhead, so the wording
+ * every rush that breaks reads is in the corpus whether or not this case's day breaks.
+ */
+const EVERYDAY_RUSH: SurfaceAdapter = {
+  id: 'everyday/rush.ts#rushResultViewOf',
+  covers: [
+    'everyday/rush.ts#rushResultViewOf',
+    'everyday/rush.ts#rushStageHeaderOf',
+    'everyday/rush.ts#RUSH_RESULT_COPY',
+    'everyday/rush.ts#RUSH_STAGE_COPY',
+    'everyday/rush.ts#RUSH_NOT_LANDED',
+    'everyday/rush.ts#RUSH_RESULT_EMPTY_LEDE',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const recording = context.recording;
+    const mid = recording.startedAt + (recording.endedAt - recording.startedAt) / 2;
+    const stopped = rushOutcomeOf(recording, mid);
+    const broke: RushOutcome = {
+      ...stopped,
+      kind: 'broke',
+      overLine: RUSH_HOLD_LINE.people,
+      saturation: recording.summary.saturation ?? {
+        verdict: 'diverging-queue',
+        windowStartS: recording.startedAt,
+        windowEndS: recording.endedAt,
+        sampleCount: 8,
+        slopePersonsPerMinute: 1.5,
+        projectedGrowthPersons: 12,
+        meanQueueLength: 4,
+        maxQueueLength: 40,
+      },
+    };
+    const band = context.trafficProfiles.profiles.find((profile) => profile.id === context.building.trafficProfile)?.arrivalRatePctPop5min;
+    const disclosure = rushDisclosureOf(context.building, band);
+    for (const [arm, outcome] of [['stopped', stopped], ['broke', broke]] as const) {
+      const view = rushResultViewOf(outcome, disclosure);
+      seeds.push({ field: `rush.result(${arm}).eyebrow`, text: view.eyebrow, role: 'label' });
+      seeds.push({ field: `rush.result(${arm}).head`, text: view.head, role: 'label' });
+      seeds.push({ field: `rush.result(${arm}).lede`, text: view.lede, role: 'observation' });
+      for (const [index, beat] of view.account.entries()) {
+        seeds.push({ field: `rush.result(${arm}).account.${String(index)}`, text: beat, role: 'observation' });
+      }
+      for (const figure of view.figures) {
+        seeds.push({ field: `rush.result(${arm}).figure.${figure.label}.value`, text: figure.value, role: 'label' });
+        seeds.push({ field: `rush.result(${arm}).figure.${figure.label}.label`, text: figure.label, role: 'label' });
+        if (figure.note !== undefined) seeds.push({ field: `rush.result(${arm}).figure.${figure.label}.note`, text: figure.note, role: 'prose' });
+      }
+      seeds.push({ field: `rush.result(${arm}).footer`, text: view.footer, role: 'prose' });
+      if (view.disclosure !== undefined) seeds.push({ field: `rush.result(${arm}).disclosure`, text: view.disclosure, role: 'reason' });
+    }
+    for (const at of [recording.startedAt, mid, recording.endedAt]) {
+      const head = rushStageHeaderOf({ recording, simTimeS: at, driverName: dispatcherNameOf(context) });
+      const tag = `rush.stage(${String(Math.round(at - recording.startedAt))})`;
+      seeds.push({ field: `${tag}.held`, text: head.held, role: 'label' });
+      seeds.push({ field: `${tag}.wave`, text: head.wave, role: 'label' });
+      seeds.push({ field: `${tag}.driving`, text: head.drivingLabel, role: 'label' });
+      for (const figure of head.figures) {
+        seeds.push({ field: `${tag}.figure.${figure.label}.value`, text: figure.value, role: 'label' });
+        seeds.push({ field: `${tag}.figure.${figure.label}.label`, text: figure.label, role: 'label' });
+      }
+    }
+    seeds.push({ field: 'rush.bar.notLanded', text: RUSH_NOT_LANDED, role: 'reason' });
+    seeds.push({ field: 'rush.result.empty', text: RUSH_RESULT_EMPTY_LEDE, role: 'reason' });
+    return singleRun(this.id, seeds);
+  },
+};
+
 const EVERYDAY_STAGE: SurfaceAdapter = {
   id: 'everyday/stageScreenModel.ts#stageHeaderOf',
   covers: [
@@ -8929,10 +9169,19 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * Engineer strip needs it as well, and one screen's model is not where both shells can read it.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
+    'everyday/stageScreenModel.ts#STAGE_CAMERAS',
+    /* Returns the chips above or none; the words are theirs, seeded below once per case. */
+    'everyday/stageScreenModel.ts#stageCameraChipsOf',
     /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
+    /*
+     * GitHub issue #338: the sentence a handover row carries when its target cannot travel to a
+     * board, drawn before the press. Rendered below on a hand-tuned target, which is the one
+     * arm that produces it.
+     */
+    'scope/switchWire.ts#switchUnpostableReasonOf',
     'everyday/stageScreenModel.ts#STAGE_RACE_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
@@ -8952,12 +9201,109 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
     'everyday/stageScreenModel.ts#STAGE_GOALS_COPY',
+    /*
+     * § 7.5's dock — GitHub issue #171, § D507. The column is `stageScreen.ts`'s to draw and
+     * `campaignDock.ts`'s to word, and the incident it draws is `campaign/incidents.ts`'s: the
+     * breakdown's and the coach party's titles, notes and options, the answer's own refusals, and
+     * the copy table, all driven below over every state the dock can be in.
+     */
+    'everyday/campaignDock.ts#campaignDockViewOf',
+    'everyday/campaignDock.ts#CAMPAIGN_DOCK_COPY',
+    'everyday/campaignDock.ts#purseRefusalOf',
+    'campaign/incidents.ts#campaignIncidentOf',
+    'campaign/incidents.ts#answerChangeOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const { recording } = context;
     const floorLabelOf = (id: string): string =>
       recording.floors.find((floor) => floor.id === id)?.label ?? id;
+
+    /*
+     * **§ 7.5's dock, over every state a campaign day can put it in** — GitHub issue #171, § D507.
+     *
+     * The tower is a fresh contract on the case's own building, and the incidents are the two the
+     * campaign chooses, described from the case's resolved building so the car a breakdown names is
+     * one the building has. Six states: quiet (a breakdown before its clock), the breakdown open,
+     * the breakdown answered, the coach party with a held car and without, and the breakdown on a
+     * purse too thin for the technician — which is the one state that reaches the shortfall arm.
+     * The answer's *too late* refusal is reached by asking at the last second of the run.
+     */
+    {
+      const tower = freshTower({
+        contractId: 'c1',
+        buildingId: recording.buildingId,
+        dispatcherId: recording.dispatcherProfileId,
+        rate: 3,
+      });
+      const runLengthS = recording.endedAt;
+      const heldCars = carsToDerate(context.building, 1).held;
+      const breakdown = campaignIncidentOf({
+        event: SHIFT_EVENTS.breakdown,
+        building: context.building,
+        runLengthS,
+        heldCars: [],
+      });
+      const coachHeld = campaignIncidentOf({
+        event: SHIFT_EVENTS['coach-party'],
+        building: context.building,
+        runLengthS,
+        heldCars,
+      });
+      const coachAlone = campaignIncidentOf({
+        event: SHIFT_EVENTS['coach-party'],
+        building: context.building,
+        runLengthS,
+        heldCars: [],
+      });
+      const dockStates: readonly (readonly [string, Parameters<typeof campaignDockViewOf>[0]])[] = [
+        ['quiet', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: 0, answeredStamp: undefined, hasRun: true }],
+        ['none', { tower, buildingName: context.buildingName, incident: undefined, runLengthS, simTimeS: 0, answeredStamp: undefined, hasRun: true }],
+        ['breakdown', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: breakdown?.atS ?? 0, answeredStamp: undefined, hasRun: true }],
+        ['breakdown-late', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: Math.max(0, runLengthS - 1), answeredStamp: undefined, hasRun: true }],
+        ['breakdown-answered', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: (breakdown?.atS ?? 0) + 60, answeredStamp: interventionLogOf([{ atS: (breakdown?.atS ?? 0) + 60, change: { kind: 'answer-incident', option: breakdown?.options[0]?.label ?? '', serviceEvents: [] } }])[0], hasRun: true }],
+        ['breakdown-broke', { tower: { ...tower, carry: 1 }, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: breakdown?.atS ?? 0, answeredStamp: undefined, hasRun: true }],
+        ['breakdown-no-run', { tower, buildingName: context.buildingName, incident: breakdown, runLengthS, simTimeS: breakdown?.atS ?? 0, answeredStamp: undefined, hasRun: false }],
+        ['coach-held', { tower, buildingName: context.buildingName, incident: coachHeld, runLengthS, simTimeS: 0, answeredStamp: undefined, hasRun: true }],
+        ['coach-alone', { tower, buildingName: context.buildingName, incident: coachAlone, runLengthS, simTimeS: 0, answeredStamp: undefined, hasRun: true }],
+      ];
+      for (const [state, input] of dockStates) {
+        const view = campaignDockViewOf(input);
+        seeds.push({ field: `stage.dock(${state}).building`, text: view.buildingName, role: 'label' });
+        seeds.push({ field: `stage.dock(${state}).day`, text: view.dayLine, role: 'label' });
+        for (const figure of view.figures) {
+          seeds.push({ field: `stage.dock(${state}).figure.${figure.label}.value`, text: figure.value, role: 'label' });
+          seeds.push({ field: `stage.dock(${state}).figure.${figure.label}.label`, text: figure.label, role: 'label' });
+        }
+        seeds.push({ field: `stage.dock(${state}).heading`, text: view.incident.heading, role: 'label' });
+        seeds.push({ field: `stage.dock(${state}).levers`, text: view.otherLevers, role: 'prose' });
+        if (view.incident.kind === 'quiet') {
+          seeds.push({ field: `stage.dock(${state}).note`, text: view.incident.note, role: 'prose' });
+          continue;
+        }
+        seeds.push({ field: `stage.dock(${state}).clock`, text: view.incident.clock, role: 'label' });
+        seeds.push({ field: `stage.dock(${state}).title`, text: view.incident.title, role: 'label' });
+        seeds.push({ field: `stage.dock(${state}).footer`, text: view.incident.footer, role: 'prose' });
+        if (view.incident.kind === 'answered') {
+          seeds.push({ field: `stage.dock(${state}).stamp`, text: view.incident.stamp, role: 'label' });
+          continue;
+        }
+        seeds.push({ field: `stage.dock(${state}).note`, text: view.incident.note, role: 'prose' });
+        for (const option of view.incident.options) {
+          seeds.push({ field: `stage.dock(${state}).option.${option.id}.label`, text: option.label, role: 'label' });
+          seeds.push({ field: `stage.dock(${state}).option.${option.id}.cost`, text: option.cost, role: 'label' });
+          seeds.push({ field: `stage.dock(${state}).option.${option.id}.when`, text: option.when, role: 'prose' });
+          seeds.push({ field: `stage.dock(${state}).option.${option.id}.effect`, text: option.effect, role: 'prose' });
+          if (option.refusal !== undefined) {
+            seeds.push({ field: `stage.dock(${state}).option.${option.id}.refusal`, text: option.refusal, role: 'reason' });
+          }
+        }
+      }
+      /* The copy table, iterated rather than listed, on `BOARD_SCREEN_COPY`'s precedent. */
+      for (const [key, text] of Object.entries(CAMPAIGN_DOCK_COPY)) {
+        seeds.push({ field: `stage.dock.copy.${key}`, text, role: 'label' });
+      }
+    }
 
     for (const rung of stageLegend()) {
       seeds.push({ field: `stage.legend.${rung.id}`, text: rung.label, role: 'label' });
@@ -8990,6 +9336,10 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     for (const speed of STAGE_SPEEDS) {
       seeds.push({ field: `stage.speed.${String(speed.simPerRealS)}`, text: speed.label, role: 'label' });
     }
+    /* § 7.3's camera chips — GitHub issue #324 — seeded once per case, like the speed chips above. */
+    for (const chip of STAGE_CAMERAS) {
+      seeds.push({ field: `stage.camera.${chip.id}`, text: chip.label, role: 'label' });
+    }
     /*
      * **Every arm the control can offer, including the one that is built per call** — GitHub issue
      * **#171**. `STAGE_INTERVENTIONS` holds only the arms whose whole content is their kind, so
@@ -9010,6 +9360,18 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         : ([
             ['offered', { target: elsewhere, driving: () => driving }],
             ['already', { target: driving, driving: () => driving }],
+            /* A hand-tuned target: the arm is offered and its note says the day will not post. */
+            [
+              'unpostable',
+              {
+                target: { ...elsewhere, id: 'saved-tuned', name: 'Tuned by hand', weights: { ...elsewhere.weights, waitTime: 0.61 } },
+                driving: () => driving,
+                unpostable: switchUnpostableReasonOf(
+                  { ...elsewhere, id: 'saved-tuned', name: 'Tuned by hand', weights: { ...elsewhere.weights, waitTime: 0.61 } },
+                  context.dispatcherProfiles.profiles,
+                ),
+              },
+            ],
           ] as const)),
     ];
     for (const [state, switchTo] of switchStates) {
@@ -9036,6 +9398,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           seeds.push({
             field: `stage.intervene(${state}).${arm.change.kind}.refusal`,
             text: arm.refusal,
+            role: 'reason',
+          });
+        }
+        if (arm.note !== undefined) {
+          seeds.push({
+            field: `stage.intervene(${state}).${arm.change.kind}.note`,
+            text: arm.note,
             role: 'reason',
           });
         }
@@ -9559,10 +9928,13 @@ function placeholderBoardEntry(
   awtS: number,
   /** `null` is *the server sent no count*. Not `undefined`: that takes the default. */
   legs: number | null = 312,
+  /** The house's dispatcher on a seeded baseline row — GitHub issue #222, § D521. */
+  baselineProfileId: string | undefined = undefined,
 ): BoardEntry {
   return {
-    id: `row-${displayName}`,
+    id: `row-${displayName}${baselineProfileId === undefined ? '' : `-${baselineProfileId}`}`,
     displayName,
+    ...(baselineProfileId === undefined ? {} : { baselineProfileId }),
     run: {
       buildingId: 'midtown-office',
       dispatcherProfileId: 'eta',
@@ -9642,6 +10014,8 @@ const GAUNTLET: SurfaceAdapter = {
     'gauntlet/run.ts#GAUNTLET_CANCELLED',
     // The board screen's own two string tables; its `mount` is excluded on the mounts' ground.
     'everyday/boardScreen.ts#BOARD_SCREEN_COPY',
+    /* GitHub issue #93 § 3: the one gap sentence, on the player's own row — seeded on the row states below. */
+    'menu/gap.ts#gapSentence',
     'everyday/boardScreen.ts#DAILY_BOARD_ABSENCE',
     // The daily tab's five states — driven below, all five, rather than the copy table alone.
     'everyday/boardScreen.ts#dailyBoardViewOf',
@@ -9896,14 +10270,14 @@ const GAUNTLET: SurfaceAdapter = {
       ['noServer', { kind: 'no-server' }],
       ['unreachable', { kind: 'unreachable', detail: 'The board service did not answer.' }],
       ['undeclared', { kind: 'undeclared' }],
-      ['empty', { kind: 'board', date: '2026-09-02', note: BOARD_NOTE, rows: [] }],
+      ['empty', { kind: 'board', date: '2026-09-02', note: BOARD_NOTE, distribution: undefined, distributionDetail: undefined, rows: [] }],
       [
         'rows',
         {
           kind: 'board',
           date: '2026-09-02',
           note: BOARD_NOTE,
-          rows: [
+          distribution: undefined, distributionDetail: undefined, rows: [
             placeholderBoardEntry('A. Turing', 21.4),
             placeholderBoardEntry('G. Hopper', 29.5),
             /*
@@ -9915,12 +10289,80 @@ const GAUNTLET: SurfaceAdapter = {
           ],
         },
       ],
+      /*
+       * A board the house has seeded — GitHub issue #222, § D521 — so the row tag and the house note
+       * are swept beside two players' rows, and the player's own row is still theirs with a house row
+       * above it.
+       */
+      [
+        'house',
+        {
+          kind: 'board',
+          date: '2026-09-02',
+          note: BOARD_NOTE,
+          distribution: undefined, distributionDetail: undefined, rows: [
+            placeholderBoardEntry('The house', 19.8, 312, 'collective'),
+            placeholderBoardEntry('A. Turing', 21.4),
+            placeholderBoardEntry('G. Hopper', 29.5),
+            placeholderBoardEntry('The house', 31.0, 312, 'auction-multi-round'),
+          ],
+        },
+      ],
+      /*
+       * The middle of the board with a ladder published — GitHub issue #327 — so every axis line,
+       * the wire's note and the energy absence are swept. Plausible rungs rather than round ones,
+       * and 24 players: the server withholds below twenty.
+       */
+      [
+        'ladder',
+        {
+          kind: 'board',
+          date: '2026-09-02',
+          note: BOARD_NOTE,
+          distribution: {
+            boardKey: 'daily:2026-09-02',
+            n: 24,
+            ladders: [
+              { axis: 'awtS', n: 24, rungs: { p10: 12.4, p25: 14.1, p50: 18.3, p75: 23.0, p90: 30.6 }, medianEntryId: 'e1' },
+              { axis: 'wt95S', n: 24, rungs: { p10: 28.0, p25: 33.5, p50: 41.2, p75: 52.9, p90: 66.1 }, medianEntryId: 'e2' },
+              { axis: 'ttdMeanS', n: 24, rungs: { p10: 40.5, p25: 45.8, p50: 53.0, p75: 61.4, p90: 74.9 }, medianEntryId: 'e3' },
+              { axis: 'pctOverLongWait', n: 24, rungs: { p10: 0.0, p25: 0.8, p50: 2.5, p75: 4.9, p90: 8.7 }, medianEntryId: 'e4' },
+            ],
+            withheld: undefined,
+            absent: [
+              {
+                axis: 'energy',
+                reason:
+                  'A posted run claims its four ranked figures and no energy figure, so no energy ladder can be computed from what the board holds.',
+              },
+            ],
+            note:
+              'Each axis is its own ladder over the players who posted, one best run each. The rungs are not one run; the median entry is. No interval is published, because the players who posted are not a sample of anybody else.',
+          },
+          distributionDetail: undefined,
+          rows: [placeholderBoardEntry('A. Turing', 21.4), placeholderBoardEntry('G. Hopper', 29.5)],
+        },
+      ],
     ];
     for (const [state, board] of dailyStates) {
-      const view = dailyBoardViewOf(board);
+      /*
+       * Rendered as the **second** row's player, so every row state carries a `your run` row that
+       * is behind the top by a published distance — GitHub issue #93's gap is on the player's own
+       * row and nowhere else, and a corpus that never signed in would never read it.
+       */
+      const own = board !== undefined && board.kind === 'board' ? board.rows[1]?.displayName : undefined;
+      const view = dailyBoardViewOf(board, own, (id) => context.profiles.find((profile) => profile.id === id)?.name);
       view.lines.forEach((line, index) => {
         seeds.push({
           field: `board.daily.${state}.line${String(index)}`,
+          text: line.text,
+          role: line.role === 'note' ? 'observation' : 'reason',
+        });
+      });
+      /* The middle of the board's lines — GitHub issue #327 — in the state's own field space. */
+      view.world.forEach((line, index) => {
+        seeds.push({
+          field: `board.daily.${state}.world${String(index)}`,
           text: line.text,
           role: line.role === 'note' ? 'observation' : 'reason',
         });
@@ -9931,6 +10373,11 @@ const GAUNTLET: SurfaceAdapter = {
           text: `${row.place}. ${row.displayName}`,
           role: 'label',
         });
+        /* GitHub issue #93: who drove the row, and the player's own distance from the top. */
+        seeds.push({ field: `board.daily.${state}.row${String(index)}.driver`, text: row.driver, role: 'label' });
+        if (row.gap !== '') {
+          seeds.push({ field: `board.daily.${state}.row${String(index)}.gap`, text: row.gap, role: 'observation' });
+        }
         /*
          * Two roles, and which one applies is the row's own answer rather than the adapter's
          * preference. A row that printed a count is an `estimate` with `countShown` — from whether
@@ -10002,7 +10449,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
   id: 'everyday/today.ts#todayOf',
   covers: [
     'everyday/today.ts#todayOf',
+    'shift/firstSession.ts#FIRST_SESSION_LINE',
     'everyday/doorView.ts#doorScreenViewOf',
+    /* § 6.1's replay words — GitHub issue #177 item 1. The door's primary note carries both arms
+       (a day inside the week, a chip from before it), and the bar and rail adapters carry the rest. */
+    'everyday/replay.ts#REPLAY_COPY',
     'everyday/doorView.ts#DOOR_STEPS',
     'everyday/doorView.ts#SAME_FOR_EVERYONE',
     'everyday/briefView.ts#briefScreenViewOf',
@@ -10010,8 +10461,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
     'everyday/briefView.ts#raceAgainstCard',
     'everyday/briefView.ts#lockedForScore',
+    /* GitHub issue #225's door into the sandbox, drawn on the brief once the tuner is built. */
+    'everyday/briefView.ts#SANDBOX_DOOR_LABEL',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
+    /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
+    'everyday/reportView.ts#FIGURE_NOTE_HANDLE',
     'everyday/world.ts#percentileLine',
     'everyday/world.ts#WORLD_FIGURES_LABEL',
     'everyday/world.ts#WORLD_FIGURES_REASON',
@@ -10037,6 +10492,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        /* A first day nobody has played, on a legible tower — the one state that draws the line. */
+        firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         /*
          * The corpus's own arm. Both preferences reach the *Rated speed* fact, and the day record
          * is seeded once per day rather than once per screen (§ 16 rule 14) — so the second
@@ -10048,6 +10505,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       seeds.push({ field: `${at}.today.label`, text: today.dayLabel, role: 'label' });
       seeds.push({ field: `${at}.today.lede`, text: today.lede, role: 'observation' });
       seeds.push({ field: `${at}.today.seed`, text: today.seedLine, role: 'label' });
+      if (today.firstSessionLine !== undefined) {
+        seeds.push({ field: `${at}.today.firstSession`, text: today.firstSessionLine, role: 'observation' });
+      }
       for (const fact of today.facts) {
         seeds.push({ field: `${at}.today.fact.${fact.label}`, text: fact.value, role: 'observation' });
       }
@@ -10068,6 +10528,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
       }).facts;
       for (const [index, fact] of imperialFacts.entries()) {
@@ -10101,8 +10562,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       for (const closed of [false, true]) {
         const arm = `${at}.${closed ? 'closed' : 'open'}`;
 
-        /* ---- the front door, at today and at a past day (the replay refusal) ---- */
-        for (const offset of [0, DAY_OFFSET_MIN]) {
+        /* ---- the front door: today, yesterday (a replay the week can hand back), and the strip's far end ---- */
+        for (const offset of [0, -1, DAY_OFFSET_MIN]) {
           const door = doorScreenViewOf({
             week: entry.week,
             today,
@@ -10221,6 +10682,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         seeds.push({ field: `${where}.figuresHeading`, text: view.headings.figures, role: 'label' });
         seeds.push({ field: `${where}.overnightHeading`, text: view.headings.overnight, role: 'label' });
         seeds.push({ field: `${where}.honesty.title`, text: view.honesty.title, role: 'label' });
+        /* GitHub issue #211: the handle on every folded card note, one string, seeded once per sheet. */
+        seeds.push({ field: `${where}.figure.handle`, text: FIGURE_NOTE_HANDLE, role: 'label' });
         /*
          * `role: 'reason'`, which is what `DAY_REPORT` and `DAY_REPORT_VIEW` classify the same
          * string as — and the classification is load-bearing rather than cosmetic. The small
@@ -10236,6 +10699,18 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seeds.push({ field: `${where}.pointer`, text: view.honesty.pointer.why, role: 'prose' });
         }
         for (const lever of view.levers) {
+          /*
+           * The button's label and the dispatcher levers' caveat — GitHub issue #213. The label is
+           * the claim about what a press does that once shipped wrong because nothing swept it;
+           * the caveat is the one string on the card entitled to name a dispatcher ordering,
+           * because it refuses one.
+           */
+          if (lever.goLabel !== undefined) {
+            seeds.push({ field: `${where}.lever(${lever.title}).go`, text: lever.goLabel, role: 'label' });
+          }
+          if (lever.caveat !== undefined) {
+            seeds.push({ field: `${where}.lever(${lever.title}).caveat`, text: lever.caveat, role: 'reason' });
+          }
           if (lever.noSurfaceNote === undefined) continue;
           seeds.push({ field: `${where}.lever.refusal`, text: lever.noSurfaceNote, role: 'reason' });
         }
@@ -10907,9 +11382,17 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     'everyday/buildNotes.ts#buildNotesViewOf',
     'everyday/buildNotes.ts#buildNotesSummaryOf',
     'everyday/buildNotes.ts#BUILD_NOTES_POINTER',
+    /* GitHub issue #246's build line, reached through `view.build`; under the corpus, the unbuilt arm. */
+    'release/version.ts#buildVersionLineOf',
     'everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES',
+    'everyday/buildNotes.ts#REGISTER_EMPTY_LINE',
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
-    'everyday/stageScreenModel.ts#STAGE_ABSENCES',
+    /*
+     * `everyday/stageScreenModel.ts#STAGE_ABSENCES` stood here until GitHub issue #171 (§ D507)
+     * emptied it. An empty array produces no prose, so `derive.test.ts` no longer finds it and a
+     * `covers` entry would be a coverage claim for nothing; the register itself is still drawn,
+     * as the section's `empty` line below.
+     */
     'everyday/rushScreenModel.ts#RUSH_ABSENCES',
     'everyday/designerModel.ts#DESIGNER_ABSENCES',
     'campaign/career.ts#CAMPAIGN_ABSENCES',
@@ -10922,6 +11405,8 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     seeds.push({ field: 'buildNotes.heading', text: view.heading, role: 'label' });
     seeds.push({ field: 'buildNotes.summary', text: buildNotesSummaryOf(view), role: 'label' });
     seeds.push({ field: 'buildNotes.lede', text: view.lede, role: 'prose' });
+    // GitHub issue #246: the build line, which under the corpus reads the unbuilt arm.
+    seeds.push({ field: 'buildNotes.build', text: view.build, role: 'prose' });
     /*
      * The front door's one remaining sentence about all this. It is drawn on the menu rather than
      * on the panel, and it is seeded here because it is the panel's constant and the menu is a DOM
@@ -10936,6 +11421,8 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
       for (const [row, entry] of section.entries.entries()) {
         seeds.push({ field: `${at}.entry.${String(row)}`, text: entry, role: 'reason' });
       }
+      /* An emptied register's line — the stage's, since GitHub issue #171 (§ D507). */
+      if (section.empty !== undefined) seeds.push({ field: `${at}.empty`, text: section.empty, role: 'prose' });
     }
 
     /*
@@ -11104,6 +11591,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // header figures share wordings with the live rail's, so an earlier slot would move every
   // rail-shaped fault onto this surface.
   EVERYDAY_STAGE,
+  EVERYDAY_RUSH,
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 12.2's withheld matrix
   // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
   // every week-shaped and menu-shaped fault onto this surface.

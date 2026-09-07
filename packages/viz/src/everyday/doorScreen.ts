@@ -18,6 +18,7 @@ import { doorScreenViewOf, type DoorScreenView } from './doorView.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import { BODY, CARD, el, EYEBROW, LEDE, MONO, pill, QUIET, section, unavailableBand } from './screenDom.js';
+import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
 import { todayOf } from './today.js';
 import {
   EVERYDAY_COLORS as C,
@@ -38,6 +39,8 @@ import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.
  * view clamps, so a stale offset can only ever select a day the strip is drawing.
  */
 let dayOffset = 0;
+/** The last view drawn, so the § 3.3 bar reads the same primary the screen does — see {@link doorBar}. */
+let lastView: DoorScreenView | undefined;
 
 /** The view for the current host state. Rebuilt on every draw; nothing is cached across one. */
 function viewOf(context: EverydayScreenShellContext): DoorScreenView {
@@ -53,6 +56,7 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
       goals: host.goalsToday(),
       seed: host.seed(),
+      firstSession: isFirstDayOnALegibleTower(host.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),
     }),
@@ -80,6 +84,7 @@ function mountDoor(
   function render(): void {
     if (!alive) return;
     const view = viewOf(context);
+    lastView = view;
     root.replaceChildren();
     root.append(leftColumn(doc, view), rightColumn(doc, view));
   }
@@ -204,6 +209,12 @@ function mountDoor(
     const seed = el(document_, 'div', 'everyday-door-seed', view.seedLine);
     seed.style.cssText = `${MONO(11.5, C.label)};margin-top:8px`;
     foot.append(same, seed);
+    /* GitHub issue #208, § D514: why this tower, said once, on the day it is true and no other. */
+    if (view.firstSessionLine !== undefined) {
+      const drawn = el(document_, 'p', 'everyday-door-first-session', view.firstSessionLine);
+      drawn.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
+      foot.append(drawn);
+    }
     column.append(foot);
     return column;
   }
@@ -329,8 +340,20 @@ function mountDoor(
      * one question.
      */
     primary: () => {
-      if (dayOffset !== 0) return;
-      context.go('brief');
+      if (dayOffset === 0) {
+        context.go('brief');
+        return;
+      }
+      /*
+       * § 6.1's replay — GitHub issue #177 item 1, § D517. The host stands the replay week up first
+       * and says why it cannot; the context follows only on its yes, `rushScreen.ts`'s own order.
+       */
+      const day = context.host.week().day + dayOffset;
+      if (context.host.startReplay(day) === undefined) {
+        /* The door reopens on today when the replay ends: the strip is a stepper, not a memory of one. */
+        dayOffset = 0;
+        context.enterReplay();
+      }
     },
   };
 }
@@ -346,11 +369,13 @@ function doorBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
   const replay = dayOffset !== 0;
   const label = base.primary.variants[replay ? 1 : 0] ?? base.primary.label;
-  const pastDay = 'A past day can be read here, not re-opened.';
+  /* The view's own resolution of the day — `doorView.ts#primaryOf` — so the bar and the screen agree. */
+  const view = lastView;
+  const inert = replay && view !== undefined && view.primary.inert ? view.primary.note : undefined;
   return {
     ...base,
-    primary: { ...base.primary, label, ...(replay ? { inert: pastDay } : {}) },
-    note: replay ? pastDay : base.note,
+    primary: { ...base.primary, label, ...(inert === undefined ? {} : { inert }) },
+    note: replay && view !== undefined ? view.primary.note : base.note,
   };
 }
 

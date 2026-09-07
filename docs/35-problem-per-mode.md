@@ -378,11 +378,13 @@ the picture rather than by the copy.
 | when | control | what it writes | shipped? |
 |---|---|---|---|
 | **During** | *Park the cars in the lobby* | `RunInterventionConfig { atS, change: { kind: 'park-cars-lobby' } }` — every idle car treated as though the profile had authored `idle.parkingStrategy: 'lobby'` from that instant, carried through `RepositionContext` rather than a second policy | **Yes** — `everyday/stageScreenModel.ts`, `dispatch/lifecycle.ts#repositionDecisionFor` |
+| **During** | *Spread the cars across the tower* | `{ kind: 'spread-cars' }` — the same mechanism with `'zone-center'` where the park press writes `'lobby'`; the two are one control with two settings and the later press is the one in force. **Built 2026-09-06**, GitHub issue #352 | **Yes** — `everyday/stageScreenModel.ts#STAGE_INTERVENTIONS`, `Simulation.#idleOverrideAt` |
 | **During** | *Switch to …* | `{ kind: 'switch-dispatcher' }`, the profile inline. **Weights only**; no stage setting switches, and `SWITCH_PINS_NOTE` says so on the control before the press | **Yes** |
 | **Before** | The three group levers — `parking` → `idle.parkingStrategy: 'lobby'`, `express` → `'zone-center'` (outranks parking), `dwell` ∈ `snappy \| normal \| patient` → six door parameters | `authoring/dispatcherSpec.ts#GroupLevers` | **Yes** |
 | **Before** | The dispatcher | `SimulationConfig.dispatcherProfile` | **Yes** |
 
-**One press is specified and not built, and it is the one this mode most wants.**
+**One press was specified and not built, and it was the one this mode most wants — it is built
+now (GitHub issue #352), and the paragraph stands as the argument for it.**
 `park-cars-lobby` is the *wrong verb* for two of the three shipped parking faults:
 `sleeping-sky-lobby` and `gym-on-the-top-floor` are both cured by parking cars **away from** the
 lobby. The vocabulary needs its opposite.
@@ -706,11 +708,14 @@ change — making the player guess the fault — is refused.
 
 **The mode already holds a complete recording of the building failing, and draws a diagram instead.**
 
-`everyday/fixitScreen.ts:335-343` runs the as-built configuration **when the case opens** —
-`session.asBuilt = recordRun(plan.asBuilt, { recordDecisions: false })`, synchronously, at the
-~0.5–1.5 s the module's own docstring prices it at — because `fixit/run.ts#figureValuesOf` computes
-the four opening figures from that run's legs. The docstring says it outright: *"The four figures —
-computed from the as-built run, never authored."*
+`everyday/fixitScreen.ts#measureAsBuilt` runs the as-built configuration **when the case opens**
+— *asynchronously*, on the off-thread runner (`runner.start({ … onDone })`), landing the recording
+on `sessionOf(entry).asBuilt` — because `fixit/run.ts#figureValuesOf` computes the four opening
+figures from that run's legs. The docstring says it outright: *"The four figures — computed from
+the as-built run, never authored."* *(This paragraph used to quote `:335-343` and call the run
+**synchronous**; GitHub issue #348's routing found the code had moved and the adverb was wrong,
+and it is corrected here on the commit that built the row — § 4.1's own lesson, cited by symbol
+rather than by a line number.)*
 
 **So a full `VizRecording` of the failing morning exists on the screen, and four numbers are read out
 of it before it is dropped.** Constraint 2 for this mode costs a renderer mount and a transport, not
@@ -761,12 +766,20 @@ seed, three rows, four named outcomes, an 80 % categorical bar rather than a sub
 
 **One rule is added, because it is currently true by luck rather than by construction:**
 
-> **`PM-FB3` — A repair may not patch `floorPopulations`.** `fixit/run.ts#fixitRunPlanOf` says
-> *"everything the passenger trace is a function of — building id, seed, horizon, demand — comes off
-> the case and is identical between the two"*, and that holds because both sides carry the `asBuilt`
-> patch and **no shipped repair touches population**. `BuildingPatch.floorPopulations` exists and a
-> repair could legally use it, at which point the two runs would meet different crowds and the whole
-> basis would be gone silently. `fixit/parse.ts` refuses it, with the reason attached.
+> **`PM-FB3` — A repair may not patch `floorPopulations`** — *as written here, and the premise under
+> it was wrong* ([§ D497](../DECISIONS.md), GitHub issue #349). This rule was argued from
+> `fixit/run.ts#fixitRunPlanOf`'s *"everything the passenger trace is a function of … comes off the
+> case and is identical between the two"* and the claim that **no shipped repair touches population**.
+> Three did, on the day this was written: `one-start-time`'s staggered tenancy starts,
+> `every-letter-says-nine`'s reprinted appointment letters and `let-faster-than-the-lifts`' staggered-starts
+> clause all patch `floorPopulations`, each is the case's **diagnosed** repair, and each is the case's
+> whole lesson — *"this is the case where the crowd, not the kit, is wrong."* A blanket refusal would
+> have made demand-side diagnosis unauthorable. **What landed instead:** `fixit/parse.ts` refuses a
+> population patch on the three *fabric* roles (a purchase cannot move a person out of the peak), the
+> diagnosed repair may change the crowd, and when it does the outcome's basis line says so
+> (`fixit/engine.ts#DEMAND_BASIS_LINE`, chosen from the legs rather than the patch) while
+> `fixit/run.ts#assertPairMatchesRepairs` holds the patch and the legs to each other in both directions
+> at both press sites.
 
 ---
 
@@ -1063,17 +1076,17 @@ of work rather than by section. Every row names the rule that asks for it.
 
 | # | rule | change | where | size |
 |---|---|---|---|---|
-| 1 | `PM-FB1` | Mount a stage over `session.asBuilt.recording` on the fix-case screen, above the four figures | `everyday/fixitScreen.ts` | **Small.** The recording already exists at `:343`; this is a renderer mount and a transport, not a simulation |
-| 2 | `PM-TT1` | Move the *How hard this looks* plate off the pre-run position, or reword it as configuration | `everyday/today.ts` and its caller | **Small**, and it is a copy-and-ordering change rather than a deletion |
+| 1 | `PM-FB1` | ~~Mount a stage over `session.asBuilt.recording` on the fix-case screen, above the four figures~~ — **built 2026-09-06**, GitHub issue #348: `everyday/asBuiltStage.ts` plays the recording on the stage's own painter (`everyday/cutaway.ts`, moved out of the stage for it), skippable, and the figures are stated after | `everyday/fixitScreen.ts`, `everyday/asBuiltStage.ts` | **Small.** The recording already exists on the session; this is a renderer mount and a transport, not a simulation |
+| 2 | `PM-TT1` | Move the *How hard this looks* plate off the pre-run position, or reword it as configuration | `everyday/today.ts` and its caller | **Small**, and it is a copy-and-ordering change rather than a deletion — **built 2026-09-06 as the second option** ([§ D514](../DECISIONS.md)): the plate reads people per working car and says the day shows whether that is comfortable |
 | 3 | `PM-TT5` | ~~A **provided ghost port** on `EverydayHost`~~ — **built 2026-09-05**, GitHub issue #226, [§ D482](../DECISIONS.md). `EverydayHost.ghostRace`/`raceAgainst`, the stage's picker, and `STAGE_NO_GHOST` deleted on the same commit with both register entries it was half of | `everyday/`, `live/raceStrip.ts`, `dev/main.ts` | Was **small–medium**; the wire was the work, and `dev/ghostRun.ts` is unchanged |
-| 4 | `PM-FB3` | `fixit/parse.ts` refuses a repair patch carrying `floorPopulations`, with the reason attached | `fixit/parse.ts` | **Small.** One check; it protects the whole mode's basis |
-| 5 | `PM5` | One shared **legs-identity assertion** — two runs agree on `(passengerId, arrivedAt, originFloorId, destinationFloorId)` and differ only on `boardedAt`, `alightedAt`, `carId` — used by the fixit pair, the intervention pair and the campaign works-night pair | a test helper under `packages/viz/src/` | **Small**, and it is the one row that makes three separate honesty claims checkable instead of argued |
+| 4 | `PM-FB3` | ~~`fixit/parse.ts` refuses a repair patch carrying `floorPopulations`, with the reason attached~~ — **built narrower, 2026-09-06** ([§ D497](../DECISIONS.md)): refused on the three fabric roles, permitted on the diagnosed repair, and the pair's basis line then says the crowd changed | `fixit/parse.ts`, `fixit/engine.ts`, `fixit/run.ts` | **Small**, and the premise was wrong: three shipped diagnosed repairs already patch population |
+| 5 | `PM5` | ~~One shared **legs-identity assertion** — two runs agree on `(passengerId, arrivedAt, originFloorId, destinationFloorId)` and differ only on `boardedAt`, `alightedAt`, `carId`~~ — **built, 2026-09-06, on a different key** ([§ D498](../DECISIONS.md), `record/crowd.ts`): the four-field key over every leg came back *different* on all seven cases in the three transfer buildings, because a transfer leg's `arrivedAt` is when the first car dropped its rider and a zoning repair moves a first leg's destination without moving the journey's. The crowd is the **first** legs on `(passengerId, arrivedAt, originFloorId, finalDestinationFloorId)`, which needed two fields the recording did not carry (schema 11). Called from the fixit pair, the intervention pair and the race; the works-night pair is #353's and not built | `packages/viz/src/record/crowd.ts` | **Small** to write and the key was wrong: it is the one row that makes three separate honesty claims checkable instead of argued |
 | 6 | `PM-FB2` | `fixit/parse.ts` requires a `symptom` to name a sight rather than carry a raw figure, in the shape it already refuses probability words and engine identifiers. **Two `data/` corrections follow and belong to a content lane, not this rule** | `fixit/parse.ts`, then `data/fixit-cases.json` | **Small** code, **small** content |
-| 7 | `PM-TT4` | `INTERVENTION_KINDS` gains `spread-cars`, writing `idle.parkingStrategy: 'zone-center'`; a label in `live/interventions.ts`; a row on the stage | `core/src/sim/types.ts`, `core/src/dispatch/lifecycle.ts`, `viz/src/live/interventions.ts`, `viz/src/everyday/stageScreenModel.ts` | **Medium.** A `core` change, on the `park-cars-lobby` precedent, which is exactly one union member and one branch |
-| 8 | `PM-CA1`, `PM-CA3` | The day opens on the building with today's event visible in it; a works-night purchase changes the picture as well as the purse | `everyday/`, and **after** GitHub issue #181's wiring | **Medium**, and #181 is the precondition rather than part of it |
+| 7 | `PM-TT4` | ~~`INTERVENTION_KINDS` gains `spread-cars`, writing `idle.parkingStrategy: 'zone-center'`; a label in `live/interventions.ts`; a row on the stage~~ — **built 2026-09-06**, GitHub issue #352. The branch is in `Simulation.#idleOverrideAt` rather than `repositionDecisionFor`, which reads the override it is handed and never needed to know the kind; the label is derived from `RULE_ACTION_WORDS['spread-out']`; the arm travels to the board beside the park arm | `core/src/sim/types.ts`, `core/src/sim/simulation.ts`, `viz/src/live/interventions.ts`, `viz/src/everyday/stageScreenModel.ts`, `dev/main.ts`, `server/src/leaderboard/submission.ts` | **Medium**, as sized |
+| 8 | `PM-CA1`, `PM-CA3` | ~~The day opens on the building with today's event visible in it; a works-night purchase changes the picture as well as the purse~~ — **built, 2026-09-06** ([§ D504](../DECISIONS.md), GitHub issue #353): the tower screen draws the elevation above every word with the works car as a dashed well, and a works night holds one car out of service on the run, pinned on the legs. The event's own hole is on the stage the moment the run lands; the tower screen cannot know it before the press and says so | `campaign/works.ts`, `everyday/elevation.ts`, `everyday/campaignScreens.ts` | **Medium**, and #181 was the precondition |
 | 9 | `PM-CA4` | Once the shop reaches a run, sweep every item against a no-purchase control on the same seed; an item that moves no leg is removed or given the sentence that says so — `docs/33` `DC-9`'s rule, at campaign scale | `campaign/`, a test | **Medium** |
-| 10 | `PM-RU2` | A climbing demand template, authored in `data/traffic-profiles.json` with its own uncited-assumption note where the rate leaves the profile's cited band | `data/traffic-profiles.json` | **Medium**, and it is `CLAUDE.md` invariant 7 work rather than engine work — **conditional on § 11's unverified item 3** |
-| 11 | `PM-RU1`, `PM-RU3` | The rush's held-time stage, the `Call it` press, and a result screen that publishes the divergence point from `summary.saturation` — never from a second definition — with its across-seed spread measured first | `everyday/rushScreen*.ts`, a measurement | **Large.** This is GitHub issue #220's whole scope |
+| 10 | `PM-RU2` | A climbing demand template, authored in `data/traffic-profiles.json` with its own uncited-assumption note where the rate leaves the profile's cited band | `data/traffic-profiles.json` | **Medium**, and it is `CLAUDE.md` invariant 7 work rather than engine work — **conditional on § 11's unverified item 3** — **built 2026-09-06** ([§ D515](../DECISIONS.md)): `endless-rush`, with the rate as the override § D478 governs and the disclosure drawn on the setup screen and the result |
+| 11 | `PM-RU1`, `PM-RU3` | The rush's held-time stage, the `Call it` press, and a result screen that publishes the divergence point from `summary.saturation` — never from a second definition — with its across-seed spread measured first | `everyday/rushScreen*.ts`, a measurement | **Large.** This is GitHub issue #220's whole scope — **built 2026-09-06** ([§ D515](../DECISIONS.md)) as the handoff's own `End the rush` rather than `Call it`: the result quotes the trend test and draws no *how far off* figure, because that figure's spread is unmeasured and the waves are one seed by design |
 | 12 | `PM-PARK` | An idle state on `FrameCar`, and a mark for it on both renderers | `viz/src/contract/types.ts`, both stages, **possibly** `core` | **Large or medium** — see § 11's unverified item 4. It is the highest-value entry in § 3.2 |
 | 13 | `PM-TT2` | A legibility arm on the difficulty sweep: for each contract's day 1, the fraction of seeds holding a third-band landing for 120 contiguous seconds | `docs/33` § 6's instrument | **Medium**, and it is the only way `PM-TT2` stops being an assertion |
 | 14 | `PM-DOOR` | The first-run sequence as a **cover** over the Everyday menu, conditioned on derived state rather than a stored flag, skippable | `everyday/`, `menuPanel.ts#coverShell`'s shape | **Large**, and **blocked on a product-owner decision** ([§ D350](../DECISIONS.md), `charter` non-goal 10) |
@@ -1133,8 +1146,11 @@ absence of `abandonedAt` · the two of eighteen `symptom` strings carrying a raw
    `dispatch/lifecycle.ts#repositionDecisionFor` is where to look. **If none exists, `PM-PARK` is a
    `core` change and must be priced as one.**
 5. **Whether 120 contiguous seconds is the right legibility window** in `PM-TT2`. It is a design choice
-   with its reasoning attached and **not** a citation. *Check:* § 10 row 13's sweep arm, and a
-   playtest.
+   with its reasoning attached and **not** a citation — and it is now *declared* as one:
+   `packages/viz/src/shift/legibility.ts#LEGIBILITY_WINDOW_S` carries the reasoning (two simulated
+   minutes are on the order of ten real seconds at the stage's default speed) and the sweep arm is
+   built ([§ D512](../DECISIONS.md), GitHub issue #354). *Check:* a playtest, which is what would
+   move the constant.
 6. **Whether each of the sixteen sight-shaped `symptom` strings is legible at the sizes the stage
    actually draws.** Capsules are 4.5 px on a 6.5 px pitch. *Check:* `docs/28` `AD-S7` and `AD-S8`
    landing first, then a playtest.
@@ -1487,7 +1503,7 @@ prose: `issue #N` · `new issue —` · `out of scope —` · `built —`.
 | 1 | `PM-FB1` | **issue #348** — *Fix a building: play the as-built run before the four figures* | Searched: nothing open covers it. #233 is case authoring and content scale; #177 item 7 is § 10.3's fuller **editor**. Neither is a stage mount. **Body:** the fix-case screen already runs the as-built configuration when a case opens — `packages/viz/src/everyday/fixitScreen.ts:315` `measureAsBuilt`, called at `:533` — and a full recording lands on `sessionOf(entry).asBuilt`, from which `fixit/run.ts#figureValuesOf` reads the four opening figures. Mount a stage over that recording above the figures, per `PM-FB1`. Constraint 2 for this mode costs a renderer mount and a transport, not a simulation |
 | 2 | `PM-TT1` | **issue #208** | Its body already quotes the copy — *"The brief grades it before the player starts"* — and docs/35 § 8.2 is the verdict on it. **The only one of the fourteen blocked by no product decision at all**, which is worth knowing while Q3's placement is open |
 | 3 | `PM-TT5` | **built —** GitHub issue #226, [§ D482](../DECISIONS.md) | Verified: `packages/viz/src/everyday/host.ts:670` `ghostRace()` and `:694` `raceAgainst(pick)`; `STAGE_NO_GHOST` is gone, quoted in `stageScreenModel.ts:958,1005` as history |
-| 4 | `PM-FB3` | **issue #349** — *`fixit/parse.ts` refuses a repair that patches `floorPopulations`* | Verified unbuilt: `packages/viz/src/fixit/parse.ts:449-455,498` decodes `floorPopulations` into a patch and refuses it nowhere. **Body:** the fixit basis is that both runs meet the same crowd; `fixitRunPlanOf` holds because no shipped repair touches population, which is luck rather than construction. One check in the file that already refuses probability words and engine identifiers, with the reason attached |
+| 4 | `PM-FB3` | **issue #349** — *`fixit/parse.ts` refuses a repair that patches `floorPopulations`* | Verified unbuilt: `packages/viz/src/fixit/parse.ts:449-455,498` decodes `floorPopulations` into a patch and refuses it nowhere. **Body:** the fixit basis is that both runs meet the same crowd; `fixitRunPlanOf` holds because no shipped repair touches population, which is luck rather than construction. One check in the file that already refuses probability words and engine identifiers, with the reason attached. **The body's premise was false when filed** — three shipped diagnosed repairs patch population, found by the refusal itself the first time it ran; § 7's `PM-FB3` block records what landed instead ([§ D497](../DECISIONS.md)) |
 | 5 | `PM5` | **issue #350** — *One shared legs-identity assertion for every paired-run claim* | Verified absent: no helper in `packages/viz/src` asserts two runs agree on `(passengerId, arrivedAt, originFloorId, destinationFloorId)`. **Body:** the fixit pair, the intervention pair and the campaign works-night pair each claim the same crowd and none asserts it. One helper, three call sites. It is the row that makes three separate honesty claims checkable instead of argued, and it is what would catch a future intervention arm that reached demand |
 | 6 | `PM-FB2` | **issue #351** — *A `symptom` names a sight, not a figure* · content half to **issue #233** | Verified: `packages/viz/src/fixit/parse.ts:75` sweeps `entry.symptom` through the copy rules and none of them is this one. The two failing cases are confirmed in `data/fixit-cases.json`: `zoning-starves-the-top` (*"a 341 s mean wait to board"*) and `car-park-nobody-serves` (*"a 322 s worst wait beside an empty hoistway"*). docs/35 § 10 row 6 already says the two `data/` corrections *"belong to a content lane, not this rule"*, and #233 is that lane. **§ D478 adds a second content rule to the same file**: a case running outside its profile's declared band declares it on its own face, which `gym-on-the-top-floor` (9.5 against residential `max: 7`) and `three-cars-one-cars-work` (exactly 7) are the cases for |
 | 7 | `PM-TT4` | **issue #352** — *`INTERVENTION_KINDS` gains a `spread-cars` arm* | Verified unbuilt: `packages/core/src/sim/types.ts:391` still declares three arms. **Not #171**, which is about offering the two *existing* unofferable arms on the Everyday stage rather than adding a fourth kind — cross-reference it, do not fold into it. **Body:** `park-cars-lobby` is the wrong verb for two of the three shipped parking faults; `sleeping-sky-lobby` and `gym-on-the-top-floor` are both cured by parking cars **away from** the lobby. One union member and one branch in `repositionDecisionFor`, on the `park-cars-lobby` precedent. The words already exist one level up — `RULE_ACTION_WORDS` ships `spread-out` |
@@ -1496,7 +1512,7 @@ prose: `issue #N` · `new issue —` · `out of scope —` · `built —`.
 | 10 | `PM-RU2` | **issue #220** (AC2) | And **re-priced**: see § 13.2c. The template layer cannot ramp past the profile's rate, so row 10 depends on [§ D478](../DECISIONS.md) as well as on § 11 item 3, which is now checked |
 | 11 | `PM-RU1`, `PM-RU3` | **issue #220** | docs/35 names it *"GitHub issue #220's whole scope"*. Unblocked for the build by [§ D477](../DECISIONS.md); the placement half stays open |
 | 12 | `PM-PARK` | **built —** in the only form that is honest; residue **out of scope —** | `packages/viz/src/render/carRest.ts` derives *standing still* and both renderers draw it: `render/canvas.ts:1463` and `everyday/stageScreen.ts:386`. It deliberately does **not** add a `FrameCar` field, and its own docstring is the argument: *parked* claims the dispatcher decided and only `core` can check that; *standing still* is an observable. The residue — a mark that says *parked* — is out of scope on that ground, and reviving it would need a `core` change nobody has asked for. **§ 3.2's row and § 9.2's third bullet are stale**; see § 13.5 |
-| 13 | `PM-TT2` | **issue #354** — *A legibility arm on the difficulty sweep* | Verified absent: nothing in `packages/` measures a contiguous third-band window. **Body:** `docs/33` `DC-4` requires a contract's day 1 to miss a goal on a third to two thirds of seeds; a day can miss *worst wait inside 230 s* on one rider at minute 41 and be invisible for the other fifty-nine minutes. Add an arm to `docs/33` § 6's instrument: for each contract's day 1, the fraction of seeds holding a landing with somebody in the third wait band for **120 contiguous simulated seconds**. It is the only way `PM-TT2` stops being an assertion — and under [§ D475](../DECISIONS.md) it is also the shape of #208's per-building eligibility measurement, so the two should be built once |
+| 13 | `PM-TT2` | **built** — [§ D512](../DECISIONS.md), GitHub issue #354 | `packages/viz/src/shift/legibility.ts#legibilityOf` measures the longest contiguous stretch a landing holds somebody in the third wait band, by exact interval union over the legs (§ 9.3's method); `legibility.sweep.test.ts` runs every contract's day 1 over `docs/33` § 4.6's 400 days and the table is published beside the window constant, with a ten-seed slice pinned by `legibility.test.ts`. **The finding:** Garden Apartments is legible on **0 of 50** seeds, Chancery House on 2 and St Jude's on 1, Midtown Office on 50 — which is #208's per-building eligibility measurement, built once here rather than twice. |
 | 14 | `PM-DOOR` | **issue #210** (the build) and **issue #208** (AC1, AC2) | Unblocked by [§ D476](../DECISIONS.md) with one playability condition. Sized **Large** |
 
 **Nine of the fourteen are unbuilt and eight of those nine are blocked by nothing.** Rows 2, 10 and

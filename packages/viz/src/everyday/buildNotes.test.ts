@@ -27,10 +27,13 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { BUILD_VERSION, buildVersionLineOf } from '../release/version.js';
+
 import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import {
   BUILD_NOTES_POINTER,
   buildNotesSummaryOf,
+  REGISTER_EMPTY_LINE,
   buildNotesViewOf,
   EVERYDAY_SHELL_ABSENCES,
 } from './buildNotes.js';
@@ -69,15 +72,37 @@ describe('the build-information panel', () => {
      * disclosure is deciding against a number. Derived, so it cannot be the wrong number: a total
      * typed beside a list is a total that is wrong one merge later.
      */
-    expect(view.entryCount).toBeGreaterThan(20);
+    // A floor rather than a pin, and it moved 20 → 15 when GitHub issue #229 built two of the
+    // settings rows the register used to refuse, and 15 → 12 when GitHub issue #171 emptied the
+    // stage's register and #169 item 1 took the campaign's incidents entry (§ D507): a register
+    // whose entries only ever fall is what § D370's queue reading predicts, so the floor follows it
+    // down rather than standing over it — and 12 → 9 when GitHub issue #220 built the rush's
+    // engine (§ D515) and three of the rush register's four entries left with it — and 9 → 8 when
+    // GitHub issue #177 item 1 handed a past day back over a replay week (§ D517), and 8 → 6 when
+    // item 5 wrote the designer's escalator rows and folded its document (§ D518).
+    expect(view.entryCount).toBeGreaterThan(6);
+  });
+
+  it('says which build it is, in a sentence the corpus sweeps — GitHub issue #246', () => {
+    const view = buildNotesViewOf();
+    expect(view.build).toBe(buildVersionLineOf(BUILD_VERSION));
+    expect(view.build.length).toBeGreaterThan(20);
   });
 
   it('gives every section a heading and a placing line, so a heading is not the only cue', () => {
     for (const section of buildNotesViewOf().sections) {
       expect(section.heading.length).toBeGreaterThan(4);
       expect(section.note.length).toBeGreaterThan(20);
-      expect(section.entries.length).toBeGreaterThan(0);
+      /* Rows, or the sentence that says there are none — never a heading over nothing. */
+      if (section.entries.length === 0) expect(section.empty).toBe(REGISTER_EMPTY_LINE);
+      else expect(section.empty).toBeUndefined();
     }
+  });
+
+  it('says so where the stage’s rows were, now that its register is empty — GitHub issue #171', () => {
+    const stage = buildNotesViewOf().sections.find((section) => section.entries === STAGE_ABSENCES);
+    expect(stage?.entries).toEqual([]);
+    expect(stage?.empty).toBe(REGISTER_EMPTY_LINE);
   });
 
   /**
@@ -167,7 +192,6 @@ interface TriagedAbsence {
  */
 const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /* The shell — the front door, the week strip, the boards, the report's levers. */
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Replaying a past day', issue: 177 },
   /*
    * **This row's fragment and its owner both moved, and neither moved on its own.** It read
    * `'The daily board'` against #161 — the umbrella issue for everything that needed a server,
@@ -184,8 +208,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * is the same defect as a register naming a closed absence, one level up.
    */
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Putting your run on the daily board', issue: 221 },
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'third piece of advice does not open the tuner', issue: 177 },
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Endless rush', issue: 220 },
 
   /*
    * The stage. The camera was #283's, held there while it was open whether the whole-building
@@ -193,9 +215,11 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * among what a player can touch, so it is a gap, and #324 is the issue that will build it or
    * record the decision not to.
    */
-  { register: 'STAGE_ABSENCES', fragment: 'no campaign dock', issue: 181 },
-  { register: 'STAGE_ABSENCES', fragment: 'no camera', issue: 324 },
-  { register: 'STAGE_ABSENCES', fragment: 'no answer to a live incident', issue: 171 },
+  /*
+   * `STAGE_ABSENCES`' two rows — *no campaign dock* (#181) and *no answer to a live incident*
+   * (#171) — left this table on the commit that built the dock and the incident it answers
+   * (GitHub issue #171, § D507). The register is empty and still asserted both ways below.
+   */
   /*
    * **Two rows left together here, and that they were a pair is the whole reason to say so.**
    * `STAGE_ABSENCES`' *no rival lane* and `EVERYDAY_SHELL_ABSENCES`' *Racing a second dispatcher*
@@ -208,10 +232,11 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * was internally honest, and only the pair was wrong.
    */
 
-  /* The rush. Three of the four are one issue, because they are one missing engine. */
-  { register: 'RUSH_ABSENCES', fragment: 'the climbing stream', issue: 220 },
-  { register: 'RUSH_ABSENCES', fragment: 'a rush stage of its own', issue: 220 },
-  { register: 'RUSH_ABSENCES', fragment: 'a result screen of its own', issue: 220 },
+  /*
+   * The rush. Three of its four entries were one issue, because they were one missing engine, and
+   * GitHub issue #220 built it (§ D515): the climbing stream, the held-time stage and the result
+   * screen left the register on that commit. The standings are #177's and stay.
+   */
   { register: 'RUSH_ABSENCES', fragment: 'the standings', issue: 177 },
 
   /*
@@ -222,17 +247,23 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * pointing at two more issues.
    */
   { register: 'DESIGNER_ABSENCES', fragment: 'a machine class per shaft', issue: 177 },
-  { register: 'DESIGNER_ABSENCES', fragment: 'escalator rows', issue: 177 },
-  { register: 'DESIGNER_ABSENCES', fragment: 'the folded-up specification', issue: 177 },
 
-  /* The campaign. */
-  { register: 'CAMPAIGN_ABSENCES', fragment: 'Incidents here are the two the building implies', issue: 169 },
+  /*
+   * The campaign. The incidents row — *"Incidents here are the two the building implies"*, issue
+   * #169 — left this table on the commit that built the breakdown draw and the contract calendar
+   * (GitHub issues #171 and #169 item 1, § D507), and this test's own rule is what took it out: an
+   * entry deleted while the map still names it fails here.
+   */
   { register: 'CAMPAIGN_ABSENCES', fragment: 'nothing files on', issue: 223 },
   { register: 'CAMPAIGN_ABSENCES', fragment: 'The career is this session', issue: 224 },
 
   /* Settings. Two of the six are #229's remainder after its premise was refuted (§ D368). */
   { register: 'SETTINGS_ABSENCES', fragment: 'Sound —', issue: 258 },
-  { register: 'SETTINGS_ABSENCES', fragment: 'Default speed', issue: 229 },
+  /*
+   * `Default speed` and `Clear saved progress` left this table on the commit that built both —
+   * GitHub issue #229. The rows they owned are drawn on the settings screen now, and a triage row
+   * still pointing at a deleted entry is what this table's second assertion exists to refuse.
+   */
   /*
    * `Units` left this table on the commit that built its consumer — GitHub issue #170, § D448.
    * The row it owned is drawn on the settings screen now, so a triage row still pointing at the
@@ -252,7 +283,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * a capability that still does not exist; sign-in does not make it false, posting does, and
    * § D460 corrected that confusion once already.
    */
-  { register: 'SETTINGS_ABSENCES', fragment: 'Clear saved progress', issue: 229 },
 ]);
 
 /** The registers by the name the triage table uses, so a failure names the array a reader can open. */

@@ -80,6 +80,7 @@ import {
   legalStarts,
   nextSlot,
   oddsAfterWorksPct,
+  offerFeeOf,
   occupiedDayIndices,
   perfectMonthUnits,
   purseOf,
@@ -94,6 +95,8 @@ import {
   wearOf,
   worksDayLine,
 } from '../campaign/economy.js';
+import { calendarDaysOf } from '../campaign/calendar.js';
+import { CONTRACTS } from '../shift/contracts.js';
 import {
   BUILD_IDS,
   BUILD_LABELS,
@@ -106,7 +109,10 @@ import {
   needOf,
   nextLineOf,
   openTowerOf,
+  offerRefusalOf,
+  quirkOf,
 } from '../campaign/career.js';
+import { worksTodayOf } from '../campaign/works.js';
 
 /* -------------------------------------------------------------------------- *
  * What the screens are given
@@ -369,9 +375,21 @@ export const TOWERS_COPY = Object.freeze({
   openCta: 'Open',
   renewCta: 'Renew',
   offersHeading: 'ON THE TABLE',
-  offersRefusal:
-    'no offers here yet — a building is offered on a complexity and a fee, and taking one moves a week ' +
-    'between assignments; neither of those reaches this screen in this build',
+  /*
+   * § 8.8's offers — GitHub issue #169 item 3, § D510. The refusal that stood here (*"no offers
+   * here yet — a building is offered on a complexity and a fee, and taking one moves a week between
+   * assignments; neither of those reaches this screen in this build"*) is deleted on the commit
+   * that built both halves: `economy.ts#OFFER_FEES` prices the offer and `career.ts#offerRefusalOf`
+   * gates it, and `everyday/host.ts#campaignAct` moves the week on a take.
+   */
+  offersTake: 'Take it',
+  offersNotYet: 'Not yet',
+  offersNone: 'Every building the agency offers is one you already hold.',
+  offersNoSlot: 'No free slot — {n} more standing opens the next one.',
+  offersAtRisk: 'A tower is one miss from ending. Fix that before adding another.',
+  /* `offersUnpriced` (*complexity unpublished — not offered until somebody measures one*) left on
+     the commit that priced the last two buildings — GitHub issue #169 item 4, § D519, § D227. */
+  offersFreshWeek: 'taking it starts a fresh week on this building; the week you are on is parked, not lost',
   incidentsHeading: 'WHAT HAS HAPPENED LATELY',
   incidentsSub: 'none of it was your doing',
   incidentsRefusal:
@@ -510,9 +528,77 @@ export interface TowersView {
   readonly headings: readonly string[];
   readonly rows: readonly TowerRowView[];
   readonly footer: string;
-  readonly offers: { readonly heading: string; readonly refusal: string };
+  readonly offers: OffersView;
   readonly lately: { readonly heading: string; readonly sub: string; readonly refusal: string };
   readonly oddsFootnote: string;
+}
+
+/** One offered building — § 8.8's card. */
+export interface OfferRowView {
+  readonly contractId: string;
+  readonly name: string;
+  /** `complexity 3 of 5 · 5 u a day`. */
+  readonly terms: string;
+  readonly quirk: string;
+  /** `Take it`, or `Not yet` with {@link refusal} beside it. */
+  readonly cta: string;
+  readonly takeable: boolean;
+  /** Which of § 8.8's two conditions blocks the take, in the guide's own words, or `undefined`. */
+  readonly refusal: string | undefined;
+}
+
+export interface OffersView {
+  readonly heading: string;
+  /** *3 offers* — § 8.8: the caption counts what is rendered. */
+  readonly caption: string;
+  readonly rows: readonly OfferRowView[];
+  /** The line drawn when there is nothing to offer. */
+  readonly empty: string | undefined;
+  /** What a take does to the week, said before the press. */
+  readonly note: string;
+}
+
+/**
+ * § 8.8's offers, per snapshot — GitHub issue #169 item 3, § D510.
+ *
+ * Every shipped contract whose building the career does not hold and whose complexity and fee are
+ * published, each with the gate `career.ts#offerRefusalOf` decides. A building with neither would
+ * be absent rather than drawn with a refusal, because *offered on a complexity and a fee* is the
+ * definition of an offer; since § D519 every shipped building has both, and the arm is kept because
+ * the function is total over ids rather than over the shipped set. The caption counts the rows
+ * actually rendered.
+ */
+export function offersView(career: CampaignCareer, buildingNameOf: (id: string) => string | undefined): OffersView {
+  const rows: OfferRowView[] = [];
+  for (const contract of CONTRACTS) {
+    const refusal = offerRefusalOf(career, contract.id);
+    if (refusal?.kind === 'held' || refusal?.kind === 'unpriced') continue;
+    const complexity = complexityOf(contract.buildingId);
+    const fee = offerFeeOf(contract.buildingId);
+    if (complexity === undefined || fee === undefined) continue;
+    const words =
+      refusal === undefined
+        ? undefined
+        : refusal.kind === 'no-slot'
+          ? TOWERS_COPY.offersNoSlot.replace('{n}', String(refusal.standingShort))
+          : TOWERS_COPY.offersAtRisk;
+    rows.push({
+      contractId: contract.id,
+      name: buildingNameOf(contract.buildingId) ?? contract.buildingId,
+      terms: `complexity ${String(complexity)} of ${String(COMPLEXITY_MAX)} · ${units(fee)} a day`,
+      quirk: quirkOf(contract.buildingId) ?? contract.teaches,
+      cta: refusal === undefined ? TOWERS_COPY.offersTake : TOWERS_COPY.offersNotYet,
+      takeable: refusal === undefined,
+      refusal: words,
+    });
+  }
+  return {
+    heading: TOWERS_COPY.offersHeading,
+    caption: `${String(rows.length)} ${rows.length === 1 ? 'offer' : 'offers'}`,
+    rows,
+    empty: rows.length === 0 ? TOWERS_COPY.offersNone : undefined,
+    note: TOWERS_COPY.offersFreshWeek,
+  };
 }
 
 /**
@@ -624,9 +710,14 @@ export function calendarView(input: CampaignInput): CalendarView {
     rows: input.career.towers.map((tower): CalendarRowView => {
       const facts = factsFor(input, tower);
       const need = needOf(tower);
+      /*
+       * A calendared crowd is a flagged day the player can read before it comes — GitHub issue
+       * #169 item 1, § D507: `campaign/calendar.ts` books it, the design's Crown Hotel fixture marks
+       * it `bad`, and § 8.6's grid already has the glyph for that.
+       */
       const marks = {
         dueDays: need === undefined ? [] : [tower.day],
-        flaggedDays: tower.flaggedDays,
+        flaggedDays: [...new Set([...tower.flaggedDays, ...calendarDaysOf(tower.id)])].sort((a, b) => a - b),
       };
       return {
         towerId: tower.id,
@@ -667,7 +758,7 @@ function tipSuffix(mark: CalendarCell['mark']): string {
     case 'due':
       return ' · a decision is due';
     case 'works':
-      return ' · works are booked';
+      return ' · works are booked, one car out for the day';
     case 'flagged':
       return ' · a crowd is booked';
     case 'cleared':
@@ -759,7 +850,7 @@ export function towersView(input: CampaignInput): TowersView {
     headings: TOWERS_COPY.tableHeadings,
     rows: career.towers.map((tower) => towerRowView(input, tower)),
     footer: `${String(wanting)} of ${String(held)} buildings want a decision · the rest need nothing from you today`,
-    offers: { heading: TOWERS_COPY.offersHeading, refusal: TOWERS_COPY.offersRefusal },
+    offers: offersView(career, (id) => input.buildings.get(id)?.name),
     lately: {
       heading: TOWERS_COPY.incidentsHeading,
       sub: TOWERS_COPY.incidentsSub,
@@ -817,6 +908,14 @@ export const BUILDING_COPY = Object.freeze({
   testsNote:
     'every one this run can read, or the day is missed — and a day it could not read is not filed at all',
   asBuilt: 'as built',
+  /**
+   * The badge and the sentence over today's works — GitHub issue #353. Not first-person about the
+   * car and not a count of peaks: one car, today, back when the nights are done.
+   */
+  worksBadge: 'UNDER WORKS',
+  worksToday:
+    'Works are on today, so one car is out of service for the whole day. It comes back the day ' +
+    'the kit goes live; the building you run today is a car short.',
 } as const);
 
 /** § 8.3's three wear heads, in the design file's own words. */
@@ -868,6 +967,14 @@ export interface BuildingView {
     | { readonly eyebrow: string; readonly note: string; readonly purse: string; readonly rows: readonly NeedOptionView[] }
     | undefined;
   readonly quiet: { readonly heading: string; readonly body: string; readonly next: string } | undefined;
+  /**
+   * Today's works, or `undefined` on a day no booking occupies — GitHub issue #353, `docs/32`
+   * GD11's first half. The sentence is the claim GitHub issue #264 withdrew, back narrower than it
+   * left: one car, on the days the works occupy, and it comes back when they are done. The screen
+   * draws the held car's own id on the elevation beside it, from `campaign/works.ts` — the same
+   * derivation `runCampaignDay` writes into the run.
+   */
+  readonly worksToday: { readonly badge: string; readonly sentence: string } | undefined;
   readonly order: {
     readonly heading: string;
     readonly sub: string;
@@ -1014,6 +1121,9 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
             body: BUILDING_COPY.quietBody,
             next: nextLineOf(tower),
           },
+    worksToday: worksTodayOf(tower)
+      ? { badge: BUILDING_COPY.worksBadge, sentence: BUILDING_COPY.worksToday }
+      : undefined,
     order: {
       heading: BUILDING_COPY.orderHeading,
       sub: BUILDING_COPY.orderSub,
@@ -1352,7 +1462,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
         ? `book ${pendingTier.name} — ${String(pendingTier.nights)} ${pendingTier.nights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, live on day ${String(index + 1 + pendingTier.nights)}`
         : `day ${String(index + 1)}${
             state === 'works'
-              ? ' · works are booked'
+              ? ' · works are booked, one car out for the day'
               : state === 'missed'
                 ? ' · missed'
                 : state === 'cleared'
@@ -1403,16 +1513,17 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       cancel: CONTRACT_COPY.cancel,
       booked,
       /*
-       * **The absence is stated here, where the player meets the cost — issue #264.** This line
-       * used to read *"N peaks run a car short"*, which was the claim's most concrete form: a count
-       * of peaks, each said to be a car down, on days that run with every lift. The count is real
-       * and the money is real; the car is not, and § D227's first direction — *a control that
-       * writes nothing must say so* — is why the sentence says so rather than going quiet.
+       * **The cost is stated here, where the player meets it.** Issue #264 withdrew *"N peaks run a
+       * car short"* because no run held a car; GitHub issue #353 (`docs/32` GD11's first half,
+       * § D504) gave `runCampaignDay` the writer, so the sentence is back in the narrower form the
+       * run now makes true: one car out on each day the works occupy, back the day the kit is live.
+       * `campaignModel.test.ts` holds the writer's presence from disk the way it once held its
+       * absence.
        */
       worksCost:
         worksDays.length === 0
           ? undefined
-          : `${String(worksDays.length)} ${worksDays.length === 1 ? 'night' : 'nights'} of works booked, for ${String(committedUnits(tower))} units of kit that stays with the building. The works take no car out of service — a booking moves the purse and this grid, not the day you run.`,
+          : `${String(worksDays.length)} ${worksDays.length === 1 ? 'night' : 'nights'} of works booked, for ${String(committedUnits(tower))} units of kit that stays with the building. On each of those days one car is out of service for the works, and it is back the day the kit goes live.`,
       legend: MONTH_LEGEND,
     },
     purse: {

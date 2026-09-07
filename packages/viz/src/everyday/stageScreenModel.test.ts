@@ -529,11 +529,12 @@ describe('§ 7.6 — the intervention control', () => {
 
   it('holds only the arms whose whole content is their kind', () => {
     /*
-     * The constant's claim, checked: parking is the one change that needs nothing beyond its kind,
-     * so it is the one entry that can be a constant at all. The handover carries a whole profile and
-     * is therefore built per call — the case below is the one that checks it exists.
+     * The constant's claim, checked: the two parking kinds are the changes that need nothing beyond
+     * their kind, so they are the entries that can be constants at all (GitHub issue #352 added the
+     * second). The handover carries a whole profile and is therefore built per call — the case
+     * below is the one that checks it exists.
      */
-    expect(STAGE_INTERVENTIONS.map((arm) => arm.change.kind)).toEqual(['park-cars-lobby']);
+    expect(STAGE_INTERVENTIONS.map((arm) => arm.change.kind)).toEqual(['park-cars-lobby', 'spread-cars']);
     for (const arm of STAGE_INTERVENTIONS) {
       expect(arm.label.length).toBeGreaterThan(4);
       expect(arm.explains).toMatch(/re-simulates/);
@@ -557,21 +558,36 @@ describe('§ 7.6 — the intervention control', () => {
     });
 
   it('offers the handover only when the screen names somebody to hand to — GitHub issue #171', () => {
-    expect(armsFor(undefined).rows.map((row) => row.change.kind)).toEqual(['park-cars-lobby']);
+    expect(armsFor(undefined).rows.map((row) => row.change.kind)).toEqual(['park-cars-lobby', 'spread-cars']);
     const offered = armsFor({ target: OTHER, driving: PLAIN });
     expect(offered.rows.map((row) => row.change.kind)).toEqual([
       'park-cars-lobby',
+      'spread-cars',
       'switch-dispatcher',
     ]);
   });
 
   it('carries the whole profile on the row, because that is what the record carries', () => {
-    const [, handover] = armsFor({ target: OTHER, driving: PLAIN }).rows;
+    const handover = armsFor({ target: OTHER, driving: PLAIN }).rows.at(-1);
     expect(handover?.change).toEqual({ kind: 'switch-dispatcher', profile: OTHER });
     /* The name, never the id — a player hands the day to somebody, not to a key in a data file. */
     expect(handover?.label).toContain('Lobby anchor');
     expect(handover?.label).not.toContain('other');
     expect(handover?.refusal).toBeUndefined();
+  });
+
+  it('carries the caller’s unpostable reason onto the row as a note, disabling nothing — #338', () => {
+    const handover = stageInterventionsOf({
+      interventions: [],
+      simTimeS: 0,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      switchTo: { target: OTHER, driving: () => PLAIN, unpostable: 'A day handed to Lobby anchor cannot be posted.' },
+    }).rows.at(-1);
+    expect(handover?.note).toBe('A day handed to Lobby anchor cannot be posted.');
+    expect(handover?.refusal).toBeUndefined();
+    expect(armsFor({ target: OTHER, driving: PLAIN }).rows.at(-1)?.note).toBeUndefined();
   });
 
   it('refuses a handover to the vector already driving, and says why', () => {
@@ -599,19 +615,23 @@ describe('§ 7.6 — the intervention control', () => {
   });
 
   /**
-   * **The pin under the register's remaining absence** — [§ D227](../../../../DECISIONS.md): a
-   * refusal is held by a run, never by another sentence.
+   * **The register is empty, and the answer is not one of these rows** — GitHub issue #171,
+   * [§ D507](../../../../DECISIONS.md).
    *
-   * `STAGE_ABSENCES` still says this screen offers no answer to a live incident. The day it does,
-   * this case goes red, and the sentence has to come out with the arm that made it false — which is
-   * what the entry it replaced failed to do for the handover.
+   * This case used to pin *"builds no answered incident, which is what the register still says"*,
+   * and it went red on the commit that built the dock, which is what it was for. What survives is
+   * the structural half: § 7.6's third arm is composed by the dock from the incident's own option
+   * data (`campaign/incidents.ts#answerChangeOf`) and never by `stageInterventionsOf`, whose rows
+   * are the arms that need nothing the dock holds. And the register stays a constant that is
+   * checked, on `screens.ts#UNBUILT_REASONS`'s rule: an entry that ever returns owes its sentence.
    */
-  it('builds no answered incident, which is what the register still says', () => {
+  it('composes no answered incident here — the dock does — and the register is empty', () => {
     for (const switchTo of [undefined, { target: OTHER, driving: PLAIN }]) {
       for (const row of armsFor(switchTo).rows) {
         expect(row.change.kind).not.toBe('answer-incident');
       }
     }
+    expect(STAGE_ABSENCES).toEqual([]);
   });
 
   it('stamps the latest change at or before the playhead, and nothing later', () => {
@@ -771,7 +791,7 @@ describe('§ 3.3 — the stage row, refined', () => {
 describe('§ 6.4 — where *Close the day* leaves the player', () => {
   const filed = { dayClosed: true, hasReport: true } as const;
 
-  it('opens the report in the two flows whose report § 3.3 numbers, and in no other', () => {
+  it('opens the report in the flows whose report row carries a timeline, and in no other', () => {
     /*
      * Every context the product has, from the value the tree derives its sweeps from — a fifth
      * added to `RUN_CONTEXTS` arrives here rather than being quietly omitted. `rush` presses this
@@ -784,6 +804,8 @@ describe('§ 6.4 — where *Close the day* leaves the player', () => {
     expect(landing).toEqual({
       daily: 'report',
       campaign: 'report',
+      /* § 6.1's replay is the daily flow over a parked week, and its report row carries the daily timeline — § D517. */
+      replay: 'report',
       rush: undefined,
       watch: undefined,
     });
@@ -865,6 +887,27 @@ describe('the cutaway’s geometry', () => {
     for (const row of g.rows) expect(row.y).toBeCloseTo(g.yForHeight(row.heightM), 9);
   });
 
+  it('fits the camera’s window to the plot and leaves the rest of the tower outside it — GitHub issue #324', () => {
+    const tall = Array.from({ length: 60 }, (_unused, index) => ({
+      ...syntheticFloor(`L${String(index)}`, index),
+      heightM: index * 3.2,
+    }));
+    const whole = stageGeometryOf({ width: 800, height: 340, floors: tall, shafts });
+    const band = stageGeometryOf({ width: 800, height: 340, floors: tall, shafts, window: { fromIndex: 10, toIndex: 30 } });
+    /* Moving the control changes what the stage draws: the pitch, and which rows are in the picture. */
+    expect(band.rowPitch).toBeGreaterThan(whole.rowPitch * 2);
+    expect(band.rows.filter((row) => row.visible).map((row) => row.floorId)).toEqual(
+      tall.slice(10, 31).map((floor) => floor.id),
+    );
+    expect(whole.rows.every((row) => row.visible)).toBe(true);
+    /* Every row still has a y on the band's scale, so a car between hidden floors is still placed. */
+    expect(band.rows).toHaveLength(60);
+    expect(band.rows[0]!.y).toBeGreaterThan(band.plot.y + band.plot.height);
+    expect(band.rows[59]!.y).toBeLessThan(band.plot.y);
+    /* And the band's own labels are all legible, which is the whole point of a band. */
+    expect(band.rows.filter((row) => row.visible).every((row) => row.labelled)).toBe(true);
+  });
+
   it('keeps every row and thins only labels, never the entrance', () => {
     const tall = Array.from({ length: 60 }, (_unused, index) => ({
       ...syntheticFloor(`L${String(index)}`, index),
@@ -918,39 +961,28 @@ describe('the cutaway’s geometry', () => {
  * -------------------------------------------------------------------------- */
 
 describe('the stage’s own register of absences', () => {
-  it('names the campaign dock and the one unbuilt intervention arm, and no longer the ghost', () => {
-    const joined = STAGE_ABSENCES.join('\n');
+  it('is empty — the dock, the answer, the handover and the ghost have all been built — and stays checked', () => {
     /*
      * **Keyed on subjects rather than on section numbers** — GitHub issue #207 took the numbers off
-     * every player-facing string, so `/§ 7\.5/` and `/§ 7\.6/` had nothing left to match. The two
-     * rows they identified are the campaign dock and the two unbuilt intervention arms, which is
-     * what this case's own name has always said it was checking.
+     * every player-facing string. Every subject this register ever named is now asserted as an
+     * absence, so a revert of any of the four has to face this case rather than slip a sentence
+     * back in beside a control that works (§ D227's defect with its polarity reversed):
+     *
+     * - *no decisions during a run* / *handover* — § 7.6's second arm, GitHub issue #171's first half;
+     * - *ghost* / *rival* — § 7.4's lane, GitHub issue #226, § D482;
+     * - *no campaign dock* / *no answer to a live incident* — § 7.5 and § 7.6's third arm, GitHub
+     *   issue #171's second half, § D507, built by `everyday/campaignDock.ts` and
+     *   `campaign/incidents.ts` on one commit.
+     *
+     * The **caution** on the race is unaffected and lives where it always did —
+     * `live/raceStrip.ts#RACE_FOOTER`, which is never conditional.
      */
-    expect(joined).toMatch(/no campaign dock/);
-    expect(joined).toMatch(/no answer to a live incident/);
-    /*
-     * And the entry that came out. GitHub issue #171's first arm landed, so *"a handover … and this
-     * screen offers neither"* became a refusal about a control a player can press — § D227's defect
-     * with its polarity reversed. Asserted as an absence so a revert would have to face it.
-     */
+    const joined = STAGE_ABSENCES.join('\n');
+    expect(STAGE_ABSENCES).toEqual([]);
     expect(joined).not.toMatch(/no decisions during a run/);
     expect(joined).not.toMatch(/handover/);
-    /*
-     * **And the second entry that came out** — GitHub issue #226, [§ D482](../../../../DECISIONS.md).
-     *
-     * `STAGE_NO_GHOST` read *"no rival lane — a ghost is a second run of the same crowd, and this
-     * screen cannot ask for one yet"*. The screen can ask for one now, through
-     * `everyday/host.ts#raceAgainst`, and a lane that shipped the picker without deleting the
-     * sentence would have left a refusal telling a player not to touch a control that works. The
-     * assertion is `not.toMatch` rather than an absent case for the same reason the pair above is:
-     * a revert has to face it, and the case's own name says what changed.
-     *
-     * The **caution** is unaffected and lives where it always did — `live/raceStrip.ts#RACE_FOOTER`,
-     * *"One day each on the same crowd. That is a race, not proof."*, which is never conditional.
-     * A race arriving is exactly when that sentence starts mattering, so nothing here relaxes it.
-     */
     expect(joined).not.toMatch(/ghost|rival/);
-    for (const absence of STAGE_ABSENCES) expect(absence.length).toBeGreaterThan(20);
+    expect(joined).not.toMatch(/no campaign dock|no answer to a live incident/);
   });
 });
 
@@ -1324,7 +1356,7 @@ describe('stageCarRestBarOf — where the mark lands and how big it gets', () =>
 /**
  * **The goal strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
  *
- * The charter names P3 as the pillar this build fails outright, and its refusal test is *where on
+ * The charter named P3 as the pillar this build failed outright — re-adjudicated on GitHub issue #277's landing, `docs/22` § 2 — and its refusal test is *where on
  * the stage would a player have seen this?* Before this strip the answer was nowhere: the day asks
  * five things, the brief lists them, the report grades them, and `grep -ni "goal"` over the stage's
  * two files returned nothing at all.
@@ -1531,5 +1563,121 @@ describe('the § 7 goal strip', () => {
     for (const at of [0, 200, 400, 599.9]) {
       expect(valueOf(stripAt(recording, at), 'energy'), `@${String(at)}s`).toBe(PENDING_DISPLAY);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § 7.3's camera — GitHub issue #324, § D505
+ * -------------------------------------------------------------------------- */
+
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseBuilding, resolveBuilding } from '@elevator-sim/core/browser';
+import { DATA_DIR } from '../fixtures.test-helper.js';
+import { RESOURCES } from '../scope/probes.test-helper.js';
+import {
+  STAGE_CAMERAS,
+  legibleFloorCount,
+  stageCameraChipsOf,
+  stageCameraWindowOf,
+  wholeTowerIsLegible,
+} from './stageScreenModel.js';
+
+describe('the camera, measured per tower — GitHub issue #324', () => {
+  /** The stage's own box: 60 vh of a 720 px viewport, and of a 1080 px one. */
+  const HEIGHTS = { laptop: Math.round(720 * 0.6), desktop: Math.round(1080 * 0.6) } as const;
+
+  /** Every shipped tower, resolved so `floorRanges` count as the floors they author. */
+  function shippedTowers(): readonly { readonly id: string; readonly floors: VizRecording['floors'] }[] {
+    const dir = join(DATA_DIR, 'buildings');
+    return readdirSync(dir)
+      .filter((name) => name.endsWith('.json'))
+      .map((name) => {
+        const config = parseBuilding(JSON.parse(readFileSync(join(dir, name), 'utf8')) as unknown);
+        const resolved = resolveBuilding(config, RESOURCES.elevatorSpecs);
+        return {
+          id: config.id,
+          floors: resolved.floors.map((floor, index) => ({
+            ...syntheticFloor(floor.id, index, floor.label ?? floor.id),
+            heightM: floor.heightM,
+            isEntrance: floor.isEntrance ?? index === 0,
+          })),
+        };
+      })
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  it('is offered on exactly the towers whose whole-tower read thins labels, at the stage’s own height', () => {
+    /*
+     * The entry's reason — *"the cutaway draws the whole building at once, so there is nothing to
+     * pan and nothing to follow"* — was a claim about today's canvas, and the issue asked for it to
+     * be measured per tower before anything was built. This is that measurement, pinned: which
+     * shipped towers thin their labels at 60 vh of a laptop viewport, which is where a camera buys
+     * reaching a floor. The list is asserted so a new tower, or a moved pitch, moves it here.
+     *
+     * Measured: two of the eight. `secure-tower`'s thirty floors fit a 432 px box at the 13 px
+     * label pitch with two to spare, which the first draft of this list had wrong — it was written
+     * from the floor count before the measurement ran, which is the mistake the issue warned about.
+     */
+    const cramped = shippedTowers()
+      .filter((tower) => !wholeTowerIsLegible(tower.floors, HEIGHTS.laptop))
+      .map((tower) => tower.id);
+    expect(cramped).toEqual(['mixed-use-high-rise', 'vertical-city']);
+    for (const tower of shippedTowers()) {
+      const chips = stageCameraChipsOf(tower.floors, HEIGHTS.laptop);
+      expect(chips.length === 0, tower.id).toBe(!cramped.includes(tower.id));
+    }
+  });
+
+  it('offers a chip exactly when the window it selects differs from the whole tower', () => {
+    for (const tower of shippedTowers()) {
+      for (const height of Object.values(HEIGHTS)) {
+        const chips = stageCameraChipsOf(tower.floors, height);
+        for (const chip of STAGE_CAMERAS) {
+          const window = stageCameraWindowOf({ camera: chip.id, floors: tower.floors, height });
+          if (chip.id === 'whole') {
+            expect(window).toBeUndefined();
+            continue;
+          }
+          /* A chip is drawn iff its window is a real band; a band on a legible tower would be inert. */
+          expect(window !== undefined, `${tower.id} ${chip.id} at ${String(height)}`).toBe(chips.length > 0);
+          if (window !== undefined) {
+            const inside = tower.floors.filter((floor) => floor.index >= window.fromIndex && floor.index <= window.toIndex);
+            expect(inside.length).toBe(Math.min(tower.floors.length, legibleFloorCount(height)));
+          }
+        }
+      }
+    }
+  });
+
+  it('follows the fullest car, and falls back to the lobby when nobody is aboard', () => {
+    const tall = Array.from({ length: 60 }, (_unused, index) => ({
+      ...syntheticFloor(`L${String(index)}`, index),
+      heightM: index * 3.2,
+      isEntrance: index === 0,
+    }));
+    const height = HEIGHTS.laptop;
+    const lobby = stageCameraWindowOf({ camera: 'lobby', floors: tall, height });
+    expect(lobby?.fromIndex).toBe(0);
+    const empty = stageCameraWindowOf({ camera: 'follow', floors: tall, height, cars: [{ heightM: 150, occupants: 0 }] });
+    expect(empty).toEqual(lobby);
+    const high = stageCameraWindowOf({
+      camera: 'follow',
+      floors: tall,
+      height,
+      cars: [{ heightM: 3.2 * 5, occupants: 2 }, { heightM: 3.2 * 45, occupants: 7 }],
+    });
+    expect(high).toBeDefined();
+    expect(high!.fromIndex).toBeLessThanOrEqual(45);
+    expect(high!.toIndex).toBeGreaterThanOrEqual(45);
+    expect(high).not.toEqual(lobby);
+    /* And it moves with the car — the same crowd, the fullest car elsewhere, a different window. */
+    const moved = stageCameraWindowOf({
+      camera: 'follow',
+      floors: tall,
+      height,
+      cars: [{ heightM: 3.2 * 25, occupants: 7 }],
+    });
+    expect(moved).not.toEqual(high);
   });
 });

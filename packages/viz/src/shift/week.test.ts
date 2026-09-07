@@ -379,7 +379,7 @@ describe('switching assignment parks the week rather than destroying it', () => 
      * The third is `FREE_PLAY_CONTRACT_ID` — GitHub issue #125 — and it is walked here rather than
      * asserted about, because the property is *the whole set fits*, not *the constant went up*.
      */
-    expect(PARKED_WEEKS_MAX).toBe(CONTRACTS.length + 3);
+    expect(PARKED_WEEKS_MAX).toBe(CONTRACTS.length + Object.keys(WEEK_CONTRACT_SENTINELS).length);
     let state = { week: openWeek(CONTRACTS[0]?.id), parked: [] as readonly WeekState[] };
     for (const contract of CONTRACTS) state = switchWeek(state.week, state.parked, contract.id, 'resume');
     state = switchWeek(state.week, state.parked, SANDBOX_CONTRACT_ID, 'resume');

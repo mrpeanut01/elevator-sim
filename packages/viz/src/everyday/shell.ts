@@ -128,9 +128,25 @@ export interface EverydayScreenShellContext extends EverydayScreenContext {
    * navigated to (§ 1.5), and a shell that entered the context on a refused row would be showing a
    * spectator chrome over the player's own day.
    *
-   * Its one non-test caller is `everyday/weekScreen.ts`'s `Watch it` row.
+   * Its non-test callers are `everyday/weekScreen.ts`'s `Watch it` row and, since GitHub issue
+   * #337, `everyday/boardScreen.ts`'s, over a daily-board row.
    */
   enterWatch(): void;
+  /**
+   * § 9's *Start the rush*, as a call — put the § 7 stage into `ctx: 'rush'` (GitHub issue #220).
+   * The run is `EverydayHost.startRush`'s and is asked for first; this is only the context, and the
+   * rush setup screen is its one caller. Leaving the stage or the result for any other screen
+   * leaves the rush, which puts the parked week back — see {@link go}'s guard.
+   */
+  enterRush(): void;
+  /**
+   * § 6.1's replay, as a call — put the daily loop into `ctx: 'replay'` over the replay week
+   * `EverydayHost.startReplay` has stood up (GitHub issue #177 item 1, § D517). The door is its one
+   * caller and asks the host first; this is only the context. Leaving the brief, the stage or the
+   * report for any other screen leaves the replay, which puts the parked week back — see
+   * {@link go}'s guard.
+   */
+  enterReplay(): void;
 }
 
 /**
@@ -234,6 +250,10 @@ export interface EverydayShell {
    * are separate and why a caller must read the host's answer before calling this.
    */
   enterWatch(): void;
+  /** § 9's rush context, the shell's half — GitHub issue #220. See {@link EverydayScreenShellContext.enterRush}. */
+  enterRush(): void;
+  /** § 6.1's replay context, the shell's half — GitHub issue #177 item 1. See {@link EverydayScreenShellContext.enterReplay}. */
+  enterReplay(): void;
   /** Which world has the page. `'engineer'` between the two presses, `'everyday'` otherwise. */
   world(): EverydayWorld;
   /**
@@ -837,6 +857,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * so a rail row and a bar button cannot end a watch differently.
      */
     if (state.ctx === 'watch' && screen !== 'stage') leaveWatch();
+    if (state.ctx === 'rush' && screen !== 'stage' && screen !== 'report') leaveRush();
+    if (state.ctx === 'replay' && screen !== 'brief' && screen !== 'stage' && screen !== 'report') leaveReplay();
     state = { ...state, screen };
     draw();
     doc.defaultView?.scrollTo(0, 0);
@@ -910,10 +932,36 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     go('stage');
   }
 
+  /** § 9's rush, the shell's half — the context; `EverydayHost.startRush` owns the run. GitHub issue #220. */
+  function enterRushStage(): void {
+    state = { ...state, ctx: 'rush' };
+    go('stage');
+  }
+
+  /** Leave the rush: the context back to the daily loop, and the host puts the parked week back. */
+  function leaveRush(): void {
+    state = { ...state, ctx: 'daily' };
+    dataHost?.leaveRush();
+  }
+
+  /** § 6.1's replay, the shell's half — the context; `EverydayHost.startReplay` owns the week. GitHub issue #177 item 1. */
+  function enterReplayBrief(): void {
+    state = { ...state, ctx: 'replay' };
+    go('brief');
+  }
+
+  /** Leave the replay: the context back to the daily loop, and the host puts the parked week back. */
+  function leaveReplay(): void {
+    state = { ...state, ctx: 'daily' };
+    dataHost?.leaveReplay();
+  }
+
   /** Leave for real: clear the flow and land on the menu. */
   function doLeave(): void {
     runOpen = false;
     if (state.ctx === 'watch') leaveWatch();
+    if (state.ctx === 'rush') leaveRush();
+    if (state.ctx === 'replay') leaveReplay();
     state = { ...state, ctx: 'daily' };
     go(EVERYDAY_ROOT);
   }
@@ -1516,6 +1564,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       wayOut.addEventListener('click', () => {
         if (state.ctx === 'campaign') go('towers');
         else if (state.ctx === 'rush') go('rush');
+        else if (state.ctx === 'replay') go('door');
         else doLeave();
       });
       bar.append(wayOut);
@@ -1868,6 +1917,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           enterEngineer,
           /* § 14.1's `Watch it`, likewise — the context, never the run. */
           enterWatch: enterWatchStage,
+          enterRush: enterRushStage,
+          enterReplay: enterReplayBrief,
         };
         mounted = module.mount(screenRegion, context);
         /*
@@ -1997,6 +2048,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     },
     enterEngineer,
     enterWatch: enterWatchStage,
+    enterRush: enterRushStage,
+    enterReplay: enterReplayBrief,
     world: () => world,
     destroy: () => {
       stopProfileWatch();

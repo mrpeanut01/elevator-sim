@@ -36,7 +36,7 @@
  *    honest spelling, because it does not claim the dispatcher considers something it does not.
  */
 
-import type { DispatcherProfile } from '@elevator-sim/core/browser';
+import { COST_TERMS_BY_ID, type DispatcherProfile } from '@elevator-sim/core/browser';
 import {
   applyPatch,
   candidateFromProfile,
@@ -467,15 +467,64 @@ export function specIsDirty(spec: DispatcherSpec, source: DispatcherProfile | un
   );
 }
 
-/** `cost = 1.00·wait + 0.30·starvation` — the handoff's summary line, § 1.3 M8. */
+/**
+ * Which register the cost line is printed in — the Engineer shell's two, by their own names.
+ * `'advanced'` is the notation; `'basic'` is the plain arm [§ D495](../../../../DECISIONS.md)
+ * ruled the Casual register is owed. Structurally `mode/types.ts#ViewMode`, restated here so this
+ * module keeps depending on nothing in `dev/` or `mode/`.
+ */
+export type CostLineRegister = 'advanced' | 'basic';
+
+/**
+ * `cost = 1.00·wait + 0.30·starvation` — the handoff's summary line, § 1.3 M8 — or, in the Basic
+ * register, the same vector in the player's own words.
+ *
+ * ## Why the plain arm is here, beside the producer, and what it says — GitHub issue #146
+ *
+ * The Engineer shell's `#view-mode` option is labelled *Casual — plain language* and its title
+ * promises *"Casual states every figure in plain language"*, and this line was drawn mode-blind at
+ * four sites while the term rows directly beneath it branched on the mode. § D495 ruled the
+ * promise is kept rather than narrowed, and that the arm lives **here**: `everyday/workshopModel.ts`
+ * already imports the Engineer editor, so a plain arm defined there could not be imported back, and
+ * an optional third parameter defaulting to today's output leaves every existing caller
+ * byte-identical — which `dev/dispatcherEditor.test.ts` asserts rather than assumes.
+ *
+ * The plain arm follows `mathsDisclosureOf`'s order — a plain sentence first, then every symbol
+ * named, then the signs — collapsed into the one line these sites draw. The names are `core`'s own
+ * `player.name` for each implemented term (never the engine id and never `shortNameOf`'s
+ * abbreviation, which is an id at one remove), so the words on this line are the words on the
+ * sliders beside it. A term `core` has not implemented has no player words, and is named by the
+ * short name rather than by an invented one. **No estimate cue** — *average*, *typical*,
+ * *percentile* — appears in the composed sentence, because a cue beside a number is
+ * `honesty-9100031`'s collision manufactured on purpose (the constraint wave 18 carried and § D495
+ * re-carried), and `core`'s player names carry none.
+ */
 export function costFunctionLine(
   spec: DispatcherSpec,
   shortNameOf: (termId: TermId) => string,
+  register: CostLineRegister = 'advanced',
 ): string {
-  const parts = Object.entries(spec.weights)
+  const weighted = Object.entries(spec.weights)
     .filter(([, position]) => position > 0)
-    .sort(([, a], [, b]) => b - a)
-    .map(([term, position]) => `${(position / 100).toFixed(2)}·${shortNameOf(term)}`);
+    .sort(([, a], [, b]) => b - a);
+  if (register === 'basic') {
+    if (weighted.length === 0) {
+      return (
+        'Every car is given a score for answering a call and the lowest score wins — and every ' +
+        'weight here is zero, so every car scores the same and the first eligible one always goes.'
+      );
+    }
+    const named = weighted.map(
+      ([term, position]) =>
+        `${COST_TERMS_BY_ID.get(term)?.player.name ?? shortNameOf(term)} counts ${(position / 100).toFixed(2)}`,
+    );
+    return (
+      'Every car is given a score for answering a call and the lowest score wins. The score adds ' +
+      `up: ${named.join(', ')}. Nothing on it pulls a score down — a weight decides which kind of ` +
+      'cost outranks which.'
+    );
+  }
+  const parts = weighted.map(([term, position]) => `${(position / 100).toFixed(2)}·${shortNameOf(term)}`);
   return parts.length === 0
     ? 'cost = nothing — every term is zero'
     : `cost = ${parts.join(' + ')}`;

@@ -59,14 +59,14 @@
 
 import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
+import { drawCutaway, sizeCanvas } from './cutaway.js';
 import { Playback } from '../playback/playback.js';
 import { systemClock } from '../playback/clock.js';
-import type { Frame, VizRecording } from '../contract/types.js';
+import type { VizRecording } from '../contract/types.js';
 import { frameAt } from '../frame/frameAt.js';
-import { queueAt, type FloorQueue } from '../frame/overlay.js';
+import { queueAt } from '../frame/overlay.js';
 import { observationsAt } from '../live/observations.js';
 // AD-S17 — one derivation of *standing still* for both stages; see `render/carRest.ts`.
-import { carRestsAt } from '../render/carRest.js';
 import {
   GHOST_OPTIONS,
   RACE_SAMPLE_INTERVAL_S,
@@ -78,7 +78,8 @@ import {
 } from '../live/raceStrip.js';
 import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
-import type { ActionBarModel } from './actionBar.js';
+import { actionBarFor, type ActionBarModel } from './actionBar.js';
+import { RUSH_NOT_LANDED, rushStageHeaderOf } from './rush.js';
 import type { EverydayHost } from './host.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -86,15 +87,10 @@ import {
   DEFAULT_STAGE_SPEED_INDEX,
   stageAlarmOf,
   stageBarModelOf,
-  stageCarPaintOf,
-  stageCarReadoutOf,
-  stageCarRestBarOf,
-  stageCrowdCapOf,
   stageFilingLandsOn,
   stageGeometryOf,
   stageGoalsOf,
   stageHeaderOf,
-  stageInkFor,
   stageInterventionsOf,
   stageLegend,
   stageOpeningLineOf,
@@ -102,17 +98,21 @@ import {
   STAGE_AWAITING_RUN,
   STAGE_DRIVING_LABEL,
   STAGE_INTERVENTIONS,
-  STAGE_OUT_OF_SERVICE,
   STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
+  STAGE_CAMERAS,
   STAGE_SPEEDS,
+  stageCameraChipsOf,
+  stageCameraWindowOf,
+  type StageCameraId,
   STAGE_SWITCH_PICKER_LABEL,
   type StageFigure,
-  type StageGeometry,
   type StageInterventionRow,
   type StageInterventionView,
   type StageSwitchTarget,
 } from './stageScreenModel.js';
+import { everydayProfileStore } from './profileStore.js';
+import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as GAP,
@@ -126,6 +126,8 @@ import {
   SPECTATOR_MAKES_NO_CHANGES,
 } from './watchStage.js';
 import type { WatchingView } from '../watch/view.js';
+import { interventionLogOf } from '../live/interventions.js';
+import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
 
 /* -------------------------------------------------------------------------- *
  * The module store — what the § 3.3 refinement reads
@@ -235,7 +237,8 @@ const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
  * it under, and the gate would go red rather than the product going quietly non-compliant — which
  * is the correct direction, and the reason no larger figure was invented to buy slack. A number
  * above 60 would have been a threshold with nothing behind it, which this file already refuses one
- * constant over (`today.ts`'s `COMFORTABLE_PER_CAR` carries a citation for exactly that reason).
+ * constant over (`today.ts`'s plate carried a cited 400 for exactly that reason, until § D514
+ * made it configuration).
  *
  * **No floor is set beneath it.** `340px` would only bind below a 567 px viewport, which is shorter
  * than anything the support matrix carries, so keeping it would have added a constant that nothing
@@ -244,240 +247,11 @@ const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
  */
 const STAGE_CANVAS_HEIGHT = '60vh';
 
-/**
- * Size a canvas for the device, or refuse.
- *
- * § 14: read the bounding rect, multiply by `min(2, devicePixelRatio)`, set the transform. Never a
- * CSS scale — a CSS-scaled canvas is a bitmap stretched, and the hairlines this cutaway is mostly
- * made of go to mush.
- *
- * **`false` for a zero box, and that is the § D335 rule rather than defensiveness.** A canvas
- * measured while an ancestor is `display:none` reports `0 × 0`; sizing to that and drawing produces
- * a blank canvas that stays blank when the ancestor comes back, because nothing re-measures. So a
- * zero box is *not* a size — it is "ask again next frame".
+/*
+ * The canvas sizing and the cutaway painter live in `cutaway.ts` now — GitHub issue #348, so that
+ * Fix a building can play the as-built run on the same picture without importing this whole stage.
+ * Nothing about the painting moved; what moved is the file it is in.
  */
-function sizeCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D | undefined {
-  const rect = canvas.getBoundingClientRect();
-  if (rect.width < 1 || rect.height < 1) return undefined;
-  const dpr = Math.min(2, canvas.ownerDocument.defaultView?.devicePixelRatio ?? 1);
-  const width = Math.round(rect.width * dpr);
-  const height = Math.round(rect.height * dpr);
-  if (canvas.width !== width) canvas.width = width;
-  if (canvas.height !== height) canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (ctx === null) return undefined;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return ctx;
-}
-
-/* -------------------------------------------------------------------------- *
- * The cutaway
- * -------------------------------------------------------------------------- */
-
-/** What one paint of the cutaway needs. All of it derived at one instant, by the caller. */
-interface CutawayInput {
-  readonly recording: VizRecording;
-  readonly frame: Frame;
-  readonly queues: readonly FloorQueue[];
-  readonly geometry: StageGeometry;
-  readonly floorLabelOf: (id: string) => string;
-}
-
-/**
- * § 7.2's picture: floor slabs, shaft wells as light voids, cars as dark boxes with amber doors that
- * split as they open, riders as marks inside the car, a `riders/capacity` readout, a direction arrow
- * while travelling, and the waiting crowd as capsules coloured by how long each person has stood.
- *
- * The colour is `stageScreenModel.ts#stageInkFor`, which reads `live/bands.ts`' boundaries — so a
- * capsule on this screen and the mood card in the Engineer rail are two paints of one banding.
- *
- * ## Every word and every rectangle in here is decided elsewhere
- *
- * This function draws five `fillText` sites, and until GitHub issue **#212** three of them were
- * composed **here**: the out-of-service caption, the `riders/capacity` readout and the direction
- * glyph. A string composed in a mount is a string no honesty property can read — the mount needs a
- * document, a canvas and an animation frame, so `derive.test.ts` excludes it, correctly. One of the
- * three was a **live figure** drawn on the vertical slice's centrepiece and swept by nothing.
- *
- * They are `stageScreenModel.ts#STAGE_OUT_OF_SERVICE` and `#stageCarReadoutOf` now, and the car's
- * geometry is `#stageCarPaintOf` for the same reason one layer down: the door-fill inversion #212
- * reports was arithmetic nothing could check without a canvas. What is left here is where a
- * rectangle lands on the page and which colour the brush is.
- */
-function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput): void {
-  const { geometry: g, frame, recording } = input;
-  ctx.clearRect(0, 0, g.width, g.height);
-
-  /* The building's ground: a warm well behind the whole elevation. */
-  ctx.fillStyle = C.cardSunk;
-  roundedRect(ctx, g.plot.x, g.plot.y, g.plot.width, g.plot.height, 10);
-  ctx.fill();
-
-  /* --- Floor slabs, with the number and the tenant line in the gutter. --- */
-  const slab = Math.max(2, Math.min(4, g.rowPitch * 0.16));
-  for (const row of g.rows) {
-    ctx.fillStyle = row.isEntrance ? C.ruleMid : C.ruleLight;
-    ctx.fillRect(g.plot.x + 6, row.y, g.plot.width - 12, slab);
-    if (!row.labelled) continue;
-    ctx.fillStyle = row.isEntrance ? C.ink : C.warmGrey;
-    ctx.font = `600 ${String(Math.min(11, Math.max(8, g.rowPitch * 0.45)))}px ${TYPE.mono}`;
-    ctx.textBaseline = 'bottom';
-    ctx.textAlign = 'left';
-    ctx.fillText(input.floorLabelOf(row.floorId), g.plot.x + 4, row.y - 1, g.gutterWidth - 8);
-  }
-
-  /* --- The wells. A void is lighter than the building around it, per § 7.2. --- */
-  for (const column of g.columns) {
-    if (column.outOfService) {
-      ctx.save();
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = C.faint;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(column.x, g.plot.y + 6, column.width, g.plot.height - 12);
-      ctx.restore();
-      ctx.save();
-      ctx.translate(column.centreX, g.plot.y + g.plot.height / 2);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillStyle = C.warmGrey;
-      ctx.font = `500 9px ${TYPE.mono}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(STAGE_OUT_OF_SERVICE, 0, 0);
-      ctx.restore();
-      continue;
-    }
-    ctx.fillStyle = C.paper;
-    ctx.fillRect(column.x, g.plot.y + 6, column.width, g.plot.height - 12);
-  }
-
-  /* --- The waiting crowd, at the landings. --- */
-  const capsuleW = 4.5;
-  const capsuleH = Math.max(5, Math.min(11, g.rowPitch * 0.62));
-  const perRow = Math.max(1, Math.floor((g.landing.width - 8) / (capsuleW + 2)));
-  for (const floor of input.queues) {
-    const row = g.rows.find((candidate) => candidate.floorId === floor.floorId);
-    if (row === undefined) continue;
-    const cap = stageCrowdCapOf(floor.riders.length);
-    for (let index = 0; index < cap.drawn; index += 1) {
-      const rider = floor.riders[index];
-      if (rider === undefined) continue;
-      const lane = Math.floor(index / perRow);
-      const slot = index % perRow;
-      /* Right-to-left from the well, so the queue reads as a crowd pressed against the doors. */
-      const x = g.landing.x + g.landing.width - 6 - (slot + 1) * (capsuleW + 2) - lane * 1.5;
-      const y = row.y - 2 - capsuleH - lane * (capsuleH * 0.25);
-      ctx.fillStyle = stageInkFor(rider.waitedS);
-      roundedRect(ctx, x, y, capsuleW, capsuleH, capsuleW / 2);
-      ctx.fill();
-    }
-    if (cap.overflow !== undefined) {
-      ctx.fillStyle = C.ink;
-      ctx.font = `600 9px ${TYPE.mono}`;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(cap.overflow, g.landing.x + 2, row.y - 2);
-    }
-  }
-
-  /* --- The cars. --- */
-  const carH = Math.max(9, Math.min(20, g.rowPitch * 0.86));
-  /* AD-S17. Derived once per paint from the record's own motions and door marks — never from a
-     field on the frame, and never from a motion the playhead has not reached. */
-  const restByCar = new Map(carRestsAt(recording, frame).map((rest) => [rest.carId, rest]));
-  for (const car of frame.cars) {
-    const column = g.columns.find((candidate) => candidate.carId === car.carId);
-    if (column === undefined || column.outOfService) continue;
-    const shaft = recording.shafts.find((candidate) => candidate.carId === car.carId);
-    const y = g.yForHeight(car.heightM) - carH;
-    const bodyX = column.x + 1.5;
-    const bodyWidth = column.width - 3;
-    ctx.fillStyle = C.ink;
-    roundedRect(ctx, bodyX, y, bodyWidth, carH, 3);
-    ctx.fill();
-
-    /*
-     * Everything inside the car is `stageScreenModel.ts#stageCarPaintOf`'s — GitHub issue **#212**.
-     * The doorway, the two leaves and the mark grid used to be arithmetic here, and the arithmetic
-     * was inverted: at `doorFraction = 0` each leaf was half the body, so a shut car was a solid
-     * amber block and the `paper` marks sat on it at 1.83:1. Nothing about that could be checked
-     * without a canvas. It is a plan now, and this loop paints it.
-     */
-    const paint = stageCarPaintOf({
-      bodyWidth,
-      carHeight: carH,
-      doorFraction: car.doorFraction,
-      occupants: car.occupants,
-    });
-    ctx.fillStyle = C.sun;
-    for (const leaf of paint.leaves) {
-      ctx.fillRect(bodyX + leaf.x, y + leaf.y, leaf.width, leaf.height);
-    }
-    /* Riders aboard, capped at nine — § 14. A tenth mark says nothing a reader can count. */
-    ctx.fillStyle = C.paper;
-    for (const mark of paint.marks) {
-      ctx.fillRect(bodyX + mark.x, y + mark.y, mark.width, mark.height);
-    }
-
-    /* `riders/capacity`, and the direction arrow while it travels. */
-    const readout = stageCarReadoutOf({
-      occupants: car.occupants,
-      capacityPersons: shaft?.capacityPersons,
-      direction: car.direction,
-    });
-    ctx.fillStyle = C.warmGrey;
-    ctx.font = `500 8.5px ${TYPE.mono}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(readout.occupancy, column.centreX, y - 1.5);
-    if (readout.direction !== undefined) {
-      ctx.fillStyle = C.terracotta;
-      ctx.font = `600 9px ${TYPE.mono}`;
-      ctx.fillText(readout.direction, column.centreX, y - 10);
-    } else {
-      /*
-       * **AD-S17 — the rest bar.** The third state of the slot above, and the only mark in this
-       * cutaway that says a lift is doing nothing.
-       *
-       * `docs/34` § 9.2 is the whole argument for it: a parking fault is *"the product's most-used
-       * fault family"* and *"has no mark on the stage"*, because an idle car is a stationary car
-       * with `direction === 0` and is pixel-identical to any empty car that happens to be stopped.
-       * Campaign stage 1 asks the player to reason about where the lifts wait; this is the first
-       * thing on the screen that shows them waiting.
-       *
-       * `inkSoft` rather than `ink`, and neither `terracotta` nor `sun`: the car's own body is
-       * `ink`, so a bar in it would read as part of the car rather than as a mark about it, and an
-       * alarm colour would make the stage assert that standing still is *wrong* — which is the
-       * player's conclusion to reach and not the renderer's to draw. `inkSoft` on the well's
-       * `paper` is the same family one rung down, measured at **8.36:1** in
-       * `render/carRest.test.ts`, and it is the only ink in this cutaway that no other mark uses.
-       */
-      const rest = restByCar.get(car.carId);
-      if (rest !== undefined) {
-        const bar = stageCarRestBarOf({ bodyWidth, fill: rest.fill });
-        ctx.fillStyle = C.inkSoft;
-        ctx.fillRect(bodyX + bar.x, y + bar.y, bar.width, bar.height);
-      }
-    }
-  }
-}
-
-function roundedRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-): void {
-  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + width, y, x + width, y + height, r);
-  ctx.arcTo(x + width, y + height, x, y + height, r);
-  ctx.arcTo(x, y + height, x, y, r);
-  ctx.arcTo(x, y, x + width, y, r);
-  ctx.closePath();
-}
 
 /* -------------------------------------------------------------------------- *
  * The mount
@@ -500,7 +274,9 @@ function mountStage(
   let alive = true;
   let playback: Playback | undefined;
   let adopted: VizRecording | undefined;
-  let speedIndex = DEFAULT_STAGE_SPEED_INDEX;
+  let speedIndex = defaultSpeedIndex();
+  /** § 7.3's camera — GitHub issue #324. A view over the recording; it writes nothing to the run. */
+  let camera: StageCameraId = 'whole';
   let started = false;
   let pendingFrame: number | undefined;
   /**
@@ -617,12 +393,55 @@ function mountStage(
   });
   speeds.append(...speedButtons);
 
-  header.append(clock, phase, nextPhase, driving, figures, playButton, speeds);
+  /*
+   * § 7.3's camera — GitHub issue #324, § D505. Drawn only on a tower the camera can help
+   * (`stageCameraChipsOf` measures it against the canvas each paint), which is the honest form of
+   * *a control that writes nothing must say so* for a view control: on a short tower the three
+   * positions are one picture, and a chip that changed nothing would be a lie in a strip.
+   */
+  const cameras = el(doc, 'div', 'everyday-stage-cameras');
+  /*
+   * Never `hidden`: the strip is a flex box whose whole content is the chips, so with none in it
+   * the box has no height, and `hiddenBox.test.ts` refuses an inline `display` on anything the
+   * `hidden` attribute is asked to hide, because the inline value outranks `[hidden]`.
+   */
+  cameras.style.cssText = `display:flex;gap:${String(GAP.tight)}px`;
+  const cameraButtons = STAGE_CAMERAS.map((chip) => {
+    const button = el(doc, 'button', 'everyday-stage-camera', chip.label);
+    button.type = 'button';
+    button.dataset['camera'] = chip.id;
+    button.addEventListener('click', () => {
+      camera = chip.id;
+      syncCamera();
+      requestFrame();
+    });
+    return button;
+  });
+  /* Empty until a laid-out paint offers the chips — see the paint below for why absent, not hidden. */
+
+  function syncCamera(): void {
+    for (const button of cameraButtons) {
+      const on = button.dataset['camera'] === camera;
+      button.setAttribute('aria-pressed', String(on));
+      button.style.cssText = [
+        `background:${on ? C.ink : 'transparent'}`,
+        `border:1px solid ${on ? C.ink : C.rule}`,
+        `border-radius:${String(R.control)}px`,
+        'padding:5px 9px',
+        `font:500 11px ${TYPE.mono}`,
+        `color:${on ? C.paper : C.warmGrey}`,
+        'cursor:pointer',
+      ].join(';');
+    }
+  }
+  syncCamera();
+
+  header.append(clock, phase, nextPhase, driving, figures, playButton, speeds, cameras);
 
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
    *
-   * The charter names P3 as the pillar this build fails outright, and its refusal test is *where on
+   * The charter named P3 as the pillar this build failed outright — re-adjudicated on GitHub issue #277's landing, `docs/22` § 2 — and its refusal test is *where on
    * the stage would a player have seen this?* The day asks five things, the brief lists them, the
    * report grades them, and until this element the stage the player actually watches said none of
    * them. Everything drawn into it is decided by `stageScreenModel.ts#stageGoalsOf`; nothing here
@@ -895,19 +714,32 @@ function mountStage(
   });
   const switchTarget = (): StageSwitchTarget | undefined => {
     const target = switchable.find((profile) => profile.id === switchPicker.value);
-    return target === undefined ? undefined : { target, driving: () => host.drivingProfile() };
+    if (target === undefined) return undefined;
+    /*
+     * GitHub issue #338, § D486: the shipped shelf is every dispatcher the host offers less the
+     * ones the reader saved, and a handover the board could not carry says so on the row before
+     * the press rather than at the moment of posting.
+     */
+    const savedIds = new Set(host.savedDispatchers().map((entry) => entry.id));
+    const shipped = switchable.filter((profile) => !savedIds.has(profile.id));
+    const unpostable = switchUnpostableReasonOf(target, shipped);
+    return { target, driving: () => host.drivingProfile(), ...(unpostable === undefined ? {} : { unpostable }) };
   };
   const interventionStamp = el(doc, 'span', 'everyday-stage-stamp');
   interventionStamp.setAttribute('role', 'status');
   interventionStamp.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
   const interventionRefusal = el(doc, 'span', 'everyday-stage-intervene-refusal');
   interventionRefusal.style.cssText = `font-size:11.5px;color:${C.label}`;
+  /* The handover arm's note — drawn, not a title, because a reason a player cannot see is not one. */
+  const interventionNote = el(doc, 'span', 'everyday-stage-intervene-note');
+  interventionNote.style.cssText = `font-size:11.5px;color:${C.warmGrey};flex-basis:100%`;
   interventions.append(
     ...interventionButtons,
     switchPicker,
     switchButton,
     interventionStamp,
     interventionRefusal,
+    interventionNote,
   );
 
   /* --- § 7.4's strip. SVG rather than a second canvas: `raceLaneOf` computes polyline
@@ -1015,7 +847,34 @@ function mountStage(
    * picked option's own note — or, when a pick cannot honestly be run, the reason. Still on the
    * control rather than only in a register, which is the rule that entry was the example of.
    */
-  root.append(header, goals, watchBand, alarm, stageWrap, legend, interventions, race);
+  /*
+   * § 7.5's dock — *"a 288 px column floats at the right of the stage"* when `ctx === 'campaign'`
+   * (GitHub issue #171, § D507). The stage and the column share a row that wraps, so on a narrow
+   * viewport the column drops under the picture rather than squeezing it: every control the dock
+   * holds is measured by `viewportGates.browser.test.ts`, and a column that overflowed the page
+   * would be a control nobody could reach. Every word in it is `campaignDock.ts`'s; this block only
+   * decides the elements. **Absent from the document** outside a campaign day — never hidden —
+   * for the camera strip's reason two blocks up.
+   */
+  const stageRow = el(doc, 'div', 'everyday-stage-row');
+  stageRow.style.cssText = `display:flex;flex-wrap:wrap;align-items:flex-start;gap:${String(GAP.row + 2)}px`;
+  stageWrap.style.flex = '1 1 480px';
+  stageWrap.style.minWidth = '0';
+  const dock = el(doc, 'aside', 'everyday-stage-dock');
+  dock.style.cssText = [
+    'flex:0 0 288px',
+    'max-width:100%',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.card)}px`,
+    `background:${C.paper}`,
+    'padding:12px 14px',
+    'display:flex',
+    'flex-direction:column',
+    `gap:${String(GAP.row)}px`,
+  ].join(';');
+  dock.setAttribute('aria-label', 'campaign dock');
+  stageRow.append(stageWrap);
+  root.append(header, goals, watchBand, alarm, stageRow, legend, interventions, race);
   region.append(root);
 
   /* ------------------------------------------------------------- behaviour */
@@ -1062,19 +921,198 @@ function mountStage(
   function intervene(change: (typeof STAGE_INTERVENTIONS)[number]['change']): void {
     const current = adopted;
     if (playback === undefined || current === undefined) return;
-    recomputingOver = current;
-    barFacts.recomputing = true;
-    context.refreshBar();
-    /* The § 7.6 beat goes up on this frame rather than on the host's notification: *show a
-       `recomputing` beat rather than freezing silently*, and the freeze starts here. */
-    syncTransport();
-    draw();
+    const atS = playback.simTimeS;
     /*
      * The playhead is *this* screen's, not the shell's — `EverydayHost.intervene`'s whole reason for
      * taking it. A change stamped at the Engineer transport's position would be filed at an instant
      * nobody was looking at.
      */
-    host.intervene(playback.simTimeS, change);
+    withRecomputeBeat(current, () => {
+      host.intervene(atS, change);
+    });
+  }
+
+  /**
+   * § 7.6's `recomputing` beat around a press that grows the record — the stage's arms and the
+   * dock's answer share it, so the two cannot freeze differently.
+   *
+   * The beat goes up on this frame rather than on the host's notification: *show a `recomputing`
+   * beat rather than freezing silently*, and the freeze starts here. It comes down when the host
+   * notifies with a different recording ({@link adopt}).
+   */
+  function withRecomputeBeat(current: VizRecording, press: () => void): void {
+    recomputingOver = current;
+    barFacts.recomputing = true;
+    context.refreshBar();
+    syncTransport();
+    draw();
+    press();
+  }
+
+  /* ---------------------------------------------------------------- § 7.5's dock */
+
+  /** The dock's last drawn state, so a frame that changes nothing rebuilds nothing. */
+  let dockKey = '';
+  /** The reason the last press was refused, drawn under the rows until the next state change. */
+  let dockRefusal: string | undefined;
+
+  function dockViewNow(): CampaignDockView | undefined {
+    if (context.ctx !== 'campaign') return undefined;
+    const facts = host.campaignDay();
+    if (facts === undefined) return undefined;
+    const dayStartS = host.dayStartS();
+    const answer = host.interventions().find((entry) => entry.change.kind === 'answer-incident');
+    return campaignDockViewOf({
+      tower: facts.tower,
+      buildingName: facts.buildingName,
+      incident: facts.incident,
+      runLengthS: facts.runLengthS,
+      simTimeS: playback?.simTimeS ?? 0,
+      dayStartS,
+      answeredStamp: answer === undefined ? undefined : interventionLogOf([answer], dayStartS)[0],
+      hasRun: adopted !== undefined && !barFacts.dayClosed && !barFacts.recomputing,
+    });
+  }
+
+  function syncDock(): void {
+    const view = dockViewNow();
+    if (view === undefined) {
+      if (dock.parentElement !== null) dock.remove();
+      dockKey = '';
+      return;
+    }
+    if (dock.parentElement === null) stageRow.append(dock);
+    const key = `${JSON.stringify(view)}\u0000${dockRefusal ?? ''}`;
+    if (key === dockKey) return;
+    dockKey = key;
+    dock.replaceChildren(...dockChildrenOf(view));
+  }
+
+  function dockChildrenOf(view: CampaignDockView): readonly HTMLElement[] {
+    const name = el(doc, 'div', 'everyday-stage-dock-name', view.buildingName);
+    name.style.cssText = `font:600 13px ${TYPE.body};color:${C.ink}`;
+    const dayLine = el(doc, 'div', 'everyday-stage-dock-day', view.dayLine);
+    dayLine.style.cssText = `font:500 10px ${TYPE.mono};letter-spacing:.1em;color:${C.inkSoft};text-transform:uppercase`;
+    const figures = el(doc, 'div', 'everyday-stage-dock-figures');
+    figures.style.cssText = `display:grid;grid-template-columns:repeat(3,1fr);gap:${String(GAP.tight)}px`;
+    for (const figure of view.figures) {
+      const cell = el(doc, 'div', 'everyday-stage-dock-figure');
+      const value = el(doc, 'div', 'everyday-stage-dock-value', figure.value);
+      value.style.cssText = `font:600 15px ${TYPE.body};color:${C.ink}`;
+      const label = el(doc, 'div', 'everyday-stage-dock-label', figure.label);
+      label.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+      cell.append(value, label);
+      figures.append(cell);
+    }
+    const block = el(doc, 'div', 'everyday-stage-dock-incident');
+    block.dataset['state'] = view.incident.kind;
+    block.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.tight)}px;border-top:1px solid ${C.rule};padding-top:${String(GAP.row)}px`;
+    const eyebrowRow = el(doc, 'div', 'everyday-stage-dock-eyebrow-row');
+    eyebrowRow.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline';
+    const eyebrow = el(doc, 'span', 'everyday-stage-dock-eyebrow', view.incident.heading);
+    eyebrow.style.cssText = `font:500 10px ${TYPE.mono};letter-spacing:.12em;color:${C.sun}`;
+    eyebrowRow.append(eyebrow);
+    if (view.incident.kind !== 'quiet') {
+      const clock = el(doc, 'span', 'everyday-stage-dock-clock', view.incident.clock);
+      clock.style.cssText = `font:500 11px ${TYPE.mono};color:${C.inkSoft}`;
+      eyebrowRow.append(clock);
+    }
+    block.append(eyebrowRow);
+    if (view.incident.kind === 'quiet') {
+      block.append(el(doc, 'div', 'everyday-stage-dock-note', view.incident.note));
+    } else {
+      const title = el(doc, 'div', 'everyday-stage-dock-title', view.incident.title);
+      title.style.cssText = `font:600 13px ${TYPE.body};color:${C.ink}`;
+      block.append(title);
+      if (view.incident.kind === 'open') {
+        block.append(el(doc, 'div', 'everyday-stage-dock-note', view.incident.note));
+        const options = el(doc, 'div', 'everyday-stage-dock-options');
+        options.setAttribute('role', 'group');
+        options.setAttribute('aria-label', 'options, with what each costs and when it takes effect');
+        options.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.tight)}px`;
+        for (const option of view.incident.options) {
+          const button = el(doc, 'button', 'everyday-stage-dock-option');
+          button.type = 'button';
+          button.dataset['option'] = option.id;
+          button.title = option.effect;
+          button.style.cssText = [
+            'text-align:left',
+            `border:1px solid ${C.rule}`,
+            `border-radius:${String(R.control)}px`,
+            `background:${C.paper}`,
+            `color:${C.ink}`,
+            'padding:8px 10px',
+            `font:500 12.5px ${TYPE.body}`,
+            'cursor:pointer',
+            'display:flex',
+            'flex-direction:column',
+            'gap:2px',
+          ].join(';');
+          const head = el(doc, 'span', 'everyday-stage-dock-option-head');
+          head.style.cssText = 'display:flex;justify-content:space-between;gap:8px';
+          head.append(
+            el(doc, 'span', 'everyday-stage-dock-option-label', option.label),
+            el(doc, 'span', 'everyday-stage-dock-option-cost', option.cost),
+          );
+          const when = el(doc, 'span', 'everyday-stage-dock-option-when', option.when);
+          when.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+          button.append(head, when);
+          if (option.refusal !== undefined) {
+            button.disabled = true;
+            button.style.opacity = '.55';
+            button.style.cursor = 'default';
+            const why = el(doc, 'span', 'everyday-stage-dock-option-refusal', option.refusal);
+            why.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+            button.append(why);
+          }
+          button.addEventListener('click', () => {
+            answerFromDock(option.id);
+          });
+          options.append(button);
+        }
+        block.append(options);
+        if (dockRefusal !== undefined) {
+          const line = el(doc, 'div', 'everyday-stage-dock-refusal', dockRefusal);
+          line.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+          block.append(line);
+        }
+      } else {
+        const stamp = el(doc, 'div', 'everyday-stage-dock-stamp', view.incident.stamp);
+        stamp.style.cssText = `font:500 11px ${TYPE.mono};color:${C.inkSoft}`;
+        block.append(stamp);
+      }
+      const footer = el(doc, 'div', 'everyday-stage-dock-footer', view.incident.footer);
+      footer.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+      block.append(footer);
+    }
+    const levers = el(doc, 'div', 'everyday-stage-dock-levers', view.otherLevers);
+    levers.style.cssText = `font:400 11px ${TYPE.body};color:${C.inkSoft}`;
+    return [name, dayLine, figures, block, levers];
+  }
+
+  function answerFromDock(optionId: string): void {
+    const current = adopted;
+    if (playback === undefined || current === undefined) return;
+    const atS = playback.simTimeS;
+    /*
+     * The host answers or says why not, in the dock's own words; a refusal is drawn under the rows
+     * rather than swallowed (§ 7.6's fourth rule), and a press that landed grows the record through
+     * the same beat the stage's arms use.
+     */
+    let reason: string | undefined;
+    withRecomputeBeat(current, () => {
+      reason = host.answerIncident(atS, optionId);
+    });
+    if (reason !== undefined) {
+      /* Nothing grew: take the beat back down on this frame rather than waiting for a run that never comes. */
+      recomputingOver = undefined;
+      barFacts.recomputing = false;
+      context.refreshBar();
+      syncTransport();
+    }
+    dockRefusal = reason;
+    dockKey = '';
+    syncDock();
   }
 
   /**
@@ -1096,14 +1134,29 @@ function mountStage(
    * playhead, so the picture does not jump — the prefix is bit-identical, so the instant the player
    * was watching is the same instant it always was.
    */
+  /**
+   * § 4.6's *Default speed*, read at the one place speed resets — GitHub issue #229. The store is
+   * this device's, so the ladder index is looked up from the stored value each time rather than
+   * cached: a player who changes the setting and starts the next day gets the next day at the new
+   * speed. A stored value off the ladder cannot arrive (`profile.ts#loadDefaultSpeed` refuses it),
+   * and the fallback to `DEFAULT_STAGE_SPEED_INDEX` is for the type rather than for a case.
+   */
+  function defaultSpeedIndex(): number {
+    const wanted = everydayProfileStore().defaultSpeed();
+    const index = STAGE_SPEEDS.findIndex((speed) => speed.simPerRealS === wanted);
+    return index === -1 ? DEFAULT_STAGE_SPEED_INDEX : index;
+  }
+
   function adopt(recording: VizRecording): void {
     const resumeAtS = recomputingOver !== undefined ? playback?.simTimeS : undefined;
     const wasPlaying = recomputingOver !== undefined && playback?.state === 'playing';
     adopted = recording;
     recomputingOver = undefined;
     barFacts.recomputing = false;
+    /* A fresh recording is a fresh answer to the dock's question; a stale refusal would outlive it. */
+    dockRefusal = undefined;
     if (resumeAtS === undefined) {
-      speedIndex = DEFAULT_STAGE_SPEED_INDEX;
+      speedIndex = defaultSpeedIndex();
       started = false;
     }
     playback = new Playback(recording, systemClock(), {
@@ -1165,6 +1218,8 @@ function mountStage(
      * `change` event fires only when a player touches it.
      */
     syncSwitchArm();
+    /* The dock reads the log and the purse, both of which move on a notification. */
+    syncDock();
     syncTransport();
     requestFrame();
   }
@@ -1265,6 +1320,7 @@ function mountStage(
       switchPicker.disabled = sharedRefusal !== undefined;
     }
     interventionRefusal.textContent = sharedRefusal ?? switchRow?.refusal ?? '';
+    interventionNote.textContent = switchRow?.note ?? '';
   }
 
   /** The handover arm re-asked from the live facts — for the picker, and for the mount. */
@@ -1308,14 +1364,27 @@ function mountStage(
     const labelOf = (id: string): string =>
       recording.floors.find((floor) => floor.id === id)?.label ?? id;
 
-    const head = stageHeaderOf({
-      simTimeS,
-      recording,
-      observations,
-      dayStartS: host.dayStartS(),
-      driverName:
-        host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId,
-    });
+    const driverName = host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId;
+    /*
+     * § 9.2, GitHub issue #220: in the `rush` context the clock is held time and the pill is the
+     * wave, and the run ends where the recording crosses the hold line — the stage stops the replay
+     * there and hands the player to the result. `everyday/rush.ts` decides both; nothing is worked
+     * out here.
+     */
+    if (context.ctx === 'rush') {
+      const session = host.rush();
+      if (session?.holdAtS !== undefined && session.endedAtS === undefined && simTimeS >= session.holdAtS) {
+        playback.pause();
+        host.endRush(session.holdAtS);
+        context.go('report');
+        return;
+      }
+    }
+    const rushHead = context.ctx === 'rush' ? rushStageHeaderOf({ recording, simTimeS, driverName }) : undefined;
+    const head =
+      rushHead === undefined
+        ? stageHeaderOf({ simTimeS, recording, observations, dayStartS: host.dayStartS(), driverName })
+        : { clock: rushHead.held, phase: rushHead.wave, next: undefined, drivingLabel: rushHead.drivingLabel, driverName: rushHead.driverName, figures: rushHead.figures };
     const watching = watchingNow();
     clock.textContent = head.clock;
     /*
@@ -1333,6 +1402,8 @@ function mountStage(
     drivingName.textContent = watching?.dispatcherName ?? head.driverName;
     drawFigures(head.figures);
     drawGoals(recording, simTimeS, watching);
+    /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
+    goals.style.display = context.ctx === 'rush' ? 'none' : '';
     drawWatching(watching);
 
     const alarmLine = stageAlarmOf(observations, labelOf);
@@ -1342,9 +1413,25 @@ function mountStage(
     const ctx = sizeCanvas(canvas);
     if (ctx !== undefined) {
       const rect = canvas.getBoundingClientRect();
+      const frame = frameAt(recording, simTimeS);
+      /*
+       * The camera chips exist exactly where a window would change the picture — GitHub issue #324.
+       * Decided only over a laid-out canvas: a box with no height yet (the first paint before layout,
+       * a covered world) would read as a plot nothing fits, and offer three chips over a tower they
+       * cannot help. Until then the strip keeps whatever the last laid-out paint decided.
+       */
+      if (rect.height > 0) {
+        /*
+         * Absent from the document rather than hidden in it: `viewportGates.browser.test.ts`
+         * measures every control the DOM holds, and a hidden chip is a zero-sized control to it.
+         */
+        const offered = stageCameraChipsOf(recording.floors, rect.height).length > 0;
+        if (offered && cameras.childElementCount === 0) cameras.replaceChildren(...cameraButtons);
+        if (!offered && cameras.childElementCount > 0) cameras.replaceChildren();
+      }
       drawCutaway(ctx, {
         recording,
-        frame: frameAt(recording, simTimeS),
+        frame,
         queues: queueAt(recording, simTimeS),
         geometry: stageGeometryOf({
           width: rect.width,
@@ -1352,6 +1439,7 @@ function mountStage(
           floors: recording.floors,
           shafts: recording.shafts,
           outOfServiceCarIds: recording.outOfServiceCarIds,
+          window: stageCameraWindowOf({ camera, floors: recording.floors, height: rect.height, cars: frame.cars }),
         }),
         floorLabelOf: labelOf,
       });
@@ -1390,6 +1478,7 @@ function mountStage(
     applySwitchRow(intervention, refusal);
 
     drawRace(recording, simTimeS);
+    syncDock();
   }
 
   /**
@@ -1730,7 +1819,7 @@ function mountStage(
    * *the player's day* and this is about *which flow the screen is serving* — § 18's own split, and
    * the reason `ctx` is a parameter of the screen rather than a field of the run.
    */
-  if (context.ctx !== 'watch' && stageEntryStartsARun(host.runState())) host.startRun();
+  if (context.ctx !== 'watch' && context.ctx !== 'rush' && stageEntryStartsARun(host.runState())) host.startRun();
   /*
    * The handover arm is drawn from inside this call, before any frame — `draw` returns early with
    * no recording, so without it the button would sit on the awaiting-run stage with no words on it.
@@ -1790,6 +1879,13 @@ function mountStage(
         playback?.pause();
         host.playThisCrowd(session.run);
         context.go('brief');
+        return;
+      }
+      /* § 9.2's *End the rush*: stopped by hand, at the playhead, and straight to its own result. */
+      if (context.ctx === 'rush') {
+        playback?.pause();
+        host.endRush(playback?.simTimeS ?? adopted?.startedAt ?? 0);
+        context.go('report');
         return;
       }
       playback?.pause();
@@ -1930,6 +2026,11 @@ function breathingDot(doc: Document): HTMLElement {
  */
 function stageBar(state: EverydayState): ActionBarModel {
   if (state.ctx === 'watch') return watchStageBarOf(state, watchFacts);
+  /* § 3.3's rush row is its own: one primary, *End the rush*, live once the stream has landed. */
+  if (state.ctx === 'rush') {
+    const base = actionBarFor(state);
+    return barFacts.hasRun ? base : { ...base, primary: { ...base.primary, inert: RUSH_NOT_LANDED } };
+  }
   return stageBarModelOf(state, barFacts);
 }
 

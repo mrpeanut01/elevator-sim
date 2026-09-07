@@ -21,9 +21,10 @@
 
 import type { ZodError } from 'zod';
 
+import { isServiceDerateEvent, isServiceRangeEvent } from './serviceEvent.js';
 import { connectivityDiagnostics } from './buildingConnectivity.js';
 import { expandFloors } from './expandFloors.js';
-import { findElevatorSpec, resolveCar } from './resolveCar.js';
+import { findElevatorSpec, ratedLoadKgOf, resolveCar } from './resolveCar.js';
 import {
   ConfigError,
   ISSUE_CODES,
@@ -513,6 +514,60 @@ export function resolveBuilding(
   const serviceEvents: ResolvedServiceEvent[] = [];
   (building.serviceEvents ?? []).forEach((event, eventIndex) => {
     const path = `serviceEvents[${eventIndex}]`;
+
+    /*
+     * **A range entry names a bank and floors, never a car** (§ D523). Every floor must be one
+     * the building declares — the same `unknown-floor` a bank's own `servesFloors` gets — and the
+     * bank must be single-deck: `shaftForBank` derives a double-deck bank's deck coupling from its
+     * range at build time, so moving the range under it would leave the pairs describing floors the
+     * bank no longer serves. Refused as a located `ConfigError` rather than simulated wrongly.
+     */
+    if (isServiceRangeEvent(event)) {
+      const bank = building.banks.find((candidate) => candidate.id === event.bankId);
+      if (bank === undefined) {
+        addIssue(
+          `${path}.bankId`,
+          `service event at ${event.atS} s moves the range of bank "${event.bankId}", which this building does not declare. Known banks: ${formatKnown(building.banks.map((candidate) => candidate.id))}.`,
+          ISSUE_CODES.unknownServiceEventBank,
+        );
+        return;
+      }
+      const resolvedBank = banks.find((candidate) => candidate.id === bank.id);
+      if (resolvedBank !== undefined && resolvedBank.cars.some((car) => car.doubleDeck)) {
+        addIssue(
+          `${path}.bankId`,
+          `service event at ${event.atS} s moves the range of bank "${bank.id}", which has double-deck cars. A double-deck bank's floor pairs are derived from its range when the run is built, so its range cannot move mid-run; author the closed floor into the bank's own servesFloors instead.`,
+          ISSUE_CODES.unsupportedServiceRange,
+        );
+        return;
+      }
+      let located = true;
+      event.servesFloors.forEach((floorId, floorIndex) => {
+        if (floorsById.has(floorId) || floors.length === 0) return;
+        located = false;
+        addIssue(
+          `${path}.servesFloors[${floorIndex}]`,
+          `service event at ${event.atS} s has bank "${bank.id}" serve floor "${floorId}", which this building does not declare. Known floor ids: ${formatKnown(knownFloorIds)}.`,
+          ISSUE_CODES.unknownFloor,
+        );
+      });
+      if (new Set(event.servesFloors).size !== event.servesFloors.length) {
+        located = false;
+        addIssue(
+          `${path}.servesFloors`,
+          `service event at ${event.atS} s lists a floor twice in bank "${bank.id}"'s range: ${event.servesFloors.join(', ')}.`,
+          ISSUE_CODES.duplicateId,
+        );
+      }
+      if (!located) return;
+      serviceEvents.push({
+        atS: event.atS,
+        bankId: bank.id,
+        servesFloors: [...event.servesFloors],
+      });
+      return;
+    }
+
     const holders = building.banks.filter(
       (bank) =>
         (event.bankId === undefined || bank.id === event.bankId) &&
@@ -538,6 +593,34 @@ export function resolveBuilding(
         `service event at ${event.atS} s names car "${event.carId}", which exists in ${holders.length} banks (${holders.map((bank) => bank.id).join(', ')}). Car ids are unique per bank, not per building — add "bankId" to say which one.`,
         ISSUE_CODES.unknownServiceEventCar,
       );
+      return;
+    }
+    if (isServiceDerateEvent(event)) {
+      /*
+       * **A derate may not rate a car above its plate** (§ D523). The plated figure is the
+       * resolved car's `ratedLoadLb` — the authored value, or the class default it inherited — and
+       * a controller setting above it would be a car that carries more than its machinery is rated
+       * for, which no load-weighing device is set to do. Converted the way `resolveCar` converts the
+       * plate, so a derate authored at the plate resolves to exactly the plate.
+       */
+      const plated = banks
+        .find((candidate) => candidate.id === holder.id)
+        ?.cars.find((car) => car.id === event.carId);
+      if (plated !== undefined && event.ratedLoadLb > plated.ratedLoadLb) {
+        addIssue(
+          `${path}.ratedLoadLb`,
+          `service event at ${event.atS} s rates car "${holder.id}-${event.carId}" at ${event.ratedLoadLb} lb, above its plated ${plated.ratedLoadLb} lb. A derate lowers what the controller admits; it cannot rate the car above its hardware.`,
+          ISSUE_CODES.serviceLoadAboveRating,
+        );
+        return;
+      }
+      serviceEvents.push({
+        atS: event.atS,
+        bankId: holder.id,
+        carId: event.carId,
+        ratedLoadLb: event.ratedLoadLb,
+        ratedLoadKg: ratedLoadKgOf(event.ratedLoadLb, specs.capacities),
+      });
       return;
     }
     serviceEvents.push({

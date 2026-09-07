@@ -216,6 +216,8 @@ export interface LeverRowView {
    * `docs/10` R2 forbids it; see {@link LEVER_SURFACES}.
    */
   readonly surface?: TabName | undefined;
+  /** `ReportLever.id`, carried so the Everyday sheet can route the card its own way — GitHub issue #213. */
+  readonly id: string;
 }
 
 /**
@@ -239,6 +241,12 @@ export interface LeverRowView {
  * Keyed on `ReportLever.id`, which is stable and is the same id the shift layer matches
  * observations against — so a fifth lever arrives here as a missing entry (no navigation) rather
  * than as a wrong one.
+ *
+ * **The Everyday sheet routes all four, by decision rather than by drift** — GitHub issue #213,
+ * [§ D503](../../../../DECISIONS.md), on the owner's ruling. `everyday/reportView.ts#EVERYDAY_LEVER_ROUTES`
+ * sends the dispatcher pair to the workshop with R2's honesty kept on the card as a caveat, and this
+ * table is unchanged because this sheet is the enthusiast's and the restraint here is still the
+ * honest one. The two sheets differ on this point on purpose.
  */
 export const LEVER_SURFACES: Readonly<Record<string, TabName>> = Object.freeze({
   'add-a-car': 'building',
@@ -728,6 +736,7 @@ export function leverRowsOf(levers: readonly ReportLever[]): readonly LeverRowVi
   return levers.map((lever) => {
     const surface = LEVER_SURFACES[lever.id];
     return {
+      id: lever.id,
       title: lever.title,
       body: lever.body,
       ...(surface === undefined ? {} : { surface }),

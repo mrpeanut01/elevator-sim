@@ -195,6 +195,54 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
     await page.close();
   }, 300_000);
 
+  /**
+   * § 7.5's dock beside the campaign stage — GitHub issue #171, § D507.
+   *
+   * Day 1 on a fresh tower draws a breakdown at § 8.3's 0.4 %, so what this walk can assert on
+   * every seed is the column itself: the three figures the desk agrees with, the contract day, and
+   * an incident block in one of its states. The open state's press is driven in `host.test.ts` on
+   * a seed found for it; a browser case that pressed only when the draw happened to land would be
+   * a test that passes by not running.
+   */
+  it('draws the dock beside the stage on a campaign day, and not on the daily loop’s', async () => {
+    const page = await coldLoad();
+    await enterCampaign(page);
+    await openDesk(page);
+    const purseBefore = await purseOnHand(page);
+    await openContract(page);
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-stage-dock', { timeout: 60_000 });
+
+    expect(await page.locator('.everyday-stage-dock-figure').count()).toBe(3);
+    expect(await page.textContent('.everyday-stage-dock-day')).toBe('day 1 of 20');
+    /* The dock and the desk read the same purse — § 8.5. */
+    expect(await page.textContent('.everyday-stage-dock-value')).toBe(`${String(purseBefore)} u`);
+    const state = await page.getAttribute('.everyday-stage-dock-incident', 'data-state');
+    expect(['quiet', 'open']).toContain(state);
+    /* An open incident offers its rows as controls a player can read the cost off. */
+    if (state === 'open') {
+      expect(await page.locator('.everyday-stage-dock-option').count()).toBeGreaterThan(0);
+      expect(await page.locator('.everyday-stage-dock-option-cost').first().textContent()).toMatch(/free|\d+ u/u);
+    }
+
+    await closeTheDayOnStage(page);
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-building', { timeout: 30_000 });
+
+    /* § 6's stage is not a campaign day: the column is absent from the document, never hidden. */
+    await toMainMenu(page);
+    await page.click('.everyday-mode[data-screen="door"]');
+    await page.waitForSelector('.everyday-door', { timeout: 30_000 });
+    /* § 6's route is door → brief → stage: two presses of the one primary. */
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-brief', { timeout: 30_000 });
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-stage-canvas', { timeout: 60_000 });
+    expect(await page.locator('.everyday-stage-dock').count()).toBe(0);
+
+    await page.close();
+  }, 300_000);
+
   it('drives the next day from the filed result, on the sheet and on the grid', async () => {
     const page = await coldLoad();
     await enterCampaign(page);

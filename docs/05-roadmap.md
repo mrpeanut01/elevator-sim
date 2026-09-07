@@ -541,7 +541,7 @@ in `packages/experiments/src/benchmark/`, whose `index.ts` is the written report
 > | the predictor-lag study | `measurePredictorLag()` |
 > | the forecast-causality audit | `auditForecastCausalityInRun()` |
 > | the auction-aggregation reachability table | `measureAuctionAggregation()` |
-> | the deadband and rate sweeps below | **no entry point ships** — driven through `runBenchmarkCase` by hand, so they are recorded rather than reproducible in one call |
+> | the deadband and rate sweeps below | `runDeadbandSweep()` and `runRateSweep()` — shipped 2026-09-06 ([§ D513](../DECISIONS.md), GitHub issue #178 item 6); pinned under `deadband-sweep` and `rate-sweep`, with the exactly-zero count beside each rate. Until then they were driven through `runBenchmarkCase` by hand and recorded rather than reproducible |
 >
 > `packages/experiments/src/benchmark/published.test.ts` now partitions every interval-shaped
 > literal in `benchmark/` into *reproduced by a pinned estimate at its own printed precision* or
@@ -604,9 +604,19 @@ Seven measurements the headline hides, all of them results rather than opinions:
   from any park. Swept at n = 300 against `stay`'s 16.31 s — `8` → `−0.006 [−0.031, +0.019]`,
   `6` → −0.021, `5` → **−0.217**, `4` → **−0.430**, `3` → **−0.792**, `2` → **−1.110**, `1` → −0.881,
   `0` → −0.623: an interior optimum at 2 s, with the curve turning back up below it as the car churns.
+  **Re-measured 2026-09-06 through `runDeadbandSweep()` at the same n = 300 and the same seed, and every
+  one of the eight reproduced to the printed digit** — `8` → −0.006 [−0.031, +0.019] through
+  `0` → −0.623 [−1.138, −0.108] — which is what the sweep shipping as an entry point was for
+  ([§ D513](../DECISIONS.md)); the pins are `PINNED_ESTIMATES['deadband-sweep']`.
   **It is not a sparsity problem**, which was the obvious hypothesis and is refuted rather than
   confirmed: at the authored deadband the arm is inert at 2, 4, 8 and 16 % of population per 5 minutes
-  (300/300 bit-identical at 4 %), so eight times the demand does not reach the threshold either. And
+  (300/300 bit-identical at 4 %), so eight times the demand does not reach the threshold either.
+  **Re-measured the same day through `runRateSweep()`, and the four rows reproduced too**: −0.006
+  [−0.031, +0.019] at 2 % with 298 of 300 exactly zero, 0.000 [0.000, 0.000] at 4 % with 300 of 300,
+  −0.014 [−0.035, +0.006] at 8 % with 297, and −0.010 [−0.030, +0.010] at 16 % with 299; the pins are
+  `PINNED_ESTIMATES['rate-sweep']`. *Inert* there means no rate is BETTER or WORSE — only 4 % is
+  bit-identical, which is what the table above says and what a first draft of the entry point
+  misread as *identical at every rate*. And
   the whole predictor apparatus, priced directly — the same profile with a forecast against
   `createPredictor: () => undefined` — is **−0.007 s [−0.032, +0.018]**, 296 of 300 replications
   bit-identical. The profile is left as authored; `idle.repositionThresholdS` is the dimension Phase 7
@@ -1981,9 +1991,9 @@ re-drive is owed in the drive phase.)*
 
 **Named limits on clause 1, in the same breath as the verdict.** The sweep's `mode` axis has **one
 value** — it plugs in at a tuple in `packages/viz/src/honesty/types.ts`, and the corpus assertion
-tightens automatically when it does. The **33 statically swept DOM entry points** are **not
-driven**, so a sentence assembled at runtime there is invisible to the search — **17** mounts and
-**16** screen-registry rows, whose pure halves *are* driven, so what goes unswept in both groups is
+tightens automatically when it does. The **35 statically swept DOM entry points** are **not
+driven**, so a sentence assembled at runtime there is invisible to the search — **18** mounts and
+**17** screen-registry rows, whose pure halves *are* driven, so what goes unswept in both groups is
 only what the entry point authors inline. **That figure is derived by
 `packages/viz/src/honesty/derive.test.ts` rather than transcribed here**, and this verdict published
 *three* from wave 12 until [§ D421](../DECISIONS.md) measured it: a named gap is part of the

@@ -93,8 +93,10 @@ describe('the split shipped two records where there was one', () => {
     // to an id no compiled-in union contains. The extra records are named rather than tolerated, so
     // this still fails on a record nobody meant to add.
     expect(shipped).toEqual(expect.arrayContaining([...DEMAND_TEMPLATE_IDS]));
+    // Two since GitHub issue #220: `endless-rush` is the second phase-list record, a mode's own
+    // stream that `selectable: false` keeps out of every list.
     expect(shipped.filter((id) => !(DEMAND_TEMPLATE_IDS as readonly string[]).includes(id))).toEqual(
-      ['office-day'],
+      ['office-day', 'endless-rush'],
     );
   });
 

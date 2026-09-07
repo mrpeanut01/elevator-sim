@@ -187,6 +187,14 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       'shape of the mode. Written only by everyday/host.ts#runCampaignDay, which presses the run in ' +
       'the same call, so no screen can move it without running the day it belongs to.',
   ),
+  'viewer.campaignEventId': control(
+    'between-days',
+    'The event § 8’s campaign day runs under — the contract’s calendar first, then § 8.3’s daily ' +
+      'failure figure, chosen by the campaign’s own incident module on a stream derived from the day’s ' +
+      'seed. between-days for campaignFitOut’s reason: it is a fact about one tower’s one day, ' +
+      'written only by everyday/host.ts#runCampaignDay in the same call that presses the run, and ' +
+      'undefined outside a campaign day so the week’s own calendar decides as it always did.',
+  ),
   'viewer.commissioningConstraintId': control(
     'presentation',
     'Which capital constraint the fabric is judged against. Presentation, and the distinction is the ' +

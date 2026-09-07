@@ -91,6 +91,11 @@ export const passengerRecordSchema = z.strictObject({
   // unchanged. Required here rather than tolerated: without it a run on an access-zoned building
   // cannot be stored and replayed, which is invariant 5 (`DECISIONS.md` § D266).
   refusedAt: simTime.optional(),
+  // Absent on every run whose building schedules no range change (§ D523), so a record written
+  // before the field existed parses unchanged; required here for the reason the two keys around it
+  // are, since a strict object that did not name it would refuse to store the first run that
+  // stranded somebody (invariant 5).
+  strandedAt: simTime.optional(),
   // Absent on every run that declares no `patience`, so a record written before patience existed
   // parses unchanged. Required here for `refusedAt`'s reason and found the same way: the recorder
   // has emitted it since patience shipped, and this schema is a `strictObject`, so **any** run

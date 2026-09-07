@@ -89,6 +89,25 @@ export class UnsafeConfigurationError extends Error {
   }
 }
 
+/**
+ * The seed token, or `undefined` when the deployment does not seed — GitHub issue #328, § D522.
+ *
+ * Optional where `ELEVATOR_SIM_SECRET` is required, because a server with no scheduled caller is a
+ * complete server; and refused when set but short, because a guessable token on a route that runs
+ * thirteen simulations is a denial-of-service invitation with a password on it.
+ */
+function seedTokenFrom(env: Readonly<Record<string, string | undefined>>): string | undefined {
+  const token = env['ELEVATOR_SIM_SEED_TOKEN'];
+  if (token === undefined || token.trim().length === 0) return undefined;
+  if (token.length < 32) {
+    throw new UnsafeConfigurationError(
+      'ELEVATOR_SIM_SEED_TOKEN is set and shorter than 32 characters. It authorises a route that ' +
+        'replays thirteen simulations; either unset it or give it a real secret.',
+    );
+  }
+  return token;
+}
+
 export async function bootstrap(options: BootstrapOptions): Promise<Server> {
   const secret = requireSecret(options.env);
   const config = await loadConfig(options.dataDir);
@@ -127,6 +146,7 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     factsFor: factsResolver(config),
     challengeFactsFor: challengeFactsResolver(config),
     secret,
+    seedToken: seedTokenFrom(options.env),
     now,
     signInUrl: signInUrlFor(options.publicOrigin),
   };

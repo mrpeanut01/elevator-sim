@@ -90,30 +90,58 @@ import type { TabName } from '../dev/elementMap.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
 
+/**
+ * Where a lever's press goes — GitHub issue #213, the owner's ruling on it, and GAMEPLAY § 6.5.
+ *
+ * § 6.5 says each lever is *"a live handoff into the workshop"* for a dispatcher change and
+ * *"routes to the tuner"* for a building one. The owner's ruling on #213 (2026-08-26) is the same
+ * thing in plainer words: *make the levers easy to find from the report's findings; make the game
+ * work for the user first and document the approach second.* So every card routes:
+ *
+ * - a **dispatcher** lever opens § 11's workshop, seeded on the dispatcher that drove the day,
+ *   because that is where a dispatcher is changed;
+ * - *Add a car* opens the sandbox tuner, whose *Shafts* row is the control that adds one;
+ * - *Zone the tower* opens the simulator's Building panel, because the tuner has no zoning control
+ *   and the card would otherwise name a surface that cannot do what it says.
+ *
+ * ## What this changes about the statistical rule, and what it does not
+ *
+ * `dev/reportPanel.ts#LEVER_SURFACES` refused to route the dispatcher pair on `docs/10` R2's ground:
+ * a sheet that pointed at the control which would make one profile beat another would be
+ * recommending a dispatcher off one replication. That rule is about what a sheet **claims**, and
+ * the card still claims nothing comparative — its {@link EverydayLeverCard.caveat} says out loud
+ * that one day is not evidence and that the bench settles it. What changed is only that the player
+ * can now find the control the advice is about. The Engineer sheet keeps the old restraint; it is
+ * the enthusiast's surface and the argument in `reportPanel.ts` is still the honest one there.
+ */
+export type LeverRoute =
+  | { readonly kind: 'engineer'; readonly tab: TabName }
+  | { readonly kind: 'everyday'; readonly screen: 'tuner' | 'workshop' };
+
 /** One § 6.5 lever, with where it is carried out. */
 export interface EverydayLeverCard {
   readonly title: string;
   readonly body: string;
   /**
-   * The Engineer panel that carries this advice out, or `undefined` for a card that names none.
-   *
-   * `dev/reportPanel.ts#LEVER_SURFACES`' answer, unedited — **including its restraint**. Two of the
-   * four cards are a *fabric* change (a car, a zoning) and name the panel that authors the building
-   * document; the other two are *a different dispatcher*, and that module refuses to point at the
-   * control that would make one profile beat another, because a sheet doing so would be
-   * recommending a dispatch strategy off one replication (`docs/10` R2, CLAUDE.md's paired-t rule).
-   * This screen does not relax that just because the Everyday brief happens to have a dispatcher
-   * picker on it: the restraint is about what a *sheet* may claim, not about which screen is handy.
+   * The Engineer panel that carries this advice out, when the route is the simulator's — kept as
+   * a field because `reportScreen.ts` presses the tab it names. `undefined` for an Everyday route.
    */
   readonly surface: TabName | undefined;
+  /** Where the press goes. Every shipped lever has one; `undefined` only for a lever this build does not know. */
+  readonly route: LeverRoute | undefined;
   /**
    * What the card's button says, or `undefined` on a card that has none — issue #213.
    *
-   * `undefined` exactly when {@link surface} is, and `reportView.test.ts` asserts that pairing in
+   * `undefined` exactly when {@link route} is, and `reportView.test.ts` asserts that pairing in
    * both directions: a label with nowhere to go and a route with nothing on its face are the same
    * defect from either end.
    */
   readonly goLabel: string | undefined;
+  /**
+   * The sentence beside a dispatcher lever's button — the statistical honesty the old refusal
+   * carried, kept on the card now that the button exists. `undefined` on a fabric lever.
+   */
+  readonly caveat: string | undefined;
   /** What the card says instead of offering a button, when it names no surface. */
   readonly noSurfaceNote: string | undefined;
 }
@@ -189,14 +217,43 @@ export interface EverydayReportInput {
 }
 
 /**
- * The sentence for a card that names no surface — `LEVER_SURFACES`' restraint, said out loud.
+ * The sentence for a card that names no surface — a lever this build does not know how to route.
  *
- * A card with no button and no explanation reads as an oversight; this is the difference between
- * *we did not wire it* and *a sheet may not send you there*.
+ * Every shipped lever routes (see {@link LeverRoute}), so this is drawn only for a lever id
+ * `shift/report.ts` has grown that {@link EVERYDAY_LEVER_ROUTES} has not, which is the honest
+ * difference between *we did not wire it* and a blank card.
  */
 const NO_SURFACE_NOTE =
-  'No button here on purpose: this is advice about which dispatcher to bring, and one day is not ' +
-  'evidence about that. The bench runs the comparison properly.';
+  'No button here yet: this build does not know which screen carries this advice out.';
+
+/**
+ * The honesty a dispatcher lever's card keeps beside its button — GitHub issue #213.
+ *
+ * It is the old refusal's second sentence with the refusal taken out: the card sends the player to
+ * the control the advice is about and says, on its face, that the sheet is not evidence the change
+ * is better. `docs/10` R2 forbids the comparative claim, not the door.
+ */
+const DISPATCHER_LEVER_CAVEAT =
+  'One day is not evidence that a different dispatcher is better. Try it, run tomorrow, and this ' +
+  'sheet will say what it did; the bench is where the comparison gets settled properly.';
+
+/**
+ * Where each of `shift/report.ts`'s four levers goes — {@link LeverRoute}'s reasoning, as data.
+ * Keyed on `ReportLever.id`, so a fifth lever arrives as a card with {@link NO_SURFACE_NOTE}
+ * rather than a wrong door.
+ */
+export const EVERYDAY_LEVER_ROUTES: Readonly<Record<string, LeverRoute>> = Object.freeze({
+  'add-a-car': { kind: 'everyday', screen: 'tuner' },
+  'zone-the-tower': { kind: 'engineer', tab: 'building' },
+  'weight-fairness': { kind: 'everyday', screen: 'workshop' },
+  'ask-destination': { kind: 'everyday', screen: 'workshop' },
+});
+
+/** What the button says for an Everyday route — the screen named as the rail names it. */
+const EVERYDAY_ROUTE_LABELS: Readonly<Record<'tuner' | 'workshop', string>> = Object.freeze({
+  tuner: 'Open the sandbox',
+  workshop: 'Open the dispatcher workshop',
+});
 
 /** The Everyday empty state. Names no Engineer control — § 16 rule 11's neighbouring rule. */
 const EMPTY_LEDE =
@@ -239,6 +296,37 @@ export type HonestyPart =
  *   fix from being *one shorter wall and one longer one*.
  */
 export const SMALL_PRINT_BUDGET = Object.freeze({ open: 110, paragraph: 70 });
+
+/**
+ * **The stated length budget for a figure card's note** — GitHub issue #211's other slot.
+ *
+ * A card's note is `mode/casualDay.ts#casualNoteFor`'s lead plus the engineer's own caption, which
+ * on the stairs card is 70 words under a value of `0`. The budget is the number of words drawn
+ * before a reader presses anything; a note inside it is drawn whole, and a note over it is drawn
+ * as its first sentence with the rest one press away ({@link figureNotePartsOf}). Twenty-four is
+ * two lines of the card's own width at its type size, which is what a reader scans under a figure
+ * before deciding whether to read on.
+ */
+export const FIGURE_NOTE_BUDGET = Object.freeze({ open: 24 });
+
+/** The handle on a folded card note — a verb, because it is a control, and never a summary of the fold. */
+export const FIGURE_NOTE_HANDLE = 'Read the rest';
+
+/**
+ * A card note as a lead and the rest, or the note whole.
+ *
+ * `rest` is `undefined` when the note is inside {@link FIGURE_NOTE_BUDGET} or is one sentence —
+ * a disclosure whose handle is its whole content reveals nothing, `foldOf`'s own rule. Joined with
+ * one space, `lead` and `rest` are the note byte for byte, which `reportView.test.ts` holds over
+ * every card of a real sheet: nothing is deleted or re-ordered, and the corpus keeps reading the
+ * whole string because the split happens at the renderer and the producer is unchanged.
+ */
+export function figureNotePartsOf(note: string): { readonly lead: string; readonly rest: string | undefined } {
+  const sentences = sentencesOf(note);
+  if (sentences.length < 2 || wordsIn(note) <= FIGURE_NOTE_BUDGET.open) return { lead: note, rest: undefined };
+  const [lead, ...tail] = sentences;
+  return { lead: lead ?? note, rest: tail.join(' ') };
+}
 
 /**
  * Sentences, split on the space between them and on nothing else.
@@ -390,16 +478,24 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       delta: sheet.delta?.caption ?? '',
       overnight: 'What changed overnight',
     },
-    levers: sheet.levers.map((lever) => ({
-      title: lever.title,
-      body: lever.body,
-      surface: lever.surface,
-      goLabel:
-        lever.surface === undefined
-          ? undefined
-          : leverButtonLabel(input.panelNames?.[lever.surface]),
-      noSurfaceNote: lever.surface === undefined ? NO_SURFACE_NOTE : undefined,
-    })),
+    levers: sheet.levers.map((lever) => {
+      const route = EVERYDAY_LEVER_ROUTES[lever.id];
+      const surface = route?.kind === 'engineer' ? route.tab : undefined;
+      return {
+        title: lever.title,
+        body: lever.body,
+        surface,
+        route,
+        goLabel:
+          route === undefined
+            ? undefined
+            : route.kind === 'engineer'
+              ? leverButtonLabel(input.panelNames?.[route.tab])
+              : EVERYDAY_ROUTE_LABELS[route.screen],
+        caveat: route?.kind === 'everyday' && route.screen === 'workshop' ? DISPATCHER_LEVER_CAVEAT : undefined,
+        noSurfaceNote: route === undefined ? NO_SURFACE_NOTE : undefined,
+      };
+    }),
     honesty: {
       title: 'This was one day',
       body: sheet.smallPrint,

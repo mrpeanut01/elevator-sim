@@ -28,6 +28,7 @@ import { SERVICE_MODES } from '../model/types.js';
 
 import { parseBuilding, parseElevatorSpecs, resolveBuilding } from './parse.js';
 import { resolveCar } from './resolveCar.js';
+import { isServiceModeEvent } from './serviceEvent.js';
 import { ConfigError, ISSUE_CODES, carConfigSchema, serviceEventSchema } from './schema.js';
 import type { ElevatorSpecs } from './types.js';
 
@@ -153,7 +154,11 @@ describe('BuildingConfig.serviceEvents resolves against the banks, or refuses to
       { atS: 100, carId: 'C', mode: 'out-of-service' },
       { atS: 300, carId: 'B', mode: 'in-service' },
     ]);
-    expect(resolved.serviceEvents?.map((event) => [event.atS, event.carId, event.mode])).toEqual([
+    expect(
+      resolved.serviceEvents?.map((event) =>
+        isServiceModeEvent(event) ? [event.atS, event.carId, event.mode] : event,
+      ),
+    ).toEqual([
       [300, 'B', 'out-of-service'],
       [100, 'C', 'out-of-service'],
       [300, 'B', 'in-service'],

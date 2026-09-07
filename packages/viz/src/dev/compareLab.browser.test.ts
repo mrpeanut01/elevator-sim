@@ -87,7 +87,7 @@ beforeAll(async () => {
   const origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
   page = await openPage(browser, { viewport: { width: 1600, height: 1000 } });
-  await page.goto(origin, { waitUntil: 'load' });
+  await page.goto(`${origin}?building=garden-apartments`, { waitUntil: 'load' });
   // The page opens on Everyday Mode now; this is the player's way to the Engineer surface.
   await enterEngineerStage(page);
   /*

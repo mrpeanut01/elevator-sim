@@ -78,7 +78,9 @@ describe('objectSectionsOf, against the shipped dispatcher profile', () => {
       expect(Object.hasOwn(dispatcherProfileSchema.shape, pseudo)).toBe(true);
       expect(DISPATCHER_PROFILE_OBJECT_SECTIONS).not.toContain(pseudo);
     }
-    for (const scalar of ['$comment', 'id', 'name', 'role', 'engine']) {
+    // `blurb` is the authored player-facing line (GitHub issue #178 item 5, § D508): a scalar the
+    // card reads and nothing samples.
+    for (const scalar of ['$comment', 'id', 'name', 'blurb', 'role', 'engine']) {
       expect(Object.hasOwn(dispatcherProfileSchema.shape, scalar)).toBe(true);
       expect(DISPATCHER_PROFILE_OBJECT_SECTIONS).not.toContain(scalar);
     }
@@ -92,6 +94,7 @@ describe('objectSectionsOf, against the shipped dispatcher profile', () => {
         '$comment',
         'id',
         'name',
+        'blurb',
         'role',
         'engine',
       ].sort(),

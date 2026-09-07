@@ -467,7 +467,7 @@ own count attached.
 |---|---|---|
 | Main | The prototype has one mode and opens straight into it | Six destinations, each with a line saying what it is; never a bare list of nouns — **and one of them recommended, in words** (see below) |
 | Campaign | The prototype's week has no way in or out — it simply is | Says which of the two things called Campaign this is, and selects the surface rather than dropping the reader on whatever tab was last open |
-| Free play | The prototype has no configuration a player chooses | Six axes, all derived from `data/`; Start disabled **and explained**; the run is day one and the screen says so |
+| Free play | The prototype's Sandbox offers two selects — a building and a pattern — behind a Scenarios/Sandbox toggle (`elevator-sim-reimagined.dc.html`, `pickSandboxBuilding` / `pickSandboxPattern`); this row's reason used to say the prototype has *no* configuration a player chooses, and § 4.13 corrects it | Six axes, all derived from `data/`; Start disabled **and explained**; the run is day one and the screen says so |
 | Settings | The prototype has no presentation controls at all | Presentation only, and that claim is **measured** — `scope.test.ts` moves each and requires the legs byte-identical |
 | Leaderboard | There is no server in the prototype | Says what a board *is* rather than letting the word imply a skill ranking |
 | Challenge | Neither is there a competition | The window is drawn and never computed; the dispatcher is the only axis; every row carries its `n` |
@@ -657,6 +657,55 @@ the profile id, because a lever-moved player handing the day back to the baselin
 under an equal id. A switch also stands the player's rules and pattern switching down for the rest
 of the day (the pin, `dispatch/policy.ts#adoptWeights`), and the control's title says so in words
 (`SWITCH_PINS_NOTE`) rather than leaving it to be deduced from a rule that stopped firing.
+
+---
+
+### 4.13 Sandbox is a state, not a mode — and *Unlock everything* is derived rather than switched
+
+**What the handoff says.** `elevator-sim-reimagined.dc.html` specifies Sandbox as a **play mode**:
+`playMode === 'sandbox'`, one of two, behind a *Scenarios | Sandbox* segmented toggle (`setCareer` /
+`setSandbox`), with two selects in the coach ribbon (`pickSandboxBuilding`, `pickSandboxPattern`),
+no growth, a `Sandbox` coach label, and *"a pattern you pick or save here follows you into
+Sandbox."* The Casual handoff (`elevator-sim-casual.dc.html`) adds a separate per-run *Unlock
+everything* toggle.
+
+**What the product does** ([§ D496](../DECISIONS.md), GitHub issue #225). **Sandbox is a state — a
+week on no assignment, arrived at and never chosen. No ninth `PlayMode`, no toggle, no screen.**
+The handoff's mode is shipped in halves: its *selection* half is Free play, whose door offers a
+fuller six-axis choice than the prototype's two selects; its *unscored* half is the sandbox
+contract (`shift/week.ts#SANDBOX_CONTRACT_ID`, one non-test writer in `dev/state.ts`, the scoring
+gate in `week.ts`, the label case in `shift/weekLabel.ts`, [§ D382](../DECISIONS.md)). What is
+genuinely unshipped is the **explicit choice** — `scope/types.ts`'s eight `PLAY_MODES` hold
+`free-play` and not `sandbox`.
+
+**Why the mode is refused rather than deferred.** Building it contradicts § D382 rather than
+extending it: that gate's whole argument is that the sandbox is the one sentinel *not* chosen, so a
+toggle letting a player choose it needs § D382 re-taken. It would also duplicate Free play, and the
+cost is not small — a ninth `PlayMode` reaches every exhaustive switch over it, `scope/permits.ts`
+and `scope/surface.ts`, a row on `everyday/screens.ts`'s registry, and new honesty surfaces.
+
+**Why the label is kept rather than deleted.** `shift/week.ts` argues it: collapsing the sentinel
+into endless tells a reader who opened the editor that they started an endless run — a claim about
+an intention they did not have — and reuse re-opens GitHub issue #125's defect, since a player
+entering free play from a sandbox week meets `switchWeek`'s same-id line.
+
+**One copy correction the ruling forced.** The brief's locked-for-score card offered a door reading
+*Take it to the sandbox* — a verb and a place, which is the mode reading — while four other
+surfaces said *state*. It now reads *Change it anyway — the day stops counting*
+(`everyday/briefView.ts#SANDBOX_DOOR_LABEL`), and `briefView.test.ts` holds it, because no honesty
+property can see a vocabulary disagreement.
+
+**The *Unlock everything* toggle is declined, and the reason is a second source of truth.** The
+tuner's *Sandbox — nothing counts* strip is **derived** from which keys have moved
+(`everyday/tunerModel.ts`, `movedKeys`): one predicate drives the strip, the run's stamp, § 3.3's
+note and the presses, so the label agrees with itself across four surfaces by construction. A
+switch beside that strip would be a second, disagreeing source for the same fact — the argument is
+at `tunerModel.ts` where the narrower guard (*the building moved*) was rejected for the same reason.
+
+**Not decided, and named so the next reader finds it named.** Whether Free play should be scored:
+a free-play week *is* posted — `week.ts` gates only on the sandbox id — while the handoff's Sandbox
+is explicitly unscored. That is a product judgement about what Free play is for, and § D496 leaves
+it open rather than settling a second question inside the first.
 
 ---
 

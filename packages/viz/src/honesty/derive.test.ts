@@ -125,6 +125,25 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'everyday/shell.ts#mountEverydayShell',
         /*
+         * GitHub issue #348's as-built stage on the fix-it screen and the painter it shares with
+         * § 7's stage. `mountAsBuiltStage` builds a canvas and a transport, so it cannot run
+         * without a document; every word it draws is `everyday/fixitScreenModel.ts`'s copy table,
+         * whose three as-built keys the FIXIT adapter seeds by name because no model reaches them
+         * — the first probe of this wave's corpus move found them in `covers` and in nothing's
+         * output. `drawCutaway` paints geometry and floor labels onto a
+         * canvas context and authors no sentence — it is derived because a floor label is a word
+         * beside a word — and the labels it draws are the recording's own.
+         */
+        'everyday/asBuiltStage.ts#mountAsBuiltStage',
+        'everyday/cutaway.ts#drawCutaway',
+        /*
+         * The brief's elevation painter, shared with the campaign's tower screen since GitHub
+         * issue #353. It paints wells and slabs onto a canvas and authors three floor marks and a
+         * car id's tail; the words beside it — the outage strip, the works strip — are
+         * `today.ts`'s and `campaignModel.ts`'s, both driven.
+         */
+        'everyday/elevation.ts#drawElevation',
+        /*
          * § 14's two-tabbed board screen, on the settings screen's split exactly: `BOARD_SCREEN` is
          * a registry row whose `mount` builds tab cards, a table and a `<details>`, so it cannot
          * run without a document. Every **word** it draws is authored elsewhere and driven by the
@@ -616,6 +635,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * rather than leaving to look like the gap moving one file over.
          */
         'shift/week.ts#WEEK_CONTRACT_SENTINELS',
+        /*
+         * Reached through that table since GitHub issue #177 item 1: `PARKED_WEEKS_MAX` is its
+         * key count and `switchWeek` reads the bound, so both inherit `free play`'s two words.
+         * Neither authors a sentence. `replayPatchOf` returns a state patch keyed on ids.
+         */
+        'shift/week.ts#PARKED_WEEKS_MAX',
+        'shift/week.ts#switchWeek',
+        'everyday/replay.ts#replayPatchOf',
       ],
     },
     {
@@ -708,6 +735,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scope/types.ts#PLAY_MODES',
         'scope/surface.ts#SCOPE_OF',
         'scope/permits.ts#permits',
+        /*
+         * GitHub issue #178 item 1's two id-only exports beside it. `permittedScopes` returns
+         * members of `CHANGE_SCOPES` and authors nothing; `MODE_OF_SCREEN` maps screen ids to
+         * `PLAY_MODES` members or `null`. Both are derived only because a hyphen reads as a word
+         * break — `stage-campaign`, `free-play` — which is `commitmentOf`'s case below. The
+         * sentence the model draws is `permittedLineFor`, driven by the menu adapter.
+         */
+        'scope/permits.ts#permittedScopes',
+        'menu/affordances.ts#MODE_OF_SCREEN',
         'scope/commitment.ts#COMMITMENTS',
         'scope/commitment.ts#commitmentOf',
         /*
@@ -727,6 +763,25 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'scope/runIdentity.ts#EXPRESSIBLE_IN_A_SELECTION',
         'scope/runIdentity.ts#fieldsAnsweredFor',
+        /*
+         * GitHub issue #338's tuple of the intervention kinds the wire carries — `park-cars-lobby`,
+         * `spread-cars`, `switch-dispatcher` — derived because a hyphen reads as a word break, and
+         * asserted against `submission.ts`'s own source by `runIdentity.test.ts` rather than swept.
+         */
+        'scope/runIdentity.ts#CARRIED_INTERVENTION_KINDS',
+        /*
+         * GitHub issue #353's works writer: returns the run's car ids, derived only because the
+         * private `${bankId}-${carId}` composer reads as a phrase — `shift/events.ts#carRuntimeId`'s
+         * own case, kept private there for the same reason. The words a player reads about the held
+         * car are `campaignModel.ts#BUILDING_COPY`'s, driven.
+         */
+        'campaign/works.ts#worksHeldCarsOf',
+        /*
+         * GitHub issue #213's route table — lever ids to screens, derived because `add-a-car` and
+         * `zone-the-tower` read as words. The strings a card draws from it, the button label and
+         * the caveat, are `everydayReportViewOf`'s and the `EVERYDAY_DAILY_LOOP` adapter seeds both.
+         */
+        'everyday/reportView.ts#EVERYDAY_LEVER_ROUTES',
       ],
     },
     {
@@ -769,7 +824,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'this module’s docstring claimed and did not have. Every string in it is returned by ' +
         '`runIdentityIssues` and by nothing else, so it reaches a reader by exactly the route above ' +
         'and is accounted for by exactly the same limitation.',
-      ids: ['scope/runIdentity.ts#runIdentityIssues', 'scope/runIdentity.ts#CARRY_CHECKS'],
+      ids: [
+        'scope/runIdentity.ts#runIdentityIssues',
+        'scope/runIdentity.ts#CARRY_CHECKS',
+        /*
+         * GitHub issue #338's permanent refusal for the incident answer, one more of the same
+         * sentences: returned by `runIdentityIssues` and by nothing else, so it reaches a reader by
+         * exactly the route above.
+         */
+        'scope/runIdentity.ts#ANSWER_INCIDENT_STAYS_REFUSED',
+      ],
     },
     {
       reason:
@@ -983,6 +1047,33 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'record/decisionLog.ts#DecisionCollector',
         'record/decisionLog.ts#recordingPolicyFactory',
         'record/decisionLog.ts#wrapPolicy',
+      ],
+    },
+    {
+      reason:
+        'Assertions that two runs met the same crowd — GitHub issue #350 — and the three sites ' +
+        'that make them. `crowdDifferencesOf` returns sentences naming the first legs that differ, ' +
+        '`sameCrowd` is the predicate over it, `assertSameCrowd` throws with the pair’s own name in ' +
+        'front, and `assertPairMatchesRepairs` is the fix-it press’s call. Every one of those ' +
+        'sentences is a developer diagnostic in `recordRun`’s own class: it reports that a surface ' +
+        'paired two recordings it had no right to pair, fires before anything is drawn from the ' +
+        'pair, and is pinned by `record/crowd.test.ts` and `fixit/run.test.ts` on fabricated ' +
+        'recordings rather than swept as player copy. `wireInterventionsOf` is the same shape one ' +
+        'module over — GitHub issue #338 — throwing on a log entry that `runIdentityIssues` should ' +
+        'have refused first; the sentence a player reads about that state is ' +
+        '`switchUnpostableReasonOf`’s, which the EVERYDAY_STAGE adapter drives.',
+      ids: [
+        'record/crowd.ts#crowdDifferencesOf',
+        'record/crowd.ts#sameCrowd',
+        'record/crowd.ts#assertSameCrowd',
+        'fixit/run.ts#assertPairMatchesRepairs',
+        'scope/switchWire.ts#wireInterventionsOf',
+        /*
+         * GitHub issue #337's inverse of the wire form: returns a profile or `undefined` and authors
+         * no sentence; derived only because a hyphenated id reads as two words. The sentence a
+         * spectator reads about an unresolvable handover is `watch/posted.ts#postedLogOf`'s, driven.
+         */
+        'scope/switchWire.ts#switchTargetFromWire',
       ],
     },
     {
@@ -1203,7 +1294,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'preference are `everyday/units.ts#UNITS_ROW_COPY`’s, driven by `EVERYDAY_SETTINGS`, and ' +
         'the figures it switches are `speedFigure`’s and `lengthFigure`’s, driven by ' +
         '`EVERYDAY_STANDALONE_SCREENS` in both preferences.',
-      ids: ['everyday/profile.ts#loadProfile', 'everyday/profile.ts#loadUnits'],
+      ids: [
+        'everyday/profile.ts#loadProfile',
+        'everyday/profile.ts#loadUnits',
+        /*
+         * GitHub issue #229's default speed, the same case a third time: read through the same
+         * `readEnvelope` under the same key, returning a number no screen prints as a sentence. The
+         * words a player reads for it are `everyday/settingsView.ts#DEFAULT_SPEED_ROW_COPY`’s,
+         * driven by `EVERYDAY_SETTINGS`.
+         */
+        'everyday/profile.ts#loadDefaultSpeed',
+      ],
     },
     {
       reason:
@@ -1290,6 +1391,58 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'surface that decides what any of them says, and `everyday/host.test.ts` drives the ' +
         'composition itself against stubs.',
       ids: ['everyday/host.ts#dailyBoardOf'],
+    },
+    {
+      reason:
+        'A vocabulary id or a stream name, not prose — GitHub issues #171 and #169 item 1, § D507. ' +
+        '`coach-party` and `campaign-incident` are hyphenated identifiers the derivation reads as ' +
+        'two adjacent words: the first is a `ShiftEventId` the contract calendar files a day under, ' +
+        'the second the name `deriveStreamSeed` mixes into the breakdown draw. Neither reaches a ' +
+        'screen as itself. What a player reads of a calendared or drawn day is ' +
+        '`shift/events.ts#SHIFT_EVENTS`’ name and note, which `EVERYDAY_STAGE` drives through ' +
+        '`campaign/incidents.ts#campaignIncidentOf`, and the two ids here are classified rather ' +
+        'than the scan loosened, on `dailyBoardOf`’s ground above.',
+      ids: [
+        'campaign/calendar.ts#CONTRACT_CALENDAR',
+        'campaign/calendar.ts#calendarDaysOf',
+        'campaign/calendar.ts#calendarEventIdFor',
+        'campaign/incidents.ts#CAMPAIGN_INCIDENT_STREAM',
+        'campaign/incidents.ts#campaignEventFor',
+      ],
+    },
+    {
+      reason:
+        'A stream name and a table of measurements, not prose — GitHub issue #208, § D514. ' +
+        '`first-session` is the name `deriveStreamSeed` mixes into the first tower’s draw, and ' +
+        '`LEGIBILITY_SWEEP` is § D512’s table as data (`garden-apartments`, a count, a median), ' +
+        'from which `shift/firstSession.ts` derives the eligible set. What a player reads of the ' +
+        'draw is `FIRST_SESSION_LINE`, which `EVERYDAY_TODAY` seeds on a first day and covers.',
+      ids: [
+        'shift/firstSession.ts#FIRST_SESSION_STREAM',
+        'shift/firstSession.ts#firstSessionContractFor',
+        'shift/legibility.ts#LEGIBILITY_SWEEP',
+      ],
+    },
+    {
+      reason:
+        'A template id, not prose — GitHub issue #220, § D515. `endless-rush` names the record in ' +
+        '`data/traffic-profiles.json` and `rushPatchOf` writes it into `ViewerState.freePlay`; what ' +
+        'a player reads of the rush is `EVERYDAY_RUSH`’s result and stage header, which it seeds.',
+      ids: ['everyday/rush.ts#RUSH_TEMPLATE_ID', 'everyday/rush.ts#rushPatchOf'],
+    },
+    {
+      reason:
+        'A table keyed by building id and a kind vocabulary, not prose — GitHub issue #169 item 3, ' +
+        '§ D510. `OFFER_FEES` is `garden-apartments: 3` six times over and `offerFeeOf` reads it; ' +
+        '`offerRefusalOf` answers `held` / `unpriced` / `no-slot` / `at-risk` and a number, never a ' +
+        'sentence. What a player reads of an offer — its terms, its quirk, its button and the ' +
+        'guide’s two refusals — is `everyday/campaignModel.ts#offersView`’s, which the campaign ' +
+        'adapter drives over every snapshot it renders.',
+      ids: [
+        'campaign/economy.ts#OFFER_FEES',
+        'campaign/economy.ts#offerFeeOf',
+        'campaign/career.ts#offerRefusalOf',
+      ],
     },
   ]);
 

@@ -186,6 +186,18 @@ export const SHIFT_EVENT_IDS = [
   'conference',
   'ordinary',
   'weekend',
+  /*
+   * **The campaign's two, and the week's rota never draws them** — GitHub issues #171 and #169,
+   * § D507. § 8.11 says incidents arrive from the building: a lift failing its safety check is a
+   * draw against § 8.3's daily odds, and a coach party is a line in the contract's own calendar
+   * (`campaign/calendar.ts`). Both are *events* in exactly this vocabulary's sense — a thing today
+   * does to the run, expressed in fields the engine reads — which is why they live here beside the
+   * five rather than in a second table the corpus and `events.test.ts` would have to learn about.
+   * `events.ts#eventFor` is unchanged and reaches neither; `campaign/incidents.ts#campaignEventFor`
+   * is the only chooser, and `everyday/host.ts#runCampaignDay` its only caller.
+   */
+  'breakdown',
+  'coach-party',
 ] as const;
 
 export type ShiftEventId = (typeof SHIFT_EVENT_IDS)[number];

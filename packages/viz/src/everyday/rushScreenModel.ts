@@ -58,6 +58,8 @@ import type { ActionBarModel } from './actionBar.js';
  * `bucketS` is the contract's *two-second buckets*: {@link expectedPerBucket} is people per bucket,
  * and any per-minute figure divides by it. `waveS` is *three minutes*, which is what makes the
  * ramp *+11 % of a normal morning's rate every three minutes*.
+ *
+ * Read by `everyday/rush.ts`, which turns the stream into a run (GitHub issue #220, § D515).
  */
 export const RUSH_STREAM = Object.freeze({
   /** Ninety minutes. The contract's own length for the generated climb. */
@@ -170,6 +172,8 @@ export function rushOpeningLine(): string {
  * is a crowd in one building and a quiet second in another. The rush is the stated exception and the
  * reason is in § 9.2: *the same line for everybody*. A rush whose ending moved with the tower would
  * not be a leaderboard.
+ *
+ * Read by `everyday/rush.ts`, which turns the stream into a run (GitHub issue #220, § D515).
  */
 export const RUSH_HOLD_LINE = Object.freeze({
   people: 40,
@@ -265,9 +269,10 @@ export function rushGeneratedRangeLine(): string {
  * What the rush needs and this build has not got, in the order a reader meets them.
  *
  * Drawn on the build-information panel (`everyday/buildNotes.ts`) since GitHub issue #207, not on
- * this screen. **`rushBarModel` does not read it** — it reads {@link RUSH_PRIMARY_REFUSAL}, which
- * is the one line that belongs to a control — and the sentence here that said otherwise was a
- * `{@link}` standing in for a caller, which is the shape `CLAUDE.md` names outright. Each entry
+ * this screen. **`rushBarModel` does not read it** — the one line that belonged to a control was
+ * the primary's refusal, deleted when GitHub issue #220 built the engine — and the sentence here
+ * that said otherwise was a `{@link}` standing in for a caller, which is the shape `CLAUDE.md`
+ * names outright. Three of the four entries this register held went with the engine. Each entry
  * names the missing seam rather than the feeling of one — `docs/18`'s register style, and
  * `shell.ts`'s.
  *
@@ -311,23 +316,8 @@ export function rushGeneratedRangeLine(): string {
  * marker § 20.11 requires of a fixture. This entry is the queue item; that one is the licence.
  */
 export const RUSH_ABSENCES: readonly string[] = Object.freeze([
-  'the climbing stream — no demand pattern this build ships ramps upward without a ceiling, so the ninety minutes a rush asks for cannot be generated yet',
-  'a rush stage of its own — a run plays on the ordinary stage screen, whose clock reads the time of day and whose pill reads the part of the day the crowd is in; a rush wants time held and a wave number, and nothing in this build works either of them out',
-  'a result screen of its own — a rush that has not run has no furthest wave, and a screen that answered anyway would be inventing one',
   'the standings — the five entries on the rush setup screen are the handoff’s own fixtures, not runs this build measured',
 ]);
-
-/**
- * The primary's refusal, one sentence, drawn in **one** place: the § 3.3 bar's note, beside the
- * button it is about — see {@link rushBarModel} for the measurement that moved it there.
- *
- * The old wording of this line said *"drawn on the disabled button and in the register"*. Neither
- * half had been true for a while: the register moved to the build-information panel on the merge
- * that closed GitHub issue #207, and *on the button* was the claim GitHub issue #262 measured and
- * found to be 186 px below a 720 px fold.
- */
-export const RUSH_PRIMARY_REFUSAL =
-  'the climbing stream is not built — this screen is the setup, and there is nothing behind it to start yet';
 
 /* -------------------------------------------------------------------------- *
  * The bands — § 9.1, computed off the ramp
@@ -408,6 +398,8 @@ export interface RushBandView extends RushBandSpec {
  * The open-ended band needs a last wave to average over, and this is it. So *absurd* is priced at
  * what the generated climb actually reaches rather than at an arbitrary distance up an infinite
  * ramp — the bar is a fact about the run, not about the idea.
+ *
+ * Read by `everyday/rush.ts`, which turns the stream into a run (GitHub issue #220, § D515).
  */
 export const LAST_GENERATED_WAVE = playerWaveAt(RUSH_STREAM.lengthS - 1);
 
@@ -572,8 +564,8 @@ export const RUSH_BESTS: readonly RushBestView[] = Object.freeze([
  *
  * ## Why it is its own constant rather than the register
  *
- * {@link RUSH_PRIMARY_REFUSAL} is the same shape one screen up, and GitHub issue #207 drew the
- * line this follows: **a refusal that belongs to a thing a player is looking at is drawn on that
+ * The primary's refusal was the same shape one screen up while it stood, and GitHub issue #207
+ * drew the line this follows: **a refusal that belongs to a thing a player is looking at is drawn on that
  * thing; a register of what the build does not do is drawn once, somewhere a reader goes looking.**
  * Putting `RUSH_ABSENCES` back on this screen would re-litigate #207 and duplicate the panel; the
  * three entries about the missing engine do not belong beside a list of names. What belongs beside
@@ -633,8 +625,8 @@ export function rushDrivingLine(name: string): string {
 /**
  * § 3.3's rush row, resolved for the setup screen — the `bar()` refinement `screens.ts` contracts.
  *
- * It edits three cells: the primary is marked **inert**, it is relabelled while it is, and the note
- * becomes {@link RUSH_PRIMARY_REFUSAL}.
+ * It edited three cells while the engine was missing: the primary was marked **inert**, relabelled
+ * while it was, and the note became its refusal. Since GitHub issue #220 it edits none.
  *
  * ## Why it is three and not one — GitHub issue #262
  *
@@ -695,15 +687,11 @@ export function rushDrivingLine(name: string): string {
  */
 export function rushBarModel(base: ActionBarModel): ActionBarModel {
   /*
-   * `inert` carries the sentence and nothing here repeats it.
-   *
-   * This resolved as a merge between two independent fixes for one defect (#262), and the other
-   * one is better: `shell.ts#drawBar` now takes a resolved-inert primary's own reason **over** the
-   * § 3.3 table note, names that node so the button can point at it with `aria-describedby`, and
-   * the type refuses a dead primary that ships without a reason — so every screen gets it, not
-   * just this one. This side's version set `note` and relabelled the button; both are dropped.
-   * `note` would now lose to `inertReason` anyway, and a second copy of the sentence on the label
-   * is the *"one constant, one place on screen"* rule this file's own refusal was written to keep.
+   * Live since GitHub issue #220 built the engine (§ D515): `rushScreen.ts`'s mount answers the
+   * press with `EverydayHost.startRush`, and the refusal this function carried — *the climbing
+   * stream is not built* — was deleted on the commit that made it false, § D227's rule. The row
+   * is the table's own; the one thing this refinement still does is keep the seam every screen's
+   * `bar()` goes through, so the note stays the table's and not a second copy.
    */
-  return { ...base, primary: { ...base.primary, inert: RUSH_PRIMARY_REFUSAL } };
+  return base;
 }

@@ -95,7 +95,7 @@ async function readStrip(page: Page): Promise<{
 /** A cold page on the Engineer surface, reached through the door a player uses. */
 async function coldEngineer(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-  await page.goto(origin, { waitUntil: 'load' });
+  await page.goto(`${origin}?building=garden-apartments`, { waitUntil: 'load' });
   await enterEngineerStage(page);
   return page;
 }

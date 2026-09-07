@@ -23,7 +23,7 @@ import { challengeScoreOf, type SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
 import { PgliteSql } from './pglite.test-helper.js';
 import { RacingSql } from './racingSql.test-helper.js';
-import { NoSuchUserError, SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
+import { HOUSE_DISPLAY_NAME, HOUSE_USER_ID, NoSuchUserError, SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
 
 /**
  * **Every test in this file boots a whole PostgreSQL, and vitest's default gives it five seconds.**
@@ -320,6 +320,18 @@ describe('a board', () => {
     });
     expect((await store.board('board-2', 'awtS', 25)).map((entry) => entry.displayName)).toEqual(['Ada', 'Bo']);
     expect((await store.board('board-2', 'wt95S', 25)).map((entry) => entry.displayName)).toEqual(['Bo', 'Ada']);
+  });
+
+  it('gives the distribution one observation per player, their best on the axis asked — GitHub issue #327', async () => {
+    const { store, ada, bo } = await fixture();
+    /* Ada twice on this board, Bo once: two observations, and Ada's is her better wait. */
+    const better = await store.recordEntry({ boardKey: 'board-4', dataHash: 'd', userId: ada, run: RUN, measured: metrics(30), legs: 100 });
+    await store.recordEntry({ boardKey: 'board-4', dataHash: 'd2', userId: ada, run: { ...RUN, seed: '77' }, measured: metrics(45), legs: 100 });
+    await store.recordEntry({ boardKey: 'board-4', dataHash: 'd3', userId: bo, run: { ...RUN, seed: '78' }, measured: metrics(35), legs: 100 });
+    const observed = await store.axisObservations('board-4', 'awtS');
+    expect(observed.map((row: { value: number }) => row.value).sort((a: number, b: number) => a - b)).toEqual([30, 35]);
+    expect(observed.find((row: { value: number }) => row.value === 30)?.entryId).toBe(better.id);
+    expect(await store.axisObservations('board-nobody', 'awtS')).toEqual([]);
   });
 
   it('replaces rather than appends when the same seed is submitted again', async () => {
@@ -869,5 +881,51 @@ describe('an account deleted underneath a write that never read it', () => {
     await expect(failure).rejects.toBeInstanceOf(NoSuchUserError);
     await expect(failure).rejects.toThrow('createSession: no such user');
     await expect(failure).rejects.not.toThrow(/foreign key|constraint|fkey/u);
+  });
+});
+
+describe('the house — GitHub issue #222, § D521', () => {
+  it('exists on every open, once, with an address no mail can reach', async () => {
+    const { store, sql } = await fixture();
+    const house = await store.userById(HOUSE_USER_ID);
+    expect(house?.displayName).toBe(HOUSE_DISPLAY_NAME);
+    expect(house?.email).toMatch(/\.invalid$/u);
+    /* A second open against the same database is idempotent by the fixed id. */
+    const again = await Store.open({ sql, now: () => 1 });
+    const count = await sql.query('SELECT COUNT(*) AS n FROM users WHERE id = $1', [HOUSE_USER_ID]);
+    expect(Number(count.rows[0]?.['n'])).toBe(1);
+    void again;
+  });
+
+  it('keeps one row per baseline dispatcher on a board, beside one row per player', async () => {
+    const { store, ada } = await fixture();
+    await store.recordEntry({ boardKey: 'daily:2026-09-06', dataHash: 'd-collective', userId: HOUSE_USER_ID, run: { ...RUN, dispatcherProfileId: 'collective' }, measured: metrics(20), legs: 300, baselineProfileId: 'collective' });
+    await store.recordEntry({ boardKey: 'daily:2026-09-06', dataHash: 'd-eta', userId: HOUSE_USER_ID, run: { ...RUN, dispatcherProfileId: 'eta' }, measured: metrics(25), legs: 300, baselineProfileId: 'eta' });
+    await store.recordEntry({ boardKey: 'daily:2026-09-06', dataHash: 'd-ada', userId: ada, run: RUN, measured: metrics(22), legs: 300 });
+    await store.recordEntry({ boardKey: 'daily:2026-09-06', dataHash: 'd-ada-2', userId: ada, run: { ...RUN, seed: '2' }, measured: metrics(27), legs: 300 });
+    const board = await store.board('daily:2026-09-06', 'awtS', 25);
+    /* Three rows: two house dispatchers and Ada once at her best — never the thirteen-into-one collapse. */
+    expect(board.map((row) => [row.displayName, row.baselineProfileId, row.measured.awtS])).toEqual([
+      [HOUSE_DISPLAY_NAME, 'collective', 20],
+      ['Ada', undefined, 22],
+      [HOUSE_DISPLAY_NAME, 'eta', 25],
+    ]);
+  });
+
+  it('counts players only in the ladder, because the house is not one', async () => {
+    const { store, ada, bo } = await fixture();
+    await store.recordEntry({ boardKey: 'daily:2026-09-07', dataHash: 'd-h', userId: HOUSE_USER_ID, run: RUN, measured: metrics(10), legs: 300, baselineProfileId: 'collective' });
+    await store.recordEntry({ boardKey: 'daily:2026-09-07', dataHash: 'd-a', userId: ada, run: RUN, measured: metrics(30), legs: 300 });
+    await store.recordEntry({ boardKey: 'daily:2026-09-07', dataHash: 'd-b', userId: bo, run: RUN, measured: metrics(35), legs: 300 });
+    const observed = await store.axisObservations('daily:2026-09-07', 'awtS');
+    expect(observed.map((row) => row.value).sort((a, b) => a - b)).toEqual([30, 35]);
+  });
+
+  it('re-seeding the same dispatcher on the same board replaces the row rather than adding one', async () => {
+    const { store } = await fixture();
+    const first = await store.recordEntry({ boardKey: 'daily:2026-09-08', dataHash: 'd-c', userId: HOUSE_USER_ID, run: RUN, measured: metrics(20), legs: 300, baselineProfileId: 'collective' });
+    const again = await store.recordEntry({ boardKey: 'daily:2026-09-08', dataHash: 'd-c', userId: HOUSE_USER_ID, run: RUN, measured: metrics(20), legs: 300, baselineProfileId: 'collective' });
+    expect(again.id).toBe(first.id);
+    expect(await store.board('daily:2026-09-08', 'awtS', 25)).toHaveLength(1);
   });
 });

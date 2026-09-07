@@ -329,7 +329,7 @@ describe('the run the shift path actually asks for', () => {
    *
    * The test above drives `shiftRunConfigOf` from a state the daily loop produced, and on that path
    * the defect had been closed since `docs/20` defect 5 landed. It came back on a path that test
-   * cannot see: *Take it to the sandbox* → *Run it and watch*, with nothing touched. The press
+   * cannot see: the brief's locked-for-score door → *Run it and watch*, with nothing touched. The press
    * re-saved the standing building under a fresh id, the matrix stopped recognising it, and the
    * five-minute band came back — so the first sheet a new player ever sees withheld **both** of its
    * headline figures on a day whose riders all turned up, with all four goal rows graded ✓.

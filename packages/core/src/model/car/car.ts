@@ -843,7 +843,10 @@ export class Car implements CarLike {
       distanceM: motion.profile.distanceM,
       direction: motion.direction,
       loadKg: this.loadSensor.massKg,
-      ratedLoadKg: this.loadSensor.ratedLoadKg,
+      // The **plate**, not the controller's setting: the counterweight is hardware, and a derate
+      // (§ D523) is a setting on the controller. `spec.ratedLoadKg` is what `resolveLoadSensor`
+      // read the plate from, so the two agree on every car that has not been derated.
+      ratedLoadKg: this.spec.ratedLoadKg,
     });
   }
 
@@ -1116,6 +1119,21 @@ export class Car implements CarLike {
   /* ---------------------------------------------------------------- *
    * Load
    * ---------------------------------------------------------------- */
+
+  /**
+   * **Set the controller's rated load** — a derate, or a return to the plate (GitHub issue #346,
+   * § D523). `LoadSensor.derate` says what moves; nothing else on the car does, and in particular
+   * the shaft, the motion constraints and the energy sample's counterweight balance are the
+   * hardware's and stay where the plate put them.
+   *
+   * @returns the hall calls this car was holding and now bypasses, if the new rating puts it at or
+   *   past its bypass threshold — the same hand-back a load-sensor trip produces, so the runner
+   *   re-offers them the same way.
+   */
+  derate(ratedLoadKg: number): readonly HallCall[] {
+    this.loadSensor.derate(ratedLoadKg);
+    return this.loadSensor.isBypassingHallCalls ? this.releaseAllHallCalls() : [];
+  }
 
   /** Everyone aboard, in boarding order. A copy. */
   get passengers(): readonly Passenger[] {

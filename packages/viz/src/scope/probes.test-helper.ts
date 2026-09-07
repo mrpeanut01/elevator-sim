@@ -545,6 +545,20 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
     ],
   },
 
+  'viewer.campaignEventId': {
+    /*
+     * The campaign's cell for `campaignFitOut`'s reason — `c1`'s hour on Garden Apartments — and
+     * the breakdown rather than the coach party because a red-tagged car is the arm whose whole
+     * effect is a service event, which is the field `shiftRunConfigOf` writes onto the building
+     * rather than beside the config. The `undefined` arm runs whatever the week's rota says for
+     * `baseState()`'s day, exactly as every non-campaign run does.
+     */
+    states: [
+      (s) => ({ ...s, shiftLengthS: 3600, campaignEventId: undefined }),
+      (s) => ({ ...s, shiftLengthS: 3600, campaignEventId: 'breakdown' }),
+    ],
+  },
+
   /* ------------------------------------------------------- within-day: re-runs today */
   'viewer.levers': {
     states: [

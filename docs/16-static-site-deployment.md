@@ -529,6 +529,37 @@ run corrected both of them ([§ D308](../DECISIONS.md)):
 
 ---
 
+## 10. Seeding the boards on a clock — GitHub issues #222 and #328
+
+Since [§ D521](../DECISIONS.md) and [§ D522](../DECISIONS.md) a daily board opens with the house's
+runs on it: one row per shipped dispatcher whose mean is quotable on the day's fixture, posted by the
+reserved `house` account, marked on the row and counted by no ladder. Nothing on the server runs
+between requests, so the clock is `.github/workflows/seed-boards.yml`, which fires at 00:10 UTC and
+calls `POST /api/boards/seed` on the deployed API with a bearer token.
+
+Two values arm it, and the workflow refuses to run without either:
+
+| where | name | value |
+|---|---|---|
+| repository variable | `ELEVATOR_SIM_API_ORIGIN` | the API's origin, already set by § 3 |
+| repository secret | `ELEVATOR_SIM_SEED_TOKEN` | at least 32 characters, and the same value the container holds in its environment |
+
+Set the container's half the way § 3.3 sets the others. A deployment without the variable answers the
+route with 503 (`seeding-not-configured`) to everyone; a mismatched bearer is 401; a token shorter
+than 32 characters is refused at boot, because the route runs thirteen simulations and a guessable
+token on it would be a denial-of-service invitation with a password on it.
+
+What the workflow's log shows is the whole response: the board key, the seed, every row seeded with
+its mean and count, and every dispatcher skipped with the verifier's own reason (`nearest-car` is
+skipped on the daily fixture because its mean is not quotable there). A **404** from the route is an
+API image that predates it, which is the lag § 0 warned about made visible; a **503** is a deployment
+with no token. Re-running the workflow on the same date is safe: the store's conflict key updates the
+rows in place. The `date` input on a manual dispatch seeds another day's board, which is how a missed
+night is made good.
+
+Measured on this container: one replay of the daily fixture is 1.2 to 1.6 s, so a seeding is about
+twenty seconds and the route answers synchronously.
+
 ## Sources
 
 - Azure Static Web Apps quotas and plan comparison, Microsoft Learn.

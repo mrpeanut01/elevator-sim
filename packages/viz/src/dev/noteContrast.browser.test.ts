@@ -179,7 +179,7 @@ beforeAll(async () => {
  */
 async function measureAt(scheme: 'dark' | 'light'): Promise<readonly Measured[]> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 }, colorScheme: scheme });
-  await page.goto(origin, { waitUntil: 'load' });
+  await page.goto(`${origin}?building=garden-apartments`, { waitUntil: 'load' });
   // The scope notes are written during *mount*, not during a render, so the first paint is enough.
   // The wait is for `boot()` to have run the mounts at all, with the canvas standing in for that.
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {

@@ -13,6 +13,31 @@
  *   set is *derived* by the caller (building ids, dispatcher profile ids), never listed here.
  * - The building is shipped, and every floor the measure names is one that building has — a
  *   complaint measured over floors that do not exist would be a measure of nothing.
+ * - **§ 10.4's basis, made a rule — and the rule is narrower than the one that was asked for**
+ *   (GitHub issue #349, `docs/35` PM-FB3, [§ D497](../../../../DECISIONS.md)). The brief said no
+ *   shipped repair touched `floorPopulations` and asked for a blanket refusal. **Three do**, and
+ *   each is the case's diagnosed repair and its whole lesson: `one-start-time` staggers tenancy
+ *   starts, `every-letter-says-nine` reprints half the appointment letters, and
+ *   `let-faster-than-the-lifts` invokes a staggered-starts clause — *"this is the case where the
+ *   crowd, not the kit, is wrong."* Refusing those would make demand-side diagnosis unauthorable.
+ *   So the refusal binds the three **fabric** roles — a costly fix, a cheap fix and a new shaft
+ *   are purchases, and a purchase cannot move a person out of the peak — and the diagnosed repair
+ *   may change the crowd **provided the pair says so**: `engine.ts#DEMAND_BASIS_LINE` replaces the
+ *   same-crowd basis, chosen from the legs rather than the patch, and `run.ts#assertPairMatchesRepairs`
+ *   holds the patch and the legs to each other in both directions. The **as-built** patch is
+ *   exempt either way: it is applied to both runs, so it shapes the crowd both arms meet.
+ * - **A `symptom` names a sight, not a figure** (GitHub issue #351, `docs/35` PM-FB2). The
+ *   symptom is printed on the failing band of the schematic so the problem arrives as something
+ *   the player can *see* on the stage rather than a statistic they are asked to take on trust.
+ *   A symptom carrying a numeral, or a statistic's name, is a figure — see
+ *   {@link symptomFigureIn} for the exact rule and the two shipped cases that failed it.
+ * - **A case that runs outside its profile's declared arrival-rate band declares it on its own
+ *   face** — [§ D478](../../../../DECISIONS.md)'s obligation, and the declaration is **derived
+ *   here rather than authored in the file**. See {@link demandDisclosureOf} for why: the brief
+ *   that asked for this expected two authored sentences, and fourteen of the eighteen shipped
+ *   cases run outside their band, thirteen of them *below* it. An authored key is refused, because
+ *   a sentence beside a number goes stale the first time the number moves and the sentence does
+ *   not (§ D227's class, aimed at the one parameter the ruling makes load-bearing).
  */
 
 import { probabilityWordIn } from '../campaign/words.js';
@@ -28,6 +53,15 @@ import type {
   FixitRepair,
   RepairRole,
 } from './types.js';
+
+/**
+ * A traffic profile's declared arrival-rate band, `% of population per 5 minutes` — the two bounds
+ * of `core`'s `DemandBand`, without its `typical`, because § D478 is about the edges.
+ */
+export interface DemandBand {
+  readonly min: number;
+  readonly max: number;
+}
 
 /** Raised when `data/fixit-cases.json` cannot be read as a case file at all. */
 export class FixitCasesError extends Error {
@@ -46,10 +80,50 @@ export interface FixitContext {
   /** Dispatcher profile ids this build's `data/` carries. */
   readonly profileIds: ReadonlySet<string>;
   /**
+   * Each shipped building's declared arrival-rate band — its `trafficProfile`'s
+   * `arrivalRatePctPop5min` range, `% of population per 5 minutes`. The caller derives it from the
+   * same loaded `data/`; this module reads it to derive {@link FixitCase.demandDisclosure} and
+   * never lists a band itself. A building absent from the map is unshipped, and is refused above.
+   */
+  readonly bandByBuilding: ReadonlyMap<string, DemandBand>;
+  /**
    * Identifiers that must not appear in player-facing copy — § 16 rule 11. The caller derives
    * this from the same loaded data (building ids, profile ids); this module never lists one.
    */
   readonly engineIds: readonly string[];
+}
+
+/**
+ * The context, derived from loaded `data/` — **one derivation with four callers** (the browser
+ * loader, the run suite, the surface-run measurement and the honesty tier's fixtures), so the
+ * forbidden-identifier set and the band map cannot be built four slightly different ways. Takes
+ * the structural minimum rather than `BrowserResources`, because this module is also validated
+ * from Node without the browser loader.
+ */
+export function fixitContextOf(input: {
+  readonly buildings: readonly {
+    readonly id: string;
+    readonly trafficProfile: string;
+    readonly floors: readonly { readonly id: string }[];
+  }[];
+  readonly trafficProfiles: { readonly profiles: readonly { readonly id: string; readonly arrivalRatePctPop5min: DemandBand }[] };
+  readonly dispatcherProfiles: { readonly profiles: readonly { readonly id: string }[] };
+}): FixitContext {
+  const bands = new Map(input.trafficProfiles.profiles.map((profile) => [profile.id, profile.arrivalRatePctPop5min]));
+  const bandByBuilding = new Map<string, DemandBand>();
+  for (const building of input.buildings) {
+    const band = bands.get(building.trafficProfile);
+    if (band !== undefined) bandByBuilding.set(building.id, band);
+  }
+  return {
+    floorIdsByBuilding: new Map(input.buildings.map((building) => [building.id, building.floors.map((floor) => floor.id)])),
+    profileIds: new Set(input.dispatcherProfiles.profiles.map((profile) => profile.id)),
+    bandByBuilding,
+    engineIds: [
+      ...input.buildings.map((building) => building.id),
+      ...input.dispatcherProfiles.profiles.map((profile) => profile.id),
+    ],
+  };
 }
 
 const ROLES: readonly RepairRole[] = ['diagnosed', 'costly-fix', 'cheap-fix', 'new-shaft'];
@@ -64,6 +138,67 @@ export const BUDGET_MAX_UNITS = 16;
 export const DIAGNOSED_MAX_UNITS = 9;
 export const NEW_SHAFT_UNITS = 34;
 
+/**
+ * What makes a `symptom` a **figure** rather than a **sight** — GitHub issue #351, PM-FB2.
+ *
+ * Two clauses, and both are deliberately blunt:
+ *
+ * - **a numeral.** `a 341 s mean wait to board` and `a 322 s worst wait beside an empty
+ *   hoistway` — the two shipped symptoms this rule was written against — are both caught here,
+ *   and so is any future `12 %` or `95th`. A number written in words (*doors held eleven seconds
+ *   at every stop*) passes, because it reads as a description of what the doors did rather than
+ *   as a reading off a dial, and because the shipped case that says it is a sight: a player can
+ *   watch the doors stand open.
+ * - **a statistic's name.** `mean`, `average`, `median`, `percentile` — a symptom naming one of
+ *   these is quoting the figure grid below it, whatever number it carries.
+ *
+ * Returns the offending token, or `null`. Exported so the sweep's own test can drive the rule in
+ * both directions without going through a whole case.
+ */
+export function symptomFigureIn(symptom: string): string | null {
+  const numeral = /\d+(?:[.,]\d+)?\s*(?:s|%|min)?\b/u.exec(symptom);
+  if (numeral !== null) return numeral[0].trim();
+  const statistic = /\b(mean|average|median|percentile)\b/iu.exec(symptom);
+  return statistic === null ? null : statistic[0];
+}
+
+/**
+ * § D478's declaration, **derived** ([§ D499](../../../../DECISIONS.md)) — the sentence a case outside its profile's declared band
+ * carries on its own face, or `undefined` for a case inside it or one running the building's own
+ * profile (`arrivalRatePctPop5min: null`, which cannot be outside a band it does not override).
+ *
+ * ## Why derived, when the ruling says "an authored case … says so on its own face"
+ *
+ * The brief (GitHub issue #351) named two subjects — `gym-on-the-top-floor` at 9.5 against
+ * residential's `max: 7`, and `three-cars-one-cars-work` at exactly 7 — and expected two authored
+ * declarations from a content lane. Measured against the shipped file, **fourteen of the eighteen
+ * cases run outside their band**, and thirteen of them run *below* it: an office at 2 % against
+ * `11–15`, a hotel at 7.8 against `10–15`. § D478's reason applies in both directions — *a figure
+ * taken from an out-of-band run is not representative of the building type, and a reader who
+ * takes it as such has been misled by a number that was correct* — and a quiet day is exactly as
+ * unrepresentative of a design peak as a busy one. Fourteen authored sentences beside fourteen
+ * authored rates is fourteen places for the sentence to stay put while the rate moves.
+ *
+ * So the declaration is a function of the rate and the band, the two facts it is about, and an
+ * authored `demandDisclosure` key in the file is a parse violation. That is the same discipline the
+ * complaint's measure already obeys — *computed from the runs and never authored* — pointed at the
+ * one parameter § D478 made load-bearing. `three-cars-one-cars-work` at exactly 7 is **inside** an
+ * inclusive band and carries nothing: a band's edge is part of the band.
+ *
+ * The figures are printed as the file authors them (`9.5 %`, `11–15 %`), never rounded, so the
+ * sentence and the case's `run` block cannot disagree.
+ */
+export function demandDisclosureOf(rate: number | null, band: DemandBand | undefined): string | undefined {
+  if (rate === null || band === undefined) return undefined;
+  if (rate >= band.min && rate <= band.max) return undefined;
+  const direction = rate > band.max ? 'Busier' : 'Quieter';
+  return (
+    `${direction} than a building like this is sized for: ${String(rate)} % of its people arrive ` +
+    `in any five minutes, against the ${String(band.min)}–${String(band.max)} % its design is ` +
+    'drawn around. The figures here are about this day, not about the building type.'
+  );
+}
+
 /** Every authored string a player reads on this case, labelled — the copy-rule sweep reads this. */
 export function playerFacingStringsOf(entry: FixitCase): readonly (readonly [string, string])[] {
   return [
@@ -73,6 +208,7 @@ export function playerFacingStringsOf(entry: FixitCase): readonly (readonly [str
     ['the complainer', entry.complaint.complainer],
     ['the measure label', entry.complaint.measure.label],
     ['the symptom', entry.symptom],
+    ...(entry.demandDisclosure === undefined ? [] : [['the demand disclosure', entry.demandDisclosure] as const]),
     ['the diagnosis', entry.diagnosis.text],
     ['its reasoning', entry.diagnosis.reasoning],
     ['the result head', entry.result.head],
@@ -95,14 +231,23 @@ export function parseFixitCases(raw: unknown, context: FixitContext): FixitCases
   const decoded = decodeFile(raw, violations);
   if (decoded === undefined) throw new FixitCasesError(violations);
   const seen = new Set<string>();
-  for (const entry of decoded.cases) {
-    const where = `case "${entry.id}"`;
-    if (seen.has(entry.id)) violations.push(`${where}: declared twice.`);
-    seen.add(entry.id);
+  const cases: FixitCase[] = [];
+  for (const decodedCase of decoded.cases) {
+    const where = `case "${decodedCase.id}"`;
+    if (seen.has(decodedCase.id)) violations.push(`${where}: declared twice.`);
+    seen.add(decodedCase.id);
+    // § D478's declaration is attached here, where the band is known, and before the copy sweep
+    // so that the sentence it composes is swept like every other string a player reads.
+    const disclosure = demandDisclosureOf(
+      decodedCase.run.arrivalRatePctPop5min,
+      context.bandByBuilding.get(decodedCase.buildingId),
+    );
+    const entry: FixitCase = disclosure === undefined ? decodedCase : { ...decodedCase, demandDisclosure: disclosure };
     violations.push(...checkCase(where, entry, context));
+    cases.push(entry);
   }
   if (violations.length > 0) throw new FixitCasesError(violations);
-  return decoded;
+  return { version: decoded.version, cases };
 }
 
 function checkCase(where: string, entry: FixitCase, context: FixitContext): readonly string[] {
@@ -164,6 +309,25 @@ function checkCase(where: string, entry: FixitCase, context: FixitContext): read
           "purchase that fixes nothing is a standing extra, and those are the engine's.",
       );
     }
+    if (repair.role !== 'diagnosed' && (repair.patch.building?.floorPopulations ?? []).length > 0) {
+      violations.push(
+        `${where}: repair "${repair.id}" (${repair.role}) patches floorPopulations. A purchase ` +
+          'cannot change who arrives: § 10.6 prices machinery, doors and a shaft, and none of them ' +
+          'moves a person out of the peak. Only the diagnosed repair may change the crowd, and when ' +
+          'it does the outcome says so on its basis line rather than claiming the same crowd twice.',
+      );
+    }
+  }
+
+  // The symptom is a sight, not a figure (PM-FB2).
+  const figure = symptomFigureIn(entry.symptom);
+  if (figure !== null) {
+    violations.push(
+      `${where}: the symptom "${entry.symptom}" states a figure ("${figure}"). A symptom names ` +
+        'something the player can see on the stage — cars standing together, doors held, a crowd ' +
+        'on a landing — so the problem arrives as a sight rather than as a statistic they are ' +
+        'asked to take on trust. The figures have their own grid (PM-FB2).',
+    );
   }
 
   // The figures: four of them, exactly one bad, at least one healthy (§ 10.1 item 3).
@@ -297,6 +461,14 @@ function decodeCase(raw: unknown, at: string, violations: string[]): FixitCase |
   if (diagnosis === undefined || result === undefined || measure === undefined) return undefined;
 
   const rate = run['arrivalRatePctPop5min'];
+  if (raw['demandDisclosure'] !== undefined) {
+    violations.push(
+      `${where}: authors a "demandDisclosure". The declaration a case outside its profile's band ` +
+        'carries is derived from the rate and the band at load time (§ D478), never authored — an ' +
+        'authored sentence beside an authored rate goes stale the first time one moves without the ' +
+        'other. Delete the key; the case will say what its rate implies.',
+    );
+  }
   return {
     id,
     name: str(raw['name']) ?? '',

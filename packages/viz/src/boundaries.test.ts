@@ -276,6 +276,15 @@ const EVERYDAY_SHELL_FILES = new Set([
    * shell tier and everything a reader reads does not.
    */
   'everyday/stageScreen.ts',
+  /*
+   * The stage's canvas painter and sizing, moved out of `stageScreen.ts` for GitHub issue #348 so
+   * the fix-it screen's as-built stage paints with the same one. `sizeCanvas` reads a bounding
+   * rect and a device pixel ratio, which is the DOM half the stage always had; the words it draws
+   * are the model's, pinned by `stageScreen.test.ts` against this file.
+   */
+  'everyday/cutaway.ts',
+  /* The brief's elevation painter, shared with the campaign's tower screen since GitHub issue #353; it sizes a canvas. */
+  'everyday/elevation.ts',
   /* The § 11 workshop's DOM half — its words and decisions stay pure in workshopModel.ts. */
   'everyday/workshopScreen.ts',
   /* The § 12 bench's DOM half — its words stay pure in benchModel.ts, and it owns a batch Worker. */

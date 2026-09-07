@@ -861,6 +861,34 @@ describe('a board', () => {
     expect((bodyOf(board)['entries'] as unknown[]).length).toBeGreaterThan(0);
   }, 60_000);
 
+  it('serves the board’s distribution: a count, a withholding below the floor, and no interval — GitHub issue #327', async () => {
+    const account = await signIn();
+    const posted = await call('POST', '/api/scores', { token: account.token, body: honest() });
+    const board_ = String(bodyOf(posted)['boardKey']);
+
+    const spread = await call('GET', '/api/board-distribution', { query: { board: board_ } });
+    expect(spread.status).toBe(200);
+    const body = bodyOf(spread);
+    expect(body['boardKey']).toBe(board_);
+    // One player has posted here, so the count is published and the ladder is not: § D484's floor.
+    expect(Number(body['n'])).toBeGreaterThan(0);
+    expect(typeof body['withheld']).toBe('string');
+    const ladders = body['ladders'] as { axis: string; n: number; rungs: unknown }[];
+    expect(ladders.map((ladder) => ladder.axis).sort()).toEqual(['awtS', 'pctOverLongWait', 'ttdMeanS', 'wt95S']);
+    for (const ladder of ladders) expect(ladder.rungs).toBeUndefined();
+    // Energy is named as absent with the reason, rather than left as a column that is not there.
+    expect((body['absent'] as { axis: string }[]).map((entry) => entry.axis)).toEqual(['energy']);
+    // The note refuses an interval by name; nothing on the wire carries one.
+    expect(String(body['note'])).toMatch(/No interval is published/u);
+    expect(JSON.stringify(body)).not.toMatch(/±|ci95|lower|upper|halfWidth/iu);
+  }, 60_000);
+
+  it('refuses a distribution for no board', async () => {
+    const response = await call('GET', '/api/board-distribution');
+    expect(response.status).toBe(400);
+    expect(bodyOf(response)['error']).toBe('no-board');
+  });
+
   it('refuses a metric that is not one of the four', async () => {
     const response = await call('GET', '/api/board', { query: { board: 'x', metric: 'energyKJ' } });
     expect(response.status).toBe(400);
@@ -1412,4 +1440,64 @@ describe('two players reaching for the same name at the same moment', () => {
     expect(bodyOf(response)['error']).toBe('name-taken');
     expect(JSON.stringify(response.body)).not.toMatch(/duplicate key|constraint|users_display_name/u);
   }, 60_000);
+});
+
+describe('POST /api/boards/seed — GitHub issues #222 and #328, § D521 and § D522', () => {
+  it('answers 503 on a deployment that holds no seed token, whoever asks', async () => {
+    const response = await call('POST', '/api/boards/seed', { body: {}, token: 'anything' });
+    expect(response.status).toBe(503);
+    expect(bodyOf(response)['error']).toBe('seeding-not-configured');
+  });
+
+  it('refuses a short token at boot rather than serving a guessable route', async () => {
+    await expect(
+      bootstrap({
+        dataDir: DATA_DIR,
+        sql: new PgliteSql(),
+        env: { ELEVATOR_SIM_SECRET: SECRET, ELEVATOR_SIM_SEED_TOKEN: 'short' },
+        publicOrigin: 'https://elevator.example',
+        now: () => clock,
+        mailer: outbox,
+      }),
+    ).rejects.toThrow(/ELEVATOR_SIM_SEED_TOKEN/u);
+  });
+
+  it('with a token: 401 on a mismatch, 400 on a bad date, and 200 with every row named and the board carrying the house', async () => {
+    const seedToken = 'seed-token-with-at-least-thirty-two-characters';
+    const sql = new PgliteSql();
+    const seeded = await bootstrap({
+      dataDir: DATA_DIR,
+      sql,
+      env: { ELEVATOR_SIM_SECRET: SECRET, ELEVATOR_SIM_SEED_TOKEN: seedToken },
+      publicOrigin: 'https://elevator.example',
+      now: () => clock,
+      mailer: outbox,
+    });
+    try {
+      const ask = (options: { body?: unknown; token?: string; query?: Record<string, string> } = {}, method = 'POST', path = '/api/boards/seed'): Promise<ApiResponse> =>
+        seeded.api({ method, path, query: new Map(Object.entries(options.query ?? {})), body: options.body, token: options.token, clientIp: '203.0.113.9' });
+
+      expect((await ask({ body: {} })).status).toBe(401);
+      expect((await ask({ body: {}, token: `${seedToken}x` })).status).toBe(401);
+      expect((await ask({ body: { date: 'yesterday' }, token: seedToken })).status).toBe(400);
+
+      const response = await ask({ body: { date: '2026-09-06' }, token: seedToken });
+      expect(response.status).toBe(200);
+      const report = bodyOf(response);
+      expect(report['boardKey']).toBe('daily:2026-09-06');
+      const seededRows = report['seeded'] as readonly { dispatcherProfileId: string }[];
+      const skipped = report['skipped'] as readonly { dispatcherProfileId: string; code: string }[];
+      expect(seededRows.length + skipped.length).toBe(seeded.config.dispatcherProfiles.profiles.length);
+      expect(skipped.map((row) => row.dispatcherProfileId)).toContain('nearest-car');
+
+      /* The board the client reads carries the house's dispatcher on each row, and nothing on a player's. */
+      const board = await ask({ query: { board: 'daily:2026-09-06', metric: 'awtS', limit: '100' } }, 'GET', '/api/board');
+      expect(board.status).toBe(200);
+      const rows = bodyOf(board)['entries'] as readonly Record<string, unknown>[];
+      expect(rows.length).toBe(seededRows.length);
+      for (const row of rows) expect(typeof row['baselineProfileId']).toBe('string');
+    } finally {
+      await seeded.close();
+    }
+  }, 600_000);
 });

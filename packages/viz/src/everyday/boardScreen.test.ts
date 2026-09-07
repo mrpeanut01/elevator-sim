@@ -68,7 +68,7 @@ describe('the daily board tab', () => {
     for (const other of [
       { kind: 'unreachable', detail: 'x' },
       { kind: 'undeclared' },
-      { kind: 'board', date: '2026-09-02', note: 'n', rows: [] },
+      { kind: 'board', date: '2026-09-02', note: 'n', distribution: undefined, distributionDetail: undefined, rows: [] },
     ] as const) {
       expect(textOf(other)).not.toContain('this build has none');
     }
@@ -101,7 +101,7 @@ describe('the daily board tab', () => {
       kind: 'board',
       date: '2026-09-02',
       note: 'Every row is replayed before it appears.',
-      rows: [],
+      distribution: undefined, distributionDetail: undefined, rows: [],
     });
     expect(view.rows).toEqual([]);
     /* The server's note stays: it is what makes the board's rows mean anything, empty or not. */
@@ -114,12 +114,34 @@ describe('the daily board tab', () => {
       kind: 'board',
       date: '2026-09-02',
       note: 'note',
-      rows: [entry('Ada', 21.44), entry('Grace', 29.5)],
+      distribution: undefined, distributionDetail: undefined, rows: [entry('Ada', 21.44), entry('Grace', 29.5)],
     });
     expect(view.rows).toEqual([
-      { place: '1', displayName: 'Ada', figure: '21.4 s', count: 'over 312 rides' },
-      { place: '2', displayName: 'Grace', figure: '29.5 s', count: 'over 312 rides' },
+      { id: 'row-Ada', watch: 'watch', place: '1', displayName: 'Ada', driver: 'eta', gap: '', figure: '21.4 s', count: 'over 312 rides' },
+      { id: 'row-Grace', watch: 'watch', place: '2', displayName: 'Grace', driver: 'eta', gap: '', figure: '29.5 s', count: 'over 312 rides' },
     ]);
+  });
+
+  /**
+   * GitHub issue #93 on the daily board: the dispatcher is revealed on every row by name when this
+   * build ships it, and the player's own row says how far behind the top row it is — in
+   * `menu/gap.ts`'s one sentence, on published figures only, and never on anybody else's row.
+   */
+  it('names who drove each row, and tells the player their own distance from the top', () => {
+    const rows = [entry('Ada', 21.44), entry('Grace', 29.5), entry('Lin', 31, null)];
+    const board = { kind: 'board' as const, date: '2026-09-02', note: 'note', distribution: undefined, distributionDetail: undefined, rows };
+    const named = dailyBoardViewOf(board, 'Grace', (id) => (id === 'eta' ? 'Minimum estimated wait' : undefined));
+    expect(named.rows.map((row) => row.driver)).toEqual(['Minimum estimated wait', 'Minimum estimated wait', 'Minimum estimated wait']);
+    expect(named.rows[1]?.watch).toBe('yours');
+    expect(named.rows[1]?.gap).toBe(' · 8.1 s behind the top row on this board’s metric');
+    /* Nobody else's row carries a gap, and the top row's own is empty even when it is the player's. */
+    expect(named.rows[0]?.gap).toBe('');
+    expect(named.rows[2]?.gap).toBe('');
+    expect(dailyBoardViewOf(board, 'Ada').rows[0]?.gap).toBe('');
+    /* A withheld mean has no distance from anything. */
+    expect(dailyBoardViewOf(board, 'Lin').rows[2]?.gap).toBe('');
+    /* An id this build does not ship is drawn as itself rather than invented into a name. */
+    expect(dailyBoardViewOf(board).rows[0]?.driver).toBe('eta');
   });
 
   it('withholds a row’s mean when the server sent no count for it', () => {
@@ -132,7 +154,7 @@ describe('the daily board tab', () => {
       kind: 'board',
       date: '2026-09-02',
       note: 'note',
-      rows: [entry('Ada', 21.4, null)],
+      distribution: undefined, distributionDetail: undefined, rows: [entry('Ada', 21.4, null)],
     });
     expect(view.rows[0]?.count).toBeUndefined();
     expect(view.rows[0]?.figure).not.toContain('21.4');
@@ -146,7 +168,7 @@ describe('the daily board tab', () => {
       kind: 'board',
       date: '2026-09-02',
       note: 'note',
-      rows: [entry('Ada', 21.4), entry('Grace', 29.5, null), entry('Kay', 33.1, 88)],
+      distribution: undefined, distributionDetail: undefined, rows: [entry('Ada', 21.4), entry('Grace', 29.5, null), entry('Kay', 33.1, 88)],
     });
     expect(view.rows.map((row) => row.count)).toEqual([
       'over 312 rides',
@@ -156,17 +178,106 @@ describe('the daily board tab', () => {
     expect(view.rows.map((row) => row.figure)).toEqual(['21.4 s', 'no count', '33.1 s']);
   });
 
+  it('gives every row a Watch it, and the signed-in player’s own row the inert your run — GitHub issue #337', () => {
+    const board = { kind: 'board' as const, date: '2026-09-06', note: 'n', distribution: undefined, distributionDetail: undefined, rows: [entry('A. Turing', 21.4), entry('Nadia R.', 29.5)] };
+    expect(dailyBoardViewOf(board).rows.map((row) => row.watch)).toEqual(['watch', 'watch']);
+    expect(dailyBoardViewOf(board, 'Nadia R.').rows.map((row) => row.watch)).toEqual(['watch', 'yours']);
+    expect(dailyBoardViewOf(board, 'Nadia R.').rows.map((row) => row.id)).toEqual(['row-A. Turing', 'row-Nadia R.']);
+    expect(BOARD_SCREEN_COPY.dailyRowYours).toBe('your run');
+  });
+
+  it('draws the middle of the board under the rows, one axis a line with its count, and never an interval — GitHub issue #327', () => {
+    const base = { kind: 'board' as const, date: '2026-09-06', note: 'n', rows: [entry('Ada', 21.4)] };
+    const unasked = dailyBoardViewOf({ ...base, distribution: undefined, distributionDetail: undefined });
+    expect(unasked.world.map((line) => line.text)).toEqual([BOARD_SCREEN_COPY.worldHeading, BOARD_SCREEN_COPY.worldUnasked]);
+    const older = dailyBoardViewOf({ ...base, distribution: undefined, distributionDetail: 'Older server.' });
+    expect(older.world[1]?.text).toContain('Older server.');
+    const withheld = dailyBoardViewOf({
+      ...base,
+      distribution: { boardKey: 'k', n: 3, ladders: [], withheld: 'Three players have posted.', absent: [], note: 'note' },
+      distributionDetail: undefined,
+    });
+    expect(withheld.world.map((line) => line.text)).toEqual([BOARD_SCREEN_COPY.worldHeading, 'Three players have posted.']);
+    const ladder = dailyBoardViewOf({
+      ...base,
+      distribution: {
+        boardKey: 'k',
+        n: 24,
+        ladders: [
+          { axis: 'awtS', n: 24, rungs: { p10: 12, p25: 14.1, p50: 18.25, p75: 23, p90: 30 }, medianEntryId: 'e1' },
+          { axis: 'pctOverLongWait', n: 24, rungs: { p10: 0, p25: 1, p50: 3.4, p75: 5, p90: 9 }, medianEntryId: 'e2' },
+        ],
+        withheld: undefined,
+        absent: [{ axis: 'energy', reason: 'not on the wire' }],
+        note: 'Each axis is its own ladder.',
+      },
+      distributionDetail: undefined,
+    });
+    const texts = ladder.world.map((line) => line.text);
+    expect(texts[0]).toBe(BOARD_SCREEN_COPY.worldHeading);
+    expect(texts[1]).toContain('Mean wait');
+    expect(texts[1]).toContain('18.3 s');
+    expect(texts[1]).toContain('over 24 players');
+    expect(texts[2]).toContain('3.4%');
+    expect(texts[3]).toBe('Each axis is its own ladder.');
+    expect(texts[4]).toBe('energy: not on the wire');
+    for (const text of texts) expect(text).not.toMatch(/interval|confidence|±/u);
+    /* No state without a read board draws a middle. */
+    expect(dailyBoardViewOf({ kind: 'no-server' }).world).toEqual([]);
+  });
+
   it('does not draw dataHash as though it were a score', () => {
     const view = dailyBoardViewOf({
       kind: 'board',
       date: '2026-09-02',
       note: 'note',
-      rows: [entry('Ada', 21.4)],
+      distribution: undefined, distributionDetail: undefined, rows: [entry('Ada', 21.4)],
     });
     const drawn = [
       ...view.lines.map((line) => line.text),
       ...view.rows.map((row) => `${row.figure} ${row.count ?? ''}`),
     ];
     expect(drawn.join(' ')).not.toContain('hash');
+  });
+});
+
+describe('the house’s rows — GitHub issue #222, § D521', () => {
+  const house = (awtS: number, dispatcher: string): BoardEntry => ({
+    ...entry('The house', awtS),
+    id: `row-house-${dispatcher}`,
+    baselineProfileId: dispatcher,
+    run: { ...entry('The house', awtS).run, dispatcherProfileId: dispatcher },
+  });
+  const board = {
+    kind: 'board' as const,
+    date: '2026-09-06',
+    note: 'One crowd.',
+    distribution: undefined,
+    distributionDetail: undefined,
+    rows: [house(19.8, 'collective'), entry('Ada', 21.4), house(31, 'eta')],
+  };
+
+  it('tags a house row, says the note once under the board’s own, and tags no player’s row', () => {
+    const view = dailyBoardViewOf(board, 'Ada', (id) => id);
+    expect(view.rows.map((row) => row.house)).toEqual([BOARD_SCREEN_COPY.dailyHouseTag, undefined, BOARD_SCREEN_COPY.dailyHouseTag]);
+    expect(view.lines.map((line) => line.className)).toEqual(['everyday-board-note', 'everyday-board-house-note']);
+    expect(view.lines[1]?.text).toBe(BOARD_SCREEN_COPY.dailyHouseNote);
+    /* Nobody played these, and the note may not read as a ranking of dispatchers. */
+    expect(BOARD_SCREEN_COPY.dailyHouseNote).toMatch(/Nobody played them/u);
+    expect(BOARD_SCREEN_COPY.dailyHouseNote).toMatch(/do not rank the dispatchers/u);
+  });
+
+  it('never treats a house row as the player’s own, even under the player’s name, and draws no gap on it', () => {
+    const named = { ...board, rows: [{ ...house(19.8, 'collective'), displayName: 'Ada' }, entry('Ada', 21.4)] };
+    const view = dailyBoardViewOf(named, 'Ada', (id) => id);
+    expect(view.rows[0]?.watch).toBe('watch');
+    expect(view.rows[0]?.gap).toBe('');
+    expect(view.rows[1]?.watch).toBe('yours');
+  });
+
+  it('draws no house note on a board with no house row', () => {
+    const view = dailyBoardViewOf({ ...board, rows: [entry('Ada', 21.4)] }, undefined, (id) => id);
+    expect(view.lines.map((line) => line.className)).toEqual(['everyday-board-note']);
+    expect(view.rows[0]?.house).toBeUndefined();
   });
 });

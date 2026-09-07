@@ -1,7 +1,7 @@
 # 38 — What the game is
 
 **Status: adopted. Written 2026-09-06 and decided the same day by the product owner as
-[§ D497](../DECISIONS.md), [§ D498](../DECISIONS.md) and [§ D499](../DECISIONS.md).** Two questions
+[§ D525](../DECISIONS.md), [§ D526](../DECISIONS.md) and [§ D527](../DECISIONS.md).** Two questions
 are still open and are marked `[OWNER: …]`; each is ruled separately when the owner takes it. [`39-decisions-in-force.md`](39-decisions-in-force.md) is the
 index of which older decisions this page supersedes and how their names map.
 
@@ -61,7 +61,7 @@ build and what it retires.
 |---|---|---|---|
 | **Scenario** | A building, a problem, a budget, and a verdict on whether you fixed it | The eighteen *Fix a building* cases in `data/fixit-cases.json`; the ten campaign stages in `data/campaign.json`; the six Engineer challenges in [`21-engineer-reimagined-contract.md`](21-engineer-reimagined-contract.md) § 4; the daily seed, as *today's scenario* | The *Fix a building* and *Today's tower* tiles, and every authored repair list |
 | **Career** | Several buildings at once, run on money you earn, that waits for you between sessions | The Campaign as built: towers, slots, purse, works, wear, contracts | The name *Campaign*, and the sentence that the career is this session's only |
-| **Rush** | One building, a crowd that grows until the lobby overflows, and a board of how long people lasted | [§ D477](../DECISIONS.md)'s ruling, and the handoff's § 9 as written | The inert primary, and the recommendation that the rush is a bench instrument |
+| **Rush** | One building, a crowd that grows until the lobby overflows, and a board of how long people lasted | [§ D477](../DECISIONS.md)'s ruling, and the handoff's § 9 as written | The recommendation that the rush is a bench instrument |
 
 **Two rules apply to all three, and both are the owner's.** Every scenario and every rush plays
 live, which is § 2.3's first paragraph and holds for Career too. And every mode earns and spends the
@@ -73,7 +73,10 @@ one currency, which is § 2.4.
 them. It is first on the menu, and it is the only mode a first-time player should meet. The first
 one or two scenarios are doable with a tweak to the dispatcher and failable with the wrong tweak:
 that is [`33-difficulty-curve.md`](33-difficulty-curve.md)'s DC-2 and DC-3 together, a stage the
-dropdown alone does not clear and a witness vector that does.
+dropdown alone does not clear and a witness vector that does. And it is visibly in trouble first:
+[§ D512](../DECISIONS.md)'s measure, a landing holding somebody in the third wait band for two contiguous
+minutes, is the instrument, and [§ D514](../DECISIONS.md)'s five legible contracts are where a first scenario
+may be set.
 
 **One shape, four sources.** A scenario is a building, a crowd, a seed set, a goal set, **a
 budget**, and **a price schedule**. `data/campaign.json`'s stage record already carries everything
@@ -170,8 +173,10 @@ tower's purse. They cannot open a slot, because slots are the one scarcity that 
 than money and standing is what opens them (GD14); and they cannot buy a missed day back, because
 that is relief on a failure.
 
-**Two halves still owed**, unchanged from docs/32 § 3.6 and § 9: GD11's *take capacity away first*
-and the rolled failure odds behind incidents. Neither is made more urgent by the rename.
+**The two halves docs/32 § 3.6 and § 9 named as owed have both landed**: a works night takes a car
+out of passenger service ([§ D504](../DECISIONS.md)), and a campaign day's event is drawn from the contract's
+calendar and § 8.3's odds on a stream off the seed ([§ D507](../DECISIONS.md)). What the rename leaves owed is
+persistence, above.
 
 ### 2.3 Rush
 
@@ -183,29 +188,28 @@ people can be watched, the player presses a control while it plays, the press is
 playhead and written into the run record as an intervention with the moment it happened
 (`{ seed, config, interventions[] }`, `packages/viz/src/live/interventions.ts`), and the day is
 re-simulated with it. The crowd is the same crowd either side of the press, so nothing the player
-already watched changes. Three intervention kinds exist: park the cars in the lobby, switch
-dispatcher, answer an incident. Equipment and building changes mid-run are new kinds, priced from
+already watched changes. Five intervention kinds exist: park the cars in the lobby, spread them across the
+tower, switch dispatcher, answer an incident, and a stairs intervention. Equipment and building
+changes mid-run are new kinds, priced from
 the schedule, on the same record. *Record what changes to what and when* is that record.
 
 **Speed.** The stage ships seven rungs from `1×`, which is real time, to `600×`, and four of them
-sit inside the range where a door cycle is still a cue ([§ D344](../DECISIONS.md)). **The run opens
-at `30×` today** ([§ D354](../DECISIONS.md)), which is a rung for watching a day rather than a car.
-The ruling that watching is the point moves the opening speed to a watching rung, `1×` or `4×`, and
-a playtest picks which. A *skip to the end* control does not exist and is new.
+sit inside the range where a door cycle is still a cue ([§ D344](../DECISIONS.md)). **Settings now carries a
+*Default speed* row** (GitHub issue #229), and it defaults to `30×` ([§ D354](../DECISIONS.md)), a rung for
+watching a day rather than a car. The ruling that watching is the point moves that default to a
+watching rung, `1×` or `4×`, and a playtest picks which. A *skip to the end* control does not exist and is new.
 
-**What is settled.** [§ D477](../DECISIONS.md): the run ends when the lobby overfills, and the ramp
-is traffic and/or breakdowns. The handoff's § 9 gives the rest of the mechanic and it is kept:
-arrivals climb every wave, the waves come from one seed so every player faces the same climb, and a
-run stopped by hand has no breaking point to post.
+**What is settled, and built.** [§ D477](../DECISIONS.md): the run ends when the lobby overfills, and
+the ramp is traffic and/or breakdowns. [§ D515](../DECISIONS.md) built it: the rush is a week of its own on
+the contract's stream, each wave holding its rate and climbing into the next, ending on the hold
+line, forty people standing over two minutes at once, which is the overfill read with the wait
+clause § 20.5 gives it. The sheet quotes its own trend test, the waves come from one seed so every
+player faces the same climb, and a run stopped by hand has no breaking point to post.
 
-**How a rush ends, mechanically.** `core/` runs a trace to a declared duration plus a drain grace
-and has no stop condition; its only early ending is the event valve, which is reserved for a
-handler that is not making progress. Two ways to build *until the lobby overfills*: simulate a
-horizon longer than any dispatcher can survive and have the stage end playback at the first moment
-the fail state holds, read off the recording; or add a stop condition to `core/`, which the charter's
-§ 6 makes an escalation rather than a lane. The first needs no engine change and is the one to try.
-Its risk is the event valve tripping on an absurd wave, and that is measured before the mode ships,
-which is the obligation § D477 already carries.
+**How it ends, as built.** `core/` runs a trace to a declared duration and has no stop condition,
+and § D515 did not add one: the run is simulated to its horizon and the recording is read for the
+first moment the hold line holds. That is the first of the two ways this page's first draft weighed,
+and the one that needed no engine change.
 
 **What the player does.** Swaps dispatchers while the run plays, as above. Rebuilds the building
 between rounds, from the same price schedule as Scenario. The fit-out kit the career already
@@ -230,7 +234,8 @@ permitted for the same reason today's board is: it ranks runs on one crowd, neve
 building as shipped, the same for everyone; a run with a bought purse or a pre-fitted building ranks
 among runs with the same modifiers and shows them. What the board never shows is the credits spent:
 a modifier is a fact about the run's configuration, and a currency figure on a results page is what
-GD13 forbids.
+GD13 forbids. A modifier-set board inherits [§ D506](../DECISIONS.md)'s twenty-player floor, so a rare
+modifier set shows no ladder, and it resets as every board does under [§ D509](../DECISIONS.md).
 
 ### 2.4 Credits — one currency across the three modes
 
@@ -274,7 +279,7 @@ nothing on it moves when that source is added: no store, no price, no purchase s
 conversion event, and no telemetry that exists to support one lives on the play side, now or later.
 Until a decision citing a real retention measurement (`charter S4`) adds such a source, there is no
 purchase anywhere. [`26-telemetry-and-privacy.md`](26-telemetry-and-privacy.md) § 10 non-goal 1 is
-amended to say exactly that, in [§ D498](../DECISIONS.md).
+amended to say exactly that, in [§ D526](../DECISIONS.md).
 
 **A sign-in bonus, which the owner said *maybe* to.** Permitted in this shape only: a small, flat,
 unconditional credit on the first session after `x` hours away. It does not compound, there is no
@@ -299,7 +304,7 @@ speeds to 10 m/s; about 154 populated floors, with floors 155 to 163 mechanical 
 floors, unpopulated floors, banks that skip floors, sky-lobby transfers, escalators as timed hops
 ([§ D167](../DECISIONS.md)), double-deck banks ([§ D131](../DECISIONS.md)), and a speed catalogue to
 20.5 m/s. The tallest shipped building, `vertical-city`, is 100 floors, 7 banks and 35 cars, so the
-reference is about 1.6× anything the engine has run. [§ D499](../DECISIONS.md) names the five
+reference is about 1.6× anything the engine has run. [§ D527](../DECISIONS.md) names the five
 measurements owed before the ruling is met: that a day at the reference runs under the event valve;
 what one replication costs on a named machine, which bounds the live re-simulation, the survivor
 count and every published interval; that the round-trip oracle holds at 10 m/s; that the stage can
@@ -328,8 +333,8 @@ Named so the next lane does not discover it. None of it is built by this page.
 - Two new intervention kinds, equipment and building changes, on the run record.
 - `docs/16`'s `ranked` row and `scope/runIdentity.ts` widen to carry recorded interventions and the
   run's modifiers, and the server's replay consumes them; boards are keyed by modifier set.
-- The rush's fail state is detected from the recording and ends playback; the horizon and the event
-  valve are measured before the tile opens. Its per-wave purse is authored in its own data.
+- The rush ships ([§ D515](../DECISIONS.md)); it gains a per-wave purse authored in its own data, recorded
+  interventions on its round, and a postable result.
 - The design handoff's § 5 session-shapes table names four modes and § 10 authors repair lists, and
   [`CLAUDE.md`](../CLAUDE.md) makes the handoff canonical for the interface. Both are deviations,
   recorded in [`12-design-handoff.md`](12-design-handoff.md) § 4 like every other one, with this
@@ -338,19 +343,19 @@ Named so the next lane does not discover it. None of it is built by this page.
   [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 4, are superseded on the mode
   set; docs/32 § 3.1's *three currencies* gains a fourth, and its § 9 Q4 is answered. Their loop
   analysis stands; it is what a scenario, a career day and a rush round are each measured against.
-- [§ D373](../DECISIONS.md) is superseded by [§ D497](../DECISIONS.md): *Fix a building* stops
+- [§ D373](../DECISIONS.md) is superseded by [§ D525](../DECISIONS.md): *Fix a building* stops
   being a tile and becomes Scenario's first content.
 - [`26-telemetry-and-privacy.md`](26-telemetry-and-privacy.md) § 10 non-goal 1 is amended by
-  [§ D498](../DECISIONS.md) from *no monetisation of any kind* to *no purchase ships, and the ledger
+  [§ D526](../DECISIONS.md) from *no monetisation of any kind* to *no purchase ships, and the ledger
   is built so one could be a source later*.
 - The honesty corpus's strings move with the tiles. Measured once, after integration, on the
   integrator, per [§ D343](../DECISIONS.md).
 - Career persistence is filed as engineering work against `career.ts`'s own stated cost.
-- A reference building at 165 levels and 57 lifts is authored, and [§ D499](../DECISIONS.md)'s five
+- A reference building at 165 levels and 57 lifts is authored, and [§ D527](../DECISIONS.md)'s five
   measurements are taken before it is called carried; the stage gains a zoned or scrolled drawing,
   recorded as a handoff deviation.
 - [`25-vertical-slice.md`](25-vertical-slice.md)'s slice is unchanged in content and its mode is
-  renamed: one *today's scenario* at Chancery House.
+  renamed: one *today's scenario*.
 
 ## 4. What this does not change
 
@@ -363,8 +368,8 @@ what a number means.
 
 ## 5. Rulings, and what is still open
 
-Ruled by the owner on 2026-09-06, in conversation, and recorded in [§ D497](../DECISIONS.md),
-[§ D498](../DECISIONS.md) and [§ D499](../DECISIONS.md):
+Ruled by the owner on 2026-09-06, in conversation, and recorded in [§ D525](../DECISIONS.md),
+[§ D526](../DECISIONS.md) and [§ D527](../DECISIONS.md):
 
 1. Scenario is first on the menu, and its first one or two are doable with a tweak and failable
    with the wrong one.
@@ -392,11 +397,11 @@ Still open:
 
 - [`22-charter.md`](22-charter.md) — the pillars this page is built under, and § 6's precedence rule
 - [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) — the five-beat loop and the honest register of modes
-- [`26-telemetry-and-privacy.md`](26-telemetry-and-privacy.md) — § 10 non-goal 1, amended by § D498
+- [`26-telemetry-and-privacy.md`](26-telemetry-and-privacy.md) — § 10 non-goal 1, amended by § D526
 - [`32-game-design.md`](32-game-design.md) — the four-mode declaration this page supersedes, the economy it keeps, and § 3.4's argument the currency borrows
 - [`33-difficulty-curve.md`](33-difficulty-curve.md) — DC-R1, DC-2 and DC-3, which the survivor count is stated against
 - [`35-problem-per-mode.md`](35-problem-per-mode.md) — what is portable about *Fix a building*, and the stage its cases gain
 - [`16-change-scope-contract.md`](16-change-scope-contract.md) — § 0's whole-day-then-playback fact, and S5, the ranked-run rule the rush board widens
 - `docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` § 5, § 9 and § 10 — the session shapes, the rush mechanic, and the repair lists this page retires
 - [`39-decisions-in-force.md`](39-decisions-in-force.md) — which older decisions this page supersedes, and the rename map
-- [`DECISIONS.md`](../DECISIONS.md) § D131, § D167, § D214, § D344, § D354, § D373, § D456, § D458, § D477, § D486, § D497, § D498, § D499
+- [`DECISIONS.md`](../DECISIONS.md) § D131, § D167, § D214, § D344, § D354, § D373, § D456, § D458, § D477, § D486, § D504, § D505, § D506, § D507, § D509, § D512, § D514, § D515, § D518, § D525, § D526, § D527

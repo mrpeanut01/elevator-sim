@@ -1365,3 +1365,219 @@ had four of four; this wave had six of seven, and the briefs were the integrator
   cause was a stop hook requiring committed work to be pushed while lanes were still in flight. It
   cost six spurious CI envelopes and no correctness, and the run went green the moment pushing
   stopped — which is the agreement's arithmetic demonstrated rather than argued.
+
+## Wave T closed
+
+**Thirteen issues closed, six decisions taken, one push.** One worker rather than a dispatch: the
+owner asked for a batch of ten to twenty committed, one pull request, one merge, and then more. Two
+pieces were delegated to worktree lanes (#329 and #356) and merged by hand; everything else was
+built serially on the branch.
+
+| issue | outcome |
+|---|---|
+| #349, #350, #351 | **closed** together, § D497 to § D499; each issue's premise refuted by running the requested check once |
+| #352 | **closed**; a fourth intervention on both shells, the wire and the server |
+| #146 | **closed**; the cost line's Basic register, § D495's ruling built |
+| #225, #277 | **closed**; Sandbox is a state, § D496's ruling built, P3 re-adjudicated |
+| #229 | **closed**, § D500 |
+| #338 | **closed**; § D486's ruling built |
+| #329 | **closed**; § D485's ruling built, scheduled daily |
+| #348 | **closed**; the as-built run plays before the figures |
+| #246 | **closed**, § D501 |
+| #356 | **closed**, § D502; the largest `viz` file's share fell from 31.8 % to 16.4 % |
+
+**Verified on the integrated tree rather than per lane**: `tsc -b` exit 0, all six vitest projects
+run in one sitting with the figures in `ISSUE_WORKER_LEDGER.md` § T.5, and the corpus measured once
+in both tiers with the base re-measured first (§ T.4).
+
+### T.6 What this wave learned
+
+**1. A guard that classifies is not a guard that sweeps.** Nineteen producers were unclassified and
+the derive guard said so; three copy keys were classified as covered and were swept by nothing, and
+only a probe that diffed the seeded fields between two trees said so. The corpus's `covers` list is a
+claim, and the probe (a scratch test rendering one case on each tree) is the cheapest way this wave
+found to check it. Worth keeping as a habit rather than as a file.
+
+**2. Serial integration is cheaper than it looks when the issues share a screen.** #349, #350 and
+#351 all touch `fixit/`, and #348 touches the same screen; as lanes they would have needed a
+conflict map and four merges. As one worker they needed none, and the refutations of #349 and #350
+each fed the next issue's design directly.
+
+**3. The push agreement held with seventeen commits behind it**, which is the first wave since it
+was written where a single push carried more than a handful.
+
+### T.7 Owed to the next wave
+
+- **#325** (a staleness guard over GAPS.md's checkable rows) was in scope and was not started; it is
+  the next small build.
+- **#353** (the works-night pairing) is where `record/crowd.ts`'s fourth call site goes; the module
+  says so and owes that sentence's deletion to that commit.
+- **#242** (error reports) is what would make the build line travel by itself rather than by hand.
+- **`judgeCleared.test.ts`** is now the `viz` project's largest file at about 16 % and was outside
+  #356's scope; a split by the batch each case reads would take the ceiling further.
+
+## Wave U closed
+
+**Six issues and two umbrella items closed, four decisions taken, one push.** One worker, serial,
+opened the hour wave T merged.
+
+| issue | outcome |
+|---|---|
+| #325 | **closed**; the GAPS.md § 3 guard, R44's mitigation, its first run failing on the row a sweep walked past |
+| #337 | **closed**; a board row can be watched, at the server's own tolerance |
+| #213 | **closed**, § D503, on the owner's ruling |
+| #353 | **closed**, § D504; GD11's first half |
+| #324 | **closed**, § D505; measured before built |
+| #327 | **closed**, § D506; § D484 as code |
+| #178 item 4, #177 item 2 | closed by #325 and #213 |
+
+**Verified on the integrated tree**: `tsc -b` exit 0, all six vitest projects in one sitting, two viz
+reds found by the full run and fixed before the push (`ISSUE_WORKER_LEDGER.md` § U.5), and the corpus
+measured once in both tiers with the base re-measured first, 594 598 and 741 367 strings (§ U.4).
+
+### U.6 What this wave learned
+
+**1. A rule and its refusal are two different things.** #213's refusal was upheld twice on a rule
+that forbids a claim; the owner's ruling made the door and kept the claim out. Reading a rule for
+what it actually forbids would have found that without a ruling.
+
+**2. A view control says it writes nothing by not being drawn.** The camera exists on two towers.
+That is the standing requirement's honest form for a control over a picture rather than a run.
+
+**3. Registers of absence need a presence arm.** Two registers this wave (the GAPS guard, the
+works writer) were built or flipped to hold both directions. A register that only holds an absence
+becomes a suppression list the day the thing is built.
+
+### U.7 Owed to the next wave
+
+- **#178 item 6** (the Phase 5 sweeps' entry point) needs pinned intervals at n = 300 and 500, which
+  is a compute job before it is a code one.
+- **#169 item 4** (a complexity for `secure-tower` and `mixed-use-high-rise`) is a placement with a
+  measurement attached; nothing here publishes one yet.
+- **#226's `world` ghost** now has its source on the wire (`medianEntryId`) and no consumer.
+- **#346**, **#177 item 5**, **#178 item 9** stand as written.
+
+## Wave V closed
+
+**Five issues and six umbrella items closed, seven decisions taken (D507 to D513), and three
+pushes where the rule says one.** One worker, serial, opened in a worktree while wave U's pull
+request was open. The first push went up before the local suite had finished, at the harness's
+insistence; CI found eight reds in it, every one this wave's own, and two fix pushes answered them
+before the local suite reached the same files. The records went up with the third.
+
+**The suite, on the integrated tree**: `tsc -b` clean; core 112 files / 2 558 tests; experiments
+108 / 1 413 (11 skipped); server 17 / 381; cli 10 / 158; viz 243 files with 5 214 passing and three
+reds in two files that had run before the fixes landed, both rerun green; viz-browser 37 / 226 on
+the fixed tree.
+
+**The corpus, once after integration**: always-on 609 249 strings (+14 651 on wave U's 594 598,
+exactly 299.0 a case), deep 759 296 (+17 929, 298.82 a case), with the base at `f60e816`
+reproducing wave U's row exactly in both tiers first. Surfaces 56 / 57 unmoved, sets identical,
+failing cases 0. The eleven strings the deep tier is short of a constant are one string on eleven
+cases, the technician refusal on a seeded breakdown, found by rendering every deep case rather than
+by inference.
+
+| issue | outcome |
+|---|---|
+| #171, #169 item 1 | **closed**, § D507; the campaign dock, and a campaign day that is the campaign's own |
+| #178 item 5 | **closed**, § D508; thirteen authored sentences, drawn only beside the vector they describe |
+| #252 | **closed**, § D509; ratings never reset, boards reset by their date, said before a rating is earned |
+| #93 | **closed**; the Engineer boards already had the hooks, and the daily board now names the driver and the gap |
+| #211 | **closed**; the cards fold on a stated budget, the closing block already did |
+| #177 item 6 | **closed** by measurement: no shipped constraint reaches the fallback |
+| #169 item 3 | **closed**, § D510; § 8.8's offers, priced, gated and taking a week with them |
+| #178 item 9 | **closed**, § D511; the structural refusal joined to the leg, version 12 |
+| #354 | **closed**, § D512; the legibility arm, and Garden Apartments at 0 of 50 |
+| #178 item 6 | **closed**, § D513; both sweeps as pinned entry points, and twelve figures that reproduced to the digit |
+
+### V.6 What this wave learned
+
+**1. A paid option that can never take effect is the signature defect priced in units.** The
+technician's forty-five minutes looked like a design choice and was unreachable on every shipped
+length; the test that compares on the legs found it before any player could.
+
+**2. Authored prose is safe beside the one vector it was written for.** The card guard turned a rule
+about who writes prose into a property a test runs: a saved copy, an edited working copy or a
+searched vector never wears a sentence about a different one.
+
+**3. Measure the eligibility, then argue about the draw.** § D475 said *eligible* and meant a
+measurement nobody had made. Made, it excludes the building the campaign opens on, which is what
+#208 filed by playing and what the table now says with its `n`.
+
+### V.7 Owed to the next wave
+
+- **#208's build** now has its instrument and its table; the draw and the first session are the
+  build, and the campaign's `c1` is #270's question.
+- **#169 item 4** (a complexity for the two unpriced buildings) is a measurement with the offers
+  now waiting on it: the two are not offered until somebody publishes one.
+- **#346** (a service event that moves a car's range and load) and **#159** (the wrinkle library)
+  stand as written, and the dock's coach party is expressed as a day's demand until #346 lands.
+- **#220** (Endless rush) is the largest front-door promise still unkept.
+
+## Wave W closed
+
+**Six issues and items closed, seven decisions taken (D514 to D520), one push.** One worker,
+serial, opened in a worktree while wave V's pull request was open, which merged mid-wave and became
+the base the branch was restarted from.
+
+**The suite, on the integrated tree**: `tsc -b` clean; core 112 files / 2 558 tests; server 17 / 382;
+cli 10 / 158; viz 247 files, 5 247 passing with six reds in four guard files on the first run (the
+annotation census, the dev-server registry over three new browser files, a landing pin that had to
+learn the fifth context, and the browser-tier file count), every one this wave's own and rerun green;
+experiments 108 / 1 411 (11 skipped) with two reds in `contentPlan.test.ts` on the first run, the
+template count the plan states moving 7 → 8 for the rush's unselectable stream, re-derived and rerun
+green; viz-browser 40 / 230 on the shipped bundle, with two reds on the first run, both cases pinning
+behaviour this wave replaced (the door's replay refusal, the plate outside its fold), repointed and
+rerun green.
+
+**The corpus, once after integration**: Both tiers in one sitting, with the base at `4111655` re-measured first in a detached worktree,
+where it reproduced wave V's row exactly: 609 249 always-on and 759 296 deep, the thirteenth
+consecutive wave that has held.** Wave W: always-on **623 363** strings (+14 114, 288.04 a case),
+deep **776 588** (+17 292, 288.20 a case); cases, simulations and failing cases unmoved; surfaces
+**57 / 58**, exactly one added in each tier and the diff names it, `everyday/rush.ts#rushResultViewOf`.
+The first case decomposes the 288 to the string across eight adapters (the door's third render
++132, the rush sheet +62, two offer cards +38, the replay context's rail and bar +30, the menu's
+sentence +23, the designer's copy +6, the report +4, seven register rows −7); the fraction above 288
+is the door's third render being conditional on the case's week having a day to hand back. The
+full table and the decomposition are in `CLAUDE.md`'s Phase 9 row.
+
+| issue | outcome |
+|---|---|
+| #208 | **closed**, § D514; the first session opens on a legible tower, and the plate is configuration |
+| #220 | **closed**, § D515; Endless rush runs, holds, and reads its own trend test |
+| #178 item 1 | **closed**, § D516; the affordance model, and S7 as a checked clause |
+| #177 item 1 | **closed**, § D517; a past day handed back over a parked week |
+| #177 item 5 | **two of three built**, § D518; escalator rows and the folded document; the class per shaft stays a stated absence |
+| #169 item 4 | **closed**, § D519; both complexities authored with the measurement beside them |
+| #234 | **the sweep built and tiered**, § D520; the register names the three stages still clearing, and the rebalance is the debt it holds |
+
+## Wave X closed
+
+**Three issues closed, four decisions taken (D521 to D524), one push.** One worker, serial, in the
+worktree wave W closed in, based on wave W's merge.
+
+**The suite, on the integrated tree**: `tsc -b` clean; core 113 files / 2 573 tests, one red on the
+first run (the fs-free module list learning `config/serviceEvent.ts`), rerun green; server 18 / 390
+with twelve reds in two guard files on the first run (the migrations register pinning two versions
+against a third, and the concurrency table asked to state the house insert's two risks), every one
+this wave's own and rerun green; cli 10 / 158; experiments 108 / 1 413 (11 skipped); viz 247 files,
+5 257 passing (7 skipped) with one red on the first run, the annotation census moving by the one
+timeout the derate legs test added, rerun green; viz-browser 40 / 230 on the shipped bundle, green
+first time.
+
+**The corpus, once after integration**: both tiers in one sitting, with the base at `5358c05`
+re-measured first in a detached worktree, where it reproduced wave W's row exactly: 623 363
+always-on and 776 588 deep, the fourteenth consecutive wave that has held. Wave X: always-on
+**624 294** strings (+931, 19.0 a case), deep **777 728** (+1 140, 19.0 a case); cases,
+simulations, failing cases and surfaces all unmoved at 49 / 60, 606 / 4 710, 0 and 57 / 58, the
+surface sets diffed and identical. The first case decomposes the nineteen to the string, all of it
+on `gauntlet/ladder.ts#ladderRowsOf`: two copy keys and the daily board's seventeen-string `house`
+state. Nothing this wave changed in `core` renders a player-facing string, and the stranded count
+is drawn by no screen yet. The table is in `CLAUDE.md`'s Phase 9 row.
+
+| issue | outcome |
+|---|---|
+| #222 | **closed**, § D521; the house posts one replayable run per shipped dispatcher, marked on the row, counted by no ladder |
+| #328 | **closed**, § D522; a scheduled workflow calls the authenticated seed route, refusing to run unconfigured |
+| #346 | **closed**, § D523 and § D524; three service-event shapes, a car finishes its leg, the stranded rider is a fifth outcome beside AWT, and the technician is the derate's first writer |
+

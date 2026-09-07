@@ -19,6 +19,7 @@
 
 import { runAccessControlStudy } from './accessControl.js';
 import { runCapacityReassignmentStudy } from './capacityReassignment.js';
+import { runDeadbandSweep, runRateSweep } from './deadbandSweep.js';
 import { runDestinationDisclosureStudy } from './destinationDisclosure.js';
 import { runDownPeakDestinationStudy } from './downPeakDestination.js';
 import { runDestinationDispatchStudy } from './destinationDispatchContrast.js';
@@ -40,6 +41,8 @@ import {
   benchmarkFigures,
   dispatchContrastFigures,
   capacityFigures,
+  deadbandSweepFigures,
+  rateSweepFigures,
   causalityFigures,
   disclosureFigures,
   doubleDeckFigures,
@@ -77,6 +80,8 @@ export async function measureAllPublishedFigures(): Promise<
     'weight-set-selection': weightSetSelectionFigures(await runWeightSetSelectionStudy({})),
     'selection-sweep': selectionSweepFigures(await runSelectionSweep({})),
     'lunch-two-way-selection': lunchTwoWaySelectionFigures(await runLunchTwoWaySelectionStudy({})),
+    'deadband-sweep': deadbandSweepFigures(await runDeadbandSweep({})),
+    'rate-sweep': rateSweepFigures(await runRateSweep({})),
     'double-deck': doubleDeckFigures(await runDoubleDeckStudy({ resources })),
   };
 }

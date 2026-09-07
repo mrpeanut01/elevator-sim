@@ -80,7 +80,7 @@
  * composes the entry from its option data on the day it lands.
  */
 
-import type { BuildingConfig, ServiceEventConfig } from '@elevator-sim/core/browser';
+import type { BuildingConfig, ServiceModeEventConfig } from '@elevator-sim/core/browser';
 
 /* -------------------------------------------------------------------------- *
  * Choosing a car
@@ -101,7 +101,19 @@ export interface CarRef {
  * out today.
  */
 export interface BankedBuilding {
-  readonly banks: readonly { readonly id: string; readonly cars: readonly { readonly id: string }[] }[];
+  readonly banks: readonly {
+    readonly id: string;
+    /**
+     * The plate is optional because a grown `BuildingConfig` may leave `ratedLoadLb` to the class
+     * default and never carries kilograms; a `ResolvedBuilding` always carries both, and
+     * `campaign/incidents.ts` reads them to return a red-tagged car derated (§ D524).
+     */
+    readonly cars: readonly {
+      readonly id: string;
+      readonly ratedLoadLb?: number | undefined;
+      readonly ratedLoadKg?: number | undefined;
+    }[];
+  }[];
 }
 
 export interface CarChoice {
@@ -183,8 +195,8 @@ export interface Incident {
 export function serviceEventsFor(
   incidents: readonly Incident[],
   runLengthS: number,
-): readonly ServiceEventConfig[] {
-  const events: ServiceEventConfig[] = [];
+): readonly ServiceModeEventConfig[] {
+  const events: ServiceModeEventConfig[] = [];
   for (const incident of incidents) {
     const fromS = Math.round(clamp01(incident.fromFraction) * runLengthS);
     events.push({ atS: fromS, carId: incident.car.carId, bankId: incident.car.bankId, mode: 'out-of-service' });

@@ -80,8 +80,9 @@ import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
+import { firstSessionContractFor } from '../shift/firstSession.js';
 import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
-import { shiftRunPatch, baseDemandOf } from '../shift/events.js';
+import { SHIFT_EVENTS, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
@@ -115,7 +116,7 @@ import {
   switchWeek,
 } from '../shift/week.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
-import type { DayOutcome, ShiftEvent, WeekState } from '../shift/types.js';
+import type { DayOutcome, ShiftEvent, ShiftEventId, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
 
@@ -398,6 +399,23 @@ export interface ViewerState {
    * argument that method's own docstring makes about the building and the dispatcher.
    */
   readonly campaignFitOut: CampaignFitOut | undefined;
+  /**
+   * The event § 8's campaign day runs under, or `undefined` outside a campaign day — GitHub issues
+   * #171 and #169 item 1, § D507.
+   *
+   * A campaign day used to inherit the **week's** event: `shiftRunConfigOf` read
+   * `scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx)` for every run, so a
+   * contract's third day ran a move-in because the player's week happened to stand on its third.
+   * The campaign's day has its own answer — `campaign/incidents.ts#campaignEventFor`, the contract's
+   * calendar first and § 8.3's odds second — and this is where it travels. An id rather than the
+   * event object, because `SHIFT_EVENTS` is the one table and a second copy of an effect on the
+   * state is how the run and the caption drift.
+   *
+   * Written by `everyday/host.ts#runCampaignDay` and by nothing else, on `campaignFitOut`'s
+   * argument: a setter would be a control that changed the day without running the day it belongs
+   * to. Cleared where that field is cleared.
+   */
+  readonly campaignEventId: ShiftEventId | undefined;
   /**
    * Which capital constraint the fabric is judged against — *retrofit*, *refurbishment*, *new build*.
    *
@@ -1047,6 +1065,28 @@ export function disclosureOf(mode: ViewMode): DisclosureMode {
 }
 
 /**
+ * A fresh device's first session — GitHub issue #208, § D475, § D514.
+ *
+ * {@link initialState} opens on `CONTRACTS[0]`, which every test in this package leans on; the draw
+ * is applied by `dev/main.ts` once, on the load that restored nothing and was handed no building by
+ * its address. The week is opened fresh on the drawn contract rather than switched to — nothing has
+ * been played, so there is nothing to park — and the building follows the week, `withBuilding`'s
+ * own rule.
+ */
+export function withFirstSession(state: ViewerState, resources: BrowserResources): ViewerState {
+  const contractId = firstSessionContractFor(state.seed);
+  const contract = contractById(contractId);
+  if (contract === undefined) return state;
+  const drawn: ViewerState = {
+    ...state,
+    week: openWeek(contractId),
+    shiftLengthS: shiftLengthForContract(contractId),
+    windowStartS: null,
+  };
+  return withBuilding(drawn, resources, contract.buildingId);
+}
+
+/**
  * The state the page opens on.
  *
  * The opening dispatcher is `collective` and not `nearest-car`, which is § D134's move and is not
@@ -1068,6 +1108,8 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     // rather than `AS_BUILT` because the two are the same run and only one of them is a statement
     // that a campaign is in progress.
     campaignFitOut: undefined,
+    // And no campaign day has chosen an event; the week's rota decides until one does.
+    campaignEventId: undefined,
     // Retrofit: the fabric is what the building already has. The opening position is the one that
     // takes nothing away and adds nothing — a player has not asked to rebuild anything yet.
     commissioningConstraintId: RETROFIT_CONSTRAINT_ID,
@@ -1475,7 +1517,17 @@ export function shiftRunConfigOf(
    * guard that stops a fifth.
    */
   const calendarDay = calendarDayFor(state.calendar, state.week.day, state.week.dayIdx);
-  const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
+  /*
+   * **A campaign day's event is the campaign's** — GitHub issues #171 and #169 item 1, § D507.
+   * `runCampaignDay` writes `campaignEventId` from the contract's calendar and § 8.3's odds, and
+   * outside a campaign day the field is `undefined` and the week's calendar decides exactly as
+   * before. Read here, at the one seam the run is built from, so the caption and the run agree for
+   * the reason `scheduledEventFor`'s comment above gives.
+   */
+  const event =
+    state.campaignEventId === undefined
+      ? scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx)
+      : SHIFT_EVENTS[state.campaignEventId];
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
   /*

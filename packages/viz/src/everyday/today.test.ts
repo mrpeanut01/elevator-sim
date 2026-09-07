@@ -30,7 +30,7 @@ import type { GoalReading, WeekState } from '../shift/types.js';
 import { openWeek } from '../shift/week.js';
 
 import { EM_DASH, groupThousands } from './figures.js';
-import { COMFORTABLE_PER_CAR, todayOf } from './today.js';
+import { todayOf } from './today.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
 const read = (path: string): unknown =>
@@ -77,6 +77,7 @@ const recordFor = (
     dispatcherName: 'Steady hand',
     goals: pendingGoals(day),
     seed: 424_242n,
+    firstSession: false,
     units: 'metric',
   });
 
@@ -151,6 +152,7 @@ describe('the facts come from the resolved building', () => {
       dispatcherName: undefined,
       goals: [],
       seed: 1n,
+      firstSession: false,
       units: 'metric',
     });
     expect(record.facts).toEqual([]);
@@ -162,23 +164,26 @@ describe('the facts come from the resolved building', () => {
 });
 
 describe('the load reading', () => {
-  it('divides the population by the cars still working, and compares against the cited line', () => {
+  it('divides the population by the cars still working, and grades nothing — docs/35 PM-TT1, § D514', () => {
     const record = recordFor(midtown, 3, 2);
     const cars = midtown.banks.reduce((total, bank) => total + bank.cars.length, 0);
     const event = scheduledEventFor(NO_CALENDAR, 3, 2);
     const held = event.effect.carsOutOfService + (event.effect.derate?.cars ?? 0);
     const perCar = Math.round(midtown.totalPopulation / (cars - held));
-    expect(record.load?.note).toContain(String(perCar).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
-    expect(record.load?.note).toContain(String(COMFORTABLE_PER_CAR));
-    expect(record.load?.word).toBe(perCar <= COMFORTABLE_PER_CAR ? 'Comfortable' : 'Busy');
+    expect(record.load?.word).toBe(`${String(perCar).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} per working car`);
+    expect(record.load?.note).toContain(`${String(cars - held)} working cars today, as the building is configured`);
+    /* The verdict words are gone: a plate at t = 0 has no day to grade. */
+    for (const text of [record.load?.word ?? '', record.load?.note ?? '']) {
+      expect(text).not.toMatch(/comfortable is around|\bBusy\b/u);
+    }
   });
 
   it('reads busier when a car goes out, on the same building and the same population', () => {
     const quiet = recordFor(midtown, 2, 1);
     const derated = recordFor(midtown, 3, 2);
-    const perCarOf = (note: string): number =>
-      Number((note.match(/^([\d,]+)/)?.[1] ?? '0').replace(/,/g, ''));
-    expect(perCarOf(derated.load?.note ?? '')).toBeGreaterThan(perCarOf(quiet.load?.note ?? ''));
+    const perCarOf = (word: string): number =>
+      Number((word.match(/^([\d,]+)/)?.[1] ?? '0').replace(/,/g, ''));
+    expect(perCarOf(derated.load?.word ?? '')).toBeGreaterThan(perCarOf(quiet.load?.word ?? ''));
   });
 });
 
@@ -262,6 +267,7 @@ function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
     dispatcherName: 'Steady hand',
     goals: pendingGoals(state.week.day),
     seed: state.seed,
+    firstSession: false,
     units: 'metric',
   });
 }

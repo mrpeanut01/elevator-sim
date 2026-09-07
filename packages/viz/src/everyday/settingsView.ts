@@ -30,11 +30,14 @@
  *   than a holding position, and it is deleted on the commit that makes a sound play and not
  *   before. [§ D447](../../../../DECISIONS.md) records that reading and the correction it owed the
  *   design guide, whose § 20.12 and § 15.1 both still put the choice as open.
- * - **Default speed — not drawn.** The prototype's row writes `st.speed`, § 18's Everyday
- *   `run.speed(1..5)` — state this build does not have: the day a player runs is the Engineer
- *   stage (§ D335's hand-off), whose ×-chips and `settings.playbackSpeed` multiplier belong to
- *   that surface and mean *how fast to watch a recording*, not *how fast a day starts*. Wiring
- *   this label to that mechanism would be a control doing something other than what it says.
+ * - **Default speed — shipped** (GitHub issue #229). It used to be refused here on the ground
+ *   that the day a player runs was the Engineer stage, whose ×-chips mean *how fast to watch a
+ *   recording*; § 7's stage has been the Everyday stage since § D335, its ladder is
+ *   `STAGE_SPEEDS`, and *"speed resets to the player's Default speed setting at the start of each
+ *   run"* (§ 4.6, § 7.3) had a slot to reset from the moment `everyday/profile.ts` carried the
+ *   preference. The row cycles the ladder's rungs; `stageScreen.ts#adopt` reads it. Presentation
+ *   only — nothing about a run changes, only how fast it is watched — so it lives in the Everyday
+ *   slot beside Units for Units's reason.
  * - **Units — shipped, and it is the newest of the two wired rows.** It used to be refused, and the
  *   refusal's own evidence was the grep: `grep -rin "imperial" packages/viz/src --include='*.ts'`
  *   found **no non-test occurrence**, so a row would have persisted a bit nothing consults.
@@ -57,13 +60,13 @@
  *   has none of"*, which was false on every served build — the server injects the API tag into the
  *   page it serves — and became visibly false when GitHub issue #221 made the board read. What is
  *   actually absent is the posting path, so that is what it says now.
- * - **This device's two statements shipped; one of its two actions now does too.** *Where progress lives* and
+ * - **This device's two statements shipped, and both of its actions have now gone one way or the other.** *Where progress lives* and
  *   *Replay verification* are statements of fact with real seams (`persist/session.ts` and this
  *   screen's own `profileStore.ts`; the server's replay-before-board, which `dev/main.ts` reports
- *   as *"The server replayed your seed and it reproduced."*). *Clear saved progress* is refused
- *   because it would lie: `dev/main.ts` saves the running session on every state change, so a
- *   cleared slot is rewritten moments later and the button's claim does not survive its own
- *   click. *Switch to Engineer* used to be refused here in the rail's own words, and is now not
+ *   as *"The server replayed your seed and it reproduced."*). *Clear saved progress* is the
+ *   section's one **control** now (GitHub issue #229, § D500): two presses, both slots, and the
+ *   Engineer session sealed against re-saving before the page reloads — see
+ *   {@link CLEAR_PROGRESS_COPY} for the four states' words. *Switch to Engineer* used to be refused here in the rail's own words, and is now not
  *   named at all: the rail's § 3.2 footer row opens the Engineer surface, so the entry went with
  *   the refusal rather than being reworded — see the note where it stood. **A *Sign out* refusal
  *   stood beside it and is deleted on this commit rather than reworded** (GitHub issue #332,
@@ -122,7 +125,7 @@ import {
  * stage's *pure* half — no document, no canvas, no clock — so this import costs this file nothing
  * it was keeping, and the arrow runs one way: that module has never imported this one.
  */
-import { STAGE_SPEEDS } from './stageScreenModel.js';
+import { DEFAULT_STAGE_SIM_PER_REAL_S, STAGE_SPEEDS } from './stageScreenModel.js';
 import {
   DEFAULT_EVERYDAY_UNITS,
   UNITS_ROW_COPY,
@@ -386,7 +389,7 @@ function signInViewOf(input: SettingsScreenInput): SettingsSignInView {
 
 /** One shipped toggle row — label, one-clause effect, and the pill's two faces. */
 export interface SettingsToggleView {
-  readonly id: 'motion' | 'units';
+  readonly id: 'motion' | 'units' | 'default-speed';
   readonly label: string;
   /** § 16's register: what the row does, in one clause. */
   readonly note: string;
@@ -403,6 +406,54 @@ export interface SettingsFactView {
   readonly note: string;
 }
 
+/**
+ * Where *Clear saved progress* is in its two-press arc, or why it cannot be pressed — GitHub
+ * issue #229, [§ D500](../../../../DECISIONS.md).
+ *
+ * - `booting` — the Engineer surface has not published its session port yet, the Motion row's own
+ *   window; the row draws its absence rather than a button whose press would clear half.
+ * - `ready` — pressable; the first press arms it.
+ * - `armed` — the second press clears. Two presses rather than a dialog, because § 20.12's rule is
+ *   that a settings row does what it says, and a destructive row that does it on one tap is a row
+ *   a thumb finds.
+ * - `cleared` — both slots are gone. The sentence says what survives (nothing) and what happens to
+ *   the run on screen (it finishes and is not kept), because a clear that said less than it did
+ *   would be the same defect as the refusal it replaced, one step along.
+ */
+export type SettingsClearStage = 'booting' | 'ready' | 'armed' | 'cleared';
+
+/** The one control in *This device* — the row that forgets everything the device keeps. */
+export interface SettingsClearView {
+  readonly id: 'clear-progress';
+  readonly stage: SettingsClearStage;
+  readonly label: string;
+  /** What pressing it does, in the state's own words — never less than it does. */
+  readonly note: string;
+  /** The button's text, or `undefined` while the row draws its absence. */
+  readonly button?: string | undefined;
+}
+
+/** Every word the clear row authors, in one table — swept through the settings surface. */
+export const CLEAR_PROGRESS_COPY = Object.freeze({
+  label: 'Clear saved progress',
+  booting:
+    'Clearing reaches the simulator’s own saved week, and the simulator is still loading — this row appears when it has.',
+  ready:
+    'Forgets everything this device keeps: the week and its banked days, the saved dispatchers, buildings and patterns, the solved cases and the ratings, and the name and picture above. Press twice.',
+  armed: 'Press again and it is gone. There is no undo, and nothing is sent anywhere first.',
+  cleared:
+    'Cleared. Nothing this device kept survives. The day on screen finishes as it stands and is not saved; the page reloads to start fresh.',
+  buttonReady: 'Clear',
+  buttonArmed: 'Press again to clear',
+  buttonCleared: 'Cleared',
+} as const);
+
+/** § 4.6's *Default speed* row, its one sentence, and the ladder's label per rung. */
+export const DEFAULT_SPEED_ROW_COPY = Object.freeze({
+  label: 'Default speed',
+  note: 'the speed every run opens at — the chips on the stage still change it for the day',
+} as const);
+
 /** The whole screen, as data. */
 export interface SettingsScreenView {
   readonly eyebrow: string;
@@ -418,6 +469,8 @@ export interface SettingsScreenView {
   readonly device: {
     readonly heading: 'THIS DEVICE';
     readonly facts: readonly SettingsFactView[];
+    /** The clear row — GitHub issue #229. Always present; its stage says whether it can act. */
+    readonly clear: SettingsClearView;
   };
 }
 
@@ -445,7 +498,15 @@ export interface SettingsScreenView {
  */
 export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
   'Sound — nothing in this build plays a sound, and a toggle that toggles nothing is a lie in a settings panel',
-  `Default speed — the stage has its own ${String(STAGE_SPEEDS.length)} speeds and resets to the same one on every run, so the preference this row would set is buildable now and is not built`,
+  /*
+   * **`Default speed` was the second entry and it is deleted, not reworded** — GitHub issue #229.
+   * It read *"the stage has its own N speeds and resets to the same one on every run, so the
+   * preference this row would set is buildable now and is not built"*, counting N off
+   * `STAGE_SPEEDS.length` so the sentence could not go stale on the ladder. It went stale on the
+   * verb instead: the row is drawn above, `everydayProfileStore().defaultSpeed()` is its slot, and
+   * `everyday/stageScreen.ts` reads it at the one place speed resets. The triage row that owned it
+   * goes on the same commit (`buildNotes.test.ts#ABSENCE_TRIAGE`).
+   */
   /*
    * **`Units` was the third entry and it is deleted, not reworded** — GitHub issue #170,
    * [§ D448](../../../../DECISIONS.md).
@@ -477,7 +538,16 @@ export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
    * *switch* over a capability that still does not exist, sign-in does not make it false, and
    * § D460 corrected that exact confusion once already. Posting is GitHub issue #221's.
    */
-  'Clear saved progress — not offered yet: the running session would write itself straight back on its next save',
+  /*
+   * **`Clear saved progress` was the sixth entry and it is deleted, not reworded** — GitHub issue
+   * #229, [§ D500](../../../../DECISIONS.md). It read *"not offered yet: the running session would
+   * write itself straight back on its next save"*, and wave K found the reason was already wrong
+   * twice over: there are four specific `saveSessionNow()` sites rather than a save on every change,
+   * and the progress the row is about had moved to a second slot (§ D433). The row is drawn in
+   * *This device* now; it clears **both** slots and says so, and the Engineer shell seals its session
+   * against re-saving (`engineerBridge.ts#clearSavedSession`) before the page reloads, which is
+   * what the old reason was afraid of and what a sentence could never have prevented.
+   */
   /*
    * **`Switch to Engineer` was the seventh entry and it is deleted, not reworded.**
    *
@@ -513,6 +583,18 @@ export interface SettingsScreenInput {
    * drawn as one, while a missing preference is not, so this row never has an absent arm.
    */
   readonly units?: EverydayUnits | undefined;
+  /**
+   * `everydayProfileStore().defaultSpeed()` — the speed every run opens at, simulated seconds per
+   * real second (GitHub issue #229). Optional on {@link units}'s footing: the store is total in it,
+   * so `undefined` means *a caller did not pass it* and the stage's own default is drawn.
+   */
+  readonly defaultSpeedSimPerRealS?: number | undefined;
+  /**
+   * Where the *Clear saved progress* row is — `'booting'` while the Engineer session port is
+   * absent, which is the same window the Motion row has. Optional for the corpus's convenience and
+   * read as `'ready'` when the bridge is present and nothing has been pressed.
+   */
+  readonly clearStage?: SettingsClearStage | undefined;
   /**
    * `everyday/accountPort.ts#everydayAccount()` — `undefined` while the Engineer surface is
    * booting, which is a state a player can reach and is drawn as one.
@@ -607,6 +689,14 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
               },
             ] as const)),
         {
+          id: 'default-speed',
+          label: DEFAULT_SPEED_ROW_COPY.label,
+          note: DEFAULT_SPEED_ROW_COPY.note,
+          value: stageSpeedLabelOf(input.defaultSpeedSimPerRealS),
+          // Filled when the player has moved it off the stage's own default — the Units rule.
+          on: (input.defaultSpeedSimPerRealS ?? DEFAULT_STAGE_SIM_PER_REAL_S) !== DEFAULT_STAGE_SIM_PER_REAL_S,
+        },
+        {
           id: 'units',
           label: UNITS_ROW_COPY.label,
           note: UNITS_ROW_COPY.note,
@@ -642,6 +732,35 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
             'cannot be turned off, and it is why the boards are worth reading.',
         },
       ],
+      clear: clearRowOf(bridgeAbsent ? 'booting' : (input.clearStage ?? 'ready')),
     },
   };
+}
+
+/** The clear row for a stage — one composer, so the screen and the corpus draw the same words. */
+export function clearRowOf(stage: SettingsClearStage): SettingsClearView {
+  const button =
+    stage === 'booting'
+      ? undefined
+      : stage === 'ready'
+        ? CLEAR_PROGRESS_COPY.buttonReady
+        : stage === 'armed'
+          ? CLEAR_PROGRESS_COPY.buttonArmed
+          : CLEAR_PROGRESS_COPY.buttonCleared;
+  return {
+    id: 'clear-progress',
+    stage,
+    label: CLEAR_PROGRESS_COPY.label,
+    note: CLEAR_PROGRESS_COPY[stage],
+    ...(button === undefined ? {} : { button }),
+  };
+}
+
+/** The ladder's own label for a stored value — the default's label for a value off the ladder. */
+function stageSpeedLabelOf(simPerRealS: number | undefined): string {
+  const rung =
+    STAGE_SPEEDS.find((speed) => speed.simPerRealS === simPerRealS) ??
+    STAGE_SPEEDS.find((speed) => speed.simPerRealS === DEFAULT_STAGE_SIM_PER_REAL_S) ??
+    STAGE_SPEEDS[0];
+  return rung.label;
 }

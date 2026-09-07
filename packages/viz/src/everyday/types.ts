@@ -81,7 +81,7 @@ export type EverydayScreen = (typeof EVERYDAY_SCREENS)[number];
  * day `watch` landed. Deriving the loop from this array is what makes a new context a new set of
  * swept strings rather than a silent gap.
  */
-export const RUN_CONTEXTS = ['daily', 'campaign', 'rush', 'watch'] as const;
+export const RUN_CONTEXTS = ['daily', 'campaign', 'rush', 'watch', 'replay'] as const;
 
 /**
  * Which flow the stage and the report are serving — GAMEPLAY § 18's `ctx` line.
@@ -90,7 +90,9 @@ export const RUN_CONTEXTS = ['daily', 'campaign', 'rush', 'watch'] as const;
  * paragraph under the inventory table and it is the reason this is a parameter rather than four
  * screen keys. `watch` is § 18's fourth value: the stage replaying somebody else's posted run,
  * which is why § 3.3 gives it its own bar row (`⤺ Stop watching`, no timeline) and § 3.4 exempts
- * it from the leave warning — there is nothing of yours to lose.
+ * it from the leave warning — there is nothing of yours to lose. `replay` is § 6.1's past day
+ * played again as the day it was (GitHub issue #177 item 1, § D517): the daily loop's own three
+ * screens over a parked week, and a close that banks nothing.
  */
 export type RunContext = (typeof RUN_CONTEXTS)[number];
 

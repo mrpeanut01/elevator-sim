@@ -400,9 +400,10 @@ describe('the reproduction gate', () => {
     if (record === undefined) return;
     const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
     const row = rowFor(record, recording);
+    const rowPosted = postedResultOf(recording);
     const stale: WatchableRun = {
       ...row,
-      posted: { ...row.posted, carried: row.posted.carried + 3, minutePct: 7 },
+      posted: { ...rowPosted, carried: rowPosted.carried + 3, minutePct: 7 },
     };
     const checked = checkedRun(
       stale,
@@ -416,7 +417,7 @@ describe('the reproduction gate', () => {
     expect(checked.run.blocked?.reason).toContain('away inside a minute');
     // The drift list is what the sentence is built from, so it is asserted rather than the prose.
     expect(
-      reproductionDrift(stale.posted, postedResultOf(recording)).map((row2) => row2.label),
+      reproductionDrift(stale.posted ?? rowPosted, postedResultOf(recording)).map((row2) => row2.label),
     ).toEqual(['people carried', 'away inside a minute (%)']);
   }, 60_000);
 
@@ -484,7 +485,8 @@ describe('the reproduction gate', () => {
     if (record === undefined) return;
     const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
     const good = rowFor(record, recording);
-    const stale: WatchableRun = { ...good, posted: { ...good.posted, carried: good.posted.carried + 3 } };
+    const goodPosted = postedResultOf(recording);
+    const stale: WatchableRun = { ...good, posted: { ...goodPosted, carried: goodPosted.carried + 3 } };
     const unreadable = rowFor({ ...record, buildingId: 'no-such-tower' }, recording);
     const [noRecord] = filedDayRuns(
       [

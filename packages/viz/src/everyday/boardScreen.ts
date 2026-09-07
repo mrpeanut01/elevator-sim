@@ -48,6 +48,7 @@
  * comparison is the same one whether the digest arrived from storage or from this sitting.
  */
 
+import { gapSentence } from '../menu/gap.js';
 import type { DispatcherProfile, ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import { savedProfilesOf } from '../batch/library.js';
@@ -71,9 +72,12 @@ import { RATING_BASIS } from '../gauntlet/rating.js';
 import { runGauntlet, type GauntletHandle, type GauntletWorker } from '../gauntlet/run.js';
 
 import { DAILY_BOARD_METRIC, type EverydayDailyBoard } from './host.js';
+import { everydayAccount } from './accountPort.js';
 import { everydayProgressWith } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
-import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
+import { WATCH_IT_LABEL } from './watchStage.js';
+import type { EverydayScreenHandle, EverydayScreenModule } from './screens.js';
+import type { EverydayScreenShellContext } from './shell.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as G,
@@ -118,11 +122,51 @@ export const BOARD_SCREEN_COPY = Object.freeze({
     'one rather than a day with no board, so there is nothing to show rather than an empty table.',
   dailyEmpty: 'Nobody has posted to today’s board yet. It resets tomorrow.',
   /*
+   * § 14.1: *"Your own row cannot be watched. Its button reads `your run` and does nothing."* The
+   * one first-person string on this screen, and it is the handoff's own: the row is the player's,
+   * so the pronoun is true. Applied on the signed-in display name, which is the only identity a
+   * board row carries — GitHub issue #337.
+   */
+  dailyRowYours: 'your run',
+  /*
    * A row whose server sent no `n`. Short, and in the figure's own place rather than a footnote,
    * because the thing a reader wants to know is why *this* row has no number while its neighbours
    * do — and the ranking is still the server's, which is why the row stays on the board at all.
    */
   dailyRowWithheld: 'no count',
+  /*
+   * The house's rows — GitHub issue #222, § D521. A tag on the row and one note under the board's
+   * own. The note says the three things a reader could otherwise get wrong: nobody played these,
+   * they are here so the board is never empty, and they do not rank the dispatchers — one crowd,
+   * one seed, one run each is exactly the shape this project refuses to draw a conclusion from.
+   */
+  dailyHouseTag: 'house',
+  dailyHouseNote:
+    'Rows marked house are the game’s own runs, one per shipped dispatcher on today’s crowd, posted ' +
+    'so the board is never empty. Nobody played them, and they do not rank the dispatchers: one ' +
+    'crowd, one run each. Beat one and you have beaten a machine on the same arrivals.',
+  /*
+   * § D509 — the reset policy, said before a rating is earned (GitHub issue #252). Two clocks and
+   * two sentences: the daily board is one date and resets by construction; the ladder is a standing
+   * rating over forty fixed cases and never resets, decays or deletes a verified run.
+   */
+  ladderPolicy:
+    'Ratings here do not reset and are not decayed. A rating is a mean over forty fixed cases, kept ' +
+    'as the cases with their seeds and recomputed from them, so two ratings a month apart are still ' +
+    'the same measurement. If the proof cases ever change, every rating is re-run from what it kept, ' +
+    'and no verified run is ever deleted.',
+  /*
+   * The middle of today's board — GitHub issue #327, § D484's ladder drawn as words. Each axis is
+   * its own line with its own count; no line combines two axes, none orders energy against wait
+   * (the wire says why energy is absent, and that sentence is carried), and no interval is drawn.
+   */
+  worldHeading: "THE MIDDLE OF TODAY'S BOARD",
+  worldUnasked: 'This build did not ask the server for the middle of the board.',
+  worldUnreachable: 'The middle of the board could not be read:',
+  worldAxisAwtS: 'Mean wait',
+  worldAxisWt95S: '95th-percentile wait',
+  worldAxisTtdMeanS: 'Time to destination',
+  worldAxisPctOverLongWait: 'Share waiting past the long-wait line',
   /*
    * The heading over the cases a rating could not score — GitHub issue #295's F26. It sits under
    * the incomplete note rather than replacing it: the note says the mean is not comparable, and
@@ -219,7 +263,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 const NOTE = `font-size:13px;line-height:1.55;color:${C.warmGrey};margin:${String(G.row)}px 0 0;max-width:70ch;text-wrap:pretty`;
 
-function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScreenHandle {
+function mount(host: HTMLElement, context: EverydayScreenShellContext): EverydayScreenHandle {
   const doc = host.ownerDocument;
   // Before the first draw reads RATINGS — a restored ladder must be there on the first paint.
   ensureRestored();
@@ -235,6 +279,8 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   let disposed = false;
   /** `undefined` while the read is in flight — the fifth thing this tab can be drawing. */
   let board: EverydayDailyBoard | undefined;
+  /** Rows whose press the gate refused, by the server's row id, with the reason — GitHub issue #337. */
+  const watchRefused = new Map<string, string>();
 
   const status = el(doc, 'div', BOARD_SCREEN_COPY.loading);
   status.style.cssText = NOTE;
@@ -565,7 +611,12 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
    * more, which is the same split `dev/reportPanel.ts` uses for the same reason.
    */
   function dailyBlock(): HTMLElement {
-    const view = dailyBoardViewOf(board);
+    const account = everydayAccount();
+    const view = dailyBoardViewOf(
+      board,
+      account?.token !== undefined ? account.user?.displayName : undefined,
+      (id) => context.host.dispatcherById(id)?.name,
+    );
     const wrap = el(doc, 'div');
     wrap.style.cssText = `margin-top:${String(G.section)}px`;
     for (const line of view.lines) {
@@ -574,7 +625,15 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       p.style.cssText = line.role === 'reason' ? NOTE : `${NOTE};color:${C.label}`;
       wrap.append(p);
     }
-    if (view.rows.length === 0) return wrap;
+    if (view.rows.length === 0) {
+      for (const line of view.world) {
+        const p = el(doc, 'p', line.text);
+        p.className = line.className;
+        p.style.cssText = line.role === 'reason' ? NOTE : `${NOTE};color:${C.label}`;
+        wrap.append(p);
+      }
+      return wrap;
+    }
 
     const rows = el(doc, 'div');
     rows.className = 'everyday-board-rows';
@@ -587,9 +646,29 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       place.style.cssText = `font:600 12px ${TYPE.mono};color:${C.label};min-width:2ch`;
       const who = el(doc, 'span', entry.displayName);
       who.style.cssText = 'flex:1';
+      if (entry.house !== undefined) {
+        /* § D521's marker: a run nobody played, said on the row and not only in the note. */
+        const house = el(doc, 'span', entry.house);
+        house.className = 'everyday-board-row-house';
+        house.style.cssText = `font:600 10px ${TYPE.mono};letter-spacing:.12em;text-transform:uppercase;color:${C.label};border:1px solid ${C.rule};border-radius:${String(R.control)}px;padding:1px 6px`;
+        row.append(place, house);
+        row.append(who);
+      } else {
+        row.append(place, who);
+      }
+      /* GitHub issue #93: who drove it, beside the name, and the player's own gap after the figure. */
+      const driver = el(doc, 'span', entry.driver);
+      driver.className = 'everyday-board-row-driver';
+      driver.style.cssText = `font-size:11.5px;color:${C.label}`;
       const wait = el(doc, 'span', entry.figure);
       wait.style.cssText = `font:600 13px ${TYPE.mono}`;
-      row.append(place, who, wait);
+      row.append(driver, wait);
+      if (entry.gap !== '') {
+        const gap = el(doc, 'span', entry.gap);
+        gap.className = 'everyday-board-row-gap';
+        gap.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label}`;
+        row.append(gap);
+      }
       if (entry.count !== undefined) {
         /* In the row, beside the mean — R13's clause one is about the visual unit, not the page. */
         const count = el(doc, 'span', entry.count);
@@ -597,9 +676,51 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
         count.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label}`;
         row.append(count);
       }
+      /*
+       * § 14.1's `Watch it` — GitHub issue #337. The press is `weekScreen.ts`'s, in the one order
+       * that is safe: the gate first, and the spectator state only on its `blocked: null`. A row it
+       * refused is redrawn with the reason where the button stood, so a run this build's data
+       * cannot reproduce is a labelled refusal rather than a blank.
+       */
+      const refusal = watchRefused.get(entry.id);
+      if (refusal !== undefined) {
+        const why = el(doc, 'span', refusal);
+        why.className = 'everyday-board-row-refused';
+        why.style.cssText = `font-size:11.5px;color:${C.label};flex-basis:100%`;
+        row.style.flexWrap = 'wrap';
+        row.append(why);
+      } else {
+        const button = el(doc, 'button', entry.watch === 'yours' ? BOARD_SCREEN_COPY.dailyRowYours : WATCH_IT_LABEL);
+        button.type = 'button';
+        button.className = entry.watch === 'yours' ? 'everyday-board-row-yours' : 'everyday-board-row-watch';
+        button.disabled = entry.watch === 'yours';
+        button.style.cssText = `border:1px solid ${C.rule};border-radius:${String(R.control)}px;background:transparent;padding:3px 9px;font-size:11.5px;color:${C.ink};cursor:${entry.watch === 'yours' ? 'default' : 'pointer'}`;
+        if (entry.watch === 'watch') {
+          const place = Number(entry.place);
+          const source = board !== undefined && board.kind === 'board' ? board.rows.find((candidate) => candidate.id === entry.id) : undefined;
+          button.addEventListener('click', () => {
+            if (source === undefined) return;
+            const checked = context.host.watchRun(context.host.postedRun(source, place));
+            if (checked.blocked !== null) {
+              watchRefused.set(entry.id, checked.blocked.reason);
+              redraw();
+              return;
+            }
+            context.enterWatch();
+          });
+        }
+        row.append(button);
+      }
       rows.append(row);
     }
     wrap.append(rows);
+    /* The middle of the board, under the rows — GitHub issue #327; the view decided every word. */
+    for (const line of view.world) {
+      const p = el(doc, 'p', line.text);
+      p.className = line.className;
+      p.style.cssText = line.role === 'reason' ? NOTE : `${NOTE};color:${C.label}`;
+      wrap.append(p);
+    }
     return wrap;
   }
 
@@ -669,7 +790,11 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     const world = el(doc, 'p', LADDER_WORLD_ABSENCE);
     world.className = 'everyday-ladder-world-absent';
     world.style.cssText = NOTE;
-    body.append(world, sendBlock(set, resources), disclosure(set, resources));
+    /* § D509: the policy is on the tab a rating is earned from, before the button that earns one. */
+    const policy = el(doc, 'p', BOARD_SCREEN_COPY.ladderPolicy);
+    policy.className = 'everyday-ladder-policy';
+    policy.style.cssText = NOTE;
+    body.append(world, policy, sendBlock(set, resources), disclosure(set, resources));
   }
 
   /*
@@ -737,10 +862,31 @@ export interface DailyBoardLine {
 
 /** One posted run, ranked. Both strings are pre-formatted so the renderer decides nothing. */
 export interface DailyBoardRowView {
+  /** The server's row id — what a press hands back to `EverydayHost.postedRun`. */
+  readonly id: string;
+  /**
+   * Which button the row carries — GitHub issue #337. `'watch'` is § 14.1's `Watch it`;
+   * `'yours'` is the inert `your run` a player's own row draws instead, decided on the signed-in
+   * display name because that is the only identity a board row carries.
+   */
+  readonly watch: 'watch' | 'yours';
   readonly place: string;
   readonly displayName: string;
+  /**
+   * Who drove the run — the dispatcher's name, or its id when this build does not ship it. GitHub
+   * issue #93's reveal, and it is not opt-in because the id has always travelled on every posted
+   * run: a board that ranks runs on one crowd has nothing to hide about which dispatcher ran them.
+   */
+  readonly driver: string;
+  /**
+   * The player's own distance from the top row, `menu/gap.ts`'s sentence — GitHub issue #93 § 3.
+   * `''` on every row that is not the player's, on the top row, and where either figure is withheld.
+   */
+  readonly gap: string;
   /** The mean wait, or the withholding sentence when this row carries no count. */
   readonly figure: string;
+  /** `BOARD_SCREEN_COPY.dailyHouseTag` on a row the house posted, `undefined` on a player's — § D521. */
+  readonly house: string | undefined;
   /**
    * The `n` behind {@link figure}, in the row's own box — R13 clause one.
    *
@@ -754,6 +900,13 @@ export interface DailyBoardRowView {
 export interface DailyBoardView {
   readonly lines: readonly DailyBoardLine[];
   readonly rows: readonly DailyBoardRowView[];
+  /**
+   * The middle of the board, under the rows — GitHub issue #327. Empty on every state but a read
+   * board; on one, a heading and then one line per axis (or the server's own withholding sentence),
+   * the wire's note, and the axes it names as absent. Drawn after the rows so a ladder never reads
+   * as a ranking.
+   */
+  readonly world: readonly DailyBoardLine[];
 }
 
 /**
@@ -774,10 +927,79 @@ export interface DailyBoardView {
  * Pure and exported so `boardScreen.test.ts` can drive every state without a document, and so the
  * shape of the decision is readable without reading a renderer.
  */
-export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBoardView {
+/** The axis's name in the player's words, or its id for an axis this build does not know. */
+function worldAxisLabelOf(axis: string): string {
+  switch (axis) {
+    case 'awtS':
+      return BOARD_SCREEN_COPY.worldAxisAwtS;
+    case 'wt95S':
+      return BOARD_SCREEN_COPY.worldAxisWt95S;
+    case 'ttdMeanS':
+      return BOARD_SCREEN_COPY.worldAxisTtdMeanS;
+    case 'pctOverLongWait':
+      return BOARD_SCREEN_COPY.worldAxisPctOverLongWait;
+    default:
+      return axis;
+  }
+}
+
+/** `18.2 s` for a seconds axis, `3.4%` for the share. Unit from the axis, never guessed. */
+function worldFigureOf(axis: string, value: number): string {
+  return axis === 'pctOverLongWait' ? `${value.toFixed(1)}%` : `${value.toFixed(1)} s`;
+}
+
+/**
+ * The middle of the board as lines — GitHub issue #327. Every figure carries its count in its own
+ * line (R13 clause one), the withholding is the server's sentence rather than a paraphrase, and an
+ * axis the wire names as absent is drawn as absent with the wire's reason.
+ */
+function worldLinesOf(board: Extract<EverydayDailyBoard, { kind: 'board' }>): readonly DailyBoardLine[] {
+  const heading: DailyBoardLine = { text: BOARD_SCREEN_COPY.worldHeading, className: 'everyday-board-world-heading', role: 'note' };
+  const spread = board.distribution;
+  if (spread === undefined) {
+    return [
+      heading,
+      board.distributionDetail === undefined
+        ? { text: BOARD_SCREEN_COPY.worldUnasked, className: 'everyday-board-world-unasked', role: 'reason' }
+        : {
+            text: `${BOARD_SCREEN_COPY.worldUnreachable} ${board.distributionDetail}`,
+            className: 'everyday-board-world-unreachable',
+            role: 'reason',
+          },
+    ];
+  }
+  if (spread.withheld !== undefined) {
+    return [heading, { text: spread.withheld, className: 'everyday-board-world-withheld', role: 'reason' }];
+  }
+  const axes: DailyBoardLine[] = spread.ladders.map((ladder) => ({
+    text:
+      ladder.rungs === undefined
+        ? `${worldAxisLabelOf(ladder.axis)} — withheld over ${String(ladder.n)} players`
+        : `${worldAxisLabelOf(ladder.axis)} — the middle is ${worldFigureOf(ladder.axis, ladder.rungs.p50)}; ` +
+          `a quarter of players are under ${worldFigureOf(ladder.axis, ladder.rungs.p25)} and a quarter over ` +
+          `${worldFigureOf(ladder.axis, ladder.rungs.p75)}, the outer tenths at ${worldFigureOf(ladder.axis, ladder.rungs.p10)} ` +
+          `and ${worldFigureOf(ladder.axis, ladder.rungs.p90)} — over ${String(ladder.n)} players, one best run each`,
+    className: 'everyday-board-world-axis',
+    role: 'note',
+  }));
+  const absent: DailyBoardLine[] = spread.absent.map((entry) => ({
+    text: `${entry.axis}: ${entry.reason}`,
+    className: 'everyday-board-world-absent',
+    role: 'reason',
+  }));
+  return [heading, ...axes, { text: spread.note, className: 'everyday-board-world-note', role: 'reason' }, ...absent];
+}
+
+export function dailyBoardViewOf(
+  board: EverydayDailyBoard | undefined,
+  ownDisplayName: string | undefined = undefined,
+  /** The dispatcher's player-facing name for an id, or `undefined` for one this build does not ship. */
+  dispatcherNameOf: (id: string) => string | undefined = () => undefined,
+): DailyBoardView {
   const only = (text: string, className: string, role: 'reason' | 'note' = 'reason'): DailyBoardView => ({
     lines: [{ text, className, role }],
     rows: [],
+    world: [],
   });
 
   if (board === undefined) {
@@ -802,6 +1024,7 @@ export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBo
           },
         ],
         rows: [],
+        world: [],
       };
     case 'undeclared':
       return only(BOARD_SCREEN_COPY.dailyUndeclared, 'everyday-board-undeclared');
@@ -818,10 +1041,13 @@ export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBo
             { text: BOARD_SCREEN_COPY.dailyEmpty, className: 'everyday-board-empty', role: 'note' },
           ],
           rows: [],
+          world: worldLinesOf(board),
         };
       }
       return {
-        lines: [note],
+        lines: board.rows.some((entry) => entry.baselineProfileId !== undefined)
+          ? [note, { text: BOARD_SCREEN_COPY.dailyHouseNote, className: 'everyday-board-house-note', role: 'note' }]
+          : [note],
         /*
          * One figure per row, and it is the one the board is ranked on. A row carrying more would
          * invite a comparison the ranking does not make, and `dataHash` — which says whether
@@ -834,8 +1060,28 @@ export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBo
          * denominator this client could honestly supply — and it withholds rather than inventing.
          */
         rows: board.rows.map((entry, index) => ({
+          id: entry.id,
+          /* A house row is never the player's own, whatever they are called (§ D521). */
+          watch:
+            entry.baselineProfileId === undefined && ownDisplayName !== undefined && entry.displayName === ownDisplayName
+              ? 'yours'
+              : 'watch',
           place: String(index + 1),
           displayName: entry.displayName,
+          house: entry.baselineProfileId === undefined ? undefined : BOARD_SCREEN_COPY.dailyHouseTag,
+          driver: dispatcherNameOf(entry.run.dispatcherProfileId) ?? entry.run.dispatcherProfileId,
+          /*
+           * The gap is the player's own and nobody else's, and only between two published figures:
+           * a withheld mean has no distance from anything (R3), and the top row's own gap is `''`.
+           */
+          gap:
+            entry.baselineProfileId === undefined &&
+            ownDisplayName !== undefined &&
+            entry.displayName === ownDisplayName &&
+            entry.legs !== undefined &&
+            board.rows[0]?.legs !== undefined
+              ? gapSentence(entry.measured[DAILY_BOARD_METRIC] - (board.rows[0]?.measured[DAILY_BOARD_METRIC] ?? 0), 's')
+              : '',
           figure:
             entry.legs === undefined
               ? BOARD_SCREEN_COPY.dailyRowWithheld
@@ -845,6 +1091,7 @@ export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBo
               ? undefined
               : `over ${entry.legs.toLocaleString('en-US')} rides`,
         })),
+        world: worldLinesOf(board),
       };
     }
   }
@@ -853,5 +1100,6 @@ export function dailyBoardViewOf(board: EverydayDailyBoard | undefined): DailyBo
 /** The registry row — one import and one line in `screens.ts`, plus its refusal sentence deleted. */
 export const BOARD_SCREEN: EverydayScreenModule = {
   key: 'board',
-  mount,
+  /* `benchScreen.ts`'s cast, for its reason: every context the shell constructs is the shell's. */
+  mount: (host, context) => mount(host, context as EverydayScreenShellContext),
 };

@@ -108,9 +108,17 @@ suspected rather than announcing something they never saw.
 
 **Refusal test.** *Where on the stage would a player have seen this?* If the report's headline has
 no visible antecedent during the run, either the stage is missing a cue or the report is asserting
-something the run did not show. **This is the pillar the build currently fails outright**
-([`MULTI_AGENT_PLAN.md`](../MULTI_AGENT_PLAN.md) § 1, goal 4), and it is why M2 carries a stage
-issue as a P0.
+something the run did not show. **This was the pillar the build failed outright** when this
+document was written ([`MULTI_AGENT_PLAN.md`](../MULTI_AGENT_PLAN.md) § 1, goal 4), and it is why
+M2 carried a stage issue as a P0. **Re-adjudicated 2026-09-06 on GitHub issue #277's landing**
+([§ D470](../DECISIONS.md)): the Everyday stage draws the five goals the report grades, at its own
+playhead, as readings and never as verdicts (`everyday/stageScreenModel.ts`, § D371), so the
+report's five headline rows now each have a visible antecedent during the run. The pillar is no
+longer failed outright. It is not yet **met**: the refusal test still fires on a campaign day whose
+event writes a visible engine change and is announced by the brief before the building shows it
+(GitHub issue #353), and on the first session presenting no problem at all (GitHub issue #208).
+Both are named here rather than the sentence being quietly left, because the issue this sentence
+used to cite, #212, closed having fixed something else.
 
 ### P4 — One change, measured
 
@@ -218,11 +226,11 @@ run rather than waiting for an audit.
 | S2 | **No** | 2026-08-25 | Same measurement |
 | S3 | **No** | 2026-08-25 | Same measurement |
 | S4 | **No** | 2026-08-25 | Same measurement. `packages/server/src/` carries accounts, leaderboard, challenge and store — and no analytics of any kind |
-| S5 | **Partial** | 2026-08-25 | `campaign/campaign.test.ts` plays stages **2, 3, 4, 5 and 6** by name; `data/campaign.json` ships **10**. The old clause *"no test derives the count across all ten"* is **retired**: `campaign/difficultyCurve.test.ts` derives DC-1's table-decidable half across every stage, with an unfailable register asserted in both directions. What is still partial is the **paired sweep** — five of ten stages are played |
+| S5 | **Partial** | 2026-08-25 | The campaign suite plays stages **2, 3, 4, 5 and 6** by name — since GitHub issue #356 split `campaign/campaign.test.ts` on 2026-09-06, one file per played stage beside it (`stageTwoEdited`, `stageThreeOverwhelmed`, `stageFourFront`, `stageFiveCredential` and `stageFiveClears`, `stageSixEscalators`), and `documentation.test.ts` reads this list off every file in the directory; `data/campaign.json` ships **10**. The old clause *"no test derives the count across all ten"* is **retired**: `campaign/difficultyCurve.test.ts` derives DC-1's table-decidable half across every stage, with an unfailable register asserted in both directions. What is still partial is the **paired sweep** — five of ten stages are played |
 | S6 | **Process only** | 2026-08-25 | A moderated playtest needs recruits and a script, not code. [`30-playtest-programme.md`](30-playtest-programme.md) **exists**; the recruited cohort does not. [§ D374](../DECISIONS.md) rules that these gates are recruited for rather than re-scoped |
 | S7 | **Process only** | 2026-08-25 | As S6, plus a recruited practitioner cohort that does not exist |
 | S8 | **Yes — and currently met** | 2026-08-25 | `packages/viz/src/honesty/` — the R1–R13 corpus, its surface list and both tiers. Still the only criterion with a working instrument, and the criterion itself now **passes**: `honesty.test.ts`'s `OUTSTANDING` holds zero entries and both tiers are green. *Instrumented* and *met* are different claims and this column makes both |
-| S9 | **No** | 2026-08-29 | `.github/workflows/` carries `ci.yml`, `deep-tiers.yml`, `deploy-viz.yml`, `review.yml` and **no load budget**. `validation/perfScaling.test.ts` and `perfSweep.test.ts` measure simulation throughput, not page load — and `deep-tiers.yml` is where both of them now run (GitHub issue #163), which moves nothing in this column: a scheduled sweep of simulation throughput is still not a cold-load gate |
+| S9 | **No** | 2026-08-29 | `.github/workflows/` carries `blocked-by.yml`, `ci.yml`, `deep-tiers.yml`, `deploy-viz.yml`, `review.yml`, `seed-boards.yml` and **no load budget** — `blocked-by.yml` (2026-09-06, [§ D485](../DECISIONS.md)) is a daily read of the issue backlog and touches no page, and `seed-boards.yml` (2026-09-06, [§ D522](../DECISIONS.md)) is a daily call of the API's seed route and touches no page either. `validation/perfScaling.test.ts` and `perfSweep.test.ts` measure simulation throughput, not page load — and `deep-tiers.yml` is where both of them now run (GitHub issue #163), which moves nothing in this column: a scheduled sweep of simulation throughput is still not a cold-load gate |
 | S10 | **Partial** | 2026-08-25 | **21** journey rows in [`TEST_MATRIX.md`](../TEST_MATRIX.md): **3** `passing` (T1, T10, T11), **14** `owned`, **4** `planned`. The 2026-08-24 reading — *"all 21 read `planned`"* — was wrong by one row when it was written and by seventeen after wave B re-measured every row |
 
 **Seven of ten criteria cannot currently be evaluated at all, two only in part, and one is both

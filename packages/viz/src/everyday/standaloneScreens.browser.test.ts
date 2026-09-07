@@ -10,7 +10,7 @@
  *    re-derived on every edit, so moving *Shafts* must move the printed interval — the standing
  *    requirement, checked on the drawn figure rather than on an internal field.
  * 3. **The tuner is reached from the brief and from nowhere else.** § 3.2 forbids a rail row and
- *    names its two doors as the brief's *Take it to the sandbox* and the report's third lever; the
+ *    names its two doors as the brief's locked-for-score door and the report's third lever; the
  *    first is drawn here (`briefView.ts#lockedForScore`) and the second is not, so what this tier
  *    says is the § 3.2 rule in both of its halves — the row and the tile that must not exist, and
  *    the card that must. Its seven controls are driven without a document in `tunerModel.test.ts`.
@@ -50,23 +50,7 @@ afterAll(async () => {
 /** What every case here drove before a viewport was ever an argument. */
 const DESKTOP: ViewportSize = { width: 1440, height: 900 };
 
-/**
- * **The shortest viewport `docs/31-support-matrix.md` supports**, which is not 720.
- *
- * The matrix commits to *width* — 360 px and above lays out, below 360 px is tier 4 — and names no
- * height floor at all. The shortest height it records anywhere is the **667** of its tier-2 row
- * *narrow layouts at 375×667, 414×896, 767×700*, driven by hand on 2026-07-30. So 667 is the bound
- * a refusal has to survive, and a screen that only fits at 720 is already outside it.
- */
-const SHORTEST_SUPPORTED: ViewportSize = { width: 375, height: 667 };
 
-/**
- * The shortest supported height at a **tier-1** width, which is the one continuously-asserted
- * geometry the matrix has. 375 px wide is a layout nothing gates (issue #240); 1280 px wide is
- * `fold1280.browser.test.ts`'s own viewport with the height taken down to the floor, so a failure
- * here is about the fold rather than about the narrow stylesheet.
- */
-const SHORT_DESKTOP: ViewportSize = { width: 1280, height: 667 };
 
 async function coldLoad(viewport: ViewportSize = DESKTOP): Promise<Page> {
   const page = await openPage(browser, { viewport });
@@ -90,46 +74,6 @@ async function openRush(page: Page): Promise<void> {
   await page.waitForSelector('.everyday-rush');
 }
 
-/**
- * Where the sentence a player is given for the dead primary actually **is**, in viewport pixels.
- *
- * Found by its words rather than by a class, and that is the point of the helper: the case below
- * is about what a player can read without scrolling, so it must keep asking the question when the
- * sentence moves from one element to another. A version of this keyed on `.everyday-rush-refusal`
- * would have gone green by being deleted.
- *
- * The deepest match wins — ancestors match the same text and would report a box the size of the
- * column.
- */
-async function reasonBox(
-  page: Page,
-  reason: string,
-): Promise<{
-  readonly where: string;
-  readonly top: number;
-  readonly bottom: number;
-  readonly viewportHeight: number;
-  readonly scrolled: number;
-  readonly drawnTimes: number;
-} | null> {
-  return page.evaluate((text) => {
-    const nodes = [...document.querySelectorAll<HTMLElement>('body *')].filter(
-      (node) => (node.textContent ?? '').trim() === text,
-    );
-    const node = nodes.at(-1);
-    if (node === undefined) return null;
-    const box = node.getBoundingClientRect();
-    return {
-      where: node.className === '' ? node.tagName : node.className,
-      top: box.top,
-      bottom: box.bottom,
-      viewportHeight: window.innerHeight,
-      scrolled:
-        window.scrollY + (document.querySelector<HTMLElement>('.everyday-screen')?.scrollTop ?? 0),
-      drawnTimes: nodes.length,
-    };
-  }, reason);
-}
 
 /**
  * What a screen reader is told about a control — Chromium's own answer, not a re-implementation
@@ -259,143 +203,35 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
    * #262 measured — and it asserts the reason is **inside the viewport**, by geometry, rather than
    * that an element carrying it exists. Existence is what passed while the defect shipped.
    */
-  it('draws `Start the rush` disabled, with the reason on the control and above the fold', async () => {
+  /*
+   * **These three cases used to pin a dead button, and GitHub issue #220 built what was behind it.**
+   *
+   * They read: the primary is `disabled`; the reason (*the climbing stream is not built*) is on the
+   * control by `title` and `aria-describedby`, drawn once, inside the viewport at the two shortest
+   * supported heights (#262's geometry), and announced to assistive technology (#239). Every one of
+   * those was a claim about a refusal, and the refusal left with the engine (§ D515, § D227). What
+   * they protected is kept in the one shape that still applies: the § 3.3 row's cells, the note that
+   * is § 3.3's own again, and a primary that can be pressed and says so.
+   */
+  it('draws `Start the rush` live, with § 3.3’s own note beside it and no timeline', async () => {
     const page = await coldLoad();
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.click('.everyday-mode[data-screen="rush"]');
     await page.waitForSelector('.everyday-rush');
 
-    // § 3.3's cells: the rush's own left button, its primary, its note — and no timeline.
     expect(await page.textContent('.everyday-bar-leave')).toBe('⤺ Leave the rush');
-    expect(await page.$eval('.everyday-bar-primary', (b) => (b as HTMLButtonElement).disabled)).toBe(
-      true,
-    );
+    expect(await page.$eval('.everyday-bar-primary', (b) => (b as HTMLButtonElement).disabled)).toBe(false);
     expect(await page.$('.everyday-bar-timeline')).toBeNull();
-    /*
-     * **The screen's own paragraph is gone, and this assertion went with it.**
-     *
-     * It read `expect(await page.textContent('.everyday-rush-refusal')).toMatch(/not built/)` under
-     * the comment *"that half was never the defect"* — true when written, and untrue by the time
-     * the two independent fixes for #262 were merged. The other one moved the sentence into the bar
-     * and deleted the paragraph, on `rushScreen.ts`'s *"one constant, one place on screen"* rule: a
-     * copy at the foot of the paper column is a sentence the player has already read above the
-     * fold, in a place they may never scroll to.
-     *
-     * Keeping both would put the reason on screen **twice**, which the fold case below asserts
-     * against by name (`drawnTimes`). Green on either branch alone; red together — the merge is
-     * what found it.
-     */
-
-    /* The control carries the reason: as a tooltip, and by `aria-describedby` — which must resolve
-       to a node that is actually in the document, since a description pointing at nothing reads as
-       a described control and describes nothing. */
-    const described = await page.$eval('.everyday-bar-primary', (button) => {
-      const id = button.getAttribute('aria-describedby');
-      const target = id === null ? null : document.getElementById(id);
-      const box = target?.getBoundingClientRect();
-      return {
-        title: (button as HTMLButtonElement).title,
-        id,
-        resolved: target !== null,
-        text: target?.textContent ?? '',
-        top: box?.top ?? Number.NaN,
-        bottom: box?.bottom ?? Number.NaN,
-      };
-    });
-    expect(described.title).toMatch(/not built/);
-    expect(described.resolved, `aria-describedby="${String(described.id)}" resolves`).toBe(true);
-    expect(described.text).toMatch(/not built/);
-
-    /* **Visible without scrolling, by geometry.** `scrollY` is 0 on a fresh screen, so the
-       client rectangle is the viewport rectangle. */
-    expect(await page.evaluate(() => window.scrollY)).toBe(0);
-    expect(described.top, 'the reason is above the top of the viewport').toBeGreaterThanOrEqual(0);
-    expect(described.bottom, 'the reason is below the fold at 720 px').toBeLessThanOrEqual(720);
-
-    /* And the sentence that read as confirmation is gone from beside the dead button. */
-    expect(await page.textContent('.everyday-bar-note')).not.toContain('Nothing to set up');
-
-    // The reason is in the bar, beside the button it is about.
-    expect(await page.textContent('.everyday-bar-note')).toMatch(/not built/);
-    /*
-     * And § 3.3's own note is **not** what is drawn there. *Nothing to set up. It ends when it
-     * ends.* is true of a rush and, next to a button that cannot be pressed, reads as confirmation
-     * — which is the half of #262 that has nothing to do with geometry.
-     */
-    expect(await page.textContent('.everyday-bar-note')).not.toContain('Nothing to set up');
+    /* § 3.3's note, which beside a live button is a description rather than a confirmation. */
+    expect(await page.textContent('.everyday-bar-note')).toContain('Nothing to set up');
+    expect(await page.$eval('.everyday-bar-primary', (b) => (b as HTMLButtonElement).title)).toBe('');
     await page.close();
   });
 
-  /**
-   * **The fold case, and the one that reproduces #262 rather than describing it.**
-   *
-   * Driven at {@link SHORT_DESKTOP} and {@link SHORTEST_SUPPORTED}, at `scrollY: 0`, with nothing
-   * scrolled. Measured on the deployed build before the fix, at `scrollY: 0`: the reason's box top
-   * was **905.8** in a 720 px viewport and **3443.2** in a 667 px one. A refusal a player cannot
-   * read is not a refusal.
-   *
-   * It asks where **the words** are, not where an element is — see {@link reasonBox}. An assertion
-   * that `.everyday-rush-refusal` exists is exactly the check that was already green while this
-   * defect shipped.
-   */
-  it('puts the reason inside the viewport at the shortest height the matrix supports', async () => {
-    const reason =
-      'the climbing stream is not built — this screen is the setup, and there is nothing behind ' +
-      'it to start yet';
-
-    for (const viewport of [SHORT_DESKTOP, SHORTEST_SUPPORTED]) {
-      const page = await coldLoad(viewport);
-      await openRush(page);
-
-      const box = await reasonBox(page, reason);
-      const at = `${String(viewport.width)}×${String(viewport.height)}`;
-      expect(box, `${at}: the reason is drawn nowhere`).not.toBeNull();
-      /*
-       * Not a guard on the harness — a claim about the product, and the one that found the defect.
-       *
-       * `openRush` clicks the tile. At `375×667` the rush tile is below the fold, so the click
-       * scrolls it into view, and the page arrives on the new screen carrying that offset unless
-       * something resets it. `shell.ts#go` now does, for every navigation. This case failed on CI
-       * and passed here before that fix, because the two Chromiums lay the four-tile menu out a few
-       * pixels apart and only one left the tile above the fold — so the assertion is kept at the
-       * shortest supported viewport precisely because that is where it bites.
-       */
-      expect(box?.scrolled, `${at}: the page kept a scroll offset across navigation`).toBe(0);
-      expect(box?.viewportHeight).toBe(viewport.height);
-      /*
-       * *"One constant, one place on screen"* — `rushScreen.ts`'s rule where its own refusal
-       * paragraph used to be, which until now was prose and nothing else. A second copy drawn to
-       * give the paper column an ending is a sentence a player has already read in the bar.
-       */
-      expect(box?.drawnTimes, `${at}: the reason is drawn more than once`).toBe(1);
-      expect(box?.top, `${at}: the reason starts above the viewport`).toBeGreaterThanOrEqual(0);
-      expect(
-        box?.bottom,
-        `${at}: the reason ends ${String(Math.round((box?.bottom ?? 0) - viewport.height))} px ` +
-          `below the fold, in ${box?.where ?? '(nowhere)'}`,
-      ).toBeLessThanOrEqual(viewport.height);
-      await page.close();
-    }
-  });
-
-  /**
-   * **The keyboard half, which is worse than the geometry half** — #262, and #239's sweep.
-   *
-   * A `disabled` button is not in the tab order, so a keyboard user never lands on it. Measured
-   * before the fix, Chromium's own AX node for this control was `button "Start the rush"` with
-   * `disabled=true` and **no description at all**: nothing to announce even to a reader who
-   * reaches it in browse mode.
-   *
-   * The assertion is over the name *and* the description together — {@link announced} — because
-   * what matters is whether the reason reaches assistive technology, not which of the two channels
-   * carries it. See `rushScreenModel.ts#rushBarModel` for why it is the name here and what it
-   * would take to make it the description.
-   */
-  it('says on the control itself that it cannot be pressed', async () => {
+  it('announces the control by its label, because there is no longer a reason to carry', async () => {
     const page = await coldLoad();
     await openRush(page);
-
-    expect(await announced(page, '.everyday-bar-primary')).toMatch(/not built/);
+    expect(await announced(page, '.everyday-bar-primary')).toMatch(/Start the rush/);
     await page.close();
   });
 });
@@ -474,6 +310,45 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
    * well if the register had been deleted outright, which is the failure this pairing exists to
    * make impossible.
    */
+  it('writes an escalator row the run reads, removes it again, and folds the document — § D518', async () => {
+    const page = await coldLoad();
+    await railRow(page, 'Design a building');
+    await page.waitForSelector('.everyday-designer-escalators');
+    expect(await page.textContent('.everyday-designer-escalators-none')).toContain('No escalators');
+    expect(await page.$$('.everyday-designer-escalator')).toHaveLength(0);
+
+    await page.click('.everyday-designer-escalator-add');
+    const rows = await page.$$eval('.everyday-designer-escalator', (nodes) =>
+      nodes.map((node) => ({
+        id: (node as HTMLElement).dataset['modeId'] ?? '',
+        ends: [...node.querySelectorAll('input')].slice(0, 2).map((input) => input.value),
+        seconds: [...node.querySelectorAll('input')][2]?.value ?? '',
+      })),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe('escalator-1');
+    expect(rows[0]?.ends).toEqual(['0', '1']);
+    expect(Number(rows[0]?.seconds)).toBeGreaterThan(5);
+    expect(await page.$('.everyday-designer-escalators-none')).toBeNull();
+
+    await page.click('.everyday-designer-escalator-remove');
+    expect(await page.$$('.everyday-designer-escalator')).toHaveLength(0);
+    expect(await page.textContent('.everyday-designer-escalators-none')).toContain('No escalators');
+
+    /* § 13.3's document is a collapsed disclosure, and the plate is inside it. */
+    const fold = await page.$eval('.everyday-designer-document', (node) => ({
+      open: (node as HTMLDetailsElement).open,
+      plates: node.querySelectorAll('.everyday-designer-plate').length,
+      summary: node.querySelector('summary')?.textContent ?? '',
+    }));
+    expect(fold.open).toBe(false);
+    expect(fold.plates).toBe(1);
+    expect(fold.summary).toContain('as an engineer would write it');
+    await page.click('.everyday-designer-document-summary');
+    expect(await page.$eval('.everyday-designer-document', (node) => (node as HTMLDetailsElement).open)).toBe(true);
+    await page.close();
+  });
+
   it('says nothing here is scored, and leaves the register to the build-information panel', async () => {
     const page = await coldLoad();
     await railRow(page, 'Design a building');
@@ -499,8 +374,19 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     const rows = await page.$$eval('.everyday-settings-build-notes li', (items) =>
       items.map((item) => item.textContent ?? ''),
     );
-    expect(rows.length).toBeGreaterThan(20);
-    expect(rows.some((row) => row.includes('escalator rows'))).toBe(true);
+    /*
+     * Nineteen after GitHub issue #229 built two Settings rows and deleted their entries; fifteen
+     * after wave V deleted the campaign register's incidents entry (#171) and emptied the stage's
+     * (#171, #352), which now draws its one empty line where its rows were.
+     */
+    /*
+     * And eight after wave W: the shell's replay row left when the door started handing a past day
+     * back (#177 item 1, § D517), and the designer's escalator and document rows left when the board
+     * wrote both (#177 item 5, § D518). The class-per-shaft row is the designer's one remaining.
+     */
+    expect(rows.length).toBeGreaterThan(6);
+    expect(rows.some((row) => row.includes('escalator rows'))).toBe(false);
+    expect(rows.some((row) => row.includes('a machine class per shaft'))).toBe(true);
     /* And the other direction: the panel no longer offers either as something the build lacks. */
     expect(rows.some((row) => row.includes('credential dots'))).toBe(false);
     expect(rows.some((row) => row.includes('sky-lobby starter'))).toBe(false);
@@ -548,7 +434,7 @@ describe.skipIf(!HAS_BROWSER)('Tune the tower', () => {
     await page.close();
   });
 
-  it('opens from the brief’s *Take it to the sandbox* card — its one shipped door', async () => {
+  it('opens from the brief’s locked-for-score card — its one shipped door', async () => {
     /*
      * **The case the two above needed.** Without it this section asserts only where the tuner is
      * *not* reachable from, which a screen nothing can open would pass just as well — and did, on

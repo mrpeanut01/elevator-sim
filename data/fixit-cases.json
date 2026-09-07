@@ -305,7 +305,7 @@
           }
         }
       },
-      "symptom": "a 341 s mean wait to board, on one car for nine dense floors",
+      "symptom": "one car answering nine dense floors, and a crowd stood at every landing it serves",
       "figures": [
         {
           "kind": "complaint",
@@ -1082,7 +1082,7 @@
           }
         }
       },
-      "symptom": "one car for the garage, and a 322 s worst wait beside an empty hoistway",
+      "symptom": "one car for the garage, and a crowd on its landing beside a hoistway standing empty",
       "figures": [
         {
           "kind": "complaint",

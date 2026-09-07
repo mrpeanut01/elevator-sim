@@ -388,7 +388,7 @@ export type TimeoutPolicy = (typeof TIMEOUT_POLICIES)[number];
  * `packages/viz`'s `watch/record.ts#recordUnreadableReason` refuses to re-ask a stored record
  * that names one, on the same footing it refuses an unknown rule condition.
  */
-export const INTERVENTION_KINDS = ['park-cars-lobby', 'switch-dispatcher', 'answer-incident'] as const;
+export const INTERVENTION_KINDS = ['park-cars-lobby', 'switch-dispatcher', 'answer-incident', 'spread-cars'] as const;
 
 /**
  * Deliberately **not** re-exported from `sim/index.ts` or `browser.ts`, and the absence is the
@@ -411,8 +411,9 @@ export function isInterventionKind(id: string): id is InterventionKind {
 }
 
 /**
- * One thing a mid-run intervention may change. A discriminated union — three arms today, and a
- * fourth is a new member beside these rather than a redesign of the field that carries it.
+ * One thing a mid-run intervention may change. A discriminated union — four arms, and the fourth
+ * arrived exactly as this sentence said it would: a new member beside the others rather than a
+ * redesign of the field that carries it.
  *
  * `park-cars-lobby` asks stage 7 to treat every idle car as though the profile had authored
  * `idle.parkingStrategy: 'lobby'` from the moment the intervention takes effect. It changes no
@@ -420,6 +421,17 @@ export function isInterventionKind(id: string): id is InterventionKind {
  * exactly as configured, and only *where a car with nothing to do waits* moves. That is why it
  * can travel through `RepositionContext` rather than through a second policy — see
  * `dispatch/lifecycle.ts#repositionDecisionFor`.
+ *
+ * `spread-cars` is the same mechanism with the opposite verb — GitHub issue #352, `docs/35`
+ * PM-TT4: `idle.parkingStrategy: 'zone-center'` from the stamped instant, so every idle car heads
+ * for the middle of the floors its shaft serves rather than for the lobby. It exists because
+ * *park the cars in the lobby* is the wrong instruction for two of the three shipped parking
+ * faults — a sky lobby whose shuttles all sleep at the street, a top-floor gym whose two cars
+ * wait at the front door — and a stage that offers only the lobby verb offers those players the
+ * opposite of their fix. The two parking kinds are one control with two settings: the **latest**
+ * of either at or before an instant is the one in force (`Simulation.#idleOverrideAt`), so a
+ * spread at 10:00 undoes a park at 08:00 the way turning a dial does, rather than the two arms
+ * interfering. It carries nothing but its kind, and it travels to the board on the same footing.
  *
  * `switch-dispatcher` hands the rest of the run to another dispatcher's **weight vector** — the
  * gameplay guide's § 7.6 policy change, and § 20.12's second wire. The arm carries the whole
@@ -459,6 +471,9 @@ export type InterventionChange =
       readonly kind: 'park-cars-lobby';
     }
   | {
+      readonly kind: 'spread-cars';
+    }
+  | {
       readonly kind: 'switch-dispatcher';
       /** The profile now driving, whole and plain — the shape the config path already serializes. */
       readonly profile: DispatcherProfile;
@@ -468,9 +483,10 @@ export type InterventionChange =
       /** The chosen option's player-facing words, for the stamp and the report. Never an id. */
       readonly option: string;
       /**
-       * The option's effect: service-mode changes, every car located, each at or after the
-       * answer's own `atS`. Empty is legal — an answer whose effect is reassurance alone still
-       * belongs on the record, because the stamp is the point.
+       * The option's effect: service events — a car's mode, a bank's range or a car's rated load
+       * (§ D523) — every car and bank located, each at or after the answer's own `atS`. Empty is
+       * legal — an answer whose effect is reassurance alone still belongs on the record, because the
+       * stamp is the point.
        */
       readonly serviceEvents: readonly ResolvedServiceEvent[];
     };
@@ -760,6 +776,13 @@ export interface UndeliveredJourney {
   readonly arrivedAt: SimTime;
   readonly boardedAt: SimTime | undefined;
   readonly carId: string | undefined;
+  /**
+   * Why every car in the bank refused the call this rider was standing on, when the refusal was
+   * structural — the reasons `Simulation` warns about per call, joined to the leg here rather than
+   * left keyed on a call id no record carries (GitHub issue #178 item 9, § D511). `undefined` on a
+   * rider whose call was simply not reached in time, and on every rider who boarded.
+   */
+  readonly structuralRefusal?: string | undefined;
 }
 
 /**
@@ -945,8 +968,23 @@ export interface ConservationAudit {
   readonly accessRefused?: number;
 
   /**
-   * `generated === delivered + undelivered + (abandoned ?? 0) + (accessRefused ?? 0) &&
-   * legsCreated === legsRecorded`.
+   * Journeys **stranded by a bank's service range moving** (GitHub issue #346, § D523): the rider
+   * was at a landing, or reached one, that no bank could now carry them onward from, because a
+   * scheduled range entry had taken their destination out of every reachable bank's range.
+   *
+   * Absent — not `0` — on every run whose building schedules no range change, for
+   * {@link accessRefused}'s reason, and a published figure for the same reason again: a stranded
+   * rider leaves the lift system, the served-leg count falls with them, and a configuration that
+   * improves its wait by stranding people has not improved anything. Counted in neither
+   * {@link delivered} nor {@link undelivered}; in `WaitStatistics.unservedCount`, since they were
+   * never served; and, if they had already been standing a while, their wait ended at the
+   * stranding and is excluded from the mean exactly as an abandonment's is.
+   */
+  readonly stranded?: number;
+
+  /**
+   * `generated === delivered + undelivered + (abandoned ?? 0) + (accessRefused ?? 0) +
+   * (stranded ?? 0) && legsCreated === legsRecorded`.
    */
   readonly balanced: boolean;
 }
@@ -1139,6 +1177,12 @@ export interface StageActivity {
    * buildings and meaningless on the other three.
    */
   readonly accessRefusedLegs?: number;
+  /**
+   * Legs stranded by a bank's service range moving (§ D523). **Absent, not `0`, when nobody was**,
+   * for {@link accessRefusedLegs}' reason: a key on every run would move every pinned identity
+   * digest to say nothing.
+   */
+  readonly strandedLegs?: number;
 }
 
 /**

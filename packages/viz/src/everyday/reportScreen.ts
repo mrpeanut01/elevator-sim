@@ -70,7 +70,13 @@ import {
   type SheetContinuity,
 } from '../dev/reportPanel.js';
 
-import { everydayReportViewOf, type EverydayReportView, type HonestyPart } from './reportView.js';
+import {
+  FIGURE_NOTE_HANDLE,
+  everydayReportViewOf,
+  figureNotePartsOf,
+  type EverydayReportView,
+  type HonestyPart,
+} from './reportView.js';
 import { openTowerOf } from '../campaign/career.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayScreenModule } from './screens.js';
@@ -93,6 +99,7 @@ import {
   EVERYDAY_RADII as R,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
+import { RUSH_RESULT_EMPTY_LEDE, rushOutcomeOf, rushResultViewOf } from './rush.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 
 /**
@@ -153,6 +160,12 @@ function mountReportScreen(
     const open = openTowerOf(context.host.campaign());
     reportBuildingName =
       open === undefined ? undefined : context.host.buildingById(open.buildingId)?.name;
+    /* § 9.3: the rush's result is its own screen and never falls through to the day's sheet. */
+    if (context.ctx === 'rush') {
+      root.replaceChildren();
+      drawRushResult();
+      return;
+    }
     const view = viewNow();
     root.replaceChildren();
     if (!view.filed) {
@@ -166,6 +179,67 @@ function mountReportScreen(
       return;
     }
     drawSheet(view);
+  }
+
+  /** § 9.3's result — `everyday/rush.ts#rushResultViewOf`, drawn and not decided here. */
+  function drawRushResult(): void {
+    const recording = context.host.recording();
+    const session = context.host.rush();
+    if (recording === undefined || session === undefined) {
+      const empty = el(doc, 'div', 'everyday-report-empty');
+      const title = el(doc, 'h1', undefined, 'Nothing to report yet');
+      title.style.cssText = `font-family:${TYPE.heading};font-size:30px;font-weight:700;margin:0`;
+      const lede = el(doc, 'p', 'everyday-report-empty-lede', RUSH_RESULT_EMPTY_LEDE);
+      lede.style.cssText = `${LEDE};margin:12px 0 0`;
+      empty.append(title, lede);
+      root.append(empty);
+      return;
+    }
+    const view = rushResultViewOf(rushOutcomeOf(recording, session.endedAtS), session.disclosure);
+    const block = el(doc, 'div', 'everyday-rush-result');
+    block.dataset['outcome'] = view.outcome;
+    const eyebrow = el(doc, 'div', 'everyday-report-meta', view.eyebrow);
+    eyebrow.style.cssText = EYEBROW;
+    const head = el(doc, 'h1', 'everyday-rush-result-head', view.head);
+    head.style.cssText = `font-family:${TYPE.heading};font-size:34px;font-weight:700;letter-spacing:-.02em;margin:10px 0 0`;
+    const lede = el(doc, 'p', 'everyday-rush-result-lede', view.lede);
+    lede.style.cssText = `${LEDE};margin:12px 0 0`;
+    block.append(eyebrow, head, lede);
+    const account = el(doc, 'ol', 'everyday-rush-result-account');
+    account.style.cssText = 'margin:18px 0 0;padding-left:22px;max-width:70ch';
+    for (const beat of view.account) {
+      const item = el(doc, 'li', 'everyday-rush-result-beat', beat);
+      item.style.cssText = `${BODY};margin:6px 0`;
+      account.append(item);
+    }
+    block.append(account);
+    const grid = el(doc, 'div', 'everyday-rush-result-figures');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:22px';
+    for (const figure of view.figures) {
+      const cell = el(doc, 'div', 'everyday-rush-result-figure');
+      cell.style.cssText = `border:1px solid ${C.ruleLight};border-radius:${String(R.card)}px;padding:12px`;
+      const value = el(doc, 'div', 'everyday-rush-result-value', figure.value);
+      value.style.cssText = `font:700 24px ${TYPE.heading}`;
+      const label = el(doc, 'div', 'everyday-rush-result-label', figure.label);
+      label.style.cssText = `${EYEBROW};margin-top:6px`;
+      cell.append(value, label);
+      if (figure.note !== undefined) {
+        const note = el(doc, 'div', 'everyday-rush-result-note', figure.note);
+        note.style.cssText = `font-size:12px;color:${C.warmGrey};margin-top:6px;line-height:1.4`;
+        cell.append(note);
+      }
+      grid.append(cell);
+    }
+    block.append(grid);
+    if (view.disclosure !== undefined) {
+      const disclosure = el(doc, 'p', 'everyday-rush-result-disclosure', view.disclosure);
+      disclosure.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.terracotta};margin:18px 0 0;max-width:70ch`;
+      block.append(disclosure);
+    }
+    const footer = el(doc, 'p', 'everyday-rush-result-footer', view.footer);
+    footer.style.cssText = `font-size:12px;color:${C.label};margin:18px 0 0`;
+    block.append(footer);
+    root.append(block);
   }
 
   function drawSheet(view: EverydayReportView): void {
@@ -209,7 +283,17 @@ function mountReportScreen(
     const figures = section(doc, view.headings.figures);
     figures.body.className = 'everyday-report-figures';
     figures.body.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:${String(GAP.row)}px`;
-    for (const cell of sheet.figures) figures.body.append(figureCell(doc, cell));
+    /* GitHub issue #211: a card's note leads with its first sentence and folds the rest. */
+    for (const cell of sheet.figures) {
+      const parts = figureNotePartsOf(cell.note);
+      figures.body.append(
+        figureCell(
+          doc,
+          cell,
+          parts.rest === undefined ? undefined : { lead: parts.lead, rest: parts.rest, handle: FIGURE_NOTE_HANDLE },
+        ),
+      );
+    }
     root.append(figures.root);
 
     /* ---- the goals: what the day asked, and how it read ---- */
@@ -286,7 +370,7 @@ function mountReportScreen(
         const body = el(doc, 'p', undefined, lever.body);
         body.style.cssText = `${QUIET};margin:0`;
         card.append(title_, body);
-        const surface = lever.surface;
+        const route = lever.route;
         const goLabel = lever.goLabel;
         /*
          * The two are `undefined` together — `reportView.ts` decides both from one branch and
@@ -294,11 +378,40 @@ function mountReportScreen(
          * asserted, because a screen that threw on the impossible arm would be a screen that goes
          * blank on a defect a note could survive.
          */
-        if (surface === undefined || goLabel === undefined) {
+        if (route === undefined || goLabel === undefined) {
           const note = el(doc, 'p', 'everyday-report-lever-note', lever.noSurfaceNote ?? '');
           note.style.cssText = `${QUIET};margin:0;color:${C.terracotta}`;
           card.append(note);
+        } else if (route.kind === 'everyday') {
+          /*
+           * GitHub issue #213, the owner's ruling: the lever opens the Everyday screen that carries
+           * it out, inside this shell, so the loop stands behind it. The caveat beside a dispatcher
+           * lever's button is the statistical honesty the old refusal carried, kept on the card.
+           */
+          if (lever.caveat !== undefined) {
+            const caveat = el(doc, 'p', 'everyday-report-lever-caveat', lever.caveat);
+            caveat.style.cssText = `${QUIET};margin:0;color:${C.terracotta}`;
+            card.append(caveat);
+          }
+          const button = el(doc, 'button', 'everyday-report-lever-go', goLabel);
+          button.type = 'button';
+          button.dataset['screen'] = route.screen;
+          button.style.cssText = [
+            'cursor:pointer',
+            'justify-self:start',
+            `border:1px solid ${C.ink}`,
+            `border-radius:${String(R.pill)}px`,
+            `background:${C.card}`,
+            `color:${C.ink}`,
+            'padding:6px 13px',
+            'font-size:12.5px',
+          ].join(';');
+          button.addEventListener('click', () => {
+            context.go(route.screen);
+          });
+          card.append(button);
         } else {
+          const surface = route.tab;
           const button = el(doc, 'button', 'everyday-report-lever-go', goLabel);
           button.type = 'button';
           button.style.cssText = [
@@ -514,6 +627,16 @@ function mountReportScreen(
      * primary), so a fifth run context answers by being in that table.
      */
     primary: () => {
+      /* § 9.3's *Run the rush again* — the same waves, asked for again, and back onto the stage. */
+      if (context.ctx === 'rush') {
+        if (context.host.startRush() === undefined) context.go('stage');
+        return;
+      }
+      /* § 6.1's replay ends at the door it started from; `go` puts the parked week back on the way. */
+      if (context.ctx === 'replay') {
+        context.go('door');
+        return;
+      }
       context.go(context.ctx === 'campaign' ? 'building' : 'week');
     },
   };
