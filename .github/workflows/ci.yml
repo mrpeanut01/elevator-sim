@@ -89,9 +89,12 @@ on:
 # `ci-refs/heads/main`; when run 34082110290 (`06341d8`, the merge of #384) arrived, GitHub
 # cancelled the queued `1a7721f` run before it had started a single job. So two merges to `main`
 # inside one run's window lost the middle commit's record, and the window was the `experiments`
-# leg's 25 to 32 minutes on the very tree #383 was shortening. The paragraph above this one was
-# true and incomplete: it protected the run that had started and said nothing about the one that
-# had not.
+# leg's 25 to 32 minutes on the very tree #383 was shortening. **It reproduced eleven minutes
+# later, while this paragraph was being written**: run 34082512532 (`6b9ef1e`, the merge of #385)
+# arrived at 04:16:57 and evicted the queued `06341d8` run in turn, so three merges behind one
+# old-tree run left two consecutive `main` commits with no record at all. The paragraph above this
+# one was true and incomplete: it protected the run that had started and said nothing about the one
+# that had not.
 #
 # So a push run is keyed on its COMMIT, and `main` runs execute side by side rather than queue: no
 # two groups share a member, so nothing is ever pending behind anything and nothing can be evicted.
