@@ -29,6 +29,7 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  openScenarioEntry,
   CHROMIUM,
   HAS_BROWSER,
   openPage,
@@ -82,7 +83,7 @@ async function coldLoad(): Promise<Page> {
  * registered the module, so a registry that regressed fails *here*, at the click.
  */
 async function openFixit(page: Page): Promise<void> {
-  await page.locator('.everyday-mode[data-screen="fixit"]').click();
+  await openScenarioEntry(page, 'fix-a-building');
   await page.waitForFunction(
     () => document.querySelectorAll('.everyday-fixit-case').length > 0,
     undefined,
@@ -212,7 +213,7 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
   it('plays the as-built run on a stage before the figures, and Skip lands on the figures', async () => {
     const page = await coldLoad();
     try {
-      await page.locator('.everyday-mode[data-screen="fixit"]').click();
+      await openScenarioEntry(page, 'fix-a-building');
       await page.waitForSelector('.everyday-fixit-stage-canvas', { timeout: 120_000 });
       // Painting, and no figure yet: the problem arrives as a sight before it is a number.
       await page.waitForFunction(
@@ -235,7 +236,7 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       // Away and back: the figures, not the stage — seen once is seen.
       await page.click('.everyday-rail-menu');
       await page.waitForSelector('.everyday-mode[data-screen="fixit"]');
-      await page.locator('.everyday-mode[data-screen="fixit"]').click();
+      await openScenarioEntry(page, 'fix-a-building');
       await page.waitForFunction(
         () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
         undefined,

@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
+import { openScenarioEntry } from '../dev/browserTier.test-helper.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
@@ -246,7 +247,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
        * player meets it. `inert` on the Everyday root reads as an attribute in one test and as
        * *nothing happens when you click* in the product; this is the second reading.
        */
-      await page.locator('.everyday-mode[data-screen="door"]').click();
+      await openScenarioEntry(page, 'today');
       // The tile opens § 6.1's front door now that it is registered — it used to skip to the
       // stage, and `modes.ts` routes it through the loop's own first screen instead.
       await page.waitForSelector('.everyday-door', { timeout: 15_000 });
