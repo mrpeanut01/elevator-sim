@@ -247,7 +247,8 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
        * group, so the front door is entered from the menu tile and from nowhere else.
        */
       await page.locator('.everyday-rail-menu').click();
-      await page.waitForSelector('.everyday-mode[data-screen="door"]', { timeout: 15_000 });
+      /* The menu-arrival probe: the door tile retired with § D525, so wait on Scenario's. */
+      await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
       await enterEverydayStage(page);
       await waitForOwnRun(page);
       await closeDay(page);
