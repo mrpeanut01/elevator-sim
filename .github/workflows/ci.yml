@@ -80,8 +80,34 @@ on:
 #
 # The group keys on the pull request NUMBER rather than `github.ref`, because `refs/pull/N/merge` and
 # a later `refs/heads/...` push for the same branch would otherwise land in different groups.
+#
+# **`cancel-in-progress: false` protects a RUNNING run and nothing else, and that was found by
+# losing one.** GitHub keeps at most one PENDING run per concurrency group: when a third run arrives
+# while one is running and one is queued, the queued one is cancelled whatever this flag says.
+# Observed on 2026-09-07 (UTC): run 34081118414 (`44bd77f`) was in progress on `main`; run
+# 34081270592 (`1a7721f`, the merge of pull request #383) was queued behind it in
+# `ci-refs/heads/main`; when run 34082110290 (`06341d8`, the merge of #384) arrived, GitHub
+# cancelled the queued `1a7721f` run before it had started a single job. So two merges to `main`
+# inside one run's window lost the middle commit's record, and the window was the `experiments`
+# leg's 25 to 32 minutes on the very tree #383 was shortening. **It reproduced eleven minutes
+# later, while this paragraph was being written**: run 34082512532 (`6b9ef1e`, the merge of #385)
+# arrived at 04:16:57 and evicted the queued `06341d8` run in turn, so three merges behind one
+# old-tree run left two consecutive `main` commits with no record at all. The paragraph above this
+# one was true and incomplete: it protected the run that had started and said nothing about the one
+# that had not.
+#
+# So a push run is keyed on its COMMIT, and `main` runs execute side by side rather than queue: no
+# two groups share a member, so nothing is ever pending behind anything and nothing can be evicted.
+# The cost is runner slots — two merges close together run ten legs at once instead of five and
+# then five — and that is the cheaper side, because a slot is shared and a record is not.
+# `merge_group` is left on `github.ref` deliberately: the merge queue gives every entry its own
+# temporary branch, so that group is already unique per entry, and keying it on the sha would change
+# nothing while suggesting it had. `workflow_dispatch` stays on the ref it was asked for, so two
+# dispatches of one ref queue, which is what a person asking twice expects. `deploy-viz.yml` keeps
+# its single `production` group on purpose: there, the newest deploy superseding a queued older one
+# is the right outcome, since a deploy is not a record.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || (github.event_name == 'push' && github.sha) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
