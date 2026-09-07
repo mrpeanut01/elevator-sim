@@ -41,6 +41,13 @@
  * milliseconds. A guard that doubled the suite's runtime is a guard somebody eventually passes
  * `--exclude` to.
  *
+ * **Since 2026-09-07 those suites are behind `ELEVATOR_SIM_BENCHMARK=1`**, so *already pay it* is
+ * true of the benchmark tier and not of a pull request: Layer A is re-derived on Sunday and on
+ * dispatch, in `.github/workflows/deep-tiers.yml`'s four `benchmark-*` jobs, and a moved pin is
+ * filed by that workflow's `report` job rather than reddening the branch that moved it. Layer B is
+ * a source scan and stays always-on. The measurement behind the move — 3 665 s of the `experiments`
+ * leg's 4 000 s, on a leg that was the whole run's wall clock — is in that workflow's header.
+ *
  * `published.test.ts` holds what is left: the domain totality, the rendering, the scan, and a check
  * that every study id in the domain really is handed to `assertPinned` somewhere — because a pin
  * table nobody calls is the same defect one level up (`CLAUDE.md` § *the integration seam has an

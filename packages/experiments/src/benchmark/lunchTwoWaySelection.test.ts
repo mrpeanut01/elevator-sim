@@ -38,6 +38,18 @@ import { PRIMARY_CELLS, SECONDARY_CELLS } from './selectionSweep.js';
 import { budgetFor } from './matrix.js';
 import { loadResources } from '../validation/harness.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 468.8 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ *
+ * The first suite — the two cells differ in the mix arc alone — reads no run and stays always-on.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const TIMEOUT_MS = 3_600_000;
 
 let cached: Promise<LunchTwoWaySelectionStudy> | undefined;
@@ -81,7 +93,7 @@ describe('the two cells are the shipped operating points, differing in the mix a
  * The run — seeds, budget, gate, limits
  * -------------------------------------------------------------------------- */
 
-describe('the § D162 measurement, run at the pre-registered budget', () => {
+describe.skipIf(!BENCHMARK)('the § D162 measurement, run at the pre-registered budget', () => {
   it('measures both cells at the same tuning and holdout seeds, disjoint, under CRN', async () => {
     const result = await study();
     expect(result.tuningSeed).toBe(LUNCH_TUNING_SEED);

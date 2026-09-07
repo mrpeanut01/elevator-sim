@@ -307,7 +307,11 @@ Two opt-in tiers exist and are **not** part of that run: `ELEVATOR_SIM_FUZZ=deep
 2 000-case fuzz campaign, and `ELEVATOR_SIM_DEEP=1` enables the oracle's deep campaign (11
 measurable banks at n = 128) and the wall-clock scaling assertions that were moved out of the
 always-on tier because a timing gate that fails under concurrent load trains everyone to ignore red
-([`DECISIONS.md` § D91](../DECISIONS.md)).
+([`DECISIONS.md` § D91](../DECISIONS.md)). Since 2026-09-07 a further gate, `ELEVATOR_SIM_BENCHMARK=1`,
+holds the sixteen benchmark studies under `experiments/src/benchmark/` — the sweeps, the censuses
+and every `checkPinned` re-derivation of the published intervals — because they were 3 665 s of the
+`experiments` leg's 4 000 s and that leg was the whole CI run's wall clock; they run weekly and on
+dispatch in `.github/workflows/deep-tiers.yml`, whose header carries the measurement and the trade.
 
 ---
 

@@ -32,6 +32,16 @@ import {
 import { loadResources } from '../validation/harness.js';
 import { capacityFigures, checkPinned, describeMismatches } from './published.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 34.3 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const TIMEOUT_MS = 900_000;
 
 /** Modest but not token: 40 replications resolve a per-run count of 0.15 from a count of 0. */
@@ -44,7 +54,7 @@ async function study(): Promise<Stage5Study> {
   return cached;
 }
 
-describe('Phase 5 scope — capacity-driven reassignment on the load edge', () => {
+describe.skipIf(!BENCHMARK)('Phase 5 scope — capacity-driven reassignment on the load edge', () => {
   it('prints the stage-5 table', async () => {
     console.log(formatCapacityReassignment(await study()));
   }, TIMEOUT_MS);
@@ -155,7 +165,7 @@ describe('Phase 5 scope — capacity-driven reassignment on the load edge', () =
  * Layer A of the publication guard — see published.ts
  * -------------------------------------------------------------------------- */
 
-describe('the figures this study publishes still come out of it', () => {
+describe.skipIf(!BENCHMARK)('the figures this study publishes still come out of it', () => {
   it('reproduces every pinned estimate, at full precision', async () => {
     // Its own run, at the study's shipped default budget rather than this suite's cheaper 40:
     // the intervals `capacityReassignment.ts` and `index.ts` § 2 publish — including the verdict
