@@ -1056,7 +1056,7 @@ in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's accept
 measurements behind it. Read its **Standing requirement — the integration seam has an owner** before
 planning work: a behaviour that is configurable, unit-tested in isolation and never called from a
 shipped path passes every other check this repository runs, and has already shipped **eleven** times in
-code — plus, once, in `data/`. The instructive one is the sixth: the whole of `tuning/` was reachable
+code — plus, **twice**, in `data/` (`destination-eta`, and `patternSwitching`'s weight sets). The instructive one is the sixth: the whole of `tuning/` was reachable
 from nothing outside its own tests, the module said so in its own docstring, and the roadmap asserted
 the phase green anyway. So the rule is not "is it reachable?" but **"name the non-test caller"**. A
 barrel re-export and a `{@link}` tag look exactly like a caller and are not one.
@@ -1259,7 +1259,11 @@ proven otherwise.
 - Units are SI internally (metres, seconds, kilograms, m/s). Imperial values appear only
   in reference data and display formatting, always with the unit in the identifier
   (`ratedLoadLb`, `minSpeedFpm`). **`speedFpm` is not an identifier in this tree** — it was named
-  here in error and two files copied the wrong name back out of this sentence.
+  here in error, and three sites copied the wrong name back out of this sentence:
+  [`docs/29`](docs/29-audio-direction.md) § 8 (corrected on this commit),
+  [`DECISIONS.md`](DECISIONS.md) § D448's transcription of this rule, and
+  `packages/viz/src/everyday/units.ts`'s docstring. The last two are left standing — a decision
+  entry is not rewritten after the fact, and a `.ts` docstring is outside a markdown-only change.
 - Time is simulated seconds, a plain number, always sourced from the kernel.
 - Prefer pure functions in `core/`. Side effects belong in the kernel and the runner.
 - Tests colocate with source as `*.test.ts`.
