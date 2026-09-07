@@ -1304,6 +1304,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * driven by `EVERYDAY_SETTINGS`.
          */
         'everyday/profile.ts#loadDefaultSpeed',
+        /*
+         * GitHub issue #258's Sound preference, the same case a fourth time: read through the same
+         * `readEnvelope` under the same key, returning a boolean no screen prints. The words a
+         * player reads for it are `everyday/audio.ts#SOUND_ROW_COPY`'s, driven by
+         * `EVERYDAY_SETTINGS` in both faces, and what it switches is a sound rather than a
+         * sentence — which is the one thing in this build no honesty property can read, and is
+         * said in `everyday/audioEngine.ts`'s own docstring rather than left implied here.
+         */
+        'everyday/profile.ts#loadSound',
       ],
     },
     {

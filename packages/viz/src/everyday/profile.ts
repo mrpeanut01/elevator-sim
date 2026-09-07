@@ -59,6 +59,12 @@ import type { SessionStore } from '../persist/types.js';
  * `settingsView.ts`: `stageScreenModel.ts` has never imported this module.
  */
 import { DEFAULT_STAGE_SIM_PER_REAL_S, STAGE_SPEEDS } from './stageScreenModel.js';
+/*
+ * The Sound preference's type, default and storage guard — GitHub issue #258. They live beside the
+ * decision the setting reaches (`everyday/audio.ts`) rather than here, on `everyday/units.ts`'
+ * own ground, and this module stores what that one defines.
+ */
+import { DEFAULT_SOUND_ON, isSoundPreference, type SoundPreference } from './audio.js';
 import {
   DEFAULT_EVERYDAY_UNITS,
   isEverydayUnits,
@@ -239,7 +245,7 @@ export function everydayProgressWith(
 const PROFILE_KEY = 'elevator-sim.everyday-profile';
 
 /** The envelope's shape number — refused in both directions, `persist/`'s rule. */
-const PROFILE_SCHEMA_VERSION = 4;
+const PROFILE_SCHEMA_VERSION = 5;
 
 /**
  * The shapes this build will read, as against the one it writes.
@@ -251,7 +257,7 @@ const PROFILE_SCHEMA_VERSION = 4;
  * added a second sibling the same way ({@link withUnits}), which is why both migrations are one
  * line each and neither touches a payload it did not add.
  */
-const PROFILE_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4]);
+const PROFILE_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5]);
 
 /**
  * Version 3: the version, the profile, the progress and the units preference — four siblings.
@@ -277,6 +283,12 @@ interface ProfileEnvelope {
    * default ({@link loadDefaultSpeed}).
    */
   readonly defaultSpeedSimPerRealS: number;
+  /**
+   * Version 5: **whether a run makes a noise** — § 15.1's *Sound* row, GitHub issue #258 under
+   * [§ D344](../../../../DECISIONS.md). A sibling on `units`' own ground: a presentation
+   * preference that must not ride along with a posted run, and one nothing in a leg can read.
+   */
+  readonly soundOn: SoundPreference;
 }
 
 /**
@@ -357,6 +369,7 @@ type EnvelopeRead =
       readonly progress: unknown;
       readonly units: unknown;
       readonly defaultSpeedSimPerRealS: unknown;
+      readonly soundOn: unknown;
     }
   | { readonly ok: false; readonly reason: EnvelopeRefusal };
 
@@ -404,13 +417,17 @@ function readEnvelope(store: SessionStore): EnvelopeRead {
     // merely newer than they are.
     return { ok: false, reason: 'version' };
   }
-  const completed = withDefaultSpeed(withUnits(withProgress(record, version), version), version);
+  const completed = withSound(
+    withDefaultSpeed(withUnits(withProgress(record, version), version), version),
+    version,
+  );
   return {
     ok: true,
     profile: completed['profile'],
     progress: completed['progress'],
     units: completed['units'],
     defaultSpeedSimPerRealS: completed['defaultSpeedSimPerRealS'],
+    soundOn: completed['soundOn'],
   };
 }
 
@@ -423,6 +440,25 @@ function readEnvelope(store: SessionStore): EnvelopeRead {
 function withDefaultSpeed(record: Record<string, unknown>, version: number): Record<string, unknown> {
   if (version >= 4) return record;
   return { ...record, defaultSpeedSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S };
+}
+
+/**
+ * An envelope written before version 5, given the one key version 5 added — GitHub issue #258's
+ * Sound row.
+ *
+ * **This is the one migration in this file where *the absence determines the value* does not point
+ * at the value the earlier build produced, and the difference is worth stating rather than
+ * skipping.** `withUnits` could say *every earlier build drew metres, so metric is what they were
+ * looking at*, and `withDefaultSpeed` could say *every earlier run opened at the same rung*. Every
+ * build before version 5 was **silent** — but it was silent because it had no sound, not because
+ * anybody asked it to be quiet, and restoring silence as a preference would be inventing a choice
+ * the player never made. That is the thing the rule exists to forbid, arrived at from the other
+ * side. So an old envelope gets {@link DEFAULT_SOUND_ON}, which is what a device with no envelope
+ * at all gets, and the two states that were genuinely identical stay identical.
+ */
+function withSound(record: Record<string, unknown>, version: number): Record<string, unknown> {
+  if (version >= 5) return record;
+  return { ...record, soundOn: DEFAULT_SOUND_ON };
 }
 
 /**
@@ -488,6 +524,19 @@ export function loadDefaultSpeed(store: SessionStore): number {
 /** Whether a stored value is a rung of the stage's own ladder. */
 function isStageSpeedValue(value: unknown): value is number {
   return typeof value === 'number' && STAGE_SPEEDS.some((speed) => speed.simPerRealS === value);
+}
+
+/**
+ * The stored Sound setting, or {@link DEFAULT_SOUND_ON} — total, on {@link loadUnits}' argument.
+ *
+ * GitHub issue #258. A stored value that is not a boolean is read as the default rather than as
+ * silence, for {@link withSound}'s reason: neither a missing key nor a corrupted one is a player
+ * asking for quiet.
+ */
+export function loadSound(store: SessionStore): SoundPreference {
+  const envelope = readEnvelope(store);
+  if (!envelope.ok) return DEFAULT_SOUND_ON;
+  return isSoundPreference(envelope.soundOn) ? envelope.soundOn : DEFAULT_SOUND_ON;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -648,6 +697,7 @@ export function saveEveryday(
   progress: EverydayProgress,
   units: EverydayUnits,
   defaultSpeedSimPerRealS: number = DEFAULT_STAGE_SIM_PER_REAL_S,
+  soundOn: SoundPreference = DEFAULT_SOUND_ON,
 ): EverydaySave {
   let progressText: string;
   try {
@@ -670,6 +720,7 @@ export function saveEveryday(
     progress,
     units,
     defaultSpeedSimPerRealS,
+    soundOn,
   };
   try {
     store.write(PROFILE_KEY, JSON.stringify(envelope));
@@ -727,6 +778,14 @@ export interface EverydayProfileStore {
   /** Set it, and hear whether it survives the tab. A value off the ladder is not stored. */
   setDefaultSpeed(simPerRealS: number): boolean;
   /**
+   * **Whether a run makes a noise** — § 15.1's *Sound* row, GitHub issue #258. Total, like
+   * {@link units}: silence is a value a player chose, not an absence. `everyday/stageScreen.ts`
+   * reads it on every frame it draws; nothing about a run changes, only whether it can be heard.
+   */
+  soundOn(): SoundPreference;
+  /** Set it, and hear whether it survives the tab. */
+  setSoundOn(on: SoundPreference): boolean;
+  /**
    * **Forget everything this slot holds** — the profile, the progress, the preferences — GitHub
    * issue #229's *Clear saved progress*. The slot is removed and memory reset to the defaults, so
    * the next write starts a new career rather than re-saving the old one. Returns whether the
@@ -775,6 +834,7 @@ export function createProfileStore(backing: SessionStore | undefined): EverydayP
   let notice = restored.notice;
   let units = backing === undefined ? DEFAULT_EVERYDAY_UNITS : loadUnits(backing);
   let defaultSpeed = backing === undefined ? DEFAULT_STAGE_SIM_PER_REAL_S : loadDefaultSpeed(backing);
+  let soundOn = backing === undefined ? DEFAULT_SOUND_ON : loadSound(backing);
   const listeners = new Set<() => void>();
   const announce = (): void => {
     for (const listener of [...listeners]) listener();
@@ -786,7 +846,14 @@ export function createProfileStore(backing: SessionStore | undefined): EverydayP
    */
   const persist = (): boolean => {
     if (backing === undefined) return false;
-    const written = saveEveryday(backing, current ?? DEFAULT_EVERYDAY_PROFILE, progress, units, defaultSpeed);
+    const written = saveEveryday(
+      backing,
+      current ?? DEFAULT_EVERYDAY_PROFILE,
+      progress,
+      units,
+      defaultSpeed,
+      soundOn,
+    );
     notice = written.notice;
     return written.ok;
   };
@@ -819,11 +886,19 @@ export function createProfileStore(backing: SessionStore | undefined): EverydayP
       announce();
       return durable;
     },
+    soundOn: () => soundOn,
+    setSoundOn: (next) => {
+      soundOn = next;
+      const durable = persist();
+      announce();
+      return durable;
+    },
     clear: () => {
       current = undefined;
       progress = EMPTY_EVERYDAY_PROGRESS;
       units = DEFAULT_EVERYDAY_UNITS;
       defaultSpeed = DEFAULT_STAGE_SIM_PER_REAL_S;
+      soundOn = DEFAULT_SOUND_ON;
       let removed = false;
       if (backing !== undefined) {
         try {

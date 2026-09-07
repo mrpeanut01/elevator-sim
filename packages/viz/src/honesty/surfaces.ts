@@ -8273,12 +8273,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
  * ## Why a settings panel belongs in a corpus about honesty
  *
  * Almost every string on it is a claim about a **control**: what a row does, where a name is
- * shown, what this device keeps, and — for six of § 15.1's rows — why the control is not there at
- * all. That is the roadmap's standing requirement in its most literal form: a control that says
- * it writes nothing while writing something, and § D227's mirror image, a refusal standing over a
- * seam that works. The register in {@link SETTINGS_ABSENCES} is six such refusals in one array,
- * and a refusal nothing sweeps is exactly the sentence that goes stale the day somebody wires the
- * seam it refuses about.
+ * shown, what this device keeps, and — for whichever of § 15.1's rows are still unbuilt — why the
+ * control is not there at all. That is the roadmap's standing requirement in its most literal
+ * form: a control that says it writes nothing while writing something, and § D227's mirror image,
+ * a refusal standing over a seam that works. The register in {@link SETTINGS_ABSENCES} is those
+ * refusals in one array, and a refusal nothing sweeps is exactly the sentence that goes stale the
+ * day somebody wires the seam it refuses about. **How many is deliberately not written here**: it
+ * has fallen to one as the rows were built, most recently `Sound` (GitHub issue #258).
  *
  * ## What is driven, and the one state that is not a fixture
  *
@@ -8305,8 +8306,8 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * the register is six entries rather than seven; the swap's words are the `ENGINEER_DOOR`
      * adapter's now.
      *
-     * `#SETTINGS_ABSENCES` left on the merge that closed GitHub issue #207: the six rows are drawn
-     * on the build-information panel this screen opens, so they are {@link EVERYDAY_BUILD_NOTES}'s
+     * `#SETTINGS_ABSENCES` left on the merge that closed GitHub issue #207: the register is drawn
+     * on the build-information panel this screen opens, so it is {@link EVERYDAY_BUILD_NOTES}'s
      * to render and no longer reachable through `settingsScreenViewOf`.
      */
     /*
@@ -8314,13 +8315,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * beside the conversion rather than on the screen (GitHub issue #170, § D448). They live there
      * because the note is a **claim about what the control reaches**, and a note kept away from the
      * conversion is § D227's stale claim waiting to happen; they are driven here because this is
-     * the surface a player reads them on, in both faces — one of the six cases below carries
+     * the surface a player reads them on, in both faces — one of the cases below carries
      * `units: 'imperial'` for exactly that.
      */
     'everyday/units.ts#UNITS_ROW_COPY',
     /*
      * § 15.1's account state — GitHub issue #332, § D489. Twelve authored strings over six arms,
-     * and every one of them is reached below: the six cases each carry a different account, so the
+     * and every one of them is reached below: the cases each carry a different account, so the
      * block is swept in every state a player can load the page into rather than in whichever one a
      * fixture happened to be in. A screen that is not in this count is a screen the search has
      * never read, and the states a sign-in surface gets wrong are exactly its unhappy ones.
@@ -8328,7 +8329,7 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
     'everyday/settingsView.ts#SIGN_IN_COPY',
     /*
      * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
-     * names — § D490. Both arms are reached below: five of the six cases draw the device one, and
+     * names — § D490. Both arms are reached below: all but one of the cases draw the device one, and
      * `not-durable` is signed in and named and draws the account one. A pair of sentences with one
      * arm driven would be the half-swept surface this adapter's own `Units` note argues about.
      * Reached through `view.you.note` rather than imported, which is how `#UNITS_ROW_COPY` above is
@@ -8345,6 +8346,16 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
     'everyday/settingsView.ts#DEFAULT_SPEED_ROW_COPY',
     'everyday/settingsView.ts#CLEAR_PROGRESS_COPY',
     'everyday/settingsView.ts#clearRowOf',
+    /*
+     * § 15.1's `Sound` row — GitHub issue #258, § D344 — whose label, § 16 register clause and two
+     * pill faces are authored beside the sound itself rather than on the screen, on
+     * `#UNITS_ROW_COPY`'s ground exactly: the note is a claim about what the control reaches, and
+     * one of its clauses is `docs/29`'s accessibility promise (*nothing is ever only heard*), which
+     * is a claim about the audio and belongs where the audio is decided. **Both faces are reached
+     * below**: `muted` is the case that carries `soundOn: false`, and every other case draws the
+     * shipped default, so the row is never swept in one state only.
+     */
+    'everyday/audio.ts#SOUND_ROW_COPY',
   ],
   render(context) {
     void context;
@@ -8422,6 +8433,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        */
       ['armed', { profile: stored, reduceMotion: false, defaultSpeedSimPerRealS: 90, clearStage: 'armed' }],
       ['cleared', { profile: undefined, reduceMotion: false, clearStage: 'cleared' }],
+      /*
+       * GitHub issue #258's other face. Every case above draws the Sound row on, because that is
+       * what a device with no stored preference gets; this is the one a player made silent, and
+       * without it the row's `off` face would ship unswept — which is the defect `keyedPlate`
+       * shipped for a whole milestone and this corpus exists to catch.
+       */
+      ['muted', { profile: stored, reduceMotion: false, soundOn: false }],
     ] as const;
 
     for (const [label, input] of cases) {
