@@ -29,10 +29,12 @@ import {
   rushGeneratedRangeLine,
   rushHoldLineFigure,
   rushOpeningLine,
+  rushTutorialWorkedAnswerOf,
   RUSH_BESTS,
   RUSH_BESTS_FIXTURE_NOTE,
   RUSH_SCREEN_COPY as COPY,
 } from './rushScreenModel.js';
+import { mountWorkedAnswer } from './tutorialScreens.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_RADII as R,
@@ -235,6 +237,22 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
   root.append(paper, ink);
   host.append(root);
+
+  /*
+   * **The Rush tutorial — § D529 clause 2, the second use of screen two.**
+   *
+   * *"Screen two is reused as the Rush tutorial when the player later opens Rush. Building it
+   * twice is what this clause exists to prevent."* So this is the tutorial's own component, called
+   * with the rush's entry point, and not a second worked answer written for this screen: the runs,
+   * the diagnosis, the change and the counts are all the tutorial's, and the only thing the rush
+   * words differently is why an answer is on the screen at all.
+   *
+   * `boundaries.test.ts` holds the allowlist that keeps this the second of two uses rather than
+   * the first of many — a module outside the tutorial that gains the component fails the build,
+   * and this file is one of the two names on it.
+   */
+  mountWorkedAnswer(root, rushTutorialWorkedAnswerOf);
+
   return {
     /*
      * § 9.1's *Start the rush* — GitHub issue #220. The run first, the context second, the brief's

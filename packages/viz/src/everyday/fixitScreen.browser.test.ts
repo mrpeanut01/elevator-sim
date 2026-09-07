@@ -29,10 +29,11 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
-  openScenarioEntry,
   CHROMIUM,
   HAS_BROWSER,
+  leaveTutorialIfOffered,
   openPage,
+  openScenarioEntry,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -235,6 +236,7 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       expect(await page.locator('.everyday-fixit-stage').count()).toBe(0);
       // Away and back: the figures, not the stage — seen once is seen.
       await page.click('.everyday-rail-menu');
+      await leaveTutorialIfOffered(page);
       await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
       await openScenarioEntry(page, 'fix-a-building');
       await page.waitForFunction(

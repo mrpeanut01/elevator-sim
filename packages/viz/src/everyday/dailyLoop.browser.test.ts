@@ -32,8 +32,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
 import {
   CHROMIUM,
-  HAS_BROWSER,
   enterEverydayStage,
+  HAS_BROWSER,
+  leaveTutorialIfOffered,
   openEverydayDoor,
   openPage,
 } from '../dev/browserTier.test-helper.js';
@@ -248,6 +249,7 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
        */
       await page.locator('.everyday-rail-menu').click();
       /* The menu-arrival probe: the door tile retired with § D525, so wait on Scenario's. */
+      await leaveTutorialIfOffered(page);
       await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
       await enterEverydayStage(page);
       await waitForOwnRun(page);

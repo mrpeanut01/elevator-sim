@@ -26,6 +26,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   CHROMIUM,
   HAS_BROWSER,
+  leaveTutorialIfOffered,
   openPage,
   startShippedSite,
   type ShippedSite,
@@ -72,6 +73,7 @@ async function openContract(page: Page): Promise<void> {
 
 /** Press the Campaign tile — the player's own path, not a scripted navigation. */
 async function enterCampaign(page: Page): Promise<void> {
+  await leaveTutorialIfOffered(page);
   const tile = page.locator('.everyday-mode[data-screen="towers"]').first();
   await tile.click();
   await page.waitForSelector('.everyday-towers');
@@ -80,6 +82,7 @@ async function enterCampaign(page: Page): Promise<void> {
 describe.skipIf(!HAS_BROWSER)('the Everyday campaign screens', () => {
   it('opens the Campaign tile, which no longer refuses, and lands on the triage list', async () => {
     const page = await coldLoad();
+    await leaveTutorialIfOffered(page);
     const tile = page.locator('.everyday-mode[data-screen="towers"]').first();
     // § D227 in the direction a landed screen needs: the tile carries no refusal at all.
     expect(await tile.textContent()).not.toContain('not built');

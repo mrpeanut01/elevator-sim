@@ -57,8 +57,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   CHROMIUM,
-  HAS_BROWSER,
   enterEverydayStage,
+  HAS_BROWSER,
+  leaveTutorialIfOffered,
   openEverydayDoor,
   openPage,
   startShippedSite,
@@ -374,6 +375,7 @@ describe.skipIf(!HAS_BROWSER)('every mode opens at 360 px, and the daily loop cr
   it('presses all three mode tiles and reaches each screen', async () => {
     const page = await coldLoad(PHONE);
     try {
+      await leaveTutorialIfOffered(page);
       const tiles = page.locator('.everyday-mode');
       const count = await tiles.count();
       /*

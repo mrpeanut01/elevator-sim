@@ -18,6 +18,7 @@ import { CAREER_STORAGE_KEY } from '../campaign/careerPersist.js';
 import {
   CHROMIUM,
   HAS_BROWSER,
+  leaveTutorialIfOffered,
   openPage,
   startShippedSite,
   type ShippedSite,
@@ -58,6 +59,7 @@ async function enterCampaign(page: Page): Promise<void> {
    * moment the rename landed. `browserTier.test-helper.ts` records the lesson: an id survives a
    * rename and a label does not, which is why the shipped tile carries one.
    */
+  await leaveTutorialIfOffered(page);
   await page.locator('.everyday-mode[data-screen="towers"]').first().click();
   await page.waitForSelector('.everyday-towers', { timeout: 15_000 });
 }
@@ -114,6 +116,7 @@ describe.skipIf(!HAS_BROWSER)('a career survives a reload', () => {
         undefined,
         { timeout: 30_000 },
       );
+      await leaveTutorialIfOffered(page);
       await page.waitForSelector('.everyday-mode', { timeout: 30_000 });
       await enterCampaign(page);
 
@@ -139,6 +142,7 @@ describe.skipIf(!HAS_BROWSER)('a career survives a reload', () => {
         undefined,
         { timeout: 30_000 },
       );
+      await leaveTutorialIfOffered(page);
       await page.waitForSelector('.everyday-mode', { timeout: 30_000 });
       expect(await page.locator('.everyday-towers').count()).toBe(0);
     } finally {

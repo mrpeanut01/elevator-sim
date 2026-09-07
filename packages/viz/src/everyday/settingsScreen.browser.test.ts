@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   CHROMIUM,
   HAS_BROWSER,
+  leaveTutorialIfOffered,
   openPage,
   startShippedSite,
   type ShippedSite,
@@ -202,6 +203,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday settings screen', () => {
 
     /* The consumer: § 7's stage, reached the way a player reaches it, opens on the chosen chip. */
     await page.click('.everyday-rail-menu');
+    await leaveTutorialIfOffered(page);
     await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
     /* § D525: the front door is a Scenario entry now — the tile, then the entry. */
     await page.click('.everyday-mode[data-screen="scenario"]');

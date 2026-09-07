@@ -52,8 +52,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
 import {
   CHROMIUM,
-  HAS_BROWSER,
   enterEverydayStage,
+  HAS_BROWSER,
+  leaveTutorialIfOffered,
   openPage,
 } from '../dev/browserTier.test-helper.js';
 import { ACTION_BAR_ROWS } from './actionBar.js';
@@ -750,6 +751,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     /* And the menu is back. The tile is keyed `door` — § 4's *"reached from menu (Today's
        tower)"* — which is the same route change {@link enterEverydayStage} walks; the claim here is
        unchanged and is about the menu having been reached at all. */
+    await leaveTutorialIfOffered(page);
     await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
     await page.close();
   });
@@ -785,6 +787,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
 
     await page.click('.everyday-bar-leave');
     expect(await page.locator('.everyday-bar-confirm-stay').count()).toBe(0);
+    await leaveTutorialIfOffered(page);
     await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
     await page.close();
   });
@@ -955,6 +958,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
    */
   it('files a campaign day on the same primary and lands on the campaign report', async () => {
     const page = await coldLoad();
+    await leaveTutorialIfOffered(page);
     await page.locator('.everyday-mode[data-screen="towers"]').first().click();
     await page.waitForSelector('.everyday-towers');
     const building = await page.textContent('.everyday-towers-name');

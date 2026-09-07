@@ -79,6 +79,7 @@ import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import { DESIGNER_ABSENCES } from './designerModel.js';
 import { RUSH_ABSENCES } from './rushScreenModel.js';
 import { SCENARIO_ABSENCES } from './scenarioModel.js';
+import { TUTORIAL_ABSENCES } from './tutorialModel.js';
 import { SETTINGS_ABSENCES } from './settingsView.js';
 import { STAGE_ABSENCES } from './stageScreenModel.js';
 
@@ -289,6 +290,12 @@ export function buildNotesViewOf(): BuildNotesView {
       heading: 'Endless rush',
       note: 'The setup screen draws; what it would start does not exist yet.',
       entries: RUSH_ABSENCES,
+    },
+    {
+      heading: 'The first session',
+      note: 'The two-screen tutorial, and the one thing about it that is not settled.',
+      entries: TUTORIAL_ABSENCES,
+      ...(TUTORIAL_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
     {
       heading: 'Scenario',

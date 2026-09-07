@@ -191,6 +191,16 @@ import {
   RUN_CONTEXTS,
 } from '../everyday/types.js';
 import { scenarioHubViewOf } from '../everyday/scenarioModel.js';
+import {
+  TUTORIAL_ABSENCES,
+  TUTORIAL_COPY,
+  TUTORIAL_STEPS,
+  tutorialCollapseViewOf,
+  tutorialWalkthroughViewOf,
+  tutorialWorkedAnswerOf,
+} from '../everyday/tutorialModel.js';
+import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
+import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
 import { weekScreenViewOf } from '../everyday/weekView.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import type { GoalObservations } from '../shift/types.js';
@@ -11408,6 +11418,199 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
 };
 
 /* -------------------------------------------------------------------------- *
+ * The first session — § D529's two-screen tutorial, GitHub issue #380
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The tutorial's two screens and the worked answer both entry points draw.**
+ *
+ * [§ D529](../../../../DECISIONS.md)'s own obligation — *"Every player-facing string enters
+ * `honesty/surfaces.ts`"* — over the pure halves of both screens. The mounts
+ * (`everyday/tutorialScreens.ts`) are excluded in `derive.test.ts` on the DOM mounts' shared
+ * ground; the pure/DOM split in `everyday/` exists so the words are drivable without a document,
+ * and here they are.
+ *
+ * ## The measured half is measured, not invented
+ *
+ * The worked answer's two counts are the ones this case actually ran:
+ * `fixit/run.ts#measuredOf` over the corpus's own comparison run and its own recording, which is
+ * exactly what `FIXIT` above does one adapter over. That matters more here than anywhere else on
+ * this list, because § D529's *real runs on the real engine* obligation exists precisely because a
+ * tutorial is where a stand-in figure is most tempting — and a corpus that swept a fabricated
+ * before/after pair would be sweeping the defect rather than the product.
+ *
+ * The **pending** arms are seeded too, on both screens. They are what a player reads for the
+ * seconds before the runs land, they are the arm most likely to be reached on a slow device, and a
+ * surface's honesty in its unfinished state is not a lesser claim than in its finished one.
+ *
+ * ## Both entry points, because § D529 clause 2 makes them one component with two framings
+ *
+ * `tutorialWorkedAnswerOf` and `rushTutorialWorkedAnswerOf` are both driven over the same facts, so
+ * the corpus reads the rush's framing line as well as the tutorial's. Driving only one would leave
+ * the other's single differing field — the one field the two entry points are allowed to differ on
+ * — unswept, which is the whole of what a second entry point can get wrong.
+ *
+ * Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`.
+ */
+const EVERYDAY_TUTORIAL: SurfaceAdapter = {
+  id: 'everyday/tutorialModel.ts#tutorialWalkthroughViewOf',
+  covers: [
+    'everyday/tutorialModel.ts#tutorialWalkthroughViewOf',
+    'everyday/tutorialModel.ts#tutorialCollapseViewOf',
+    'everyday/tutorialModel.ts#tutorialWorkedAnswerOf',
+    'everyday/tutorialModel.ts#TUTORIAL_COPY',
+    'everyday/tutorialModel.ts#TUTORIAL_STEPS',
+    'everyday/tutorialModel.ts#TUTORIAL_ABSENCES',
+    'everyday/workedAnswer.ts#workedAnswerViewOf',
+    'everyday/workedAnswer.ts#WORKED_ANSWER_COPY',
+    'everyday/rushScreenModel.ts#rushTutorialWorkedAnswerOf',
+    'everyday/rushScreenModel.ts#RUSH_TUTORIAL_WHY',
+  ],
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const entry = fixitSearchCase(context);
+    const measurement = measuredOf(entry, context.comparisonRecording, context.recording);
+    const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
+
+    /* ---- screen one: before the run lands, and after ---- */
+    const figures = figureValuesOf(entry, context.recording).map((figure, index) => ({
+      id: `figure-${String(index)}`,
+      label: figure.label,
+      value: figure.text,
+      note: entry.complaint.measure.label,
+    }));
+    for (const [arm, drawn] of [
+      ['pending', []],
+      ['landed', figures],
+    ] as const) {
+      const view = tutorialWalkthroughViewOf({ figures: drawn });
+      seeds.push({ field: `tutorial.${arm}.eyebrow`, text: view.eyebrow, role: 'label' });
+      seeds.push({ field: `tutorial.${arm}.title`, text: view.title, role: 'prose' });
+      seeds.push({ field: `tutorial.${arm}.lede`, text: view.lede, role: 'prose' });
+      for (const step of view.steps) {
+        seeds.push({ field: `tutorial.${arm}.step.${step.id}.control`, text: step.control, role: 'label' });
+        seeds.push({ field: `tutorial.${arm}.step.${step.id}.title`, text: step.title, role: 'prose' });
+        seeds.push({ field: `tutorial.${arm}.step.${step.id}.body`, text: step.body, role: 'prose' });
+      }
+      seeds.push({ field: `tutorial.${arm}.figuresHeading`, text: view.figuresHeading, role: 'label' });
+      for (const figure of view.figures) {
+        seeds.push({
+          field: `tutorial.${arm}.figure.${figure.id}`,
+          text: `${figure.label}: ${figure.value}`,
+          role: 'observation',
+        });
+        seeds.push({ field: `tutorial.${arm}.figure.${figure.id}.note`, text: figure.note, role: 'label' });
+      }
+      /*
+       * `reason`, not `prose`, in both arms: one says the run has not landed and the other says
+       * where the figures came from, and both are statements about what the surface may be
+       * believed about — which is R3's cue-rule reading rather than description.
+       */
+      seeds.push({ field: `tutorial.${arm}.figuresNote`, text: view.figuresNote, role: 'reason' });
+      seeds.push({ field: `tutorial.${arm}.skip`, text: view.skip, role: 'label' });
+      seeds.push({ field: `tutorial.${arm}.skipNote`, text: view.skipNote, role: 'reason' });
+    }
+
+    /* ---- the worked answer, from both entry points, over the measured pair ---- */
+    const facts: WorkedAnswerFacts = {
+      diagnosis: entry.diagnosis.text,
+      reasoning: entry.diagnosis.reasoning,
+      change: diagnosed?.name ?? '',
+      effect: diagnosed?.effect ?? '',
+      measure: entry.complaint.measure.label,
+      before: measurement.complaintBefore,
+      after: measurement.complaintAfter,
+      sameCrowd: measurement.sameCrowd,
+    };
+    const worked: readonly (readonly [string, WorkedAnswerView])[] = [
+      ['tutorial', tutorialWorkedAnswerOf(facts)],
+      ['rush', rushTutorialWorkedAnswerOf(facts)],
+      /*
+       * The crowd-changed arm, which the pair above cannot reach: the tutorial's own repair is a
+       * dispatcher setting and never moves who arrives, so the basis line for a pair that did
+       * would go unswept. `FIXIT` seeds its own equivalent one adapter over, for the same reason.
+       */
+      ['crowd-changed', tutorialWorkedAnswerOf({ ...facts, sameCrowd: false })],
+    ];
+    for (const [arm, view] of worked) {
+      seeds.push({ field: `worked.${arm}.heading`, text: view.heading, role: 'label' });
+      seeds.push({ field: `worked.${arm}.why`, text: view.why, role: 'reason' });
+      seeds.push({ field: `worked.${arm}.diagnosis`, text: view.diagnosis, role: 'prose', provenance: 'authored' });
+      seeds.push({ field: `worked.${arm}.reasoning`, text: view.reasoning, role: 'prose', provenance: 'authored' });
+      seeds.push({ field: `worked.${arm}.changeHeading`, text: view.changeHeading, role: 'label' });
+      seeds.push({ field: `worked.${arm}.change`, text: view.change, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `worked.${arm}.effect`, text: view.effect, role: 'prose', provenance: 'authored' });
+      seeds.push({
+        field: `worked.${arm}.before`,
+        text: view.before,
+        role: 'observation',
+        declaredCount: measurement.scopeBoardedBefore,
+      });
+      seeds.push({
+        field: `worked.${arm}.after`,
+        text: view.after,
+        role: 'observation',
+        declaredCount: measurement.scopeBoardedAfter,
+      });
+      seeds.push({ field: `worked.${arm}.movement`, text: view.movement, role: 'comparison' });
+      seeds.push({ field: `worked.${arm}.basis`, text: view.basis, role: 'reason' });
+      seeds.push({ field: `worked.${arm}.boundary`, text: view.boundary, role: 'reason' });
+    }
+
+    /*
+     * ---- screen two's own words, loaded and not-yet-loaded ----
+     *
+     * The worked answer is not one of this view's fields — it is its own component above, drawn on
+     * this screen and on the rush's — so what varies here is whether the case file has arrived.
+     * The empty arm is seeded because it is what a player reads on a slow load, and because every
+     * one of its quoted fields is `undefined` rather than a placeholder: a tutorial that drew a
+     * stand-in complaint would be authoring the one piece of writing `docs/35` § 9.1 calls the best
+     * in the product.
+     */
+    for (const [arm, view] of [
+      ['loading', tutorialCollapseViewOf({})],
+      ['loaded', tutorialCollapseViewOf({
+        complaint: entry.complaint.text,
+        complainer: entry.complaint.complainer,
+        symptom: entry.symptom,
+      })],
+    ] as const) {
+      seeds.push({ field: `collapse.${arm}.eyebrow`, text: view.eyebrow, role: 'label' });
+      seeds.push({ field: `collapse.${arm}.title`, text: view.title, role: 'prose' });
+      seeds.push({ field: `collapse.${arm}.lede`, text: view.lede, role: 'prose' });
+      seeds.push({ field: `collapse.${arm}.complaintHeading`, text: view.complaintHeading, role: 'label' });
+      if (view.complaint !== undefined) {
+        seeds.push({ field: `collapse.${arm}.complaint`, text: view.complaint, role: 'prose', provenance: 'authored' });
+      }
+      if (view.complainer !== undefined) {
+        seeds.push({ field: `collapse.${arm}.complainer`, text: view.complainer, role: 'label', provenance: 'authored' });
+      }
+      seeds.push({ field: `collapse.${arm}.symptomHeading`, text: view.symptomHeading, role: 'label' });
+      if (view.symptom !== undefined) {
+        seeds.push({ field: `collapse.${arm}.symptom`, text: view.symptom, role: 'observation', provenance: 'authored' });
+      }
+      seeds.push({ field: `collapse.${arm}.finish`, text: view.finish, role: 'label' });
+      seeds.push({ field: `collapse.${arm}.finishNote`, text: view.finishNote, role: 'reason' });
+    }
+
+    /*
+     * The register, and the two copy tables' own keys — iterated generically so a key added to
+     * either arrives in the corpus without anybody remembering to seed it.
+     */
+    TUTORIAL_ABSENCES.forEach((absence, index) => {
+      seeds.push({ field: `tutorial.absence.${String(index)}`, text: absence, role: 'reason' });
+    });
+    for (const [key, text] of Object.entries(TUTORIAL_COPY)) {
+      seeds.push({ field: `tutorial.copy.${key}`, text, role: 'prose' });
+    }
+    for (const [key, text] of Object.entries(WORKED_ANSWER_COPY)) {
+      seeds.push({ field: `worked.copy.${key}`, text, role: 'prose' });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
  * The build-information panel — every register of absences, in one place
  * -------------------------------------------------------------------------- */
 
@@ -11775,6 +11978,13 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * surface wherever it sat. The end of the array is where a new adapter goes anyway.
    */
   EVERYDAY_SIGN_IN_LINK,
+  /*
+   * Appended last in turn — § D529's two-screen tutorial (GitHub issue #380). It seeds a measured
+   * before/after pair, so the fault-ordering rule is not free here the way the sign-in banner's
+   * was: a slot ahead of `FIXIT` would take the scoped-count faults off the surface that exists to
+   * carry them. The end of the array is both the rule and the right place.
+   */
+  EVERYDAY_TUTORIAL,
 ]);
 
 /* -------------------------------------------------------------------------- *

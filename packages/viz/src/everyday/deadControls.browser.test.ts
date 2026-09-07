@@ -50,6 +50,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   CHROMIUM,
   HAS_BROWSER,
+  leaveTutorialIfOffered,
   openPage,
   startShippedSite,
   type ShippedSite,
@@ -185,6 +186,7 @@ describe.skipIf(!HAS_BROWSER)('a dead control says why, or is not a control', ()
       }
     };
 
+    await leaveTutorialIfOffered(page);
     await inspect('the main menu');
     for (const screen of SCREENS) {
       for (const step of screen.enter) {
@@ -195,6 +197,7 @@ describe.skipIf(!HAS_BROWSER)('a dead control says why, or is not a control', ()
       await page.waitForTimeout(400);
       await inspect(screen.name);
       await page.click('nav.everyday-rail button:has-text("Main menu")');
+      await leaveTutorialIfOffered(page);
       await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
     }
 
@@ -224,6 +227,7 @@ describe.skipIf(!HAS_BROWSER)('a dead control says why, or is not a control', ()
      */
     const page = await coldLoad();
     /* § D525: the front door is a Scenario entry now, so it is two presses. */
+    await leaveTutorialIfOffered(page);
     await page.click('.everyday-mode[data-screen="scenario"]');
     await page.click('.everyday-scenario-entry[data-entry="today"]');
     await page.waitForSelector('.everyday-bar-timeline');

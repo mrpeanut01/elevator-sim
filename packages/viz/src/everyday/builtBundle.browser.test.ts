@@ -117,8 +117,9 @@ import {
   BUILT_ARTIFACT_CLAIMS,
   CHROMIUM,
   HAS_BROWSER,
-  SKIP_REASON,
+  leaveTutorialIfOffered,
   openPage,
+  SKIP_REASON,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -182,6 +183,7 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
     await page.goto(site.origin, { waitUntil: 'load' });
     await page.waitForSelector('.everyday-screen', { timeout: 30_000 });
     /* The menu has rendered when its tiles have — Scenario's, since § D525 retired fixit's. */
+    await leaveTutorialIfOffered(page);
     await page.waitForSelector('[data-screen="scenario"]', { timeout: 30_000 });
 
     /*
@@ -245,6 +247,7 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
     await page.goto(site.origin, { waitUntil: 'load' });
     await page.waitForSelector('.everyday-screen', { timeout: 30_000 });
     /* The menu has rendered when its tiles have — Scenario's, since § D525 retired fixit's. */
+    await leaveTutorialIfOffered(page);
     await page.waitForSelector('[data-screen="scenario"]', { timeout: 30_000 });
 
     /*
