@@ -58,7 +58,7 @@ import {
   openPage,
 } from '../dev/browserTier.test-helper.js';
 import { ACTION_BAR_ROWS } from './actionBar.js';
-import { STAGE_SPEEDS } from './stageScreenModel.js';
+import { STAGE_DAY_OVER, STAGE_SKIP_COPY, STAGE_SPEEDS } from './stageScreenModel.js';
 import { REST_BAR_MIN_PX } from '../render/carRest.js';
 import { EVERYDAY_COLORS } from './tokens.js';
 
@@ -579,6 +579,44 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     expect(await page.isVisible('.everyday-stage-start')).toBe(false);
     await page.click('.everyday-stage-play');
     expect(await page.textContent('.everyday-stage-play')).toContain('Play');
+    await page.close();
+  });
+
+  /**
+   * **§ 2.3's way out of watching, driven** — GitHub issue **#369**, § D525 clause 4.
+   *
+   * `stageSkip.test.ts` makes the claims about the transport and about the recording; this makes
+   * the one neither of those can, because it needs a mounted stage and a real run: **pressing the
+   * control reaches the end of the day and the row hears it.** § 3.3's note is the observable —
+   * `STAGE_DAY_OVER` is drawn only when `syncTransport` sees `ended`, and the whole reason the
+   * skip plays rather than pauses is to make that edge fire.
+   */
+  it('skips to the end of the day, and § 3.3’s row hears it', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+
+    /* Live while the day still has somewhere to go, with a note that is not the refusal. */
+    expect(await page.locator('.everyday-stage-skip').isEnabled()).toBe(true);
+    expect(await page.textContent('.everyday-stage-skip')).toBe(STAGE_SKIP_COPY.label);
+    expect(await page.getAttribute('.everyday-stage-skip', 'title')).toBe(STAGE_SKIP_COPY.note);
+
+    await page.click('.everyday-stage-skip');
+
+    /*
+     * The row is re-rendered on the `dayEnded` edge rather than on a frame, so this waits on the
+     * note rather than sleeping: what is being asserted is that the edge fired at all.
+     */
+    await page.waitForFunction(
+      (over) => (document.querySelector('.everyday-bar-note')?.textContent ?? '') === over,
+      STAGE_DAY_OVER,
+      { timeout: 20_000 },
+    );
+
+    /* And the control now refuses, with the reason on its face rather than a dead button. */
+    expect(await page.locator('.everyday-stage-skip').isDisabled()).toBe(true);
+    expect(await page.getAttribute('.everyday-stage-skip', 'title')).toBe(
+      STAGE_SKIP_COPY.doneReason,
+    );
     await page.close();
   });
 
