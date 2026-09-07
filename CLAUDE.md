@@ -909,11 +909,12 @@ verdict:
   are now fixed**; both were deliberately *recorded rather than fixed* in the lane that found them,
   because a corpus that grew an axis and stayed green is a different claim from one that had to be
   repaired first. **Say the gaps in the same breath.** Clause 4 —
-  *every unit names its non-test caller* — is **satisfied in prose and mechanised by nothing**: all
-  **28** `packages/viz/src` directories — and they no longer sit outside `AUDITED_MODULES`:
-  `packages/viz/src/deadCode.test.ts:124-152` lists all 28, asserted against `readdirSync` in both
-  directions at `:358-366`. What remains unmechanised is the prose half — the four dead-code
-  audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
+  *every unit names its non-test caller* — is **mechanised for reachability and not for the naming**.
+  All **28** `packages/viz/src` directories are now inside `AUDITED_MODULES`:
+  `packages/viz/src/deadCode.test.ts:124-154` lists them and `:356-366` asserts that list against
+  `readdirSync` in both directions, so an export with no caller is caught. **What no test checks is
+  the clause's own words** — that each unit *names* its caller in prose — and there the four
+  dead-code audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
   the clause to distrust first, and a fifth audit under `packages/viz` is the fix — **done in
   wave 12** (`packages/viz/src/deadCode.test.ts`, [§ D192](DECISIONS.md)), which **on the tree it
   landed on** derived 19 directories from disk, asserted them both ways, classified 1 017 exports,
