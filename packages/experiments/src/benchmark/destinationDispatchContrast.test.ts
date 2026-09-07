@@ -37,6 +37,19 @@ import { checkPinned, describeMismatches, dispatchContrastFigures } from './publ
 import { cellOf, loadResources, runGateExperiment, withProfiles } from '../validation/harness.js';
 import { BENCHMARK_SEED } from './suite.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 55.4 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ *
+ * The top-level `beforeAll` that runs the study does not run when its only suite is skipped: vitest
+ * marks a suite skipped when every task in it is.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const TIMEOUT_MS = 600_000;
 
 let study: DispatchContrastStudy;
@@ -45,7 +58,7 @@ beforeAll(async () => {
   study = await runDestinationDispatchStudy({});
 }, TIMEOUT_MS);
 
-describe('Phase 6b — the C→D contrast', () => {
+describe.skipIf(!BENCHMARK)('Phase 6b — the C→D contrast', () => {
   it('prints the table', () => {
     console.log(formatDispatchContrast(study));
   });

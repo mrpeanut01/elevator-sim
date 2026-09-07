@@ -52,12 +52,22 @@ import {
 } from './mixedUseHighRise.js';
 import { BENCHMARK_SEED } from './suite.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 899.4 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const ALL_PROFILES = [BASELINE_PROFILE, ...ARM_PROFILES];
 
 /** Long: three buildings, nine arms, up to 1000 replications each. */
 const TIMEOUT_MS = 900_000;
 
-describe('Phase 5 — the operating points are the highest at which an interval may be quoted', () => {
+describe.skipIf(!BENCHMARK)('Phase 5 — the operating points are the highest at which an interval may be quoted', () => {
   it('has every cell quotable at the chosen budget, on all three cases', async () => {
     const resources = withProfiles(await loadResources(), []);
     for (const spec of BENCHMARK_CASES) {
@@ -295,7 +305,7 @@ describe('Phase 5 — the operating points are the highest at which an interval 
  * `admissibleReplications`, and still for § D261's reason: it discloses a destination and carries
  * no credential, so an access-restricted destination is refused by every car.
  */
-describe('Phase 6a — the interfloor-mix operating points, censused rather than inherited', () => {
+describe.skipIf(!BENCHMARK)('Phase 6a — the interfloor-mix operating points, censused rather than inherited', () => {
   async function destinationResources() {
     const config = await loadResources();
     const baseline = config.dispatcherProfilesById.get(DISCLOSURE_BASELINE);
@@ -474,7 +484,7 @@ describe('Phase 6a — the interfloor-mix operating points, censused rather than
  * asserted below rather than mentioned, because "we dropped the rate that did not suit us" and "we
  * dropped the rate whose baseline saturates" look identical in a results table.
  */
-describe('Phase 6 — the Mixed-Use High-Rise operating points, censused rather than inherited', () => {
+describe.skipIf(!BENCHMARK)('Phase 6 — the Mixed-Use High-Rise operating points, censused rather than inherited', () => {
   async function mixedUseResources() {
     const config = await loadResources();
     const destination = config.dispatcherProfilesById.get(DISCLOSURE_PROFILE);

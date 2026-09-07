@@ -142,6 +142,16 @@ import {
 import { DISCLOSURE_BASELINE } from './destinationDisclosure.js';
 import { accessControlFigures, checkPinned, describeMismatches, pinMatches } from './published.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 17.0 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const TIMEOUT_MS = 900_000;
 
 let cached: AccessControlStudy | undefined;
@@ -159,7 +169,7 @@ function row(result: AccessControlStudy, building: string, armId: string): Cover
   return found;
 }
 
-describe('H-ACCESS-1 — coverage, and it is not a confidence interval', () => {
+describe.skipIf(!BENCHMARK)('H-ACCESS-1 — coverage, and it is not a confidence interval', () => {
   it('prints the whole report', async () => {
     console.log(formatAccessControlStudy(await study()));
   }, TIMEOUT_MS);
@@ -360,7 +370,7 @@ describe('H-ACCESS-1 — coverage, and it is not a confidence interval', () => {
   }, TIMEOUT_MS);
 });
 
-describe('H-ACCESS-2 — the optimization claim, as a difference-of-differences', () => {
+describe.skipIf(!BENCHMARK)('H-ACCESS-2 — the optimization claim, as a difference-of-differences', () => {
   it('REFUTES the roadmap’s mechanism: the destination buys LESS where access is controlled', async () => {
     const { optimization } = await study();
 
@@ -425,7 +435,7 @@ describe('H-ACCESS-2 — the optimization claim, as a difference-of-differences'
  * Layer A of the publication guard — see published.ts
  * -------------------------------------------------------------------------- */
 
-describe('the figures this study publishes still come out of it', () => {
+describe.skipIf(!BENCHMARK)('the figures this study publishes still come out of it', () => {
   it('reproduces every pinned estimate, at full precision', async () => {
     const mismatches = checkPinned('access-control', accessControlFigures(await study()));
     expect(
@@ -445,7 +455,7 @@ const SOURCE = readFileSync(fileURLToPath(import.meta.url), 'utf8');
 /** The module docstring with its comment furniture removed, so a line wrap cannot hide a claim. */
 const PROSE = (SOURCE.split('*/')[0] ?? '').replace(/\n\s*\*\s?/g, ' ');
 
-describe('the counts this study publishes still come out of it', () => {
+describe.skipIf(!BENCHMARK)('the counts this study publishes still come out of it', () => {
   it('reproduces every pinned coverage row, field for field', async () => {
     // Layer A for a categorical. `checkPinned` cannot hold these — they have no standard error —
     // and until § T50-D1 moved two of them nothing in the suite re-derived them at all. The

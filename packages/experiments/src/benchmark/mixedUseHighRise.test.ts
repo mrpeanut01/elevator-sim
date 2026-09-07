@@ -46,6 +46,19 @@ import {
 import { checkPinned, describeMismatches, mixedUseFigures } from './published.js';
 
 /** Three points and a three-rate coverage census on a 60-floor, 16-car building. */
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 153.1 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ *
+ * Whole file: even the baselines suite reads `study`, which the top-level `beforeAll` runs, and
+ * that hook does not run when every suite is skipped.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const TIMEOUT_MS = 900_000;
 
 let study: MixedUseStudy;
@@ -61,7 +74,7 @@ beforeAll(async () => {
  * The baselines are data
  * -------------------------------------------------------------------------- */
 
-describe('the naive baselines are read out of data/, not named in code', () => {
+describe.skipIf(!BENCHMARK)('the naive baselines are read out of data/, not named in code', () => {
   it('finds every profile carrying role: "baseline" and nothing else', async () => {
     const config = await loadResources();
     const found = baselineProfileIds(config.dispatcherProfilesById);
@@ -86,7 +99,7 @@ describe('the naive baselines are read out of data/, not named in code', () => {
  * § 1 — the building's own scenario
  * -------------------------------------------------------------------------- */
 
-describe('§ 1 — the building’s own scenario admits a paired comparison after all (§ D254, § D279)', () => {
+describe.skipIf(!BENCHMARK)('§ 1 — the building’s own scenario admits a paired comparison after all (§ D254, § D279)', () => {
   /**
    * **The inversion, and it is asserted as an identity rather than as a negation.**
    *
@@ -237,7 +250,7 @@ describe('§ 1 — the building’s own scenario admits a paired comparison afte
  * The apparatus
  * -------------------------------------------------------------------------- */
 
-describe('every operating point is quotable at its budget, paired, and inside its ceiling', () => {
+describe.skipIf(!BENCHMARK)('every operating point is quotable at its budget, paired, and inside its ceiling', () => {
   it('has every arm quotable and every replication CRN-aligned', () => {
     for (const point of study.points) {
       expect(
@@ -274,7 +287,7 @@ describe('every operating point is quotable at its budget, paired, and inside it
  * The decomposition
  * -------------------------------------------------------------------------- */
 
-describe('the call type alone is worth exactly zero here, and the study says so by measurement', () => {
+describe.skipIf(!BENCHMARK)('the call type alone is worth exactly zero here, and the study says so by measurement', () => {
   it('is bit-identical to eta on every replication of every point', () => {
     for (const point of study.points) {
       expect(
@@ -293,7 +306,7 @@ describe('the call type alone is worth exactly zero here, and the study says so 
  * The gate — § D27's shape
  * -------------------------------------------------------------------------- */
 
-describe('the gate is TTD, and AWT and WT95 are reported beside it with verdicts (§ D27)', () => {
+describe.skipIf(!BENCHMARK)('the gate is TTD, and AWT and WT95 are reported beside it with verdicts (§ D27)', () => {
   it('carries an AWT cell and a WT95 cell for every gate cell — omitting one fails the phase', () => {
     for (const point of study.points) {
       const gates = point.cells.filter((cell) => cell.metric === MIXED_USE_GATE);
@@ -408,7 +421,7 @@ describe('the gate is TTD, and AWT and WT95 are reported beside it with verdicts
  * The verdict, and the resolution it rests on
  * -------------------------------------------------------------------------- */
 
-describe('the criterion’s verdict is derived from the cells, not written', () => {
+describe.skipIf(!BENCHMARK)('the criterion’s verdict is derived from the cells, not written', () => {
   it('agrees with a recount of the gate cells', () => {
     const recount: string[] = [];
     for (const point of study.points) {
@@ -453,7 +466,7 @@ describe('the criterion’s verdict is derived from the cells, not written', () 
  * Layer A of the publication guard
  * -------------------------------------------------------------------------- */
 
-describe('the published figures still reproduce', () => {
+describe.skipIf(!BENCHMARK)('the published figures still reproduce', () => {
   it('matches every pinned estimate, in both directions', () => {
     const mismatches = checkPinned('mixed-use-high-rise', mixedUseFigures(study));
     expect(

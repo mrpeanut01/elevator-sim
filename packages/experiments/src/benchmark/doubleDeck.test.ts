@@ -48,6 +48,16 @@ import { checkPinned, describeMismatches, doubleDeckFigures } from './published.
 import { BENCHMARK_SEED } from './suite.js';
 
 /** Long: two operating points at their real budgets, plus a three-rate coverage census. */
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 482.9 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const TIMEOUT_MS = 900_000;
 
 let cached: Promise<DoubleDeckStudy> | undefined;
@@ -62,7 +72,7 @@ async function study(): Promise<DoubleDeckStudy> {
  * 1. The control arm
  * -------------------------------------------------------------------------- */
 
-describe('the control arm is the retired disclaimer’s own configuration', () => {
+describe.skipIf(!BENCHMARK)('the control arm is the retired disclaimer’s own configuration', () => {
   it('strips the pairing and nothing else, and the runtime says what that means', async () => {
     const config = await loadResources();
     const treatment = config.buildingsById.get(DOUBLE_DECK_BUILDING) as ResolvedBuilding;
@@ -101,7 +111,7 @@ describe('the control arm is the retired disclaimer’s own configuration', () =
  * 2. The pairing, and 3. the denominators
  * -------------------------------------------------------------------------- */
 
-describe('the two arms share a passenger population and do not share a leg decomposition', () => {
+describe.skipIf(!BENCHMARK)('the two arms share a passenger population and do not share a leg decomposition', () => {
   /**
    * Field by field on the generated trace, at six replication seeds.
    *
@@ -225,7 +235,7 @@ describe('the two arms share a passenger population and do not share a leg decom
  * 4. The census
  * -------------------------------------------------------------------------- */
 
-describe('where an interval may be quoted at all, censused on this cell and not inherited', () => {
+describe.skipIf(!BENCHMARK)('where an interval may be quoted at all, censused on this cell and not inherited', () => {
   /**
    * **The third building on which this claim was the § D254 defect, and the third refutation.**
    *
@@ -363,7 +373,7 @@ describe('where an interval may be quoted at all, censused on this cell and not 
  * 5. The result
  * -------------------------------------------------------------------------- */
 
-describe('the double-deck verdict', () => {
+describe.skipIf(!BENCHMARK)('the double-deck verdict', () => {
   it('is quotable at the 1 % point and no longer at the 1.5 % one, with nothing bit-identical', async () => {
     const result = await study();
     console.log(formatDoubleDeckStudy(result));
@@ -511,7 +521,7 @@ describe('the double-deck verdict', () => {
  * Layer A of the publication guard
  * -------------------------------------------------------------------------- */
 
-describe('the published figures still reproduce', () => {
+describe.skipIf(!BENCHMARK)('the published figures still reproduce', () => {
   it('matches every pinned estimate, in both directions', async () => {
     const mismatches = checkPinned('double-deck', doubleDeckFigures(await study()));
     expect(

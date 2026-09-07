@@ -41,6 +41,19 @@ import {
 import { loadResources, runGateExperiment } from '../validation/harness.js';
 import type { ReplicationRecord } from '../runner/types.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 135.2 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ *
+ * The liveness suite and the four-dimension suite stay always-on: the first is the dead-seam guard
+ * for `patternSwitching` and the second reads the search space, and neither runs a study.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const TIMEOUT_MS = 600_000;
 
 let cachedStudy: Promise<SelectionStudy> | undefined;
@@ -147,7 +160,7 @@ describe('the weight-set selector is live in a real run, measured on trajectorie
  * Both halves are asserted, because they fail for different reasons: the synthetic case pins the
  * arithmetic exactly, and the real one pins that the case is not hypothetical on shipped data.
  */
-describe('the census ceiling reads every ground awtIsValid has, not just saturation', () => {
+describe.skipIf(!BENCHMARK)('the census ceiling reads every ground awtIsValid has, not just saturation', () => {
   /** A record carrying only the two fields the ceiling reads. */
   const record = (awtIsValid: boolean, saturated: boolean): ReplicationRecord =>
     ({
@@ -235,7 +248,7 @@ describe('the learned policy is four declared dimensions, not a tensor', () => {
  * The known answer
  * -------------------------------------------------------------------------- */
 
-describe('the 2 s deadband — the known answer the policy cannot see', () => {
+describe.skipIf(!BENCHMARK)('the 2 s deadband — the known answer the policy cannot see', () => {
   it('rediscovers the interior optimum from the shipped 8 s, blind', async () => {
     // `docs/07` § 5: the shipped profile carries **8 s**, the interior optimum is **2 s**, and the
     // wrong value is left shipped on purpose. § D126: *one that returns 8 s has failed, not
@@ -264,7 +277,7 @@ describe('the 2 s deadband — the known answer the policy cannot see', () => {
  * The verdict
  * -------------------------------------------------------------------------- */
 
-describe('Phase 6c, measured against the criterion written before it', () => {
+describe.skipIf(!BENCHMARK)('Phase 6c, measured against the criterion written before it', () => {
   it('gates on TTD and publishes AWT, WT95 and the energy proxy beside it', async () => {
     const result = await study();
     expect(result.gateMetric).toBe(SELECTION_GATE);

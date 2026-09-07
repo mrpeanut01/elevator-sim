@@ -73,6 +73,16 @@ import {
 } from './destinationDisclosure.js';
 import { checkPinned, describeMismatches, disclosureFigures } from './published.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 30.5 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const TIMEOUT_MS = 900_000;
 
 let cached: DisclosureStudy | undefined;
@@ -85,7 +95,7 @@ async function study(): Promise<DisclosureStudy> {
 
 const HEADLINE = rideArmId(1);
 
-describe('Phase 6a — destination disclosure at the primary operating point', () => {
+describe.skipIf(!BENCHMARK)('Phase 6a — destination disclosure at the primary operating point', () => {
   it('prints the whole table, including the arms that lose', async () => {
     console.log(formatDisclosureStudy(await study()));
   }, TIMEOUT_MS);
@@ -290,7 +300,7 @@ describe('Phase 6a — destination disclosure at the primary operating point', (
   }, TIMEOUT_MS);
 });
 
-describe('the budget is re-derived here rather than quoted from the contract', () => {
+describe.skipIf(!BENCHMARK)('the budget is re-derived here rather than quoted from the contract', () => {
   it('resolves the effect it reports, and says what it would take to resolve less', async () => {
     const result = await study();
     const ttd = result.budget.rows.find((row) => row.metric === 'ttdMeanS');
@@ -313,7 +323,7 @@ describe('the budget is re-derived here rather than quoted from the contract', (
   }, TIMEOUT_MS);
 });
 
-describe('the shipped operating points are blind to this effect, and it is predicted in advance', () => {
+describe.skipIf(!BENCHMARK)('the shipped operating points are blind to this effect, and it is predicted in advance', () => {
   it('separates an expected zero from a wiring zero, by measuring both on the same code', async () => {
     const result = await study();
     expect(result.negativeControls.length).toBeGreaterThan(0);
@@ -347,7 +357,7 @@ describe('the shipped operating points are blind to this effect, and it is predi
  * Layer A of the publication guard — see published.ts
  * -------------------------------------------------------------------------- */
 
-describe('the figures this study publishes still come out of it', () => {
+describe.skipIf(!BENCHMARK)('the figures this study publishes still come out of it', () => {
   it('reproduces every pinned estimate, at full precision', async () => {
     const mismatches = checkPinned('destination-disclosure', disclosureFigures(await study()));
     expect(
