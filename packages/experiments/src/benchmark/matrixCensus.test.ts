@@ -163,8 +163,9 @@ describe('the census tier announces itself when it is not running', () => {
     if (!DEEP) {
       console.log(
         '\nmatrix census: SKIPPED. Set ELEVATOR_SIM_DEEP=1 to re-derive every matrix budget from a ' +
-          `${String(CENSUS_REPLICATIONS)}-replication census (~197 s). The matrix itself is always-on ` +
-          'at its full derived budgets and is not affected by this flag.',
+          `${String(CENSUS_REPLICATIONS)}-replication census (~197 s). The matrix itself runs at ` +
+          'its full derived budgets behind ELEVATOR_SIM_BENCHMARK=1 (since 2026-09-07) and is ' +
+          'not affected by this flag.',
       );
     }
     expect(CENSUS_REPLICATIONS).toBe(200);

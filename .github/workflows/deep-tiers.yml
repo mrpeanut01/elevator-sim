@@ -268,6 +268,50 @@
 # a second. A scheduled run's red X is seen by nobody by default — GitHub emails only the author of
 # the last commit that touched the cron — which is the same shape as a probe reporting zero because
 # nothing was watching. An issue is where the rest of this repository's findings already live.
+#
+# ## The benchmark studies — four more jobs, 2026-09-07
+#
+# Sixteen files under `packages/experiments/src/benchmark/` carry a gate,
+# `ELEVATOR_SIM_BENCHMARK=1`, and it differs in kind from every gate above it. Those open a DEEP
+# variant of a check whose always-on half still runs on every pull request; this one moves the
+# always-on check itself. Measured on `ubuntu-latest` (CI run 34075532017, 2026-09-07): the
+# `experiments` leg of `ci.yml` ran 25 to 32 minutes while no other leg took ten, and `benchmark/`
+# was 3 665 s of that leg's 4 000 s of test time — four files alone were 2 819 s. A suite's wall
+# clock is its longest leg, so every pull request waited on studies whose numbers can move only when
+# `core`, `experiments` or `data/` do, and a wave that touches none of them paid for them anyway.
+#
+# What moves and what stays, stated so the next reader does not have to diff it. Behind the gate:
+# the sweeps, the censuses, the studies, and every `checkPinned` call against
+# `benchmark/published.ts`. Still always-on: the suites in those files that read no run — candidacy
+# and cell sets, the analytic resolution limit, the matrix's design suite, the `patternSwitching`
+# liveness guard — and every file under `benchmark/` that cost under ten seconds.
+# `packages/viz/src/deepTiers.test.ts` carries the measured seconds per file beside each entry.
+#
+# The tier's size is derived, by the `vitest list` diff the header's first section describes:
+# **1 241 cases always-on, 1 413 with the gate open, so 172 cases in the tier**, across the sixteen
+# files, and **24 cases in four of them stay always-on** (twelve in `selectionSweep`, seven in
+# `weightSetSelection`, three in `matrix`, two in `lunchTwoWaySelection`). Nothing is removed by
+# opening the gate — the diff in that direction is empty. What the always-on leg costs afterwards,
+# measured on a quiet 10-core developer machine rather than the runner: 108 files, 96 passed and 12
+# skipped whole; 1 241 cases passed, 183 skipped (the 172 here plus the eleven the older gates
+# already held); **50 s of wall clock** over 255 s of summed file time, with every one of the
+# sixteen at 0.3 s or under and the slowest file in the project now `validation/crippledVariant` at
+# 48.5 s.
+#
+# What a pull request gives up: the pin table is no longer re-derived on the pull request that moves
+# a number. It is re-derived on Sunday and on dispatch, a moved pin is filed by `report`, and
+# attribution is a read back over the wave rather than a red check on one branch. That is the trade
+# `matrix-census` already made for the census the matrix's replication counts derive from, taken one
+# level up. The working agreement that keeps it honest: **a wave that touches `core`, `experiments`
+# or `data/` dispatches `benchmark` before it integrates and reads the result**, the way a wave
+# already asks for the corpus figures.
+#
+# Four jobs rather than one, and the arithmetic decides it as it did above: a job runs its files in
+# series, the four quarters are 968 s, 899 s, 952 s and 846 s, so one job is an hour's wall clock
+# and four are the slowest file's. The `benchmark` dispatch choice runs all four; each job id runs
+# one, so a fix to one study can be re-measured without paying for the other three. Every file has
+# its own `run:` line because `deepTiers.test.ts` reads one file per line, and every step sets the
+# gate because that test walks back from the `run:` to the step's own `env:`.
 name: Deep tiers
 
 on:
@@ -293,6 +337,11 @@ on:
           - difficulty-curve
           - honesty-deep
           - corpus-figures
+          - benchmark
+          - benchmark-selection-sweep
+          - benchmark-saturation-census
+          - benchmark-double-deck-and-lunch
+          - benchmark-studies
 
 # No `cancel-in-progress`. A four-hour job cancelled by the next firing produces no result at all,
 # and two overlapping weekly runs is not a state this schedule can reach.
@@ -694,6 +743,143 @@ jobs:
   # `always()` so a red tier is reported rather than skipped past, and no `needs` result is allowed
   # to decide whether the summary exists.
   # ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # The benchmark studies — the always-on check, moved. See the header, § "The benchmark
+  # studies".
+  # Four jobs, each a quarter of the cost; the `benchmark` dispatch choice runs all four.
+  # ---------------------------------------------------------------------------
+  benchmark-selection-sweep:
+    name: benchmark — the eight-cell selection sweep
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'benchmark' || inputs.tiers == 'benchmark-selection-sweep'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      # Every `--project experiments` job builds first — see the header, § "A tier that runs
+      # replications needs a built tree". Not optional and not merely prudent.
+      - name: Typecheck and build
+        run: npm run build
+      - name: Selection sweep (§ D151, § D156)
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/selectionSweep.test.ts
+
+  benchmark-saturation-census:
+    name: benchmark — the operating-point census
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'benchmark' || inputs.tiers == 'benchmark-saturation-census'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      # Every `--project experiments` job builds first — see the header, § "A tier that runs
+      # replications needs a built tree". Not optional and not merely prudent.
+      - name: Typecheck and build
+        run: npm run build
+      - name: Saturation census
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/saturationCensus.test.ts
+
+  benchmark-double-deck-and-lunch:
+    name: benchmark — double deck, and lunch two-way
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'benchmark' || inputs.tiers == 'benchmark-double-deck-and-lunch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      # Every `--project experiments` job builds first — see the header, § "A tier that runs
+      # replications needs a built tree". Not optional and not merely prudent.
+      - name: Typecheck and build
+        run: npm run build
+      - name: Double-deck study (§ D131)
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/doubleDeck.test.ts
+      - name: Lunch two-way selection (§ D162)
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/lunchTwoWaySelection.test.ts
+
+  benchmark-studies:
+    name: benchmark — the twelve remaining studies
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'benchmark' || inputs.tiers == 'benchmark-studies'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      # Every `--project experiments` job builds first — see the header, § "A tier that runs
+      # replications needs a built tree". Not optional and not merely prudent.
+      - name: Typecheck and build
+        run: npm run build
+      - name: Mixed-Use High-Rise study
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/mixedUseHighRise.test.ts
+      - name: Experiment matrix at its derived replication counts
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/matrix.test.ts
+      - name: Weight-set selection (Phase 6c)
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/weightSetSelection.test.ts
+      - name: Tail study
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/tailStudy.test.ts
+      - name: Destination dispatch contrast (Phase 6b)
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/destinationDispatchContrast.test.ts
+      - name: Dispatcher benchmark (Phase 5)
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/dispatcherBenchmark.test.ts
+      - name: Capacity reassignment
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/capacityReassignment.test.ts
+      - name: Destination disclosure (Phase 6a)
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/destinationDisclosure.test.ts
+      - name: En-route diversion
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/enRouteDiversion.test.ts
+      - name: Down-peak destination
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/downPeakDestination.test.ts
+      - name: Deadband and rate sweeps
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/deadbandSweep.test.ts
+      - name: Access-control study
+        env:
+          ELEVATOR_SIM_BENCHMARK: '1'
+        run: npx vitest run --passWithNoTests=false --project experiments src/benchmark/accessControl.test.ts
+
   summary:
     name: summary
     if: always()
@@ -708,6 +894,10 @@ jobs:
       - honesty-deep
       - difficulty-curve
       - corpus-figures
+      - benchmark-selection-sweep
+      - benchmark-saturation-census
+      - benchmark-double-deck-and-lunch
+      - benchmark-studies
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -761,6 +951,10 @@ jobs:
       - perf-scaling
       - honesty-deep
       - corpus-figures
+      - benchmark-selection-sweep
+      - benchmark-saturation-census
+      - benchmark-double-deck-and-lunch
+      - benchmark-studies
     runs-on: ubuntu-latest
     permissions:
       contents: read

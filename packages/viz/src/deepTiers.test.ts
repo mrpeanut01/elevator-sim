@@ -243,6 +243,139 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
     scheduled: true,
   },
   /*
+   * The benchmark tier — sixteen files, one gate, four jobs — 2026-09-07.
+   *
+   * These are not deep variants of an always-on check; they ARE the always-on check, moved. Every
+   * one ran on every pull request until the day this entry is dated, and together they were
+   * 3 665 s of the `experiments` leg's 4 000 s of test time on `ubuntu-latest` (CI run
+   * 34075532017) — a leg that took 25 to 32 minutes while no other leg took ten, on a suite whose
+   * wall clock is its longest leg. Behind the gate, the leg is what is left: 79 files, 335 s.
+   *
+   * What the pull request gives up is stated rather than glossed. Fourteen of these files hold the
+   * `checkPinned` calls that re-derive `benchmark/published.ts`'s pin table — the guard that exists
+   * because three published intervals had gone stale before it did. After this entry a pull request
+   * that moves a pinned number merges green, and the move is found by the next dispatch or Sunday
+   * run and filed by the `report` job, then attributed by reading back over the wave rather than
+   * off one pull request. That is the same trade `matrixCensus.test.ts` made at the top of this
+   * table, and it is the right one for numbers that move only when `core`, `experiments` or `data/`
+   * do. A wave that touches any of those dispatches the `benchmark` choice before it integrates.
+   *
+   * The seconds beside each file are that run's, quoted so the next reader can tell a file that
+   * belongs here from one that drifted in: a file under ten seconds does not earn a gate.
+   *
+   * Sized by the `vitest list` diff this file's own header describes, on the tree the entries
+   * landed on: 1 241 cases always-on, 1 413 with the gate open — 172 in the tier — and 24 cases in
+   * four of the sixteen files kept always-on because they read no run.
+   */
+  'packages/experiments/src/benchmark/accessControl.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'the access-control study (H-ACCESS-2, § D280’s difference-of-differences) and its ' +
+      'pinned figures and counts; 17 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/capacityReassignment.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'Phase 5’s stage-5 capacity-reassignment study and its pinned figures; 34 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/deadbandSweep.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'the deadband and rate sweeps, twelve paired intervals with their pins; 19 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/destinationDisclosure.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'Phase 6a at the primary operating point, the re-derived budget and the blind points; ' +
+      '31 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/destinationDispatchContrast.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'Phase 6b’s C→D contrast, run in a top-level beforeAll that the gate also shuts; 55 s ' +
+      'of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/dispatcherBenchmark.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'Phase 5’s criterion, every dispatcher against nearest-car, and the benchmark pins; ' +
+      '51 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/doubleDeck.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      '§ D131’s double-deck comparison at both operating points plus its coverage census; ' +
+      '483 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/downPeakDestination.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'the down-peak destination question and its pins; 28 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/enRouteDiversion.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'en-route diversion paired against collective at two quotable rates; 29 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/lunchTwoWaySelection.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      '§ D162’s measurement at the pre-registered budget — two censuses, two searches, two ' +
+      'verdicts; 469 s of the leg. The cell-identity suite stays always-on',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/matrix.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'the experiment matrix at its derived budgets, every suite that reads a cell result; ' +
+      '150 s of the leg. The design suite stays always-on',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/mixedUseHighRise.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'the Mixed-Use High-Rise study, every operating point paired and censused; 153 s of the ' +
+      'leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/saturationCensus.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'the census that fixes every operating point in arms.ts — three buildings, nine arms, ' +
+      'up to 1 000 replications; 899 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/selectionSweep.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'Phase 6c’s eight-cell sweep under § D151’s protocol; 968 s of the leg, the single most ' +
+      'expensive file in the repository. Candidacy, the cell set, Holm and the analytic limit ' +
+      'stay always-on',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/tailStudy.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'Phase 5’s tail study over the census loads and its pins; 119 s of the leg',
+    scheduled: true,
+  },
+  'packages/experiments/src/benchmark/weightSetSelection.test.ts': {
+    gates: ['ELEVATOR_SIM_BENCHMARK'],
+    reason:
+      'Phase 6c’s census ceiling, deadband known-answer and § D139 verdict; 135 s of the leg. ' +
+      'The patternSwitching liveness guard stays always-on',
+    scheduled: true,
+  },
+  /*
    * The one that must stay off, and the reason it is in this table rather than absent from it.
    *
    * `ELEVATOR_SIM_REGENERATE_GOAL_RATES=1` does not open a tier — it **closes** one. Measured with

@@ -38,6 +38,19 @@ import {
 } from './selectionSweep.js';
 import { loadResources } from '../validation/harness.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 968.2 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ *
+ * The four suites above the sweep — candidacy, the cell set, Holm and the analytic resolution limit
+ * — read no run and stay always-on.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 const TIMEOUT_MS = 3_600_000;
 
 let cached: Promise<SelectionSweep> | undefined;
@@ -250,7 +263,7 @@ describe('the smallest detectable effect reproduces docs/07 § 4’s own near-ne
  * The sweep
  * -------------------------------------------------------------------------- */
 
-describe('the sweep, run at the pre-registered budget', () => {
+describe.skipIf(!BENCHMARK)('the sweep, run at the pre-registered budget', () => {
   it('screens every cell and filters none of them', async () => {
     // § D151 § 5: the screen is a moderator for interpretation, never a filter for inclusion.
     // Asserted as a count rather than as a property of any one cell's regime count, because the

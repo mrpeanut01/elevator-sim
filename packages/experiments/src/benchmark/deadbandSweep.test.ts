@@ -20,7 +20,17 @@ import {
 } from './deadbandSweep.js';
 import { checkPinned, deadbandSweepFigures, rateSweepFigures } from './published.js';
 
-describe('the deadband sweep — eight paired intervals against stay', () => {
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 19.3 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
+describe.skipIf(!BENCHMARK)('the deadband sweep — eight paired intervals against stay', () => {
   it('reproduces its pins at the published budget, and finds the interior optimum the verdict quotes', async () => {
     const study = await runDeadbandSweep({});
     expect(study.replications).toBe(SWEEP_REPLICATIONS);
@@ -38,7 +48,7 @@ describe('the deadband sweep — eight paired intervals against stay', () => {
   }, 3_600_000);
 });
 
-describe('the rate sweep — four paired intervals and the count beside each', () => {
+describe.skipIf(!BENCHMARK)('the rate sweep — four paired intervals and the count beside each', () => {
   it('reproduces its pins at the published budget, and is inert at every rate without being identical at every rate', async () => {
     const study = await runRateSweep({});
     expect(study.thresholdS).toBe(8);

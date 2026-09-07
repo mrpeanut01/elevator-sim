@@ -107,6 +107,19 @@ jobs:
   # one machine, and separate legs are separate runners. So the split satisfies it rather than
   # straining it, and the integrator who ran `experiments` next to `viz` on one container and got
   # nothing back in fifty minutes is why this sentence is here.
+  #
+  # **And since 2026-09-07 that leg no longer runs the benchmark studies.** Measured on run
+  # 34075532017: `experiments` took 25 to 32 minutes while none of the other four legs took ten, and
+  # `packages/experiments/src/benchmark/` was 3 665 s of its 4 000 s of test time. A suite's wall
+  # clock is its longest leg, so every pull request waited on studies whose numbers can move only
+  # when `core`, `experiments` or `data/` do. Those studies now sit behind
+  # `ELEVATOR_SIM_BENCHMARK=1` and run in `deep-tiers.yml`'s four `benchmark-*` jobs — weekly, and
+  # on dispatch — and this leg is what was left: the validation, oracle, runner, fuzz and tuning
+  # suites, plus the suites in those sixteen files that read no run. The matrix below is unchanged
+  # on purpose: the gate is in the files, `packages/viz/src/deepTiers.test.ts` is what keeps it
+  # wired, and a leg that had to know which files moved would be a second list to go stale. The
+  # trade — a moved pin is found on the next dispatch rather than on the pull request — is written
+  # where the jobs are.
   legs:
     name: ${{ matrix.leg }}
     runs-on: ${{ matrix.runner }}

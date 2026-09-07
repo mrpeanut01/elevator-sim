@@ -22,6 +22,16 @@ import {
   type DiversionPoint,
 } from './enRouteDiversion.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 28.9 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 let config: LoadedConfig;
 
 beforeAll(async () => {
@@ -63,7 +73,7 @@ function line(cell: DiversionCell): string {
   );
 }
 
-describe('en-route diversion, paired against conventional collective', () => {
+describe.skipIf(!BENCHMARK)('en-route diversion, paired against conventional collective', () => {
   it('measures the difference under common random numbers and reports the interval', async () => {
     const cells: DiversionCell[] = [];
     for (const point of POINTS) {
@@ -98,7 +108,7 @@ describe('en-route diversion, paired against conventional collective', () => {
  * The profile as shipped — the question an operator actually asks
  * -------------------------------------------------------------------------- */
 
-describe('collective-enroute, as shipped, against collective', () => {
+describe.skipIf(!BENCHMARK)('collective-enroute, as shipped, against collective', () => {
   it('is better or null on both metrics everywhere, and worse on neither', async () => {
     const cells: DiversionCell[] = [];
     for (const point of [...POINTS, { building: 'vertical-city', rate: 4, callType: 'mobile-credential' } as const]) {

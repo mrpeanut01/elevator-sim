@@ -1,5 +1,9 @@
 /**
- * **The matrix, always-on: eight cells, twelve arms, three-axis fronts, every figure pinned.**
+ * **The matrix: eight cells, twelve arms, three-axis fronts, every figure pinned.**
+ *
+ * It was *always-on* in this line's first wording, and since 2026-09-07 it is not: every suite that
+ * reads a cell result runs behind `ELEVATOR_SIM_BENCHMARK=1`, in `deep-tiers.yml`'s benchmark jobs,
+ * and only the design suite below still runs on a pull request — see the gate for the measurement.
  *
  * This is the whole deliverable at its full derived budget — nothing here is a reduced-budget
  * stand-in for a table that lives somewhere else, and there is no such table. Measured at 72.7 s of
@@ -47,6 +51,20 @@ import {
 } from './matrix.js';
 import { checkPinned, describeMismatches, matrixFigures } from './published.js';
 
+/**
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
+ * 150.5 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
+ * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly
+ * as they did before, at their pre-registered budgets, and `packages/viz/src/deepTiers.test.ts`
+ * requires the workflow to open this gate for this file.
+ *
+ * The design suite — *the matrix covers what it claims to cover* — reads no run and stays
+ * always-on; every suite that reads a result is gated, and the `beforeAll` pre-warm below is gated
+ * with them.
+ */
+const BENCHMARK = process.env['ELEVATOR_SIM_BENCHMARK'] === '1';
+
 let matrix: readonly MatrixCellResult[] | undefined;
 let elapsedMs = 0;
 
@@ -60,6 +78,9 @@ async function matrixOf(): Promise<readonly MatrixCellResult[]> {
 }
 
 beforeAll(async () => {
+  // The pre-warm belongs to the tier: with the gate shut every suite that reads the matrix is
+  // skipped, and running it here would be the whole cost with nothing reading the result.
+  if (!BENCHMARK) return;
   await matrixOf();
 }, 600_000);
 
@@ -117,7 +138,7 @@ describe('the matrix covers what it claims to cover', () => {
  * The apparatus
  * -------------------------------------------------------------------------- */
 
-describe('every cell is a paired experiment, and says so', () => {
+describe.skipIf(!BENCHMARK)('every cell is a paired experiment, and says so', () => {
   it('ran every arm on the baseline\'s own passenger populations', async () => {
     for (const result of await matrixOf()) {
       expect(result.crnAligned, `${result.cell.id} is not CRN-aligned`).toBe(true);
@@ -205,7 +226,7 @@ describe('every cell is a paired experiment, and says so', () => {
  * The front
  * -------------------------------------------------------------------------- */
 
-describe('the Pareto front is over three axes and never orders a tie', () => {
+describe.skipIf(!BENCHMARK)('the Pareto front is over three axes and never orders a tie', () => {
   it('decides every cell on (awt, energy, wt95), with none of the three inactive', async () => {
     for (const result of await matrixOf()) {
       expect(result.front.objectiveIds).toEqual(['awt', 'energy', 'wt95']);
@@ -275,7 +296,7 @@ describe('the Pareto front is over three axes and never orders a tie', () => {
  * IDENTICAL — a wiring bug until proven otherwise
  * -------------------------------------------------------------------------- */
 
-describe('bit-identical arms are found and named', () => {
+describe.skipIf(!BENCHMARK)('bit-identical arms are found and named', () => {
   it('finds destination-eta separated from eta everywhere the destination carries information', async () => {
     /*
      * **This assertion used to say the opposite, and the change is the fix rather than a
@@ -405,7 +426,7 @@ describe('bit-identical arms are found and named', () => {
  * Layer A — the pins
  * -------------------------------------------------------------------------- */
 
-describe('every published matrix figure is the one the code still produces', () => {
+describe.skipIf(!BENCHMARK)('every published matrix figure is the one the code still produces', () => {
   /*
    * **The 44 `vertical-city-up-peak` pins were regenerated once, deliberately, and § D150 says
    * why.** They are the only pins in this group measured after § D131 made double-deck operation
@@ -479,7 +500,7 @@ describe('every published matrix figure is the one the code still produces', () 
  * Reading helpers
  * -------------------------------------------------------------------------- */
 
-describe('cellResult', () => {
+describe.skipIf(!BENCHMARK)('cellResult', () => {
   it('names the cells it has when asked for one it does not', async () => {
     const results = await matrixOf();
     expect(cellResult(results, 'midtown-up-peak').cell.building).toBe('midtown-office');
