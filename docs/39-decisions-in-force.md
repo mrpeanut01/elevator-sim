@@ -18,14 +18,17 @@ tidy is done the only way it can be: the entries the owner's 2026-09-06 rulings 
 
 ## 1. In force
 
-The three rulings that declare the game's shape, taken and confirmed by the product owner on
-2026-09-06:
+The rulings that declare the game's shape, taken and confirmed by the product owner on 2026-09-06 —
+the first three in one conversation, the last three later the same day:
 
 | decision | what it rules |
 |---|---|
 | [§ D525](../DECISIONS.md) | Three modes, **Scenario** first, then **Career**, then **Rush**. *Fix a building* and *Today's tower* become Scenario content. No fixes are proposed; a budget, the whole editor, and a price ladder that runs dispatcher, equipment settings, building. Difficulty is the number of affordable configurations that survive, pre-simulated. Everything plays live. A rush round with recorded mid-run changes is postable |
 | [§ D526](../DECISIONS.md) | One currency across the modes, earned by completing turns and spent on a mode's modifiers. Nothing resets on time. No purchase ships; the ledger is built so an add from outside is invisible to the play surface |
 | [§ D527](../DECISIONS.md) | The model carries a building up to and slightly beyond the largest in the world: 165 levels, 57 lifts, 10 m/s, unpopulated mechanical floors, escalators. What already carries it is read off the tree; what is owed is five measurements |
+| [§ D528](../DECISIONS.md) | Difficulty is the **survivor count**, budgeted by ladder position, positions one and two exempt from the dropdown clause. The **budget joins demand and fabric** as DC-R1's third substrate, and per-scenario scarcity is **a price, never a removed control**. DC-1, DC-2, DC-2b and DC-7 fold into one measurement; DC-9 is re-aimed from repairs to controls; DC-5 splits; a floor is added on the first hour |
+| [§ D529](../DECISIONS.md) | The first session is a **two-screen tutorial** before Scenario — walk the player through the editor, then let a building fall apart and show the fix. Screen two is reused as the Rush tutorial. **A worked answer is permitted in the tutorial and nowhere else** |
+| [§ D530](../DECISIONS.md) | The cross-mode currency is named **chimes**, closing the first of § D526's two open items |
 
 The standing decisions those three rest on, unchanged and cited rather than restated:
 
@@ -64,16 +67,22 @@ the same thing in one sentence.
 | [§ D354](../DECISIONS.md) | The stage speed ladder is honest and opens at `30×` | **Amended.** The ladder stands; the opening speed moves to a watching rung, `1×` or `4×`, chosen by playtest | § D525 |
 | [§ D475](../DECISIONS.md), [§ D514](../DECISIONS.md) | Every eligible building can carry the first session, drawn at random; built as a draw among the five legible contracts on a named stream | **Narrowed.** The first session is Scenario's first entry, authored to be doable with a tweak and failable with the wrong one; the draw among the legible five stands only where every candidate passes that test | § D525 |
 | [§ D477](../DECISIONS.md) | Endless rush is kept; placement left open | **Amended.** Placement settled: the front door, as Rush, where § D515 had built it | § D525 |
-| [§ D515](../DECISIONS.md) | Endless rush runs as a week of its own, ends on the hold line, quotes the sheet's trend test | **Amended.** The build stands; a round gains recorded interventions, a per-wave purse credits can widen, and a postable result keyed by modifier set | § D525, § D526 |
+| [§ D515](../DECISIONS.md) | Endless rush runs as a week of its own, ends on the hold line, quotes the sheet's trend test | **Amended.** The build stands; a round gains recorded interventions, a per-wave purse chimes can widen, and a postable result keyed by modifier set | § D525, § D526 |
 | [§ D497](../DECISIONS.md) | A purchase may not change the crowd, the diagnosed repair may, and the basis line says which | **Amended.** With no authored repair roles, one rule per change: a fabric purchase may not change the crowd, a demand-side change may, and the basis line says which it did | § D525 |
 | [§ D411](../DECISIONS.md) | `docs/25`'s slice definition is adopted | **Amended.** The slice is unchanged in content; its mode is *today's scenario* in Scenario rather than *Today's tower* | § D525 |
 | [§ D414](../DECISIONS.md) | `docs/35` is adopted | **Amended.** § 6's placement question is settled and § 7's repair lists retire; the rest stands, including the stage a fix case has, which wave T built | § D525 |
-| [§ D218](../DECISIONS.md) | A challenge board, and the prohibition it survives | **Amended.** Boards are keyed by modifier set as well as by day; a run carries its modifiers and never the credits spent | § D526 |
+| [§ D218](../DECISIONS.md) | A challenge board, and the prohibition it survives | **Amended.** Boards are keyed by modifier set as well as by day; a run carries its modifiers and never the chimes spent | § D526 |
 | [§ D224](../DECISIONS.md) | The Engineer menu explains the game, checked against the game | **Re-derive.** The check stands; the explanation it checks changes with the mode set | § D525 |
 | `docs/32` GD4 | Endless rush is a calibration instrument beside the bench | **Withdrawn** | § D525 |
 | `docs/32` § 9 Q4 | The only day-2 mechanism is the daily seed | **Answered.** The daily seed, a record to beat, and a balance to save up | § D526 |
 | `docs/26` § 10 non-goal 1 | No monetisation of any kind, and no event that supports one | **Amended.** No purchase ships anywhere; the ledger is built so an add from outside would be one more source and move nothing on the play surface; such a source is added only by a decision citing a measured `charter S4` | § D526 |
 | `docs/04`, `data/buildings/README.md` | The shipped set tops out at `vertical-city`, 100 floors and 35 cars | **Extended.** A reference building at 165 levels and 57 lifts is owed, with the five measurements § D527 names | § D527 |
+| `docs/33` DC-R1 | Difficulty may move declared traffic parameters and building fabric, **and nothing else** | **Amended.** A third substrate joins them: the budget and the price schedule. Scarcity is expressed as a price with its reason, never as a removed control | § D528 |
+| `docs/33` DC-2 | No stage may clear from the dispatcher dropdown alone | **Superseded in part.** The blanket form is withdrawn; it becomes a per-tier budget on the survivor count, and **positions one and two are exempt** | § D528 |
+| `docs/33` DC-2b | A stage must admit at least two profiles other than its baseline | **Superseded.** Deleted — § D525 clause 2 retires per-scenario control lists, so every scenario admits everything | § D528 |
+| `docs/33` DC-1, DC-7 | Every stage must fail a goal under some plausible move; fix cases are ordered by how many offered repairs clear | **Superseded.** Both fold into the survivor count; DC-7's offered-repair list is retired by § D525 clause 2 | § D528 |
+| `docs/33` DC-9 | No case may offer a repair that is inert unless it declares it inert | **Amended.** Re-aimed from repairs to controls: no control the editor offers may be inert in a scenario unless the scenario says so | § D528 |
+| `docs/33` DC-5 | A contract's miss rate must be non-decreasing across days 1, 5, 10 and 20 | **Superseded in part.** The *growth reaches the run* half stands; the monotonicity half is dropped, because it bans a designed breather | § D528 |
 
 ## 3. The rename map
 
@@ -87,7 +96,7 @@ Older entries use the names that were true when they were written. Read them wit
 | *Endless rush* | **Rush** | § D477's mechanic, on the front door |
 | *the daily challenge* (Engineer surface, [§ D221](../DECISIONS.md)) | unchanged | The Engineer-side name for the same daily seed; the Engineer surface is not renamed |
 | *units* | unchanged | Money inside a mode. Not the cross-mode currency |
-| *credits* | placeholder | The cross-mode currency of § D526, name pending the owner |
+| *credits* | **chimes** | The cross-mode currency of § D526. *Credits* was the placeholder; the name was ruled by [§ D530](../DECISIONS.md) on 2026-09-06 |
 
 ## 4. What was and was not re-read
 

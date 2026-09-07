@@ -1,8 +1,10 @@
 # 38 — What the game is
 
 **Status: adopted. Written 2026-09-06 and decided the same day by the product owner as
-[§ D525](../DECISIONS.md), [§ D526](../DECISIONS.md) and [§ D527](../DECISIONS.md).** Two questions
-are still open and are marked `[OWNER: …]`; each is ruled separately when the owner takes it. [`39-decisions-in-force.md`](39-decisions-in-force.md) is the
+[§ D525](../DECISIONS.md), [§ D526](../DECISIONS.md) and [§ D527](../DECISIONS.md), with
+[§ D528](../DECISIONS.md), [§ D529](../DECISIONS.md) and [§ D530](../DECISIONS.md) taken later the
+same day.** **One** question is still open and is marked `[OWNER: …]`; it is ruled separately when
+the owner takes it. [`39-decisions-in-force.md`](39-decisions-in-force.md) is the
 index of which older decisions this page supersedes and how their names map.
 
 This page comes before the charter. [`22-charter.md`](22-charter.md) says how we build the game.
@@ -42,7 +44,7 @@ you. It waits for you between sessions.
 while it runs and rebuild between rounds. The only question is how long you last, and the board is
 the same crowd for everyone.
 
-Everything you finish earns credits, in every mode. Credits buy a wider budget on the scenario, the
+Everything you finish earns chimes, in every mode. Chimes buy a wider budget on the scenario, the
 contract or the rush you are saving up for. Nothing resets while you are away, and nothing is ever
 locked: you play to earn, and you spend to reach.
 
@@ -139,7 +141,7 @@ two are compatible. And the budget bounds the space the count is taken over with
 any run is judged against, so charter non-goal 6 holds: two players who post the same run read the
 same verdict whatever their budget was.
 
-**A wider budget can be bought.** Credits (§ 2.4) buy a scenario's budget up, in steps the scenario
+**A wider budget can be bought.** Chimes (§ 2.4) buy a scenario's budget up, in steps the scenario
 authors. The count is pre-simulated at each step and the scenario shows the count for the budget the
 player actually has, so buying up is choosing an easier version of the same puzzle and the screen
 says so. A clear at a bought budget is recorded with its budget.
@@ -168,7 +170,7 @@ standing opens slots and buys nothing. No currency buys access, a verdict, or a 
 consequence of § 2.1: the shop prices its works from the same schedule Scenario uses, with nights on
 top, so a fourth car costs the same units in both modes and a career day costs time as well.
 
-**Credits in a career.** A contract day that pays earns credits, per § 2.4. Credits can top up a
+**Chimes in a career.** A contract day that pays earns chimes, per § 2.4. Chimes can top up a
 tower's purse. They cannot open a slot, because slots are the one scarcity that is attention rather
 than money and standing is what opens them (GD14); and they cannot buy a missed day back, because
 that is relief on a failure.
@@ -217,7 +219,7 @@ reaches the run through ([§ D427](../DECISIONS.md)) is the same kit. A between-
 between-games scope on the next round's record; a mid-round change is an intervention on this one.
 
 **The between-round budget.** Each wave survived pays a fixed purse of units into the next round,
-authored in the rush's own data, so a player who lasts longer has more to rebuild with. Credits
+authored in the rush's own data, so a player who lasts longer has more to rebuild with. Chimes
 (§ 2.4) can top that purse up, and a rush started with a wider purse or a pre-fitted building
 carries those modifiers on its record. Nothing about the purse changes because time passed; it is
 earned inside the run and widened only by spending.
@@ -232,12 +234,12 @@ unchanged. `scope/runIdentity.ts` is where the refusal lives and where it moves.
 permitted for the same reason today's board is: it ranks runs on one crowd, never dispatchers.
 **A run carries its modifiers onto the board.** The standard board is the standard purse and the
 building as shipped, the same for everyone; a run with a bought purse or a pre-fitted building ranks
-among runs with the same modifiers and shows them. What the board never shows is the credits spent:
+among runs with the same modifiers and shows them. What the board never shows is the chimes spent:
 a modifier is a fact about the run's configuration, and a currency figure on a results page is what
 GD13 forbids. A modifier-set board inherits [§ D506](../DECISIONS.md)'s twenty-player floor, so a rare
 modifier set shows no ladder, and it resets as every board does under [§ D509](../DECISIONS.md).
 
-### 2.4 Credits — one currency across the three modes
+### 2.4 Chimes — one currency across the three modes
 
 **What they are.** A tally the player earns by finishing things, in every mode, and spends to widen
 what a mode lets them reach. They are the reason to save up: a scenario you cannot yet afford the
@@ -246,14 +248,14 @@ right change for, a contract that needs a bigger purse, a rush record that needs
 **Earned by completing a turn, never by a run's figures.** A scenario cleared, a contract day paid,
 a rush wave survived. Each pays a flat amount authored in `data/` (invariant 7). Harder scenarios
 may pay more, by their survivor-count band, because that is a property of the scenario and not of
-the run. **No credit is ever scaled by a wait figure or any quantity the run can suppress.** That is
+the run. **No chime is ever scaled by a wait figure or any quantity the run can suppress.** That is
 the argument [`32-game-design.md`](32-game-design.md) § 3.4 makes for standing, a tally of completed
-turns rather than a statistic over a run, and it is what keeps credits outside charter non-goal 1.
+turns rather than a statistic over a run, and it is what keeps chimes outside charter non-goal 1.
 
-**Spent on modifiers, never on access.** Credits buy budget: a scenario's budget up, a tower's purse
+**Spent on modifiers, never on access.** Chimes buy budget: a scenario's budget up, a tower's purse
 up, a rush's between-round purse up or a pre-fitted start. That is GD13 clause 1's one permission, a
 limit on a configuration. Everything else in GD13 holds and is restated here so nobody reads the
-currency as relaxing it: credits never open a mode, a screen, a building, a dispatcher, a case or a
+currency as relaxing it: chimes never open a mode, a screen, a building, a dispatcher, a case or a
 figure (GD9); they never buy a verdict, a retry the mode declares free, or relief on a measurement,
 including a missed day or a suppressed mean; and they never appear on a results page, beside a
 wait figure, or in any comparison between players.
@@ -270,7 +272,7 @@ never knows where an entry came from. A scenario cleared posts an earn; a budget
 spend; the screen shows what is in the account and lets the player spend or earn against it, and
 that is the whole of its contract. Without an account the ledger is on this device alone and says
 so, in the shape the tree already uses for device-only artefacts, and a run played with device-only
-credits can be played and not posted.
+chimes can be played and not posted.
 
 **No purchase ships, and the ledger is built so an add from outside is invisible to play.** A
 ledger has sources; today they are the three completions above. Any external add, a purchase or a
@@ -282,15 +284,16 @@ purchase anywhere. [`26-telemetry-and-privacy.md`](26-telemetry-and-privacy.md) 
 amended to say exactly that, in [§ D526](../DECISIONS.md).
 
 **A sign-in bonus, which the owner said *maybe* to.** Permitted in this shape only: a small, flat,
-unconditional credit on the first session after `x` hours away. It does not compound, there is no
+unconditional chime on the first session after `x` hours away. It does not compound, there is no
 streak, and missing it costs nothing, so it is a gift and not a timer. [OWNER: on at launch, or off
 until `S4` is measured? The ledger carries the source either way.]
 
-**The name.** *Credits* is the placeholder. The name may not be a quantity the run measures, so
-*rides*, *calls*, *stops*, *floors*, *landings*, *trips* and *waits* are out, and it may not be
-*units*, which is money inside a mode. Recommended: **chimes**, the arrival sound, distinctive and
-dry enough for the voice rule (*you have 40 chimes · widen this budget: 12 chimes*). Alternatives:
-*fares*, *bells*. [OWNER: pick one, and it replaces *credits* everywhere on this page.]
+**The name is ruled: chimes** ([§ D530](../DECISIONS.md), 2026-09-06). The arrival sound —
+distinctive, dry enough for the voice rule, and it reads correctly in the two sentences a player
+actually meets (*you have 40 chimes · widen this budget: 12 chimes*). The name may not be a quantity
+the run measures, so *rides*, *calls*, *stops*, *floors*, *landings*, *trips* and *waits* were out; and
+it may not be *units*, which is money inside a mode and stays so. *Fares* and *bells* were the
+alternatives offered and not taken. *Credits* was the placeholder and is replaced throughout.
 
 ### 2.5 The building ceiling
 
@@ -326,7 +329,7 @@ Named so the next lane does not discover it. None of it is built by this page.
   prices and commissioning's `CapitalConstraint`.
 - **A survivor count per scenario per budget step**, pre-simulated, pinned, published on the
   scenario, with its sampling method beside it where the space is sampled.
-- **A credit ledger on the account**, with its sources and sinks authored in `data/`, a device-only
+- **A chime ledger on the account**, with its sources and sinks authored in `data/`, a device-only
   fallback that says so, and the server checking a posted modified run against a real spend.
 - The stage's opening speed moves to a watching rung, reopening [§ D354](../DECISIONS.md)'s
   default, and a *skip to the end* control is added.
@@ -386,10 +389,18 @@ Ruled by the owner on 2026-09-06, in conversation, and recorded in [§ D525](../
 8. The model carries a building up to and slightly beyond the largest in the world, with the
    Burj Khalifa as the reference (§ 2.5).
 
+Ruled later the same day, in the same conversation:
+
+9. Difficulty is the survivor count budgeted by ladder position; the budget joins demand and fabric
+   as a third substrate; four rules fold into one measurement; scarcity is a price and never a
+   removed control ([§ D528](../DECISIONS.md)).
+10. The first session is a two-screen tutorial, and a worked answer is permitted there and nowhere
+    else ([§ D529](../DECISIONS.md)).
+11. The currency is named **chimes** ([§ D530](../DECISIONS.md)).
+
 Still open:
 
 - Whether the sign-in bonus is on at launch or off until `S4` is measured (§ 2.4).
-- The currency's name (§ 2.4).
 
 ---
 
