@@ -155,7 +155,7 @@ const AUDITED_MODULES = [
 
 /**
  * Exports with no caller anywhere and **no stated reason to have none** — the defect class this
- * repository has shipped ten times in code. Each entry is a *recorded finding*, kept here so the
+ * repository has shipped eleven times in code. Each entry is a *recorded finding*, kept here so the
  * suite is green while the register carries the defect: deleting or wiring these is follow-up
  * work with its own verification, and this lane's deliverable is the classification. An entry
  * leaving this list must leave it because the code moved, and the staleness assertion below is
@@ -255,6 +255,17 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    */
   'everyday/GUIDE_WATCHING_NOTE':
     'the guide’s own cell, transcribed and never drawn; the deviation guard is its consumer',
+
+  /*
+   * The second transcription, on the row above's exact ground — § D525, GitHub issue #364. The
+   * guide's menu cell names four modes because it was written against § D335's four-tile menu;
+   * the shipped cell is three. Drawing this one would offer two retired tiles, which is what the
+   * deviation exists instead of. Its consumer is `everyday/actionBar.test.ts`'s both-directions
+   * assertion, which turns the pair red the day someone reverts the menu to four rather than
+   * letting an old transcription quietly start matching again.
+   */
+  'everyday/GUIDE_MENU_PRIMARY':
+    'the guide’s own menu cell, transcribed and never drawn; the deviation guard is its consumer',
 
   /*
    * -- Guards given a value so a claim cannot rot. The first is a conditional type — a runtime

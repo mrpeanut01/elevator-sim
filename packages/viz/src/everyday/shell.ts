@@ -311,7 +311,9 @@ export interface EverydayShellHost {
  * a default.
  */
 export function mountEverydayShell(doc: Document, options: EverydayShellHost = {}): EverydayShell {
-  let state: EverydayState = { screen: EVERYDAY_ROOT, ctx: 'daily', modePick: 'today' };
+  // § D525: the first tile is Scenario, so it is what the shell opens selected. This read
+  // `'today'` until that ruling retired the tile the pick named.
+  let state: EverydayState = { screen: EVERYDAY_ROOT, ctx: 'daily', modePick: 'scenario' };
 
   /** § 3.4's latch — see {@link EverydayShell.setRunOpen}. */
   let runOpen = false;

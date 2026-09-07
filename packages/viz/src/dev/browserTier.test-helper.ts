@@ -478,8 +478,32 @@ export async function openEverydayRail(page: Page): Promise<void> {
   await page.locator('.everyday-rail').waitFor({ state: 'visible', timeout: 15_000 });
 }
 
+/**
+ * Open one of the Scenario hub's entries from the main menu — § D525's route, GitHub issue #364.
+ *
+ * The two presses a player makes: the Scenario tile, then the entry. Shared because five browser
+ * files used to press a retired tile directly, and five copies of a two-step route is five places
+ * for the next re-homing to be missed.
+ */
+export async function openScenarioEntry(page: Page, entry: 'today' | 'fix-a-building'): Promise<void> {
+  await page.locator('.everyday-mode[data-screen="scenario"]').click();
+  await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
+  await page.locator(`.everyday-scenario-entry[data-entry="${entry}"]`).click();
+}
+
 export async function openEverydayDoor(page: Page): Promise<void> {
-  await page.locator('.everyday-mode[data-screen="door"]').click();
+  /*
+   * **Two presses since § D525, and the second one is the point.** This used to press a
+   * *Today's tower* tile directly; GitHub issue #364 retired that tile and re-homed its screen
+   * inside Scenario, so the player's route is now the Scenario tile and then the hub's own
+   * *Today's scenario* entry.
+   *
+   * Updated rather than routed around, on this file's own standing rule: a tier that reached a
+   * surface by a path no player has is a tier that tests a surface nobody can open. If the hub
+   * ever stopped offering the entry, this helper would fail — which is the failure worth having,
+   * because it is the same one a player would meet.
+   */
+  await openScenarioEntry(page, 'today');
   await page.waitForSelector('.everyday-door', { timeout: 15_000 });
 }
 

@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
+import { openScenarioEntry } from '../dev/browserTier.test-helper.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
@@ -197,7 +198,7 @@ async function coldLoad(): Promise<Page> {
  */
 
 describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
-  it('draws the menu, the rail and the four mode tiles — not the Engineer menu', async () => {
+  it('draws the menu, the rail and the three mode tiles — not the Engineer menu', async () => {
     const page = await coldLoad();
     try {
       const front = await page.evaluate(() => ({
@@ -208,7 +209,8 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
         engineerMenuHidden: document.querySelector<HTMLElement>('.menu-overlay')?.hidden,
       }));
       expect(front.shells).toBe(1);
-      expect(front.tiles).toBe(4);
+      // Three since § D525 (GitHub issue #364): Scenario, Career, Rush.
+      expect(front.tiles).toBe(3);
       expect(front.rails).toBe(1);
       // § 3.5: the front door is not overridable, and a deep link is what would override it. The
       // load above carries two query parameters and still lands here.
@@ -246,7 +248,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
        * player meets it. `inert` on the Everyday root reads as an attribute in one test and as
        * *nothing happens when you click* in the product; this is the second reading.
        */
-      await page.locator('.everyday-mode[data-screen="door"]').click();
+      await openScenarioEntry(page, 'today');
       // The tile opens § 6.1's front door now that it is registered — it used to skip to the
       // stage, and `modes.ts` routes it through the loop's own first screen instead.
       await page.waitForSelector('.everyday-door', { timeout: 15_000 });
@@ -255,7 +257,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
     }
   });
 
-  it('leaves no mode tile refusing, and every one of the four takes a click', async () => {
+  it('leaves no mode tile refusing, and every one of the three takes a click', async () => {
     const page = await coldLoad();
     try {
       const tiles = await page.evaluate(() =>
@@ -274,16 +276,20 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
        * merged: neither branch's number was right here.
        *
        * A count of zero would be a weak case on its own, so the claim is the pair rather than the
-       * count: four tiles, none disabled, and none carrying a refusal it can no longer mean. A tile
-       * that stayed refused over a mode whose screens exist is § D227's defect and fails the second
-       * assertion; a tile that vanished rather than opening fails the first.
+       * count: **three** tiles since § D525 (GitHub issue #364) — Scenario, Career, Rush — none
+       * disabled, and none carrying a refusal it can no longer mean. A tile that stayed refused
+       * over a mode whose screens exist is § D227's defect and fails the second assertion; a tile
+       * that vanished rather than opening fails the first.
+       *
+       * *Today's tower* and *Fix a building* are not missing tiles: § D525 re-homed them into
+       * Scenario, and `scenarioModel.test.ts` is where their reachability is asserted.
        *
        * The rush's own missing engine has not gone anywhere — its § 3.3 primary is drawn inert with
        * the refusal on it, which is that honesty one level in, and
        * `standaloneScreens.browser.test.ts` is where that disabled primary is asserted. This case
        * deliberately does not cover it.
        */
-      expect(tiles.map((tile) => tile.screen)).toEqual(['door', 'towers', 'rush', 'fixit']);
+      expect(tiles.map((tile) => tile.screen)).toEqual(['scenario', 'towers', 'rush']);
       expect(tiles.filter((tile) => tile.disabled)).toEqual([]);
       for (const tile of tiles) expect(tile.text, tile.screen).not.toMatch(/not built/);
     } finally {
@@ -337,7 +343,8 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       // The left button is present and inert on the menu — there is no mode to abandon yet — and
       // the primary is named for its effect, never "Next".
       expect(bar.leave).toEqual({ label: '⌂ Modes', disabled: true });
-      expect(bar.primary).toEqual({ label: "Play today's tower", disabled: false });
+      // § D525: the menu row follows the selected card, and the first card is Scenario.
+      expect(bar.primary).toEqual({ label: 'Pick a scenario', disabled: false });
       expect(bar.note).toBe('Pick a mode above, then play it.');
     } finally {
       await page.close();
@@ -353,7 +360,14 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
        * because § 6.1's front door was unbuilt, and now it opens the door, which is what the guide
        * asks for. The claim the case is making is unchanged: the bar's primary enters the mode.
        */
+      /*
+       * The bar's primary is the player's second way in, and § D525 changed where it lands: on the
+       * Scenario hub rather than straight on the front door. The door is one press further, from
+       * the hub's own *Today's scenario* entry — which is the route the tile takes too.
+       */
       await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
+      await page.locator('.everyday-scenario-entry[data-entry="today"]').click();
       await page.waitForSelector('.everyday-door', { timeout: 15_000 });
       expect(await page.textContent('.everyday-bar-primary')).toBe('Set up today');
     } finally {
@@ -627,7 +641,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
       const back = await page.evaluate(() => ({
         // *Today's tower* is the tile, and it opens the front door now rather than the stage —
         // `modes.ts`'s own routing change. The claim is unchanged: the menu is back.
-        onMenu: document.querySelector('.everyday-mode[data-screen="door"]') !== null,
+        onMenu: document.querySelector('.everyday-mode[data-screen="scenario"]') !== null,
         stageGone: document.querySelector('.everyday-stage-canvas') === null,
       }));
       expect(back).toEqual({ onMenu: true, stageGone: true });
@@ -653,7 +667,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
        */
       await page.locator('.everyday-rail-menu').click();
       await page.locator('.everyday-bar-confirm-leave').click();
-      await page.waitForSelector('.everyday-mode[data-screen="door"]', { timeout: 15_000 });
+      await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
 
       const back = await page.evaluate(() => ({
         mainShown: document.querySelector<HTMLElement>('.everyday-main')?.style.display,
@@ -864,7 +878,7 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
         engineerInert: document.querySelector<HTMLElement>('.shell')?.inert,
         subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
       }));
-      expect(reloaded.tiles).toBe(4);
+      expect(reloaded.tiles).toBe(3);
       expect(reloaded.visibility).toBe('');
       expect(reloaded.engineerInert).toBe(true);
       expect(reloaded.subline).toContain('YOU ARE HERE');

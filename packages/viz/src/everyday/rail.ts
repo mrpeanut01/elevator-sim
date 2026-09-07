@@ -231,6 +231,12 @@ export function sublineFor(state: EverydayState): string {
   switch (state.screen) {
     case 'menu':
       return 'YOU ARE HERE';
+    /*
+     * § D525's hub. The bare word, like every other arm — the shell appends nothing here, because
+     * a list of scenarios has no live detail to append.
+     */
+    case 'scenario':
+      return 'PICKING A SCENARIO';
     case 'door':
       return "TODAY'S TOWER";
     case 'brief':

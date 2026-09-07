@@ -53,6 +53,7 @@
  */
 export const EVERYDAY_SCREENS = [
   'menu',
+  'scenario',
   'door',
   'brief',
   'stage',
@@ -103,7 +104,17 @@ export type RunContext = (typeof RUN_CONTEXTS)[number];
  * build), and the pick exists so the § 3.3 menu row's primary can follow the selected card
  * (*Play today's tower* / *Play the campaign* / …) before anything is entered.
  */
-export const MODE_PICKS = ['today', 'campaign', 'rush', 'fixit'] as const;
+/*
+ * § D525's three picks, Scenario first. `today` and `fixit` left this list when their tiles
+ * retired into Scenario; the screens behind them are unchanged and are reached from the Scenario
+ * hub instead, which is what keeps them out of `UNBUILT_REASONS`.
+ *
+ * **The middle pick is still `campaign`, and the tile above it reads *Career*.** `docs/39` § 3's
+ * rename map is about the words a player reads, and `campaign` is also a `RunContext` value, a
+ * `data/campaign.json` filename and a directory — renaming the id would move all four to buy
+ * nothing a player can see.
+ */
+export const MODE_PICKS = ['scenario', 'campaign', 'rush'] as const;
 
 export type EverydayModePick = (typeof MODE_PICKS)[number];
 

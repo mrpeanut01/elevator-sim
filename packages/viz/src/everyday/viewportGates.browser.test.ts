@@ -120,8 +120,9 @@
  * Three things in the original table are worth reading rather than skimming.
  *
  * 1. **§ 3.2's column is 0 in every row, including the four that fail.** That is the issue.
- * 2. **The five controls at 360×800 were the whole main menu.** All four mode tiles — § 4's four
- *    modes, the only way into any of them — plus § 3.3's primary, `Play today's tower`, which at
+ * 2. **The five controls at 360×800 were the whole main menu.** All three mode tiles — § D525's
+ *    three modes, the only way into any of them — plus § 3.3's primary (`Play today's tower` when
+ *    this was measured; `Pick a scenario` since § D525), which at
  *    360 px was drawn at `left: 360` and was **100 % outside the viewport** before any scroll was
  *    attempted. The rail was `RAIL_WIDTH_PX = 212` at every width, inline and with no breakpoint,
  *    against `grid-template-columns: 212px minmax(0,1fr)`, which left the screen region 148 px at

@@ -28,7 +28,7 @@ bit-identical to the control, so a mode the router ignored genuinely fails the t
 
 1. **`drawTransport` has a shipped caller and no DOM driver.** `dev/main.ts` is the only caller of
    `mountBuildingEditor`, and no test drives the mounted panel. This is the known Phase 9 gap — the
-   **35 statically swept DOM entry points**, of which this mount is one — matched exactly by the
+   **36 statically swept DOM entry points**, of which this mount is one — matched exactly by the
    access-zone editor beside it. It is **not widened** by this step, and it is not closed either.
    *(This sentence named that gap ~~"three DOM panels are statically swept rather than driven"~~
    and then put a fifth panel in it, which is how a count stops being a measurement and becomes a

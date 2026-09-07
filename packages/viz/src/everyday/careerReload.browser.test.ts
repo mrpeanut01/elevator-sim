@@ -52,7 +52,13 @@ async function coldLoad(): Promise<Page> {
 }
 
 async function enterCampaign(page: Page): Promise<void> {
-  await page.locator('.everyday-mode', { hasText: 'Campaign' }).first().click();
+  /*
+   * By id, not by prose. § D525 renames this tile *Campaign* -> *Career*, and this file was
+   * written on a branch where it still read Campaign — so a `hasText` locator matched nothing the
+   * moment the rename landed. `browserTier.test-helper.ts` records the lesson: an id survives a
+   * rename and a label does not, which is why the shipped tile carries one.
+   */
+  await page.locator('.everyday-mode[data-screen="towers"]').first().click();
   await page.waitForSelector('.everyday-towers', { timeout: 15_000 });
 }
 

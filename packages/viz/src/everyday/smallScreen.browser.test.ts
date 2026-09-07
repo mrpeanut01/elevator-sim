@@ -16,7 +16,7 @@
  *    the minimum viewport as well as at desktop width"*, and the gate's own header cites it. The
  *    gate does walk the player's route into the stage — `enterEverydayStage`, deliberately rather
  *    than a helper that jumps it — but it stops there and measures. This file plays: it presses the
- *    four mode tiles at 360 px, crosses the daily flow, works the drawer, and comes back.
+ *    three mode tiles at 360 px, crosses the daily flow, works the drawer, and comes back.
  *
  * ## The third criterion, and the building it is honestly measured against
  *
@@ -371,12 +371,17 @@ describe.skipIf(!HAS_BROWSER)('the rail is reachable at 360 px, and so is everyt
  * -------------------------------------------------------------------------- */
 
 describe.skipIf(!HAS_BROWSER)('every mode opens at 360 px, and the daily loop crosses it', () => {
-  it('presses all four mode tiles and reaches each screen', async () => {
+  it('presses all three mode tiles and reaches each screen', async () => {
     const page = await coldLoad(PHONE);
     try {
       const tiles = page.locator('.everyday-mode');
       const count = await tiles.count();
-      expect(count, '§ 4 has four modes and the front door drew a different number').toBe(4);
+      /*
+       * Three since § D525 (GitHub issue #364): Scenario, Career, Rush. The count is asserted
+       * rather than derived so a tile that stops drawing at 360 px fails here rather than being
+       * silently skipped by the loop below.
+       */
+      expect(count, '§ D525 has three modes and the front door drew a different number').toBe(3);
 
       for (let index = 0; index < count; index += 1) {
         /* Back to the front door between presses, through the bar's own way out rather than a
