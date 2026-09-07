@@ -343,7 +343,8 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       // The left button is present and inert on the menu — there is no mode to abandon yet — and
       // the primary is named for its effect, never "Next".
       expect(bar.leave).toEqual({ label: '⌂ Modes', disabled: true });
-      expect(bar.primary).toEqual({ label: "Play today's tower", disabled: false });
+      // § D525: the menu row follows the selected card, and the first card is Scenario.
+      expect(bar.primary).toEqual({ label: 'Pick a scenario', disabled: false });
       expect(bar.note).toBe('Pick a mode above, then play it.');
     } finally {
       await page.close();
@@ -359,7 +360,14 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
        * because § 6.1's front door was unbuilt, and now it opens the door, which is what the guide
        * asks for. The claim the case is making is unchanged: the bar's primary enters the mode.
        */
+      /*
+       * The bar's primary is the player's second way in, and § D525 changed where it lands: on the
+       * Scenario hub rather than straight on the front door. The door is one press further, from
+       * the hub's own *Today's scenario* entry — which is the route the tile takes too.
+       */
       await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
+      await page.locator('.everyday-scenario-entry[data-entry="today"]').click();
       await page.waitForSelector('.everyday-door', { timeout: 15_000 });
       expect(await page.textContent('.everyday-bar-primary')).toBe('Set up today');
     } finally {
@@ -633,7 +641,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
       const back = await page.evaluate(() => ({
         // *Today's tower* is the tile, and it opens the front door now rather than the stage —
         // `modes.ts`'s own routing change. The claim is unchanged: the menu is back.
-        onMenu: document.querySelector('.everyday-mode[data-screen="door"]') !== null,
+        onMenu: document.querySelector('.everyday-mode[data-screen="scenario"]') !== null,
         stageGone: document.querySelector('.everyday-stage-canvas') === null,
       }));
       expect(back).toEqual({ onMenu: true, stageGone: true });
@@ -659,7 +667,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
        */
       await page.locator('.everyday-rail-menu').click();
       await page.locator('.everyday-bar-confirm-leave').click();
-      await page.waitForSelector('.everyday-mode[data-screen="door"]', { timeout: 15_000 });
+      await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
 
       const back = await page.evaluate(() => ({
         mainShown: document.querySelector<HTMLElement>('.everyday-main')?.style.display,
