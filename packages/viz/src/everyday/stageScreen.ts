@@ -86,30 +86,31 @@ import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   DEFAULT_STAGE_SPEED_INDEX,
-  stageAlarmOf,
-  stageBarModelOf,
-  stageFilingLandsOn,
-  stageGeometryOf,
-  stageGoalsOf,
-  stageHeaderOf,
-  stageInterventionsOf,
-  stageLegend,
-  stageOpeningLineOf,
-  stageSpeedAt,
   STAGE_AWAITING_RUN,
+  STAGE_CAMERAS,
   STAGE_DRIVING_LABEL,
   STAGE_INTERVENTIONS,
   STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
-  STAGE_CAMERAS,
   STAGE_SPEEDS,
-  stageCameraChipsOf,
-  stageCameraWindowOf,
-  type StageCameraId,
   STAGE_SWITCH_PICKER_LABEL,
+  stageAlarmOf,
+  stageBarModelOf,
+  stageCameraChipsOf,
+  type StageCameraId,
+  stageCameraWindowOf,
   type StageFigure,
+  stageFilingLandsOn,
+  stageGeometryOf,
+  stageGoalsOf,
+  stageHeaderOf,
   type StageInterventionRow,
+  stageInterventionsOf,
   type StageInterventionView,
+  stageLegend,
+  stageOpeningLineOf,
+  stageSkipViewOf,
+  stageSpeedAt,
   type StageSwitchTarget,
 } from './stageScreenModel.js';
 import { everydayProfileStore } from './profileStore.js';
@@ -438,11 +439,28 @@ function mountStage(
   speeds.append(...speedButtons);
 
   /*
+   * § 2.3's way out of watching — GitHub issue **#369**, § D525 clause 4.
+   *
+   * Beside the ladder rather than on it, and the placement is the argument: it is not an eighth
+   * rung. A rung changes how fast the recording is drawn; this moves the playhead to `endedAt`.
+   * `stageScreenModel.ts#STAGE_SKIP_COPY`'s note is what says that to the player, and
+   * {@link syncTransport} is what keeps the control honest once the day is over — a button still
+   * pressable when it can do nothing is § D354's defect wearing different clothes.
+   */
+  const skipButton = el(doc, 'button', 'everyday-stage-skip');
+  skipButton.type = 'button';
+  skipButton.addEventListener('click', () => {
+    skipToEnd();
+  });
+
+  /*
    * § 7.3's camera — GitHub issue #324, § D505. Drawn only on a tower the camera can help
    * (`stageCameraChipsOf` measures it against the canvas each paint), which is the honest form of
    * *a control that writes nothing must say so* for a view control: on a short tower the three
    * positions are one picture, and a chip that changed nothing would be a lie in a strip.
    */
+  speeds.append(skipButton);
+
   const cameras = el(doc, 'div', 'everyday-stage-cameras');
   /*
    * Never `hidden`: the strip is a flex box whose whole content is the chips, so with none in it
@@ -1030,6 +1048,29 @@ function mountStage(
     description.textContent = sentence;
   }
 
+  /**
+   * **Run the picture out — § 2.3's skip control, GitHub issue #369.**
+   *
+   * Three lines, and the first one is the one that is easy to leave out. `Playback.state` reports
+   * `ended` only while the transport is *playing* and the playhead has reached `endedAt` — it is a
+   * derived state rather than a flag, which is what lets a seek backwards resume without anything
+   * resetting. A skip that paused and seeked would therefore leave the transport reading `paused`
+   * at the last frame, `syncTransport`'s `dayEnded` edge would never fire, and § 3.3's row would go
+   * on offering *Close the day* about a day the player can see has finished.
+   *
+   * **It reaches the transport and nothing else**, which is `docs/16`'s rule for a presentation
+   * control: the recording was simulated on a worker before this screen drew a frame, so a day
+   * watched at `1×`, at `600×` and a day skipped are the same day — the same legs, the same
+   * report. `stageSkip.test.ts` asserts that rather than leaving it to this paragraph.
+   */
+  function skipToEnd(): void {
+    if (playback === undefined) return;
+    playback.play();
+    playback.seekTo(playback.recording.endedAt);
+    syncTransport();
+    requestFrame();
+  }
+
   function intervene(change: (typeof STAGE_INTERVENTIONS)[number]['change']): void {
     const current = adopted;
     if (playback === undefined || current === undefined) return;
@@ -1365,6 +1406,25 @@ function mountStage(
     }
     playButton.textContent = playing ? '⏸ Pause' : '▶ Play';
     playButton.disabled = playback === undefined;
+    /*
+     * § 2.3's skip control, resolved from the same fact the bar reads — GitHub issue #369. Inert
+     * once there is nothing left to skip, with the reason on the button's own `title` rather than
+     * only in a docstring: `stageSkipViewOf` is the one place that decides, so the mount cannot
+     * disagree with the corpus about what this control says.
+     */
+    const skip = stageSkipViewOf({ dayEnded: ended, hasRun: playback !== undefined });
+    skipButton.textContent = skip.label;
+    skipButton.title = skip.note;
+    skipButton.disabled = skip.inert;
+    skipButton.style.cssText = [
+      'background:transparent',
+      `border:1px solid ${C.rule}`,
+      `border-radius:${String(R.control)}px`,
+      'padding:5px 9px',
+      `font:500 11px ${TYPE.mono}`,
+      `color:${skipButton.disabled ? C.label : C.ink}`,
+      `cursor:${skipButton.disabled ? 'default' : 'pointer'}`,
+    ].join(';');
     for (const [index, button] of speedButtons.entries()) {
       const on = index === speedIndex;
       button.disabled = playback === undefined;
