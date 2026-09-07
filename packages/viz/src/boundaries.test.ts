@@ -511,6 +511,119 @@ describe('§ 16 rule 15 — a missing server can only leave a hole where the wor
   });
 });
 
+/* -------------------------------------------------------------------------- *
+ * § D529 clause 4 — a worked answer is permitted in the tutorial and nowhere else
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The one boundary the product owner asked to have written down once**, as a build failure.
+ *
+ * [§ D529](../../../DECISIONS.md) clause 4, given directly — *"Also agreed, **write the boundary
+ * down once**"*:
+ *
+ * > A worked answer is permitted in the tutorial and nowhere else. No hint control, no suggested
+ * > fix, no diagnosis line, and no *here is what we would have done*, in any scenario, in any mode,
+ * > at any ladder position.
+ *
+ * [§ D525](../../../DECISIONS.md) clause 2 retires proposed fixes from every scenario — the
+ * four-repair menu, the five decoys, and the printed line saying what kind of fix it is — and the
+ * tutorial shows one anyway, because a tutorial teaches and a scenario does not. The clause exists
+ * because **without it the tutorial's teaching component is reused as a hint button on scenario
+ * twelve and the thing § D525 scrapped returns through the side door**, and a sentence in a
+ * decision file cannot stop that. An allowlist can.
+ *
+ * Two rules, because the component has two halves and each can be borrowed on its own: the words
+ * (`everyday/workedAnswer.ts`) and the mount that runs the pair and draws them
+ * (`everyday/tutorialScreens.ts#mountWorkedAnswer`). A scenario surface that imported either would
+ * be able to answer for the player.
+ *
+ * **`everyday/tutorialScreens.ts` is on the first list for one string and no more**, and the
+ * distinction is worth reading rather than counting. It takes `WorkedAnswerFacts` and
+ * `WorkedAnswerView` as **types** and never calls `workedAnswerViewOf`: the only value it imports
+ * is `WORKED_ANSWER_COPY.pending`, the line the component draws before its two runs land, which
+ * belongs to the component rather than to either screen for the reason that constant carries. So
+ * the file that *draws* the answer still cannot *word* one, and the only two places that can say
+ * what would have fixed a building are § D529 clause 2's two entry points.
+ *
+ * **The sweep is on the words' list and is not an exception to the rule.** `honesty/surfaces.ts`
+ * renders every player-facing string in this product and draws none of them to anybody; it is on
+ * `SERVER_READERS` above for exactly the same reason. A rule that excluded it would be a rule that
+ * un-swept the one surface most in need of sweeping.
+ */
+const WORKED_ANSWER_READERS: readonly string[] = Object.freeze([
+  // § D529 clause 2's two entry points: the rush's, and the tutorial's own.
+  'everyday/rushScreenModel.ts',
+  'everyday/tutorialModel.ts',
+  // Screen two's mount, for the pending line the component owns and for nothing else — see above.
+  'everyday/tutorialScreens.ts',
+  // The sweep, which drives both entry points and reads the words to nobody.
+  'honesty/surfaces.ts',
+]);
+
+/** Who may draw the component — screen two, and § D529 clause 2's one reuse. */
+const WORKED_ANSWER_MOUNTERS: readonly string[] = Object.freeze([
+  'everyday/rushScreen.ts',
+  'everyday/tutorialScreens.ts',
+]);
+
+describe('§ D529 clause 4 — the worked answer is the tutorial’s and nobody else’s', () => {
+  it('confines the words to the two entry points, screen two and the sweep', async () => {
+    const readers = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter((file) =>
+        /import\s+(?!type\b)[^;]*from\s+['"][^'"]*workedAnswer\.js['"]/.test(file.code),
+      )
+      .map((file) => file.id)
+      .sort((a, b) => a.localeCompare(b));
+    expect(
+      readers,
+      'a module outside the tutorial gained the worked answer. § D529 clause 4 permits one in the ' +
+        'tutorial and nowhere else — no hint control, no suggested fix, no diagnosis line, and no ' +
+        '“here is what we would have done”, in any scenario, in any mode, at any ladder position. ' +
+        'If this is a third tutorial surface the owner has ruled on, add it here with the ruling; ' +
+        'otherwise the surface should hand the player the building, the letter and the editor.',
+    ).toEqual([...WORKED_ANSWER_READERS]);
+  });
+
+  it('confines the component to screen two and the rush tutorial', async () => {
+    const mounters = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter((file) => file.id !== 'everyday/tutorialScreens.ts')
+      .filter((file) => /\bmountWorkedAnswer\b/.test(file.identifiers))
+      .map((file) => file.id)
+      .sort((a, b) => a.localeCompare(b));
+    // The declaring module is filtered out above, so the list is the *importers* — and it must be
+    // exactly the one reuse § D529 clause 2 names.
+    expect(
+      mounters,
+      'a module outside the tutorial gained the worked answer’s mount. See the clause quoted above; ' +
+        'the second use is the Rush tutorial and § D529 clause 2 names it, so a third is a ruling ' +
+        'somebody has to make rather than an import somebody can add.',
+    ).toEqual(WORKED_ANSWER_MOUNTERS.filter((id) => id !== 'everyday/tutorialScreens.ts'));
+  });
+
+  it('positive control: the grep finds the imports it is supposed to be confining', async () => {
+    /*
+     * This file's own habit — a rule whose regex quietly stopped matching would pass forever. Both
+     * lists are asserted non-empty against the tree rather than against themselves, so a renamed
+     * module or a changed specifier is red here rather than silently permissive above.
+     */
+    const sources = await vizSources();
+    expect(sources.filter((file) => file.id === 'everyday/workedAnswer.ts')).toHaveLength(1);
+    expect(sources.filter((file) => file.id === 'everyday/tutorialScreens.ts')).toHaveLength(1);
+    expect(WORKED_ANSWER_READERS.length).toBeGreaterThan(1);
+    expect(WORKED_ANSWER_MOUNTERS.length).toBe(2);
+    /*
+     * The narrower claim the paragraph above makes, checked rather than asserted in prose: the
+     * mount imports the component's copy table and does not word an answer. A file that gained
+     * `workedAnswerViewOf` would be a third place the product could say what it would have done,
+     * and the allowlist above cannot see that on its own because the module is already on it.
+     */
+    const mount = sources.find((file) => file.id === 'everyday/tutorialScreens.ts');
+    expect(/\bworkedAnswerViewOf\b/.test(mount?.identifiers ?? '')).toBe(false);
+  });
+});
+
 describe('the browser-facing modules import no node builtins', () => {
   it('leaves `node:` to the dev entry point and the test helpers', async () => {
     const offenders = (await vizSources())

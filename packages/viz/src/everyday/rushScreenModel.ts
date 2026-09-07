@@ -47,6 +47,11 @@
  */
 
 import type { ActionBarModel } from './actionBar.js';
+import {
+  workedAnswerViewOf,
+  type WorkedAnswerFacts,
+  type WorkedAnswerView,
+} from './workedAnswer.js';
 
 /* -------------------------------------------------------------------------- *
  * ENGINE_CONTRACT § 3.2 — the stream, as arithmetic
@@ -694,4 +699,34 @@ export function rushBarModel(base: ActionBarModel): ActionBarModel {
    * `bar()` goes through, so the note stays the table's and not a second copy.
    */
   return base;
+}
+
+/* -------------------------------------------------------------------------- *
+ * The Rush tutorial — § D529 clause 2's second use of screen two
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Why a player opening Rush is being handed an answer — the framing line, and the only field this
+ * entry point may differ from the tutorial's on.
+ *
+ * [§ D529](../../../../DECISIONS.md) clause 2: *"Screen two is reused as the Rush tutorial when the
+ * player later opens Rush. Building it twice is what this clause exists to prevent."* The rush is
+ * the one mode whose whole subject is a building that stops draining, so the screen that showed
+ * one coming apart is the screen that belongs in front of it — and § D525 clause 6 made the
+ * climbing stream a front-door mode rather than a bench instrument, which is what gives a
+ * first-time rush player nothing else to have learned it from.
+ */
+export const RUSH_TUTORIAL_WHY =
+  'Rush is one building losing, on purpose. Before it starts, here is a smaller one losing and the change that stopped it — the last answer this game gives you.';
+
+/**
+ * **The Rush entry point into the worked answer** — the second of the two § D529 clause 2 names.
+ *
+ * One line, exactly as `tutorialModel.ts#tutorialWorkedAnswerOf` is, and calling the same view.
+ * The facts are the tutorial's own: reused means the same component about the same runs, not a
+ * second worked answer written for the rush. `workedAnswer.test.ts` drives both entry points in
+ * one case with one measurement and asserts every field but {@link WorkedAnswerView.why} matches.
+ */
+export function rushTutorialWorkedAnswerOf(facts: WorkedAnswerFacts): WorkedAnswerView {
+  return workedAnswerViewOf(facts, RUSH_TUTORIAL_WHY);
 }

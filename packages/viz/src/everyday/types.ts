@@ -36,14 +36,21 @@
  */
 
 /**
- * The screen keys from GAMEPLAY § 4's inventory.
+ * The screen keys — GAMEPLAY § 4's inventory, plus the three the product owner has ruled since.
  *
- * **Seventeen keys, although the guide's own heading says "Sixteen screens".** Count its § 4
+ * **Seventeen from the guide, although its own heading says "Sixteen screens".** Count its § 4
  * table: `menu door brief stage report towers building contract rush fixit workshop bench
  * designer tuner week board settings` is seventeen rows. The table is the contract and the
  * heading is a miscount, so this array follows the table and says so rather than repeating the
  * guide's number — a docstring that asserted "sixteen" over a seventeen-entry array would be this
  * repository's signature defect in one line.
+ *
+ * **Twenty today**, and every addition past the seventeen carries a ruling beside it: `scenario`
+ * is [§ D525](../../../../DECISIONS.md)'s first tile (GitHub issue #364), and `tutorial` and
+ * `collapse` are [§ D529](../../../../DECISIONS.md)'s two-screen tutorial (#380). The count is
+ * stated rather than left to be inferred for the reason the paragraph above exists: a number in a
+ * docstring that has stopped matching the array under it is this repository's signature defect,
+ * and the same sentence has now been wrong once and corrected twice.
  *
  * The full inventory is named here rather than only the screens that are built, because a key
  * that is missing from the type is a screen nobody can even route to.
@@ -53,6 +60,22 @@
  */
 export const EVERYDAY_SCREENS = [
   'menu',
+  /*
+   * § D529's two-screen tutorial (GitHub issue #380), ahead of Scenario because that is where it
+   * sits: *"The first session is a tutorial of two screens, and it sits before Scenario rather
+   * than inside it."* `tutorial` walks the player through making changes; `collapse` is
+   * `docs/35` § 8.1's `PM-DOOR` — a building falls apart, and the player is shown how it could
+   * have been fixed.
+   *
+   * **Two keys past § 4's seventeen, and the deviation is § D529's rather than this file's.**
+   * § D489 ruled that sign-in was *"the missing state of an already-specified surface, not an
+   * eighteenth screen"*, and the argument turned on the handoff already specifying that state. It
+   * does not reach here: the handoff specifies no tutorial at all, and the product owner ruled one
+   * into existence with its shape written down. A state on an existing surface is not available to
+   * a screen that comes *before the front door*.
+   */
+  'tutorial',
+  'collapse',
   'scenario',
   'door',
   'brief',

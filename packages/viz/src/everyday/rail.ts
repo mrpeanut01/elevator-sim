@@ -210,6 +210,13 @@ export function sublineFor(state: EverydayState): string {
     case 'menu':
       return 'YOU ARE HERE';
     /*
+     * § D529's two-screen tutorial (GitHub issue #380). Bare words, like every other arm; there is
+     * no live detail to append, because the tutorial's own runs are not the shell's transport.
+     */
+    case 'tutorial':
+    case 'collapse':
+      return 'FIRST SESSION';
+    /*
      * § D525's hub. The bare word, like every other arm — the shell appends nothing here, because
      * a list of scenarios has no live detail to append.
      */

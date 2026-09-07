@@ -42,6 +42,7 @@ import { RUSH_ABSENCES, RUSH_SCREEN_COPY } from './rushScreenModel.js';
 import { SCENARIO_ABSENCES } from './scenarioModel.js';
 import { SETTINGS_ABSENCES } from './settingsView.js';
 import { STAGE_ABSENCES } from './stageScreenModel.js';
+import { TUTORIAL_ABSENCES } from './tutorialModel.js';
 
 /** Every register the build keeps, in one list, so the two directions below read off one place. */
 const REGISTERS: readonly (readonly string[])[] = [
@@ -49,13 +50,14 @@ const REGISTERS: readonly (readonly string[])[] = [
   STAGE_ABSENCES,
   RUSH_ABSENCES,
   SCENARIO_ABSENCES,
+  TUTORIAL_ABSENCES,
   DESIGNER_ABSENCES,
   CAMPAIGN_ABSENCES,
   SETTINGS_ABSENCES,
 ];
 
 describe('the build-information panel', () => {
-  it('carries all seven registers, by identity rather than by copy', () => {
+  it('carries all eight registers, by identity rather than by copy', () => {
     const view = buildNotesViewOf();
     const drawn = view.sections.map((section) => section.entries);
     for (const register of REGISTERS) {
@@ -276,6 +278,14 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    */
   { register: 'SETTINGS_ABSENCES', fragment: 'Post runs to the board', issue: 161 },
   /*
+   * The tutorial — § D529, which built the two screens and deliberately did **not** settle which
+   * building the first session uses: *"What this does not decide. Which building the tutorial
+   * uses, which is #270's."* The lane picked a shipped fix case and argued the choice in
+   * `tutorialModel.ts`; the row is here because an argued choice is still an open question until
+   * the issue that owns it closes.
+   */
+  { register: 'TUTORIAL_ABSENCES', fragment: 'Which building the first session should use', issue: 270 },
+  /*
    * **`Sign out` left this table on the commit that built the control** — GitHub issue #332,
    * [§ D489](../../../../DECISIONS.md). Its entry refused a button on the grounds that *nothing on
    * this surface is signed in*; § 15.1's YOU section holds the session now and *Sign out* is one of
@@ -296,6 +306,12 @@ const NAMED_REGISTERS: readonly (readonly [string, readonly string[]])[] = Objec
   ['DESIGNER_ABSENCES', DESIGNER_ABSENCES],
   ['CAMPAIGN_ABSENCES', CAMPAIGN_ABSENCES],
   ['SETTINGS_ABSENCES', SETTINGS_ABSENCES],
+  /*
+   * § D529's tutorial (GitHub issue #380). Named here on the commit that adds the register, which
+   * is the direction this file's first case checks: an absence drawn to a player and owned by no
+   * issue fails on the commit that adds it, not on the one somebody notices it.
+   */
+  ['TUTORIAL_ABSENCES', TUTORIAL_ABSENCES],
 ]);
 
 describe('every absence is a queue item — § D370', () => {

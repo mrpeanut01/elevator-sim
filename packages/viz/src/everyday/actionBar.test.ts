@@ -300,12 +300,16 @@ describe('the table matches the guide, cell for cell', () => {
     // The three non-guide rows: the watched report, and § 6.1's replay over the stage and the
     // report (GitHub issue #177 item 1, § D517) — the guide gives the replay a door variant and no
     // bar rows of its own, so these two are the daily rows restated with *never scored* on them.
+    // § D529's tutorial adds two more (GitHub issue #380): § 3.3's table predates the ruling and
+    // contains no tutorial at all, so neither row can be compared against a transcription of it.
     const extras = ACTION_BAR_ROWS.filter((row) => !row.guide);
     expect(extras.map((row) => keyOf(row.screen, row.ctx)).sort()).toEqual([
+      'collapse',
       'report·replay',
       'report·watch',
       'scenario',
       'stage·replay',
+      'tutorial',
     ]);
   });
 

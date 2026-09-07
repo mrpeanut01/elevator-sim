@@ -312,6 +312,39 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * weaker: there is no residue left over for the static sweep to be the only reader of.
          */
         'everyday/scenarioScreen.ts#SCENARIO_SCREEN',
+        /*
+         * § D529's two-screen tutorial (GitHub issue #380), on the mounts' shared ground. Both
+         * rows draw into the shell's scroll region and neither can run without a document; the
+         * pure halves are `everyday/tutorialModel.ts` and `everyday/workedAnswer.ts`, and the
+         * `EVERYDAY_TUTORIAL` adapter drives both screens whole — each in its pending state and
+         * its landed one, and the worked answer from both of § D529 clause 2's entry points.
+         *
+         * `mountWorkedAnswer` is the third row and it is the same exclusion for the same reason:
+         * it is the component clause 2 forbids building twice, it authors no string of its own,
+         * and every word it draws is `workedAnswerViewOf`'s. What it does author is the run — it
+         * asks `dev/offThreadRuns.ts` for the shipped `fixit/run.ts` pair — and a run is not a
+         * string this corpus can read.
+         */
+        'everyday/tutorialScreens.ts#TUTORIAL_SCREEN',
+        'everyday/tutorialScreens.ts#COLLAPSE_SCREEN',
+        'everyday/tutorialScreens.ts#mountWorkedAnswer',
+      ],
+    },
+    {
+      reason:
+        'An id naming a document in `data/`, never a word a player reads. The derivation cannot ' +
+        'tell a hyphenated slug from a sentence, so it arrives here rather than in an adapter — ' +
+        'and the screens that use it print the case’s own authored copy, which the tutorial ' +
+        'adapter drives, rather than the id.',
+      ids: [
+        /*
+         * § D529's tutorial names a shipped fix case rather than authoring one (GitHub issue
+         * #380). The id reaches `fixit/parse.ts`'s loaded document and is never rendered; what a
+         * player reads is the case's own complaint, diagnosis and repair, all of which
+         * `fixit/parse.ts` validates for player-facing copy at load and `EVERYDAY_TUTORIAL`
+         * sweeps.
+         */
+        'everyday/tutorialModel.ts#TUTORIAL_CASE_ID',
       ],
     },
     {

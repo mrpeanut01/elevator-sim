@@ -261,6 +261,40 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     note: 'Pick a mode above, then play it.',
     inverted: false,
   }),
+  /*
+   * § D529's two-screen tutorial (GitHub issue #380), both rows `guide: false` — § 3.3's table
+   * predates the ruling and contains no tutorial, so the pair sits beside the Scenario hub's row
+   * and the two replay rows rather than being compared against a transcription of the handoff.
+   *
+   * **Both primaries are live and neither is authored inert.** Screen one's advances to screen
+   * two; screen two's files the day and leaves, which is § D476's condition — *skipping must
+   * advance the derived state* — and its counterpart on the way out the front. The one refinement
+   * either screen makes is `collapse`'s note while its pair of runs is still in flight, which
+   * belongs in a `bar()` because the table cannot know it.
+   */
+  row({
+    screen: 'tutorial',
+    guide: false,
+    leave: { label: MODES, inert: false },
+    primary: primary(['Show me a building losing']),
+    note: 'Or skip the walkthrough — the day still runs and still gets filed.',
+    inverted: false,
+  }),
+  row({
+    screen: 'collapse',
+    guide: false,
+    leave: { label: MODES, inert: false },
+    back: { label: 'How this works', screen: 'tutorial' },
+    primary: primary(['Start playing']),
+    note: 'Files the day and opens the main menu.',
+    /*
+     * **Not inverted, although it is the last step of a sequence.** § 3.3 inverts the *report* and
+     * nothing else, and `actionBar.test.ts` holds that as a rule over the data rather than a taste
+     * — so a tutorial row that inverted would be the first exception to a rule the guide states,
+     * bought for emphasis. The fixit row makes the same trade and ships uninverted.
+     */
+    inverted: false,
+  }),
   row({
     /*
      * § D525's hub. `leave` is the menu's own word rather than a mode's, because leaving Scenario

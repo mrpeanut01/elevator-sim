@@ -403,6 +403,13 @@ describe('every rush constant names the module that draws it — § D227, GitHub
     RUSH_ABSENCES: 'buildNotes.ts',
     RUSH_BESTS: 'rushScreen.ts',
     RUSH_BESTS_FIXTURE_NOTE: 'rushScreen.ts',
+    /*
+     * § D529 clause 2's framing line (GitHub issue #380). In-file: `rushTutorialWorkedAnswerOf`
+     * hands it to `workedAnswer.ts#workedAnswerViewOf` and the rush setup screen draws the *view*,
+     * never the constant — which is what makes the reuse one component with two framings rather
+     * than a second screen quoting a second string.
+     */
+    RUSH_TUTORIAL_WHY: 'rushScreenModel.ts',
   });
 
   it('declares a renderer for every exported constant, so a new one cannot arrive unclaimed', () => {

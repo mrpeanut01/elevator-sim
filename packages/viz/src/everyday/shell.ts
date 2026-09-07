@@ -68,6 +68,7 @@ import type { EverydayHost, EverydayHostSlot } from './host.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { everydayProfileStore } from './profileStore.js';
+import { tutorialIsDue } from './tutorialModel.js';
 import { railFooter, railModel } from './rail.js';
 import type { RailModel } from './rail.js';
 import { routeFor, SCREEN_NAMES, screenModuleFor, unbuiltReasonFor } from './screens.js';
@@ -336,6 +337,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * name typed on the settings screen move the `PLAYING AS` card without a reload.
    */
   const profileStore = everydayProfileStore();
+  /** Whether this shell has already asked whether the tutorial is due — see `offerTutorial`. */
+  let tutorialOffered = false;
 
   const root = el(doc, 'div', EVERYDAY_ROOT_CLASS);
 
@@ -1994,6 +1997,42 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     sync();
     dataHostUnsubscribe = next.subscribe(sync);
     if (routeFor(state.screen) === 'screen' && mounted === undefined) draw();
+    offerTutorial(next);
+  }
+
+  /**
+   * **The tutorial, reached before Scenario** — [§ D529](../../../../DECISIONS.md) clause 1,
+   * GitHub issue #380.
+   *
+   * Here rather than in the initial state, because the answer is a function of the week and the
+   * week arrives with the host. The condition is
+   * `tutorialModel.ts#tutorialIsDue` over three counts the player produced by playing, so
+   * [§ D476](../../../../DECISIONS.md)'s ruling holds unchanged: **nothing is stored and nothing
+   * survives a reload** — it is re-derived, which is what every screen that depends on progress
+   * already does, and `charter` non-goal 10 is about a remembered world rather than about a
+   * function of game state.
+   *
+   * ## Two guards, and each is load-bearing
+   *
+   * {@link tutorialOffered} is **session-local and deliberately not persisted**: without it, a player who left
+   * the tutorial for the menu without filing a day would be sent straight back, and the front door
+   * would be unreachable. It is not the flag § D476 forbids — a reload clears it and the question
+   * is asked again from the week, which is the behaviour that rule is protecting.
+   *
+   * The front-door guard is the other half: the offer only ever moves a player who is *on the
+   * menu*, so a host notification arriving while somebody is mid-run cannot take the page off them.
+   */
+  function offerTutorial(host: EverydayHost): void {
+    if (tutorialOffered) return;
+    tutorialOffered = true;
+    if (state.screen !== EVERYDAY_ROOT) return;
+    const progress = profileStore.progress();
+    const due = tutorialIsDue({
+      filedDays: host.week().history.length,
+      solvedCases: progress.solvedCaseIds.length,
+      ratings: progress.ratings.length,
+    });
+    if (due) go('tutorial');
   }
 
   const slotUnsubscribe = options.host?.whenReady(connectDataHost);
