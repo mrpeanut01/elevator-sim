@@ -1290,7 +1290,12 @@ cite why.
 - **One push per wave, not one per commit.** Commit as often as you like; push when the wave is
   ready. Every push to a **pull request branch** cancels the CI run in flight — `ci.yml:85` sets
   `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`, so a push to `main` cancels
-  nothing — and
+  nothing through that flag — and since
+  [GitHub PR #386](https://github.com/mrpeanut01/elevator-sim/pull/386) a push run on `main` is
+  keyed on **its own commit** rather than on `github.ref`, because `cancel-in-progress: false`
+  protects only a *running* run: GitHub keeps at most one **pending** run per group, so a third
+  arrival evicts the queued one whatever the flag says. That was found by losing a run
+  (`RISKS.md` R46 carries the three run ids). And
   starts a fresh ~45-minute suite, and the cancelled run completes a check suite on a head nobody
   cares about — which arrives as a `check_suite.completed` notification saying *"no third-party check
   suite is still running or failed"* about a commit that is no longer the head. Measured on

@@ -116,7 +116,7 @@ Run this continuously, in waves of three to five parallel subagents in git workt
   instrument moves.
 - **Never re-measure the honesty corpus on a branch.** Three lanes in one wave produced three correct
   numbers, none correct after integration.
-- **CI is 30–44 min, and `cancel-in-progress` is conditional**: `ci.yml:85` sets
+- **CI is 30–44 min, and `cancel-in-progress` is conditional**: `ci.yml` sets
   `${{ github.event_name == 'pull_request' }}`, so a push to a **pull-request branch** cancels the
   run in flight and a push to **`main`** cancels nothing. Batch commits on a PR branch; do not push
   mid-run there.
