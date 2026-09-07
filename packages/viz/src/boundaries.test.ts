@@ -296,6 +296,7 @@ const EVERYDAY_SHELL_FILES = new Set([
   /* The tuner's DOM half — its seven controls and their seams stay in tunerModel.ts. */
   'everyday/tunerScreen.ts',
   /* The one place Everyday touches window.localStorage; profile.ts itself is storage-agnostic. */
+  'everyday/careerStore.ts',
   'everyday/profileStore.ts',
   /*
    * § 6's daily loop — four DOM halves and the vocabulary they share. Each one's words and

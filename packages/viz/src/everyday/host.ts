@@ -149,6 +149,7 @@ import {
   type CampaignIncident,
 } from '../campaign/incidents.js';
 import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
+import { everydayCareerStore, type CareerStore } from './careerStore.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
 import { switchWeek } from '../shift/week.js';
 import type { VizRecording } from '../contract/types.js';
@@ -576,6 +577,17 @@ export interface EverydayHost {
    * derives every figure from it, so no screen counts anything.
    */
   campaign(): CampaignCareer;
+
+  /**
+   * What the last career load refused, in the player's words, or `undefined` when it restored or
+   * when there was nothing to restore — GitHub issue #375.
+   *
+   * Read by the campaign screens rather than surfaced as a toast: a career that silently restarted
+   * is the defect this closes, and a sentence the player meets *where the career is* is the fix. A
+   * first-ever load returns `undefined`, because nothing failed and a notice there would read as a
+   * fault.
+   */
+  careerNotice(): string | undefined;
 
   /** The dispatchers the reader saved, id and profile. Read-only. */
   savedDispatchers(): readonly SavedDispatcher[];
@@ -1339,7 +1351,19 @@ function horizonOf(b: EverydayHostBindings): RunHorizon {
  * Build the host over the closure's bindings. Pure over its input: every derivation reads
  * `bindings.state()` fresh, so the host never holds a stale copy of anything.
  */
-export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost {
+export function createEverydayHost(
+  bindings: EverydayHostBindings,
+  /*
+   * The career's storage — GitHub issue #375. Injectable, and it is not a convenience.
+   *
+   * The default is the page's shared store, which is right for a page: one career, restored on
+   * open. It is **wrong for a process running many hosts**, because under node the store's backing
+   * is memory and a singleton would hand the second host the first one's career. Two campaign
+   * tests went red on exactly that before this parameter existed, which is the argument for it
+   * being here rather than a `resetForTests` nobody remembers to call.
+   */
+  careerStore: CareerStore = everydayCareerStore(),
+): EverydayHost {
   const b = bindings;
 
   /*
@@ -1360,7 +1384,25 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
    * on every navigation. Seeded from the standing dispatcher so a fresh career's one building
    * starts on whatever is driving today rather than on an id this module chose.
    */
-  let career: CampaignCareer = openingCareer(b.state().dispatcherId);
+  /**
+   * The career, restored if one was saved — GitHub issue #375, § D525's *"the Campaign becomes a
+   * Career that persists"*.
+   *
+   * A refused read falls back to a fresh career and **keeps the bytes**: `careerPersist.ts` states
+   * why a load path may never be destructive. The refusal's sentence is held for the campaign
+   * screens to draw, because a career that silently restarts is the defect, not the fix.
+   */
+  const restored = careerStore.load();
+  let career: CampaignCareer = restored.career ?? openingCareer(b.state().dispatcherId);
+  const careerLoadNotice: string | undefined = restored.notice;
+  /**
+   * Assign and persist together. One writer, so a lane that adds a fourth mutation site cannot
+   * forget the save — which is how a career that persists on two of three paths ships.
+   */
+  const setCareer = (next: CampaignCareer): void => {
+    career = next;
+    careerStore.save(next);
+  };
   /** {@link EverydayHost.drivingProfile}'s memo — see the binding for why it is keyed on identity. */
   let drivingCache: { readonly forState: ViewerState; readonly profile: DispatcherProfile } | undefined;
   const campaignListeners = new Set<() => void>();
@@ -1485,6 +1527,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       return resolved === undefined ? undefined : statLineOf(resolved);
     },
     campaign: () => career,
+    careerNotice: () => careerLoadNotice,
     savedDispatchers: () => b.state().savedDispatchers,
     recording: () => b.state().recording,
     /*
@@ -1697,7 +1740,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
         trips: observations.loadedDepartures,
       });
       if (next === career) return;
-      career = next;
+      setCareer(next);
       notifyCampaign();
     },
     intervene: (atS, change) => {
@@ -1760,7 +1803,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       /* A refused action moves nothing and notifies nobody: a redraw over an unchanged record
          would repaint a screen mid-interaction for no reason a player could see. */
       if (next === career) return;
-      career = next;
+      setCareer(next);
       /*
        * **§ 8.8: taking an offer moves a week between assignments** — GitHub issue #169 item 3,
        * § D510. The record above is the campaign's; the week is `ViewerState`'s, and it moves the
@@ -1882,12 +1925,14 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
        * refusal there is a race with the desk and the answer must not land on the run either.
        */
       const before = career;
-      career = applyCampaignAction(career, {
-        kind: 'answer-incident',
-        towerId: facts.tower.id,
-        units: option.units,
-        label: option.label,
-      });
+      setCareer(
+        applyCampaignAction(career, {
+          kind: 'answer-incident',
+          towerId: facts.tower.id,
+          units: option.units,
+          label: option.label,
+        }),
+      );
       if (option.units > 0 && career === before) return CAMPAIGN_DOCK_COPY.refusedPurse;
       notifyCampaign();
       b.intervene(atS, composed.change);

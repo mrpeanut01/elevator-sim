@@ -66,7 +66,7 @@ legs, and a run in which it would silently skip is red rather than green
 
 | Platform | Browser | Evidence |
 |---|---|---|
-| Linux, x86-64 (`ubuntu-latest`) | **Chromium** headless shell, from `playwright-core` | 40 `*.browser.test.ts` files, driven through a real Vite dev server against the built `core` |
+| Linux, x86-64 (`ubuntu-latest`) | **Chromium** headless shell, from `playwright-core` | 41 `*.browser.test.ts` files, driven through a real Vite dev server against the built `core` |
 | ~~macOS (`macos-latest`, ARM64 today)~~ | ~~**Chromium** headless shell~~ | **Withdrawn by § D462.** It drove the same 36 files under the same gate until 2026-09-02. Struck rather than deleted: the tier-1 claim for macOS rested on this row, and a claim that loses its evidence should be visibly unsupported rather than absent |
 
 Three things about this tier that a reader will otherwise assume wrongly:
@@ -97,7 +97,7 @@ the result written down. **A tier-2 row with no date is a tier-3 row that has no
 |---|---|---|---|
 | Desktop Chromium at 1280×800 | Chromium | continuous | `packages/viz/src/dev/fold1280.browser.test.ts` — this is really tier 1, listed here because § 2 needs the viewport |
 | Desktop, narrow layouts at 375×667, 414×896, 767×700 — **the Engineer surface** | Chromium | 2026-07-30 (wave 12 drive phase, commit `5d4b782`) | `packages/viz/UX.md` rows `RX-03`, `RX-04b`, `RX-12`. The shell those three were fixed against is the one `@media (max-width: 767px)` restyles; `packages/viz/index.html` did not load `everyday/boot.ts` until 2026-08-12 ([§ D335](../DECISIONS.md)), so this row says nothing about the shell a player now meets first |
-| Narrow layouts at 360×800 and 375×667 — **the Everyday shell** | Chromium | continuous, since GitHub issue #292 | `packages/viz/src/everyday/viewportGates.browser.test.ts` — really tier 1. It measures all three of § 2's clauses and **currently registers 18 failures across them** — ~~*21*~~ until GitHub issue #303 closed the three clause-2 rows on 2026-08-29 ([§ D391](../DECISIONS.md)) — which is the state § 2 commits against and #240 is open to fix. Every one of the 18 is now #240's |
+| Narrow layouts at 360×800 and 375×667 — **the Everyday shell** | Chromium | continuous, since GitHub issue #292 | `packages/viz/src/everyday/viewportGates.browser.test.ts` — really tier 1. It measures all three of § 2's clauses and **currently registers 22 failures across them** — 11 at each of the two widths, counted from `OUTSTANDING` on 2026-09-07 and **carried here as prose, which nothing derives**: `viewportGateClaims.test.ts` checks this document's browser-tier *file* count and never reads that register, so this cell can go stale the next time an entry leaves, as it has three times already (21 → 18 → 22) — which is the state § 2 commits against and #240 is open to fix. Every one of the 22 is now #240's. *(This cell read 18, struck through from 21, until 2026-09-07; both were stale and they disagreed with § 3's own figure.)* |
 
 **And that is the whole of tier 2, which is the finding.** No row in this table names Firefox, Safari,
 or Edge, because no record in this tree says the product has been opened in one. If you have driven
@@ -273,7 +273,7 @@ to read it as narrower or wider than it is.
 being driven at all**~~ — **that was true until GitHub issue #292.** The floor for *asserted geometry*
 is **360 px** now, on the Everyday shell, at both of § 2's named widths. What has not changed is the
 thing that sentence was really reporting: the 360–767 band is still CSS that was correct on one
-afternoon, and the gate that now watches it is watching it **fail** — 21 registered findings across
+afternoon, and the gate that now watches it is watching it **fail** — 22 registered findings across
 the three clauses, listed in `viewportGates.browser.test.ts`'s `OUTSTANDING`. A gate at a width is
 not the same as a product that passes at it, and turning the second column of that table into gates
 is done for § 2's three clauses and undone for everything else. #240 is the layout work. This document's commitment above — 360 px, three
@@ -414,7 +414,7 @@ since § D462 the macOS column is the price of *re-adding* a leg rather than of 
 The browser tier is **~157 s out of ~2 000–3 400 s**. That is roughly **5–8 %** of a leg. So the
 cost of a second browser engine is *not* a second CI leg — it is a second pass over the tier, on the
 same leg, at roughly the tier's own cost. **The ~157 s was measured over the 25 files the tier held
-then; the tier holds 40** and the timing has not been re-measured, so read the percentage as the
+then; the tier holds 41** and the timing has not been re-measured, so read the percentage as the
 shape of the answer rather than as a current figure.
 
 > **Two numbers in that sentence and only one of them is a claim about now.** The 25 is a *dated*
@@ -427,7 +427,7 @@ shape of the answer rather than as a current figure.
 
 | What to add | What it buys | What it costs | Verdict |
 |---|---|---|---|
-| **Firefox** on the existing Linux leg | Tier 3's largest claim becomes a fact. Gecko is where the canvas and `@container` assertions are most likely to differ | ~157 s per leg when the tier held 25 files and the tier holds 40 now, so somewhat more, plus one more Playwright browser download (size unmeasured — `playwright-core install firefox` reports it), and a real risk of an initial burst of engine-specific failures that are the product's, not the tier's | **Recommended, and the highest-value single addition.** Run it on the **Linux leg only** — the engine is the variable, not the host OS |
+| **Firefox** on the existing Linux leg | Tier 3's largest claim becomes a fact. Gecko is where the canvas and `@container` assertions are most likely to differ | ~157 s per leg when the tier held 25 files and the tier holds 41 now, so somewhat more, plus one more Playwright browser download (size unmeasured — `playwright-core install firefox` reports it), and a real risk of an initial burst of engine-specific failures that are the product's, not the tier's | **Recommended, and the highest-value single addition.** Run it on the **Linux leg only** — the engine is the variable, not the host OS |
 | **WebKit** on a macOS leg | Safari — and, more to the point, **every browser on iOS**, all of which are WebKit whatever their name | **The price went up with § D462.** It was ~157 s on a leg that already existed; it is now a whole macOS leg plus a Playwright WebKit download | **Still recommended second, and it now costs a leg first.** The reason is unchanged and is why this cannot simply move to Linux: Playwright's Linux WebKit is a build that is not Safari, and testing a not-Safari to claim Safari support is the shape of defect this repository records. Anyone pricing this should read it against § D462's own note that re-adding a leg is one `include:` entry |
 | **A Windows leg** (`windows-latest`) | The largest desktop user base by share, on an engine tier 1 already covers | A **whole third leg** — ~33–56 min of runner time per PR, plus the pin-portability question `ci.yml`'s header opens: a third platform is *a third pin environment whose pin set nobody has measured*, and § D201 found 26 pins **exactly inverted** between two platforms | **Refused for now, and the reason is not the minutes.** It would fork the pinned-digest question three ways. If Windows support ever needs to be a tier-1 claim, it should be a **browser-tier-only** leg that runs no statistical pins |
 | **A touch/mobile emulation pass** | § 2's `best effort` becomes measurable | Small: Playwright's `hasTouch`/`isMobile` on the **already-installed** Chromium. A handful of files at a phone viewport | **Recommended, and cheapest of all.** It is #240's gate |

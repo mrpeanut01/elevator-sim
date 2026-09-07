@@ -56,7 +56,7 @@ once produced **21 test failures that had nothing to do with the code**.
 | Branch | `fix/repin-to-reproducible-values`, at `ea94d7f` |
 | PR | #4, open, **eight commits, last five `[skip ci]` — no CI result for the current head** |
 | Baseline | `d52f347` — **4 896 tests, 4 886 passed, 0 failed, 10 skipped**, `tsc -b` clean, `review-gates` green, all 981 pins and both identity digests reproducing |
-| Landed this program | **Step 1 only** (`d52f347`) — the traffic seed |
+| Landed this program | ~~**Step 1 only** (`d52f347`) — the traffic seed~~ — **superseded 2026-09-07: steps 0–6 are all built; read [`docs/14`](docs/14-building-behaviour-contract.md) § status.** This row is a 2026-07-31 snapshot and GitHub issue #235 was filed from it |
 | Wave board | `ea94d7f` — plan, status, three permanent risk rows, coverage rule |
 
 Two branches were cut and are still there at `d52f347`, unused and safe to delete or reuse:

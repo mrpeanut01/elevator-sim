@@ -556,7 +556,7 @@ there is no consumer to build. Units stays open because **the work is merely uns
 a correctness bite that has nothing to do with audio —
 `docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md` § 13 requires the Units switch to
 *convert, not relabel*, and [`CLAUDE.md`](../CLAUDE.md)'s units convention keeps imperial values in
-reference data with the unit in the identifier (`ratedLoadLb`, `speedFpm`), so a display-layer
+reference data with the unit in the identifier (`ratedLoadLb`, `minSpeedFpm`), so a display-layer
 conversion must not leak into a stored figure.
 
 Concretely, for whoever holds the tracker:

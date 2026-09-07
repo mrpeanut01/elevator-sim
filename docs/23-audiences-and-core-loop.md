@@ -379,6 +379,15 @@ human decision and is not proposed here.
 
 ## 4. The per-mode declaration
 
+> **Status 2026-09-07: SUPERSEDED IN PART by [§ D525](../DECISIONS.md).** The **mode set** is three
+> — Scenario, Career, Rush — not four; *Today's tower* and *Fix a building* are Scenario content.
+> **The per-mode loop analysis below stands unchanged and is the reason this section is not
+> deleted**: what each mode asks of a player, and which half of the loop it serves, is what § D525's
+> re-homing was decided against. Read the rows through [`docs/39`](39-decisions-in-force.md) § 3's
+> rename map — *Campaign* is **Career**, *Endless rush* is **Rush** — and read *Today's tower* and
+> *Fix a building* as scenarios rather than as tiles. See [`docs/38`](38-what-the-game-is.md) § 2.
+
+
 Built **from** the design handoff's session-shapes table
 (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`:249-254), which
 [`CLAUDE.md`](../CLAUDE.md) makes canonical for the interface. The first three columns are the
