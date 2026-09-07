@@ -34587,3 +34587,178 @@ Reopening `packages/core/` for a capability the game cannot reach is an escalati
 charter's § 6, and this entry is the product owner making it.
 
 ---
+
+## D528 — Difficulty is the survivor count, the budget is a third substrate, and four rules fold into one measurement
+
+**Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/33`](docs/33-difficulty-curve.md) DC-R1, DC-1, DC-2, DC-2b, DC-5, DC-7, DC-9, [§ D525](#d525) clauses 2 and 3, [§ D345](#d345), GitHub issues #234, #270, #366, #367, #381, #382.**
+
+**Decided by the product owner, 2026-09-06** — given in conversation after a review of all twelve of
+`docs/33`'s rules that the owner asked for in those terms: *"We need to look at the 'difficulty
+rules' to make sure those rules aren't hindering game play / enjoyability / user retention."*
+
+Given directly, on what the player is actually holding: *"I believe a consistent control surface for
+'tweaks' is important, more so than being fed 'drop down' actions."* On the opening: *"It's fine that
+the first building is hard to fail, but the user is going to want to try, and we should ramp up
+volumes or something that makes it better than just watching."* On per-scenario scarcity: *"We can
+decide if we want to limit available changes based on the scenario (your electrician is on vacation,
+getting a new one to fix this issue will take an extra day…)"*, and on the form that takes: *"frame
+it as **make it a price, not a prohibition**."*
+
+**Ruling.** Six clauses.
+
+1. **The dispatcher dropdown is not a special case of anything.** It is the cheapest corner of a
+   configuration space the player always has full access to. What protects a player from picking
+   blindly is [§ D525](#d525) clause 2 keeping the whole editor open on every scenario, not a rule
+   against the dropdown ever working. **`docs/33` DC-2's blanket form is withdrawn.**
+2. **Difficulty is the survivor count, budgeted by ladder position.** A scenario's count may be large
+   early and must shrink as the ladder goes on. **Positions one and two are exempt** from the
+   dropdown clause; from position three, no single shipped dispatcher profile may meet every bar on
+   its own. **Position three is the number to attack** — it is where a player has met the editor
+   twice — and it is published as a design choice with its reasoning rather than as a citation.
+3. **DC-R1 gains a third substrate: the budget and the price schedule.** DC-R1 permits demand and
+   fabric *"and nothing else"*, and § D525 clause 3 makes the budget the primary lever, so as the two
+   stood the ruling could not be implemented without breaking the rule. A budget belongs there on
+   DC-R1's own test: it is declared, it is data, the player can see it, and it changes what the
+   player can **reach** without changing what any number **means**. **Per-scenario scarcity is
+   expressed as a price with its reason attached, never as a removed control** — § D525 clause 2
+   forbids varying which controls are offered, and a price does not vary them. A greyed-out control
+   teaches nothing; a control that costs three days teaches where the pain in this building is.
+4. **Four rules fold into the survivor count.** DC-1, DC-2, DC-2b and DC-7 are four approximations of
+   *how many ways through are there?*, each measured over a different restricted move set; § D525
+   clause 3 measures it exactly over everything the budget can reach. DC-1 becomes *the count is less
+   than the whole affordable space*; DC-2 becomes clause 2's per-tier budget; **DC-2b is deleted**,
+   because § D525 clause 2 retires per-scenario control lists; DC-7's measured axis has no subject,
+   because the offered-repair list is retired by the same clause. **Twelve rules become nine.**
+5. **DC-9 is re-aimed from repairs to controls**: *no control the editor offers may be inert in a
+   scenario unless the scenario says so.* Its old subject is gone and its principle matters more,
+   because every control is now offered everywhere. GitHub issue #270 measured a live instance — on a
+   one-car `garden-apartments`, `weights.waitTime` and `weights.distanceTravelled` move the legs on
+   two cars and neither moves them on one, and `campaign/parse.ts` checks *editable* rather than
+   *live*, so nothing goes red.
+6. **DC-5 splits, and a floor is added on the other side.** Keep *growth reaches the run*, proved on
+   the legs — the check DC-5 was written for, and this repository's most-repeated defect. **Drop
+   *difficulty must be monotonic across days 1, 5, 10 and 20***: nobody argued for it as a design
+   constraint and it forbids a designed breather. And because nine of the twelve rules guard against
+   the game being too easy and about one and a half against it being too hard — while the
+   measurement says the harsh end is worse — **no scenario a player meets in the first hour may have
+   a survivor count of one.** One survivor is the ceiling of the ladder and may not be reachable
+   before the player knows what the controls do.
+
+**What this supersedes.** `docs/33` DC-2's blanket form and DC-2b entirely; DC-7's ordering
+mechanism; DC-9's subject; DC-5's monotonicity half. DC-R1 is **amended** rather than superseded —
+its two substrates stand and a third joins them. [§ D345](#d345) is untouched: difficulty may raise
+the stakes and may not move the bar, and a budget bounds the space without moving any bar, so
+`charter` non-goal 6 holds.
+
+**What this does not decide.** Where exactly the ladder-position threshold falls — three is the
+recommendation and the number to attack. How the survivor count is sampled at the building tier,
+which [§ D525](#d525) already leaves to the lane.
+
+**What this measured and did not fix.** Day-1 miss rates over the eight contracts, in the order a
+player meets them, of 30 seeds against a band of a third to two thirds: **0.00, 1.00, 0.23, 0.80,
+1.00, 0.03, 0.30, 0.00**. Two contracts cannot be passed by any shipped configuration and the eighth
+ties the first for the easiest day in the game. `docs/33` § 4.2 already recorded both failures — F4
+*"DC-4 is red on 8 of 8 contracts"* and F3 *"the contract order is not a ramp"* — and filed them
+against **W3**, an obligation over the week's contracts that had no issue. **The rules were not
+hindering the game; the game was failing them and nothing was scheduled.** That is GitHub issue #382.
+
+**Obligations that follow.** `docs/33` is revised on #381 with each superseded rule carrying a marker
+in [`docs/39`](docs/39-decisions-in-force.md) § 5's fixed vocabulary rather than being silently
+rewritten. The survivor count is reportable **per price tier** and carries its ladder position
+(#367). DC-4's stale wording is corrected in the same pass — it reads over the day's goals as shipped
+and § 4.2's figures are four-goal measurements, while the day has asked five since [§ D468](#d468).
+The tutorial [§ D529](#d529) builds is **outside this curve** and is asserted to be.
+
+---
+
+## D529 — The first session is a two-screen tutorial, and a worked answer is permitted there and nowhere else
+
+**Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.1, [§ D525](#d525) clauses 2 and 4, [§ D476](#d476), [§ D372](#d372), [§ D515](#d515), `docs/35` § 8.1's `PM-DOOR`, GitHub issues #210, #270, #380.**
+
+**Decided by the product owner, 2026-09-06.** Given directly: *"I think that PM-DOOR is a good second
+tutorial screen, this one where a building falls apart, and perhaps showing the user how they could
+have fixed it. Using that same tutorial as a Rush tutorial will work as well."* And on the shape of
+the first screen: *"Perhaps that is a tutorial instead of the first scenario, and we can walk people
+through making all the changes."* On the boundary below: *"Also agreed, **write the boundary down
+once**."*
+
+**Ruling.** Four clauses.
+
+1. **The first session is a tutorial of two screens, and it sits before Scenario rather than inside
+   it.** Screen one walks the player through making changes on a forgiving building — the editor is
+   taught before a scenario asks the player to use it. Screen two is `docs/35` § 8.1's **`PM-DOOR`**:
+   a building falls apart, and the player is then shown how it could have been fixed.
+2. **Screen two is reused as the Rush tutorial** when the player later opens Rush ([§ D515](#d515)).
+   Building it twice is what this clause exists to prevent.
+3. **This settles the question § D525 opened and does so by dissolving it.** `docs/38` § 2.1 says
+   Scenario is *"the only mode a first-time player should meet"*, and `PM-DOOR`'s opening is the
+   rush's climbing stream — which stopped being a bench instrument and became a front-door mode under
+   § D525 clause 6. Those ninety seconds are **tutorial content, not a mode**: the player has met no
+   mode when they reach the menu. [§ D476](#d476)'s mechanism ruling is untouched and still binds —
+   the cover is conditioned on derived state rather than a stored flag, and **skipping must advance
+   that state**, so a player who skips and reloads does not meet the screen they dismissed.
+4. **A worked answer is permitted in the tutorial and nowhere else.** No hint control, no suggested
+   fix, no diagnosis line, and no *here is what we would have done*, in any scenario, in any mode, at
+   any ladder position. Screen two shows a worked answer and [§ D525](#d525) clause 2 retires
+   proposed fixes; the two coexist only because a tutorial teaches and a scenario does not. **Without
+   this clause written down once, the tutorial's teaching component is reused as a hint button on
+   scenario twelve and the thing § D525 scrapped returns through the side door.**
+
+**What this changes elsewhere.** GitHub issue **#270** changes shape: with a tutorial before it, the
+first *scenario* is no longer the first thing a player meets, so the pressure to make
+`garden-apartments` failable comes off. [§ D372](#d372) stands and may have found its home — its
+authored, failable building may now be **the tutorial's** rather than a campaign stage's, which is
+the cheapest version of § D372 anybody has proposed. The demand ceiling is unchanged and is why
+*ramp up the volumes* is not available on that building: the residential profile's declared `max` is
+`7`, the building does not struggle until about `25`, and DC-R1 forbids exceeding a declared rate. A
+**new** building declares its own band.
+
+**What this does not decide.** Which building the tutorial uses, which is #270's. Whether GitHub
+issue #210's AC1 — *a new player completes one diagnose-change-prove cycle unaided* — is a driven
+journey test or a second tester gate; that wording ruling was asked for on 2026-09-02, is still owed,
+and a two-screen tutorial with a skip makes it sharper rather than softer.
+
+**Obligations that follow.** Both screens are **real runs on the real engine** (`docs/10` § 5.5,
+§ D525 clause 4), not scripted mocks. The worked answer is asserted in **both** directions — the
+tutorial draws one and no scenario surface can, in the shape `boundaries.test.ts` already uses. The
+tutorial is **outside `docs/33`'s curve** ([§ D528](#d528)) and is asserted to be. Every player-facing
+string enters `honesty/surfaces.ts`, and the corpus is re-measured once after integration per
+[§ D343](#d343).
+
+---
+
+## D530 — The cross-mode currency is named chimes
+
+**Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.4 and § 5, [§ D526](#d526) clause 1, GitHub issue #368.**
+
+**Decided by the product owner, 2026-09-06**, closing the first of the two items
+[§ D526](#d526) left open and `docs/38` § 5 lists as still open.
+
+**Ruling.** The cross-mode currency of [§ D526](#d526) is **chimes**. *Credits* was the placeholder
+and is replaced everywhere it names this currency.
+
+**Why this name and not another, carried from `docs/38` § 2.4 rather than re-argued.** The name may
+not be a quantity the run measures — so *rides*, *calls*, *stops*, *floors*, *landings*, *trips* and
+*waits* are out, because a currency named after a measured quantity invites the reader to think the
+run's figures buy something, which is exactly what § D526 clause 2 forbids. It may not be *units*,
+which is money **inside** a mode and stays so. *Chimes* is the arrival sound: distinctive, dry enough
+for the voice rule, and it reads correctly in the two sentences the player will actually meet —
+*you have 40 chimes*, *widen this budget: 12 chimes*. The alternatives offered and not taken were
+*fares* and *bells*.
+
+**What this does not change.** Everything else in § D526. *Units* is untouched and still means money
+inside a mode ([`docs/39`](docs/39-decisions-in-force.md) § 3's rename map keeps that row as it is).
+The name is a name: it buys no access, appears on no results page, and is never scaled by a figure
+the run can suppress.
+
+**What is still open.** § D526 clause 7's other item — whether the sign-in bonus is on at launch or
+off until a measured `charter S4`. The ledger carries the source either way, so #368 is not blocked
+on it.
+
+**Obligations that follow.** `docs/38` § 2.4 and § 5 are edited to say *chimes* and to record the
+name as ruled rather than pending; [`docs/39`](docs/39-decisions-in-force.md) § 3's rename map row
+for *credits* moves from **placeholder** to **chimes**. Every player-facing string carrying the name
+enters `honesty/surfaces.ts` when the ledger lands (#368), and `docs/26` § 10 is edited on that
+commit and not before, per § D526's own obligation.
+
+---
