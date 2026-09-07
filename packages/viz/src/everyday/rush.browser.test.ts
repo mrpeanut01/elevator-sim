@@ -95,7 +95,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await page.locator('.everyday-bar-wayout').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
       await page.locator('.everyday-bar-leave').click();
-      await page.waitForSelector('.everyday-mode[data-screen="door"]', { timeout: 15_000 });
+      await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
       await openEverydayDoor(page);
       const seedLine = await page.textContent('.everyday-door-seed');
       expect(seedLine).toContain('tower garden-apartments');

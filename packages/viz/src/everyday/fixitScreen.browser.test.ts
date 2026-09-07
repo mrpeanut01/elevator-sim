@@ -235,7 +235,7 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       expect(await page.locator('.everyday-fixit-stage').count()).toBe(0);
       // Away and back: the figures, not the stage — seen once is seen.
       await page.click('.everyday-rail-menu');
-      await page.waitForSelector('.everyday-mode[data-screen="fixit"]');
+      await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
       await openScenarioEntry(page, 'fix-a-building');
       await page.waitForFunction(
         () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
@@ -621,7 +621,7 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       expect(await page.locator('.everyday-fixit').count()).toBe(1);
       await page.locator('.everyday-bar-leave').click();
       await page.waitForFunction(
-        () => document.querySelectorAll('.everyday-mode').length === 4,
+        () => document.querySelectorAll('.everyday-mode').length === 3,
         undefined,
         { timeout: 15_000 },
       );
