@@ -24,7 +24,7 @@ import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_SCREENS, RUN_CONTEXTS } from './types.js';
 
 describe('what this build has actually built', () => {
-  it('is § 4’s whole inventory — the shell’s own menu and sixteen registered modules', () => {
+  it('is § 4’s whole inventory — the shell’s own menu and seventeen registered modules', () => {
     /*
      * Stated as a fact about this tree rather than a design intent, exactly as `modes.test.ts`
      * does for the tiles: the day a screen lane lands, this case fails and is updated in the same
@@ -68,6 +68,7 @@ describe('what this build has actually built', () => {
      */
     expect(EVERYDAY_SCREENS_BUILT).toEqual([
       'menu',
+      'scenario',
       'door',
       'brief',
       'stage',

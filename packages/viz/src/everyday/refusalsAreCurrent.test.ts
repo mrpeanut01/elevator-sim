@@ -73,6 +73,7 @@ import { EVERYDAY_SHELL_ABSENCES } from './buildNotes.js';
 import { DESIGNER_ABSENCES } from './designerModel.js';
 import { CAREER_LOAD_NOTICES } from '../campaign/careerPersist.js';
 import { RUSH_ABSENCES } from './rushScreenModel.js';
+import { SCENARIO_ABSENCES } from './scenarioModel.js';
 import { EVERYDAY_SCREENS_BUILT, SCREEN_NAMES, UNBUILT_REASONS } from './screens.js';
 import { SETTINGS_ABSENCES } from './settingsView.js';
 import { STAGE_ABSENCES } from './stageScreenModel.js';
@@ -109,6 +110,7 @@ function unkeyedRegisters(): readonly Refusal[] {
     ['everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES', EVERYDAY_SHELL_ABSENCES],
     ['everyday/designerModel.ts#DESIGNER_ABSENCES', DESIGNER_ABSENCES],
     ['everyday/rushScreenModel.ts#RUSH_ABSENCES', RUSH_ABSENCES],
+    ['everyday/scenarioModel.ts#SCENARIO_ABSENCES', SCENARIO_ABSENCES],
     ['everyday/settingsView.ts#SETTINGS_ABSENCES', SETTINGS_ABSENCES],
     ['everyday/stageScreenModel.ts#STAGE_ABSENCES', STAGE_ABSENCES],
   ];

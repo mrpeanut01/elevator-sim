@@ -202,8 +202,10 @@ describe.skipIf(!HAS_BROWSER)('the Everyday settings screen', () => {
 
     /* The consumer: § 7's stage, reached the way a player reaches it, opens on the chosen chip. */
     await page.click('.everyday-rail-menu');
-    await page.waitForSelector('.everyday-mode[data-screen="door"]');
-    await page.click('.everyday-mode[data-screen="door"]');
+    await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
+    /* § D525: the front door is a Scenario entry now — the tile, then the entry. */
+    await page.click('.everyday-mode[data-screen="scenario"]');
+    await page.click('.everyday-scenario-entry[data-entry="today"]');
     await page.waitForSelector('.everyday-door');
     await page.click('.everyday-bar-primary');
     await page.waitForSelector('.everyday-brief');

@@ -22,18 +22,21 @@ import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { rushBarModel } from './rushScreenModel.js';
 import { isScreenBuilt, routeFor, UNBUILT_REASONS } from './screens.js';
+import { scenarioHubViewOf } from './scenarioModel.js';
 import { ENGINEER_SWAP_NOTE, EVERYDAY_SCREENS, MODE_PICKS } from './types.js';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 
-describe('the menu offers the four modes the design names', () => {
-  it('lists all four, in the guide’s order, and none twice', () => {
-    expect(EVERYDAY_MODES.map((mode) => mode.title)).toEqual([
-      "Today's tower",
-      'Campaign',
-      'Endless rush',
-      'Fix a building',
-    ]);
+describe('the menu offers the three modes the design names', () => {
+  it('lists all three, Scenario first, and none twice', () => {
+    // § D525: three tiles, Scenario first, then Career, then Rush. *Today's tower* and *Fix a
+    // building* are not scrapped — they are Scenario's content, reached from the hub the Scenario
+    // tile opens. The count and the order are read off the shipped constant, never a second list.
+    expect(EVERYDAY_MODES.map((mode) => mode.title)).toEqual(['Scenario', 'Career', 'Rush']);
+  });
+
+  it('declares exactly three tiles', () => {
+    expect(EVERYDAY_MODES).toHaveLength(3);
   });
 
   it('opens each tile on a screen the inventory knows', () => {
@@ -51,7 +54,7 @@ describe('the menu offers the four modes the design names', () => {
     }
   });
 
-  it('carries § 18’s four picks, one each, in the picks’ own order', () => {
+  it('carries § 18’s three picks, one each, in the picks’ own order', () => {
     // The § 3.3 menu primary follows the selected card by `modePick`, so a duplicated or missing
     // pick is a card the bar cannot name.
     expect(EVERYDAY_MODES.map((mode) => mode.pick)).toEqual([...MODE_PICKS]);
@@ -66,7 +69,7 @@ describe('a tile either reaches the simulation or says it does not', () => {
     }
   });
 
-  it('leaves all four modes playable — the rush was the last tile to open', () => {
+  it('leaves all three modes playable — the rush was the last tile to open', () => {
     /*
      * Stated as a fact about this build rather than as a design intent. When another mode's
      * Everyday screens land, this case fails — which is the point: the menu's refusals and the tree
@@ -86,7 +89,7 @@ describe('a tile either reaches the simulation or says it does not', () => {
      * this list.
      */
     const playable = EVERYDAY_MODES.filter(isPlayable).map((mode) => mode.title);
-    expect(playable).toEqual(["Today's tower", 'Campaign', 'Endless rush', 'Fix a building']);
+    expect(playable).toEqual(['Scenario', 'Career', 'Rush']);
     // And the pair, the other way: nothing refuses, and nothing carries a sentence it cannot mean.
     expect(EVERYDAY_MODES.filter((mode) => mode.unavailable !== undefined)).toEqual([]);
   });
@@ -105,10 +108,15 @@ describe('a tile either reaches the simulation or says it does not', () => {
        * set up, watch, read, and see the week. § 6's claim is that this mode is a *loop*, and a
        * mode whose report dead-ends is the shape the campaign row below refuses.
        */
-      door: ['door', 'brief', 'stage', 'report', 'week'],
+      /*
+       * Scenario gates on its hub **and on the two screens the hub offers**, for § 6's reason one
+       * level up: a hub whose only two entries dead-end is worse than a refused tile. The gate is
+       * the tile's own `unlessBuilt` list, and this table is the independent copy that would
+       * disagree if either moved.
+       */
+      scenario: ['scenario', 'door', 'fixit'],
       towers: ['towers', 'building', 'contract'],
       rush: ['rush'],
-      fixit: ['fixit'],
     } as const;
     for (const mode of EVERYDAY_MODES) {
       const needed = gates[mode.screen as keyof typeof gates];
@@ -117,17 +125,35 @@ describe('a tile either reaches the simulation or says it does not', () => {
     }
   });
 
-  it('opens Today’s tower on § 6.1’s front door, now that the loop’s four screens exist', () => {
+  it('opens Scenario on its hub, and the hub still reaches every retired tile’s screen', () => {
     /*
-     * This case used to assert the opposite — *straight to the stage, because the door is not
-     * built* — and it was right when the door and the brief were unbuilt: a tile that routed
-     * through two empty screens was worse than one that skipped them. Both are registered now, so
-     * the skip is the stale thing and the guide's own route is the live one. The case is inverted
-     * rather than deleted, because *which screen the front tile opens* is exactly the fact a
-     * future lane might quietly change back.
+     * This case has now been inverted twice, and both inversions are the same fact moving.
+     *
+     * It first asserted *straight to the stage, because the door is not built*. When the door and
+     * the brief were registered it became *the tile opens the door*. § D525 retires the tile
+     * itself, so what it asserts now is the thing that ruling puts at risk: **a retired tile must
+     * not take its screen with it.** `door` and `fixit` are registered screens; if nothing reached
+     * them the registry would be carrying two screens no player can open, which is the shape
+     * `screens.test.ts` exists to fail.
+     *
+     * So this is § D525's acceptance criterion 2, driven from the shipped constants rather than
+     * asserted in prose: the first tile is the hub, and the hub's own entries name the two screens
+     * whose tiles went away.
      */
-    expect(EVERYDAY_MODES[0]?.screen).toBe('door');
-    // And the day the tile opens is a day, not a hand-off: the whole loop is registered.
+    expect(EVERYDAY_MODES[0]?.screen).toBe('scenario');
+    expect(EVERYDAY_MODES[0]?.title).toBe('Scenario');
+
+    const reached = scenarioHubViewOf().entries.map((entry) => entry.screen);
+    expect(reached).toContain('door');
+    expect(reached).toContain('fixit');
+
+    // Every screen the hub names is registered — a hub row pointing at an unbuilt key would be a
+    // dead end drawn as an invitation.
+    for (const screen of reached) {
+      expect(isScreenBuilt(screen), screen).toBe(true);
+    }
+
+    // And the day behind the door is still a day, not a hand-off: the whole loop is registered.
     for (const screen of ['door', 'brief', 'stage', 'report', 'week'] as const) {
       expect(isScreenBuilt(screen), screen).toBe(true);
     }
@@ -390,14 +416,17 @@ describe('modes.ts’ prose is checked against the tree, not against a reader’
  * The last clause is a text check because text is the layer that drifted: the code was already
  * right on the commit the sentence became wrong, which is exactly why nothing caught it.
  */
-describe('the Today’s-tower row describes § D338’s door, not § D335’s hand-off', () => {
+describe('the Scenario row describes § D525’s hub, not § D335’s four-tile menu', () => {
   const MODES_TEXT = readFileSync(`${SRC}everyday/modes.ts`, 'utf8');
   const BOOT_TEXT = readFileSync(`${SRC}everyday/boot.ts`, 'utf8');
 
-  it('opens the tile on § 6.1’s front door and routes the stage as a screen', () => {
-    expect(EVERYDAY_MODES[0]?.title).toBe("Today's tower");
-    expect(EVERYDAY_MODES[0]?.screen).toBe('door');
+  it('opens the first tile on the hub and routes the stage as a screen', () => {
+    expect(EVERYDAY_MODES[0]?.title).toBe('Scenario');
+    expect(EVERYDAY_MODES[0]?.screen).toBe('scenario');
+    // The stage is still reached as a screen rather than as a hand-off — § D338's half of the
+    // claim, which § D525 does not touch: the hub changed which tile leads there, not the route.
     expect(routeFor('stage')).toBe('screen');
+    expect(routeFor('scenario')).toBe('screen');
   });
 
   it('leaves no route arm a hand-off could come back through', () => {

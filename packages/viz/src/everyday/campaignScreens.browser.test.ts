@@ -72,7 +72,7 @@ async function openContract(page: Page): Promise<void> {
 
 /** Press the Campaign tile — the player's own path, not a scripted navigation. */
 async function enterCampaign(page: Page): Promise<void> {
-  const tile = page.locator('.everyday-mode', { hasText: 'Campaign' }).first();
+  const tile = page.locator('.everyday-mode[data-screen="towers"]').first();
   await tile.click();
   await page.waitForSelector('.everyday-towers');
 }
@@ -80,7 +80,7 @@ async function enterCampaign(page: Page): Promise<void> {
 describe.skipIf(!HAS_BROWSER)('the Everyday campaign screens', () => {
   it('opens the Campaign tile, which no longer refuses, and lands on the triage list', async () => {
     const page = await coldLoad();
-    const tile = page.locator('.everyday-mode', { hasText: 'Campaign' }).first();
+    const tile = page.locator('.everyday-mode[data-screen="towers"]').first();
     // § D227 in the direction a landed screen needs: the tile carries no refusal at all.
     expect(await tile.textContent()).not.toContain('not built');
     await enterCampaign(page);

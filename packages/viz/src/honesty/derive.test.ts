@@ -300,6 +300,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/rushScreen.ts#RUSH_SCREEN',
         'everyday/designerScreen.ts#DESIGNER_SCREEN',
         'everyday/tunerScreen.ts#TUNER_SCREEN',
+        /*
+         * § D525's Scenario hub (GitHub issue #364), on the mounts' shared ground and on exactly
+         * the same split. Its `mount` draws buttons into the shell's scroll region, so it cannot
+         * run without a document; its pure half is `everyday/scenarioModel.ts`, and the
+         * `EVERYDAY_DAILY` adapter drives `scenarioHubViewOf` whole — the eyebrow, the title, the
+         * lede, every entry's title, blurb and shape, the note, and every absence.
+         *
+         * **What the mount authors of its own is nothing.** Every string it draws comes from the
+         * model, which is why this exclusion is stronger than the four above it rather than
+         * weaker: there is no residue left over for the static sweep to be the only reader of.
+         */
+        'everyday/scenarioScreen.ts#SCENARIO_SCREEN',
       ],
     },
     {
@@ -1386,6 +1398,22 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'first-person and the shipped one is not, so a guide revision that drops the pronoun makes ' +
         'the deviation red rather than merely unnecessary.',
       ids: ['everyday/actionBar.ts#GUIDE_WATCHING_NOTE'],
+    },
+    {
+      reason:
+        'The second **transcription that is never drawn**, on the row above’s exact ground — ' +
+        'GitHub issue #364, § D525. `GUIDE_MENU_PRIMARY` is `GAMEPLAY_AND_NAVIGATION.md` § 3.3’s ' +
+        'own menu cell, which names four modes because it was written against § D335’s four-tile ' +
+        'menu. § D525 replaced that with three and `docs/39` § 2 records § D335 as superseded in ' +
+        'part, so the shipped cell is three labels and this constant is what it replaced. Nothing ' +
+        'draws it: `ACTION_BAR_ROWS`’ menu row carries the shipped three, which `EVERYDAY_MENU` ' +
+        'covers and this search sweeps through that adapter’s row loop. Seeding it would put two ' +
+        'retired tiles’ labels into the corpus as though a menu still offered them. What holds the ' +
+        'pair honest is `everyday/actionBar.test.ts`, which asserts in both directions that the ' +
+        'transcription still names four and the shipped row does not match it — so a lane that ' +
+        'quietly reverted the menu to four tiles goes red rather than passing by matching an old ' +
+        'transcription.',
+      ids: ['everyday/actionBar.ts#GUIDE_MENU_PRIMARY'],
     },
     {
       reason:

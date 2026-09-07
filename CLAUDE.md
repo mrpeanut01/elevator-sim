@@ -938,7 +938,7 @@ verdict:
   the Day report and the live-metrics panel became mode-aware for GitHub issues #110 and #100, and
   both adapters now render **both** registers on every case, which is where the always-on tier's
   string count moved to 278 756. A null is a measurement of a tree, not a property of the axis)*,
-  **35 statically swept DOM entry points** are not driven *(**18** mounts and **17**
+  **36 statically swept DOM entry points** are not driven *(**18** mounts and **18**
   screen-registry rows, derived by `packages/viz/src/honesty/derive.test.ts` rather than
   transcribed, and published in this verdict as three until [§ D421](DECISIONS.md) measured it —
   the screen rows' pure halves **are** driven, so what goes unswept in both groups is only what the
