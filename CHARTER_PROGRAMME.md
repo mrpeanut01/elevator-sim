@@ -293,16 +293,21 @@ measured the preview answering `403` to `CONNECT`.
 
 **Review.** Vertical slice review, with recorded sessions.
 
-**State: not open — with one fast-tracked exception.** **#206 is being fixed now**, ahead of
-milestone order, by product-owner decision on 2026-08-24. The charter's own § 7 lists it as an
+**State: OPEN (2026-08-24)**, which is what the *Programme state at a glance* table above records.
+*(This heading read "not open — with one fast-tracked exception" until 2026-09-07, contradicting
+that table on the same date. The table is the authority and `AGENT_STATUS.md` agrees with it; the
+fast-track note below is kept because it is still the reason #206 moved first.)* **#206 was fixed
+first**, ahead of milestone order, by product-owner decision on 2026-08-24. The charter's own § 7 lists it as an
 immediate next action, it is a defect fix rather than a feature so it needs no specification, and
-every journey test written before it lands asserts a dead end. **No other M2 issue is open.**
+every journey test written before it lands asserts a dead end. *(This paragraph closed with **"No
+other M2 issue is open."** until 2026-09-07. That was true while M2 was gated; the milestone is open
+and #210 and #218 are open issues within it.)*
 
 **Verification of all thirteen issues is complete** — evidence in
 [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) §§ M–N, S–U, and dispositions in
 [`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md).
 
-**#206 is confirmed exactly and is the first thing to fix** — a game whose loop does not close has
+**#206 was confirmed exactly and was the first thing fixed** — closed 2026-08-26 — — a game whose loop does not close has
 nothing else worth measuring. It is two independent gaps, not one: the stage's primary never
 navigates, and the breadcrumb's enabling rule asks *position in the timeline* rather than *does the
 destination have anything to show*. Campaign shares the path; Fix a building does not.

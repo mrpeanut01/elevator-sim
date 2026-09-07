@@ -612,8 +612,11 @@ promotes the mode, since promoting a tile does not give a mode a way back into i
 
 ## 7. Proposed journey rows against `TEST_MATRIX.md`
 
-**Proposals only.** [`TEST_MATRIX.md`](../TEST_MATRIX.md)'s twenty-one rows all read `planned`,
-which is `charter S10`'s stated failure condition. Below: what each existing row covers against this
+**Proposals only.** [`TEST_MATRIX.md`](../TEST_MATRIX.md) carries twenty-one rows: **three
+`passing` (T1, T10, T11), fourteen `owned`, and four `planned` (T7, T8, T18, T19)**. *(This
+paragraph read "all read `planned`, which is `charter S10`'s stated failure condition" until
+2026-09-07. That was true when it was written and had stopped being true; it is corrected here
+rather than deleted, because GitHub issue #237 was filed from it.)* Below: what each existing row covers against this
 map, and what is missing. Nothing here edits that file.
 
 ### 7.1 The existing twenty-one

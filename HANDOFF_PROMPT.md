@@ -17,7 +17,8 @@ deploy, and push the design forward until the backlog is done or the user stops 
    and exit criteria, and which are open.
 3. **`AGENT_STATUS.md`** — the lane board. **Append to it; never overwrite it.** Read § *Where a new
    agent picks up* and the wave-B board above it.
-4. **`RISKS.md`** — the project register, R1–R41. Read R1, R7, R25, R38, R40 and R41 before you plan
+4. **`RISKS.md`** — the project register, R1–R46. Read R1, R7, R25, R38, R40, R41, R44 (stale gap
+   register) and R46 (CI envelope) before you plan
    anything; they are the ways this project has actually failed.
 5. **`MULTI_AGENT_PLAN.md`** for the task tree, **`ISSUE_VERIFICATION_FINDINGS.md`** for the evidence
    behind every scheduled issue, **`TEST_MATRIX.md`** for journey coverage.
@@ -115,7 +116,10 @@ Run this continuously, in waves of three to five parallel subagents in git workt
   instrument moves.
 - **Never re-measure the honesty corpus on a branch.** Three lanes in one wave produced three correct
   numbers, none correct after integration.
-- **CI is 30–44 min and `cancel-in-progress: true`.** Batch commits; do not push mid-run.
+- **CI is 30–44 min, and `cancel-in-progress` is conditional**: `ci.yml` sets
+  `${{ github.event_name == 'pull_request' }}`, so a push to a **pull-request branch** cancels the
+  run in flight and a push to **`main`** cancels nothing. Batch commits on a PR branch; do not push
+  mid-run there.
 - **A published count with no test deriving it goes stale silently.** Wave B found the corpus surfaces
   column had been wrong by one in both tiers, **before** the wave — caught only by probing the
   surface *sets* at base and head and diffing them rather than trusting the counts.

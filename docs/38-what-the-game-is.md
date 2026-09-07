@@ -190,8 +190,10 @@ people can be watched, the player presses a control while it plays, the press is
 playhead and written into the run record as an intervention with the moment it happened
 (`{ seed, config, interventions[] }`, `packages/viz/src/live/interventions.ts`), and the day is
 re-simulated with it. The crowd is the same crowd either side of the press, so nothing the player
-already watched changes. Five intervention kinds exist: park the cars in the lobby, spread them across the
-tower, switch dispatcher, answer an incident, and a stairs intervention. Equipment and building
+already watched changes. Four intervention kinds exist: park the cars in the lobby, spread them across the
+tower, switch dispatcher, and answer an incident — `core/src/sim/types.ts#INTERVENTION_KINDS`.
+(Stairs are a **transport mode**, `TRANSPORT_MODE_KINDS`, not an intervention; an earlier draft of
+this paragraph counted them as a fifth kind and GitHub issue #370 inherited the error.) Equipment and building
 changes mid-run are new kinds, priced from
 the schedule, on the same record. *Record what changes to what and when* is that record.
 

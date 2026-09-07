@@ -763,7 +763,9 @@ verdict:
   rather than a coincidence.
 
   The `EVERYDAY_MENU` adapter drives the four mode tiles, the rail over **every** screen key in all
-  three run contexts, both shapes of the rail, and the shell's register of absences. It does not
+  **five** run contexts — `everyday/types.ts:84` is `daily, campaign, rush, watch, replay`, and the
+  adapter iterates the array, so the sweep is right and only this sentence had gone stale — both
+  shapes of the rail, and the shell's register of absences. It does not
   drive `mountEverydayShell`, which needs a document and is excluded on the DOM mounts' shared
   ground — the pure/DOM split in `everyday/` exists so that the words are drivable without one.
 
@@ -907,9 +909,12 @@ verdict:
   are now fixed**; both were deliberately *recorded rather than fixed* in the lane that found them,
   because a corpus that grew an axis and stayed green is a different claim from one that had to be
   repaired first. **Say the gaps in the same breath.** Clause 4 —
-  *every unit names its non-test caller* — is **satisfied in prose and mechanised by nothing**: all
-  **27** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
-  audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
+  *every unit names its non-test caller* — is **mechanised for reachability and not for the naming**.
+  All **28** `packages/viz/src` directories are now inside `AUDITED_MODULES`:
+  `packages/viz/src/deadCode.test.ts:124-154` lists them and `:356-366` asserts that list against
+  `readdirSync` in both directions, so an export with no caller is caught. **What no test checks is
+  the clause's own words** — that each unit *names* its caller in prose — and there the four
+  dead-code audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
   the clause to distrust first, and a fifth audit under `packages/viz` is the fix — **done in
   wave 12** (`packages/viz/src/deadCode.test.ts`, [§ D192](DECISIONS.md)), which **on the tree it
   landed on** derived 19 directories from disk, asserted them both ways, classified 1 017 exports,
@@ -917,9 +922,11 @@ verdict:
   unchanged.
 
   **Two of those figures are dated and one was live and wrong, which is the distinction this row
-  keeps failing.** The directory count is a present-tense claim about the tree — it read **19** and
-  the tree holds **27** (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`), so it is
-  corrected. The wave-12 pair is a record of what that audit found when it landed, and is now marked
+  keeps failing.** The directory count is a present-tense claim about the tree — it read **19**, was
+  corrected to **27**, and the tree now holds **28**
+  (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`; `release/` landed 2026-09-06).
+  **That is the third value this one figure has taken, which is the argument for deriving it rather
+  than quoting it.** The wave-12 pair is a record of what that audit found when it landed, and is now marked
   as such rather than silently refreshed. **The export count is deliberately not re-published**: two
   derivations disagreed (2 357 against ~2 893 by a cruder scan), and the audit's own figure cannot be
   read off a run because vitest intercepts `console.log` — the same trap that made
@@ -1003,8 +1010,10 @@ carries the way back (`#back-to-everyday`), reached through `everyday/swap.ts`'s
 because `dev/main.ts` may not import the Everyday shell — `boot.ts` already imports `dev/main.ts`,
 and closing that cycle is what produced this directory's last module-init `undefined`.
 
-Four consequences worth knowing before you touch either shell. **`inert` has two writers** —
-`menuPanel.ts#coverShell` and `everyday/shell.ts` — and the rule between them is that the outer cover
+Four consequences worth knowing before you touch either shell. **`inert` has three non-test
+writers**, not two — `menuPanel.ts#coverShell`, `everyday/shell.ts#setInert`, and
+`everyday/boot.ts:117`, which lifts and restores the overlay's own `inert` inside one synchronous
+block in `dismissEngineerMenu`. The rule between the first two is that the outer cover
 wins while it is up; writing it unguarded hangs the renderer, because `el.inert = true` on an
 already-inert element still calls `setAttribute` and still records a mutation. **Both roots are
 covered and neither is ever hidden**: the Engineer root because its canvases size from their laid-out
@@ -1016,7 +1025,9 @@ through the player's own path** (`enterEngineerStage`, `reopenEngineerMenu`) rat
 cover off, which is the difference between a tier that tests the product and one that tests a surface
 nobody can open — and that helper had gone stale with the hand-off, leaving the tier red in 25 cases
 across 12 files while the product worked. And **all four mode tiles open now**: every one of
-§ 4's seventeen screen keys is registered in `everyday/screens.ts`, so `UNBUILT_REASONS` is empty for
+§ 4's seventeen screen keys is accounted for — **sixteen are registered in `everyday/screens.ts`
+and `menu` is the shell's own**, which `screens.ts`'s docstring states and this sentence used to
+blur — so `UNBUILT_REASONS` is empty for
 the first time. The constant and the both-directions test around it stay exactly where they are — a
 screen that ever leaves the registry owes its sentence back, and an empty table is a state that must
 keep being checked rather than a rule that can be deleted.
@@ -1045,8 +1056,8 @@ single editor was mounted ([§ D177](DECISIONS.md)). If you add a control, add t
 in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
 measurements behind it. Read its **Standing requirement — the integration seam has an owner** before
 planning work: a behaviour that is configurable, unit-tested in isolation and never called from a
-shipped path passes every other check this repository runs, and has already shipped **ten** times in
-code — plus, once, in `data/`. The instructive one is the sixth: the whole of `tuning/` was reachable
+shipped path passes every other check this repository runs, and has already shipped **eleven** times in
+code — plus, **twice**, in `data/` (`destination-eta`, and `patternSwitching`'s weight sets). The instructive one is the sixth: the whole of `tuning/` was reachable
 from nothing outside its own tests, the module said so in its own docstring, and the roadmap asserted
 the phase green anyway. So the rule is not "is it reachable?" but **"name the non-test caller"**. A
 barrel re-export and a `{@link}` tag look exactly like a caller and are not one.
@@ -1076,7 +1087,10 @@ lesson: a feature can be observable **through a bug** and inert without one.
 
 **The eleventh is the most recent and the most instructive, and it is the one to read first.** The
 whole deck API on `model/bank.ts` — `isDoubleDeck`, `deckAt`, `deckAssignmentFor`, `pairedFloorOf`,
-`servesFloorPair` — had **no non-test caller anywhere in the tree**. Every reference outside its own
+`servesFloorPair` — had **no non-test caller anywhere in the tree**. **Two of those five were
+closed by deletion rather than by simulation** — `pairedFloorOf` and `servesFloorPair` are gone
+(`model/bank.ts` says so where they were), and only `isDoubleDeck`, `deckAt` and
+`deckAssignmentFor` acquired a caller, `sim/simulation.ts:4438#bankDecksAllow`. Every reference outside its own
 file was `bank.test.ts` or a barrel re-export. It is instructive because nothing about it looked
 neglected: `vertical-city` had authored eight double-deck cars and four floor pairs since the
 building was written, the config layer cross-validated them with four dedicated warning codes, and
@@ -1092,7 +1106,9 @@ into studies that publish an interval and studies classified `'no-intervals'`, t
 its members were dead by the same measure. `benchmark/livenessSuite.ts` is now that driver and
 `src/index.test.ts`'s guard iterates the entry-point set **derived from the directory** rather than
 five hand-written names. The one in `data/` is `destination-eta`: two authored fields, a schema-valid
-profile, its own tests, and `weights.rideTime: 0` — so the destination reached `estimateCost` and
+profile, its own tests, and — **as it shipped, since raised to 0.5 by § D112, which is what
+`data/dispatcher-profiles.json` carries today** — `weights.rideTime: 0`, so the destination
+reached `estimateCost` and
 changed no decision, **bit-identical to `eta` at 8 of 8 matrix cells**. Invariant 7 makes strategy
 data; it does not make data exempt. See [§ D112](DECISIONS.md) and [§ D114](DECISIONS.md).
 
@@ -1104,11 +1120,12 @@ under common random numbers, the difference-of-differences is `+1.020 s [+0.625,
 `benchmark/published.ts` under `difference-of-differences/absolute` and re-pinned by
 [§ D280](DECISIONS.md); the superseded `+0.982 [+0.584, +1.380]` was measured on the tree carrying
 [§ D254](DECISIONS.md)'s pickup-access defect. All seven are
-corrected, and `packages/experiments/src/validation/documentation.test.ts` now asserts it four
+corrected, and `packages/experiments/src/validation/documentation.test.ts` now asserts it five
 ways: the claim may not appear without a refutation within 400 characters of it, the correction may
 not be silently deleted, `model/car/estimateCost.ts`'s exclusion — its sentence is *descriptive*
-and true — is asserted in **both** directions, and no site may re-state the withdrawn destination for
-the saving. If you write a sentence about *why* something
+and true — is asserted in **both** directions, no site may re-state the withdrawn destination for
+the saving, and the carrier set the check runs over is **derived from disk rather than transcribed**,
+so a new site carrying the claim cannot escape by not being on a list. If you write a sentence about *why* something
 performs better, either measure it or say it is unmeasured.
 
 **And the second half of that correction was itself a stated mechanism, which is why it is now
@@ -1151,7 +1168,9 @@ violations as bugs, and reject changes that introduce them.
    comparison power — see [Architecture § Determinism](docs/01-architecture.md#determinism-strategy).
 3. **No wall-clock time in `core/`.** All time comes from the kernel. No `Date.now()`,
    no `performance.now()`, no timers.
-4. **Event queue ties break deterministically** by `(time, sequenceNumber)`. Never by
+4. **Event queue ties break deterministically** by `(time, sequence)` — the field is `sequence`
+   (`kernel/eventQueue.ts:19`), and the queue owns the counter so a caller cannot supply one.
+   Never by
    insertion order into a hash structure.
 5. **Every persisted run record carries its seed**, so any run replays exactly.
 6. **`core/` never depends on `viz/`.** The core must build and test with `viz` absent.
@@ -1202,7 +1221,12 @@ Full detail in [`docs/03-traffic-and-statistics.md`](docs/03-traffic-and-statist
 ## Correctness oracle
 
 Under pure up-peak, simulated interval and handling capacity must match the closed-form
-Barney/CIBSE round-trip-time calculation within a few percent. Implement that calculation
+Barney/CIBSE round-trip-time calculation within a few percent — **but only against the
+*corrected* closed form**. The raw textbook comparison is ~25 % out and
+`analytical/validation.test.ts:822` says so in terms; agreement reaches ~3 % once
+`correctedRoundTripSeconds` restores two documented omissions (`stop-time-excludes-acceleration`,
+`no-minimum-dwell`). A reader who runs the raw comparison and finds 25 % has found the textbook's
+simplification, not a broken simulation. Implement that calculation
 as a test. If simulation and closed form diverge, assume the simulation is wrong until
 proven otherwise.
 
@@ -1235,7 +1259,12 @@ proven otherwise.
 - TypeScript. Strict mode.
 - Units are SI internally (metres, seconds, kilograms, m/s). Imperial values appear only
   in reference data and display formatting, always with the unit in the identifier
-  (`ratedLoadLb`, `speedFpm`).
+  (`ratedLoadLb`, `minSpeedFpm`). **`speedFpm` is not an identifier in this tree** — it was named
+  here in error, and three sites copied the wrong name back out of this sentence:
+  [`docs/29`](docs/29-audio-direction.md) § 8 (corrected on this commit),
+  [`DECISIONS.md`](DECISIONS.md) § D448's transcription of this rule, and
+  `packages/viz/src/everyday/units.ts`'s docstring. The last two are left standing — a decision
+  entry is not rewritten after the fact, and a `.ts` docstring is outside a markdown-only change.
 - Time is simulated seconds, a plain number, always sourced from the kernel.
 - Prefer pure functions in `core/`. Side effects belong in the kernel and the runner.
 - Tests colocate with source as `*.test.ts`.
@@ -1259,7 +1288,14 @@ cite why.
   only in a commit message.
 - Do not weaken an acceptance criterion to make a phase pass. Raise it instead.
 - **One push per wave, not one per commit.** Commit as often as you like; push when the wave is
-  ready. Every push cancels the CI run in flight (`ci.yml` sets `cancel-in-progress: true`) and
+  ready. Every push to a **pull request branch** cancels the CI run in flight — `ci.yml:85` sets
+  `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`, so a push to `main` cancels
+  nothing through that flag — and since
+  [GitHub PR #386](https://github.com/mrpeanut01/elevator-sim/pull/386) a push run on `main` is
+  keyed on **its own commit** rather than on `github.ref`, because `cancel-in-progress: false`
+  protects only a *running* run: GitHub keeps at most one **pending** run per group, so a third
+  arrival evicts the queued one whatever the flag says. That was found by losing a run
+  (`RISKS.md` R46 carries the three run ids). And
   starts a fresh ~45-minute suite, and the cancelled run completes a check suite on a head nobody
   cares about — which arrives as a `check_suite.completed` notification saying *"no third-party check
   suite is still running or failed"* about a commit that is no longer the head. Measured on
