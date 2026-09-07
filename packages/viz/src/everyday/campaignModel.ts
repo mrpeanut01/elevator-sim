@@ -150,6 +150,14 @@ export interface CampaignInput {
   readonly observations: GoalObservations | undefined;
   /** The week's closed days, for § 7's *was* column. */
   readonly history: readonly DayOutcome[];
+  /**
+   * What the last career load refused, in the player's words — GitHub issue #375.
+   *
+   * `undefined` when the career restored, and when there was nothing to restore. Drawn on this
+   * screen because it is where the career is: a career that silently restarted is the defect the
+   * persistence closes, and a sentence somewhere else is a disclosure that becomes nobody's.
+   */
+  readonly careerNotice?: string | undefined;
 }
 
 /** § 16 rule 1's mark for anything unfinished. Shared, so the three screens use one character. */
@@ -531,6 +539,8 @@ export interface TowersView {
   readonly offers: OffersView;
   readonly lately: { readonly heading: string; readonly sub: string; readonly refusal: string };
   readonly oddsFootnote: string;
+  /** The career-load refusal, if the last load refused. Never a bare blank. */
+  readonly careerNotice: string | undefined;
 }
 
 /** One offered building — § 8.8's card. */
@@ -782,6 +792,7 @@ export function towersView(input: CampaignInput): TowersView {
   const held = career.towers.length;
 
   return {
+    careerNotice: input.careerNotice,
     title: TOWERS_COPY.title,
     stagePill: careerStageLabel(career.today),
     meta: `${String(Math.min(held, open))} of ${String(SLOTS.length)} slots in hand · ${String(atRisk)} at risk · standing ${String(standing)}`,

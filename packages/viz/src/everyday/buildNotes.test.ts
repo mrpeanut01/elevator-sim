@@ -79,8 +79,10 @@ describe('the build-information panel', () => {
     // down rather than standing over it — and 12 → 9 when GitHub issue #220 built the rush's
     // engine (§ D515) and three of the rush register's four entries left with it — and 9 → 8 when
     // GitHub issue #177 item 1 handed a past day back over a replay week (§ D517), and 8 → 6 when
-    // item 5 wrote the designer's escalator rows and folded its document (§ D518).
-    expect(view.entryCount).toBeGreaterThan(6);
+    // item 5 wrote the designer's escalator rows and folded its document (§ D518) — and 6 → 5 when
+    // GitHub issue #375 persisted the career and deleted the session-only entry that said it did
+    // not (§ D227, § D525).
+    expect(view.entryCount).toBeGreaterThan(5);
   });
 
   it('says which build it is, in a sentence the corpus sweeps — GitHub issue #246', () => {
@@ -255,7 +257,6 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * entry deleted while the map still names it fails here.
    */
   { register: 'CAMPAIGN_ABSENCES', fragment: 'nothing files on', issue: 223 },
-  { register: 'CAMPAIGN_ABSENCES', fragment: 'The career is this session', issue: 224 },
 
   /* Settings. Two of the six are #229's remainder after its premise was refuted (§ D368). */
   { register: 'SETTINGS_ABSENCES', fragment: 'Sound —', issue: 258 },

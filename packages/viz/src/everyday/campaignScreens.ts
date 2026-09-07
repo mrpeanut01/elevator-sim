@@ -183,6 +183,7 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
   const run = host.runState();
   return {
     career: host.campaign(),
+    careerNotice: host.careerNotice(),
     buildings,
     dispatchers: host.dispatchers().map(
       (profile): DispatcherChoice => ({
@@ -373,6 +374,17 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
     const lede = el(doc, 'p', undefined, view.lede);
     lede.style.cssText = `font-size:16.5px;line-height:1.55;color:${C.inkSoft};margin:12px 0 0;max-width:74ch;text-wrap:pretty`;
     root.append(header, lede);
+
+    /*
+     * The career-load refusal, drawn where the career is — GitHub issue #375. Present only when the
+     * last load actually refused: a first-ever load has nothing to apologise for, and a notice
+     * there would read as a fault.
+     */
+    if (view.careerNotice !== undefined) {
+      const notice = el(doc, 'p', 'everyday-towers-career-notice', view.careerNotice);
+      notice.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:14px 0 0;padding:12px 14px;border:1px solid ${C.amberEdge};background:${C.amberWash};border-radius:${String(R.card)}px;max-width:74ch;text-wrap:pretty`;
+      root.append(notice);
+    }
 
     /* ---- standing and the slots ---- */
     root.append(eyebrow(doc, view.standing.heading));

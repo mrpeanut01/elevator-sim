@@ -42,18 +42,18 @@
  * so this record carries only the money their answers cost (`economy.ts#IncidentSpend`) and never the
  * incident itself.
  *
- * ## The career is this session's
+ * ## The career persists, and the three things it needed are built
  *
- * Nothing here writes storage. `everyday/profileStore.ts` persists a name and a colour because
- * § 20.15 asks for it; a career would need a schema, a migration and a reconciliation with
- * `ViewerState.week`, and shipping one that silently disagreed with the week is the defect this
- * repository keeps a register of. **{@link CAMPAIGN_ABSENCES}'s third entry is where the player
- * reads it** — *“The career is this session's. Nothing on these three screens is written to this
- * device.”* This used to point at the rail instead, and #214 took that away: the rail's career
- * line now reads the persisted **week**, so it no longer says the build keeps no career, and it
- * never spoke for the *campaign's* career anyway. The guarantee is unchanged; only the surface
- * that discloses it moved, and a pointer at the wrong surface is how a disclosure quietly
- * becomes nobody's.
+ * This section used to read *"The career is this session's"* and list what a persisted one would
+ * need: a schema, a migration, and a reconciliation with `ViewerState.week`. All three exist —
+ * `campaign/careerPersist.ts` is the versioned envelope, refused in both directions;
+ * `everyday/careerStore.ts` is the storage half; and the reconciliation is **non-interference**,
+ * which is what the third item turned out to be once it was looked at properly. The week and the
+ * career are different records with different lifetimes, on separate keys, and neither is evidence
+ * about the other — so there is no disagreement to resolve, and `careerPersist.test.ts` asserts
+ * that in both directions rather than leaving it to the fact that nobody has written a coupling.
+ *
+ * GitHub issue #375, § D525's *"the Campaign becomes a Career that persists"*.
  */
 
 import {
@@ -255,7 +255,15 @@ export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
    * into or out of the player-facing list.
    */
   'A day is run from here and scored by the day itself; the month grid marks a day cleared or missed when the campaign day is filed, and nothing files one automatically.',
-  'The career is this session’s. Nothing on these three screens is written to this device.',
+  /*
+   * **The session-only entry is deleted, not reworded** — GitHub issue #375, § D227, and the same
+   * rule the incidents entry above came out under. It read *"The career is this session's. Nothing
+   * on these three screens is written to this device."* and it stopped being true on the commit
+   * that made it false: `campaign/careerPersist.ts` is the schema, `everyday/careerStore.ts` is the
+   * storage, and `everyday/host.ts` restores on open and saves through one writer.
+   *
+   * A stale refusal is worse than a dead seam, because it tells the player not to try.
+   */
 ]);
 
 /* -------------------------------------------------------------------------- *

@@ -173,13 +173,25 @@ describe('the opening career', () => {
 
   it('says out loud what this build does not do', () => {
     /*
-     * Two, since GitHub issues #171 and #169 item 1 (§ D507) deleted the incidents entry on the
-     * commit that built the draw and the calendar it said did not exist. Pinned at exactly two so
-     * the next deletion or addition is a deliberate edit here rather than a count drifting.
+     * **One**, and the count has only ever fallen — which is what § D370's queue reading predicts of
+     * a register whose entries leave on the commit that makes them false.
+     *
+     * Two, after GitHub issues #171 and #169 item 1 (§ D507) deleted the incidents entry on the
+     * commit that built the draw and the calendar it said did not exist. **One since #375**, which
+     * built the schema, the storage and the reconciliation the session-only entry named, and
+     * deleted that entry rather than rewording it (§ D227). Pinned exactly so the next deletion or
+     * addition is a deliberate edit here rather than a count drifting.
      */
-    expect(CAMPAIGN_ABSENCES.length).toBe(2);
+    expect(CAMPAIGN_ABSENCES.length).toBe(1);
     for (const entry of CAMPAIGN_ABSENCES) expect(entry.length).toBeGreaterThan(40);
     expect(CAMPAIGN_ABSENCES.join(' ')).not.toContain('draws this build cannot make');
+    /*
+     * Both directions, for the two sentences that have left. A reworded refusal would still contain
+     * its own subject, so this fails on a rewording as well as on a resurrection — which is the
+     * distinction § D227 is about.
+     */
+    expect(CAMPAIGN_ABSENCES.join(' ')).not.toContain('this session');
+    expect(CAMPAIGN_ABSENCES.join(' ')).not.toContain('written to this device');
   });
 });
 

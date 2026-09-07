@@ -71,6 +71,7 @@ import { describe, expect, it } from 'vitest';
 import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import { EVERYDAY_SHELL_ABSENCES } from './buildNotes.js';
 import { DESIGNER_ABSENCES } from './designerModel.js';
+import { CAREER_LOAD_NOTICES } from '../campaign/careerPersist.js';
 import { RUSH_ABSENCES } from './rushScreenModel.js';
 import { EVERYDAY_SCREENS_BUILT, SCREEN_NAMES, UNBUILT_REASONS } from './screens.js';
 import { SETTINGS_ABSENCES } from './settingsView.js';
@@ -99,6 +100,12 @@ interface Refusal {
 function unkeyedRegisters(): readonly Refusal[] {
   const registers: readonly (readonly [string, readonly string[]])[] = [
     ['campaign/career.ts#CAMPAIGN_ABSENCES', CAMPAIGN_ABSENCES],
+    /*
+     * GitHub issue #375's career-load refusals. They belong in this corpus for the reason the file
+     * exists: each says the career on screen is not the one the player left, and a refusal that
+     * outlives the condition it describes is worse than a missing one.
+     */
+    ['campaign/careerPersist.ts#CAREER_LOAD_NOTICES', Object.values(CAREER_LOAD_NOTICES)],
     ['everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES', EVERYDAY_SHELL_ABSENCES],
     ['everyday/designerModel.ts#DESIGNER_ABSENCES', DESIGNER_ABSENCES],
     ['everyday/rushScreenModel.ts#RUSH_ABSENCES', RUSH_ABSENCES],

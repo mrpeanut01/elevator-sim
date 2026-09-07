@@ -202,6 +202,7 @@ import {
   type CampaignCareer,
   type CampaignTower,
 } from '../campaign/career.js';
+import { CAREER_LOAD_NOTICES } from '../campaign/careerPersist.js';
 import { admitProfile } from '../campaign/dimensions.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
 import { judgeStage } from '../campaign/judge.js';
@@ -8633,6 +8634,15 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       worstWaitIsCensored: false,
     };
 
+    /*
+     * GitHub issue #375's career-load refusals. Seeded as `reason` — each says why the career on
+     * screen is not the one the player left, which is a refusal rather than description. All three
+     * grounds, because a refusal drawn on one and not the others is how the untested arm ships.
+     */
+    for (const [ground, notice] of Object.entries(CAREER_LOAD_NOTICES)) {
+      seeds.push({ field: `campaign.careerNotice.${ground}`, text: notice, role: 'reason' });
+    }
+
     const cases: readonly (readonly [string, CampaignCareer, GoalObservations | undefined])[] = [
       ['first-day', first, undefined],
       ['second-month', { ...second, openTowerId: 'c6' }, observations],
@@ -11396,6 +11406,9 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#RUSH_ABSENCES',
     'everyday/designerModel.ts#DESIGNER_ABSENCES',
     'campaign/career.ts#CAMPAIGN_ABSENCES',
+    /* GitHub issue #375: the career-load refusals, drawn on the towers screen. */
+    'campaign/careerPersist.ts#decodeCareer',
+    'campaign/careerPersist.ts#CAREER_LOAD_NOTICES',
   ],
   render(context) {
     void context;
