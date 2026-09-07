@@ -448,6 +448,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/screenDom.ts#pill',
         'everyday/screenDom.ts#QUIET',
         'everyday/screenDom.ts#section',
+        /*
+         * `sideBySide` writes a `grid`-replacing flex row and two `flex` shorthands and puts no
+         * string on the page at all — GitHub issue #240. It is derived here for the reason this
+         * group's own sentence gives: `flex-start` beside `flex-wrap` satisfies the
+         * two-adjacent-words prose test, exactly as `EVERYDAY_TYPE`'s entry above predicts for
+         * CSS. Its arguments are two elements and three numbers; there is no seat in its signature
+         * for a sentence.
+         */
+        'everyday/screenDom.ts#sideBySide',
         'everyday/screenDom.ts#unavailableBand',
         'everyday/screenDom.ts#WELL',
         'everyday/figures.ts#percentFigure',

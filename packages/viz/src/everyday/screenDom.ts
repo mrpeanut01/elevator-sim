@@ -189,3 +189,61 @@ export function unavailableBand(
   root.append(label, reason, list);
   return root;
 }
+
+/**
+ * **A fixed-width column beside a fluid one, that stacks when there is no room for both** —
+ * GitHub issue **#240**, `docs/31-support-matrix.md` § 2.
+ *
+ * ## The defect this replaces, which is `shell.ts#RAIL_WIDTH_PX` again one level down
+ *
+ * Five screens in this directory drew their two columns as `grid-template-columns: 288px
+ * minmax(0,1fr)` or its mirror — a **fixed track with no breakpoint**, which is exactly the shape
+ * that put the Everyday rail 212 px wide against a 360 px viewport. A grid track sized in pixels
+ * does not stack; it takes its pixels and leaves the other track whatever is left. Measured on the
+ * shipped build at 360×800, the Fix-a-building screen's 288 px case rail left its **main column 16
+ * px wide** and clipped 125 px out of a card, and the Dispatcher workshop put **42 boxes** past the
+ * right edge of the screen.
+ *
+ * ## Why flex rather than a media query or a second grid template
+ *
+ * `everyday/` has no stylesheet — the handoff's § 19 rule, and `hiddenBox.test.ts` depends on it —
+ * so a media query would mean either a `matchMedia` listener per screen or a first stylesheet for
+ * this directory. Neither is needed: a wrapping flex row **is** the breakpoint, computed from the
+ * two columns' own widths rather than from a number somebody picked. Both bases fit on one line, or
+ * they do not and the fluid column wraps under the fixed one. Nothing has to agree with anything.
+ *
+ * **Above the wrap the geometry is byte-identical to the grid it replaces**: the fixed column does
+ * not grow (`flex-grow: 0`), the fluid one takes every remaining pixel ({@link FLUID_GROW}, large
+ * enough that the fixed column's own grow could never matter if it had one), and the gap is the
+ * caller's. Below it, the fluid column is on its own line at the full width and the fixed one
+ * shrinks to the line if it is wider than it.
+ *
+ * `fluidMinPx` is where the wrap happens and is the one judgement here: it is the width below which
+ * the fluid column has stopped being a column. 300 px is this directory's own answer already —
+ * `campaignScreens.ts`, `designerScreen.ts` and `tunerScreen.ts` all pass `minmax(300px,1fr)` to
+ * `auto-fit` for the same question.
+ *
+ * The caller appends its own children in the order it wants them read; this styles them and the row.
+ */
+export function sideBySide(
+  row: HTMLElement,
+  parts: {
+    readonly fixed: HTMLElement;
+    readonly fluid: HTMLElement;
+    readonly fixedPx: number;
+    readonly gapPx: number;
+    readonly fluidMinPx?: number;
+  },
+): void {
+  row.style.cssText = `display:flex;flex-wrap:wrap;align-items:flex-start;gap:${String(parts.gapPx)}px`;
+  /* `0 1 <fixed>px`: never grows, and shrinks only when it is alone on a line narrower than it. */
+  parts.fixed.style.cssText += `;flex:0 1 ${String(parts.fixedPx)}px;min-width:0;max-width:100%`;
+  parts.fluid.style.cssText += `;flex:${String(FLUID_GROW)} 1 ${String(parts.fluidMinPx ?? 300)}px;min-width:0`;
+}
+
+/**
+ * The fluid column's grow factor — large rather than 1, so that on a shared line it absorbs the
+ * free space whatever the fixed column's own factor turns out to be. The *flexbox holy albatross*
+ * idiom, and the reason {@link sideBySide} needs no `flex-grow: 0` promise from its caller.
+ */
+const FLUID_GROW = 999;

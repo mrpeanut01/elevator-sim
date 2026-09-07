@@ -69,7 +69,7 @@ import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { everydayProfileStore } from './profileStore.js';
 import { tutorialIsDue } from './tutorialModel.js';
-import { railFooter, railModel } from './rail.js';
+import { RAIL_DRAWER_COPY, railFooter, railModel } from './rail.js';
 import type { RailModel } from './rail.js';
 import { routeFor, SCREEN_NAMES, screenModuleFor, unbuiltReasonFor } from './screens.js';
 import type { EverydayScreenContext, EverydayScreenHandle } from './screens.js';
@@ -84,6 +84,7 @@ import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as GAP,
   EVERYDAY_RADII as R,
+  EVERYDAY_RAIL_DRAWER_MAX_PX,
   EVERYDAY_RAIL_SURFACES as RAIL_SURFACE,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
@@ -164,6 +165,14 @@ export interface MountedEverydayScreen extends EverydayScreenHandle {
 }
 
 const RAIL_WIDTH_PX = 212;
+/**
+ * The id the narrow header's toggle points at, so `aria-controls` names the drawer it opens.
+ *
+ * A constant rather than two literals for {@link BAR_REASON_ID}'s reason: an `aria-controls` naming
+ * an id that is not in the document reads as a described relationship and describes nothing, and
+ * the browser tier asserts the binding by resolving whatever id the attribute names.
+ */
+const RAIL_DRAWER_ID = 'everyday-rail-drawer';
 
 /**
  * The id `drawBar` puts on the bar's note **when that note is a dead primary's reason**, so the
@@ -343,10 +352,19 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   const root = el(doc, 'div', EVERYDAY_ROOT_CLASS);
 
   /*
-   * One geometry: the shell is the whole viewport, rail then screen region. It was two while the
-   * stage handed off — a strip beside the inset Engineer surface — and collapsed to this when § 7's
-   * stage became a screen. Keeping it here rather than in a stylesheet means the 212 px appears
-   * exactly once, in {@link RAIL_WIDTH_PX}.
+   * **Two geometries, and the second is a width rather than a mode** — GitHub issue #240.
+   *
+   * Wide: the shell is the whole viewport, rail then screen region. It was two while the stage
+   * handed off — a strip beside the inset Engineer surface — and collapsed to one when § 7's stage
+   * became a screen. Narrow (at or below `tokens.ts#EVERYDAY_RAIL_DRAWER_MAX_PX`): the rail leaves
+   * the grid entirely and becomes an overlay drawer, the shell grows a header row to work it, and the
+   * screen region gets the whole width. Keeping both here rather than in a stylesheet means the
+   * 212 px appears exactly once, in {@link RAIL_WIDTH_PX}, and the breakpoint exactly once.
+   *
+   * Nothing here is a *mode the player picks*, which matters: § 3.5 forbids an entry screen that
+   * survives a reload, and `docs/31` § 2 records that a viewport-conditional entry screen is close
+   * enough to that rule to need a ruling. This is not one — the same screen is drawn either way and
+   * only the frame around it moves, so a reload at any width lands where § 3.5 says it does.
    */
   const RAIL = String(RAIL_WIDTH_PX) + 'px';
   const COMMON = [
@@ -354,6 +372,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     'top:0',
     'bottom:0',
     'left:0',
+    'right:0',
     'display:grid',
     'overflow:hidden',
     `background:${C.paperDeep}`,
@@ -361,13 +380,69 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     `font-family:${TYPE.body}`,
     `z-index:${String(SHELL_Z_INDEX)}`,
   ].join(';');
-  const FULL = COMMON + `;right:0;grid-template-columns:${RAIL} minmax(0,1fr)`;
+  const FULL = COMMON + `;grid-template-columns:${RAIL} minmax(0,1fr)`;
+  /*
+   * One column, two rows: the narrow header, then main. The rail is `position:fixed` in this
+   * geometry and a fixed element is **not a grid item**, so it takes no track — which is why this
+   * template names two rows rather than three and why nothing has to be re-parented on a resize.
+   */
+  const NARROW = COMMON + ';grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)';
   root.style.cssText = FULL;
+
+  /*
+   * --- The narrow header (§ 3.2, small screens). Drawn only below the breakpoint. ---
+   *
+   * `display` is written directly rather than through the `hidden` attribute, because this element
+   * carries an inline `display:flex` and an author `display` outranks the user agent's
+   * `[hidden] { display: none }` — `everyday/hiddenBox.test.ts` is the file that knows why.
+   */
+  const narrowHeader = el(doc, 'div', 'everyday-narrowbar');
+  narrowHeader.style.cssText = [
+    'display:none',
+    'align-items:center',
+    `gap:${String(GAP.row)}px`,
+    'padding:8px 12px',
+    `border-bottom:1px solid ${C.rule}`,
+    `background:${C.card}`,
+    'min-width:0',
+  ].join(';');
+
+  const railToggle = el(doc, 'button', 'everyday-rail-toggle', RAIL_DRAWER_COPY.open);
+  railToggle.type = 'button';
+  railToggle.setAttribute('aria-controls', RAIL_DRAWER_ID);
+  railToggle.setAttribute('aria-expanded', 'false');
+  railToggle.style.cssText = [
+    `background:${C.paper}`,
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    'padding:8px 13px',
+    `color:${C.ink}`,
+    'font-size:13px',
+    'font-weight:600',
+    'cursor:pointer',
+    'flex:none',
+  ].join(';');
+  narrowHeader.append(railToggle);
+
+  /*
+   * The scrim, which is what makes the open drawer dismissible by the gesture everybody already
+   * knows. It is a `<div>` and not a control: the drawer's own `✕ Close` is the control, and a
+   * second focusable thing over the whole screen would be a tab stop that says nothing.
+   */
+  const railScrim = el(doc, 'div', 'everyday-rail-scrim');
+  railScrim.style.cssText = [
+    'display:none',
+    'position:absolute',
+    'inset:0',
+    'background:rgba(20,18,15,.45)',
+    'z-index:1',
+  ].join(';');
 
   /* --- The rail (§ 3.2). Dark ink ground; scrolls independently of the screen region. --- */
   const rail = el(doc, 'nav', 'everyday-rail');
+  rail.id = RAIL_DRAWER_ID;
   rail.setAttribute('aria-label', 'Everyday Mode');
-  rail.style.cssText = [
+  const RAIL_SKIN = [
     'overflow-y:auto',
     `background:${C.ink}`,
     `color:${C.paper}`,
@@ -377,6 +452,20 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     `gap:${String(GAP.section)}px`,
     'box-sizing:border-box',
   ].join(';');
+  /** Docked: an ordinary grid item in {@link FULL}'s first column. */
+  const RAIL_DOCKED = RAIL_SKIN;
+  /**
+   * A drawer: out of the grid, over the screen, never wider than the screen it covers.
+   *
+   * `min(288px,86vw)` rather than a literal, so the drawer still leaves a strip of the screen
+   * showing at 320 px — the width `docs/31` tier 4 puts below support and which nothing promises,
+   * but which should degrade rather than fill.
+   */
+  const RAIL_DRAWER =
+    RAIL_SKIN +
+    ';position:fixed;top:0;bottom:0;left:0;width:min(288px,86vw);z-index:2' +
+    ';box-shadow:2px 0 18px rgba(20,18,15,.35)';
+  rail.style.cssText = RAIL_DOCKED;
 
   /* --- Main: the screen region above, the pinned bar below (§ 3.1). --- */
   const main = el(doc, 'div', 'everyday-main');
@@ -411,16 +500,40 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   signInNotice.setAttribute('role', 'status');
 
   const screenRegion = el(doc, 'div', 'everyday-screen');
-  screenRegion.style.cssText = [
+  /**
+   * The region's own inset, which is a **share of the width** at phone widths rather than a
+   * constant — GitHub issue #240.
+   *
+   * 32 px each side is 18 % of a 360 px viewport against 5 % of a 1280 px one, and the front door's
+   * mode tiles are 177 px wide; the wide inset was the difference between the four of them fitting
+   * and not. 14 px is the rail's own padding, so the two insets agree at the width where the rail
+   * is over the screen rather than beside it.
+   */
+  const REGION_SKIN = [
     'overflow-y:auto',
-    'padding:28px 32px',
     'min-width:0',
     `background:linear-gradient(160deg,${C.paper},${C.paperDeep} 60%,${C.paperDeeper})`,
   ].join(';');
+  const REGION_WIDE = REGION_SKIN + ';padding:28px 32px';
+  const REGION_NARROW = REGION_SKIN + ';padding:16px 14px';
+  screenRegion.style.cssText = REGION_WIDE;
 
   /* § 3.3. Owned by the shell — no screen declares its own footer. */
   const bar = el(doc, 'div', 'everyday-bar');
-  bar.style.cssText = [
+  /**
+   * The bar wraps at phone widths and does not at desktop ones, and the asymmetry is deliberate.
+   *
+   * Its cells are leave · back · the timeline strip · a spacer · the note · the primary, and on the
+   * § 7 stage they need **469 px** of one line. Left un-wrapped at 360 px the primary is drawn at
+   * `left: 614` — 254 px outside a viewport whose bar cannot scroll, which was four of the twenty-two
+   * findings in the register. Wrapping is the only shape that keeps every cell on screen without
+   * dropping one, and § 3.1's pinned-bar property survives it: `main`'s third track is `auto`, so a
+   * bar two lines tall takes two lines of the grid rather than falling below the fold.
+   *
+   * It is not switched on at desktop widths because a bar that never needs a second line cannot
+   * gain one, and a difference nothing can observe is a difference worth not shipping.
+   */
+  const BAR_SKIN = [
     'display:flex',
     'align-items:center',
     `gap:${String(GAP.row + 2)}px`,
@@ -429,11 +542,115 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     `background:${C.card}`,
     'min-height:52px',
   ].join(';');
+  const BAR_NARROW = BAR_SKIN + ';flex-wrap:wrap;padding:8px 12px';
+  bar.style.cssText = BAR_SKIN;
 
   main.append(signInNotice, screenRegion, bar);
-  root.append(rail, main);
+  root.append(narrowHeader, rail, main, railScrim);
 
   doc.body.append(root);
+
+  /* ---------------------------------------------------------------- *
+   * The small-screen geometry — GitHub issue #240, `docs/31` § 2
+   * ---------------------------------------------------------------- */
+
+  /** Whether the drawer is open. Meaningless while {@link narrow} is false; see {@link applyWidth}. */
+  let drawerOpen = false;
+  /** Which geometry is on the screen, so a media change that changes nothing does nothing. */
+  let narrow: boolean | undefined;
+
+  /**
+   * The drawer's own dismiss, built once and re-appended by every {@link drawRail}.
+   *
+   * `drawRail` empties the rail on every navigation, so a close button created inside it would be a
+   * new element with a new identity each time — and the focus this shell hands it on open would be
+   * handed to something that is about to be discarded.
+   */
+  const railClose = el(doc, 'button', 'everyday-rail-close', RAIL_DRAWER_COPY.close);
+  railClose.type = 'button';
+  railClose.style.cssText = [
+    'display:none',
+    'align-self:flex-start',
+    'align-items:center',
+    'background:transparent',
+    `border:1px solid ${RAIL_SURFACE.edge}`,
+    'border-radius:9px',
+    'padding:7px 12px',
+    `color:${C.paper}`,
+    'font-size:12.5px',
+    'cursor:pointer',
+  ].join(';');
+
+  /**
+   * Put the drawer up or down.
+   *
+   * Focus moves with it — to the drawer's own close on the way in, back to the toggle on the way
+   * out — because a drawer that opens without taking focus leaves a keyboard player tabbing through
+   * a screen that is behind a scrim, and one that closes without giving it back drops them at the
+   * top of the document.
+   */
+  function setDrawer(open: boolean): void {
+    drawerOpen = open;
+    railScrim.style.display = open ? 'block' : 'none';
+    rail.style.display = open ? 'flex' : 'none';
+    railToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) railClose.focus();
+    else if (doc.activeElement !== null && rail.contains(doc.activeElement)) railToggle.focus();
+  }
+
+  /**
+   * Switch geometries, and **only** when the answer has changed.
+   *
+   * The guard is not an optimisation. `matchMedia` fires on every crossing and a resize drag fires
+   * it repeatedly; re-applying the narrow geometry would close a drawer the player has open under
+   * their finger, and re-applying the wide one would keep re-writing three `cssText`s per frame.
+   */
+  function applyWidth(isNarrow: boolean): void {
+    if (narrow === isNarrow) return;
+    narrow = isNarrow;
+    root.style.cssText = isNarrow ? NARROW : FULL;
+    narrowHeader.style.display = isNarrow ? 'flex' : 'none';
+    screenRegion.style.cssText = isNarrow ? REGION_NARROW : REGION_WIDE;
+    bar.style.cssText = isNarrow ? BAR_NARROW : BAR_SKIN;
+    railClose.style.display = isNarrow ? 'flex' : 'none';
+    if (isNarrow) {
+      rail.style.cssText = RAIL_DRAWER;
+      setDrawer(false);
+    } else {
+      rail.style.cssText = RAIL_DOCKED;
+      railScrim.style.display = 'none';
+      drawerOpen = false;
+      railToggle.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  railClose.addEventListener('click', () => {
+    setDrawer(false);
+  });
+  railToggle.addEventListener('click', () => {
+    setDrawer(!drawerOpen);
+  });
+  railScrim.addEventListener('click', () => {
+    setDrawer(false);
+  });
+  /* `Escape` dismisses it, on § D188's precedent for the Engineer drawer — same gesture, same shell. */
+  doc.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && narrow === true && drawerOpen) setDrawer(false);
+  });
+
+  /*
+   * `matchMedia` rather than a `resize` listener: it fires on the crossing rather than on every
+   * frame of a drag, and it is the one API that answers the question this shell is asking. The
+   * optional chaining is for a document with no view — this module is exempt from `boundaries.ts`
+   * because it owns a document, not because it may assume a window.
+   */
+  const narrowQuery = doc.defaultView?.matchMedia(
+    `(max-width: ${String(EVERYDAY_RAIL_DRAWER_MAX_PX)}px)`,
+  );
+  applyWidth(narrowQuery?.matches ?? false);
+  narrowQuery?.addEventListener('change', (event: MediaQueryListEvent) => {
+    applyWidth(event.matches);
+  });
 
   /* ---------------------------------------------------------------- *
    * The scroll keeper — GitHub issue #298, § D388
@@ -866,6 +1083,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (state.ctx === 'replay' && screen !== 'brief' && screen !== 'stage' && screen !== 'report') leaveReplay();
     state = { ...state, screen };
     draw();
+    /*
+     * A navigation puts the drawer down — GitHub issue #240. Every rail row calls this, and a
+     * drawer left standing over the screen it has just opened is the phone version of the defect
+     * `everyday/viewportGates.browser.test.ts` clause 3 measures: a screen drawn and not reachable.
+     * Placed after `draw()` because `drawRail` re-appends `railClose`, and after that append is
+     * where the focus this returns to the toggle belongs.
+     */
+    if (narrow === true && drawerOpen) setDrawer(false);
     doc.defaultView?.scrollTo(0, 0);
     const screenEl = root.querySelector<HTMLElement>('.everyday-screen');
     if (screenEl !== null) screenEl.scrollTop = 0;
@@ -1081,7 +1306,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   }
 
   function drawRail(): void {
-    rail.replaceChildren();
+    /* The drawer's dismiss survives the emptying — see {@link railClose}. It is `display:none` in
+       the docked geometry, so on a desktop this appends a box with no line and draws nothing. */
+    rail.replaceChildren(railClose);
     const stored = profileStore.current();
     const model: RailModel = railModel(state, {
       ...campaignRailOptions(),
@@ -1466,7 +1693,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (model.timeline !== undefined) {
       const stops = TIMELINE_STEPS[model.timeline.flow];
       const strip = el(doc, 'div', 'everyday-bar-timeline');
-      strip.style.cssText = `display:flex;align-items:center;gap:${String(GAP.tight)}px;margin-left:6px`;
+      strip.style.cssText = `display:flex;flex-wrap:wrap;align-items:center;gap:${String(GAP.tight)}px;margin-left:6px`;
       for (const [index, stop] of stops.entries()) {
         const reached = index + 1 <= model.timeline.step;
         const current = index + 1 === model.timeline.step;

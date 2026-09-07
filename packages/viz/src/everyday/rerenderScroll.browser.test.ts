@@ -55,6 +55,7 @@ import {
   CHROMIUM,
   HAS_BROWSER,
   SKIP_REASON,
+  openEverydayRail,
   openPage,
   startShippedSite,
   type ShippedSite,
@@ -120,10 +121,41 @@ describe.skipIf(!HAS_BROWSER)('an in-screen toggle keeps the scroll offset (issu
      * Reaching the screen the player's own way is the difference between testing the product and
      * testing a surface nobody can open.
      */
+    /* And the rail itself is behind a toggle at 375×667 since GitHub issue #240 — the player's own
+       path is now viewport-dependent, which is what `openEverydayRail` is for. */
+    await openEverydayRail(page);
     await page.locator('.everyday-rail button', { hasText: 'Test bench' }).first().click();
     await page.waitForSelector('.everyday-bench-test input', { timeout: 30_000 });
     return page;
   }
+
+  /**
+   * The offset that puts the first bench checkbox on screen, derived rather than typed.
+   *
+   * **This was `1518` at 375×667 and `400` at 1280×800, and GitHub issue #240 moved the first
+   * one.** The small-screen layout gives the screen region the whole 375 px rather than 163, and
+   * drops its inset from 32 px to 14, so the bench's content is shorter and the checkbox that used
+   * to sit mid-viewport at 1 518 px sits **423 px above the top of it**. The case caught that
+   * itself — its own docstring says both bounds are asserted *"because a layout change would move
+   * the control one way or the other"* — which is the check working rather than the case being
+   * wrong.
+   *
+   * Replacing the literal with a derivation is what stops the next layout change costing a red run
+   * for a reason that is not a defect. What the case measures is unchanged: the region really takes
+   * the offset, the control is really on screen before the press, and neither may move under it.
+   * The figure the issue published — 1 432 px lost at this viewport — is a record of the defect and
+   * was never the input.
+   */
+  const offsetShowingCheckbox = async (page: Page): Promise<number> =>
+    page.evaluate(() => {
+      const region = document.querySelector<HTMLElement>('.everyday-screen');
+      const box = document.querySelector<HTMLElement>('.everyday-bench-test input');
+      if (region === null || box === null) return 0;
+      const withinRegion =
+        box.getBoundingClientRect().top - region.getBoundingClientRect().top + region.scrollTop;
+      const wanted = Math.round(withinRegion - region.clientHeight / 3);
+      return Math.max(0, Math.min(wanted, region.scrollHeight - region.clientHeight - 1));
+    });
 
   /**
    * Scroll the region, press the first checkbox with a **pointer**, and require both halves.
@@ -187,13 +219,13 @@ describe.skipIf(!HAS_BROWSER)('an in-screen toggle keeps the scroll offset (issu
 
   it('keeps the offset when a bench checkbox is pressed at 375×667', async () => {
     const page = await openBench(SHORTEST_SUPPORTED);
-    await pressCheckboxAt(page, 1518);
+    await pressCheckboxAt(page, await offsetShowingCheckbox(page));
     await page.close();
   }, 120_000);
 
   it('keeps it at 1280×800 too, where the screen also overflows', async () => {
     const page = await openBench(DESKTOP);
-    await pressCheckboxAt(page, 400);
+    await pressCheckboxAt(page, await offsetShowingCheckbox(page));
     await page.close();
   }, 120_000);
 
