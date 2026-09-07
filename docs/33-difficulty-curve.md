@@ -219,6 +219,33 @@ to edit.
 
 ---
 
+### 1.6 The first hour, and what is outside the curve
+
+> **Stated 2026-09-07 under [§ D528](../DECISIONS.md).**
+
+**The first-hour floor.** § D528, in the owner's own words: *"It's fine that the first building is
+hard to fail, but the user is going to want to try, and we should ramp up volumes or something that
+makes it better than just watching."* So ladder positions one and two are **exempt from DC-1 and
+DC-2's failability reading** — an opening the player cannot fail is correct — and what carries the
+first hour instead is **volume**: the crowd ramps so the building is visibly working, rather than
+the goals tightening so the player is visibly losing.
+
+The floor is a claim about the survivor count and is **mechanised by nothing yet**: it needs the
+count itself ([GitHub issue #367](https://github.com/mrpeanut01/elevator-sim/issues/367)) and the
+contract ramp ([#382](https://github.com/mrpeanut01/elevator-sim/issues/382)). Stated here rather
+than deferred silently, because a floor nobody wrote down is one the next rebalance walks through.
+
+**The tutorial is outside the curve.** [§ D529](../DECISIONS.md)'s two-screen tutorial — walk the
+player through the editor, then let a building fall apart and show the fix — is **not a ladder
+position and is governed by none of DC-1 through DC-9**. It is the one place a worked answer is
+permitted, which is the exact opposite of what DC-1 asks of a stage, and reading it as position zero
+would make every rule in this document say the wrong thing about it. It is
+[GitHub issue #380](https://github.com/mrpeanut01/elevator-sim/issues/380).
+
+---
+
+---
+
 ## 2. What a stage owes the player
 
 ### 2.1 The three things every stage names
@@ -293,6 +320,15 @@ Measured over the ten shipped stages, the two forms disagree on **three** of the
 > measurement below is kept as the record of what was true when the rule stood; **do not read it as
 > a live gate**. Owner's words: *"a consistent control surface for 'tweaks' is important, more so
 > than being fed 'drop down' actions."*
+>
+> **The fold is ruled and not yet built, and DC-2b's gate stays until it is.** The survivor count is
+> [#367](https://github.com/mrpeanut01/elevator-sim/issues/367) and the scenario schema that opens
+> every scenario's controls is [#365](https://github.com/mrpeanut01/elevator-sim/issues/365);
+> neither has landed, and `campaign/difficultyCurve.test.ts` still enforces DC-2b as an always-on
+> gate. **Do not delete that gate on this marker's authority** — § 3.1's own measurement below still
+> shows stages 8 and 10 admitting only their baseline and stage 9 admitting one other, so the
+> vacuity guard is still doing work. It leaves on the commit that makes it false, like every other
+> refusal in this repository.
 
 
 > **No stage may clear from the dispatcher dropdown alone.**
@@ -1590,14 +1626,17 @@ are a property of what was already authored.
 
 ### 5.3 The specified ordering
 
-> **DC-7.** The eighteen cases are ordered by **how many affordable offered repairs clear both bars**,
->
 > **Status 2026-09-07: SUPERSEDED by [§ D528](../DECISIONS.md).** *Offered repairs* have no referent
-> after § D525 clause 2: the four-repair menu and the five decoys go, and the player has the whole
-> editor under a budget. The ordering folds into the **survivor count** — how many affordable
-> configurations clear both bars — which is the same intuition measured over a space instead of a
-> list. See [`docs/12`](12-design-handoff.md) § 4.15 for the deviation this ruling forces on the
-> handoff, and #367 for the measurement.
+> after § D525 clause 2: the four-repair menu and the five standing extras go, and the player has
+> the whole editor under a budget. The ordering folds into the **survivor count** — how many
+> affordable configurations clear both bars — which is the same intuition measured over a space
+> instead of a list. See [`docs/12`](12-design-handoff.md) § 4.15 for the deviation this ruling
+> forces on the handoff, and
+> [#367](https://github.com/mrpeanut01/elevator-sim/issues/367) for the measurement. **The rule is
+> restated below whole**, as it stood, because the ordering it specifies is what the survivor count
+> has to reproduce.
+
+> **DC-7.** The eighteen cases are ordered by **how many affordable offered repairs clear both bars**,
 > *descending*, and within a band by the diagnosed repair's cost, *ascending*.
 
 Three bands, and the band is what the ordering is really about:
@@ -1627,15 +1666,17 @@ DC-8 looks trivial and is not: it is the fix-mode form of *standing still clears
 the one assertion that would catch a complaint whose measure had drifted to something the as-built run
 already satisfies.
 
-> **DC-9.** No case may offer a repair that is inert unless the case declares it inert. Already
->
 > **Status 2026-09-07: AMENDED by [§ D528](../DECISIONS.md).** **Re-aimed from repairs to
-> controls**: no control the editor offers may be inert in a scenario unless the scenario declares it
-> inert. The rule survives § D525 clause 2 intact in spirit and is *strengthened* by it — with the
-> whole editor open and scarcity expressed as a price rather than a prohibition, an inert control is
-> unambiguously a defect. **The test is owed and is not in this commit**: `campaign/parse.ts` checks
-> *editable* and must check *live*, proved on the legs in both directions, which collides with the
-> 78-test surface GitHub issue #270 measured. Recorded as owed rather than asserted as done.
+> controls**: no control the editor offers may be inert in a scenario unless the scenario declares
+> it inert. The rule survives § D525 clause 2 intact in spirit and is *strengthened* by it — with
+> the whole editor open and scarcity expressed as a price rather than a prohibition, an inert
+> control is unambiguously a defect. **The test is owed and is not in this commit**:
+> `campaign/parse.ts` checks *editable* and must check *live*, proved on the legs in both
+> directions, which collides with the 78-test surface
+> [#270](https://github.com/mrpeanut01/elevator-sim/issues/270) measured. Recorded as owed rather
+> than asserted as done.
+
+> **DC-9.** No case may offer a repair that is inert unless the case declares it inert. Already
 > enforced — `fixit/cases.test.ts` compares the as-repaired run to the as-built one **on the legs**
 > for every repair of every case, in both directions. Named here because it is DC-R1's companion at
 > case scale and because a later case added without it would pass everything else.
@@ -1792,33 +1833,6 @@ working around it.
 **It may not compare two configurations and call one better.** It asks whether a configuration clears
 a bar, which is a per-cell predicate. The moment a rule wants *better*, it needs a paired-t interval
 excluding zero at 50–200 replications under common random numbers, and it stops being this sweep.
-
----
-
-### 1.4 The first hour, and what is outside the curve
-
-> **Stated 2026-09-07 under [§ D528](../DECISIONS.md).**
-
-**The first-hour floor.** § D528, in the owner's own words: *"It's fine that the first building is
-hard to fail, but the user is going to want to try, and we should ramp up volumes or something that
-makes it better than just watching."* So ladder positions one and two are **exempt from DC-1 and
-DC-2's failability reading** — an opening the player cannot fail is correct — and what carries the
-first hour instead is **volume**: the crowd ramps so the building is visibly working, rather than
-the goals tightening so the player is visibly losing.
-
-The floor is a claim about the survivor count and is **mechanised by nothing yet**: it needs the
-count itself ([GitHub issue #367](https://github.com/mrpeanut01/elevator-sim/issues/367)) and the
-contract ramp ([#382](https://github.com/mrpeanut01/elevator-sim/issues/382)). Stated here rather
-than deferred silently, because a floor nobody wrote down is one the next rebalance walks through.
-
-**The tutorial is outside the curve.** [§ D529](../DECISIONS.md)'s two-screen tutorial — walk the
-player through the editor, then let a building fall apart and show the fix — is **not a ladder
-position and is governed by none of DC-1 through DC-9**. It is the one place a worked answer is
-permitted, which is the exact opposite of what DC-1 asks of a stage, and reading it as position zero
-would make every rule in this document say the wrong thing about it. It is
-[GitHub issue #380](https://github.com/mrpeanut01/elevator-sim/issues/380).
-
----
 
 ## 7. What is open
 

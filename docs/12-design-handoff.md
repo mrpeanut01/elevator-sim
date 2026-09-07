@@ -734,17 +734,25 @@ once as a scenario — which is the thing the ruling exists to stop.
 row that inherited it: the hub's *Today's scenario* entry still reads *~3 min · no losing — a day is
 a score, not a pass*, and its *Fix a building* entry still reads *~5 min a case · retry as often as
 you like*. § 5 is a table about **sessions**, and the sessions are unchanged; what moved is which
-surface offers them. `everyday/actionBar.ts#GUIDE_MENU_PRIMARY` keeps § 3.3's four-label cell
-transcribed and undrawn so the pair can be read against each other, and
-`everyday/actionBar.test.ts` asserts in both directions that the transcription still names four and
-the shipped row does not match it.
+surface offers them.
+
+**What holds the pair honest is not built on the tree this row lands on, and this row says so
+rather than implying otherwise.** `everyday/actionBar.test.ts`'s `GUIDE_TABLE` still transcribes
+§ 3.3's four-label menu cell and asserts the shipped row **matches** it — which is correct here,
+because the shipped menu is still four tiles. The three-tile menu, and the both-directions guard
+beside it on `GUIDE_WATCHING_NOTE`'s pattern, arrive with
+[GitHub issue #364](https://github.com/mrpeanut01/elevator-sim/issues/364). Until then this row is
+**the ruling recorded, not the deviation shipped**, and a reader who takes it as already-guarded
+will find `row menu` red on the commit that ships three labels.
 
 ### 4.15 The four-repair menu and the five decoys go, and the diagnosis line goes with them
 
 **What the handoff says.** § 10 already cut one quiz — *"There is no guess-the-fault quiz… The case
 now opens with **the diagnosis** printed plainly, and the play is the reconfiguration"* — and what
-it kept is an authored **repair list**: four priced repairs per case, five of them across the set
-inert by construction, and a printed line naming what kind of fix the case wants.
+it kept is an authored **repair list**: **four priced repairs per case**, plus
+**five standing extras** offered in every case and inert by construction — § 10's own words,
+*"Besides the case's four repairs, five standing extras are offered in every case"* — and a printed
+line naming what kind of fix the case wants.
 
 **What the product does** ([§ D525](../DECISIONS.md) clause 2). **The repair list, the decoys and
 the kind-of-fix line all go.** The player gets a budget and the whole editor. The complaint in a
@@ -758,8 +766,9 @@ four-item priced menu is the same proposal with the price left on. § D525's dif
 *the number of affordable configurations that survive, pre-simulated* — which is a statement about a
 **space**, not about a list, and a four-item list has no space to be a share of.
 
-**What this costs, said plainly.** `fixit/cases.test.ts` checks the five decoys are inert, and that
-check has no referent once the decoys go: the criterion must be re-derived against the open editor
+**What this costs, said plainly.** `fixit/cases.test.ts` checks both — one inert repair pinned per case
+(`inertRepairIds`) and the five standing extras kept honest in their own case — and neither check
+has a referent once the extras and the repair list go: the criterion must be re-derived against the open editor
 and a budget. That is [GitHub issue #233](https://github.com/mrpeanut01/elevator-sim/issues/233)'s,
 and it waits on the scenario schema (#365) rather than on this row. Recorded here rather than in the
 test, because a deviation that hides its cost is the half of this register that goes stale first.
