@@ -20,6 +20,7 @@ import {
   actionBarFor,
   confirmStripFor,
   GUIDE_WATCHING_NOTE,
+  GUIDE_MENU_PRIMARY,
   TIMELINE_STEPS,
   WATCHING_NOTE,
   type TimelineFlow,
@@ -59,7 +60,13 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     leaveInert: true,
     back: null,
     timeline: null,
-    primary: ["Play today's tower", 'Play the campaign', 'Play the rush', 'Play a broken building'],
+    /*
+     * The guide's cell names four modes; § D525 replaced them with three, and `docs/39` § 2
+     * records § D335 as superseded in part. `GUIDE_MENU_PRIMARY` in `actionBar.ts` keeps the
+     * guide's own four, and the case below asserts the shipped list differs from it — so this row
+     * is the *shipped* cell, and the transcription it deviates from is one import away.
+     */
+    primary: ['Pick a scenario', 'Play the career', 'Play the rush'],
     notes: ['Pick a mode above, then play it.'],
     inverted: false,
   },
@@ -294,7 +301,12 @@ describe('the table matches the guide, cell for cell', () => {
     // report (GitHub issue #177 item 1, § D517) — the guide gives the replay a door variant and no
     // bar rows of its own, so these two are the daily rows restated with *never scored* on them.
     const extras = ACTION_BAR_ROWS.filter((row) => !row.guide);
-    expect(extras.map((row) => keyOf(row.screen, row.ctx)).sort()).toEqual(['report·replay', 'report·watch', 'stage·replay']);
+    expect(extras.map((row) => keyOf(row.screen, row.ctx)).sort()).toEqual([
+      'report·replay',
+      'report·watch',
+      'scenario',
+      'stage·replay',
+    ]);
   });
 
   for (const guide of GUIDE_TABLE) {
@@ -425,16 +437,36 @@ describe('the § 3.3 rules, held over the data rather than the literals', () => 
     );
   });
 
-  it('follows the selected card on the menu, defaulting to today', () => {
-    expect(actionBarFor({ screen: 'menu', ctx: 'daily' }).primary.label).toBe("Play today's tower");
-    expect(actionBarFor({ screen: 'menu', ctx: 'daily', modePick: 'campaign' }).primary.label).toBe(
+  it('keeps the guide’s superseded menu cell, and ships a different one', () => {
+    /*
+     * § D525's deviation, asserted in both directions like the watching note's: the transcription
+     * still says what the handoff said, and the shipped row does not match it. A lane that
+     * reverted the menu to four tiles would make these equal and fail here.
+     */
+    expect(GUIDE_MENU_PRIMARY).toEqual([
+      "Play today's tower",
       'Play the campaign',
+      'Play the rush',
+      'Play a broken building',
+    ]);
+    const shipped = ACTION_BAR_ROWS.find((row) => row.screen === 'menu')?.primary.variants;
+    expect(shipped).not.toEqual(GUIDE_MENU_PRIMARY);
+    expect(shipped).toHaveLength(3);
+  });
+
+  it('follows the selected card on the menu, defaulting to Scenario', () => {
+    // § D525 makes Scenario the first tile, so it is also the default the bar falls back to when
+    // nothing is selected — § 3.3's menu row *follows the selected card*, and the first card is
+    // what a player who has selected nothing is looking at.
+    expect(actionBarFor({ screen: 'menu', ctx: 'daily' }).primary.label).toBe('Pick a scenario');
+    expect(actionBarFor({ screen: 'menu', ctx: 'daily', modePick: 'scenario' }).primary.label).toBe(
+      'Pick a scenario',
+    );
+    expect(actionBarFor({ screen: 'menu', ctx: 'daily', modePick: 'campaign' }).primary.label).toBe(
+      'Play the career',
     );
     expect(actionBarFor({ screen: 'menu', ctx: 'daily', modePick: 'rush' }).primary.label).toBe(
       'Play the rush',
-    );
-    expect(actionBarFor({ screen: 'menu', ctx: 'daily', modePick: 'fixit' }).primary.label).toBe(
-      'Play a broken building',
     );
   });
 

@@ -1,5 +1,5 @@
 /**
- * **The build-information panel** — that it carries all six registers, and that it is the only
+ * **The build-information panel** — that it carries all seven registers, and that it is the only
  * place any of them is drawn.
  *
  * GitHub issue #207 moved every register of honest absences off the six player screens that drew
@@ -39,6 +39,7 @@ import {
 } from './buildNotes.js';
 import { DESIGNER_ABSENCES, DESIGNER_COPY } from './designerModel.js';
 import { RUSH_ABSENCES, RUSH_SCREEN_COPY } from './rushScreenModel.js';
+import { SCENARIO_ABSENCES } from './scenarioModel.js';
 import { SETTINGS_ABSENCES } from './settingsView.js';
 import { STAGE_ABSENCES } from './stageScreenModel.js';
 
@@ -47,13 +48,14 @@ const REGISTERS: readonly (readonly string[])[] = [
   EVERYDAY_SHELL_ABSENCES,
   STAGE_ABSENCES,
   RUSH_ABSENCES,
+  SCENARIO_ABSENCES,
   DESIGNER_ABSENCES,
   CAMPAIGN_ABSENCES,
   SETTINGS_ABSENCES,
 ];
 
 describe('the build-information panel', () => {
-  it('carries all six registers, by identity rather than by copy', () => {
+  it('carries all seven registers, by identity rather than by copy', () => {
     const view = buildNotesViewOf();
     const drawn = view.sections.map((section) => section.entries);
     for (const register of REGISTERS) {

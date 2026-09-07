@@ -190,6 +190,7 @@ import {
   EVERYDAY_SCREENS,
   RUN_CONTEXTS,
 } from '../everyday/types.js';
+import { scenarioHubViewOf } from '../everyday/scenarioModel.js';
 import { weekScreenViewOf } from '../everyday/weekView.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import type { GoalObservations } from '../shift/types.js';
@@ -10463,6 +10464,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/briefView.ts#lockedForScore',
     /* GitHub issue #225's door into the sandbox, drawn on the brief once the tuner is built. */
     'everyday/briefView.ts#SANDBOX_DOOR_LABEL',
+    /* GitHub issue #364: § D525's Scenario hub — the words the first tile opens on. */
+    'everyday/scenarioModel.ts#scenarioHubViewOf',
+    'everyday/scenarioModel.ts#SCENARIO_COPY',
+    'everyday/scenarioModel.ts#SCENARIO_ABSENCES',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
     /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
@@ -10597,6 +10602,27 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             role: door.primary.inert ? 'reason' : 'prose',
           });
         }
+
+        /* ---- Scenario: § D525's hub, the first tile's whole surface (issue #364) ---- */
+        const hub = scenarioHubViewOf();
+        seeds.push({ field: `${arm}.scenario.eyebrow`, text: hub.eyebrow, role: 'prose' });
+        seeds.push({ field: `${arm}.scenario.title`, text: hub.title, role: 'prose' });
+        seeds.push({ field: `${arm}.scenario.lede`, text: hub.lede, role: 'prose' });
+        for (const scenarioEntry of hub.entries) {
+          const at = `${arm}.scenario.entry.${scenarioEntry.id}`;
+          seeds.push({ field: `${at}.title`, text: scenarioEntry.title, role: 'prose' });
+          seeds.push({ field: `${at}.blurb`, text: scenarioEntry.blurb, role: 'prose' });
+          seeds.push({ field: `${at}.shape`, text: scenarioEntry.shape, role: 'observation' });
+        }
+        /*
+         * The note and the absences are `reason`, not `prose`: each one says why the list is short.
+         * Rolled as a reason so R3's cue rules read them as refusals rather than as description —
+         * a short list presented as prose is the surface reading finished when it is not.
+         */
+        seeds.push({ field: `${arm}.scenario.note`, text: hub.note, role: 'reason' });
+        hub.absences.forEach((absence, index) => {
+          seeds.push({ field: `${arm}.scenario.absence.${index}`, text: absence, role: 'reason' });
+        });
 
         /* ---- Your week: today's card, the tally, the percentile, the board's absence ---- */
         const week = weekScreenViewOf({

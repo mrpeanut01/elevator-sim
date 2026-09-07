@@ -78,6 +78,7 @@ import { BUILD_VERSION, buildVersionLineOf } from '../release/version.js';
 import { CAMPAIGN_ABSENCES } from '../campaign/career.js';
 import { DESIGNER_ABSENCES } from './designerModel.js';
 import { RUSH_ABSENCES } from './rushScreenModel.js';
+import { SCENARIO_ABSENCES } from './scenarioModel.js';
 import { SETTINGS_ABSENCES } from './settingsView.js';
 import { STAGE_ABSENCES } from './stageScreenModel.js';
 
@@ -288,6 +289,11 @@ export function buildNotesViewOf(): BuildNotesView {
       heading: 'Endless rush',
       note: 'The setup screen draws; what it would start does not exist yet.',
       entries: RUSH_ABSENCES,
+    },
+    {
+      heading: 'Scenario',
+      note: 'Two of the four kinds of scenario are playable; the rest wait on the schema.',
+      entries: SCENARIO_ABSENCES,
     },
     {
       heading: 'The drawing board',
