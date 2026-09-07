@@ -58,6 +58,7 @@ import { BRIEF_SCREEN } from './briefScreen.js';
 import { BUILDING_SCREEN, CONTRACT_SCREEN, TOWERS_SCREEN } from './campaignScreens.js';
 import { DESIGNER_SCREEN } from './designerScreen.js';
 import { DOOR_SCREEN } from './doorScreen.js';
+import { SCENARIO_SCREEN } from './scenarioScreen.js';
 import { FIXIT_SCREEN } from './fixitScreen.js';
 import type { EverydayHost } from './host.js';
 import { REPORT_SCREEN } from './reportScreen.js';
@@ -119,6 +120,7 @@ const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModu
     // {@link EVERYDAY_SCREENS_BUILT} derives anyway — the table is a filter over the inventory, so
     // a row's position here decides nothing and matching the inventory keeps the two readable
     // side by side.
+    scenario: SCENARIO_SCREEN,
     door: DOOR_SCREEN,
     brief: BRIEF_SCREEN,
     stage: STAGE_SCREEN,
@@ -275,6 +277,7 @@ export function unbuiltReasonFor(screen: EverydayScreen): string {
  */
 export const SCREEN_NAMES: Readonly<Record<EverydayScreen, string>> = Object.freeze({
   menu: 'Main menu',
+  scenario: 'Scenario',
   door: 'Front door',
   brief: 'The brief',
   stage: 'The day',

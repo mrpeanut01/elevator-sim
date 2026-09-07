@@ -37,6 +37,7 @@
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
+import { openScenarioEntry } from '../dev/browserTier.test-helper.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
@@ -82,7 +83,7 @@ async function coldLoad(): Promise<Page> {
 
 /** Press the Campaign tile — the player's own path, not a scripted navigation. */
 async function enterCampaign(page: Page): Promise<void> {
-  await page.locator('.everyday-mode', { hasText: 'Campaign' }).first().click();
+  await page.locator('.everyday-mode[data-screen="towers"]').first().click();
   await page.waitForSelector('.everyday-towers');
 }
 
@@ -231,7 +232,7 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
 
     /* § 6's stage is not a campaign day: the column is absent from the document, never hidden. */
     await toMainMenu(page);
-    await page.click('.everyday-mode[data-screen="door"]');
+    await openScenarioEntry(page, 'today');
     await page.waitForSelector('.everyday-door', { timeout: 30_000 });
     /* § 6's route is door → brief → stage: two presses of the one primary. */
     await page.click('.everyday-bar-primary');

@@ -19,6 +19,7 @@
  */
 
 import { chromium, type Browser, type Page, type ViewportSize } from 'playwright-core';
+import { openScenarioEntry } from '../dev/browserTier.test-helper.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
@@ -446,7 +447,7 @@ describe.skipIf(!HAS_BROWSER)('Tune the tower', () => {
      * this tier exists not to do.
      */
     const page = await coldLoad();
-    await page.click('.everyday-mode[data-screen="door"]');
+    await openScenarioEntry(page, 'today');
     await page.waitForSelector('.everyday-door');
     await page.click('.everyday-bar-primary');
     await page.waitForSelector('.everyday-brief');

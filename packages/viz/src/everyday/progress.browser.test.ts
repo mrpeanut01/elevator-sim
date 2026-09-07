@@ -55,6 +55,7 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  openScenarioEntry,
   CHROMIUM,
   HAS_BROWSER,
   openPage,
@@ -112,7 +113,7 @@ async function reload(page: Page): Promise<void> {
  * regressed fails here, at the click.
  */
 async function openFixit(page: Page): Promise<void> {
-  await page.locator('.everyday-mode[data-screen="fixit"]').click();
+  await openScenarioEntry(page, 'fix-a-building');
   await page.waitForFunction(
     () => document.querySelectorAll('.everyday-fixit-case').length > 0,
     undefined,

@@ -159,10 +159,9 @@ export interface ConfirmStrip {
 
 /** The menu primary per pick, § 3.3's menu row: *follows the selected card*. */
 const MENU_PRIMARY: Readonly<Record<EverydayModePick, string>> = Object.freeze({
-  today: "Play today's tower",
-  campaign: 'Play the campaign',
+  scenario: 'Pick a scenario',
+  campaign: 'Play the career',
   rush: 'Play the rush',
-  fixit: 'Play a broken building',
 });
 
 const LEAVE_TOWER = "⤺ Leave today's tower";
@@ -177,6 +176,24 @@ const MODES = '⌂ Modes';
  *
  * It is transcribed and deliberately never drawn. See {@link WATCHING_NOTE}.
  */
+/**
+ * § 3.3's menu primary **as the guide wrote it**, kept so the deviation can be read against it.
+ *
+ * The guide's cell names four modes, because it was written against § D335's four-tile menu.
+ * § D525 replaced that with three — Scenario, Career, Rush — and `docs/39` § 2 records § D335 as
+ * *superseded in part*. So the shipped cell is three labels, and this constant is what it replaced.
+ *
+ * Transcribed and deliberately never drawn, exactly like {@link GUIDE_WATCHING_NOTE} one constant
+ * down. `actionBar.test.ts` asserts it differs from the shipped list, so a lane that quietly
+ * reverted the menu to four would fail here rather than pass by matching an old transcription.
+ */
+export const GUIDE_MENU_PRIMARY: readonly string[] = Object.freeze([
+  "Play today's tower",
+  'Play the campaign',
+  'Play the rush',
+  'Play a broken building',
+]);
+
 export const GUIDE_WATCHING_NOTE =
   'Their record, replayed. Nothing here is scored, and your own day is untouched.';
 
@@ -242,6 +259,28 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     leave: { label: MODES, inert: true },
     primary: primary(MODE_PICKS.map((pick) => MENU_PRIMARY[pick])),
     note: 'Pick a mode above, then play it.',
+    inverted: false,
+  }),
+  row({
+    /*
+     * § D525's hub. `leave` is the menu's own word rather than a mode's, because leaving Scenario
+     * is leaving a *list*, not abandoning a run — nothing is open here to warn about.
+     *
+     * The primary plays the first entry; the cards pick any of them. That keeps the row live, which
+     * is what `ActionBarRow#inert`'s docstring requires of a table row: an inert primary is a
+     * screen's `bar()` refinement for a state the table cannot know, never an authored cell.
+     */
+    screen: 'scenario',
+    /*
+     * **Not the guide's row.** § 3.3's table predates § D525 and has no Scenario screen in it, so
+     * this row is marked `guide: false` beside the watched report and the two replay rows — the
+     * same mechanism, for the same reason: a row the handoff never wrote must not be compared
+     * against a transcription of the handoff.
+     */
+    guide: false,
+    leave: { label: MODES, inert: false },
+    primary: primary(["Play today's scenario"]),
+    note: 'Or pick another from the list.',
     inverted: false,
   }),
   row({
@@ -499,7 +538,12 @@ export function actionBarFor(state: EverydayState): ActionBarModel {
     throw new Error(`no § 3.3 row for ${state.screen} in ctx ${state.ctx}`);
   }
   if (matched.screen !== 'menu') return matched;
-  const pick = state.modePick ?? 'today';
+  /*
+   * § D525 made Scenario the first tile, so it is also the fallback: § 3.3's menu row *follows the
+   * selected card*, and the card a player who has selected nothing is looking at is the first one.
+   * This read `'today'` until that ruling, which is a pick `MODE_PICKS` no longer carries.
+   */
+  const pick = state.modePick ?? 'scenario';
   return { ...matched, primary: { ...matched.primary, label: MENU_PRIMARY[pick] } };
 }
 

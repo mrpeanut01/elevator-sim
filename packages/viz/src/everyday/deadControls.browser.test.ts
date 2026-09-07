@@ -135,22 +135,37 @@ async function deadControlsOn(page: Page): Promise<readonly DeadControl[]> {
 /**
  * The screens this file drives, and how it gets to each.
  *
- * The four tiles are § 4's four modes; the rail rows are the standalone screens beside them. Every
+ * The three tiles are § D525's three modes; the rail rows are the standalone screens beside them. Every
  * one is reached the way a player reaches it — a click on the thing they would click — rather than
  * by calling `go`, because a screen that can only be entered from a test is a screen this file
  * would be certifying and nobody would be visiting.
  */
-const SCREENS: readonly { readonly name: string; readonly enter: string }[] = Object.freeze([
-  { name: 'front door', enter: '.everyday-mode[data-screen="door"]' },
-  { name: 'all buildings', enter: '.everyday-mode[data-screen="towers"]' },
-  { name: 'endless rush', enter: '.everyday-mode[data-screen="rush"]' },
-  { name: 'fix a building', enter: '.everyday-mode[data-screen="fixit"]' },
-  { name: 'dispatcher workshop', enter: 'nav.everyday-rail button:has-text("Dispatcher workshop")' },
-  { name: 'test bench', enter: 'nav.everyday-rail button:has-text("Test bench")' },
-  { name: 'design a building', enter: 'nav.everyday-rail button:has-text("Design a building")' },
-  { name: 'your week', enter: 'nav.everyday-rail button:has-text("Your week")' },
-  { name: 'boards and ladder', enter: 'nav.everyday-rail button:has-text("Boards & ladder")' },
-  { name: 'settings', enter: 'nav.everyday-rail button:has-text("Settings")' },
+/*
+ * `enter` is a **route**, not a selector, since § D525 (GitHub issue #364): the front door and
+ * *Fix a building* are no longer tiles, they are entries inside the Scenario hub, so reaching them
+ * is two presses. Every other row is still one, and the array says which without a special case.
+ */
+const SCREENS: readonly { readonly name: string; readonly enter: readonly string[] }[] =
+  Object.freeze([
+  {
+    name: 'front door',
+    enter: ['.everyday-mode[data-screen="scenario"]', '.everyday-scenario-entry[data-entry="today"]'],
+  },
+  { name: 'all buildings', enter: ['.everyday-mode[data-screen="towers"]'] },
+  { name: 'endless rush', enter: ['.everyday-mode[data-screen="rush"]'] },
+  {
+    name: 'fix a building',
+    enter: [
+      '.everyday-mode[data-screen="scenario"]',
+      '.everyday-scenario-entry[data-entry="fix-a-building"]',
+    ],
+  },
+  { name: 'dispatcher workshop', enter: ['nav.everyday-rail button:has-text("Dispatcher workshop")'] },
+  { name: 'test bench', enter: ['nav.everyday-rail button:has-text("Test bench")'] },
+  { name: 'design a building', enter: ['nav.everyday-rail button:has-text("Design a building")'] },
+  { name: 'your week', enter: ['nav.everyday-rail button:has-text("Your week")'] },
+  { name: 'boards and ladder', enter: ['nav.everyday-rail button:has-text("Boards & ladder")'] },
+  { name: 'settings', enter: ['nav.everyday-rail button:has-text("Settings")'] },
 ]);
 
 describe.skipIf(!HAS_BROWSER)('a dead control says why, or is not a control', () => {
@@ -172,13 +187,15 @@ describe.skipIf(!HAS_BROWSER)('a dead control says why, or is not a control', ()
 
     await inspect('the main menu');
     for (const screen of SCREENS) {
-      await page.click(screen.enter);
+      for (const step of screen.enter) {
+        await page.click(step);
+      }
       await page.waitForSelector('.everyday-bar-primary');
       /* The screen region is replaced on navigation; one frame settles the mount's first draw. */
       await page.waitForTimeout(400);
       await inspect(screen.name);
       await page.click('nav.everyday-rail button:has-text("Main menu")');
-      await page.waitForSelector('.everyday-mode[data-screen="door"]');
+      await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
     }
 
     expect(
@@ -206,7 +223,9 @@ describe.skipIf(!HAS_BROWSER)('a dead control says why, or is not a control', ()
      * are on says so with `aria-current` rather than only with a colour.
      */
     const page = await coldLoad();
-    await page.click('.everyday-mode[data-screen="door"]');
+    /* § D525: the front door is a Scenario entry now, so it is two presses. */
+    await page.click('.everyday-mode[data-screen="scenario"]');
+    await page.click('.everyday-scenario-entry[data-entry="today"]');
     await page.waitForSelector('.everyday-bar-timeline');
 
     const strip = await page.$eval('.everyday-bar-timeline', (element) => ({

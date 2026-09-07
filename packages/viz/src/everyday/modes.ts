@@ -76,44 +76,40 @@ function unlessBuilt(refusal: string, ...screens: readonly EverydayScreen[]): st
 export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
   Object.freeze({
     /*
-     * **Opens § 6.1's front door**, which is what the guide asks for and what this tile could not
-     * do for two waves: the door and the brief were unbuilt, so the tile skipped to the stage and
-     * said so here. Both are registered now, so the skip is gone with them — a tile that still
-     * jumped the queue would be routing around two screens that exist, and the comment claiming
-     * they do not would be § D227's stale refusal in a code path.
+     * § D525 clause 1, and the tile the ruling puts first: *"Scenario, then Career, then Rush"*,
+     * and § 2.1 makes it *"the only mode a first-time player should meet"*.
      *
-     * The tile is gated on all four screens of the loop rather than on the door alone. § 6's whole
-     * claim is that Today's tower is a **loop** — set up, watch, read, and see the week — and a
-     * mode whose report or week dead-ends mid-flow is the shape `campaign`'s own gate refuses one
-     * row down.
+     * It opens `everyday/scenarioScreen.ts`'s hub rather than a scenario, because the retiring
+     * tiles' screens have to be reachable from somewhere and a hub is that somewhere. What the hub
+     * is **not** is the schema — `docs/38` § 2.1's four sources under one record with a budget is
+     * GitHub issue #365, and this tile is deliberately not waiting for it.
      */
-    screen: 'door' as const,
-    pick: 'today' as const,
-    title: "Today's tower",
-    blurb: 'One building, one day, one score. The same day for everybody.',
-    shape: '~3 min · no losing — a day is a score, not a pass',
+    screen: 'scenario' as const,
+    pick: 'scenario' as const,
+    title: 'Scenario',
+    blurb: 'A building with something wrong with it. Watch it, read the letter, and fix it.',
+    shape: '~3-5 min a case · retry as often as you like',
     unavailable: unlessBuilt(
-      'the day runs, but its Everyday screens are not built yet',
+      'the scenarios run, but the screen that lists them is not built yet',
+      'scenario',
       'door',
-      'brief',
-      'stage',
-      'report',
-      'week',
+      'fixit',
     ),
   }),
   Object.freeze({
+    /*
+     * *Campaign* reads **Career** — `docs/39` § 3's rename map — and § D525 makes it the mode that
+     * persists. The `pick` stays `campaign`: see `types.ts#MODE_PICKS` for why the id did not move
+     * with the word.
+     *
+     * The gate is unchanged and still all three of § 8's screens: a campaign whose desk or contract
+     * screen dead-ends mid-flow is worse than a refused tile.
+     */
     screen: 'towers' as const,
     pick: 'campaign' as const,
-    title: 'Campaign',
+    title: 'Career',
     blurb: 'Clear days, spend units, keep the contracts you signed.',
     shape: '~2 min a building-day · three lost contracts ends the career',
-    /*
-     * The campaign *engine* exists and is exercised — `campaign/` judges days and `commissioning/`
-     * prices works — but only through the Engineer shell's campaign panel. The tile opens when all
-     * three of § 8's screens (`towers`, `building`, `contract`) are registered: a campaign whose
-     * desk or contract screen dead-ends mid-flow is worse than a refused tile. Saying that is the
-     * honest form; opening a blank `towers` would not be.
-     */
     unavailable: unlessBuilt(
       'the campaign runs, but its Everyday screens are not built yet',
       'towers',
@@ -122,86 +118,34 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     ),
   }),
   Object.freeze({
+    /*
+     * *Endless rush* reads **Rush**, § D525's third tile and `docs/39` § 3's other rename. The
+     * engine landed with GitHub issue #220, so `unlessBuilt` resolves to `undefined` here and the
+     * sentence below is the one a reader would meet if `rush` ever left the registry.
+     *
+     * Where the rush's own registers live, each named with the module that draws it, because the
+     * sentence that used to stand here named one that had moved (issue #293):
+     *
+     * - what the rush lacks — `buildNotes.ts`, the Settings build-information panel;
+     * - the standings' fixture marker — `RUSH_BESTS_FIXTURE_NOTE`, declared in
+     *   `rushScreenModel.ts` and drawn by `rushScreen.ts` beside the five rows, because § 20.11
+     *   requires a fixture's marker to travel with the fixture rather than sit two clicks away.
+     *
+     * `modes.test.ts` checks both against the import graph rather than against a reader's
+     * diligence, so the next register to move fails here instead of on a player's screen.
+     */
     screen: 'rush' as const,
     pick: 'rush' as const,
-    title: 'Endless rush',
+    title: 'Rush',
     blurb: 'One climbing day until the building stops draining.',
     shape: '~5 min · the run always ends; the question is when',
-    /*
-     * § 9.1's setup screen is registered, so this resolves to `undefined` and the tile opens. The
-     * sentence is kept current rather than left as it was: it is what a reader would be told if the
-     * screen were ever unregistered, and a refusal that describes a build two waves old is § D227's
-     * defect with a longer fuse.
-     *
-     * **The sentence that stood here was that defect, in the comment arguing against it** — GitHub
-     * issue #293. It read *"what the rush still lacks is named **on the screen itself**
-     * (`rushScreenModel.ts#RUSH_ABSENCES`)"*, and `RUSH_ABSENCES` left that screen on the merge
-     * that closed issue #207. It is written out rather than quietly corrected because a comment
-     * that names the failure mode and then commits it is the most persuasive kind of wrong: a
-     * reader checking this claim has just been told by the same paragraph that such claims go
-     * stale.
-     *
-     * Where the three things actually are, each named with the module that draws it:
-     *
-     * - the **register** of what the rush lacks — `buildNotes.ts`, the Settings build-information
-     *   panel, since #207 put every register in one place a reader goes looking;
-     * - the **primary's** refusal, while there was one — drawn into the § 3.3 bar beside the button
-     *   it was about, which is where a refusal about a missing engine belongs once the screen in
-     *   front of it is real, and gone since #220 built the engine;
-     * - the **standings'** fixture marker — `rushScreenModel.ts#RUSH_BESTS_FIXTURE_NOTE`, drawn by
-     *   `rushScreen.ts` beside the five rows, because § 20.11 requires a fixture's marker to
-     *   travel with the fixture rather than sit two clicks away.
-     *
-     * `modes.test.ts` checks all three against the import graph rather than against a reader's
-     * diligence, so the next register to move fails here instead of leaving a sentence behind.
-     */
     unavailable: unlessBuilt(
       'not built yet — the rush setup screen draws, but nothing behind it generates the climb',
       'rush',
     ),
   }),
-  Object.freeze({
-    screen: 'fixit' as const,
-    pick: 'fixit' as const,
-    title: 'Fix a building',
-    blurb: 'A building with something wrong. Diagnose it, change it, re-run it.',
-    shape: '~5 min a case · retry as often as you like',
-    /*
-     * `everyday/fixitScreen.ts` is registered, so `unlessBuilt` resolves to `undefined` here and
-     * **the sentence below is a dead branch** — nothing draws it, on any build where the screen is
-     * in the registry. What was stale was this comment, which went on reading *"three authored
-     * cases exist … and § 10's Everyday screen is not built"* after both of its halves had stopped
-     * being true. The *three* is a fossil of `docs/18`'s *"Three cases ship in
-     * `data/fixit-cases.json`"*, which the table's own docstring above already flags as stale; the
-     * count is **eighteen**, and it is stated once up there and derived from `data/` by
-     * `modes.test.ts` rather than typed a third time here.
-     *
-     * **Say precisely what the defect was, because the issue that reported it did not.** #217's
-     * AC3 says the refusal *"still reads"* the stale sentence, which implies a player meets it.
-     * A player never did. This is § D227's class in a code path — a stale sentence beside dead
-     * code — and it is the milder half of that class rather than the dangerous one: a refusal a
-     * player can read tells them not to touch a thing that works, while this one only misled a
-     * reader of the file about whether the screen existed. Milder is not harmless, and the
-     * Today's-tower row at the top of this table named this exact shape before it happened here.
-     *
-     * **The call stays; only the sentence is corrected.** Hard-coding `unavailable: undefined`
-     * would buy nothing and would take the derivation with it — the one thing that fails on the
-     * commit `fixit` leaves the registry. That is the Endless rush row's reasoning one tile up,
-     * and `screens.ts#UNBUILT_REASONS`' reasoning for keeping an empty table.
-     *
-     * **And the sentence now carries no count**, like its three siblings. A number inside a
-     * refusal is a second copy of a figure that has already gone stale once in this row, and it
-     * would sit in the one place no test reads — the branch that does not evaluate. The subject
-     * is the screen rather than the cases behind it, which is this table's own wording rule.
-     * **Recorded here rather than in `DECISIONS.md`, under § D405** — both halves are about this
-     * table's own wording rule: the countless refusal, and the count being bound to
-     * `data/fixit-cases.json` instead of to a reader's diligence.
-     */
-    unavailable: unlessBuilt('the cases run, but their Everyday screen is not built yet', 'fixit'),
-  }),
 ]);
 
-/** Whether the menu may open this tile. */
 export function isPlayable(mode: EverydayMode): boolean {
   return mode.unavailable === undefined;
 }

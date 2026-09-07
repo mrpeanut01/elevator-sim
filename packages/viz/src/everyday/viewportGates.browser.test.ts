@@ -118,7 +118,7 @@
  * Three things in the original table are worth reading rather than skimming.
  *
  * 1. **§ 3.2's column is 0 in every row, including the four that fail.** That is the issue.
- * 2. **The five controls at 360×800 are the whole main menu.** All four mode tiles — § 4's four
+ * 2. **The five controls at 360×800 are the whole main menu.** All three mode tiles — § D525's three
  *    modes, the only way into any of them — plus § 3.3's primary, `Play today's tower`, which at
  *    360 px is drawn at `left: 360` and is **100 % outside the viewport** before any scroll is
  *    attempted. The rail is `RAIL_WIDTH_PX = 212` at every width (`everyday/shell.ts:129`, inline,
@@ -621,7 +621,7 @@ function failuresOf(cell: Cell): readonly string[] {
 const OUTSTANDING: readonly string[] = Object.freeze([
   '360×800 · main menu · clause 1 · content clipped horizontally',
   '360×800 · main menu · clause 3 · everyday-bar-primary ×1',
-  '360×800 · main menu · clause 3 · everyday-mode ×4',
+  '360×800 · main menu · clause 3 · everyday-mode ×3',
   '360×800 · stage · clause 1 · content clipped horizontally',
   '360×800 · stage · clause 3 · everyday-bar-primary ×1',
   '360×800 · stage · clause 3 · everyday-bar-timeline > button ×2',
@@ -632,7 +632,7 @@ const OUTSTANDING: readonly string[] = Object.freeze([
   '360×800 · stage · clause 3 · everyday-stage-switch-pick ×1',
   '375×667 · main menu · clause 1 · content clipped horizontally',
   '375×667 · main menu · clause 3 · everyday-bar-primary ×1',
-  '375×667 · main menu · clause 3 · everyday-mode ×4',
+  '375×667 · main menu · clause 3 · everyday-mode ×3',
   '375×667 · stage · clause 1 · content clipped horizontally',
   '375×667 · stage · clause 3 · everyday-bar-primary ×1',
   '375×667 · stage · clause 3 · everyday-bar-timeline > button ×2',
