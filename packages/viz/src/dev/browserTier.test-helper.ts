@@ -456,6 +456,29 @@ export async function pressMenuRow(page: Page, id: string): Promise<void> {
  * reports a failure about the harness in the voice of a failure about the product.
  */
 /**
+ * **Put § 3.2's rail where a player can press a row, at any viewport** — GitHub issue **#240**.
+ *
+ * Below `everyday/tokens.ts#EVERYDAY_RAIL_DRAWER_MAX_PX` the rail is not a column beside the screen;
+ * it is an overlay behind a toggle in the shell's narrow header, and a test that clicks a rail row
+ * without pressing that toggle waits thirty seconds for an element that is `display:none`. Above
+ * the breakpoint the rail is already up and this does nothing.
+ *
+ * It is here rather than in each file for the reason every other helper in this section is: a tier
+ * that reaches a surface by a path no player has is a tier that tests a surface nobody can open,
+ * and the path is now viewport-dependent. Idempotent, so a caller may open the rail twice.
+ *
+ * Its non-test caller is nothing — like every export in this file, it is the tier's own vocabulary;
+ * `everyday/rerenderScroll.browser.test.ts` is what needed it first, at 375×667.
+ */
+export async function openEverydayRail(page: Page): Promise<void> {
+  const toggle = page.locator('.everyday-rail-toggle');
+  if ((await toggle.count()) === 0 || !(await toggle.isVisible())) return;
+  if ((await toggle.getAttribute('aria-expanded')) === 'true') return;
+  await toggle.click();
+  await page.locator('.everyday-rail').waitFor({ state: 'visible', timeout: 15_000 });
+}
+
+/**
  * Open one of the Scenario hub's entries from the main menu — § D525's route, GitHub issue #364.
  *
  * The two presses a player makes: the Scenario tile, then the entry. Shared because five browser

@@ -59,6 +59,7 @@ import {
 import { plainLeverEchoOf, plainLeverHelp, plainLeverSub } from '../mode/plainLevers.js';
 
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
+import { sideBySide } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import type { EverydayHost } from './host.js';
@@ -177,6 +178,15 @@ function toggle(doc: Document, on: boolean, label: string, onPress: () => void):
   return pill;
 }
 
+/**
+ * § 11's left rail, in pixels — the width the prototype gives the weight list beside the workshop.
+ *
+ * A constant rather than a literal for `fixitScreen.ts#CASE_RAIL_PX`'s reason: it is
+ * `screenDom.ts#sideBySide`'s argument now, so the width at which the row stacks is derived from
+ * it rather than from a second number (GitHub issue #240).
+ */
+const WORKSHOP_RAIL_PX = 300;
+
 function mountWorkshop(
   host: HTMLElement,
   context: EverydayScreenShellContext,
@@ -185,12 +195,13 @@ function mountWorkshop(
   let alive = true;
 
   const root = el(doc, 'div', 'everyday-workshop');
-  root.style.cssText = [
-    'display:grid',
-    'grid-template-columns:300px minmax(0,1fr)',
-    `gap:${String(GAP.wide)}px`,
-    'align-items:start',
-  ].join(';');
+  /*
+   * The two columns' widths are `screenDom.ts#sideBySide`'s from here — GitHub issue #240. This read
+   * `grid-template-columns:300px minmax(0,1fr)`, a fixed track with no breakpoint, and at 360 px it
+   * put **42 boxes** past the right edge of the screen. `render` writes the row itself on every
+   * draw, beside the two children it sizes; this is the shape before the first one.
+   */
+  root.style.cssText = 'display:flex;flex-direction:column;min-width:0';
   host.append(root);
 
   const api = context.host;
@@ -782,7 +793,8 @@ function mountWorkshop(
   function render(): void {
     if (!alive) return;
     root.replaceChildren();
-    root.append(drawLeft());
+    const left = drawLeft();
+    root.append(left);
 
     const column = el(doc, 'div');
     column.style.cssText = 'min-width:0';
@@ -799,6 +811,7 @@ function mountWorkshop(
     column.append(optimising);
     column.append(drawBehaviour(), drawSwitching(), drawRules());
     root.append(column);
+    sideBySide(root, { fixed: left, fluid: column, fixedPx: WORKSHOP_RAIL_PX, gapPx: GAP.wide });
     context.refreshBar();
   }
 

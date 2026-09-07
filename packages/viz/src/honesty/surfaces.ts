@@ -127,7 +127,7 @@ import {
   designerReading,
   designerWarnings,
 } from '../everyday/designerModel.js';
-import { railModel, sublineFor } from '../everyday/rail.js';
+import { RAIL_DRAWER_COPY, railModel, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
   RUSH_BESTS,
@@ -7700,6 +7700,7 @@ const EVERYDAY_MENU: SurfaceAdapter = {
   id: 'everyday/modes.ts#EVERYDAY_MODES',
   covers: [
     'everyday/modes.ts#EVERYDAY_MODES',
+    'everyday/rail.ts#RAIL_DRAWER_COPY',
     'everyday/rail.ts#sublineFor',
     'everyday/rail.ts#railGroups',
     'everyday/rail.ts#railFooter',
@@ -7813,6 +7814,18 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         }
       }
     }
+
+    /*
+     * **The two words the small-screen drawer is worked by** — GitHub issue #240.
+     *
+     * They are a rail surface like every other row above, and they are here for the same reason:
+     * below `tokens.ts#EVERYDAY_RAIL_DRAWER_MAX_PX` the toggle is the **only** way to any of those
+     * rows, so a stale or wrong word on it is a player who cannot find the rail at all. The mount
+     * that draws them is excluded from this corpus on the DOM mounts' shared ground, which is
+     * exactly why the copy is declared in `rail.ts` and driven here rather than authored inline.
+     */
+    seeds.push({ field: 'rail.drawer.open', text: RAIL_DRAWER_COPY.open, role: 'label' });
+    seeds.push({ field: 'rail.drawer.close', text: RAIL_DRAWER_COPY.close, role: 'label' });
 
     /*
      * § 3.2's footer, once — it does not vary by campaign shape.

@@ -50,6 +50,28 @@ import { REPLAY_COPY } from './replay.js';
 import { ENGINEER_SWAP_NOTE } from './types.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 
+/**
+ * **The two words the rail's small-screen drawer is worked by** — GitHub issue **#240**,
+ * `docs/31-support-matrix.md` § 2.
+ *
+ * Below `tokens.ts#EVERYDAY_RAIL_DRAWER_MAX_PX` the rail is not a column beside the screen; it is an
+ * overlay a toggle opens. That toggle and its close are the only two controls the small-screen
+ * layout **adds** to the product, so they are the only two strings it adds, and they are declared
+ * here rather than in the mount for this module's standing reason: the words are pure and the
+ * document is not, which is what lets the honesty sweep read them (`honesty/surfaces.ts`'s
+ * `EVERYDAY_MENU`).
+ *
+ * `open` is deliberately not the words *Main menu*. That is a rail **row**, and it navigates to the
+ * front door; this opens the rail itself and navigates nowhere. Two controls a thumb-width apart
+ * sharing a word would be the shell saying the same thing about two different things.
+ */
+export const RAIL_DRAWER_COPY = Object.freeze({
+  /** The narrow header's toggle. */
+  open: '☰ Where to',
+  /** The drawer's own dismiss, at the top of the rail while it is open. */
+  close: '✕ Close',
+});
+
 /** One rail row. */
 export interface RailItem {
   readonly screen: EverydayScreen;
