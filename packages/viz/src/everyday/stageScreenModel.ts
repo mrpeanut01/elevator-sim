@@ -1137,6 +1137,83 @@ export interface StageBarInput {
  */
 export const STAGE_DAY_OVER = 'the day has run out — the stage will not move again on its own';
 
+/* -------------------------------------------------------------------------- *
+ * Skip to the end — § D525 clause 4, GitHub issue #369
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The words on § 2.3's skip control, and the sentence that says what it is not.**
+ *
+ * `docs/38` § 1: *"The fun is watching the people … If you would rather not watch, you can speed it
+ * up or skip to the end, but watching is the point, not a replay."* So this is an escape hatch with
+ * the emphasis kept where the design put it — a control that runs the picture out, offered beside
+ * the ladder rather than at the head of it.
+ *
+ * ## It is not an eighth rung, and the note is where that is said to the player
+ *
+ * A rung changes how fast the recording is drawn; this moves the playhead to `endedAt` and stops.
+ * The distinction matters because a player who reads it as *very fast* would expect the day to be
+ * different for having been skipped, and it is not: `docs/16`'s rule is that a presentation control
+ * reaches a sink and **must not** reach the legs, and the recording this seeks through was
+ * simulated before the stage drew its first frame. {@link STAGE_SKIP_COPY.note} says so in the
+ * player's own terms rather than leaving it to a docstring nobody on the stage can read.
+ *
+ * ## Two arms, because a day already over has nothing to skip
+ *
+ * The second is the one that is easy to leave out and is exactly what § D354's ladder got wrong in
+ * the other direction: a control that is still pressable once it can do nothing is a control that
+ * lies about itself. {@link stageSkipViewOf} resolves it inert with the reason attached, which is
+ * the shape `stageBarModelOf` already uses for the three states its primary refuses.
+ */
+export const STAGE_SKIP_COPY = Object.freeze({
+  label: 'Skip to the end',
+  note: 'Runs the picture out to the end of the day. It changes nothing about the day itself — the same people, the same waits, the same report.',
+  doneReason: 'the day has already run out, so there is nothing left to skip',
+  pendingReason: 'the day is still being simulated — there is nothing to run out yet',
+});
+
+/** What {@link stageSkipViewOf} is asked about — the two facts the answer turns on. */
+export interface StageSkipState {
+  /** Whether the playhead has already reached `endedAt`. */
+  readonly dayEnded: boolean;
+  /**
+   * Whether there is a transport at all. `false` in the window between the stage mounting and the
+   * worker handing back a recording — `stageScreen.ts`'s `playback` is `undefined` there.
+   */
+  readonly hasRun?: boolean | undefined;
+}
+
+/** § 2.3's skip control, resolved: its face, its note, and whether it can still do anything. */
+export interface StageSkipView {
+  readonly label: string;
+  readonly note: string;
+  readonly inert: boolean;
+}
+
+/**
+ * Resolve § 2.3's skip control against the transport.
+ *
+ * Pure, and in this module rather than in the mount, for the reason every other view function here
+ * is: the words reach `honesty/surfaces.ts` without a document, so both arms are swept rather than
+ * only the one a browser test happened to drive.
+ */
+export function stageSkipViewOf(state: StageSkipState): StageSkipView {
+  /*
+   * **Three arms rather than two, and the third is why this function grew.** A skip drawn before
+   * the worker hands a recording back is disabled either way; the version that shipped first left
+   * its note reading *what pressing it would do*, on a control that could not be pressed. That is
+   * the stale-refusal shape `CLAUDE.md` names outright — a sentence that goes on describing a seam
+   * after the seam stopped being reachable — arrived at from the other side. Each state that
+   * disables the control says why it is disabled, and only the live one says what it does.
+   */
+  if (state.hasRun === false) {
+    return { label: STAGE_SKIP_COPY.label, note: STAGE_SKIP_COPY.pendingReason, inert: true };
+  }
+  return state.dayEnded
+    ? { label: STAGE_SKIP_COPY.label, note: STAGE_SKIP_COPY.doneReason, inert: true }
+    : { label: STAGE_SKIP_COPY.label, note: STAGE_SKIP_COPY.note, inert: false };
+}
+
 /**
  * § 3.3's stage row, refined.
  *

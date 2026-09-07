@@ -160,6 +160,16 @@ import { FIGURE_NOTE_HANDLE, everydayReportViewOf } from '../everyday/reportView
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
+  STAGE_ABSENCES,
+  STAGE_AWAITING_RUN,
+  STAGE_CAMERAS,
+  STAGE_GOALS_COPY,
+  STAGE_INTERVENTIONS,
+  STAGE_OUT_OF_SERVICE,
+  STAGE_RACE_PICKER_LABEL,
+  STAGE_RECOMPUTING,
+  STAGE_SPEEDS,
+  STAGE_SWITCH_PICKER_LABEL,
   stageAlarmOf,
   stageBarModelOf,
   stageCarReadoutOf,
@@ -170,16 +180,7 @@ import {
   stageInterventionsOf,
   stageLegend,
   stageOpeningLineOf,
-  STAGE_ABSENCES,
-  STAGE_AWAITING_RUN,
-  STAGE_GOALS_COPY,
-  STAGE_INTERVENTIONS,
-  STAGE_OUT_OF_SERVICE,
-  STAGE_RECOMPUTING,
-  STAGE_CAMERAS,
-  STAGE_SPEEDS,
-  STAGE_RACE_PICKER_LABEL,
-  STAGE_SWITCH_PICKER_LABEL,
+  stageSkipViewOf,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
@@ -9225,6 +9226,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'scope/switchWire.ts#switchUnpostableReasonOf',
     'everyday/stageScreenModel.ts#STAGE_RACE_PICKER_LABEL',
+    /*
+     * § 2.3's skip control — GitHub issue #369. The producer is claimed rather than the constant,
+     * because both arms are driven below and the inert arm's *reason* is the half a browser test
+     * cannot reach: it is only ever drawn on a day that has already run out.
+     */
+    'everyday/stageScreenModel.ts#stageSkipViewOf',
+    'everyday/stageScreenModel.ts#STAGE_SKIP_COPY',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
     /*
@@ -9377,6 +9385,34 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     for (const speed of STAGE_SPEEDS) {
       seeds.push({ field: `stage.speed.${String(speed.simPerRealS)}`, text: speed.label, role: 'label' });
+    }
+    /*
+     * **§ 2.3's skip control, both arms** — GitHub issue **#369**, § D525 clause 4.
+     *
+     * Driven rather than iterated, because the interesting half is the arm the browser tier does
+     * not reach: a day already run out resolves the control inert with a *reason* in place of its
+     * note, and a reason nothing sweeps is the class § D354 was written about. Two states is the
+     * whole space — `stageSkipViewOf` turns on one boolean — so this is total by construction
+     * rather than by inspection.
+     */
+    const skipStates: readonly (readonly [string, { dayEnded: boolean; hasRun: boolean }])[] = [
+      ['running', { dayEnded: false, hasRun: true }],
+      ['over', { dayEnded: true, hasRun: true }],
+      ['pending', { dayEnded: false, hasRun: false }],
+    ];
+    for (const [arm, state] of skipStates) {
+      const skip = stageSkipViewOf(state);
+      seeds.push({ field: `stage.skip.${arm}.label`, text: skip.label, role: 'label' });
+      /*
+       * `reason` on the inert arm and `prose` on the live one, which is the distinction this axis
+       * exists to make: the first is a refusal's own words about a control that can do nothing,
+       * and the second is a sentence about what pressing it would do.
+       */
+      seeds.push({
+        field: `stage.skip.${arm}.note`,
+        text: skip.note,
+        role: skip.inert ? 'reason' : 'prose',
+      });
     }
     /* § 7.3's camera chips — GitHub issue #324 — seeded once per case, like the speed chips above. */
     for (const chip of STAGE_CAMERAS) {
