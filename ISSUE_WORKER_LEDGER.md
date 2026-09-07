@@ -2627,7 +2627,7 @@ those five issues are re-scoped for exactly that reason.
 | #197 | RESCOPE | *every mode mapped* is three modes now — `docs/38` § 3 bullet 1. `docs/27` F2's finding is promoted to a ruling |
 | #201 | UNAFFECTED | `docs/26` § 7.4 derives `screenKey` from the registry, so the schema follows the tiles by construction |
 | #202 | UNAFFECTED | § D526's own obligation: `docs/26` § 10 is edited on the commit that lands the ledger, **not before** |
-| #210 | **NEEDS-RULING** | does `PM-DOOR`'s rush prologue survive *"Scenario … the only mode a first-time player should meet"* — `docs/38` § 2.1 against § D476 |
+| #210 | **RULED 2026-09-06** | the question dissolved: the first session is a two-screen **tutorial**, so those ninety seconds are tutorial content and not a mode. Screen two is reused as the Rush tutorial. Built as #380; the worked-answer boundary is written down once |
 | #218 | UNAFFECTED | `docs/38` § 3: `docs/25`'s slice is *unchanged in content*, mode renamed only |
 | #219 | RESCOPE (epic) | feature-complete is measured against three modes — `docs/38` § 3 bullet 1. Children #221, #227 moved |
 | #221 | RESCOPE | modifier-set board keys (§ D526 clause 3) and postable interventions (§ D525 clause 6) |
@@ -2635,7 +2635,7 @@ those five issues are re-scoped for exactly that reason.
 | #231 | RESCOPE (epic) | `docs/37`'s per-type targets re-derive under one schema; the set gains a building — `docs/39` § 2. Children #232, #233, #234, #240 moved |
 | #232 | RESCOPE | the shipped set's ceiling is **Extended** — `docs/39` § 2; § D527 |
 | #233 | RESCOPE + retitle | Scenario content authoring, repair lists gone, budget added — § D525 clauses 1–2; AC3 keeps its requirement and loses its instrument |
-| #234 | **NEEDS-RULING** | does DC-2 bind on every scenario, or only the first one or two — `docs/38` § 2.1's two clauses against each other |
+| #234 | **RULED 2026-09-06** | difficulty is the survivor count; the dropdown is the cheap corner of a space always fully open. A budget on the count that tightens by ladder position, **positions one and two exempt**. Stages 3, 5 and 7 still need rebalancing — the work is unchanged, its justification is not |
 | #235 | UNAFFECTED | a `README.md` and `docs/14` correction; premise already refuted |
 | #236 | UNAFFECTED | § D525 clause 3 keeps DC-R1 saying what difficulty is made of; telemetry tuning is a third axis |
 | #237 | UNAFFECTED | journey rows are per flow; AC4's own rule covers a changed mode set |
@@ -2677,6 +2677,17 @@ Filed **after** every disposition was settled, so a re-scoped issue was never du
 | #375 | Career persistence | § 2.2 | § D525 cl. 5 | P1 | — |
 | #376 | the Burj-class reference building and four of § D527's five measurements | § 2.5 | § D527 | P2 | — |
 | #377 | the fifth measurement — whether the stage draws 165 floors | § 2.5 | § D527 | P2 | #376 |
+
+## A.5 Filed after the rulings of 2026-09-06, and one issue that arrived mid-audit
+
+| # | what it is | descends from | P | blocked by |
+|---|---|---|---|---|
+| #379 | playtest personas from the documented audiences — **arrived mid-audit, not from it**; dispositioned **UNAFFECTED** (already written against `docs/38`), with one correction: it cites § D498 for *the board as the return mechanism*, which is wave T's crowd-identity decision. The content is § D526's, under the draft number `docs/39` § 4 warns about | — | — | — |
+| #380 | the two-screen tutorial, and the worked-answer boundary written down once | the #210 ruling | P1 | #364 |
+| #381 | the `docs/33` revision — budget as a third substrate, four rules folded into the survivor count, DC-9 re-aimed at controls, DC-5 split, a floor on the first hour | the difficulty-rules review | P1 | #367 |
+| #382 | the contract rebalance — day one outside the band on **8 of 8**, two contracts unpassable, and the order not a ramp | the difficulty-rules review | P1 | #381 |
+
+**#379's mis-citation is the first D497–D499 draft reference found in the wild**, and nothing catches it: `citations.test.ts` asserts every `§ Dnnn` **resolves to a heading**, and D498 resolves — to the wrong one. A citation pointing at a real heading with the wrong content is invisible to the only guard that reads citations. Recorded rather than mechanised; the general form is not writable as a test.
 
 **Five `Blocked by #N` lines, driven through `scripts/blocked-by.mjs#declaredBlockersOf` rather than
 eyeballed**: #367 → #365, #366; #370 → #366; #372 → #371; #377 → #376.

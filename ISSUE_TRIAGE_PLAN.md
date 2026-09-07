@@ -3,7 +3,7 @@
 Backlog snapshot, clusters, priority rationale, and batch plan for the open GitHub Issues on
 `mrpeanut01/elevator-sim`.
 
-**The current snapshot is § J, at the end of this file — 2026-09-06, 38 open at start and 52 at
+**The current snapshot is § J, at the end of this file — 2026-09-06, 38 open at start and 56 at
 end.** This line said *§ C* through snapshots D to I, which is `RISKS.md` R38 on the pointer to the
 register rather than on the register: nothing re-derives it, and six snapshots were appended under a
 header naming the third. Corrected on the commit that appended § J, and the correction is recorded
@@ -1294,3 +1294,88 @@ as an acceptance criterion on every issue filed here.
 It closes nothing for tidiness, it allocates no decision number — **D528 is the next free and it is
 not this audit's** — and it edits no `DECISIONS.md` entry. Where a closure would have needed a
 ruling, the issue is NEEDS-RULING instead.
+
+## J.7 Both NEEDS-RULING were taken the same day, and the second answer was bigger than its question
+
+The product owner ruled #234 and #210 on 2026-09-06, hours after the audit posted them. **A decision
+number is owed for each and neither is allocated here — D528 is the next free and it is the owner's.**
+
+**#234.** Difficulty is the survivor count, and **the dropdown is not a special case of anything** —
+it is the cheapest corner of a space the player always has full access to. What protects the player
+from picking blindly is § D525 clause 2 keeping the whole editor open, not a rule against the
+dropdown working. The rule replacing AC1 is **a budget on the count that tightens with ladder
+position**, with **positions one and two exempt**. Recommended threshold: from position three, no
+single shipped profile may meet every bar alone — published as the number to attack rather than as a
+citation. **All three registered stages sit at position three or later, so the work is unchanged and
+only its justification moves.**
+
+**#210 dissolved rather than resolved.** The first session is a **two-screen tutorial**: walk the
+player through the editor, then let a building fall apart and show how it could have been fixed.
+Screen two is reused as the Rush tutorial. So `PM-DOOR`'s ninety seconds are tutorial content and not
+a mode, and § 2.1's *"the only mode a first-time player should meet"* is satisfied by construction.
+
+**The boundary that ruling needs, written down once** — because screen two shows a worked answer and
+§ D525 clause 2 retires proposed fixes: **a worked answer is permitted in the tutorial and nowhere
+else.** No hint control, no suggested fix, no diagnosis line, in any scenario at any ladder position.
+Without that sentence the tutorial's teaching component is reused as a hint button on scenario twelve.
+
+## J.8 The difficulty rules were reviewed at the owner's request, and the rules are not the problem
+
+All twelve of `docs/33`'s rules were read against `docs/38`. **The finding is that the game fails them
+on 8 contracts out of 8 and nobody acted.**
+
+Day-1 miss rates in the order a player meets them, of 30 seeds: **0.00 · 1.00 · 0.23 · 0.80 · 1.00 ·
+0.03 · 0.30 · 0.00**, against a target band of a third to two thirds. **Contract two cannot be passed
+by any shipped configuration**, contract five likewise, and the eighth ties the first for the easiest
+day in the game. `docs/33` records both failures — F4 *"DC-4 is red on 8 of 8 contracts"* and F3 *"the
+contract order is not a ramp, and is not close to one"* — and files them against **W3**, an obligation
+over the week's contracts that **has no issue**. #234 owns the stages and every one of its criteria is
+worded about stages. That gap is now **#382**, and it is the largest playability finding in the
+backlog.
+
+**Five changes to the rules themselves, and the first is a contradiction rather than an opinion.**
+
+1. **DC-R1 gains a third substrate.** It permits demand and fabric *"and nothing else"*; § D525 makes
+   the **budget** the primary lever. As the two documents stand the ruling cannot be implemented
+   without breaking the rule. A budget belongs there on DC-R1's own test — declared, data, visible,
+   and it changes what the player can *reach* without changing what any number *means*. This is also
+   where **scarcity as price, not prohibition** lives.
+2. **Four rules become one measurement.** DC-1, DC-2, DC-2b and DC-7 are four approximations of *how
+   many ways through are there?*, each over a different restricted move set. § D525 measures it
+   exactly. Twelve rules become nine.
+3. **DC-9 loses its subject and gets a bigger one** — from *no offered repair may be inert* to **no
+   control the editor offers may be inert**, which matters more now that every control is always
+   offered. #270 measured a live instance.
+4. **DC-5 splits**: keep *growth reaches the run*, drop *difficulty must be monotonic*, which bans a
+   designed breather. **Flagged as the one arguable recommendation of the five.**
+5. **A rule on the other side.** Nine of twelve rules guard against the game being too easy and about
+   one and a half against it being too hard; the measurement says the harsh end is worse. **No
+   scenario a player meets in the first hour may have a survivor count of one.**
+
+Left alone, and should be: DC-R2, DC-R3, DC-3, DC-4's upper bound, DC-6 and DC-8.
+
+Filed as **#381**.
+
+## J.9 Four more issues, and one that arrived mid-audit carrying the trap
+
+**#380** the tutorial · **#381** the `docs/33` revision · **#382** the contract rebalance — all three
+from the rulings above, none covered by an existing issue.
+
+**#379 arrived from the playtest harness while the audit was running**, and is **UNAFFECTED** — it is
+already written against `docs/38`. But it cites **§ D498** twice for *"the board as the return
+mechanism"*. § D498 is wave T's *the crowd is the first legs*; the content it means is **§ D526**'s.
+That is the **first D497–D499 draft reference found in the wild**, exactly the substitution
+[`docs/39`](docs/39-decisions-in-force.md) § 4 exists to warn about.
+
+**Nothing catches it**, and that is the part to keep: `citations.test.ts` asserts every `§ Dnnn`
+**resolves to a heading**, and D498 resolves — to the wrong one. A citation pointing at a real heading
+with the wrong content is invisible to the only guard that reads citations. Recorded rather than
+mechanised, because the general form — *does this citation mean what the citing sentence says?* — is
+not writable as a test.
+
+## J.10 Final counts
+
+**56 open at the end**, against 38 at the start. Of the original 38: 0 closed, 16 RESCOPE, 20 UNAFFECTED, **2 RULED**
+(#210 and #234, both taken the same day), 1 UNAFFECTED arrival (#379), **17 filed** (#364–#377, #380,
+#381, #382). The ledger is reconciled mechanically against the live open set: **56 rows, 56 open, no
+difference in either direction.**
