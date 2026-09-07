@@ -254,6 +254,12 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
      * proves shorter. The tile is kept because it is the one the deployed measurement used and the
      * two should quote the same navigation. Its key is read off `data-screen` rather than the
      * label, so a copy change cannot silently point this case at another screen.
+     *
+     * **The navigation gained a step with § D525 (GitHub issue #364), and the case kept the
+     * destination rather than the route.** `fixit` is no longer a tile — it is an entry in the
+     * Scenario hub — so reaching it is now two presses. The scroll is applied and asserted before
+     * **each** of them, which tests `shell.ts#go`'s reset twice rather than once and still lands on
+     * the same tall incoming screen the deployed measurement used.
      */
     await page.evaluate((to) => {
       const region = document.querySelector<HTMLElement>('.everyday-screen');
@@ -268,7 +274,22 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
       'the menu did not scroll, so this case cannot observe a reset',
     ).toBeGreaterThan(0);
 
-    await page.locator('[data-screen="fixit"]').first().click();
+    await page.locator('[data-screen="scenario"]').first().click();
+    await page.waitForSelector('.everyday-scenario', { timeout: 30_000 });
+    expect(
+      await offsetOf(page),
+      'the hub opened at the offset the menu was left at — `shell.ts#go` did not reset both ' +
+        'scrollers on the first of the two presses',
+    ).toBe(0);
+
+    /* Scroll again, so the second press is also made from a scrolled surface. */
+    await page.evaluate((to) => {
+      const region = document.querySelector<HTMLElement>('.everyday-screen');
+      if (region !== null) region.scrollTop = to;
+      window.scrollTo(0, to);
+    }, SCROLLED_TO);
+
+    await page.locator('.everyday-scenario-entry[data-entry="fix-a-building"]').click();
     await page.waitForSelector('.everyday-fixit', { timeout: 30_000 });
 
     expect(

@@ -955,7 +955,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
    */
   it('files a campaign day on the same primary and lands on the campaign report', async () => {
     const page = await coldLoad();
-    await page.locator('.everyday-mode', { hasText: 'Campaign' }).first().click();
+    await page.locator('.everyday-mode[data-screen="towers"]').first().click();
     await page.waitForSelector('.everyday-towers');
     const building = await page.textContent('.everyday-towers-name');
     await page.click('.everyday-towers-open');

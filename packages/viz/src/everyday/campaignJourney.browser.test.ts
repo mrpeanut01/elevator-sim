@@ -83,7 +83,7 @@ async function coldLoad(): Promise<Page> {
 
 /** Press the Campaign tile — the player's own path, not a scripted navigation. */
 async function enterCampaign(page: Page): Promise<void> {
-  await page.locator('.everyday-mode', { hasText: 'Campaign' }).first().click();
+  await page.locator('.everyday-mode[data-screen="towers"]').first().click();
   await page.waitForSelector('.everyday-towers');
 }
 
