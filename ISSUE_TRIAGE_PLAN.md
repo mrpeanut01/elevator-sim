@@ -3,7 +3,12 @@
 Backlog snapshot, clusters, priority rationale, and batch plan for the open GitHub Issues on
 `mrpeanut01/elevator-sim`.
 
-**The current snapshot is § C, at the end of this file — 2026-08-29, 89 open.**
+**The current snapshot is § J, at the end of this file — 2026-09-06, 38 open at start and 52 at
+end.** This line said *§ C* through snapshots D to I, which is `RISKS.md` R38 on the pointer to the
+register rather than on the register: nothing re-derives it, and six snapshots were appended under a
+header naming the third. Corrected on the commit that appended § J, and the correction is recorded
+rather than made silently because a header that quietly changed would leave the next reader unable to
+tell a correction from a move.
 
 This file is three appended snapshots, and **each restarted its own numbering**, so a bare *§ 4* is
 ambiguous across them and *§ 6* named two different sections until this edit. Snapshot A (2026-08-07,
@@ -1167,3 +1172,125 @@ It does not close anything for tidiness, and it does not combine two issues that
 but need distinct fixes. § C's #170 ↔ #229 finding is the standing warning: two issues that read as
 duplicates were the *opposite* of duplicates once the register was partitioned by owner, and closing
 either against the other would have silently dropped a requirement.
+
+---
+
+# Snapshot J — 2026-09-06: the 2026-09-06 direction audited against all 38 open issues, and nothing was overtaken
+
+**Taken at `1c487f1`** (= `origin/main`, PR #363 merged, carrying [`docs/38-what-the-game-is.md`](docs/38-what-the-game-is.md), [`docs/39-decisions-in-force.md`](docs/39-decisions-in-force.md) and [§ D525](DECISIONS.md)–[§ D527](DECISIONS.md)). **Open issues at start: 38. Open at end: 52.** No issue was closed.
+
+Every open issue was read with its comments and tested against the product owner's 2026-09-06
+direction: is it overtaken (OBE), does its substance survive under a new name or schema (RESCOPE),
+is it untouched (UNAFFECTED), or has the direction made its premise ambiguous in a way only the
+owner can settle (NEEDS-RULING)?
+
+## J.1 The headline: **zero OBE closures**, and the ruling says why in its own words
+
+The audit was commissioned to close what the direction subsumes or contradicts. It closed **nothing**,
+and that is a finding rather than a failure of nerve. [§ D525](DECISIONS.md) is explicit:
+
+> *Fix a building* **is not scrapped; it is re-homed**, and its cases keep the stage wave T built.
+
+The owner's first note named *Fix a building* as the one to scrap. The ruling that came out of the
+conversation did the opposite: it **absorbed** four content sources under one schema rather than
+cancelling any of them. So the tiles retire and the content does not, the Campaign is renamed and
+its economy is untouched, and the rush is promoted rather than demoted. **A direction that absorbs
+kills no backlog.**
+
+The three retirements the direction does make — the four-tile menu, the authored repair menus and
+decoys, and the printed diagnosis line — **are asked for by no open issue.** Verified mechanically:
+`grep -ril` over all 38 bodies for *Fix a building*, *Today's tower*, *four tiles*, *four modes*,
+*mode picker*, *decoy*, *repair menu*, *proposed fix*, *diagnosis line* and *endless rush* returns
+five hits, and **every one is a descriptive premise rather than a request**: #233's title, #244's
+*"gets a mode picker"*, #219's *"Endless rush has a setup screen and no engine"*, #249's *"a free
+web game with no monetisation"*. Four of those five are re-scoped for exactly that reason.
+
+## J.2 Counts
+
+| disposition | n | issues |
+|---|---|---|
+| **OBE** (closed) | **0** | — |
+| **RESCOPE** (open, commented) | **16** | #159, #169, #177, #197, #219, #221, #227, #231, #232, #233, #240, #244, #247, #248, #249, #270 |
+| **UNAFFECTED** | **20** | #174, #178, #195, #201, #202, #218, #235, #236, #237, #238, #239, #241, #242, #243, #245, #250, #251, #258, #340, #355 |
+| **NEEDS-RULING** | **2** | #210, #234 |
+| **filed** | **14** | #364–#377 |
+
+**No `obe` label was created.** The instruction to create it was conditional on there being closures
+to carry it, and a label named for this audit with no members is a register that says something
+happened. Recorded here instead.
+
+**One retitle.** #233 *Expand Fix a building and build an authoring pipeline for cases* →
+*Expand Scenario's fix-case content and build an authoring pipeline for scenarios*. Its title named a
+retired tile; every criterion, its milestone and its priority are unchanged. That is the RESCOPE rule
+working: an issue whose **title** is retired and whose **substance** is not is never OBE.
+
+## J.3 The two NEEDS-RULING, and the question each needs
+
+**#234 — does DC-2 still bind on every scenario, or only on the ladder's first one or two?**
+`docs/38` § 2.1 keeps DC-2 by name (*"a stage the dropdown alone does not clear"*) and § D520's sweep
+is listed in force — and the same section redefines difficulty as a count with **no blanket
+prohibition**: *"Many survivors is easy."* A stage that clears from the dropdown is then a scenario
+with many survivors, which the ladder is supposed to contain at its easy end, and this issue's AC1
+calls it a breach. § D520's register names three such stages today. Narrowing AC1 to make the issue
+schedulable is what `CLAUDE.md` forbids, so it stays as written.
+
+**#210 — does `PM-DOOR`'s ninety seconds of the rush survive *"Scenario … is the only mode a
+first-time player should meet"*?** § D476 ruled the derived-state **cover** permitted; it did not rule
+on the content behind it, and § D525 changed what that content is a member of by making Rush a
+front-door mode rather than a bench instrument. A guided first turn inside Scenario and a rush
+prologue plus a fix case are different builds with different files.
+
+## J.4 Three findings the audit produced that were not its subject
+
+- **#169's thread now records all four items closed and one comment says otherwise.** Item 2 was
+  closed by #314 in wave J and re-verified in wave S; the wave W comment says it *"leaves item 2 as
+  the only open item"*. Items 1, 3 and 4 closed in waves V and W. Whether the issue closes is the
+  owner's and was not taken here — the audit's mandate was OBE only.
+- **`docs/35` § 13's routing table carries three rows the direction settles and all three read as
+  open** — Q3's *"placement is not settled"*, the two placement candidates, and Q4's draw.
+  `documentRouting.test.ts` asserts every register member is **dispositioned**, not that the
+  disposition is **true**, so it stays green over them. That gap is the one that test's own docstring
+  names. Recorded on #374.
+- **`docs/26` did not go stale on the mode set, and that is worth saying because it is the exception.**
+  #201 and #202 were the obvious RESCOPE candidates and are UNAFFECTED: § 7.4 derives `screenKey`
+  from `everyday/screens.ts`'s registry rather than authoring a mode vocabulary, so the schema
+  follows the tiles by construction. § D526's own obligation then keeps #202 still — *"`docs/26` § 10
+  and § 7's allowlist are edited on the commit that lands the ledger, not before."*
+
+## J.5 What was filed, and against which bullet
+
+`docs/38` § 3 was walked bullet by bullet **after** every disposition was settled, so that a
+re-scoped issue was never duplicated beside.
+
+| # | bullet | P |
+|---|---|---|
+| #364 | four tiles become three, Scenario first | P1 |
+| #365 | one scenario schema in `data/` | P1 |
+| #366 | one price schedule in `data/` | P1 |
+| #367 | a survivor count per scenario per budget step | P1 |
+| #368 | a credit ledger on the account | P1 |
+| #369 | the opening speed moves to a watching rung; *skip to the end* | P2 |
+| #370 | two new intervention kinds | P2 |
+| #371 | `docs/16`'s `ranked` row and `runIdentity.ts` widen; modifier-set boards | P1 |
+| #372 | the rush's per-wave purse, recorded interventions, postable result | P1 |
+| #373 | the two design-handoff deviations | P2 |
+| #374 | `docs/32`, `docs/23` and `docs/25`'s mode-set supersession (**two bullets, one issue**) | P2 |
+| #375 | Career persistence | P1 |
+| #376 | the Burj-class reference building and four of § D527's five measurements | P2 |
+| #377 | the fifth measurement — whether the stage draws 165 floors | P2 |
+
+Five `Blocked by #N` declarations were written and **driven through the shipped parser**
+(`scripts/blocked-by.mjs#declaredBlockersOf`) rather than eyeballed: #367 → #365, #366; #370 → #366;
+#372 → #371; #377 → #376.
+
+**Three § 3 bullets were deliberately not filed for.** § D373's supersession is already recorded in
+`DECISIONS.md`'s status lines; `docs/26` § 10 non-goal 1's amendment is § D526's own obligation to
+land with the ledger (#368) and explicitly not before; and *the honesty corpus's strings move with
+the tiles* is [§ D343](DECISIONS.md)'s standing integration rule rather than new work, and is carried
+as an acceptance criterion on every issue filed here.
+
+## J.6 What this snapshot deliberately does not do
+
+It closes nothing for tidiness, it allocates no decision number — **D528 is the next free and it is
+not this audit's** — and it edits no `DECISIONS.md` entry. Where a closure would have needed a
+ruling, the issue is NEEDS-RULING instead.
