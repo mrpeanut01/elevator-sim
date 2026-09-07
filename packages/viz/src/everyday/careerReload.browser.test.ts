@@ -81,6 +81,14 @@ describe.skipIf(!HAS_BROWSER)('a career survives a reload', () => {
       const fresh = await towersMeta(page);
       expect(fresh.trim()).not.toBe('');
 
+      /*
+       * Cause a save first. The host writes through `setCareer`, which runs on a mutation — so a
+       * career nobody has touched is never in storage, and the guard below caught that on the
+       * first run of this case. Opening a tower is the cheapest mutation the screen offers.
+       */
+      await page.click('.everyday-towers-open');
+      await page.waitForSelector('.everyday-building', { timeout: 15_000 });
+
       /* A career with standing banked — `carry` is in the meta line, `openTowerId` is not. */
       const planted = await page.evaluate((key) => {
         const raw = window.localStorage.getItem(key);
