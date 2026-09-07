@@ -135,7 +135,7 @@ async function deadControlsOn(page: Page): Promise<readonly DeadControl[]> {
 /**
  * The screens this file drives, and how it gets to each.
  *
- * The four tiles are § 4's four modes; the rail rows are the standalone screens beside them. Every
+ * The three tiles are § D525's three modes; the rail rows are the standalone screens beside them. Every
  * one is reached the way a player reaches it — a click on the thing they would click — rather than
  * by calling `go`, because a screen that can only be entered from a test is a screen this file
  * would be certifying and nobody would be visiting.

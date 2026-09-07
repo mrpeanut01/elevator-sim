@@ -198,7 +198,7 @@ async function coldLoad(): Promise<Page> {
  */
 
 describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
-  it('draws the menu, the rail and the four mode tiles — not the Engineer menu', async () => {
+  it('draws the menu, the rail and the three mode tiles — not the Engineer menu', async () => {
     const page = await coldLoad();
     try {
       const front = await page.evaluate(() => ({
@@ -209,7 +209,8 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
         engineerMenuHidden: document.querySelector<HTMLElement>('.menu-overlay')?.hidden,
       }));
       expect(front.shells).toBe(1);
-      expect(front.tiles).toBe(4);
+      // Three since § D525 (GitHub issue #364): Scenario, Career, Rush.
+      expect(front.tiles).toBe(3);
       expect(front.rails).toBe(1);
       // § 3.5: the front door is not overridable, and a deep link is what would override it. The
       // load above carries two query parameters and still lands here.
@@ -256,7 +257,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
     }
   });
 
-  it('leaves no mode tile refusing, and every one of the four takes a click', async () => {
+  it('leaves no mode tile refusing, and every one of the three takes a click', async () => {
     const page = await coldLoad();
     try {
       const tiles = await page.evaluate(() =>
@@ -275,16 +276,20 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
        * merged: neither branch's number was right here.
        *
        * A count of zero would be a weak case on its own, so the claim is the pair rather than the
-       * count: four tiles, none disabled, and none carrying a refusal it can no longer mean. A tile
-       * that stayed refused over a mode whose screens exist is § D227's defect and fails the second
-       * assertion; a tile that vanished rather than opening fails the first.
+       * count: **three** tiles since § D525 (GitHub issue #364) — Scenario, Career, Rush — none
+       * disabled, and none carrying a refusal it can no longer mean. A tile that stayed refused
+       * over a mode whose screens exist is § D227's defect and fails the second assertion; a tile
+       * that vanished rather than opening fails the first.
+       *
+       * *Today's tower* and *Fix a building* are not missing tiles: § D525 re-homed them into
+       * Scenario, and `scenarioModel.test.ts` is where their reachability is asserted.
        *
        * The rush's own missing engine has not gone anywhere — its § 3.3 primary is drawn inert with
        * the refusal on it, which is that honesty one level in, and
        * `standaloneScreens.browser.test.ts` is where that disabled primary is asserted. This case
        * deliberately does not cover it.
        */
-      expect(tiles.map((tile) => tile.screen)).toEqual(['door', 'towers', 'rush', 'fixit']);
+      expect(tiles.map((tile) => tile.screen)).toEqual(['scenario', 'towers', 'rush']);
       expect(tiles.filter((tile) => tile.disabled)).toEqual([]);
       for (const tile of tiles) expect(tile.text, tile.screen).not.toMatch(/not built/);
     } finally {
@@ -865,7 +870,7 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
         engineerInert: document.querySelector<HTMLElement>('.shell')?.inert,
         subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
       }));
-      expect(reloaded.tiles).toBe(4);
+      expect(reloaded.tiles).toBe(3);
       expect(reloaded.visibility).toBe('');
       expect(reloaded.engineerInert).toBe(true);
       expect(reloaded.subline).toContain('YOU ARE HERE');
