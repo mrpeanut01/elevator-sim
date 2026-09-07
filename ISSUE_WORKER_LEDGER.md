@@ -2592,3 +2592,117 @@ technician's new sentence is a substitution, the beat label's house form is on n
 the corpus by a board state. Third wave to land on nineteen a case (O, R at twenty, X); the
 coincidence is named in `CLAUDE.md` so nobody reads it as a copied row.
 
+
+---
+
+# OBE audit — 2026-09-06: all 38 open issues against the 2026-09-06 direction, nothing overtaken, fourteen filed
+
+Not a build wave. A read-only audit of the whole open backlog against
+[`docs/38-what-the-game-is.md`](docs/38-what-the-game-is.md), [`docs/39-decisions-in-force.md`](docs/39-decisions-in-force.md)
+and [§ D525](DECISIONS.md)–[§ D527](DECISIONS.md), taken at `1c487f1` — `origin/main` with PR #363
+merged. The batch reasoning is [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md) § J.
+
+**38 open at start, 52 at end. 0 closed, 16 RESCOPE, 20 UNAFFECTED, 2 NEEDS-RULING, 14 filed.**
+
+## A.1 Why nothing closed, in the ruling's own words
+
+[§ D525](DECISIONS.md): *"**Fix a building** is not scrapped; it is **re-homed**, and its cases keep
+the stage wave T built."* The direction absorbs four content sources under one schema rather than
+cancelling any, renames the Campaign without touching its economy, and promotes the rush rather than
+demoting it. The three things it does retire — the four-tile menu, the authored repair menus and
+decoys, and the printed diagnosis line — **are asked for by no open issue**, verified by grep over
+all 38 bodies rather than by reading impression: the five hits are descriptive premises, and four of
+those five issues are re-scoped for exactly that reason.
+
+## A.2 One row per open issue
+
+| # | disposition | what the direction does to it, and the section a reader can open |
+|---|---|---|
+| #159 | RESCOPE | the daily rotation is *today's scenario* inside Scenario; days author to the scenario schema — `docs/38` § 2.1, § 3 bullet 2; `docs/39` § 3 |
+| #169 | RESCOPE | *Campaign* reads as **Career**, economy untouched — `docs/39` § 3; § D525 clause 5. Thread now records all four items closed and one comment says otherwise |
+| #174 | UNAFFECTED | TWIN shafts, measurement fan-out, `infra/checks/`; engine and infrastructure |
+| #177 | RESCOPE | item 3's standings become a modifier-set board (§ D526 clause 3); item 7's fixit-editor subset is required open by § D525 clause 2 |
+| #178 | UNAFFECTED | Bayesian/OCBA and `UX.md` PB-09/ED-23; Engineer optimizer and rows |
+| #195 | UNAFFECTED | art direction and the legibility floor; the ceiling is #377's |
+| #197 | RESCOPE | *every mode mapped* is three modes now — `docs/38` § 3 bullet 1. `docs/27` F2's finding is promoted to a ruling |
+| #201 | UNAFFECTED | `docs/26` § 7.4 derives `screenKey` from the registry, so the schema follows the tiles by construction |
+| #202 | UNAFFECTED | § D526's own obligation: `docs/26` § 10 is edited on the commit that lands the ledger, **not before** |
+| #210 | **RULED 2026-09-06** | the question dissolved: the first session is a two-screen **tutorial**, so those ninety seconds are tutorial content and not a mode. Screen two is reused as the Rush tutorial. Built as #380; the worked-answer boundary is written down once |
+| #218 | UNAFFECTED | `docs/38` § 3: `docs/25`'s slice is *unchanged in content*, mode renamed only |
+| #219 | RESCOPE (epic) | feature-complete is measured against three modes — `docs/38` § 3 bullet 1. Children #221, #227 moved |
+| #221 | RESCOPE | modifier-set board keys (§ D526 clause 3) and postable interventions (§ D525 clause 6) |
+| #227 | RESCOPE | the six briefs become Scenario content under one schema — § D525 clause 1; E6 now maps, `docs/38` § 2.1 |
+| #231 | RESCOPE (epic) | `docs/37`'s per-type targets re-derive under one schema; the set gains a building — `docs/39` § 2. Children #232, #233, #234, #240 moved |
+| #232 | RESCOPE | the shipped set's ceiling is **Extended** — `docs/39` § 2; § D527 |
+| #233 | RESCOPE + retitle | Scenario content authoring, repair lists gone, budget added — § D525 clauses 1–2; AC3 keeps its requirement and loses its instrument |
+| #234 | **RULED 2026-09-06** | difficulty is the survivor count; the dropdown is the cheap corner of a space always fully open. A budget on the count that tightens by ladder position, **positions one and two exempt**. Stages 3, 5 and 7 still need rebalancing — the work is unchanged, its justification is not |
+| #235 | UNAFFECTED | a `README.md` and `docs/14` correction; premise already refuted |
+| #236 | UNAFFECTED | § D525 clause 3 keeps DC-R1 saying what difficulty is made of; telemetry tuning is a third axis |
+| #237 | UNAFFECTED | journey rows are per flow; AC4's own rule covers a changed mode set |
+| #238 | UNAFFECTED | CI performance budget |
+| #239 | UNAFFECTED | accessibility |
+| #240 | RESCOPE | *the tallest shipped building* becomes 165 levels — § D527; its measurement is #377's |
+| #241 | UNAFFECTED (epic) | four launch criteria untouched. Child #244 moved |
+| #242 | UNAFFECTED | error monitoring and the runbook |
+| #243 | UNAFFECTED | launch checklist |
+| #244 | RESCOPE | the pitch is `docs/38` § 1 now, and the primary call to action is Scenario — § 2.1 |
+| #245 | UNAFFECTED | support surface |
+| #247 | RESCOPE (epic) | AC1's board is renamed and doubled — `docs/38` § 2.3. Children #248, #249 moved |
+| #248 | RESCOPE | the board key gains a modifier-set axis, and a second board family — § D526 clause 3 |
+| #249 | RESCOPE | *no monetisation* is amended (`docs/39` § 2) and the day-2 argument gains a fourth pillar — § D526 |
+| #250 | UNAFFECTED | KPI dashboard; the ledger is not telemetry |
+| #251 | UNAFFECTED | community loop |
+| #258 | UNAFFECTED | § D344 stands; both candidate defaults sit inside the `S ≤ 39` discrete tier |
+| #270 | RESCOPE | stage 1's failable goal is restated as a ruling — `docs/38` § 2.1's *doable with a tweak and failable with the wrong one*; § D372's tutorial building stands (`docs/39` § 1) and § D514's draw is **Narrowed**. *Two of its three editable dials* re-reads under § D525 clause 2, which removes the per-stage control list |
+| #340 | UNAFFECTED | telemetry implementation |
+| #355 | UNAFFECTED | the revert procedure |
+
+## A.3 Filed, one per `docs/38` § 3 bullet
+
+Filed **after** every disposition was settled, so a re-scoped issue was never duplicated beside.
+
+| # | the `docs/38` § 3 bullet it descends from | serves | decision | P | blocked by |
+|---|---|---|---|---|---|
+| #364 | four tiles become three, Scenario first | § 2, § 2.1 | § D525 | P1 | — |
+| #365 | one scenario schema in `data/` | § 2.1 | § D525 cl. 1 | P1 | — |
+| #366 | one price schedule in `data/` | § 2.1 | § D525 cl. 2 | P1 | — |
+| #367 | a survivor count per scenario per budget step | § 2.1 | § D525 cl. 3 | P1 | #365, #366 |
+| #368 | a credit ledger on the account | § 2.4 | § D526 | P1 | — |
+| #369 | the opening speed moves to a watching rung; *skip to the end* | § 2.3 | § D525 cl. 4 | P2 | — |
+| #370 | two new intervention kinds | § 2.3 | § D525 cl. 4 | P2 | #366 |
+| #371 | `docs/16`'s `ranked` row and `runIdentity.ts` widen; modifier-set boards | § 2.3 | § D525 cl. 6, § D526 cl. 3 | P1 | — |
+| #372 | the rush's per-wave purse, recorded interventions, postable result | § 2.3 | § D525 cl. 6, § D526 | P1 | #371 |
+| #373 | the two design-handoff deviations | § 2, § 2.1 | § D525 | P2 | — |
+| #374 | `docs/32`, `docs/23` and `docs/25`'s mode-set supersession (**two bullets, one issue**) | § 2 | § D525, § D526 | P2 | — |
+| #375 | Career persistence | § 2.2 | § D525 cl. 5 | P1 | — |
+| #376 | the Burj-class reference building and four of § D527's five measurements | § 2.5 | § D527 | P2 | — |
+| #377 | the fifth measurement — whether the stage draws 165 floors | § 2.5 | § D527 | P2 | #376 |
+
+## A.5 Filed after the rulings of 2026-09-06, and one issue that arrived mid-audit
+
+| # | what it is | descends from | P | blocked by |
+|---|---|---|---|---|
+| #379 | playtest personas from the documented audiences — **arrived mid-audit, not from it**; dispositioned **UNAFFECTED** (already written against `docs/38`), with one correction: it cites § D498 for *the board as the return mechanism*, which is wave T's crowd-identity decision. The content is § D526's, under the draft number `docs/39` § 4 warns about | — | — | — |
+| #380 | the two-screen tutorial, and the worked-answer boundary written down once | the #210 ruling | P1 | #364 |
+| #381 | the `docs/33` revision — budget as a third substrate, four rules folded into the survivor count, DC-9 re-aimed at controls, DC-5 split, a floor on the first hour | the difficulty-rules review | P1 | #367 |
+| #382 | the contract rebalance — day one outside the band on **8 of 8**, two contracts unpassable, and the order not a ramp | the difficulty-rules review | P1 | #381 |
+
+**#379's mis-citation is the first D497–D499 draft reference found in the wild**, and nothing catches it: `citations.test.ts` asserts every `§ Dnnn` **resolves to a heading**, and D498 resolves — to the wrong one. A citation pointing at a real heading with the wrong content is invisible to the only guard that reads citations. Recorded rather than mechanised; the general form is not writable as a test.
+
+**Five `Blocked by #N` lines, driven through `scripts/blocked-by.mjs#declaredBlockersOf` rather than
+eyeballed**: #367 → #365, #366; #370 → #366; #372 → #371; #377 → #376.
+
+**Three bullets deliberately unfiled**, each with its reason: § D373's supersession is already in
+`DECISIONS.md`'s status lines; `docs/26` § 10's amendment is § D526's obligation to land **with** the
+ledger and not before; and the corpus moving with the tiles is § D343's standing rule, carried as an
+acceptance criterion on every issue filed rather than as work of its own.
+
+## A.4 What this audit did not do
+
+No `DECISIONS.md` edit. **No decision number allocated — D528 is the next free and it is not this
+audit's**; where a closure would have needed a ruling the issue is NEEDS-RULING instead. No `obe`
+label created, because a label named for this audit with no members is a register that says something
+happened. Nothing closed for tidiness.
+
+**Verification:** `npx vitest run packages/experiments/src/validation/` — 26 files, 261 passed,
+6 skipped, green before and after the document edits.
