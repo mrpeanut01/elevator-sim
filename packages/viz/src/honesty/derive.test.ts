@@ -1380,6 +1380,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A storage key — GitHub issue #375. `CAREER_STORAGE_KEY` is the `localStorage` slot the ' +
+        'career is written under. It is not prose and no surface draws it: it is the identifier ' +
+        '`everyday/careerStore.ts` addresses the slot with. The refusal *sentences* in the same ' +
+        'file are player-facing and are driven rather than excluded — `decodeCareer` is the ' +
+        'producer the sweep names, the `EVERYDAY_CAMPAIGN` adapter seeds all three grounds, and ' +
+        '`everyday/campaignScreens.ts` draws whichever one the load produced.',
+      ids: ['campaign/careerPersist.ts#CAREER_STORAGE_KEY'],
+    },
+    {
+      reason:
         'A **composition that authors no string** — GitHub issue #221. `dailyBoardOf` turns two ' +
         'client reads into one of four states, and every word it can put on a screen belongs to ' +
         'somebody else: `detail` is `menu/client.ts`’s own failure sentence, `note` is the ' +
