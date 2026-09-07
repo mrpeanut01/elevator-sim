@@ -34762,3 +34762,52 @@ enters `honesty/surfaces.ts` when the ledger lands (#368), and `docs/26` § 10 i
 commit and not before, per § D526's own obligation.
 
 ---
+
+## D531 — The sign-in bonus ships at launch, in the one shape D526 permits
+
+**Date: 2026-09-06 · Owner: product owner · Rules on: [§ D526](#d526) clause 7, [`docs/38`](docs/38-what-the-game-is.md) § 2.4 and § 5, [§ D530](#d530), `docs/32` § 9 Q4, `docs/26` § 10, GitHub issue #368.**
+
+**Decided by the product owner, 2026-09-06**, closing the second and last of the two items
+[§ D526](#d526) left open. With [§ D530](#d530) before it, **`docs/38` § 5 now has no open items.**
+
+**Ruling.** The sign-in bonus is **on at launch**, in the shape § D526 clause 7 already bounds and in
+no other: **a small, flat, unconditional award of chimes on the first session after `x` hours away.
+It does not compound, there is no streak, and missing it costs nothing.** That is what makes it a
+gift rather than a timer, and it is how it survives § D526 clause 4's *nothing resets on time* — the
+balance still does not refill, expire or decay while the player is away; a separate, unconditional
+gift is added to it.
+
+**The argument that was put and not taken, recorded because it is the better-evidenced one.** Shipping
+the bonus at launch **forfeits the baseline**: `charter S4` is a retention criterion, and a product
+that has always had the bonus cannot measure whether the bonus did anything. Turning it on later as a
+before-and-after is measurable; having always had it is not. The owner ruled for shipping it anyway,
+and the trade is stated here rather than lost, so that a later reader does not mistake the absence of
+an S4 figure for an oversight. **No S4 claim may be made about the bonus**, in either direction, on
+the evidence this decision ships with.
+
+**What this does not decide.** The value of **`x`**, and the size of the award. Both are data under
+`CLAUDE.md` invariant 7 — they belong in the earn table `docs/38` § 3's ledger bullet puts in `data/`,
+carrying the schema invariant 8 asks for, not in code and not in a lane's judgement at the call site.
+
+**What this does not relax, restated because a bonus is where a currency ruling is most likely to
+leak.** Every clause of § D526 stands. The bonus is **earned by nothing the run measures** and is
+therefore not a violation of clause 2 — it is not scaled by a wait figure or by any quantity the run
+can suppress, because it is not scaled at all. It is **spent like any other chime**, on modifiers and
+never on access (clause 3). It **never appears on a results page**, beside a wait figure, or in a
+comparison between players. It is **one more source on the ledger**, so the play surface reads the
+same one balance and does not know where the entry came from (clause 5). And it is **not a purchase**:
+`docs/26` § 10 non-goal 1 as amended by § D526 clause 6 forbids a purchase, a price, a store, a
+conversion event or supporting telemetry, and a gift the product hands out is none of those.
+
+**What this answers.** `docs/32` § 9 Q4 asked for the day-2 return mechanism and § D526 gave it three
+— the daily seed, a record to beat, and a balance to save up for. This adds a fourth and the weakest
+of them by design: a reason to open the game that costs nothing to ignore.
+
+**Obligations that follow.** The bonus is a **named source on the ledger** (#368), so it is
+distinguishable in the store from a completed turn and invisible on the play surface, which is the
+property § D526 clause 5 was built for. `x` and the award are authored in `data/` before the ledger
+ships. Every player-facing string enters `honesty/surfaces.ts`. And the shape is asserted rather than
+reviewed: **it does not compound, it carries no streak, and missing it costs nothing** — a test that
+awards it twice in one window, or that makes a missed window reduce anything, fails.
+
+---
