@@ -2499,3 +2499,96 @@ The first case decomposes the 288 to the string across eight adapters (the door'
 sentence +23, the designer's copy +6, the report +4, seven register rows −7); the fraction above 288
 is the door's third render being conditional on the case's week having a day to hand back. The
 full table and the decomposition are in `CLAUDE.md`'s Phase 9 row.
+
+# Wave X — 2026-09-06: one worker, three issues, a house on the board, and a service event that can close a lobby
+
+## X.1 The wave's shape: one worker, three issues, one push
+
+Wave X ran as waves T to W did: one integrator, no lanes, serial on one branch, opened in the same
+worktree wave W closed in and based on wave W's merge. Decisions D521 to D524 were allocated from the
+reservation opened before the first commit (`documentation.test.ts#OPEN_RESERVATION`, D521 to D530),
+and the block's other six went unspent.
+
+| issue | what landed | decision |
+|---|---|---|
+| #222 | the house: a reserved `house` account posts one replayable run per shipped dispatcher on the day's fixture, marked on the row and on the board, counted by no ladder, idempotent by the store's own conflict key; the verifier's replay is the seeder's measurement | § D521 |
+| #328 | a scheduled workflow calls an authenticated `POST /api/boards/seed` at 00:10 UTC and on dispatch, gated twice, refusing to run at all when the origin or the token is unset, failing on a non-200 or an empty report | § D522 |
+| #346 | a service event is one of three shapes: a car's mode, a bank's range, a car's rated load; a car finishes the leg it is carrying; the rider the change leaves without a bank is stranded, a fifth outcome published beside AWT and never folded into it | § D523 |
+| #346 | the campaign technician brings a red-tagged car back rated to three quarters of its plate, which is the derate event's first shipped writer | § D524 |
+
+## X.2 What the code found, and what the measurement decided
+
+**The board had no column for who did not play.** Every entry requires a user, so the house is a
+reserved account and a nullable `baseline_profile_id` on the row: both, because the constraint is
+worth keeping and a display name a player could choose is not an identity. The board's `DISTINCT ON`
+now groups by `(user_id, baseline_profile_id)`, so thirteen house rows survive a query that keeps one
+row a player, and the ladders exclude them by the column rather than by the name.
+
+**One replay of the daily fixture is 1.2 to 1.6 s**, measured on one worker, which is what made the
+seed route synchronous: thirteen are about twenty seconds, inside any ingress timeout, and a route
+that answers when it is done is one whose failure the caller sees. `nearest-car` is skipped by the
+verifier on the fixture with `awt-not-quotable`, and the report says so by name rather than posting a
+row with a mean the run refuses.
+
+**The range change's design question was answered before the code, and the answer is *finish the
+leg*.** A car carrying somebody to a floor that has just left the range still stops there: the shaft
+is hardware, the car call stands, and nothing in `#onRangeChange` touches either. What the bank stops
+doing is answering. The other two candidates were weighed on the stage rather than on paper: one
+carries a rider past their floor, the other makes a scheduled closure conditional on traffic.
+
+**Stranded is the fifth outcome, and it is not the fourth wearing a new name.** A refusal is about
+the rider's credential and a stranding is about the fabric, and a reader deciding what to fix needs
+to know which; a stranding can also land after a real wait, so the promise the rider held is voided
+and counted where a revocation is. The key is absent rather than `0` when nobody was stranded, for
+the reason every such key on the audit is: `structuralDigestOfResult` hashes every key.
+
+**No route is re-planned, on purpose.** The trace is fixed and the run is what varies; re-routing a
+stranded rider through a bank the planner did not choose would make the trace a function of the
+schedule and break common random numbers between two arms of a paired comparison. The count beside
+the mean is the honest measure of what a closure cost.
+
+**The derate's control had to be shown where it bites.** Garden Apartments at `c1`'s hour never
+fills a car to three quarters of its plate, so the technician's derated return there is bit-identical
+to a return at the plate; the legs test moved to Midtown Office, where the same answer is a different
+day from the instant the car comes back and the car carries fewer people at its peak.
+
+**A resolved building had to stay a `BuildingConfig`.** Three viz sites hand one to the other, and
+the first draft of the resolved derate event carried kilograms alone; keeping the authored pounds
+beside them is what let every one of them keep typechecking without a cast.
+
+**Two consumers had to learn the union.** The fuzz shrinker's draft copied service events field by
+field and would have silently dropped a range or derate entry a hand-written case carried in; it
+copies whole now. Its resolvability check and the generator's test narrow on the mode guard, and the
+test asserts the generator still authors mode events only, so a generator change arrives as a red
+test rather than a quiet widening.
+
+## X.3 What was not built, and is said on the issues
+
+- **The range event's shipped writer.** § D523 built it, tested it on the legs, and named the
+  question of where #159's library reaches a run as #159's rather than answering it here.
+  `EventEffect` gained no field, because nothing in `shift/` writes a range or a derate yet, and a
+  field nothing writes is the dead seam `shift/types.ts` warns about. A building document authored
+  through the Engineer's fabric editor reaches the range event today, which is a route rather than
+  a writer, and the ledger says so rather than counting it.
+- **A stranding ground on the awt-validity table.** A stranding rate large enough to bias the mean
+  is caught by `censored` with the wrong sentence, the same named limitation § D266 recorded for the
+  refusal; widening `AwtInvalidGround` widens every total `Record` over it in `packages/viz`, and is
+  its own lane.
+- **A stranded count on a player surface.** Core publishes it beside the mean in the audit and the
+  stage activity; no Everyday screen draws it yet, because no shipped building or day schedules a
+  range change for a screen to draw it about.
+
+## X.4 The corpus, once after integration
+
+**Both tiers in one sitting, with the base at `5358c05` re-measured first in a detached worktree,
+where it reproduced wave W's row exactly: 623 363 always-on and 776 588 deep, the fourteenth
+consecutive wave that has held.** Wave X: always-on **624 294** strings (+931, 19.0 a case), deep
+**777 728** (+1 140, 19.0 a case); cases, simulations, failing cases and surfaces all unmoved, the
+surface sets diffed and identical in both tiers. The first case decomposes the nineteen to the
+string and every one of them is `gauntlet/ladder.ts#ladderRowsOf`: two `BOARD_SCREEN_COPY` keys and
+the daily board's `house` state, seventeen strings over two house rows and two player rows. The
+technician's new sentence is a substitution, the beat label's house form is on no seeded state, and
+`core`'s fifth outcome renders no player-facing string, so a wave that moved the outcome model moved
+the corpus by a board state. Third wave to land on nineteen a case (O, R at twenty, X); the
+coincidence is named in `CLAUDE.md` so nobody reads it as a copied row.
+

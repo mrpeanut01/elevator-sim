@@ -20,6 +20,7 @@ import { freshTower } from './career.js';
 import { failureOddsPct } from './economy.js';
 import {
   TECHNICIAN_CALLOUT_S,
+  TECHNICIAN_RETURN_LOAD_FRACTION,
   TECHNICIAN_UNITS,
   answerChangeOf,
   campaignEventFor,
@@ -128,14 +129,28 @@ describe('composing the answer', () => {
     if (late.kind === 'refused') expect(late.reason).toContain('the day ends before');
   });
 
-  it('appends an in-service event for the car, after the answer, and the default appends nothing', () => {
+  it('appends an in-service event and a derate for the car, after the answer, and the default appends nothing', () => {
     const answered = answerChangeOf(incident, technician, incident.atS + 60, 3600);
+    const backAtS = incident.atS + 60 + TECHNICIAN_CALLOUT_S;
+    const plate = GARDEN.banks
+      .find((bank) => bank.id === incident.car?.bankId)
+      ?.cars.find((car) => car.id === incident.car?.carId);
+    expect(plate).toBeDefined();
+    expect(technician.when).toContain('three quarters of its plated load');
     expect(answered).toMatchObject({
       kind: 'change',
       change: {
         kind: 'answer-incident',
         option: technician.label,
-        serviceEvents: [{ atS: incident.atS + 60 + TECHNICIAN_CALLOUT_S, mode: 'in-service', carId: incident.car?.carId }],
+        serviceEvents: [
+          { atS: backAtS, mode: 'in-service', carId: incident.car?.carId },
+          {
+            atS: backAtS,
+            carId: incident.car?.carId,
+            ratedLoadLb: Math.round((plate?.ratedLoadLb ?? 0) * TECHNICIAN_RETURN_LOAD_FRACTION),
+            ratedLoadKg: Math.round((plate?.ratedLoadKg ?? 0) * TECHNICIAN_RETURN_LOAD_FRACTION),
+          },
+        ],
       },
     });
     expect(answerChangeOf(incident, leave, incident.atS + 60, 3600)).toEqual({
@@ -175,5 +190,60 @@ describe('on the legs, through the shipped path', () => {
     const before = (legs: typeof called.legs) => legs.filter((leg) => leg.arrivedAt < answerAtS && (leg.boardedAt ?? Infinity) < answerAtS);
     expect(before(called.legs)).toEqual(before(left.legs));
     expect(called.legs).not.toEqual(left.legs);
+
+  }, 300_000);
+
+  it('the technician’s derate moves the run where the car fills: the same answer at the plate is a different day', () => {
+    /*
+     * **The derate is a control, so it must move the run** (§ D524, CLAUDE.md's standing shape),
+     * and it must be shown where it can bite. Garden Apartments at `c1`'s hour never fills a car to
+     * three quarters of its plate, so the cell is Midtown Office, whose lobby does. The same answer
+     * with the derate struck out — the car back at its plate — is a different day from the instant
+     * the car returns, and the car carries fewer people at its peak once rated down.
+     */
+    const midtown = RESOURCES.buildings.find((building) => building.id === 'midtown-office')!;
+    const cell = { ...base, buildingId: 'midtown-office', shiftLengthS: 3600, campaignEventId: 'breakdown' as const };
+    const broken = shiftRunConfigOf(RESOURCES, cell);
+    const incident = campaignIncidentOf({ event: SHIFT_EVENTS.breakdown, building: midtown, runLengthS: 3600, heldCars: [] })!;
+    const answerAtS = incident.atS;
+    const technician = answerChangeOf(incident, incident.options[0]!, answerAtS, 3600);
+    if (technician.kind !== 'change') throw new Error(`the answer composes: ${technician.reason}`);
+    if (technician.change.kind !== 'answer-incident') throw new Error('the answer is an incident answer');
+    const modeOnly = {
+      ...technician.change,
+      serviceEvents: technician.change.serviceEvents.filter((event) => 'mode' in event),
+    };
+    expect(modeOnly.serviceEvents.length).toBe(technician.change.serviceEvents.length - 1);
+    const derated = recordRun(
+      { ...broken.config, interventions: [{ atS: answerAtS, change: technician.change }] },
+      { recordDecisions: false },
+    ).recording;
+    const atPlate = recordRun(
+      { ...broken.config, interventions: [{ atS: answerAtS, change: modeOnly }] },
+      { recordDecisions: false },
+    ).recording;
+    expect(derated.legs).not.toEqual(atPlate.legs);
+
+    const backAtS = answerAtS + TECHNICIAN_CALLOUT_S;
+    const carId = `${incident.car?.bankId ?? ''}-${incident.car?.carId ?? ''}`;
+    /** The most people aboard the returned car at once, from its return on. */
+    const peakAboardAfter = (legs: typeof derated.legs): number => {
+      const events: { at: number; delta: number }[] = [];
+      for (const leg of legs) {
+        if (leg.carId !== carId || leg.boardedAt === undefined) continue;
+        events.push({ at: leg.boardedAt, delta: 1 });
+        if (leg.alightedAt !== undefined) events.push({ at: leg.alightedAt, delta: -1 });
+      }
+      events.sort((a, b) => a.at - b.at || a.delta - b.delta);
+      let aboard = 0;
+      let peak = 0;
+      for (const event of events) {
+        aboard += event.delta;
+        if (event.at >= backAtS && aboard > peak) peak = aboard;
+      }
+      return peak;
+    };
+    expect(peakAboardAfter(derated.legs)).toBeGreaterThan(0);
+    expect(peakAboardAfter(derated.legs)).toBeLessThan(peakAboardAfter(atPlate.legs));
   }, 300_000);
 });

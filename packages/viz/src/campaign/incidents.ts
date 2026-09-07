@@ -36,10 +36,15 @@
  *
  * **Every option's effect is real or the option is not offered.** The design file's `outage` and
  * `event` option sets include a technician, a marshal in the lobby, a temporary handover and a
- * zoning change. Of those, what an `answer-incident` entry can carry is a service-mode change
- * (`core`'s arm carries `serviceEvents` and nothing else), so the options here are the ones a
- * service-mode change can honestly express: bring the red-tagged car back, or bring back the car
- * tonight's works are holding. The handover and the parking are the stage's own arms one row down,
+ * zoning change. Of those, what an `answer-incident` entry can carry is a service event (`core`'s
+ * arm carries `serviceEvents` and nothing else — a car's mode, a bank's range or a car's rated
+ * load, § D523), so the options here are the ones a service event can honestly express: bring the
+ * red-tagged car back, or bring back the car tonight's works are holding. **The technician brings
+ * the car back derated** (§ D524): a car cleared to run after a red tag runs at
+ * {@link TECHNICIAN_RETURN_LOAD_FRACTION} of its plated load for the rest of the day, which is what
+ * a load-weighing device set conservatively after a fault does, and it is the first shipped writer
+ * of a derate event — the standing requirement is *name the non-test caller*, and this is it. The
+ * handover and the parking are the stage's own arms one row down,
  * and the dock's footer says so rather than duplicating them as options that would append a
  * different kind of entry. A marshal in the lobby is a person the engine cannot simulate, and an
  * option that charged for one would be a control that writes nothing (§ D219).
@@ -47,7 +52,8 @@
  * ## Composing the answer — {@link answerChangeOf}
  *
  * The change is `core`'s `answer-incident` arm: the option's own words for the stamp, and the
- * in-service event the option promises, at or after the answer's own second. An option whose car
+ * in-service event the option promises — with the derate beside it when the car comes back rated
+ * down — at or after the answer's own second. An option whose car
  * would return after the day ends is **refused with the reason** rather than appended: `core` warns
  * and skips an event past the deadline, and a paid answer whose effect the run never reaches is the
  * same defect as a marshal.
@@ -84,6 +90,14 @@ export const TECHNICIAN_CALLOUT_S = 1200;
 
 /** What calling the technician costs — the design file's `tech` option, *"3 u · overtime"*. */
 export const TECHNICIAN_UNITS = 3;
+
+/**
+ * The share of its plated load a red-tagged car runs at once the technician clears it (§ D524).
+ * Three quarters: below the 0.8 design-load factor, so the derate bites on every boarding rather
+ * than only at the alarm, and above a half, so the car is still worth bringing back. Applied to
+ * the plate in both units, so the resolved event's kilograms and pounds describe one setting.
+ */
+export const TECHNICIAN_RETURN_LOAD_FRACTION = 0.75;
 
 /** What bringing a works-held car back for the day costs — the design's `zone` figure, 2 u. */
 export const BRING_BACK_UNITS = 2;
@@ -124,7 +138,18 @@ export interface CampaignIncidentOption {
    * The car this option puts back in service, and how long after the answer. `undefined` for an
    * option whose whole effect is that nothing changes.
    */
-  readonly returns?: { readonly car: CarRef; readonly afterS: number } | undefined;
+  readonly returns?:
+    | {
+        readonly car: CarRef;
+        readonly afterS: number;
+        /**
+         * The rating the car comes back at, when it comes back derated (§ D524) — both units, from
+         * the plate, so the resolved event carries the same setting the config would. `undefined`
+         * for a car that returns at its plate.
+         */
+        readonly derate?: { readonly ratedLoadLb: number; readonly ratedLoadKg: number } | undefined;
+      }
+    | undefined;
 }
 
 export interface CampaignIncident {
@@ -155,6 +180,7 @@ export function campaignIncidentOf(input: CampaignIncidentInput): CampaignIncide
     const car = eventCarChoice(event.effect, input.building).derateCars[0];
     if (car === undefined) return undefined;
     const atS = Math.round(BREAKDOWN_AT_FRACTION * input.runLengthS);
+    const derate = technicianDerateOf(input.building, car);
     return {
       eventId: 'breakdown',
       title: `Car ${car.carId} failed its safety check`,
@@ -166,9 +192,12 @@ export function campaignIncidentOf(input: CampaignIncidentInput): CampaignIncide
           id: 'technician',
           label: 'Call the technician out now',
           units: TECHNICIAN_UNITS,
-          when: `the car is back ${String(Math.round(TECHNICIAN_CALLOUT_S / 60))} minutes after you say so`,
+          when:
+            derate === undefined
+              ? `the car is back ${String(Math.round(TECHNICIAN_CALLOUT_S / 60))} minutes after you say so`
+              : `the car is back ${String(Math.round(TECHNICIAN_CALLOUT_S / 60))} minutes after you say so, cleared to run at three quarters of its plated load for the rest of the day`,
           effect: 'Overtime, paid from this building’s purse. Until they arrive the queue is whatever the other cars can clear.',
-          returns: { car, afterS: TECHNICIAN_CALLOUT_S },
+          returns: { car, afterS: TECHNICIAN_CALLOUT_S, ...(derate === undefined ? {} : { derate }) },
         },
         {
           id: 'leave',
@@ -220,6 +249,26 @@ export function campaignIncidentOf(input: CampaignIncidentInput): CampaignIncide
   return undefined;
 }
 
+/**
+ * The rating the technician clears a red-tagged car to run at, from the car's plate — or
+ * `undefined` when the building in hand carries no plate for it (a grown config leaving
+ * `ratedLoadLb` to its class default; every `ResolvedBuilding` carries both figures, so the shipped
+ * path always derates). Rounded to the pound and the kilogram, the units the plate is stated in.
+ */
+function technicianDerateOf(
+  building: BankedBuilding,
+  car: CarRef,
+): { readonly ratedLoadLb: number; readonly ratedLoadKg: number } | undefined {
+  const plate = building.banks
+    .find((bank) => bank.id === car.bankId)
+    ?.cars.find((candidate) => candidate.id === car.carId);
+  if (plate?.ratedLoadLb === undefined || plate.ratedLoadKg === undefined) return undefined;
+  return {
+    ratedLoadLb: Math.round(plate.ratedLoadLb * TECHNICIAN_RETURN_LOAD_FRACTION),
+    ratedLoadKg: Math.round(plate.ratedLoadKg * TECHNICIAN_RETURN_LOAD_FRACTION),
+  };
+}
+
 /** Why an answer cannot be given now, or the change it appends. */
 export type AnswerComposition =
   | { readonly kind: 'change'; readonly change: InterventionChange }
@@ -257,8 +306,21 @@ export function answerChangeOf(
     change: {
       kind: 'answer-incident',
       option: option.label,
+      // In service first, then derated, at one instant: the kernel fires the two in this order, so
+      // the car re-enters the group and is rated down before the bank's next decision reads it.
       serviceEvents: [
         { atS: backAtS, bankId: option.returns.car.bankId, carId: option.returns.car.carId, mode: 'in-service' },
+        ...(option.returns.derate === undefined
+          ? []
+          : [
+              {
+                atS: backAtS,
+                bankId: option.returns.car.bankId,
+                carId: option.returns.car.carId,
+                ratedLoadLb: option.returns.derate.ratedLoadLb,
+                ratedLoadKg: option.returns.derate.ratedLoadKg,
+              },
+            ]),
       ],
     },
   };

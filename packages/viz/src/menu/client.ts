@@ -266,6 +266,13 @@ export interface BoardEntry {
    * reads it off its own replay — see `packages/server/src/store/store.ts#EntryRow.legs`.
    */
   readonly legs: number | undefined;
+  /**
+   * The dispatcher this row ran **as the house** — a baseline the server seeded so a new player never
+   * meets an empty board (GitHub issue #222, § D521) — or absent on a row a player posted. On the
+   * wire rather than inferred from a display name, which a player could choose. A screen draws the
+   * marker and the note off this field and never treats the row as the player's own.
+   */
+  readonly baselineProfileId?: string | undefined;
   readonly submittedAtMs: number;
 }
 
@@ -623,9 +630,12 @@ function isDailyFixture(value: unknown): value is DailyFixture {
 function withLegs(entry: unknown): BoardEntry {
   const record = entry as Record<string, unknown>;
   const legs = record['legs'];
+  const baseline = record['baselineProfileId'];
   return {
     ...record,
     legs: typeof legs === 'number' && Number.isFinite(legs) ? legs : undefined,
+    // A non-empty string names the house's dispatcher; anything else is a player's row.
+    baselineProfileId: typeof baseline === 'string' && baseline.length > 0 ? baseline : undefined,
   } as unknown as BoardEntry;
 }
 

@@ -120,6 +120,11 @@ import type {
   ResolvedServiceEvent,
 } from '../config/types.js';
 import {
+  describeServiceEvent,
+  isServiceModeEvent,
+  isServiceRangeEvent,
+} from '../config/serviceEvent.js';
+import {
   CapacityReassignmentMonitor,
   DISPATCH_DEFAULTS,
   callCarriesCredential,
@@ -724,6 +729,15 @@ export class Simulation {
   readonly #accessRefusedLegs = new Set<string>();
   /** Journeys ended by an access refusal. See {@link ConservationAudit.accessRefused}. */
   readonly #accessRefusedJourneys = new Set<string>();
+  /** Legs stranded by a bank's range moving. See {@link #strand}. */
+  readonly #strandedLegs = new Set<string>();
+  /**
+   * Whether any range event has fired yet. Gates {@link #admit}'s stranding check, so a run whose
+   * building schedules no range change takes exactly the path it took before § D523 — including
+   * `#openCalls`' routing-failure throw, which is still the right answer for a trace that planned a
+   * route the as-built building cannot fly.
+   */
+  #rangeMoved = false;
 
   #ran = false;
 
@@ -1197,6 +1211,7 @@ export class Simulation {
       ...(this.#accessRefusedLegs.size === 0
         ? {}
         : { accessRefusedLegs: this.#accessRefusedLegs.size }),
+      ...(this.#strandedLegs.size === 0 ? {} : { strandedLegs: this.#strandedLegs.size }),
     });
   }
 
@@ -1360,7 +1375,7 @@ export class Simulation {
       if (event.atS > this.#deadlineS) {
         this.#deadlineTruncations += 1;
         this.#warnings.push(
-          `serviceEvents[${index}] would set car "${event.bankId}-${event.carId}" to "${event.mode}" at ${event.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and the car's mode is unchanged by it.`,
+          `serviceEvents[${index}] would ${describeServiceEvent(event)} at ${event.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and the building is unchanged by it.`,
         );
         continue;
       }
@@ -1402,21 +1417,48 @@ export class Simulation {
       for (const effect of entry.change.serviceEvents) {
         if (effect.atS < entry.atS) {
           this.#warnings.push(
-            `interventions[${index}] answers an incident at ${entry.atS} s with an effect setting car "${effect.bankId}-${effect.carId}" to "${effect.mode}" at ${effect.atS} s — before the answer itself. An answer cannot reschedule the past (contract § 1.4's prefix is bit-identical by construction), so this effect was not scheduled.`,
+            `interventions[${index}] answers an incident at ${entry.atS} s with an effect that would ${describeServiceEvent(effect)} at ${effect.atS} s — before the answer itself. An answer cannot reschedule the past (contract § 1.4's prefix is bit-identical by construction), so this effect was not scheduled.`,
           );
           continue;
         }
         if (effect.atS > this.#deadlineS) {
           this.#deadlineTruncations += 1;
           this.#warnings.push(
-            `interventions[${index}]'s incident answer would set car "${effect.bankId}-${effect.carId}" to "${effect.mode}" at ${effect.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and the car's mode is unchanged by it.`,
+            `interventions[${index}]'s incident answer would ${describeServiceEvent(effect)} at ${effect.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and the building is unchanged by it.`,
           );
+          continue;
+        }
+        if (isServiceRangeEvent(effect)) {
+          // A range effect names a bank and floors; the model refuses an unknown bank, an unknown
+          // floor or a double-deck bank when it fires, with the same words `resolveBuilding` uses,
+          // and a building's own schedule gets that check at config time. Kept to the two facts
+          // this method can check without the model: the bank exists and the set is non-empty.
+          if (this.#building.bankById(effect.bankId) === undefined) {
+            throw new SimulationError(
+              `interventions[${index}]'s incident answer moves the range of bank "${effect.bankId}", which this run did not build. Known banks: ${this.#building.banks.map((bank) => bank.id).join(', ')}.`,
+            );
+          }
+          if (effect.servesFloors.length === 0) {
+            throw new SimulationError(
+              `interventions[${index}]'s incident answer would set bank "${effect.bankId}" to serve no floors, which is a car out of service wearing a different name; say that instead.`,
+            );
+          }
+          events.push(effect);
           continue;
         }
         if (!this.#carsById.has(`${effect.bankId}-${effect.carId}`)) {
           throw new SimulationError(
             `interventions[${index}]'s incident answer names car "${effect.carId}" in bank "${effect.bankId}", which this run did not build. Known cars: ${[...this.#carsById.keys()].join(', ')}.`,
           );
+        }
+        if (!isServiceModeEvent(effect)) {
+          if (!Number.isFinite(effect.ratedLoadKg) || effect.ratedLoadKg <= 0) {
+            throw new SimulationError(
+              `interventions[${index}]'s incident answer would rate car "${effect.bankId}-${effect.carId}" at ${String(effect.ratedLoadKg)} kg, which is not a positive load.`,
+            );
+          }
+          events.push(effect);
+          continue;
         }
         // The mode against the declared vocabulary, for the reason the kind check gives one
         // level up: `Car.setMode` stores whatever string it is handed, and every later
@@ -1495,12 +1537,20 @@ export class Simulation {
         `Service event ${index} is not in the schedule of building "${this.#resolved.id}".`,
       );
     }
+    if (isServiceRangeEvent(event)) {
+      this.#onRangeChange(event.bankId, event.servesFloors, at);
+      return;
+    }
     const car = this.#carsById.get(`${event.bankId}-${event.carId}`);
     /* c8 ignore next 5 -- resolveBuilding located this car against the same banks. */
     if (car === undefined) {
       throw new SimulationError(
         `Service event ${index} names car "${event.carId}" in bank "${event.bankId}", which this run did not build.`,
       );
+    }
+    if (!isServiceModeEvent(event)) {
+      this.#onDerate(car, event.ratedLoadKg, at);
+      return;
     }
 
     const released = new Set<string>();
@@ -1532,6 +1582,186 @@ export class Simulation {
       }
     }
     this.#dispatchBank(car.bankId, at);
+  }
+
+  /**
+   * **A car's rated load changes** (GitHub issue #346, § D523) — the second of the three things a
+   * service event can do.
+   *
+   * {@link Car.derate} is the authority on what moves — the controller's rating, and with it the
+   * design load, the bypass and the alarm — and hands back the hall calls the car now bypasses, if
+   * the new rating puts it at or past its bypass threshold with what it is already carrying. Those
+   * take {@link #reofferCall}'s path, the same one a load-sensor trip and a mode change take,
+   * because it is the same problem: work committed to a car that will not do it. Then the bank
+   * re-decides, since every car's room has changed and the group's next choice should know it.
+   *
+   * Nothing aboard is disturbed. A car already past its new design load carries its riders to
+   * their floors and admits nobody until somebody alights, which is *finish the leg* for a derate.
+   */
+  #onDerate(car: Car, ratedLoadKg: number, at: SimTime): void {
+    for (const call of car.derate(ratedLoadKg)) {
+      const active = this.#activeCalls.get(call.id);
+      if (active === undefined) continue;
+      this.#noteRefusal(active, car.id, 'derated');
+      this.#reofferCall(car, active, at);
+    }
+    this.#dispatchBank(car.bankId, at);
+  }
+
+  /**
+   * **A bank's service range changes** (GitHub issue #346, § D523) — the third thing a service
+   * event can do, and the one with a design question in it.
+   *
+   * ## The rule: finish the leg, then withdraw
+   *
+   * The issue names three candidates — *finish the leg then withdraw*, *withdraw at the next stop*,
+   * *refuse the change while a leg is in flight* — and this is the first. A car carrying somebody
+   * to a floor that has just left the range still stops there and lets them off: their car call
+   * stands, `Car.shaft` still knows the floor, and nothing here touches either. What the bank stops
+   * doing is *answering* — `Bank.servesFloor` says no from this instant, so no new call is opened
+   * for a leg the range cannot serve and `#carCanCarry` refuses to board one. The second candidate
+   * would carry a rider past their floor to somewhere they did not ask for, which is a delivery
+   * that is not one; the third would make a scheduled closure conditional on traffic, so two runs
+   * of the same building would close the lobby at different instants. Both are worse on the stage
+   * than on paper: a player watching would see a car sail past a lit landing, or a closure that
+   * did not happen when the clock said.
+   *
+   * ## What happens to the people already standing there
+   *
+   * Three groups, handled in order, and the order is load-bearing for the reason `#abandon` gives:
+   * every predicate downstream must see a landing that no longer contains a rider it has stranded.
+   *
+   * 1. **Calls the new range cannot serve are retired.** A call of this bank at a floor it no
+   *    longer serves, or — under destination dispatch — for a destination it no longer serves, is
+   *    taken back through the lifecycle's `cancel` exit and released from every car holding it, so
+   *    no car keeps a stop for a landing the bank has left.
+   * 2. **Waiters are re-examined, floor by floor in floor order.** A promise to one of this bank's
+   *    cars that the bank can no longer honour is revoked (§ D29's one revocation ground, a fact
+   *    about the fabric rather than the score). Then anybody whom **no** bank serving their landing
+   *    can carry is **stranded** — {@link #strand} — and everybody else has their calls re-opened by
+   *    `#openCalls`, which puts a rider a second bank can still carry onto that bank's call.
+   * 3. **Every bank touched re-decides.** The moved bank always; any bank that gained a call too.
+   *
+   * A widening — the lobby reopening — takes the same path and retires nothing: no call becomes
+   * unservable, no waiter is stranded, and `#openCalls` opens the bank's calls at the floors it
+   * has regained.
+   *
+   * ## What is deliberately not done
+   *
+   * **No route is re-planned.** The trace planned every journey against the as-built topology
+   * (`traffic/route.ts`), and a rider whose plan the change breaks is stranded where it breaks
+   * rather than re-routed through a bank the planner did not choose — a G → 40 rider whose
+   * express lost 40 stands at G and is stranded there even where a local could have taken them via
+   * the sky lobby. Re-planning would make the trace a function of the schedule, so two arms of a
+   * paired comparison would no longer share passenger traces (CLAUDE.md, common random numbers),
+   * and the rule this repository runs on is that the trace is fixed and the run is what varies.
+   * The count published beside the mean is the honest measure of what the closure cost.
+   */
+  #onRangeChange(bankId: string, servesFloors: readonly string[], at: SimTime): void {
+    const bank = this.#building.bankById(bankId);
+    /* c8 ignore next 5 -- resolveBuilding located this bank against the same building. */
+    if (bank === undefined) {
+      throw new SimulationError(
+        `A range event names bank "${bankId}", which building "${this.#resolved.id}" did not build.`,
+      );
+    }
+    const before = new Set(bank.servesFloors);
+    this.#building.setBankServesFloors(bankId, servesFloors);
+    this.#rangeMoved = true;
+    const after = new Set(servesFloors);
+
+    // 1. Calls the new range cannot serve.
+    for (const active of [...this.#activeCalls.values()]) {
+      if (active.bankId !== bank.id) continue;
+      const servable =
+        bank.servesFloor(active.floorId) &&
+        (active.destinationFloorId === undefined || bank.servesFloor(active.destinationFloorId));
+      if (servable) continue;
+      this.#withdrawCall(active, at);
+    }
+
+    // 2. Waiters, in floor order — `#building.floors` is floor order, so the stranding sequence,
+    //    and with it every `(time, sequenceNumber)` this fires, is a property of the config.
+    const touched = new Set<string>([bank.id]);
+    for (const floor of this.#building.floors) {
+      if (!before.has(floor.id) && !after.has(floor.id)) continue;
+      for (const passenger of [...floor.waiting()]) {
+        const promisedCarId = passenger.assignedCarId;
+        if (
+          promisedCarId !== undefined &&
+          this.#carsById.get(promisedCarId)?.bankId === bank.id &&
+          !(bank.servesFloor(floor.id) && this.#bankCanCarry(bank, passenger))
+        ) {
+          this.#dischargePromise(promisedCarId, floor.id, passenger.massKg);
+          passenger.releasePromise(at);
+          this.#recorder.releaseAssignment(passenger, at);
+          this.#promisesRevoked += 1;
+        }
+        if (this.#strandedBy(floor, passenger)) this.#strand(passenger, at);
+      }
+      for (const touchedBankId of this.#openCalls(floor, at)) touched.add(touchedBankId);
+    }
+
+    // 3. Everybody re-decides.
+    for (const touchedBankId of touched) this.#dispatchBank(touchedBankId, at);
+  }
+
+  /**
+   * Whether a rider standing at (or arriving at) this landing has nowhere to go **because a range
+   * moved**: no bank serving the landing can carry them now, some bank whose range has moved could
+   * have as built, and the kiosk is not the thing refusing them. The third clause keeps the bare
+   * kiosk's refusal its own outcome (`#kioskAllows`); the second attributes the stranding to the
+   * schedule rather than to a trace that planned a route the as-built building could never fly,
+   * which stays the routing failure `#openCalls` throws for.
+   */
+  #strandedBy(floor: Floor, passenger: Passenger): boolean {
+    if (!this.#kioskAllows(passenger)) return false;
+    if (this.#building.banksServing(floor.id).some((bank) => this.#bankCanCarry(bank, passenger))) {
+      return false;
+    }
+    return this.#building.banks.some(
+      (bank) =>
+        bank.rangeMoved &&
+        bank.declaredFloors.includes(floor.id) &&
+        bank.declaredFloors.includes(passenger.destinationFloorId),
+    );
+  }
+
+  /**
+   * **A rider the fabric left behind** (GitHub issue #346, § D523): the bank's range moved and no
+   * bank serving their landing reaches their destination any more. A fifth outcome, on the footing
+   * `#refuseAccess` put the fourth on — neither delivered, nor waiting, nor abandoned, nor refused,
+   * and each of those would be a different lie: *waiting* would run their censored wait past the
+   * horizon and suppress the mean of every run that closed a lobby; *abandoned* would report riders
+   * giving up under a run that declares no patience; *refused* would send a reader to the access
+   * zoning for a fault in the range.
+   *
+   * Off the landing first, so every predicate downstream sees a queue without them; then out of the
+   * books — the promise they held is voided (counted in `promisesRevoked`, released in the record),
+   * the leg is recorded stranded, and any call at the floor with nobody eligible left behind it is
+   * withdrawn. A rider not yet on the landing — a fresh arrival `#admit` turns away — takes the same
+   * path with nothing to remove. The count is published as `ConservationAudit.stranded` and
+   * `StageActivity.strandedLegs`, beside the mean their absence flatters (§ D106).
+   */
+  #strand(passenger: Passenger, at: SimTime): void {
+    const floor = this.#building.requireFloor(passenger.originFloorId);
+    const wasWaiting = floor.removeWaiting(passenger);
+    this.#strandedLegs.add(passenger.id);
+    if (passenger.assignedCarId !== undefined) {
+      this.#dischargePromise(passenger.assignedCarId, passenger.originFloorId, passenger.massKg);
+      this.#promisesRevoked += 1;
+    }
+    // The recorder clears the promise from the record; the model clears it from the rider.
+    this.#recorder.recordStranding(passenger, at);
+    passenger.releasePromise(at);
+    if (!wasWaiting) return;
+    for (const active of this.#callsAtFloor(passenger.originFloorId)) {
+      const bank = this.#building.bankById(active.bankId);
+      if (bank === undefined) continue;
+      if (this.#eligibleWaiting(bank, active).count > 0) continue;
+      this.#withdrawCall(active, at);
+    }
+    this.#syncButton(passenger.originFloorId, passenger.direction);
   }
 
   /** The waiters of this call whom the panel promised to this car. Empty conventionally. */
@@ -1852,6 +2082,7 @@ export class Simulation {
     // The leg carries its own `arrivedAt`; there is no second clock to pass in, and a runner
     // that supplied one could put the record and the model a fraction of a second apart.
     this.#recorder.recordArrival(passenger);
+    const floor = this.#building.requireFloor(passenger.originFloorId);
     // Recorded first and turned away second, deliberately: the person walked to the lift, and a
     // record that omitted them would make the refusal invisible to every count taken over the
     // record — which is exactly the shortfall `ConservationAudit.stairsJourneys` exists to stop
@@ -1860,8 +2091,15 @@ export class Simulation {
       this.#refuseAccess(passenger);
       return;
     }
+    // Recorded and then stranded, for the refusal's reason: the person walked to the lift. Gated
+    // on a range having moved so a building that schedules none takes the path it always took —
+    // and there `#openCalls` still throws for a route nobody could ever have flown.
+    if (this.#rangeMoved && this.#strandedBy(floor, passenger)) {
+      this.#strand(passenger, passenger.arrivedAt);
+      return;
+    }
     this.#observeArrival(passenger);
-    this.#building.requireFloor(passenger.originFloorId).addWaiting(passenger);
+    floor.addWaiting(passenger);
     this.#armPatience(passenger);
   }
 
@@ -1963,7 +2201,9 @@ export class Simulation {
   #onPatienceExpired(legId: string, at: SimTime): void {
     const passenger = this.#legs.get(legId);
     if (passenger === undefined) return;
-    if (passenger.hasBoarded || this.#abandonedLegs.has(legId)) return;
+    if (passenger.hasBoarded || this.#abandonedLegs.has(legId) || this.#strandedLegs.has(legId)) {
+      return;
+    }
     this.#abandon(passenger, at);
   }
 
@@ -4232,6 +4472,11 @@ export class Simulation {
     return (
       car.acceptsHallCalls &&
       car.shaft.floorsById.has(passenger.destinationFloorId) &&
+      // The shaft is the hardware and knows every as-built floor; the bank's range is what the
+      // bank *answers* now, and a range event may have narrowed it (§ D523). A car may still stop
+      // at a floor outside the range to let somebody off — that is `Car.alight`'s business, not
+      // this predicate's — but it boards nobody for one.
+      (this.#building.bankById(car.bankId)?.servesFloor(passenger.destinationFloorId) ?? true) &&
       isAccessPermitted(car.shaft, passenger.credentialGroup, passenger.destinationFloorId) &&
       this.#deckAllows(car, passenger) &&
       this.#kioskAllows(passenger)
@@ -4677,6 +4922,17 @@ export class Simulation {
       );
     }
 
+    /*
+     * The range change's own casualties, said out loud once, for the same reason (§ D523): a
+     * stranded rider opened no call that is still live, the landing around them was collected or
+     * emptied, and the only other trace of them is a count in `conservation.stranded`.
+     */
+    if (this.#strandedLegs.size > 0) {
+      this.#warnings.push(
+        `${String(this.#strandedLegs.size)} leg(s) were stranded by a scheduled range change: a serviceEvents entry moved a bank's served floors and, from that instant, no bank serving their landing reached the floor they were going to, so no car could be sent and they left. They are counted in conservation.stranded and in stageActivity.strandedLegs, and they are neither delivered nor waiting — read the count beside the mean, because every per-leg figure this run reports is taken over the riders the building could still carry, and a building that strands more people reports a shorter wait for exactly that reason (DECISIONS.md § D106's rule, one axis over; § D523). No dispatcher setting reaches this: the fix is the schedule, or the building's service zoning.`,
+      );
+    }
+
     for (const [callId, reasons] of this.#unservable) {
       const active = this.#activeCalls.get(callId);
       if (active === undefined) continue;
@@ -4752,6 +5008,7 @@ export class Simulation {
     let delivered = 0;
     let abandoned = 0;
     let accessRefused = 0;
+    let stranded = 0;
 
     // Which car took each leg, so an undelivered rider can be named with the car it is in.
     const carOfLeg = new Map<string, string>();
@@ -4847,6 +5104,13 @@ export class Simulation {
         accessRefused += 1;
         continue;
       }
+      // **A rider the fabric left behind is a fifth outcome** (§ D523), out of `undelivered` for
+      // the refusal's reason: they are in no queue and no car, and a run that closed its sky lobby
+      // on schedule did not fail to drain.
+      if (this.#strandedLegs.has(last.id)) {
+        stranded += 1;
+        continue;
+      }
 
       const reason: UndeliveredReason = last.hasAlighted
         ? 'transferring'
@@ -4880,9 +5144,9 @@ export class Simulation {
         `${legsCreated} legs were created but ${legsRecorded} reached the recorder; the difference is invisible to every metric`,
       );
     }
-    if (delivered + undelivered.length + abandoned + accessRefused !== generated) {
+    if (delivered + undelivered.length + abandoned + accessRefused + stranded !== generated) {
       problems.push(
-        `${generated} journeys were generated but ${delivered} were delivered, ${undelivered.length} accounted for as undelivered, ${abandoned} as abandoned and ${accessRefused} as refused for want of a credential`,
+        `${generated} journeys were generated but ${delivered} were delivered, ${undelivered.length} accounted for as undelivered, ${abandoned} as abandoned, ${accessRefused} as refused for want of a credential and ${stranded} as stranded by a range change`,
       );
     }
 
@@ -4963,7 +5227,10 @@ export class Simulation {
      * would fail its own conservation audit for a reason that is not a defect. Zero on every
      * building that declares no `accessZones`.
      */
-    const promisableLegs = legsCreated - abandonedLegs - this.#accessRefusedLegs.size;
+    // A stranded leg is netted out too (§ D523): its promise, if it held one, was voided at the
+    // stranding and counted in `promisesRevoked`, so it is neither promisable nor in force.
+    const promisableLegs =
+      legsCreated - abandonedLegs - this.#accessRefusedLegs.size - this.#strandedLegs.size;
     if (this.#panelAssigns && undelivered.length === 0 && promisesInForce !== promisableLegs) {
       problems.push(
         `${promisableLegs} legs were created and not abandoned and every journey was delivered, but ${promisesInForce} promises were in force at the end (${this.#legsAssigned} made, ${this.#promisesRevoked} revoked, ${this.#promisesAbandoned} voided by abandonment); ${promisableLegs - promisesInForce} boarded without being promised anything`,
@@ -5021,11 +5288,14 @@ export class Simulation {
        * building.
        */
       ...(accessRefused === 0 ? {} : { accessRefused }),
+      // Present only when a range change actually stranded somebody, for `accessRefused`'s reason
+      // and on its footing (§ D523).
+      ...(stranded === 0 ? {} : { stranded }),
       balanced:
         problems.length === 0 &&
         legsCreated === legsRecorded &&
         this.#wrongCarBoardings === 0 &&
-        delivered + undelivered.length + abandoned + accessRefused === generated,
+        delivered + undelivered.length + abandoned + accessRefused + stranded === generated,
     });
 
     return { audit, undelivered, problems };

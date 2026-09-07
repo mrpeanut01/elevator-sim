@@ -43,7 +43,10 @@ export {
   formatPath,
   issuesFromZodError,
   parseLoadDivisor,
+  serviceDerateEventSchema,
   serviceEventSchema,
+  serviceModeEventSchema,
+  serviceRangeEventSchema,
   trafficProfileSchema,
   trafficProfilesSchema,
   transportModeSchema,
@@ -97,6 +100,12 @@ export {
   resolveBuilding,
   type ResolveBuildingOptions,
 } from './parse.js';
+export {
+  describeServiceEvent,
+  isServiceDerateEvent,
+  isServiceModeEvent,
+  isServiceRangeEvent,
+} from './serviceEvent.js';
 
 /* `./loader.js` is deliberately NOT re-exported here — see this file's header. Node-side
    callers import `loadConfig` from `@elevator-sim/core`, or from `./loader.js` directly. */
@@ -183,8 +192,14 @@ export type {
   ResolvedBank,
   ResolvedBuilding,
   ResolvedCar,
+  ResolvedServiceDerateEvent,
   ResolvedServiceEvent,
+  ResolvedServiceModeEvent,
+  ResolvedServiceRangeEvent,
+  ServiceDerateEventConfig,
   ServiceEventConfig,
+  ServiceModeEventConfig,
+  ServiceRangeEventConfig,
   TrafficProfile,
   TrafficProfiles,
   DirectionalTraversalTime,

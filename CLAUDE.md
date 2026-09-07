@@ -77,15 +77,52 @@ verdict:
   of those were already wrong in the published row — the deep tier's surface count is **31**, not 30,
   because `campaign/judge.ts#judgeStage` speaks in no other tier, and *0 violations* had stopped
   being true of the deep half the day the temporal axis landed. The current figures, **measured on the
-  integrated tree after wave W** against a base that was re-measured first (the habit § D442 set);
+  integrated tree after wave X** against a base that was re-measured first (the habit § D442 set);
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **623 363** | **606** | **57** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **776 588** | **4 710** | **58** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **624 294** | **606** | **57** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **777 728** | **4 710** | **58** | **0** | **green**, and the register is empty |
+
+  **Wave X's move is exactly nineteen strings a case in both tiers, all of it on one adapter, and it
+  is the third time this column has landed on nineteen.** Measured on the integrated tree after
+  wave X, both tiers in one sitting, with the base at `5358c05` re-measured first in a detached
+  worktree — where it reproduced wave W's published row **exactly in both tiers**, the
+  **fourteenth** consecutive wave that has held.
+
+  | | base `5358c05` | wave X | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 623 363 | **624 294** | **+931** | **19.0** |
+  | deep strings | 776 588 | **777 728** | **+1 140** | **19.0** |
+  | surfaces | 57 / 58 | **57 / 58** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **The first corpus case moves by exactly 19, rendered on each tree and diffed by producer, and
+  every one of the nineteen is `gauntlet/ladder.ts#ladderRowsOf`**, the board adapter: two are
+  `BOARD_SCREEN_COPY`'s new keys (the house tag and the house note, iterated generically), and
+  seventeen are the daily board's new `house` state — two house rows and two player rows, each with
+  a driver, a wait and a name, one gap, two world lines and two lines under the table. 2 + 17 = 19,
+  49 × 19 = 931 and 60 × 19 = 1 140. **A wave that changed a core outcome model, a schema and a
+  campaign answer moved this column by a board state and two copy keys**: the technician's new
+  *when* is a substitution on an option the dock adapter already seeded, the beat label's `(house)`
+  form is drawn on no seeded state, and nothing in `core` renders a player-facing string. The
+  stranded count is published in the audit and the stage activity and drawn by no screen yet, which
+  is why the sweep cannot see it and why the ledger says so.
+
+  **The coincidence is worth naming for the third time.** Wave O moved +931 / +1 140 and wave R
+  +980 / +1 200 at nineteen and twenty a case; this is +931 / +1 140 again, on different surfaces for
+  different reasons — fourteen board states plus five keys then, seventeen board strings plus two
+  keys now. Three waves landing on the same integer is arithmetic, and the sentence exists so the
+  next reader does not read it as a copied row.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical,
+  nothing added, nothing removed. The house is a state on the existing board surface, § D489's
+  ruling showing up in the measurement once more. The deep tier's one-surface lead survives and
+  the diff names it: `campaign/judge.ts#judgeStage` is the only surface in deep and not in
+  always-on, and nothing is in always-on and not in deep.
 
   **Wave W's move is 288 strings a case to within a fraction in both tiers, and one surface, and the
   fraction is the door.** Measured on the integrated tree after wave W, both tiers in one sitting,

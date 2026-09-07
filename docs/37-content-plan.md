@@ -258,8 +258,9 @@ content declares:
 
 ### 5.1 The wrinkle library (#159) — the case that made the rule necessary
 
-§ 17 names six wrinkle kinds. Checked against the engine, **four are fully authorable and two are
-authorable only in their all-day form:**
+§ 17 names six wrinkle kinds. Checked against the engine, **four were fully authorable and two were
+authorable only in their all-day form when this section was written; all six are authorable since
+GitHub issue #346 landed ([§ D523](../DECISIONS.md)):**
 
 | wrinkle kind | field | verdict |
 |---|---|---|
@@ -267,14 +268,17 @@ authorable only in their all-day form:**
 | a floor's occupancy spiked | `FloorConfig.population` | **passes** |
 | a timed arrival burst (coaches, caterers, a fire drill) | `demandTemplates[].phases` intensity arc; a coach is `batchSize.mean` + `batchSharesDestination`; a drill read as *cars into recall* rather than *people arriving* is `serviceEvents` + `ServiceMode 'fire-recall'` | **passes**, with a bound: phase intensity is `[0, 1]` and a template may not raise the building's rate, so a burst is authored by lowering the baseline rather than raising the peak |
 | doors slowed on one car | `CarConfig.doorOpenS`, `doorCloseS`, `dwellCarCallS`, `dwellHallCallS` — per car, and every one of them overridable | **passes** |
-| a sky lobby closed | `BankConfig.servesFloors` | **all-day only.** `serviceEvents` moves a car's `mode`, never a bank's service range — *closed from 12:00* is **blocked (a)** |
-| capacity derated | `CarConfig.ratedLoadLb` | **all-day only**, same reason — a mid-run derate is **blocked (a)** |
+| a sky lobby closed | `BankConfig.servesFloors` all day; a `serviceEvents` **range entry** (`{ atS, bankId, servesFloors }`) from an instant | **passes** since #346 (§ D523). The entry replaces the bank's served set; a car mid-leg finishes it, and a rider no bank can now carry is **stranded**, a fifth outcome published beside AWT as `conservation.stranded` and never folded into the mean. *Closed from 12:00* was **blocked (a)** until then |
+| capacity derated | `CarConfig.ratedLoadLb` all day; a `serviceEvents` **derate entry** (`{ atS, carId, ratedLoadLb }`) from an instant | **passes** since #346 (§ D523). The design load, the bypass and the alarm move with the rating; the counterweight does not. A mid-run derate was **blocked (a)** until then |
 
-**So #159 is four-sixths authorable today, and the one engine capability it needs is nameable in a
-sentence:** *a service event that changes a car's or a bank's service range and rated load, not only
-its service mode.* That is the issue #159 must open and schedule before it can build the
-mid-run half of its library, and it is exactly the shape of thing CR-4 exists to force into the open
-before twenty templates have been authored against it.
+**So #159 is six-sixths authorable today.** The one engine capability it needed was nameable in a
+sentence — *a service event that changes a car's or a bank's service range and rated load, not only
+its service mode* — and that sentence became GitHub issue #346, built under § D523, whose first
+shipped writer is the campaign technician bringing a red-tagged car back derated (§ D524). Where the
+library's own route into a run lives is still #159's question and § D523 does not answer it:
+`EventEffect` gained no field, because nothing in `shift/` writes a range or a derate yet, and a
+field nothing writes is the dead seam `shift/types.ts` warns about in advance. What #159 authors
+against is now a choice between two live paths rather than a wait on a missing one.
 
 ### 5.2 The fix-case catalogue (#233) — six of twenty-six are blocked, and four more only by a schema
 
@@ -484,7 +488,7 @@ nothing a display name does not already buy them.
 | **#233** — expand Fix a building | **AC1 target: 44 cases** (§ 4.2, from § 10.6's own catalogue of 26). **Do the schema widening first** (§ 5.2): `FixitCase.run`'s three fields reach the demand *level* and not its *shape*, which blocks four catalogue cases for a `fixit/` reason rather than an engine one. **Six of the 26 are blocked outright** and § 5.2 names all ten and the check that confirms the classification. So the realistic first tranche is **16**, not 26. **AC4** is already specified — `docs/33` § 5.3's DC-7 bands, and new cases take a band rather than an index. **Plus the disclosure paragraph** § 7.3 says is owed |
 | **#249** — publish a content cadence | **The honest input, which is not the one the issue expects.** At the § 4.1 rate a median player consumes ~40 min a week; one fix case is 7.67 min. **A cadence cannot be justified as content replacement** — a weekly case replaces a sixth of a week's play — so it must be justified as *a reason to return*, which is a different design argument and belongs in #249 rather than here. What this document does give it: the per-type authoring costs in § 6 (285 lines a fix case today), so the cadence is set by what the pipeline sustains rather than by ambition |
 | **#158** — the two proof-case buildings | **Resolved: option 1, author them** (§ 7.3), with the deadline condition — **before the daily board ships**, after which option 2 becomes the only honest exit and must be recorded rather than applied to the vendored file. #158's own option 2 as worded (*amend § 12.3*) is **unavailable**; § 7.3 says why and what replaces it |
-| **#159** — the wrinkle library | **Target: 20 templates** (§ 4.3, its own figure). **Four of its six named kinds are authorable today and two are all-day only** (§ 5.1); the one engine capability it needs is named in a sentence and must be opened as its own issue. **#159 is on #249's critical path** — § 4.2's finite targets reach 8.87 h and the quarter needs up to 10.8; the daily rotation is what covers the difference, and it does not exist |
+| **#159** — the wrinkle library | **Target: 20 templates** (§ 4.3, its own figure). **All six of its named kinds are authorable today** (§ 5.1; two were all-day only until #346 landed under § D523); the route the library takes into a run is the question it still has to settle. **#159 is on #249's critical path** — § 4.2's finite targets reach 8.87 h and the quarter needs up to 10.8; the daily rotation is what covers the difference, and it does not exist |
 | **#235** — traffic realism | Unchanged by this document. § 5.3 records that patience, lobby crowding and the stairs metrics have landed in `core` and that what blocks content using them is the content schemas, not the engine |
 
 ---

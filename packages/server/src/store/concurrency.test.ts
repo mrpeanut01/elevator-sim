@@ -107,6 +107,35 @@ const REMEDIES: Readonly<Record<string, readonly Remedy[]>> = Object.freeze({
     },
   ],
 
+  '#ensureHouseUser': [
+    {
+      risks: ['unique'],
+      remedy: 'arbitrated-by-the-write',
+      because:
+        'One statement, `INSERT … ON CONFLICT (id) DO NOTHING`, run on every open (§ D521). The house’s ' +
+        'id is fixed, so two containers starting at once both insert and the second is a no-op arbitrated ' +
+        'by the clause rather than by a pre-read. The other two unique keys are stated rather than ' +
+        'mapped: the address is under `.invalid`, which no sign-in link can reach, so `users_email_key` ' +
+        'cannot fire against a player; and `LOWER(display_name)` fires only if a player took the house’s ' +
+        'name before the first open on this code, in which case the open **throws** and the operator ' +
+        'sees it, which is the right answer — a mapped `23505` here would boot a server whose seed route ' +
+        'then fails every night on a foreign key. After the first open the house holds the name and ' +
+        '`setDisplayName` refuses it to players by the mapped path above.',
+      player:
+        'Nothing on any route: the row exists before the first request is served. On a board, rows ' +
+        'marked `house` under a name no player can take.',
+    },
+    {
+      risks: ['cascade'],
+      remedy: 'nothing-can-fire',
+      because:
+        'It inserts a row rather than reading one, on `createUser`’s ground. The house is never deleted ' +
+        'by any member — `deleteUser` takes an id a session resolved, and the house has no session — so ' +
+        'the cascade on its children is a fact about the schema and not a race this write can lose.',
+      player: 'Unchanged: no request reaches this write, and no board row moves because of it.',
+    },
+  ],
+
   setDisplayName: [
     {
       risks: ['unique'],

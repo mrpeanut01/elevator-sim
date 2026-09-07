@@ -21,6 +21,7 @@ import {
   type CallType,
   type DispatcherProfile,
   type LoadedConfig,
+  isServiceModeEvent,
 } from '@elevator-sim/core';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -529,6 +530,10 @@ describe('the service-mode axis', () => {
         for (const car of bank.cars) if (car.mode !== undefined) seen.add(car.mode);
       }
       for (const event of entry.building.serviceEvents ?? []) {
+        // The generator authors mode events only; a range or derate entry here would be a
+        // generator change this test has not been told about.
+        expect(isServiceModeEvent(event)).toBe(true);
+        if (!isServiceModeEvent(event)) continue;
         seen.add(event.mode);
         if (event.bankId === undefined) unqualified += 1;
         else qualified += 1;
@@ -573,6 +578,7 @@ describe('the service-mode axis', () => {
       check('at t=0');
 
       for (const event of entry.building.serviceEvents ?? []) {
+        if (!isServiceModeEvent(event)) continue;
         const holder = entry.building.banks.find(
           (bank) =>
             (event.bankId === undefined || bank.id === event.bankId) &&

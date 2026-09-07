@@ -483,9 +483,10 @@ export type InterventionChange =
       /** The chosen option's player-facing words, for the stamp and the report. Never an id. */
       readonly option: string;
       /**
-       * The option's effect: service-mode changes, every car located, each at or after the
-       * answer's own `atS`. Empty is legal — an answer whose effect is reassurance alone still
-       * belongs on the record, because the stamp is the point.
+       * The option's effect: service events — a car's mode, a bank's range or a car's rated load
+       * (§ D523) — every car and bank located, each at or after the answer's own `atS`. Empty is
+       * legal — an answer whose effect is reassurance alone still belongs on the record, because the
+       * stamp is the point.
        */
       readonly serviceEvents: readonly ResolvedServiceEvent[];
     };
@@ -967,8 +968,23 @@ export interface ConservationAudit {
   readonly accessRefused?: number;
 
   /**
-   * `generated === delivered + undelivered + (abandoned ?? 0) + (accessRefused ?? 0) &&
-   * legsCreated === legsRecorded`.
+   * Journeys **stranded by a bank's service range moving** (GitHub issue #346, § D523): the rider
+   * was at a landing, or reached one, that no bank could now carry them onward from, because a
+   * scheduled range entry had taken their destination out of every reachable bank's range.
+   *
+   * Absent — not `0` — on every run whose building schedules no range change, for
+   * {@link accessRefused}'s reason, and a published figure for the same reason again: a stranded
+   * rider leaves the lift system, the served-leg count falls with them, and a configuration that
+   * improves its wait by stranding people has not improved anything. Counted in neither
+   * {@link delivered} nor {@link undelivered}; in `WaitStatistics.unservedCount`, since they were
+   * never served; and, if they had already been standing a while, their wait ended at the
+   * stranding and is excluded from the mean exactly as an abandonment's is.
+   */
+  readonly stranded?: number;
+
+  /**
+   * `generated === delivered + undelivered + (abandoned ?? 0) + (accessRefused ?? 0) +
+   * (stranded ?? 0) && legsCreated === legsRecorded`.
    */
   readonly balanced: boolean;
 }
@@ -1161,6 +1177,12 @@ export interface StageActivity {
    * buildings and meaningless on the other three.
    */
   readonly accessRefusedLegs?: number;
+  /**
+   * Legs stranded by a bank's service range moving (§ D523). **Absent, not `0`, when nobody was**,
+   * for {@link accessRefusedLegs}' reason: a key on every run would move every pinned identity
+   * digest to say nothing.
+   */
+  readonly strandedLegs?: number;
 }
 
 /**

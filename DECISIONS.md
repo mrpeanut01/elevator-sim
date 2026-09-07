@@ -34153,3 +34153,190 @@ the instrument in enough detail to build without a second design pass.
 because it asks whether a stage can be won and this asks whether the dropdown can win it; under C2
 that assertion inverts, as § 3.3 predicts. The 45 admitted cells here are without the baseline
 arm; § 3.1's 77 counted the control on every stage.
+
+## D521 — The house seeds a daily board: one replayable run per shipped dispatcher, posted by a reserved account, marked on the row, counted by no ladder
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #222.**
+
+**Context.** *"A leaderboard with nobody on it does not create competitive pull; it creates the
+impression the game has no players."* Every entry in the store requires a user and the table had no
+column telling a seeded row from a player's, so the first thing #222 needed was a row identity, and
+the issue's own re-verification said the choice was between a reserved synthetic user and a
+dedicated column. Both, it turns out: the constraint `entries.user_id NOT NULL REFERENCES users` is
+worth keeping, and a name a player could choose is not an identity.
+
+**Decision.**
+
+1. **A column, nullable, and a reserved account.** Migration 2 adds `entries.baseline_profile_id`,
+   `NULL` on every row a player ever posted and the dispatcher's id on a row the house posted. The
+   house is `users.id = 'house'`, display name *The house*, address under `.invalid` so no sign-in
+   link can ever reach it, inserted on every `Store.open` and idempotent by its fixed id. A baseline
+   goes through `recordEntry` exactly as a player's run does; the column is the one thing that tells
+   them apart, and it is on the wire as `baselineProfileId`.
+2. **A baseline is a run, measured by the verifier's own replay.** `verify.ts#measureRun` is the
+   half of `verifySubmission` with no claim in it, and `leaderboard/seed.ts#seedDailyBoard` runs the
+   day's fixture under every shipped dispatcher through it. A dispatcher whose mean is not quotable
+   is **not posted** and is reported with the verifier's sentence — `nearest-car` on the daily
+   fixture is measured `awtIsValid: false` — because the board would otherwise carry a figure the
+   rest of the project suppresses. A client's *Watch it* replays a house row exactly as it replays a
+   player's.
+3. **The ranking keeps one row per (player, baseline dispatcher); the ladder counts players only.**
+   `Store.board`'s `DISTINCT ON` widens to `(user_id, baseline_profile_id)` so thirteen house runs
+   are thirteen targets rather than one, and `axisObservations` excludes the house, because the
+   world figures' `n` is *players who posted*.
+4. **Said on the row and under the board, and never as a ranking of dispatchers.** The Everyday
+   board tags each house row and draws one note: nobody played these, they are here so the board is
+   never empty, and one crowd, one seed, one run each does not order the dispatchers. The Engineer
+   board appends *(house)* to the name. A house row is never the player's own, whatever the player
+   is called, and carries no gap.
+
+**Consequences.** Idempotent by the store's conflict key: each dispatcher's data hash differs, so a
+second seeding of the same date updates thirteen rows in place, which `seed.test.ts` asserts by
+entry id. What runs it on a clock is § D522.
+
+
+## D522 — A scheduled workflow calls an authenticated seed route: the cheapest of the three shapes, with its cost named
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #328.**
+
+**Context.** Nothing executed on the server when nobody was looking: the API is request-driven and
+runs at `minReplicas: 0`. Board identity rolls over by UTC date, so #222's *seeded when a new board
+opens* is a time and not a request, and #248's *a failure to generate a day raises an alert* has
+nothing to raise it. The issue named three mechanisms and asked for the choice to be made
+deliberately: a scheduled container job, a platform timer, or a scheduled GitHub Actions workflow
+calling an authenticated route.
+
+**Decision.** The third. `.github/workflows/seed-boards.yml` fires at 00:10 UTC daily and on
+dispatch, and calls `POST /api/boards/seed` on the deployed API with a bearer token.
+
+- **The route is gated twice.** A deployment holding no `ELEVATOR_SIM_SEED_TOKEN` answers 503 to
+  everyone: seeding is a capability an operator turns on. With one, the bearer is compared in
+  constant time and a mismatch is 401. The token is a second secret rather than the signing one, so
+  the workflow that holds it can seed a board and do nothing else, and `bootstrap.ts` refuses one
+  shorter than 32 characters because the route runs thirteen simulations.
+- **Synchronous, because the cost was measured.** One replay of the daily fixture is 1.2 to 1.6 s on
+  one worker, so thirteen are about twenty seconds, well inside any ingress timeout, and a route
+  that answers when it is done is one whose failure is a non-200 the caller sees.
+- **Idempotent across a repeated firing**, by the store's conflict key (§ D521), asserted in
+  `seed.test.ts` by entry id; the workflow's `concurrency` group refuses to overlap itself.
+- **Observable where a human will see it.** The workflow fails on a non-200 and on a report that
+  seeded nothing, and prints the response whole, so the log names every row and every skipped
+  dispatcher with the verifier's reason. #242 owns where an alert goes; this is the thing that runs
+  to raise one. A lagging image shows up as a 404 on the route, which is the visibility #328 asked
+  for and the reason the error text says so.
+- **The cost, named.** A secret in CI, outside the deployment boundary. The other two shapes keep it
+  inside and need infrastructure this repository deploys by hand; if the API ever gets a rebuild on
+  push, a platform timer is the shape to move to, and the route stays the same.
+
+**Consequences.** #222 AC5 and #248 AC5 can each name this workflow as their means. What it needs
+before it runs for real is the repository variable `ELEVATOR_SIM_API_ORIGIN`, which the deploy
+already sets, and the secret `ELEVATOR_SIM_SEED_TOKEN` matching the API's environment; unset, the
+workflow refuses to run rather than failing halfway. `docs/16` § 10 is the operator's page.
+
+## D523 — A service event moves a bank's range or a car's rated load; a car finishes the leg it is carrying, and the rider the change leaves without a bank is stranded, a fifth outcome published beside AWT
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #346.**
+
+**Context.** `BuildingConfig.serviceEvents` scheduled one thing, a car's service mode. `docs/37`
+§ 5.1 audited § 17's six wrinkle kinds against the engine and found two authorable only in their
+all-day form, a sky lobby closed and a car derated, because nothing could move `servesFloors` or
+`ratedLoadLb` at a simulated instant. The issue named the substantive design question rather than
+leaving it to the code: what happens to a car mid-journey when its bank's range narrows, and what
+happens to the rider whose destination leaves the served set.
+
+**Decision.** `ServiceEventConfig` is a structural union of three shapes, told apart by the field
+each alone carries (`config/serviceEvent.ts`): the mode entry as before; a **range entry**
+`{ atS, bankId, servesFloors }` that replaces a bank's served set whole; a **derate entry**
+`{ atS, carId, bankId?, ratedLoadLb }` that sets the controller's rated load. The resolved forms
+follow (`ResolvedServiceEvent`), and a resolved building remains a valid `BuildingConfig`
+structurally, so every viz path that handed one to the other still typechecks.
+
+- **Finish the leg, then withdraw.** Of the issue's three candidates, the first. A car carrying
+  somebody to a floor that has just left the range still stops there and lets them off: the shaft is
+  hardware and knows every as-built floor, the rider's car call stands, and `Simulation#onRangeChange`
+  touches neither. What the bank stops doing is *answering*: `Bank.servesFloor` says no from that
+  instant, no call is opened for a leg the range cannot serve, and `#carCanCarry` boards nobody for
+  one. *Withdraw at the next stop* would carry a rider past their floor, which is a delivery that is
+  not one; *refuse the change while a leg is in flight* would make a scheduled closure conditional
+  on traffic, so two runs of one building would close the lobby at different instants. Both are
+  worse on the stage than on paper.
+- **Stranded is a fifth outcome, on the fourth's footing.** A rider standing at a landing whom no
+  bank can now carry, and every later arrival in that position whom a moved bank could have carried
+  as built, is stranded: `PassengerRecord.strandedAt`, `Recorder#recordStranding`,
+  `ConservationAudit.stranded`, `StageActivity.strandedLegs`, and a warning line naming the count.
+  Neither delivered, nor waiting, nor abandoned, nor refused, and each would be a different lie
+  (`#strand`'s docstring says which). Their wait ended at the stranding, so it is excluded from the
+  mean exactly as an abandonment's is and the count is published beside it, § D106's rule one axis
+  over. The key is absent rather than `0` when nobody was stranded, for `accessRefused`'s reason.
+- **No route is re-planned.** The trace planned every journey against the as-built topology, and a
+  rider whose plan the change breaks is stranded where it breaks rather than re-routed through a
+  bank the planner did not choose. Re-planning would make the trace a function of the schedule, so
+  two arms of a paired comparison would no longer share passenger traces. The count is the honest
+  measure of what a closure cost.
+- **A derate moves what the controller reads, not what the shaft is.** `LoadSensor.ratedLoadKg` is
+  the controller's setting; the design load, the bypass and the alarm scale from it. The energy
+  sample balances the counterweight against the plate (`Car.spec.ratedLoadKg`), because a derate is
+  a setting and not lighter machinery. A car already past its new design load admits nobody until
+  somebody alights; one past its new alarm has its doors held at the next stop as an over-boarded
+  car does. `resolveBuilding` refuses a rating above the plate (`service-load-above-rating`).
+- **Two refusals at config time.** A range entry may not name a double-deck bank
+  (`unsupported-service-range`): the deck coupling is derived from the range when the run is built,
+  and moving the range under it would leave the pairs describing floors the bank no longer serves.
+  A range entry may not be empty: a bank serving nothing is a car out of service by another name,
+  and the mode entry already says that.
+- **Deterministic and replayed.** Both kinds schedule through the one `serviceChange` event kind in
+  authored order, so ties break by `(time, sequenceNumber)`; the stranding sweep walks floors in
+  floor order; `strandedAt` is in the record's strict schema so a run that stranded somebody stores
+  and replays (invariant 5). `sim/serviceRange.test.ts` asserts two runs agree to the byte and the
+  record round-trips.
+- **Per-run state resets.** `Bank.resetRange`, `Building.reset` and `LoadSensor.reset` return the
+  range and the rating to the plate, so a replication cannot inherit the previous one's schedule.
+
+**Measured on the legs**, `sim/serviceRange.test.ts`: on a two-bank tower whose upper floors the
+express alone reaches, closing the express above the sky lobby at 300 s strands riders in both
+directions from that instant and none before it, boards nobody for the closed floors until the
+reopening at 600 s and boards them again after, and every rider in a car bound for a closed floor
+when the range narrowed alights there. A derate of one car to 700 lb lowers that car's peak load and
+leaves its sibling's where it was. A range event that restates the as-built range moves nothing.
+
+**What this does not do.** `EventEffect` gains no field: nothing in `shift/` writes a range or a
+derate, and the issue is explicit that a field nothing writes is the dead seam `shift/types.ts` warns
+about. Where #159's library reaches the run is #159's question. The awt-validity ground table is
+unchanged: a stranding rate large enough to bias the mean is caught by the existing `censored`
+ground with the wrong sentence, the same named limitation § D266 recorded for a refusal.
+
+**Consequences.** `docs/37` § 5.1 reads six of six. `shift/incidents.ts` is no longer `serviceEvents`'
+only writer: § D524 names the derate's. The range entry's first shipped writer is still owed and is
+#159's; a building document authored through the Engineer's fabric editor reaches it today, which is
+a route and not a writer.
+
+## D524 — The campaign technician brings a red-tagged car back derated, which makes the campaign the first shipped writer of a derate event
+
+**Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #346.**
+
+**Context.** The standing requirement is *name the non-test caller*, and § D523 built two event kinds
+whose only caller would otherwise have been their tests. The campaign already had a player choice
+whose honest expression is a derate: after a breakdown, the technician option
+(`campaign/incidents.ts`) brought the car back at its plate, which is not what a car cleared to run
+after a red tag does.
+
+**Decision.** The technician's answer appends two service events at one instant, in this order: the
+car back `in-service`, then rated down to `TECHNICIAN_RETURN_LOAD_FRACTION` (three quarters) of its
+plated load for the rest of the day. The option's *when* says so in the player's words. Three
+quarters is below the 0.8 design-load factor, so the derate bites on every boarding rather than only
+at the alarm, and above a half, so the car is still worth paying for. Both units come from the plate
+the resolved building carries, so the resolved event's kilograms and pounds describe one setting.
+Where a `BankedBuilding` carries no plate, a grown config leaving the load to its class default, the
+car returns at the plate and the copy does not claim otherwise; every `ResolvedBuilding` carries
+both, so the shipped path always derates.
+
+**Measured on the legs**, `campaign/incidents.test.ts`: on Midtown Office at the campaign's hour,
+the same answer with the derate struck out is a different day from the instant the car returns, and
+the returned car carries fewer people at its peak once rated down. On Garden Apartments at `c1`'s
+hour the two are identical, because no car there fills to three quarters of its plate; the control
+is asserted where it can bite.
+
+**Consequences.** The breakdown day's difficulty moves slightly against the player, in the direction
+GD11 wants. `campaign/difficultyCurve.test.ts`'s sweep does not answer incidents, so its pins are
+unmoved. The range event has no equivalent writer yet; § D523 says whose question that is.
+

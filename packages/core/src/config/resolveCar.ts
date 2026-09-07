@@ -28,6 +28,23 @@ import type {
 /** Exact definition of the international pound, for loads with no standard-size entry. */
 const KG_PER_LB = 0.45359237;
 
+/**
+ * A rated load in kilograms, the way this module derives the plate's: the reference table's own
+ * figure when the pounds name a standard size (2 500 lb is a 1 150 kg car, not 1 134 kg), otherwise
+ * the conversion rounded to the kilogram. Exported for `resolveBuilding`'s derate entries (§ D523),
+ * so a derate authored at a standard size resolves to that size's figure and a derate authored at
+ * the plate resolves to exactly the plate.
+ */
+export function ratedLoadKgOf(
+  ratedLoadLb: number,
+  capacities: readonly { readonly ratedLoadLb: number; readonly ratedLoadKg: number }[],
+): number {
+  return (
+    capacities.find((entry) => entry.ratedLoadLb === ratedLoadLb)?.ratedLoadKg ??
+    Math.round(ratedLoadLb * KG_PER_LB)
+  );
+}
+
 export interface ResolveCarOptions {
   /** File name used in error messages. */
   readonly file?: string | undefined;

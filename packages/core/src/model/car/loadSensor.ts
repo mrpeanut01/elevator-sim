@@ -245,19 +245,52 @@ export function loadFactorOf(massKg: number, ratedLoadKg: number): number {
  * ```
  */
 export class LoadSensor {
+  /** As resolved from the plate. `config.ratedLoadKg` is the plated rating; see {@link ratedLoadKg}. */
   readonly config: ResolvedLoadSensorConfig;
 
   /** Occupant id to mass, in boarding order. A Map, so iteration order is deterministic. */
   readonly #occupants = new Map<string, number>();
   #massKg = 0;
+  /** What the controller is set to now; the plate until a derate moves it (§ D523). */
+  #ratedLoadKg: number;
 
   constructor(config: ResolvedLoadSensorConfig) {
     this.config = config;
+    this.#ratedLoadKg = config.ratedLoadKg;
   }
 
-  /** Rated load, kilograms: the denominator of {@link loadFactor}. */
+  /**
+   * Rated load, kilograms: the denominator of {@link loadFactor}, and the figure every threshold
+   * scales from. **The controller's setting, not the plate**: equal to `config.ratedLoadKg` until
+   * {@link derate} moves it. A reader that needs the hardware's rating — the counterweight balance
+   * in the energy sample — reads the car's spec, not this.
+   */
   get ratedLoadKg(): number {
-    return this.config.ratedLoadKg;
+    return this.#ratedLoadKg;
+  }
+
+  /** Whether a derate has moved the controller's rating off the plate. */
+  get isDerated(): boolean {
+    return this.#ratedLoadKg !== this.config.ratedLoadKg;
+  }
+
+  /**
+   * **A derate lands here** (GitHub issue #346, § D523): the controller's rated load is replaced,
+   * and the design load, the bypass and the overload alarm move with it because all three are
+   * fractions of it. Nothing aboard changes — a car carrying 900 kg rated down to 800 kg is at
+   * once past its design load and admits nobody until somebody alights, and one rated down past
+   * its alarm has its doors held at the next stop exactly as an over-boarded car does.
+   *
+   * @throws ModelError unless positive and finite. *At most the plate* is `resolveBuilding`'s
+   *   check; the model accepts a re-rate upward so a derate can be undone by a later event.
+   */
+  derate(ratedLoadKg: number): void {
+    if (!Number.isFinite(ratedLoadKg) || ratedLoadKg <= 0) {
+      throw new ModelError(
+        `A load sensor needs a positive rated load to be set to; received ${ratedLoadKg}.`,
+      );
+    }
+    this.#ratedLoadKg = ratedLoadKg;
   }
 
   /** Load fraction at which the car stops accepting new hall calls. */
@@ -282,7 +315,7 @@ export class LoadSensor {
    * docstring.
    */
   get designLoadKg(): number {
-    return this.config.ratedLoadKg * this.config.designLoadFactor;
+    return this.#ratedLoadKg * this.config.designLoadFactor;
   }
 
   /** Persons at design load, truncated: `floor(capacityPersons * designLoadFactor)`. */
@@ -302,7 +335,7 @@ export class LoadSensor {
 
   /** `massKg / ratedLoadKg`. */
   get loadFactor(): number {
-    return loadFactorOf(this.#massKg, this.config.ratedLoadKg);
+    return loadFactorOf(this.#massKg, this.#ratedLoadKg);
   }
 
   /**
@@ -390,7 +423,7 @@ export class LoadSensor {
   snapshot(): CarLoadSnapshot {
     return Object.freeze({
       massKg: this.#massKg,
-      ratedLoadKg: this.config.ratedLoadKg,
+      ratedLoadKg: this.#ratedLoadKg,
       loadFactor: this.loadFactor,
       occupants: this.#occupants.size,
       bypassLoadThreshold: this.config.bypassLoadThreshold,
@@ -405,6 +438,9 @@ export class LoadSensor {
   reset(): void {
     this.#occupants.clear();
     this.#massKg = 0;
+    // A derate is per-run state, like the load: a replication that inherited one would be
+    // measuring the previous replication's schedule.
+    this.#ratedLoadKg = this.config.ratedLoadKg;
   }
 
   /**

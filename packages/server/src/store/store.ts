@@ -137,6 +137,16 @@ export interface LoginTokenRow {
   readonly expiresAtMs: number;
 }
 
+/**
+ * The house's fixed user id — GitHub issue #222, § D521. A name rather than a uuid, so a reader of
+ * the table can see whose row is whose, and so `leaderboard/seed.ts` and the store agree on it
+ * without a lookup. See {@link Store.open}.
+ */
+export const HOUSE_USER_ID = 'house';
+/** What a board draws beside a baseline row. `.invalid` is reserved by RFC 2606: no mail can reach it. */
+export const HOUSE_DISPLAY_NAME = 'The house';
+const HOUSE_EMAIL = 'house@elevator-sim.invalid';
+
 /** One accepted score. The **server's** metrics; a claim is never persisted (§ D214 § 3). */
 export interface EntryRow {
   readonly id: string;
@@ -177,6 +187,16 @@ export interface EntryRow {
    */
   readonly legs: number | undefined;
   readonly submittedAtMs: number;
+  /**
+   * The dispatcher this row ran **as the house** — GitHub issue #222, § D521 — or `undefined` on a
+   * row a player posted. A baseline is a real, replayable run under a shipped dispatcher on the
+   * board's own crowd, posted by {@link HOUSE_USER_ID} so a new player never meets an empty ladder.
+   * It is not a player, and the board says so: the client draws the marker and the note off this
+   * field, {@link Store.board} keeps one best row per (player, baseline dispatcher) rather than
+   * collapsing thirteen house rows into one, and {@link Store.axisObservations} counts players only,
+   * because the ladder's `n` is *players who posted* and the house is not one.
+   */
+  readonly baselineProfileId: string | undefined;
 }
 
 /**
@@ -335,7 +355,27 @@ export class Store {
     // which is why that line existed. PostgreSQL always enforces them, so the guarantee the pragma
     // bought is now a property of the database rather than a line that could be deleted.
     await applyMigrations(options.sql, options.now);
-    return new Store(options);
+    const store = new Store(options);
+    await store.#ensureHouseUser();
+    return store;
+  }
+
+  /**
+   * The house — the account every baseline row is posted by (GitHub issue #222, § D521).
+   *
+   * Inserted on every open and idempotent by its fixed id, so two containers starting at once cannot
+   * make two of it. It is a user row because `entries.user_id` is `NOT NULL REFERENCES users`, and
+   * that constraint is worth more than a second table would be: a baseline goes through
+   * {@link recordEntry} exactly as a player's run does, with `baseline_profile_id` the one thing
+   * that tells them apart. Its address is under `.invalid`, so no sign-in link can ever be mailed
+   * to it, and its display name is what a board draws beside its rows.
+   */
+  async #ensureHouseUser(): Promise<void> {
+    await this.#sql.query(
+      'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) ' +
+        'VALUES ($1, $2, $3, TRUE, $4) ON CONFLICT (id) DO NOTHING',
+      [HOUSE_USER_ID, HOUSE_EMAIL, HOUSE_DISPLAY_NAME, this.#now()],
+    );
   }
 
   async close(): Promise<void> {
@@ -632,6 +672,8 @@ export class Store {
     readonly measured: ClaimedMetrics;
     /** {@link EntryRow.legs} — the server's own count, never the client's. */
     readonly legs: number;
+    /** {@link EntryRow.baselineProfileId}. Only `leaderboard/seed.ts` sets it, and only for {@link HOUSE_USER_ID}. */
+    readonly baselineProfileId?: string | undefined;
   }): Promise<EntryRow> {
     const user = await this.userById(input.userId);
     if (user === undefined) throw new NoSuchUserError('recordEntry');
@@ -645,6 +687,7 @@ export class Store {
       measured: input.measured,
       legs: input.legs,
       submittedAtMs: this.#now(),
+      baselineProfileId: input.baselineProfileId,
     };
     // Guarded, because the `userById` above is a check-then-act and `deleteUser` is what made its
     // second half reachable. See {@link NoSuchUserError}.
@@ -652,12 +695,12 @@ export class Store {
     try {
       written = await this.#sql.query(
         'INSERT INTO entries (id, board_key, data_hash, user_id, seed, run_json, awt_s, wt95_s, ' +
-          'ttd_mean_s, pct_over_long_wait, legs, submitted_at_ms) ' +
-          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ' +
+          'ttd_mean_s, pct_over_long_wait, legs, submitted_at_ms, baseline_profile_id) ' +
+          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ' +
           'ON CONFLICT (board_key, data_hash, user_id, seed) DO UPDATE SET run_json = excluded.run_json, ' +
           'awt_s = excluded.awt_s, wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
           'pct_over_long_wait = excluded.pct_over_long_wait, legs = excluded.legs, ' +
-          'submitted_at_ms = excluded.submitted_at_ms ' +
+          'submitted_at_ms = excluded.submitted_at_ms, baseline_profile_id = excluded.baseline_profile_id ' +
           'RETURNING id',
         [
           randomUUID(),
@@ -672,6 +715,7 @@ export class Store {
           draft.measured.pctOverLongWait,
           draft.legs,
           draft.submittedAtMs,
+          draft.baselineProfileId ?? null,
         ],
       );
     } catch (error) {
@@ -701,10 +745,14 @@ export class Store {
   async board(boardKey: string, metric: BoardMetric, limit: number): Promise<readonly EntryRow[]> {
     const column = COLUMN_OF[metric];
     const result = await this.#sql.query(
+      // One best row per player — and per baseline dispatcher, so the house's thirteen runs are
+      // thirteen rows a player can measure themselves against rather than one (§ D521). For every
+      // player `baseline_profile_id` is NULL, and `DISTINCT ON` treats the NULLs as equal, so the
+      // player half of the rule is exactly what it was.
       `SELECT * FROM (` +
-        `SELECT DISTINCT ON (e.user_id) e.*, u.display_name AS display_name ` +
+        `SELECT DISTINCT ON (e.user_id, e.baseline_profile_id) e.*, u.display_name AS display_name ` +
         `FROM entries e JOIN users u ON u.id = e.user_id WHERE e.board_key = $1 ` +
-        `ORDER BY e.user_id, e.${column} ASC, e.submitted_at_ms ASC` +
+        `ORDER BY e.user_id, e.baseline_profile_id, e.${column} ASC, e.submitted_at_ms ASC` +
         `) best ORDER BY best.${column} ASC, best.submitted_at_ms ASC LIMIT $2`,
       [boardKey, limit],
     );
@@ -723,8 +771,11 @@ export class Store {
   ): Promise<readonly { readonly entryId: string; readonly value: number }[]> {
     const column = COLUMN_OF[metric];
     const result = await this.#sql.query(
+      // Players only: a house row is a run nobody played, and the ladder's `n` is the count of
+      // players who posted (GitHub issue #222, § D521). The board draws the house; the world
+      // figures do not count it.
       `SELECT DISTINCT ON (e.user_id) e.id AS id, e.${column} AS value ` +
-        `FROM entries e WHERE e.board_key = $1 ` +
+        `FROM entries e WHERE e.board_key = $1 AND e.baseline_profile_id IS NULL ` +
         `ORDER BY e.user_id, e.${column} ASC, e.submitted_at_ms ASC`,
       [boardKey],
     );
@@ -1024,6 +1075,8 @@ function entryOf(row: Record<string, unknown>): EntryRow {
       // Only quotable runs are ever stored, so this is a fact about the table rather than a column.
       awtIsValid: true,
     }),
+    // A house row names its dispatcher; a player's row carries NULL, and absent is the same answer.
+    baselineProfileId: typeof row['baseline_profile_id'] === 'string' ? row['baseline_profile_id'] : undefined,
     // `null` and absent are the two shapes a pre-migration row reaches here in, and neither may go
     // through `Number`: it turns the first into `0` and the second into `NaN`, and `0` is the more
     // dangerous of those because it looks like an answer. Measured against this driver rather than
@@ -1103,6 +1156,12 @@ CREATE TABLE IF NOT EXISTS entries (
   -- NOT NULL and no default: this landed before any database held a row, and the honest thing once
   -- one does is the versioned migration this file's schema docstring names, not a backfilled zero.
   legs                INTEGER NOT NULL,
+  -- The dispatcher a HOUSE row ran, or NULL on every row a player posted -- GitHub issue #222,
+  -- section D521. A baseline is a run nobody played, seeded so a new player never meets an empty
+  -- ladder, and this column is what lets a reader, the ranking and the ladder tell it apart: the
+  -- board keeps one best row per (player, baseline dispatcher), and the distribution counts players
+  -- only. Nullable and indexed by nothing; added by migration 2 to a database that predates it.
+  baseline_profile_id TEXT,
   submitted_at_ms     BIGINT NOT NULL,
   UNIQUE (board_key, data_hash, user_id, seed)
 );
@@ -1225,6 +1284,17 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
     version: 1,
     name: 'entries.legs, nullable for the rows that predate it',
     sql: 'ALTER TABLE entries ADD COLUMN IF NOT EXISTS legs INTEGER;',
+  }),
+  /*
+   * GitHub issue #222, § D521: the house's dispatcher on a baseline row, `NULL` on a player's. Same
+   * `IF NOT EXISTS` shape as migration 1 and for the same reason — a database created today has the
+   * column from migration 0 and this does nothing. Nullable is the meaning rather than a concession:
+   * every row a player ever posted is a player's row, and no backfill could say otherwise.
+   */
+  Object.freeze({
+    version: 2,
+    name: 'entries.baseline_profile_id, null on every row a player posted',
+    sql: 'ALTER TABLE entries ADD COLUMN IF NOT EXISTS baseline_profile_id TEXT;',
   }),
 ]);
 
