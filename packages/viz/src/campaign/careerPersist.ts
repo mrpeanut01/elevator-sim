@@ -22,27 +22,57 @@
  * ## A refused read does not clear the slot
  *
  * Deliberate, and the same rule `profile.ts` states. A player who downgrades a tab, reads a refusal
- * and then reloads on the newer build gets their career back. Clearing on refusal would make the
- * first read destructive, which is the one thing a load path must never be.
+ * and then reloads on the newer build gets their career back.
  *
- * ## The week is not reconciled with, because it is a different record
+ * **Keeping them in place is not enough, and the first draft of this file got that wrong.** The
+ * fallback career is saved through the host's one writer on the player's next action, straight over
+ * the refused bytes — so the notice promised a save that the very screen it was drawn on destroyed.
+ * The bytes are moved to {@link CAREER_QUARANTINE_KEY} before play resumes, which is what makes the
+ * sentence true.
  *
- * `everyday/host.ts` says so where the career is declared — *"The week and the campaign career are
- * different records with different lifetimes, and conflating them here is what made the old wording
- * plausible."* So the rule is **non-interference**, stated rather than emergent: restoring a career
- * writes nothing to the week's slot, and restoring a week writes nothing to this one. They have
- * separate keys, separate versions and separate refusals, and `careerPersist.test.ts` asserts both
- * directions rather than leaving it to the fact that nobody has written the coupling yet.
+ * ## The week and the career are separate records, and they are joined in exactly one place
  *
- * That is the honest answer to *"what happens when they disagree?"*: **they cannot**, because
- * neither is evidence about the other. A career's `today` counts career days; a week counts a
- * week's days; a player can hold both, or either, and no arithmetic relates them.
+ * `everyday/host.ts` says where the career is declared that the two have different lifetimes. That
+ * is right about *ownership* and it was overstated into *"they cannot disagree"*, which an
+ * independent review falsified: `everyday/campaignModel.ts#campaignTestRows` computes
+ * `was: wasDisplayOf(history, tower.day, goal)` — the **career's** contract day joined against the
+ * **week's** closed days by day number (`shift/goals.ts:621`, `entry.day === day - 1`). They are
+ * coupled in the presentation, and `host.ts`'s `take-offer` writes both on one player action.
+ *
+ * Before persistence that coupling was harmless, because a reload reset both together. It is not
+ * harmless now: the two slots carry independent versions and independent refusals, and
+ * `dev/main.ts` **clears** the session slot on a refused restore while this one deliberately does
+ * not. A future `SESSION_SCHEMA_VERSION` bump — there have been six — resets the week to day 1 with
+ * no history while a career restores at contract day 6.
+ *
+ * **The rule, stated rather than emergent: the week is authoritative for what happened on a day,
+ * and the career never fabricates one.** `wasDisplayOf` withholds — an em-dash, not a zero — when
+ * the week has no entry for the day the career is on, which is exactly the disagreement above and
+ * is already the shipped behaviour. So a restored career beside a reset week reads *day 6 of
+ * twenty* with its `was` column withheld, which is true and legible, rather than a `was` invented
+ * from a week that never happened. `careerPersist.test.ts` asserts that withholding directly.
+ *
  */
 
 import type { CampaignCareer } from './career.js';
+import { DIFFICULTY_IDS } from './economy.js';
 
 /** The slot. One key, one record — three keys would be three states that can disagree. */
 export const CAREER_STORAGE_KEY = 'elevator-sim:career';
+
+/**
+ * Where a **refused** career's bytes are moved, so the refusal's promise is kept.
+ *
+ * The notices below say *"Nothing was deleted"*, and for one commit that was false: the fallback
+ * career is saved through the host's one writer on the player's very next action, over the top of
+ * the bytes the refusal had just promised to keep. One slot cannot hold both a career being played
+ * and a career being preserved.
+ *
+ * So a refused read moves the bytes here first. This slot is written by the load path and read by
+ * nobody — deliberately: it exists so a player who downgraded a tab can go back to the build that
+ * wrote it and recover, and a build that could read it would not have refused it.
+ */
+export const CAREER_QUARANTINE_KEY = 'elevator-sim:career:refused';
 
 /** The envelope's shape number, refused in both directions. */
 export const CAREER_SCHEMA_VERSION = 1;
@@ -84,11 +114,11 @@ export interface CareerLoad {
 export const CAREER_LOAD_NOTICES: Readonly<Record<Exclude<CareerLoadRefusal, 'empty'>, string>> =
   Object.freeze({
     unreadable:
-      'The saved career could not be read, so this one starts fresh. Nothing was deleted — the save is still there for a build that can read it.',
+      'The saved career could not be read, so this one starts fresh. The old save was set aside rather than overwritten, for a build that can read it.',
     version:
-      'The saved career was written by a different version of the game, so this one starts fresh. Nothing was deleted.',
+      'The saved career was written by a different version of the game, so this one starts fresh. The old save was set aside rather than overwritten.',
     shape:
-      'The saved career was not the shape this build expects, so this one starts fresh. Nothing was deleted.',
+      'The saved career was not the shape this build expects, so this one starts fresh. The old save was set aside rather than overwritten.',
   });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -102,10 +132,19 @@ function isFiniteNumber(value: unknown): value is number {
 /**
  * The payload's shape, checked field by field rather than cast.
  *
- * Deliberately structural and deliberately shallow on the towers: it checks that each tower is a
- * record carrying the identifying fields the career is indexed by, and does not re-validate every
- * economic field. A deeper check would be a second copy of `CampaignTower` to go stale, and the
- * fields below are the ones whose absence makes the record unusable rather than merely incomplete.
+ * **The depth is set by what the first derivation touches, not by taste**, and the first draft got
+ * that wrong. It checked the identifying fields only, on the argument that a deeper check would be
+ * a second copy of `CampaignTower` to go stale — and a tower carrying those three fields and
+ * nothing else decodes cleanly and then throws
+ * `Cannot read properties of undefined (reading 'miss')` at `economy.ts:964`, because
+ * `DIFFICULTIES[tower.difficultyId]` is `undefined`. `towersView` runs on `mountTowers`, so the
+ * Campaign tile dies with an uncaught throw: the refusal machinery exists for exactly that payload
+ * and the shallow check routed straight past it.
+ *
+ * So every field the economy indexes or does arithmetic on is checked, and `difficultyId` is
+ * checked against `DIFFICULTY_IDS` rather than merely for being a string — an unrecognised id is
+ * the same crash by another route. That is `profile.ts`'s convention: re-apply the build's own gate
+ * on the way back in, and prefer a refusal a player can read to a screen that does not draw.
  */
 function isCareerShape(value: unknown): value is CampaignCareer {
   if (!isRecord(value)) return false;
@@ -119,6 +158,12 @@ function isCareerShape(value: unknown): value is CampaignCareer {
     if (typeof tower['id'] !== 'string') return false;
     if (typeof tower['buildingId'] !== 'string') return false;
     if (typeof tower['dispatcherId'] !== 'string') return false;
+    /* Indexed into `DIFFICULTIES`. An unrecognised id crashes the first derivation. */
+    if (!DIFFICULTY_IDS.includes(tower['difficultyId'] as never)) return false;
+    /* Arithmetic in `atRiskTowers`, `carriedIn` and `purseOf`. */
+    if (!isFiniteNumber(tower['day'])) return false;
+    if (!isFiniteNumber(tower['missed'])) return false;
+    if (!isFiniteNumber(tower['months'])) return false;
   }
   const open = value['openTowerId'];
   if (open !== undefined && typeof open !== 'string') return false;

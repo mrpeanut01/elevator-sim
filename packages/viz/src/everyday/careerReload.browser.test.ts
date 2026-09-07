@@ -14,6 +14,7 @@
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { CAREER_STORAGE_KEY } from '../campaign/careerPersist.js';
 import {
   CHROMIUM,
   HAS_BROWSER,
@@ -61,20 +62,37 @@ async function towersMeta(page: Page): Promise<string> {
 }
 
 describe.skipIf(!HAS_BROWSER)('a career survives a reload', () => {
-  it('comes back on a second load, read off the screen both times', async () => {
+  it('restores a career the page did not create, read off the screen', async () => {
+    /*
+     * **This case was vacuous in its first form, and the fix is what it asserts on.**
+     *
+     * It used to open a tower, reload, and compare `.everyday-towers-meta` either side. That string
+     * is built from `carry` and `towers` (`campaignModel.ts#towersView`), and `open-tower` writes
+     * only `openTowerId` — so a *fresh* career after the reload produced the identical string, and
+     * an independent review proved it by disabling the restore and watching all three cases pass.
+     *
+     * So the mutation now moves a field the screen actually reads, and it is written **into
+     * storage** rather than through the UI: a career this page never created cannot appear on the
+     * screen unless the host read it back. Disable the restore and this fails on the first assert.
+     */
     const page = await coldLoad();
     try {
       await enterCampaign(page);
-      const before = await towersMeta(page);
-      expect(before.trim()).not.toBe('');
+      const fresh = await towersMeta(page);
+      expect(fresh.trim()).not.toBe('');
 
-      /*
-       * Move the career, so the assertion is about a *restored* record rather than about two
-       * identical opening careers — which is the vacuity this case would otherwise have. Opening a
-       * tower writes `openTowerId`, which is career state and goes through the host's one writer.
-       */
-      await page.click('.everyday-towers-open');
-      await page.waitForSelector('.everyday-building', { timeout: 15_000 });
+      /* A career with standing banked — `carry` is in the meta line, `openTowerId` is not. */
+      const planted = await page.evaluate((key) => {
+        const raw = window.localStorage.getItem(key);
+        if (raw === null) return null;
+        const envelope = JSON.parse(raw) as { version: number; career: Record<string, unknown> };
+        envelope.career['carry'] = 4321;
+        window.localStorage.setItem(key, JSON.stringify(envelope));
+        return JSON.stringify(envelope);
+      }, CAREER_STORAGE_KEY);
+
+      // Non-vacuity: if nothing was written, the reload below proves nothing.
+      expect(planted, 'no career was saved, so there is nothing to restore').not.toBeNull();
 
       await page.reload({ waitUntil: 'load' });
       await page.waitForFunction(
@@ -82,12 +100,12 @@ describe.skipIf(!HAS_BROWSER)('a career survives a reload', () => {
         undefined,
         { timeout: 30_000 },
       );
-
-      /* § D366: a reload lands on the main menu whichever screen the player was on. */
       await page.waitForSelector('.everyday-mode', { timeout: 30_000 });
-
       await enterCampaign(page);
-      expect(await towersMeta(page)).toBe(before);
+
+      const restored = await towersMeta(page);
+      expect(restored).not.toBe(fresh);
+      expect(restored).toContain('4321');
     } finally {
       await page.close();
     }

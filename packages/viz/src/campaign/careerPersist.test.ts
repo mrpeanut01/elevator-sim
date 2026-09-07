@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CAREER_LOAD_NOTICES,
+  CAREER_QUARANTINE_KEY,
   CAREER_SCHEMA_VERSION,
   CAREER_SCHEMA_VERSIONS_READ,
   CAREER_STORAGE_KEY,
@@ -15,6 +16,9 @@ import {
   encodeCareer,
 } from './careerPersist.js';
 import { openingCareer, type CampaignCareer } from './career.js';
+import { goalsForDay, PENDING_DISPLAY, wasDisplayOf } from '../shift/goals.js';
+import { createCareerStore } from '../everyday/careerStore.js';
+import type { SessionStore } from '../persist/types.js';
 import { SESSION_KEY } from '../persist/types.js';
 
 describe('a career round-trips', () => {
@@ -102,31 +106,134 @@ describe('the envelope refuses in both directions', () => {
     // career screen reads as *your months are gone*.
     for (const [ground, notice] of Object.entries(CAREER_LOAD_NOTICES)) {
       expect(notice.trim(), ground).not.toBe('');
-      expect(notice, ground).toMatch(/nothing was deleted/iu);
+      /*
+       * The promise the notices make is now *set aside*, not *not deleted* — because the first
+       * draft's promise was false: the fallback career was saved over the refused bytes on the
+       * player's next action. `careerStore.ts` moves them to the quarantine slot, which is what
+       * makes this wording true.
+       */
+      expect(notice, ground).toMatch(/set aside rather than overwritten/iu);
     }
   });
 });
 
-describe('the career and the week are different records, and neither reconciles the other', () => {
+describe('the week is authoritative for what happened on a day, and the career never fabricates one', () => {
   it('keeps its own slot — a career write cannot land in the session slot', () => {
-    /*
-     * `everyday/host.ts` states the rule where the career is declared: *"The week and the campaign
-     * career are different records with different lifetimes, and conflating them here is what made
-     * the old wording plausible."* Asserted rather than left to the fact that nobody has written
-     * the coupling yet — the next lane to add one fails here.
-     */
     expect(CAREER_STORAGE_KEY).not.toBe(SESSION_KEY);
-    // Non-vacuity, and it is not decoration: the first draft of this case imported a constant that
-    // does not exist, so it compared against `undefined` and passed over nothing. `tsc` caught it.
+    expect(CAREER_QUARANTINE_KEY).not.toBe(CAREER_STORAGE_KEY);
+    /*
+     * Non-vacuity, and it is not decoration: the first draft of this case imported a constant that
+     * does not exist, so it compared against `undefined` and passed over nothing. `tsc` caught it.
+     */
     expect(SESSION_KEY).toBeTypeOf('string');
     expect(CAREER_STORAGE_KEY).toBeTypeOf('string');
   });
 
+  it('withholds the `was` column when the week has no day the career is on', () => {
+    /*
+     * **This replaces a claim that was false.** The first draft asserted the two records "cannot
+     * disagree". They can: `campaignModel.ts#campaignTestRows` joins the career's `tower.day`
+     * against the week's `history` by day number, and the two slots carry independent versions and
+     * independent refusals — a session-schema bump resets the week while the career restores.
+     *
+     * So the rule is not that they never disagree; it is what happens when they do. The week is
+     * authoritative, and the career draws a withheld cell rather than inventing a reading from a
+     * week that never happened.
+     */
+    const goal = goalsForDay(6)[0];
+    expect(goal).toBeDefined();
+    if (goal === undefined) return;
+    // A career on contract day 6 beside a week with no history at all — the reset-week case.
+    const withheld = wasDisplayOf([], 6, goal);
+    expect(withheld).toBe(PENDING_DISPLAY);
+    // Non-vacuity: the mark must not be a zero or a blank, which is what R3 is about.
+    expect(withheld.trim()).not.toBe('');
+    expect(withheld).not.toMatch(/^0/u);
+  });
+
   it('decodes a career without consulting anything about a week', () => {
-    // The codec takes a string and returns a career. There is no week-shaped input to disagree
-    // with, which is what "they cannot disagree" means operationally.
     const career = openingCareer('collective');
     expect(decodeCareer(encodeCareer(career)).career).toEqual(career);
     expect(encodeCareer(career)).not.toContain('week');
+  });
+});
+
+describe('a refused load reaches the player, and keeps the bytes it promised to keep', () => {
+  /**
+   * A store over a memory backing, so the refusal path can be driven without a browser.
+   *
+   * This also gives `createEverydayHost`'s `careerStore` parameter its first non-default caller.
+   * An independent review found it had none — every call site used the default — so the injection
+   * seam the persistence rests on was exercised by nothing, which is this repository's own
+   * standing defect (`CLAUDE.md`: name the non-test caller).
+   */
+  function backingWith(raw: string | null): { store: SessionStore; slots: Map<string, string> } {
+    const slots = new Map<string, string>();
+    if (raw !== null) slots.set(CAREER_STORAGE_KEY, raw);
+    return {
+      slots,
+      store: {
+        read: (key) => slots.get(key) ?? null,
+        write: (key, value) => {
+          slots.set(key, value);
+        },
+        remove: (key) => {
+          slots.delete(key);
+        },
+      },
+    };
+  }
+
+  it('sets the refused bytes aside instead of letting the next save eat them', () => {
+    /*
+     * The defect this closes, in one sentence: the notice promised the old save survived, and the
+     * host's one writer saved the fallback career straight over it on the player's next action.
+     */
+    const original = JSON.stringify({ version: 99, career: openingCareer('collective') });
+    const { store, slots } = backingWith(original);
+    const career = createCareerStore(store);
+
+    const load = career.load();
+    expect(load.refusal).toBe('version');
+    expect(load.notice).toBe(CAREER_LOAD_NOTICES.version);
+
+    // The promise, kept: the bytes are somewhere a build that can read them will find them.
+    expect(slots.get(CAREER_QUARANTINE_KEY)).toBe(original);
+
+    // And now the thing that used to destroy them — the very next save.
+    career.save(openingCareer('collective'));
+    expect(slots.get(CAREER_STORAGE_KEY)).not.toBe(original);
+    expect(slots.get(CAREER_QUARANTINE_KEY), 'the refused save was eaten').toBe(original);
+  });
+
+  it('sets nothing aside for an empty slot, which is not a refusal', () => {
+    const { store, slots } = backingWith(null);
+    expect(createCareerStore(store).load().refusal).toBe('empty');
+    expect(slots.has(CAREER_QUARANTINE_KEY)).toBe(false);
+  });
+
+  it('survives a backing whose read throws, rather than killing the page at boot', () => {
+    /*
+     * `persist/types.ts` says every `SessionStore` method may throw, and a browser with site data
+     * blocked throws on the *read*. The first draft guarded only the write, so this threw inside
+     * `createEverydayHost` — and the page opens on Everyday Mode, so the whole shell died.
+     */
+    const throwing: SessionStore = {
+      read: () => {
+        throw new Error('SecurityError');
+      },
+      write: () => {
+        throw new Error('SecurityError');
+      },
+      remove: () => {
+        throw new Error('SecurityError');
+      },
+    };
+    const store = createCareerStore(throwing);
+    expect(() => store.load()).not.toThrow();
+    expect(store.load().refusal).toBe('empty');
+    expect(() => {
+      store.save(openingCareer('collective'));
+    }).not.toThrow();
   });
 });

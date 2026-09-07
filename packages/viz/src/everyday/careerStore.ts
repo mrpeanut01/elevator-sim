@@ -12,6 +12,7 @@
  */
 
 import {
+  CAREER_QUARANTINE_KEY,
   CAREER_STORAGE_KEY,
   decodeCareer,
   encodeCareer,
@@ -21,12 +22,16 @@ import type { CampaignCareer } from '../campaign/career.js';
 import type { SessionStore } from '../persist/types.js';
 
 export interface CareerStore {
-  /** The stored career, or a refusal that says why and a sentence for the player. */
+  /**
+   * The stored career, or a refusal that says why and a sentence for the player.
+   *
+   * **Moves the bytes aside on a refusal**, to `CAREER_QUARANTINE_KEY`. The notices promise the old
+   * save was set aside rather than overwritten, and the host's one writer would otherwise save the
+   * fallback career straight over it on the player's next action.
+   */
   load(): CareerLoad;
   /** Write. Silently a no-op where storage is denied — the caller cannot fix that. */
   save(career: CampaignCareer): void;
-  /** Forget. Used by *Start a new career*, never by a failed read. */
-  clear(): void;
 }
 
 function browserBacking(): SessionStore | undefined {
@@ -50,9 +55,46 @@ function browserBacking(): SessionStore | undefined {
 
 export function createCareerStore(backing: SessionStore | undefined): CareerStore {
   let memory: string | null = null;
-  const read = (): string | null => (backing === undefined ? memory : backing.read(CAREER_STORAGE_KEY));
+  let quarantine: string | null = null;
+
+  /*
+   * Every `SessionStore` method may throw — `persist/types.ts` says so, and a browser with site
+   * data blocked throws on the *read*, not only on the getter `browserBacking` already guards.
+   * `persist/session.ts` and `profile.ts` both guard the read for that reason; the first draft of
+   * this file guarded only the write, so a page that opens on Everyday Mode would have died at
+   * boot inside `createEverydayHost` rather than drawing a sentence.
+   */
+  const read = (): string | null => {
+    if (backing === undefined) return memory;
+    try {
+      return backing.read(CAREER_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  };
+
+  const setAside = (bytes: string): void => {
+    if (backing === undefined) {
+      quarantine = bytes;
+      return;
+    }
+    try {
+      backing.write(CAREER_QUARANTINE_KEY, bytes);
+    } catch {
+      /* Quota or a denied write. The bytes stay where they are, which is no worse than before. */
+    }
+  };
+
   return {
-    load: () => decodeCareer(read()),
+    load: () => {
+      const raw = read();
+      const loaded = decodeCareer(raw);
+      /* `empty` is not a refusal — there is nothing to set aside and nothing to apologise for. */
+      if (loaded.refusal !== undefined && loaded.refusal !== 'empty' && raw !== null) {
+        setAside(raw);
+      }
+      return loaded;
+    },
     save: (career) => {
       const bytes = encodeCareer(career);
       if (backing === undefined) {
@@ -68,13 +110,6 @@ export function createCareerStore(backing: SessionStore | undefined): CareerStor
          * silence. `profile.ts` takes the same position on the same failure.
          */
       }
-    },
-    clear: () => {
-      if (backing === undefined) {
-        memory = null;
-        return;
-      }
-      backing.remove(CAREER_STORAGE_KEY);
     },
   };
 }
