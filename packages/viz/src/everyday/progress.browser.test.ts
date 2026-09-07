@@ -202,8 +202,8 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
        * holding ids the rail does not badge, or a rail badging cases the store does not hold, is a
        * seam that will restore the wrong afternoon.
        */
-      // `profile.ts`'s `PROFILE_SCHEMA_VERSION`, which GitHub issue #229 moved 3 → 4 while this read 3.
-      expect(stored?.schemaVersion).toBe(4);
+      // `profile.ts`'s `PROFILE_SCHEMA_VERSION`, which #229 moved 3 → 4 and #258's `soundOn` moved 4 → 5.
+      expect(stored?.schemaVersion).toBe(5);
       const kept = stored?.progress?.solvedCaseIds ?? [];
       expect(kept.length).toBe(ran.tags.filter((tag) => tag === 'FIXED').length);
 
@@ -437,11 +437,11 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
       expect(rail.count).toBe(`0/${String(rail.tags.length)} fixed`);
 
       /*
-       * And the next write carries the migrated profile into the **current** envelope — version 3
-       * since GitHub issue #170's Units half added a fourth key. This is the half a migration
+       * And the next write carries the migrated profile into the **current** envelope — version 5
+       * since GitHub issue #258's `soundOn` added a fifth key. This is the half a migration
        * usually gets wrong: reading the old shape is not the same as keeping what it held, and the
        * write that stores the first solved building is the one that could lose the name. A version
-       * 1 payload now crosses **two** migrations to get here, which is what makes this case worth
+       * 1 payload now crosses **four** migrations to get here, which is what makes this case worth
        * more than it was: `withProgress` and `withUnits` run in sequence on one read, and a second
        * migration that clobbered the first would be invisible to a one-step case.
        */
@@ -450,7 +450,7 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
       await page.waitForSelector('.everyday-fixit-outcome', { timeout: 120_000 });
 
       expect(await slotContents(page)).toMatchObject({
-        schemaVersion: 4,
+        schemaVersion: 5,
         profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
         units: 'metric',
       });
