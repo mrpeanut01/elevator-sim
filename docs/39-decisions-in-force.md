@@ -29,6 +29,7 @@ the first three in one conversation, the last three later the same day:
 | [§ D528](../DECISIONS.md) | Difficulty is the **survivor count**, budgeted by ladder position, positions one and two exempt from the dropdown clause. The **budget joins demand and fabric** as DC-R1's third substrate, and per-scenario scarcity is **a price, never a removed control**. DC-1, DC-2, DC-2b and DC-7 fold into one measurement; DC-9 is re-aimed from repairs to controls; DC-5 splits; a floor is added on the first hour |
 | [§ D529](../DECISIONS.md) | The first session is a **two-screen tutorial** before Scenario — walk the player through the editor, then let a building fall apart and show the fix. Screen two is reused as the Rush tutorial. **A worked answer is permitted in the tutorial and nowhere else** |
 | [§ D530](../DECISIONS.md) | The cross-mode currency is named **chimes**, closing the first of § D526's two open items |
+| [§ D531](../DECISIONS.md) | The **sign-in bonus ships at launch**, in the one shape § D526 clause 7 permits — small, flat, unconditional, no compounding, no streak, nothing lost by missing it. Closes § D526's second open item, so `docs/38` § 5 has none left |
 
 The standing decisions those three rest on, unchanged and cited rather than restated:
 

@@ -2,9 +2,9 @@
 
 **Status: adopted. Written 2026-09-06 and decided the same day by the product owner as
 [§ D525](../DECISIONS.md), [§ D526](../DECISIONS.md) and [§ D527](../DECISIONS.md), with
-[§ D528](../DECISIONS.md), [§ D529](../DECISIONS.md) and [§ D530](../DECISIONS.md) taken later the
-same day.** **One** question is still open and is marked `[OWNER: …]`; it is ruled separately when
-the owner takes it. [`39-decisions-in-force.md`](39-decisions-in-force.md) is the
+[§ D528](../DECISIONS.md) to [§ D531](../DECISIONS.md) taken later the same day.** **No question on
+this page is open** — the two § 2.4 once carried, the currency's name and the sign-in bonus, are ruled
+by § D530 and § D531, and no `[OWNER: …]` marker remains. [`39-decisions-in-force.md`](39-decisions-in-force.md) is the
 index of which older decisions this page supersedes and how their names map.
 
 This page comes before the charter. [`22-charter.md`](22-charter.md) says how we build the game.
@@ -283,10 +283,13 @@ Until a decision citing a real retention measurement (`charter S4`) adds such a 
 purchase anywhere. [`26-telemetry-and-privacy.md`](26-telemetry-and-privacy.md) § 10 non-goal 1 is
 amended to say exactly that, in [§ D526](../DECISIONS.md).
 
-**A sign-in bonus, which the owner said *maybe* to.** Permitted in this shape only: a small, flat,
-unconditional chime on the first session after `x` hours away. It does not compound, there is no
-streak, and missing it costs nothing, so it is a gift and not a timer. [OWNER: on at launch, or off
-until `S4` is measured? The ledger carries the source either way.]
+**A sign-in bonus, and it ships at launch** ([§ D531](../DECISIONS.md), 2026-09-06). In this shape
+only: a small, flat, unconditional award of chimes on the first session after `x` hours away. It does
+not compound, there is no streak, and missing it costs nothing, so it is a gift and not a timer.
+`x` and the size of the award are data, authored in the earn table beside the rest of the ledger.
+**The trade the ruling accepts, recorded rather than lost:** shipping it at launch forfeits the
+baseline, so no `charter S4` claim may be made about the bonus in either direction on the evidence it
+ships with.
 
 **The name is ruled: chimes** ([§ D530](../DECISIONS.md), 2026-09-06). The arrival sound —
 distinctive, dry enough for the voice rule, and it reads correctly in the two sentences a player
@@ -397,10 +400,10 @@ Ruled later the same day, in the same conversation:
 10. The first session is a two-screen tutorial, and a worked answer is permitted there and nowhere
     else ([§ D529](../DECISIONS.md)).
 11. The currency is named **chimes** ([§ D530](../DECISIONS.md)).
+12. The sign-in bonus **ships at launch**, in the one shape § D526 clause 7 permits
+    ([§ D531](../DECISIONS.md)).
 
-Still open:
-
-- Whether the sign-in bonus is on at launch or off until `S4` is measured (§ 2.4).
+Nothing on this page is still open.
 
 ---
 
