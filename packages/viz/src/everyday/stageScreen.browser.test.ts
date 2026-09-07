@@ -582,6 +582,94 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     await page.close();
   });
 
+  /**
+   * **The stage is readable without seeing it** — GitHub issue **#239**'s second criterion.
+   *
+   * A `<canvas>` has no accessible children, so this screen — the one the game is played on — was
+   * a blank rectangle to a non-sighted player until `describeFrame` was wired to it. Asserted on
+   * the real stage rather than on the pure function, because the claim is *the wiring exists*: the
+   * sentence is already `render/describeFrame.test.ts`'s subject, and what could not be true
+   * before was that anything on this screen carried it.
+   *
+   * **Facts rather than a phrase.** The assertion is that the label names things only a described
+   * frame could know — the clock and the run's own driver — rather than matching a sentence, which
+   * would pin this test to `describeFrame`'s wording and break on every reword of it.
+   */
+  it('carries the frame’s description on the canvas and in a polite live region', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+
+    const label = (await page.getAttribute('.everyday-stage-canvas', 'aria-label')) ?? '';
+    expect(label.length).toBeGreaterThan(40);
+    /* The clock, which only a frame has: `describeFrame` opens on the playhead against the run. */
+    expect(label).toMatch(/\d+:\d\d/u);
+    /* And the driver, which only the recording has. */
+    const driver = (await page.textContent('.everyday-stage-driver')) ?? '';
+    expect(driver.length).toBeGreaterThan(0);
+    expect(label).toContain(driver.trim());
+
+    /*
+     * The region is a *status*, politely — belt and braces, because readers key off one or the
+     * other — and visually hidden, because every fact in it is already drawn for a sighted player.
+     */
+    const region = page.locator('.everyday-stage-description');
+    expect(await region.getAttribute('role')).toBe('status');
+    expect(await region.getAttribute('aria-live')).toBe('polite');
+    expect(((await region.textContent()) ?? '').length).toBeGreaterThan(40);
+
+    /*
+     * **Hidden to the eye and present to a reader, which is one claim and not two.** The obvious
+     * assertion — that the element is not visible — is the wrong one, and it was written first:
+     * `display:none` and `visibility:hidden` take an element *out of the accessibility tree*, so a
+     * region that passed it would be a region no screen reader ever reads. The technique is
+     * therefore a clipped 1×1 box, which Playwright correctly calls visible. What is asserted is
+     * what actually matters: it occupies no space a sighted player can see, and it is still
+     * rendered.
+     */
+    const box = await page.evaluate(() => {
+      const el = document.querySelector<HTMLElement>('.everyday-stage-description');
+      if (el === null) return null;
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      return {
+        width: rect.width,
+        height: rect.height,
+        display: style.display,
+        visibility: style.visibility,
+      };
+    });
+    expect(box).not.toBeNull();
+    expect(box?.width ?? 99).toBeLessThanOrEqual(1);
+    expect(box?.height ?? 99).toBeLessThanOrEqual(1);
+    expect(box?.display).not.toBe('none');
+    expect(box?.visibility).not.toBe('hidden');
+
+    /*
+     * **The label follows the day, and the region does not follow it sixty times a second.** Both
+     * halves in one press: playing at the top rung moves the playhead far enough that a description
+     * of the same frame is impossible, and the region is rate-limited to `STAGE_ANNOUNCE_MS` — so
+     * what is asserted is that it *changed*, not that it changed on every frame, which is the
+     * defect a live region makes when nobody thinks about it.
+     */
+    const labelBefore = label;
+    const regionBefore = (await region.textContent()) ?? '';
+    await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
+    await page.click('.everyday-stage-play');
+    await page.waitForFunction(
+      (from) =>
+        (document.querySelector('.everyday-stage-canvas')?.getAttribute('aria-label') ?? '') !==
+        from,
+      labelBefore,
+      { timeout: 20_000 },
+    );
+    await page.waitForFunction(
+      (from) => (document.querySelector('.everyday-stage-description')?.textContent ?? '') !== from,
+      regionBefore,
+      { timeout: 20_000 },
+    );
+    await page.close();
+  });
+
   it('takes an intervention, re-simulates, and keeps the playhead', async () => {
     const page = await coldLoad();
     await enterEverydayStage(page);

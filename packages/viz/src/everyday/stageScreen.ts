@@ -63,6 +63,7 @@ import { drawCutaway, sizeCanvas } from './cutaway.js';
 import { Playback } from '../playback/playback.js';
 import { systemClock } from '../playback/clock.js';
 import type { Frame, VizRecording } from '../contract/types.js';
+import { describeFrame } from '../render/describeFrame.js';
 import { frameAt } from '../frame/frameAt.js';
 import { queueAt } from '../frame/overlay.js';
 import { observationsAt } from '../live/observations.js';
@@ -259,6 +260,18 @@ const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
  */
 const STAGE_CANVAS_HEIGHT = '60vh';
 
+/**
+ * How often the stage's live region is re-announced — GitHub issue **#239**.
+ *
+ * The label on the canvas is rewritten on every frame, which costs nothing and is read only when a
+ * player asks for it. The **region** is different: `aria-live` re-reads on every write, so a region
+ * rewritten sixty times a second is a screen reader talking over the player continuously. Two
+ * seconds is `dev/main.ts#ANNOUNCE_MS`'s figure, kept rather than re-chosen — the Engineer surface
+ * has been announcing a stage at that cadence since `KB-13`, and a second number here would be two
+ * answers to one question.
+ */
+const STAGE_ANNOUNCE_MS = 2000;
+
 /*
  * The canvas sizing and the cutaway painter live in `cutaway.ts` now — GitHub issue #348, so that
  * Fix a building can play the as-built run on the same picture without importing this whole stage.
@@ -285,6 +298,8 @@ function mountStage(
 
   let alive = true;
   let playback: Playback | undefined;
+  /** Display time of the last live-region write — see {@link STAGE_ANNOUNCE_MS}. */
+  let lastAnnouncedMs = Number.NEGATIVE_INFINITY;
   let adopted: VizRecording | undefined;
   let speedIndex = defaultSpeedIndex();
   /* ---- § D344's sound — GitHub issue #258. Four cells, none of which a leg can read. ---- */
@@ -582,6 +597,40 @@ function mountStage(
   ].join(';');
   const canvas = el(doc, 'canvas', 'everyday-stage-canvas');
   canvas.style.cssText = `display:block;width:100%;height:${STAGE_CANVAS_HEIGHT}`;
+
+  /**
+   * **The stage's text alternative** — GitHub issue **#239**'s second criterion, `UX.md` `KB-13`.
+   *
+   * A `<canvas>` has no accessible children, so to a non-sighted player everything on this screen
+   * is a blank rectangle — and this is the screen the game is played on. The Engineer surface has
+   * had `render/describeFrame.ts` in its canvas label and a live region since `KB-13`; the
+   * Everyday stage shipped without either, which is the gap #239 names as *"the hard case"*.
+   *
+   * **The same sentence rather than a second one.** `describeFrame` is a pure function of
+   * `(recording, frame)`, so the words and the picture read the same frame and cannot drift. A
+   * description assembled from this module's own state would be a second source of truth about
+   * what is on screen, which is the defect that file's docstring was written about.
+   *
+   * **Visually hidden rather than drawn**, because every fact in it is already on the screen for a
+   * sighted player — the clock, the figures, the alarm — and printing it again would be two copies
+   * to reconcile. `role="status"` and `aria-live="polite"` together are belt and braces (readers
+   * key off one or the other), and *polite* because a day in progress is not an alert.
+   */
+  const description = el(doc, 'p', 'everyday-stage-description');
+  description.setAttribute('role', 'status');
+  description.setAttribute('aria-live', 'polite');
+  description.style.cssText = [
+    'position:absolute',
+    'width:1px',
+    'height:1px',
+    'margin:-1px',
+    'padding:0',
+    'overflow:hidden',
+    'clip:rect(0 0 0 0)',
+    'clip-path:inset(50%)',
+    'white-space:nowrap',
+    'border:0',
+  ].join(';');
   const status = el(doc, 'div', 'everyday-stage-status');
   status.style.cssText = [
     'position:absolute',
@@ -613,7 +662,7 @@ function mountStage(
     togglePlay();
   });
   status.append(statusText, startButton);
-  stageWrap.append(canvas, watchPill, status);
+  stageWrap.append(canvas, description, watchPill, status);
 
   const legend = el(doc, 'div', 'everyday-stage-legend');
   legend.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.section)}px;font-size:11.5px;color:${C.warmGrey}`;
@@ -951,6 +1000,34 @@ function mountStage(
     playback?.setSpeed(stageSpeedAt(index).simPerRealS);
     syncTransport();
     requestFrame();
+  }
+
+  /**
+   * **Say the picture** — GitHub issue **#239**'s second criterion, `UX.md` `KB-13`.
+   *
+   * Two writes with two different cadences, and the split is the whole of it.
+   *
+   * The **label** goes on every frame. It is not read aloud on write — a screen reader speaks a
+   * canvas's accessible name when the player moves to it — so keeping it current costs one string
+   * per frame and means a reader who arrives mid-day is told what is on screen *now* rather than
+   * what was on it when the day started.
+   *
+   * The **region** is rate-limited by {@link STAGE_ANNOUNCE_MS}, because `aria-live` re-reads on
+   * every write. That is the mistake this function exists to not make: a polite region rewritten on
+   * every frame is a reader talking over the player for the whole day, which is worse than silence
+   * because it cannot be interrupted.
+   *
+   * Both take `describeFrame`'s sentence rather than composing their own, so the words on this
+   * screen and the words on the Engineer surface's stage are one function's, and neither can drift
+   * from the frame it describes.
+   */
+  function announce(recording: VizRecording, frame: Frame, dispatcherName: string): void {
+    const sentence = describeFrame({ recording, frame, dispatcherName });
+    canvas.setAttribute('aria-label', sentence);
+    const nowMs = systemClock().now();
+    if (nowMs - lastAnnouncedMs < STAGE_ANNOUNCE_MS) return;
+    lastAnnouncedMs = nowMs;
+    description.textContent = sentence;
   }
 
   function intervene(change: (typeof STAGE_INTERVENTIONS)[number]['change']): void {
@@ -1470,6 +1547,7 @@ function mountStage(
       recording.floors.find((floor) => floor.id === id)?.label ?? id;
 
     const driverName = host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId;
+    announce(recording, frame, driverName);
     /*
      * § 9.2, GitHub issue #220: in the `rush` context the clock is held time and the pill is the
      * wave, and the run ends where the recording crosses the hold line — the stage stops the replay
