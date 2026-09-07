@@ -27,6 +27,10 @@ decisions that belong to a doc are recorded there as well, per
 
 ---
 
+> **Reading this file in 2026-09 or later: start at [`docs/39-decisions-in-force.md`](docs/39-decisions-in-force.md).** The product owner re-declared the game's shape on 2026-09-06 ([§ D525](#d525), [§ D526](#d526), [§ D527](#d527)) and several entries below describe a four-tile front door, a mode called *Fix a building*, a campaign that does not persist and a product with no currency, all true when written. Nothing here is deleted or renumbered; an overtaken entry carries a **Status** line under its heading, and `docs/39` is the map and the rename table.
+
+---
+
 ## D1 — Work the review register before any tuning or measurement campaign
 
 **Date:** 2026-07-27 · **Owner:** orchestrator
@@ -13940,6 +13944,8 @@ are open. Naming them is the point of writing them down.
 
 ## D218 — a challenge board, and the prohibition it has to survive
 
+> **Status 2026-09-06: AMENDED by [§ D526](#d526).** Boards are keyed by modifier set as well as by day; a run carries its modifiers and never the credits spent. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-08-04 · Architecture, written before the code.** § D217 left the leaderboard's central
 defect described and unfixed: a board is keyed by a digest that **includes the dispatcher and
 excludes the seed**, so every entry on one board is the same configuration on a different seed, and
@@ -14482,6 +14488,8 @@ paragraph exists for.
 ---
 
 ## D224 — the menu explains the game, and the explanation is checked against the game
+
+> **Status 2026-09-06: RE-DERIVE under [§ D525](#d525).** The check stands; the explanation it checks changes with the mode set. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-08-05 · Written after the code, and says so.** GitHub issue #13 — *"New user
 onboarding: no tutorial, welcome screen, or 'how to play' guidance."*
@@ -23366,6 +23374,8 @@ search rather than by the suite, which is the argument for keeping the search.
 
 ## D335 — the page opens on Everyday Mode, because the build plan's "already exists" row named a different thing
 
+> **Status 2026-09-06: SUPERSEDED IN PART by [§ D525](#d525).** The page still opens on Everyday Mode; the menu carries three tiles, Scenario first, not four. See [`docs/39`](docs/39-decisions-in-force.md).
+
 `docs/design/design_handoff_casual_mode/BUILD_PLAN.md` § 0 has a table headed *"What already
 exists"*, and two of its rows map the menus and the shell chrome onto `packages/viz/src/menu/` and
 `packages/viz/src/dev/`. Both rows point at the **Engineer** shell: an eight-screen developer menu
@@ -24465,6 +24475,8 @@ which the charter forbids and which would need a recorded amendment rather than 
 
 ## D350 — #217 is split: the cleanup is code, the position is a decision
 
+> **Status 2026-09-06: AMENDED by [§ D525](#d525).** The position this entry reserved was ruled by § D373 and is now ruled by § D525. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-08-24 · Owner: product owner · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § AA**
 
 **Decision.** #217's **AC3 and AC4** — the stale refusal and the wrong count in
@@ -24606,6 +24618,8 @@ on an unhandled page error, which is the same disease.
 ---
 
 ## D354 — the stage speed ladder is honest, and the default is a decision rather than a constant
+
+> **Status 2026-09-06: AMENDED by [§ D525](#d525).** The ladder stands; the opening speed moves from `30×` to a watching rung, `1×` or `4×`, chosen by playtest. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-257 · Closes: #257 · Unblocks: #258**
 
@@ -25473,6 +25487,8 @@ lands**, and goes red for whoever lands it — which is the register working, no
 ---
 
 ## D373 — *Fix a building* is a main-menu mode, and is not the default entry
+
+> **Status 2026-09-06: SUPERSEDED by [§ D525](#d525).** *Fix a building* is Scenario's first content, not a tile and not a default entry. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Rules on:** GitHub issue #217, AC1 and AC2, held for the product owner by [§ D350](#d350).
 
@@ -27899,6 +27915,8 @@ own, and an adoption number does not discharge them.
 
 ## D411 — `docs/25-vertical-slice.md`'s slice definition is adopted
 
+> **Status 2026-09-06: AMENDED by [§ D525](#d525).** The slice is unchanged in content; its mode is *today's scenario* inside Scenario rather than *Today's tower*. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
 
 [`docs/25-vertical-slice.md`](docs/25-vertical-slice.md) § 8's first bullet. **The seed is still not
@@ -27935,6 +27953,8 @@ series it opens in § 2.2 is cited with its document, per [§ D343](#d343).
 ---
 
 ## D414 — `docs/35-problem-per-mode.md` is adopted
+
+> **Status 2026-09-06: AMENDED by [§ D525](#d525).** `docs/35` § 6's placement question is settled and § 7's repair lists retire; the rest stands, including the stage a fix case gains. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-08-29 · Owner: Lane E, wave H · Anchor only, under [§ D405](#d405) criterion 3.**
 
@@ -31780,6 +31800,8 @@ cancelled leg as a failure, on the same ground as above.
 
 ## D475 — every eligible building can carry the first session, drawn at random, and *eligible* is a measurement
 
+> **Status 2026-09-06: NARROWED by [§ D525](#d525), through [§ D514](#d514), which built this ruling.** The first session is Scenario's first entry, authored to be doable with a tweak and failable with the wrong one; the draw among the legible five stands only where every candidate passes that test. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-05 · Owner: product owner · Rules on: `docs/35` Q4, GitHub issues #208, #210, #270.**
 
 The ruling, given directly: *allow all eligible buildings to be 1st session, but rotate them randomly
@@ -31838,6 +31860,8 @@ has moved by the time anything could reload.
 ---
 
 ## D477 — Endless rush is kept, and its shape is a ramp against a fail state
+
+> **Status 2026-09-06: AMENDED by [§ D525](#d525).** The placement this entry left open is settled: the front door, as Rush, where [§ D515](#d515) had built it. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-05 · Owner: product owner · Rules on: `docs/35` Q3, GitHub issue #220.**
 
@@ -33274,6 +33298,8 @@ next reader finds it named rather than discovering it.
 
 ## D497 — a purchase may not change the crowd, the diagnosed repair may, and the pair's basis line says which it did
 
+> **Status 2026-09-06: AMENDED by [§ D525](#d525).** With no authored repair roles, the refusal and the lift become one rule per change: a fabric purchase may not change the crowd, a demand-side change may, and the basis line says which it did. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-06 · Owner: the integrator, wave T · Rules on: GitHub issue #349, `docs/35` PM-FB3,
 `fixit/parse.ts`, `fixit/engine.ts#DEMAND_BASIS_LINE`, `fixit/run.ts#assertPairMatchesRepairs`.**
 
@@ -33871,6 +33897,8 @@ for Phase 7 to search, and this entry makes the curve reproducible rather than m
 
 ## D514 — the first session draws from the five legible contracts on a named stream, and the plate is configuration
 
+> **Status 2026-09-06: NARROWED by [§ D525](#d525).** The first session is Scenario's first entry; the draw among the legible five stands only where every candidate is doable with a tweak and failable with the wrong one. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-06 · Owner: the integrator, wave W · Rules on: GitHub issue #208's code half under
 § D475 and § D512, `docs/35` `PM-TT1`, `packages/viz/src/shift/firstSession.ts`, `dev/state.ts`,
 `dev/main.ts`'s boot, `everyday/today.ts`, the door.**
@@ -33912,6 +33940,8 @@ against Garden Apartments without saying so; they now name it in the address, wh
 link's purpose, and the two that test a first load assert the draw instead.
 
 ## D515 — Endless rush runs as a week of its own on the contract's stream, ends on the hold line, and quotes the sheet's own trend test
+
+> **Status 2026-09-06: AMENDED by [§ D525](#d525) and [§ D526](#d526).** The build stands; a round gains recorded interventions, a per-wave purse credits can widen, and a postable result keyed by modifier set. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-06 · Owner: the integrator, wave W · Rules on: GitHub issue #220 under § D477 and
 § D478, `data/traffic-profiles.json`'s `endless-rush` template, `packages/viz/src/everyday/rush.ts`,
@@ -34340,3 +34370,220 @@ is asserted where it can bite.
 GD11 wants. `campaign/difficultyCurve.test.ts`'s sweep does not answer incidents, so its pins are
 unmoved. The range event has no equivalent writer yet; § D523 says whose question that is.
 
+## D525 — Three modes: Scenario, Career and Rush; no proposed fixes; difficulty is the number of ways through; everything plays live
+
+**Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md), [§ D373](#d373), [§ D477](#d477), [§ D354](#d354), [§ D497](#d497), [§ D514](#d514), [§ D515](#d515), `docs/32` § 1.2 and GD4, `docs/23` § 4, `docs/16` S5's `ranked` row, the design handoff §§ 5 and 10, GitHub issues #217 and #220.**
+
+**Decided by the product owner, 2026-09-06** — given in conversation and confirmed the same day.
+
+Given directly, first note: three modes the owner wants to keep — a career over several buildings
+with a budget; a scenario mode of authored and player-built problems, which is where a first-time
+player starts; and an endless rush with a leaderboard. *Fix a building* was named as the one to
+scrap, because it was not clear how to make it playable.
+
+Given directly, second note, on Scenario: *"I do not want to propose fixes to the user. They have a
+budget, they can change anything and everything, up to their budget. … Changing and tuning
+dispatchers is very inexpensive. Changing configurable settings on the equipment (door dwell) is a
+little more expensive, doing building changes (adding lifts, changing speed of equipment, etc) is
+more expensive. … kind of like a puzzle to be solved, but with potentially more than one solution.
+In fact, the definition of 'easy' to 'impossible' is probably quantified by the number of potential
+configurations which actually survive the scenario. This will require pre-simulation."* And on the
+rush and every mode: *"all scenarios / rushes play live. The fun in the game is watching the people
+ride the lifts. This needs to be a primary point of the game."* Postable: *"Yes … Just have to
+record what changes to what and when."* First on the menu: *"it has to be scenario, where the first
+one or two are doable with tweaks, and failable with the wrong tweaks."* The Engineer challenges
+join the scenarios.
+
+**Ruling.** The front door carries **three** modes, **Scenario** first, then **Career** and
+**Rush**. Each is defined in one sentence in `docs/38` § 2, and that page is the record of what each
+absorbs. Six clauses:
+
+1. **Scenario absorbs four content sources under one schema** — the ten campaign stages, the
+   eighteen fix cases, the six Engineer challenges `E1`–`E6`, and the daily seed — and the schema is
+   `data/campaign.json`'s stage record plus a **budget**. *Fix a building* is not scrapped; it is
+   re-homed, and its cases keep the stage wave T built: the as-built run plays before the figures.
+2. **No fixes are proposed.** The authored repair menus and decoys retire, and with them the line
+   that says what kind of fix a case wants. The player has the whole editor, priced from **one
+   schedule in `data/`** whose ordering is dispatcher, then equipment settings, then building. The
+   schedule replaces the fix cases' `costUnits`, the campaign shop's tier prices and commissioning's
+   `CapitalConstraint`.
+3. **Difficulty is the number of affordable configurations that clear the goals**, judged on the
+   scenario's seeds under common random numbers, pre-simulated, pinned, and published on the
+   scenario's face. One survivor is the hardest a scenario may be; zero is a diagnosis scenario in
+   `docs/10` § 5.4 stage 3's shape or it is not a scenario, per `docs/33` DC-3. DC-R1 still says
+   what difficulty is made of; this says how it is counted. The budget bounds the space and moves no
+   bar, so charter non-goal 6 holds.
+4. **Every scenario and every rush plays live**, meaning the stage plays at a watching speed and a
+   press is stamped at the playhead into the run record's `interventions[]` and the day is
+   re-simulated. No second engine. The opening speed moves from § D354's `30×` to a watching rung,
+   `1×` or `4×`, chosen by playtest; a *skip to the end* control is added. Equipment and building
+   changes become intervention kinds beside the five that exist.
+5. **Career** is the Campaign as built, renamed, and it **persists** across reloads. GD11 to GD14
+   and the two halves still owed are unchanged.
+6. **Rush** is the mode [§ D515](#d515) shipped under § D477 — a week of its own on the contract's
+   stream, ending on the hold line — and **a round with mid-run changes is
+   postable**: the submission carries the intervention log and the server replays it, § D486's
+   shape. `docs/16`'s `ranked` row widens from *between-games only* to *between-games plus recorded
+   interventions*; S5's one-derivation rule is unchanged, and `scope/runIdentity.ts` is where the
+   refusal moves.
+
+**What this supersedes.** § D373 held *Fix a building* as a main-menu tile; it is superseded, in the
+direction #217 argued from rather than the one it argued to — the mode becomes the first thing a
+player plays, as content, rather than a tile or a default entry. `docs/32` GD4's recommendation that
+the rush is a bench instrument is withdrawn, and the placement half § D477 left open is settled:
+**the front door**, where [§ D515](#d515) had already built it. § D354's opening speed, now the
+*Default speed* row's default (GitHub issue #229), is reopened by clause 4. [§ D514](#d514)'s draw
+among the five legible contracts is narrowed: the first session is Scenario's first entry, and the
+draw stands only where every candidate passes the doable-and-failable test. [§ D497](#d497)'s fixit
+rule is amended: with no authored repair roles, its refusal on the fabric roles and its lift for the
+diagnosed repair become one rule per change — a fabric purchase may not change the crowd, a
+demand-side change may, and the pair's basis line says which it did. [§ D515](#d515)'s build stands
+and gains a postable round, a per-wave purse and modifiers. The handoff's four-mode table and
+its authored repair lists are deviated from, and both deviations are recorded in `docs/12` § 4 with
+`docs/38` as the reason.
+
+**What it does not decide.** Which watching rung opens a run, which is a playtest's. How the survivor count is
+sampled at the building tier, which is the lane's and is published beside the count.
+
+**Obligations that follow.** The survivor count is measured before a scenario ships and a moved
+count is a finding to report, on the published-pin rule. The rush's horizon and the event valve are
+measured before its tile opens, which is the obligation § D477 already carries. The corpus is
+re-measured once, after integration, per [§ D343](#d343). Career persistence is engineering work
+filed against `campaign/career.ts`'s own stated cost — a schema, a migration, a reconciliation with
+the week — and is not reopened here as design.
+
+---
+
+## D526 — One currency across the modes, earned by completing turns and spent on modifiers; nothing resets on time; no purchase ships and the ledger is built so an add from outside is invisible to play
+
+**Date: 2026-09-06 · Owner: product owner · Rules on: `docs/26` § 10 non-goal 1, `docs/32` § 3.1's three currencies and § 9 Q4, `docs/32` GD9 and GD13, [§ D366](#d366), [`docs/38`](docs/38-what-the-game-is.md) § 2.4.**
+
+**Decided by the product owner, 2026-09-06** — given in conversation and confirmed the same day. Two
+items below are marked *Open* and are ruled separately when the owner takes them.
+
+Given directly: *"we don't need actual monetization yet. We want to provide the eventual ability to
+'add credits' … to an account. … across each of the play modes, completing a challenge, or getting
+paid by contracts in career, or surviving x rushes earns credits. These can then be 'spent' modifying
+the modifiers for each of the play modes. This incentivizes people to play and play, and then save
+up for a specific challenge or rush goal / record they are aiming for. … Nothing 'resets' based on
+time. The player earns the credit / currency by playing. MAYBE there is a small 'bonus' every time
+they log in every x hours."* And on the boundary: *"the 'credit' ecosystem does not need to worry
+beyond its own spending or earning of credits. … any external credit 'add' should be seamless to the
+play surface which only shows what's in our credit account and allows the user to spend / earn
+against it."*
+
+**Ruling.** Seven clauses.
+
+1. **One currency across Scenario, Career and Rush**, a fourth beside `docs/32` § 3.1's units,
+   nights and standing, and the only one that crosses a mode boundary. *Credits* is the placeholder
+   name; the real name may not be a quantity the run measures and may not be *units*.
+   *Open:* the name. `docs/38` § 2.4 recommends *chimes*, with *fares* and *bells* as alternatives.
+2. **Earned by completing a turn, never by a run's figures.** A scenario cleared, a contract day
+   paid, a rush wave survived, each paying a flat amount authored in `data/` (invariant 7). A harder
+   scenario may pay more by its survivor-count band, which is a property of the scenario. **No
+   credit is ever scaled by a wait figure or any quantity the run can suppress.** This is the
+   argument `docs/32` § 3.4 makes for standing, and it is what keeps the balance outside charter
+   non-goal 1.
+3. **Spent on modifiers, never on access.** Credits widen a scenario's budget, top up a tower's
+   purse, top up a rush's between-round purse or pre-fit its building. That is GD13 clause 1's one
+   permission. GD9 and GD13 clauses 2 to 5 hold unchanged: credits never open a mode, screen,
+   building, dispatcher, case or figure; never buy a verdict, a free retry, or relief on a
+   measurement, including a missed day; and never appear on a results page, beside a wait figure,
+   or in a comparison between players. A run played with a bought modifier carries the **modifier**
+   on its record and its board row, keyed by modifier set, and never the credits spent. A modifier-set board inherits
+   [§ D506](#d506)'s twenty-player floor, so a rare modifier set shows no ladder, and resets as every
+   board does under [§ D509](#d509).
+4. **Nothing resets on time.** The balance is earned by playing and spent by choosing. Nothing
+   refills, expires or decays while the player is away, and no streak exists. `docs/32` Q4's refusal
+   of *a daily reward, a streak bonus, an expiring case* stands for every one of those three shapes.
+5. **The play surface reads one balance and posts two verbs, earn and spend, and never knows a
+   source.** The ledger is the account's (`packages/server/`, [§ D214](#d214), and Everyday's own
+   sign-in under [§ D458](#d458)) and the server holds it, so a posted modified run is checked
+   against a real spend. Without an account the ledger is on this device alone, says so in the
+   tree's existing device-only shape, and its runs are playable and not postable.
+6. **No purchase ships, and `docs/26` § 10 non-goal 1 is amended** from *no monetisation of any
+   kind, and no event that exists to support one* to: **no purchase, price, store, conversion event
+   or supporting telemetry ships anywhere; the ledger is built so that an add from outside would be
+   one more source on it and would move nothing on the play surface; and such a source is added
+   only by a decision that cites a measured `charter S4`.** Non-goals 2 to 10 of that section are
+   untouched, and non-goal 4 is restated for the currency: the balance is a ledger of completed
+   turns, not a metric over a person built from telemetry.
+7. **A sign-in bonus is permitted in one shape only**, because the owner said *maybe*: a small,
+   flat, unconditional credit on the first session after `x` hours away, that does not compound,
+   carries no streak, and costs nothing to miss. It is a gift and not a timer, which is how it
+   survives clause 4. *Open:* on at launch, or off until `S4` is measured. The ledger carries the
+   source either way.
+
+**What this answers.** `docs/32` § 9 Q4 asked for the day-2 return mechanism and found only the
+daily seed. It now has three: the daily seed, a record to beat, and a balance to save up for a
+specific challenge. § D525's open item, *what earns the between-round budget in a rush*, closes: each
+wave survived pays a fixed purse authored in the rush's data, and credits top it up.
+
+**What this refuses, still.** A budget that refills on the clock. A purchase that reaches a run, a
+verdict, a retry, a reconfiguration, or access. A currency figure on any results page. A board that
+ranks by balance or mixes modifier sets.
+
+**Obligations that follow.** The earn table and the spend prices are data and carry the schema
+invariant 8 asks for. A scenario's survivor count is pre-simulated and pinned at every budget step
+credits can buy, so a bought budget shows its own count. `docs/16`'s `ranked` row and
+`scope/runIdentity.ts` carry the modifier set beside the intervention log. `docs/26` § 10 and § 7's
+allowlist are edited on the commit that lands the ledger, not before.
+
+---
+
+## D527 — The model carries a building up to and slightly beyond the largest in the world
+
+**Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.5, `docs/04`, `data/buildings/README.md`, the charter's § 6 escalation rule, [§ D167](#d167), [§ D131](#d131), [§ D391](#d391), [§ D483](#d483).**
+
+**Decided by the product owner, 2026-09-06** — given in conversation and confirmed the same day.
+
+Given directly: *"the modeling aspect needs to be able to model and simulate buildings up to and
+slightly beyond the largest building(s) in the world. For example, The Burj Khalifa has 163 floors
+above ground and 57 elevators. … 2 basement levels, bringing the total count to 165 levels. … 57
+elevators and 8 escalators, with speeds reaching up to 10 meters per second. … approximately 154 are
+habitable, while the top floors (155–163) are dedicated to mechanical and maintenance systems."*
+
+**Ruling.** The engine, the building schema, the stage and every sweep must carry a building of at
+least **165 levels** (163 above ground, 2 below), **57 lifts** across its banks, rated speeds to
+**10 m/s**, about **154 populated floors** with the top floors unpopulated mechanical space, and
+**8 escalators**. *Slightly beyond* means the reference is a floor and not a ceiling. A reference
+building at that size is authored in `data/buildings/`, with its population and traffic mix cited
+or declared as assumptions in the file's own idiom, and it is a shipped building like the eight.
+
+**What already carries it, read off the tree and not measured.** The schema allows a negative floor
+`index` for basements, a floor with `population: 0`, `servesFloors` zoning so a bank can skip
+mechanical floors, `isTransferFloor` sky lobbies, `transportModes` escalators with a derived
+traversal time ([§ D167](#d167)), which the designer now writes ([§ D518](#d518)), double-deck banks ([§ D131](#d131)), and `MAX_FLOORS_PER_RANGE`
+of 1 000; the speed catalogue runs to 20.5 m/s. The tallest shipped building is `vertical-city`:
+100 floors, 7 banks, 35 cars, 4 887 people. So the reference is about 1.6× the floors and 1.6× the
+cars of anything this tree has run, and an unknown multiple of the population.
+
+**What is owed before this ruling is met, and each is a measurement rather than a sentence.**
+
+1. **It runs.** A full day at the reference under the event valve (`sim.maxEvents`, 20 000 000)
+   without aborting, and the recording's size stated.
+2. **What it costs.** Wall clock per replication at the reference on a named machine
+   ([§ D483](#d483): a test-cost figure is a claim about a machine). That one figure bounds three
+   things and each gets a budget or a tier from it: the live re-simulate-on-press path of `docs/38`
+   § 2.3, the survivor-count pre-simulation of § 2.1, and the 50–200 replications behind any
+   published interval. `docs/33` § 6.4's tiering and `docs/15` phase B's fan-out are the shapes
+   available.
+3. **The oracle holds.** Barney/CIBSE round-trip time per bank at 10 m/s with jerk over a rise of
+   several hundred metres, within the few percent `CLAUDE.md` requires.
+4. **The stage draws it.** The stage has a camera, measured per tower ([§ D505](#d505)). Whether
+   it carries 165 floors in a `60vh` canvas ([§ D391](#d391)) is measured rather than assumed, and
+   where it cannot, a zoned or scrolled stage is design work the handoff has no row for and a
+   recorded deviation in `docs/12` § 4.
+5. **Escalators earn their field.** As modelled they are undirected, uncapacitated hops with a
+   traversal time, and `data/buildings/README.md`'s own rule is that a declared mode with zero hops
+   is a dead field. Eight of them in a supertall are measured for hop count first; capacity and
+   direction are added only if the count says they change a decision.
+
+**What this does not decide.** The reference building's population and traffic mix, which the file
+cites. Whether escalators gain capacity or direction, which the measurement in 5 decides. Which mode
+first uses the building.
+
+Reopening `packages/core/` for a capability the game cannot reach is an escalation under the
+charter's § 6, and this entry is the product owner making it.
+
+---

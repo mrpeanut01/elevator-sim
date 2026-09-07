@@ -47,7 +47,7 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
-| Next free decision number | **D525** — wave X reserved **D521–D530** and spent **four** (§ D521 #222, § D522 #328, § D523 #346, § D524 #346), returning **D525–D530 unreached, which makes them free rather than holes**. Wave W before it reserved D514–D530 and spent seven |
+| Next free decision number | **D528** — **D525, D526 and D527 were taken outside a wave on 2026-09-06 by the product owner**: D525 three modes (Scenario, Career, Rush), D526 one currency across the modes with no purchase shipping, and D527 the model carries a building up to and slightly beyond the largest in the world, all written against [`docs/38`](docs/38-what-the-game-is.md) and decided by the owner the same day. They are three of the six numbers wave X returned unreached, and the row is reconciled on the same commit — they were first drafted as D497–D499 on a branch that had not seen waves T to X, which is § D404's warning arriving on the owner's own desk. Before that, the row read **D525** — wave X reserved **D521–D530** and spent **four** (§ D521 #222, § D522 #328, § D523 #346, § D524 #346), returning **D525–D530 unreached, which makes them free rather than holes**. Wave W before it reserved D514–D530 and spent seven |
 
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
