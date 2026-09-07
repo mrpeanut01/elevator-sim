@@ -53,6 +53,14 @@ milestone instead of a phase.
 
 ### 1.1 One sentence
 
+> **Status 2026-09-07: AMENDED by [§ D525](../DECISIONS.md).** The slice's **mode** is *today's
+> scenario* inside Scenario rather than *Today's tower* as a tile — [§ D411](../DECISIONS.md) is
+> recorded amended in [`docs/39`](39-decisions-in-force.md) § 2 for this reason. **The slice itself
+> is unchanged**: one day, at Chancery House, one car short for most of the morning. Read *the tile*
+> in the beat table below as *the Scenario tile, then today's scenario*. See
+> [`docs/38`](38-what-the-game-is.md) § 2.1.
+
+
 > **The slice is one day in Today's tower at Chancery House.** A first-time player opens the game,
 > is given a building whose lift group is one car short for most of the morning, watches the queue
 > build where they can see it, reads a sheet that tells them what today showed and what can be done

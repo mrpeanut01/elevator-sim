@@ -709,6 +709,62 @@ it open rather than settling a second question inside the first.
 
 ---
 
+### 4.14 The session table names four modes, and the front door carries three
+
+**What the handoff says.** `design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` § 5 is a
+four-row table — *Today's tower*, *Campaign*, *Endless rush*, *Fix a building* — each with a
+length, a loop and a can-you-lose cell. § 3.3's menu row names the same four as primary labels, and
+§§ 6–10 give each a mode chapter. The four-tile menu is § D335's, built to that table.
+
+**What the product does** ([§ D525](../DECISIONS.md), GitHub issues #364 and #380). **Three tiles:
+Scenario, then Career, then Rush.** [`docs/38`](38-what-the-game-is.md) § 2 is the ruling's own
+page and § 2.1 makes Scenario first and *"the only mode a first-time player should meet"*.
+[`docs/39`](39-decisions-in-force.md) § 2 records § D335 as **superseded in part** — Everyday-first
+stands, the four-tile menu does not — and § D373 as **superseded**: *Fix a building* is Scenario's
+first content, not a tile. § 3's rename map reads *Campaign* as **Career** and *Endless rush* as
+**Rush**; the Engineer-side *daily challenge* is not renamed.
+
+**The constraint that forced it.** The table's four rows are four *entry points*, and § D525 makes
+two of them **content** rather than modes: *Today's tower* and *Fix a building* are scenarios under
+one schema with a budget and a price ladder, alongside the campaign stages and the six Engineer
+challenges. A menu that kept them as tiles would offer the same content twice — once as a mode and
+once as a scenario — which is the thing the ruling exists to stop.
+
+**What did not change, and it is most of the table.** Every length and loop cell survives on the
+row that inherited it: the hub's *Today's scenario* entry still reads *~3 min · no losing — a day is
+a score, not a pass*, and its *Fix a building* entry still reads *~5 min a case · retry as often as
+you like*. § 5 is a table about **sessions**, and the sessions are unchanged; what moved is which
+surface offers them. `everyday/actionBar.ts#GUIDE_MENU_PRIMARY` keeps § 3.3's four-label cell
+transcribed and undrawn so the pair can be read against each other, and
+`everyday/actionBar.test.ts` asserts in both directions that the transcription still names four and
+the shipped row does not match it.
+
+### 4.15 The four-repair menu and the five decoys go, and the diagnosis line goes with them
+
+**What the handoff says.** § 10 already cut one quiz — *"There is no guess-the-fault quiz… The case
+now opens with **the diagnosis** printed plainly, and the play is the reconfiguration"* — and what
+it kept is an authored **repair list**: four priced repairs per case, five of them across the set
+inert by construction, and a printed line naming what kind of fix the case wants.
+
+**What the product does** ([§ D525](../DECISIONS.md) clause 2). **The repair list, the decoys and
+the kind-of-fix line all go.** The player gets a budget and the whole editor. The complaint in a
+named person's words stays — [`docs/35`](35-problem-per-mode.md) § 1.4 says why it is the most
+portable writing in the product — and so does the diagnosis; what is withdrawn is the *menu of
+answers* underneath it.
+
+**The constraint that forced it.** Read from the ruling: **the owner does not want fixes proposed.**
+A line saying *it is a setting, not a shaft* is a proposed fix with the price removed, and a
+four-item priced menu is the same proposal with the price left on. § D525's difficulty measure is
+*the number of affordable configurations that survive, pre-simulated* — which is a statement about a
+**space**, not about a list, and a four-item list has no space to be a share of.
+
+**What this costs, said plainly.** `fixit/cases.test.ts` checks the five decoys are inert, and that
+check has no referent once the decoys go: the criterion must be re-derived against the open editor
+and a budget. That is [GitHub issue #233](https://github.com/mrpeanut01/elevator-sim/issues/233)'s,
+and it waits on the scenario schema (#365) rather than on this row. Recorded here rather than in the
+test, because a deviation that hides its cost is the half of this register that goes stale first.
+
+
 ## 5 — Definition of done
 
 The refactor is done when all of the following are true, and not before.

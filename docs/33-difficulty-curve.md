@@ -66,10 +66,29 @@ stage 3, stage 5 and stage 7. The measurement, the instrument and the three othe
 
 ## 1. The two substrates, and the test that separates them
 
-### 1.1 DC-R1 — difficulty is made of exactly two things
+### 1.1 DC-R1 — difficulty is made of exactly three things
 
-A difficulty change may move **declared traffic parameters** and **building fabric**, and nothing
-else.
+> **Status 2026-09-07: AMENDED by [§ D528](../DECISIONS.md).** A **third** substrate joins the two:
+> the scenario's **budget**, with its **price schedule**. See [`docs/38`](38-what-the-game-is.md)
+> § 2.1 and [`docs/39`](39-decisions-in-force.md) § 2.
+
+A difficulty change may move **declared traffic parameters**, **building fabric**, and **the budget
+and its price schedule** — and nothing else.
+
+**Why a budget is not a fudge factor, which is the objection this rule exists to answer.** DC-R1's
+whole purpose is to forbid a difficulty knob that makes a day harder without making the *building*
+harder — a hidden multiplier on the goal bar, a thumb on the scale. A budget is not that, and the
+difference is measurable rather than rhetorical: the building is byte-identical either side of a
+budget change, and what moves is **how many of the configurations the player can afford still clear
+the day**. That is § D528's survivor count, and it is a property of the *space*, not of the run. A
+fudge factor changes the answer; a budget changes the question.
+
+**Scarcity is a price, never a prohibition.** § D528 states the form directly — *"your electrician
+is on vacation, getting a new one to fix this issue will take an extra day"* is a **cost**, not a
+disabled control. § D525 clause 2 keeps the whole editor open on every scenario, so a scenario may
+never express scarcity by removing a control; it expresses it by what the budget will reach. That
+pairing is what makes DC-9 (below) checkable at all: with no prohibitions, *inert* is a defect
+rather than a design.
 
 | substrate | what may move | where it is declared |
 |---|---|---|
@@ -79,6 +98,8 @@ else.
 | Fabric | floors, shafts, speed, capacity, population, service zoning, access zoning | `data/buildings/`, [`docs/04-test-buildings.md`](04-test-buildings.md) |
 | Fabric | availability — a car out of service, a bank derated | `packages/viz/src/shift/incidents.ts`, `packages/viz/src/shift/events.ts` |
 | Fabric | population growth over a contract | `packages/viz/src/shift/growth.ts` |
+| Budget | the scenario's budget — what the player may spend before the day runs | the scenario record's `budget`, GitHub issue #365 |
+| Budget | the price schedule — what each dispatcher, equipment and building change costs | one authored schedule in `data/`, GitHub issue #366 |
 
 Two constraints ride on that table and are not negotiable here.
 
@@ -224,6 +245,16 @@ and its § 9.3 measures the building where the gap is widest.
 
 ### 2.2 DC-1 — the teaching rule, in testable form
 
+> **Status 2026-09-07: SUPERSEDED by [§ D528](../DECISIONS.md).** DC-1 folds into the **survivor
+> count**: a scenario teaches when the count is a *share* of the affordable space rather than all of
+> it, so *some plausible move fails* becomes *some affordable configuration does not survive*.
+> **Ladder positions one and two are exempt** — § D528 rules that the opening being hard to fail is
+> correct, and what ramps instead is volume. The reading below is kept because it is the argument
+> the fold was decided against, and because the survivor count is not built: it is
+> [GitHub issue #367](https://github.com/mrpeanut01/elevator-sim/issues/367), and until it lands
+> this section is the live statement of the rule. See [`docs/38`](38-what-the-game-is.md) § 2.1.
+
+
 > **Every stage must fail at least one goal under at least one plausible player choice.**
 
 That is #200's sentence. Its testable form needs *plausible player choice* to be a set rather than an
@@ -251,6 +282,18 @@ is satisfied at every stage by the player changing nothing. It would be a rule t
 Measured over the ten shipped stages, the two forms disagree on **three** of them, which is § 3.1.
 
 ### 2.3 DC-2 — the dropdown rule, and the vacuity guard it needs
+
+> **Status 2026-09-07: SUPERSEDED by [§ D528](../DECISIONS.md).** **DC-2's blanket form is
+> withdrawn**, and **DC-2b is deleted outright**. § D528 clause 1: *"The dispatcher dropdown is not
+> a special case of anything. It is the cheapest corner of a configuration space the player always
+> has full access to."* What protects a player from picking blindly is § D525 clause 2 keeping the
+> whole editor open, not a rule against the dropdown ever working. Both fold into the survivor
+> count — a scenario the dropdown alone clears is one whose affordable space is nearly all
+> survivors, which the count says directly and more cheaply than a per-profile sweep. The
+> measurement below is kept as the record of what was true when the rule stood; **do not read it as
+> a live gate**. Owner's words: *"a consistent control surface for 'tweaks' is important, more so
+> than being fed 'drop down' actions."*
+
 
 > **No stage may clear from the dispatcher dropdown alone.**
 
@@ -1199,6 +1242,14 @@ loop's own unit. It is offered as the number to attack.
 > day 10 and day 20** on the same seeds. Growth is linear and the bars floor out, so a contract whose
 > later days are easier than its first is a contract whose growth mechanism is not reaching the run.
 
+> **Status 2026-09-07: SUPERSEDED IN PART by [§ D528](../DECISIONS.md).** The rule **splits**. The
+> *growth reaches the run* half **stands, with its existing test** — it is the half that catches this
+> repository's most-repeated defect, a mechanism that is configured and reaches nothing. The
+> **monotonicity** half is **dropped**: it asserts a shape over four points, and under a budget the
+> honest curve is not monotone — a contract whose later days are easier because the player has spent
+> well is a contract working as designed, not one whose growth failed. What replaces the dropped half
+> is the survivor count read per day ([GitHub issue #367](https://github.com/mrpeanut01/elevator-sim/issues/367)).
+
 DC-5 is deliberately cheap to check and deliberately weak: it is a monotonicity assertion on four
 points, not a shape. It exists because the failure it catches — a difficulty mechanism that does not
 reach the simulation — is this repository's most-repeated defect, and the standing requirement's own
@@ -1540,6 +1591,13 @@ are a property of what was already authored.
 ### 5.3 The specified ordering
 
 > **DC-7.** The eighteen cases are ordered by **how many affordable offered repairs clear both bars**,
+>
+> **Status 2026-09-07: SUPERSEDED by [§ D528](../DECISIONS.md).** *Offered repairs* have no referent
+> after § D525 clause 2: the four-repair menu and the five decoys go, and the player has the whole
+> editor under a budget. The ordering folds into the **survivor count** — how many affordable
+> configurations clear both bars — which is the same intuition measured over a space instead of a
+> list. See [`docs/12`](12-design-handoff.md) § 4.15 for the deviation this ruling forces on the
+> handoff, and #367 for the measurement.
 > *descending*, and within a band by the diagnosed repair's cost, *ascending*.
 
 Three bands, and the band is what the ordering is really about:
@@ -1570,6 +1628,14 @@ the one assertion that would catch a complaint whose measure had drifted to some
 already satisfies.
 
 > **DC-9.** No case may offer a repair that is inert unless the case declares it inert. Already
+>
+> **Status 2026-09-07: AMENDED by [§ D528](../DECISIONS.md).** **Re-aimed from repairs to
+> controls**: no control the editor offers may be inert in a scenario unless the scenario declares it
+> inert. The rule survives § D525 clause 2 intact in spirit and is *strengthened* by it — with the
+> whole editor open and scarcity expressed as a price rather than a prohibition, an inert control is
+> unambiguously a defect. **The test is owed and is not in this commit**: `campaign/parse.ts` checks
+> *editable* and must check *live*, proved on the legs in both directions, which collides with the
+> 78-test surface GitHub issue #270 measured. Recorded as owed rather than asserted as done.
 > enforced — `fixit/cases.test.ts` compares the as-repaired run to the as-built one **on the legs**
 > for every repair of every case, in both directions. Named here because it is DC-R1's companion at
 > case scale and because a later case added without it would pass everything else.
@@ -1726,6 +1792,31 @@ working around it.
 **It may not compare two configurations and call one better.** It asks whether a configuration clears
 a bar, which is a per-cell predicate. The moment a rule wants *better*, it needs a paired-t interval
 excluding zero at 50–200 replications under common random numbers, and it stops being this sweep.
+
+---
+
+### 1.4 The first hour, and what is outside the curve
+
+> **Stated 2026-09-07 under [§ D528](../DECISIONS.md).**
+
+**The first-hour floor.** § D528, in the owner's own words: *"It's fine that the first building is
+hard to fail, but the user is going to want to try, and we should ramp up volumes or something that
+makes it better than just watching."* So ladder positions one and two are **exempt from DC-1 and
+DC-2's failability reading** — an opening the player cannot fail is correct — and what carries the
+first hour instead is **volume**: the crowd ramps so the building is visibly working, rather than
+the goals tightening so the player is visibly losing.
+
+The floor is a claim about the survivor count and is **mechanised by nothing yet**: it needs the
+count itself ([GitHub issue #367](https://github.com/mrpeanut01/elevator-sim/issues/367)) and the
+contract ramp ([#382](https://github.com/mrpeanut01/elevator-sim/issues/382)). Stated here rather
+than deferred silently, because a floor nobody wrote down is one the next rebalance walks through.
+
+**The tutorial is outside the curve.** [§ D529](../DECISIONS.md)'s two-screen tutorial — walk the
+player through the editor, then let a building fall apart and show the fix — is **not a ladder
+position and is governed by none of DC-1 through DC-9**. It is the one place a worked answer is
+permitted, which is the exact opposite of what DC-1 asks of a stage, and reading it as position zero
+would make every rule in this document say the wrong thing about it. It is
+[GitHub issue #380](https://github.com/mrpeanut01/elevator-sim/issues/380).
 
 ---
 

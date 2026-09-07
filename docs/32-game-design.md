@@ -373,6 +373,15 @@ Three things, and naming them is what stops `docs/32 GD5` reading as *there is n
 
 ### 3.1 There are three currencies, not one, and only one of them is money
 
+> **Status 2026-09-07: AMENDED by [§ D526](../DECISIONS.md).** A **fourth** scarce quantity ships:
+> one currency earned by completing turns and spent on a mode's modifiers, named **chimes**
+> ([§ D530](../DECISIONS.md)), running across all three modes. **The three-currency analysis below
+> stands** — the distinction it draws between money, time and standing is what makes the fourth
+> legible, and § D526's own constraint (nothing resets on time, no purchase ships, and the ledger is
+> built so an add from outside is invisible to the play surface) is written against it. See
+> [`docs/38`](38-what-the-game-is.md) § 2.4.
+
+
 The shipped career campaign (`packages/viz/src/campaign/economy.ts`, implementing
 `docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md` § 8) already runs three scarce
 quantities. They are named together here because every design mistake available in this area comes
@@ -1036,7 +1045,7 @@ product owner can agree or refuse rather than start from a blank page.
 | **Q1** | **Is Endless rush a mode or an instrument?** (§ 1.4) | Recommend **demote to an instrument beside the bench**: it serves neither half of the loop, its output is a limit rather than a differential, and a limit is an hour-3 quantity. **Not taken here** — moving a tile off the front door is an interface change, and the interface is the handoff's. The separable half, which needs no positioning decision, is that its tile may not advertise a session shape the build cannot deliver |
 | **Q2** | **`charter` non-goal 6 forbids more than it means to.** (§ 5.1) | It permits difficulty to move *only* declared traffic parameters and building fabric; the shipped difficulty tiers move the purse, the rate ladder, the miss allowance and four goal bars, none of which is either. Recommend the charter's wording be **narrowed to name *stakes* separately** (`docs/32 GD18`), or the tiers be changed. **A charter clause is amended by its owner, not by a lane** |
 | **Q3** | **Should the campaign's failure odds be rolled?** (§ 3.6) | `failureOddsPct` computes a daily hazard that nothing rolls against, and `career.ts` publishes that refusal in its own words. Recommend building the seeded stream, because a wear clock that cannot bite makes every service booking a purely arithmetic decision. **It needs a seeded stream for a campaign day and an event calendar behind a contract, neither of which exists** |
-| **Q4** | **What is the day-2 return mechanism?** (§ 7.4) | The only candidate the product has is Today's tower being the same day for everybody, and it needs the server the front door is built around. Recommend it be treated as `charter S4`'s critical path. **Nothing else in this document produces a reason to return on a specific day**, and inventing one — a daily reward, a streak bonus, an expiring case — would be a currency that measures progress, which `docs/32 GD9` forbids |
+| **Q4** | **ANSWERED 2026-09-06 by [§ D526](../DECISIONS.md)** — the daily seed, a record to beat, and a balance to save up; see [`docs/38`](38-what-the-game-is.md) § 2.4 and [`docs/39`](39-decisions-in-force.md) § 2. The question as it stood: **What is the day-2 return mechanism?** (§ 7.4) | The only candidate the product has is Today's tower being the same day for everybody, and it needs the server the front door is built around. Recommend it be treated as `charter S4`'s critical path. **Nothing else in this document produces a reason to return on a specific day**, and inventing one — a daily reward, a streak bonus, an expiring case — would be a currency that measures progress, which `docs/32 GD9` forbids |
 | **Q5** | **Where does the § 2.3 schedule live?** | The eight introductions are specified here and **implemented nowhere**: there is no progression state in the tree, and `docs/32 GD6`'s triggers (*a completed turn of a named kind*) need a record of completed turns that spans modes. Recommend it be built as one derived value over the existing records rather than as a new store, so it cannot disagree with them. **The store's shape is an M2 engineering decision** |
 | **Q6** | **Does the campaign day-goal bar belong to the difficulty tier or to the contract?** | Today it is the tier's (`DIFFICULTIES[].tests`). Under `docs/32 GD18` that is *stakes* and legitimate. **But a bar that moves with a setting and a bar that moves with a building are different games**, and the second is closer to `docs/10` § 5.4's *progression by mechanism introduced*. Recommend deciding it explicitly rather than letting the tier own it by default |
 

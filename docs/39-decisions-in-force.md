@@ -84,6 +84,10 @@ the same thing in one sentence.
 | `docs/33` DC-1, DC-7 | Every stage must fail a goal under some plausible move; fix cases are ordered by how many offered repairs clear | **Superseded.** Both fold into the survivor count; DC-7's offered-repair list is retired by § D525 clause 2 | § D528 |
 | `docs/33` DC-9 | No case may offer a repair that is inert unless it declares it inert | **Amended.** Re-aimed from repairs to controls: no control the editor offers may be inert in a scenario unless the scenario says so | § D528 |
 | `docs/33` DC-5 | A contract's miss rate must be non-decreasing across days 1, 5, 10 and 20 | **Superseded in part.** The *growth reaches the run* half stands; the monotonicity half is dropped, because it bans a designed breather | § D528 |
+| `docs/23` § 4 | The per-mode declaration, built from the handoff's four-row session-shapes table | **Superseded in part.** The mode set is three; the per-mode loop analysis stands unchanged and is marked as standing | § D525 |
+| `docs/25` § 1.1 | The slice is one day in *Today's tower* at Chancery House | **Amended.** The slice is unchanged; its mode is *today's scenario* inside Scenario rather than a tile | § D525 |
+| `docs/32` § 3.1 | There are three currencies, not one, and only one of them is money | **Amended.** A fourth ships — chimes, earned by completing turns and spent on modifiers; the three-currency analysis stands | § D526, § D530 |
+| `docs/12` § 4 | The design handoff wins every disagreement about what the screen looks like | **Narrowed.** Still true; two deviations are now recorded in its own register — § 4.14 the four-mode session table, § 4.15 the authored repair lists | § D525 |
 
 ## 3. The rename map
 
