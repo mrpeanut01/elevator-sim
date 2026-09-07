@@ -26,7 +26,7 @@ become real. A gate that closes without this file being read has not been closed
 - **Ids are names, not positions.** R1 is *the dead-seam class* and will be for as long as this
   repository exists. [`docs/05-roadmap.md`](docs/05-roadmap.md) states outright that renumbering
   breaks every reference; **never renumber**. New rows take the next number above the highest ever
-  issued. The highest issued to date is **R45**. **R43 and R44 were written concurrently by two
+  issued. The highest issued to date is **R46**. **R43 and R44 were written concurrently by two
   waves** — R43 is wave L's, which merged in #322 on 2026-09-02; R44 is wave M's, which follows in
   #326. Neither is a hole. Recorded because this line is the one a lane reads before taking a
   number, and two open waves is exactly when it goes wrong.

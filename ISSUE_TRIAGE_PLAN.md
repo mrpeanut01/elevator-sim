@@ -1291,14 +1291,15 @@ as an acceptance criterion on every issue filed here.
 
 ## J.6 What this snapshot deliberately does not do
 
-It closes nothing for tidiness, it allocates no decision number — **D528 is the next free and it is
+It closes nothing for tidiness, it allocates no decision number — **D528–D531 were stamped on
+2026-09-06 and the next free is D532; this sentence read "D528 is the next free" and it is
 not this audit's** — and it edits no `DECISIONS.md` entry. Where a closure would have needed a
 ruling, the issue is NEEDS-RULING instead.
 
 ## J.7 Both NEEDS-RULING were taken the same day, and the second answer was bigger than its question
 
 The product owner ruled #234 and #210 on 2026-09-06, hours after the audit posted them. **A decision
-number is owed for each and neither is allocated here — D528 is the next free and it is the owner's.**
+number is owed for each and neither is allocated here — D528–D531 are stamped and the next free is **D532** (`CHARTER_PROGRAMME.md`).**
 
 **#234.** Difficulty is the survivor count, and **the dropdown is not a special case of anything** —
 it is the cheapest corner of a space the player always has full access to. What protects the player

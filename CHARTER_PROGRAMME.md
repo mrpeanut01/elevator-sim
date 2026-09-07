@@ -293,8 +293,11 @@ measured the preview answering `403` to `CONNECT`.
 
 **Review.** Vertical slice review, with recorded sessions.
 
-**State: not open — with one fast-tracked exception.** **#206 is being fixed now**, ahead of
-milestone order, by product-owner decision on 2026-08-24. The charter's own § 7 lists it as an
+**State: OPEN (2026-08-24)**, which is what the *Programme state at a glance* table above records.
+*(This heading read "not open — with one fast-tracked exception" until 2026-09-07, contradicting
+that table on the same date. The table is the authority and `AGENT_STATUS.md` agrees with it; the
+fast-track note below is kept because it is still the reason #206 moved first.)* **#206 was fixed
+first**, ahead of milestone order, by product-owner decision on 2026-08-24. The charter's own § 7 lists it as an
 immediate next action, it is a defect fix rather than a feature so it needs no specification, and
 every journey test written before it lands asserts a dead end. **No other M2 issue is open.**
 

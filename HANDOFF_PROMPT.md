@@ -17,7 +17,8 @@ deploy, and push the design forward until the backlog is done or the user stops 
    and exit criteria, and which are open.
 3. **`AGENT_STATUS.md`** — the lane board. **Append to it; never overwrite it.** Read § *Where a new
    agent picks up* and the wave-B board above it.
-4. **`RISKS.md`** — the project register, R1–R41. Read R1, R7, R25, R38, R40 and R41 before you plan
+4. **`RISKS.md`** — the project register, R1–R46. Read R1, R7, R25, R38, R40, R41, R44 (stale gap
+   register) and R46 (CI envelope) before you plan
    anything; they are the ways this project has actually failed.
 5. **`MULTI_AGENT_PLAN.md`** for the task tree, **`ISSUE_VERIFICATION_FINDINGS.md`** for the evidence
    behind every scheduled issue, **`TEST_MATRIX.md`** for journey coverage.

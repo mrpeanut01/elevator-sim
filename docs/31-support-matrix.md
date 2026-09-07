@@ -97,7 +97,7 @@ the result written down. **A tier-2 row with no date is a tier-3 row that has no
 |---|---|---|---|
 | Desktop Chromium at 1280×800 | Chromium | continuous | `packages/viz/src/dev/fold1280.browser.test.ts` — this is really tier 1, listed here because § 2 needs the viewport |
 | Desktop, narrow layouts at 375×667, 414×896, 767×700 — **the Engineer surface** | Chromium | 2026-07-30 (wave 12 drive phase, commit `5d4b782`) | `packages/viz/UX.md` rows `RX-03`, `RX-04b`, `RX-12`. The shell those three were fixed against is the one `@media (max-width: 767px)` restyles; `packages/viz/index.html` did not load `everyday/boot.ts` until 2026-08-12 ([§ D335](../DECISIONS.md)), so this row says nothing about the shell a player now meets first |
-| Narrow layouts at 360×800 and 375×667 — **the Everyday shell** | Chromium | continuous, since GitHub issue #292 | `packages/viz/src/everyday/viewportGates.browser.test.ts` — really tier 1. It measures all three of § 2's clauses and **currently registers 18 failures across them** — ~~*21*~~ until GitHub issue #303 closed the three clause-2 rows on 2026-08-29 ([§ D391](../DECISIONS.md)) — which is the state § 2 commits against and #240 is open to fix. Every one of the 18 is now #240's |
+| Narrow layouts at 360×800 and 375×667 — **the Everyday shell** | Chromium | continuous, since GitHub issue #292 | `packages/viz/src/everyday/viewportGates.browser.test.ts` — really tier 1. It measures all three of § 2's clauses and **currently registers 22 failures across them** — 11 at each of the two widths, and the count is the length of `OUTSTANDING` rather than a number carried in prose — which is the state § 2 commits against and #240 is open to fix. Every one of the 22 is now #240's. *(This cell read 18, struck through from 21, until 2026-09-07; both were stale and they disagreed with § 3's own figure.)* |
 
 **And that is the whole of tier 2, which is the finding.** No row in this table names Firefox, Safari,
 or Edge, because no record in this tree says the product has been opened in one. If you have driven
@@ -273,7 +273,7 @@ to read it as narrower or wider than it is.
 being driven at all**~~ — **that was true until GitHub issue #292.** The floor for *asserted geometry*
 is **360 px** now, on the Everyday shell, at both of § 2's named widths. What has not changed is the
 thing that sentence was really reporting: the 360–767 band is still CSS that was correct on one
-afternoon, and the gate that now watches it is watching it **fail** — 21 registered findings across
+afternoon, and the gate that now watches it is watching it **fail** — 22 registered findings across
 the three clauses, listed in `viewportGates.browser.test.ts`'s `OUTSTANDING`. A gate at a width is
 not the same as a product that passes at it, and turning the second column of that table into gates
 is done for § 2's three clauses and undone for everything else. #240 is the layout work. This document's commitment above — 360 px, three
