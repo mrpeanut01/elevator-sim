@@ -56,6 +56,16 @@ export interface BuildingEntry {
 }
 
 export interface BrowserResources {
+  /**
+   * `data/price-schedule.json` — what every purchasable change costs, GitHub issue **#366**.
+   *
+   * Here rather than behind its own loader, unlike the fix cases and the proof cases, and the test
+   * is the one those two state: *does everything that loads resources have a use for it?* It does.
+   * The campaign shop, the fix-a-building editor and the fixit case parser all price from it, so a
+   * second fetch per surface would be three chances for two surfaces to disagree about what a car
+   * costs — which is the defect this document was authored to end. It is about seven kilobytes.
+   */
+  readonly priceSchedule: PriceSchedule;
   readonly elevatorSpecs: ElevatorSpecs;
   readonly trafficProfiles: TrafficProfiles;
   /**
@@ -154,12 +164,14 @@ function describe(error: unknown): string {
 
 /** Everything a run needs, fetched and validated. Throws `ConfigError` on invalid data. */
 export async function loadBrowserResources(): Promise<BrowserResources> {
-  const [specsRaw, trafficRaw, dispatchersRaw, manifestRaw] = await Promise.all([
+  const [specsRaw, trafficRaw, dispatchersRaw, manifestRaw, scheduleRaw] = await Promise.all([
     fetchJson('/elevator-specs.json'),
     fetchJson('/traffic-profiles.json'),
     fetchJson('/dispatcher-profiles.json'),
     fetchJson('/__buildings.json'),
+    fetchJson('/price-schedule.json'),
   ]);
+  const priceSchedule = parsePriceSchedule(scheduleRaw);
 
   const elevatorSpecs = parseElevatorSpecs(specsRaw);
   const trafficProfiles = parseTrafficProfiles(trafficRaw);
@@ -182,6 +194,7 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
   const buildings = entries.map((entry) => entry.resolved);
 
   return {
+    priceSchedule,
     elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: dispatchers,
@@ -285,26 +298,13 @@ export async function loadReferenceRuns(
   return parseReferenceRuns(raw, buildingNameOf);
 }
 
-/**
- * `data/price-schedule.json`, fetched and parsed — GitHub issue **#366**, § D525 clause 2.
- *
- * One price for one change, in one file, so the same purchase costs the same on every screen.
- * Fetched rather than imported, on this directory's own convention: no module in `src/` imports a
- * `data/` document, and a bundled schedule would be the one price list nobody could swap.
- */
-export async function loadPriceSchedule(): Promise<PriceSchedule> {
-  return parsePriceSchedule(await fetchJson('/price-schedule.json'));
-}
-
 export async function loadFixitCases(resources: BrowserResources): Promise<FixitCases> {
-  const [raw, schedule] = await Promise.all([
-    fetchJson('/fixit-cases.json'),
-    loadPriceSchedule(),
-  ]);
+  const raw = await fetchJson('/fixit-cases.json');
   return parseFixitCases(
     raw,
     fixitContextOf({
-      schedule,
+      /* One document, loaded once with the rest — see `BrowserResources.priceSchedule`. */
+      schedule: resources.priceSchedule,
       buildings: resources.buildings,
       trafficProfiles: resources.trafficProfiles,
       dispatcherProfiles: resources.dispatcherProfiles,

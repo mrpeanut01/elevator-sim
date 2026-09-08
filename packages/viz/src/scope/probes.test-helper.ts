@@ -49,6 +49,7 @@ import {
 } from '@elevator-sim/core/browser';
 
 import { DEFAULT_LEVERS, specFromProfile } from '../authoring/dispatcherSpec.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
 import type { BrowserResources } from '../dev/data.js';
 import { disclosureOf, initialState, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
@@ -100,6 +101,7 @@ export function resourcesOf(): BrowserResources {
   });
   const trafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),

@@ -47,6 +47,8 @@
  */
 
 import { readGoal, wasDisplayOf, PENDING_DISPLAY } from '../shift/goals.js';
+import type { PriceSchedule } from '../pricing/types.js';
+import { shopTierPrice } from '../campaign/economy.js';
 import type { DayOutcome, GoalObservations, GoalReading, ShiftGoal } from '../shift/types.js';
 import { wasGraded } from '../shift/week.js';
 import {
@@ -144,6 +146,14 @@ export interface DispatcherChoice {
  */
 export interface CampaignInput {
   readonly career: CampaignCareer;
+  /**
+   * What everything in the shop costs — `data/price-schedule.json`, GitHub issue **#366**.
+   *
+   * On the input rather than reached for, so every view that prints a price prints the same one the
+   * reducer charged. The sixteen tiers used to carry their own `units` and `nights`, which was one
+   * of the six price lists that issue counted.
+   */
+  readonly schedule: PriceSchedule;
   readonly buildings: ReadonlyMap<string, BuildingFacts>;
   readonly dispatchers: readonly DispatcherChoice[];
   /** Today's readings at the playhead, for the four tests. Empty before any run. */
@@ -1371,23 +1381,34 @@ function shopTierRow(
   tower: CampaignTower,
   category: ShopCategory,
   tier: ShopTier,
+  schedule: PriceSchedule,
 ): ShopTierRowView {
-  const state = shopTierState(tower, category.id, tier);
+  const state = shopTierState(tower, category.id, tier, schedule);
+  const priced = shopTierPrice(schedule, tier);
   return {
     categoryId: category.id,
     level: tier.level,
     levelLabel: `L${String(tier.level)}`,
     name: tier.name,
-    cost: tier.nights === 0 ? units(tier.units) : `${units(tier.units)} · ${String(tier.nights)}n`,
+    cost:
+      priced.nights === 0
+        ? units(priced.units)
+        : `${units(priced.units)} · ${String(priced.nights)}n`,
     effect: tier.effect,
-    state: shopStateLine(tower, tier, state),
+    state: shopStateLine(tower, tier, state, schedule),
     stateId: state.id,
     pressable: state.pressable,
   };
 }
 
 /** § 8.2's *"every tier shows its own derived state"*, worded. */
-function shopStateLine(tower: CampaignTower, tier: ShopTier, state: ShopTierState): string {
+function shopStateLine(
+  tower: CampaignTower,
+  tier: ShopTier,
+  state: ShopTierState,
+  schedule: PriceSchedule,
+): string {
+  const nights = shopTierPrice(schedule, tier).nights;
   switch (state.id) {
     case 'fitted':
       return 'in the building';
@@ -1402,8 +1423,8 @@ function shopStateLine(tower: CampaignTower, tier: ShopTier, state: ShopTierStat
     case 'past-contract':
       return 'works run past the contract';
     case 'buyable': {
-      if (tier.nights === 0) return 'working tomorrow';
-      const ready = dayIndexOf(tower) + tier.nights;
+      if (nights === 0) return 'working tomorrow';
+      const ready = dayIndexOf(tower) + nights;
       return `ready on day ${String(ready + 1)} · ${String(CONTRACT_DAYS - ready)} days of benefit`;
     }
   }
@@ -1424,7 +1445,10 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       : SHOP.find((category) => category.id === pending.categoryId)?.tiers.find(
           (tier) => tier.level === pending.level,
         );
-  const starts = pendingTier === undefined ? [] : legalStarts(tower, pendingTier.nights);
+  /* The pending tier's nights, from the schedule — issue #366. */
+  const pendingNights =
+    pendingTier === undefined ? 0 : shopTierPrice(input.schedule, pendingTier).nights;
+  const starts = pendingTier === undefined ? [] : legalStarts(tower, pendingNights);
   const occupied = occupiedDayIndices(tower);
   const lastCleared = tower.day - 1 - tower.missed;
   const worksDays = [...occupied].filter((index) => index >= dayIdx);
@@ -1470,7 +1494,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
      */
     const tip =
       state === 'bookable' && pendingTier !== undefined
-        ? `book ${pendingTier.name} — ${String(pendingTier.nights)} ${pendingTier.nights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, live on day ${String(index + 1 + pendingTier.nights)}`
+        ? `book ${pendingTier.name} — ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, live on day ${String(index + 1 + pendingNights)}`
         : `day ${String(index + 1)}${
             state === 'works'
               ? ' · works are booked, one car out for the day'
@@ -1520,7 +1544,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       prompt:
         pendingTier === undefined
           ? undefined
-          : `Pick the night ${pendingTier.name} goes in. ${String(pendingTier.nights)} ${pendingTier.nights === 1 ? 'night' : 'nights'} of works, and it is live the day after the last of them.`,
+          : `Pick the night ${pendingTier.name} goes in. ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} of works, and it is live the day after the last of them.`,
       cancel: CONTRACT_COPY.cancel,
       booked,
       /*
@@ -1554,7 +1578,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
         tower.bookings.length === 0
           ? 'Nothing booked yet, so this keeps climbing with every trip. Machine and door work is what moves this number.'
           : 'With the nights you have booked. Machines and doors both take load off the gear, which pushes the service window further out.',
-      totalNote: `A perfect month pays ${String(perfectMonthUnits(difficulty))} units. The shop below is worth ${String(shopTotalUnits())}. You are choosing what this building does not get.`,
+      totalNote: `A perfect month pays ${String(perfectMonthUnits(difficulty))} units. The shop below is worth ${String(shopTotalUnits(input.schedule))}. You are choosing what this building does not get.`,
       carryNote: `This purse belongs to ${facts.name} alone and ${CONTRACT_COPY.purseCarryNote}`,
       kitNote: CONTRACT_COPY.purseKitNote,
     },
@@ -1581,7 +1605,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
               : booking > 0
                 ? `level ${String(booking)} booked`
                 : 'nothing yet',
-          rows: category.tiers.map((tier) => shopTierRow(tower, category, tier)),
+          rows: category.tiers.map((tier) => shopTierRow(tower, category, tier, input.schedule)),
         };
       }),
     },

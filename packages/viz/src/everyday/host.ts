@@ -116,6 +116,7 @@ import type {
  * imports by name. The row shape crosses this façade; the transport does not.
  */
 import type { BoardDistribution, BoardEntry, BoardPage, BoardsPage, Result } from '../menu/client.js';
+import type { PriceSchedule } from '../pricing/types.js';
 
 import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
 import {
@@ -577,6 +578,14 @@ export interface EverydayHost {
    * derives every figure from it, so no screen counts anything.
    */
   campaign(): CampaignCareer;
+
+  /**
+   * What everything in the shop costs — `data/price-schedule.json`, GitHub issue **#366**.
+   *
+   * On the host because the campaign screens print prices and the campaign reducer charges them,
+   * and one accessor is what stops those two disagreeing.
+   */
+  priceSchedule(): PriceSchedule;
 
   /**
    * What the last career load refused, in the player's words, or `undefined` when it restored or
@@ -1527,6 +1536,7 @@ export function createEverydayHost(
       return resolved === undefined ? undefined : statLineOf(resolved);
     },
     campaign: () => career,
+    priceSchedule: () => bindings.resources.priceSchedule,
     careerNotice: () => careerLoadNotice,
     savedDispatchers: () => b.state().savedDispatchers,
     recording: () => b.state().recording,
@@ -1738,7 +1748,7 @@ export function createEverydayHost(
         towerId,
         verdict,
         trips: observations.loadedDepartures,
-      });
+      }, bindings.resources.priceSchedule);
       if (next === career) return;
       setCareer(next);
       notifyCampaign();
@@ -1799,7 +1809,7 @@ export function createEverydayHost(
       b.applyPatch({ dispatcherSpec: applied.spec, levers: applied.levers });
     },
     campaignAct: (action) => {
-      const next = applyCampaignAction(career, action);
+      const next = applyCampaignAction(career, action, bindings.resources.priceSchedule);
       /* A refused action moves nothing and notifies nobody: a redraw over an unchanged record
          would repaint a screen mid-interaction for no reason a player could see. */
       if (next === career) return;
@@ -1931,7 +1941,7 @@ export function createEverydayHost(
           towerId: facts.tower.id,
           units: option.units,
           label: option.label,
-        }),
+        }, bindings.resources.priceSchedule),
       );
       if (option.units > 0 && career === before) return CAMPAIGN_DOCK_COPY.refusedPurse;
       notifyCampaign();

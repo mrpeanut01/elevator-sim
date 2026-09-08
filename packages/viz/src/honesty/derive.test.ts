@@ -59,8 +59,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'pricing/repairPrice.ts#changesBought',
         'pricing/repairPrice.ts#unpricedPathsIn',
         'pricing/repairPrice.ts#repairPriceUnits',
-        /* Returns a number and a fetch; its only literals are the refusal above and a document path. */
-        'dev/data.ts#loadPriceSchedule',
         'fixit/parse.ts#newShaftUnits',
         /*
          * Returns three numbers. `standingExtrasFrom` beside it is deliberately **not** here — it

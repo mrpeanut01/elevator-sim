@@ -4803,6 +4803,7 @@ const RIGHT_RAIL: SurfaceAdapter = {
  */
 export function browserResourcesOf(context: HonestyContext): BrowserResources {
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs: context.elevatorSpecs as ElevatorSpecs,
     trafficProfiles: context.trafficProfiles,
     dispatcherProfiles: context.dispatcherProfiles,
@@ -6059,6 +6060,7 @@ const CHALLENGE: SurfaceAdapter = {
       buildings: context.buildings,
       dispatcherProfiles: context.dispatcherProfiles,
       trafficProfiles: context.trafficProfiles,
+      priceSchedule: shippedPriceSchedule(),
       elevatorSpecs: context.elevatorSpecs,
     } as unknown as Parameters<typeof challengeRunConfigs>[1];
 
@@ -8662,20 +8664,20 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       towers: [{ ...first.towers[0]!, day: 6, carry: 120 }],
     };
     const booked = applyCampaignAction(
-      applyCampaignAction(spending, {
-        kind: 'press-tier',
-        towerId: 'c1',
-        categoryId: 'machines',
-        level: 1,
-      }),
+      applyCampaignAction(
+        spending,
+        { kind: 'press-tier', towerId: 'c1', categoryId: 'machines', level: 1 },
+        shippedPriceSchedule(),
+      ),
       { kind: 'pick-start', startIdx: 11 },
+      shippedPriceSchedule(),
     );
     const pending = applyCampaignAction(spending, {
       kind: 'press-tier',
       towerId: 'c1',
       categoryId: 'doors',
       level: 2,
-    });
+    }, shippedPriceSchedule());
     /* A run on the stage, so the three measurable tests grade rather than sit pending. */
     const observations: GoalObservations = {
       arrived: 400,
@@ -8706,6 +8708,7 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     for (const [label, career, observed] of cases) {
       const input = {
         career,
+        schedule: shippedPriceSchedule(),
         buildings,
         dispatchers,
         observations: observed,

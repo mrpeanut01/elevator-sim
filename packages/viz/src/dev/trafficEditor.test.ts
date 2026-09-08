@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import {
   parseBuilding,
   parseDispatcherProfiles,
@@ -62,6 +64,7 @@ const RESOURCES: BrowserResources = (() => {
     return { file: `${id}.json`, config, resolved: resolveBuilding(config, elevatorSpecs) };
   });
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs,
     trafficProfiles: TRAFFIC,
     dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),

@@ -183,6 +183,7 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
   const run = host.runState();
   return {
     career: host.campaign(),
+    schedule: host.priceSchedule(),
     careerNotice: host.careerNotice(),
     buildings,
     dispatchers: host.dispatchers().map(

@@ -16,6 +16,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import {
   CAMPAIGN_ABSENCES,
   LOST_CONTRACTS_MAX,
@@ -197,17 +199,17 @@ describe('the opening career', () => {
 
 describe('a building is a commitment, not a setting (§ 8.1)', () => {
   it('opening one disturbs no other and resumes rather than resets', () => {
-    const opened = applyCampaignAction(SECOND_MONTH, { kind: 'open-tower', towerId: 'c7' });
+    const opened = applyCampaignAction(SECOND_MONTH, { kind: 'open-tower', towerId: 'c7' }, shippedPriceSchedule());
     expect(opened.openTowerId).toBe('c7');
     // Every tower's own day, record and clock is exactly what it was.
     expect(opened.towers).toEqual(SECOND_MONTH.towers);
-    const back = applyCampaignAction(opened, { kind: 'open-tower', towerId: 'c1' });
+    const back = applyCampaignAction(opened, { kind: 'open-tower', towerId: 'c1' }, shippedPriceSchedule());
     expect(back.towers).toEqual(SECOND_MONTH.towers);
     expect(openTowerOf(back)?.day).toBe(19);
   });
 
   it('refuses to open a building the career does not hold', () => {
-    expect(applyCampaignAction(SECOND_MONTH, { kind: 'open-tower', towerId: 'c5' })).toBe(
+    expect(applyCampaignAction(SECOND_MONTH, { kind: 'open-tower', towerId: 'c5' }, shippedPriceSchedule())).toBe(
       SECOND_MONTH,
     );
   });
@@ -217,14 +219,14 @@ describe('a building is a commitment, not a setting (§ 8.1)', () => {
       kind: 'set-dispatcher',
       towerId: 'c6',
       dispatcherId: 'collective',
-    });
+    }, shippedPriceSchedule());
     expect(towerById(next, 'c6')?.dispatcherId).toBe('collective');
     expect(towerById(next, 'c1')?.dispatcherId).toBe('eta');
     const built = applyCampaignAction(next, {
       kind: 'set-build',
       towerId: 'c6',
       buildId: 'doors-first',
-    });
+    }, shippedPriceSchedule());
     expect(towerById(built, 'c6')?.buildId).toBe('doors-first');
     expect(towerById(built, 'c1')?.buildId).toBe('as-built');
   });
@@ -234,7 +236,7 @@ describe('a building is a commitment, not a setting (§ 8.1)', () => {
       kind: 'set-difficulty',
       towerId: 'c6',
       difficultyId: 'hard',
-    });
+    }, shippedPriceSchedule());
     const tower = towerById(next, 'c6')!;
     expect(tower.difficultyId).toBe('hard');
     expect(tower.day).toBe(1);
@@ -259,7 +261,7 @@ describe('§ 8.4’s two-step buy', () => {
       towerId: 'c1',
       categoryId: 'doors',
       level: 1,
-    });
+    }, shippedPriceSchedule());
     const tower = after.towers[0]!;
     expect(after.pendingBooking).toBeUndefined();
     expect(fittedLevel(tower, 'doors')).toBe(1);
@@ -273,11 +275,11 @@ describe('§ 8.4’s two-step buy', () => {
       towerId: 'c1',
       categoryId: 'machines',
       level: 1,
-    });
+    }, shippedPriceSchedule());
     expect(pressed.pendingBooking).toEqual({ towerId: 'c1', categoryId: 'machines', level: 1 });
     expect(committedUnits(pressed.towers[0]!)).toBe(0);
 
-    const booked = applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 5 });
+    const booked = applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 5 }, shippedPriceSchedule());
     expect(booked.pendingBooking).toBeUndefined();
     expect(committedUnits(booked.towers[0]!)).toBe(14);
     expect(booked.towers[0]!.bookings[0]).toMatchObject({ startIdx: 5, nights: 2 });
@@ -289,8 +291,8 @@ describe('§ 8.4’s two-step buy', () => {
       towerId: 'c1',
       categoryId: 'machines',
       level: 1,
-    });
-    const cancelled = applyCampaignAction(pressed, { kind: 'cancel-booking' });
+    }, shippedPriceSchedule());
+    const cancelled = applyCampaignAction(pressed, { kind: 'cancel-booking' }, shippedPriceSchedule());
     expect(cancelled.pendingBooking).toBeUndefined();
     expect(committedUnits(cancelled.towers[0]!)).toBe(0);
   });
@@ -301,9 +303,9 @@ describe('§ 8.4’s two-step buy', () => {
       towerId: 'c1',
       categoryId: 'machines',
       level: 1,
-    });
+    }, shippedPriceSchedule());
     // Yesterday is not a legal start (§ 8.2: `s ≥ dayIdx`).
-    expect(applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 0 })).toBe(pressed);
+    expect(applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 0 }, shippedPriceSchedule())).toBe(pressed);
     // And a tier the purse cannot reach is refused at the press.
     const poor = openingCareer('eta');
     expect(
@@ -312,7 +314,7 @@ describe('§ 8.4’s two-step buy', () => {
         towerId: 'c1',
         categoryId: 'shafts',
         level: 1,
-      }),
+      }, shippedPriceSchedule()),
     ).toBe(poor);
   });
 });
@@ -379,7 +381,7 @@ describe('answering the decision', () => {
       kind: 'answer-need',
       towerId: 'c1',
       optionId: 'sign',
-    });
+    }, shippedPriceSchedule());
     const renewed = towerById(after, 'c1')!;
     expect(renewed.day).toBe(1);
     expect(renewed.missed).toBe(0);
@@ -400,7 +402,7 @@ describe('answering the decision', () => {
       kind: 'answer-need',
       towerId: 'c1',
       optionId: 'push',
-    });
+    }, shippedPriceSchedule());
     expect(towerById(after, 'c1')?.rate).toBe(6);
   });
 
@@ -409,7 +411,7 @@ describe('answering the decision', () => {
       kind: 'answer-need',
       towerId: 'c1',
       optionId: 'refurbish',
-    });
+    }, shippedPriceSchedule());
     const renewed = towerById(after, 'c1')!;
     expect(renewed.trips).toBe(0);
     expect(renewed.refit).toBe(0);
@@ -427,7 +429,7 @@ describe('answering the decision', () => {
       kind: 'answer-need',
       towerId: 'c1',
       optionId: 'hand-back',
-    });
+    }, shippedPriceSchedule());
     expect(towerById(after, 'c1')).toBeUndefined();
     expect(after.towers).toHaveLength(before.towers.length - 1);
     expect(after.openTowerId).toBeUndefined();
@@ -443,7 +445,7 @@ describe('answering the decision', () => {
       kind: 'answer-need',
       towerId: 'c1',
       optionId: 'window',
-    });
+    }, shippedPriceSchedule());
     const tower = towerById(after, 'c1')!;
     expect(tower.trips).toBe(0);
     expect(tower.bookings[0]).toMatchObject({ categoryId: 'machines', nights: 3, units: 0 });
@@ -456,7 +458,7 @@ describe('answering the decision', () => {
       ...openingCareer('eta'),
       towers: [{ ...openingCareer('eta').towers[0]!, day: 6, trips: 41_000 }],
     };
-    expect(applyCampaignAction(worn, { kind: 'answer-need', towerId: 'c1', optionId: 'leave' })).toBe(
+    expect(applyCampaignAction(worn, { kind: 'answer-need', towerId: 'c1', optionId: 'leave' }, shippedPriceSchedule())).toBe(
       worn,
     );
   });
@@ -470,11 +472,11 @@ describe('answering the decision', () => {
     expect(needOf(before.towers[0]!)?.kind).toBe('service');
     expect(purseOf(before.towers[0]!)).toBeLessThan(REFURBISHMENT.units);
     expect(
-      applyCampaignAction(before, { kind: 'answer-need', towerId: 'c1', optionId: 'refurbish' }),
+      applyCampaignAction(before, { kind: 'answer-need', towerId: 'c1', optionId: 'refurbish' }, shippedPriceSchedule()),
     ).toBe(before);
     // And the free one is taken, so the refusal is about the price rather than about the option.
     expect(
-      applyCampaignAction(before, { kind: 'answer-need', towerId: 'c1', optionId: 'window' }),
+      applyCampaignAction(before, { kind: 'answer-need', towerId: 'c1', optionId: 'window' }, shippedPriceSchedule()),
     ).not.toBe(before);
   });
 });
@@ -555,7 +557,7 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'cleared',
       trips: 0,
-    });
+    }, shippedPriceSchedule());
 
     expect(first(after).day).toBe(first(before).day + 1);
     expect(first(after).missed).toBe(0);
@@ -577,7 +579,7 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'missed',
       trips: 0,
-    });
+    }, shippedPriceSchedule());
 
     expect(first(after).missed).toBe(1);
     expect(clearedDays(first(after))).toBe(0);
@@ -596,13 +598,13 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'cleared',
       trips: 0,
-    });
+    }, shippedPriceSchedule());
     const missed = applyCampaignAction(before, {
       kind: 'file-day',
       towerId: 'c1',
       verdict: 'missed',
       trips: 0,
-    });
+    }, shippedPriceSchedule());
 
     expect(purseOf(first(cleared))).toBe(purseOf(first(before)) + rate);
     expect(purseOf(first(missed))).toBe(purseOf(first(before)));
@@ -617,7 +619,7 @@ describe('filing a campaign day', () => {
         towerId: 'c1',
         verdict: 'missed',
         trips: 0,
-      });
+      }, shippedPriceSchedule());
     }
     expect(first(career).missed).toBe(allowance + 1);
     expect(contractIsLost(first(career))).toBe(true);
@@ -631,7 +633,7 @@ describe('filing a campaign day', () => {
         towerId: 'c1',
         verdict: 'cleared',
         trips: 0,
-      });
+      }, shippedPriceSchedule());
     }
     expect(first(career).day).toBe(CONTRACT_DAYS + 1);
     expect(clearedDays(first(career))).toBe(CONTRACT_DAYS);
@@ -643,7 +645,7 @@ describe('filing a campaign day', () => {
         towerId: 'c1',
         verdict: 'cleared',
         trips: 0,
-      }),
+      }, shippedPriceSchedule()),
     ).toBe(career);
   });
 
@@ -655,7 +657,7 @@ describe('filing a campaign day', () => {
         towerId: 'c6',
         verdict: 'cleared',
         trips: 0,
-      }),
+      }, shippedPriceSchedule()),
     ).toBe(before);
   });
 
@@ -666,7 +668,7 @@ describe('filing a campaign day', () => {
       towerId: 'c6',
       verdict: 'cleared',
       trips: 0,
-    });
+    }, shippedPriceSchedule());
     expect(towerById(after, 'c6')!.day).toBe(towerById(before, 'c6')!.day + 1);
     expect(towerById(after, 'c1')).toEqual(towerById(before, 'c1'));
     expect(towerById(after, 'c7')).toEqual(towerById(before, 'c7'));
@@ -680,7 +682,7 @@ describe('filing a campaign day', () => {
         towerId: 'c1',
         verdict,
         trips: 0,
-      });
+      }, shippedPriceSchedule());
     }
     const tower = first(career);
     // Two of the three days held, which is what the agent prices the renewal from.
@@ -707,7 +709,7 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'cleared',
       trips: 1_400,
-    });
+    }, shippedPriceSchedule());
     expect(first(after).trips).toBe(1_400);
     expect(wearOf(first(after))).toBeCloseTo(1_400 / SERVICE_AT_TRIPS, 12);
     // `daysLeft` is the figure the desk prints, and it has moved by exactly one working day.
@@ -719,7 +721,7 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'missed',
       trips: 600,
-    });
+    }, shippedPriceSchedule());
     expect(first(second).trips).toBe(2_000);
   });
 
@@ -731,7 +733,7 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'cleared',
       trips: Math.round(SERVICE_AT_TRIPS * 0.61),
-    });
+    }, shippedPriceSchedule());
     expect(wearHeadOf(first(career))).toBe('wearing');
     // And past 0.85 — *Service window due*, which is the incident `needOf` derives.
     career = applyCampaignAction(career, {
@@ -739,7 +741,7 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'cleared',
       trips: Math.round(SERVICE_AT_TRIPS * 0.3),
-    });
+    }, shippedPriceSchedule());
     expect(wearHeadOf(first(career))).toBe('due');
     expect(needOf(first(career))?.kind).toBe('service');
   });
@@ -755,13 +757,13 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'cleared',
       trips: 1_400,
-    });
+    }, shippedPriceSchedule());
     const after = applyCampaignAction(before, {
       kind: 'file-day',
       towerId: 'c1',
       verdict: 'cleared',
       trips: undefined,
-    });
+    }, shippedPriceSchedule());
     expect(first(after).trips).toBe(first(before).trips);
     expect(first(after).day).toBe(first(before).day + 1);
   });
@@ -774,7 +776,7 @@ describe('filing a campaign day', () => {
         towerId: 'c1',
         verdict: 'cleared',
         trips,
-      });
+      }, shippedPriceSchedule());
       expect(first(after).trips).toBe(0);
       expect(Number.isFinite(wearOf(first(after)))).toBe(true);
     }
@@ -791,7 +793,7 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'cleared',
       trips: Math.round(SERVICE_AT_TRIPS * 0.9),
-    });
+    }, shippedPriceSchedule());
     const need = needOf(first(career));
     expect(need?.kind).toBe('service');
     const window = need!.options.find((option) => option.id !== 'leave')!;
@@ -799,7 +801,7 @@ describe('filing a campaign day', () => {
       kind: 'answer-need',
       towerId: 'c1',
       optionId: window.id,
-    });
+    }, shippedPriceSchedule());
     expect(first(career).trips).toBe(0);
 
     career = applyCampaignAction(career, {
@@ -807,7 +809,7 @@ describe('filing a campaign day', () => {
       towerId: 'c1',
       verdict: 'cleared',
       trips: 700,
-    });
+    }, shippedPriceSchedule());
     expect(first(career).trips).toBe(700);
   });
 });
