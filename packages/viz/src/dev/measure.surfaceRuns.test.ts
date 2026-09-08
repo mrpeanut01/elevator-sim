@@ -102,6 +102,7 @@ function shippedResources(): BrowserResources {
     };
   });
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: parseDispatcherProfiles(dataFile('dispatcher-profiles.json')),

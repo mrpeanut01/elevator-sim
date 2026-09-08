@@ -50,6 +50,8 @@ import {
 } from '@elevator-sim/core/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
 import { initialState, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
@@ -78,6 +80,7 @@ function resourcesOf(): BrowserResources {
   });
   const trafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),

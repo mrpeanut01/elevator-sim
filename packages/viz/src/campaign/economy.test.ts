@@ -16,6 +16,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import {
   CALENDAR_SPAN,
   CONTRACT_DAYS,
@@ -53,6 +55,7 @@ import {
   renewalOffer,
   serviceDaysLeft,
   shopTierAt,
+  shopTierPrice,
   shopTierState,
   shopTotalUnits,
   slotsOpen,
@@ -94,17 +97,20 @@ describe('the figures § 8 publishes, derived from the tables that produce them'
   });
 
   it('prices the shop at 324, summed over six categories rather than stated', () => {
-    expect(shopTotalUnits()).toBe(324);
+    expect(shopTotalUnits(shippedPriceSchedule())).toBe(324);
     // And the sum is genuinely over the table: the six category subtotals add to it.
     const subtotals = SHOP.map((category) =>
-      category.tiers.reduce((sum, tier) => sum + tier.units, 0),
+      category.tiers.reduce(
+        (sum, tier) => sum + shopTierPrice(shippedPriceSchedule(), tier).units,
+        0,
+      ),
     );
     expect(subtotals).toEqual([29, 43, 79, 50, 88, 35]);
-    expect(subtotals.reduce((a, b) => a + b, 0)).toBe(shopTotalUnits());
+    expect(subtotals.reduce((a, b) => a + b, 0)).toBe(shopTotalUnits(shippedPriceSchedule()));
   });
 
   it('leaves the contract screen’s lede true — a perfect month is about a third of the shop', () => {
-    const share = perfectMonthUnits(DIFFICULTIES.standard) / shopTotalUnits();
+    const share = perfectMonthUnits(DIFFICULTIES.standard) / shopTotalUnits(shippedPriceSchedule());
     expect(share).toBeGreaterThan(0.28);
     expect(share).toBeLessThan(0.36);
   });
@@ -208,10 +214,20 @@ describe('§ 8.2’s shop table', () => {
     expect(SHOP.map((category) => category.tiers.length)).toEqual([3, 3, 3, 2, 2, 3]);
   });
 
+  /**
+   * The signature figures, now read through the schedule — GitHub issue **#366**.
+   *
+   * The tier carries a `priceId` and nothing else about money; 34 units and eight nights are
+   * `data/price-schedule.json`'s. The literals stay here deliberately: a test that read the price
+   * back off the schedule would be comparing the schedule with itself, and 34 is the figure four
+   * shipped lists independently agreed on before there was a schedule to hold it.
+   */
   it('prices the shaft at the contract’s signature figures — 34 units and eight nights', () => {
     const shaft = shopTierAt('shafts', 1);
-    expect(shaft?.units).toBe(34);
-    expect(shaft?.nights).toBe(8);
+    expect(shaft).toBeDefined();
+    const priced = shopTierPrice(shippedPriceSchedule(), shaft!);
+    expect(priced.units).toBe(34);
+    expect(priced.nights).toBe(8);
   });
 
   it('numbers every tier from one, with no gaps', () => {
@@ -226,7 +242,7 @@ describe('§ 8.2’s shop table', () => {
 
 describe('§ 8.2’s buying rules', () => {
   it('refuses a tier whose tier below is not owned, and says which', () => {
-    const state = shopTierState(tower({ carry: 100 }), 'doors', SHOP[0]!.tiers[1]!);
+    const state = shopTierState(tower({ carry: 100 }), 'doors', SHOP[0]!.tiers[1]!, shippedPriceSchedule());
     expect(state.id).toBe('needs-below');
     expect(state.needsLevel).toBe(1);
     expect(state.pressable).toBe(false);
@@ -234,7 +250,7 @@ describe('§ 8.2’s buying rules', () => {
 
   it('names what an unaffordable tier is short by, and refuses the press', () => {
     // Standard opens with 8 units; the fourth car is 34.
-    const state = shopTierState(tower(), 'shafts', SHOP[4]!.tiers[0]!);
+    const state = shopTierState(tower(), 'shafts', SHOP[4]!.tiers[0]!, shippedPriceSchedule());
     expect(state.id).toBe('short');
     expect(state.shortBy).toBe(34 - 8);
     expect(state.pressable).toBe(false);
@@ -244,12 +260,12 @@ describe('§ 8.2’s buying rules', () => {
     // Day 18 of twenty, and the fourth car needs eight nights.
     const late = tower({ day: 18, carry: 100 });
     expect(daysOfBenefit(late, 8)).toBeLessThanOrEqual(0);
-    expect(shopTierState(late, 'shafts', SHOP[4]!.tiers[0]!).id).toBe('past-contract');
+    expect(shopTierState(late, 'shafts', SHOP[4]!.tiers[0]!, shippedPriceSchedule()).id).toBe('past-contract');
   });
 
   it('lets a zero-night tier be bought on any day, because it needs no nights at all', () => {
     const late = tower({ day: 20, carry: 100 });
-    expect(shopTierState(late, 'tenants', SHOP[5]!.tiers[0]!).id).toBe('buyable');
+    expect(shopTierState(late, 'tenants', SHOP[5]!.tiers[0]!, shippedPriceSchedule()).id).toBe('buyable');
   });
 
   it('legalises a start only from today, inside the contract, and clear of other works', () => {
@@ -286,10 +302,10 @@ describe('§ 8.2’s buying rules', () => {
     // Works on day 5 (index 4); live on day 6 (index 5).
     expect(fittedLevel(tower({ day: 5, bookings: [booking] }), 'doors')).toBe(0);
     expect(fittedLevel(tower({ day: 6, bookings: [booking] }), 'doors')).toBe(2);
-    expect(shopTierState(tower({ day: 6, bookings: [booking] }), 'doors', SHOP[0]!.tiers[1]!).id).toBe(
+    expect(shopTierState(tower({ day: 6, bookings: [booking] }), 'doors', SHOP[0]!.tiers[1]!, shippedPriceSchedule()).id).toBe(
       'fitted',
     );
-    expect(shopTierState(tower({ day: 5, bookings: [booking] }), 'doors', SHOP[0]!.tiers[1]!).id).toBe(
+    expect(shopTierState(tower({ day: 5, bookings: [booking] }), 'doors', SHOP[0]!.tiers[1]!, shippedPriceSchedule()).id).toBe(
       'under-works',
     );
   });

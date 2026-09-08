@@ -39,6 +39,9 @@
  * testable against a published number without a screen anywhere near them.
  */
 
+import { priceOf } from '../pricing/parse.js';
+import type { PriceSchedule } from '../pricing/types.js';
+
 /* -------------------------------------------------------------------------- *
  * § 8.6 — difficulty, which is the budget
  * -------------------------------------------------------------------------- */
@@ -240,9 +243,16 @@ export interface ShopTier {
   /** 1-based. A tier requires the tier below it — § 8.2's first buying rule. */
   readonly level: number;
   readonly name: string;
-  readonly units: number;
-  /** Nights of works. `0` is fitted immediately and works tomorrow. */
-  readonly nights: number;
+  /**
+   * The `data/price-schedule.json` row that prices this tier — GitHub issue **#366**.
+   *
+   * The `units` and `nights` that used to sit here were one of the six price lists that issue
+   * counted. They are unchanged in value — all sixteen tiers keep the figures they shipped, so the
+   * shop is still worth 324 units and 48 nights and the difficulty tuning that reads
+   * {@link shopTotalUnits} does not move — but they are read from one file now, beside the price
+   * the fix-a-building editor charges for the same act.
+   */
+  readonly priceId: string;
   readonly effect: string;
   /**
    * What this tier does to the day once it is live — {@link FitOutDelta}, absolute at this level.
@@ -277,16 +287,14 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 1,
         name: 'Faster doors',
-        units: 4,
-        nights: 0,
+        priceId: 'faster-doors',
         effect: 'A second off every stop, all day, forever.',
         fits: Object.freeze({ doorSecondsSaved: 1 }),
       }),
       Object.freeze({
         level: 2,
         name: 'Better sensors',
-        units: 9,
-        nights: 1,
+        priceId: 'door-sensors',
         effect: 'Doors stop re-opening for people who were not coming.',
         /*
          * The second comes off the **hall-call** dwell and nothing else, because that is the figure
@@ -301,8 +309,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 3,
         name: 'Advance opening',
-        units: 16,
-        nights: 2,
+        priceId: 'advance-opening',
         effect: 'Doors start opening as the car lands. Two seconds a stop.',
         fits: Object.freeze({ doorSecondsSaved: 3, hallDwellSecondsSaved: 1 }),
       }),
@@ -316,16 +323,14 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 1,
         name: 'Zone the tower',
-        units: 6,
-        nights: 1,
+        priceId: 'zone-the-tower',
         effect: 'Low and high groups. Shorter trips, thinner cover when quiet.',
         fits: Object.freeze({ zonesTheTower: true }),
       }),
       Object.freeze({
         level: 2,
         name: 'Destination panels',
-        units: 13,
-        nights: 2,
+        priceId: 'destination-panels',
         effect: 'People say their floor in the lobby, so cars can be grouped.',
         /*
          * `docs/09` § 1.1's **Level 0** — disclosure. The call carries a destination and
@@ -340,8 +345,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 3,
         name: 'Full destination dispatch',
-        units: 24,
-        nights: 3,
+        priceId: 'full-destination',
         effect: 'Every call knows both ends. The largest gain short of building.',
         /* Level 1: the panel names a car per passenger and boarding honours it — `destination-panel`. */
         fits: Object.freeze({
@@ -360,8 +364,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 1,
         name: '4.0 m/s',
-        units: 14,
-        nights: 2,
+        priceId: 'machines-4mps',
         effect: 'Modest on fourteen floors; real above ten.',
         /*
          * The class is named as well as the speed, because a speed alone is not a legal building:
@@ -375,16 +378,14 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 2,
         name: '5.0 m/s, softer ride',
-        units: 25,
-        nights: 3,
+        priceId: 'machines-5mps',
         effect: 'Faster and smoother, so people load without hesitating.',
         fits: Object.freeze({ machineClassId: 'gearless-traction', ratedSpeedMps: 5 }),
       }),
       Object.freeze({
         level: 3,
         name: 'Gearless, 8.0 m/s',
-        units: 40,
-        nights: 5,
+        priceId: 'machines-gearless',
         effect: 'More than this tower can use. Bought for the renewal, not for now.',
         fits: Object.freeze({ machineClassId: 'high-speed-gearless', ratedSpeedMps: 8 }),
       }),
@@ -398,16 +399,14 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 1,
         name: '16-person cars',
-        units: 18,
-        nights: 3,
+        priceId: 'larger-cars',
         effect: 'Three more per trip. The morning shortens by a fifth.',
         fits: Object.freeze({ carPersons: 16 }),
       }),
       Object.freeze({
         level: 2,
         name: '21-person cars',
-        units: 32,
-        nights: 4,
+        priceId: 'larger-cars-21',
         effect: 'Needs new shells and ropes. Slower doors, far fewer trips.',
         /*
          * **Both halves of that trade are the model's, and neither is a second number written here.**
@@ -431,8 +430,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 1,
         name: 'A fourth car',
-        units: 34,
-        nights: 8,
+        priceId: 'new-car',
         /*
          * **This read *"… Eight nights with two cars out."* until GitHub issue #272, and the second
          * sentence is withdrawn rather than reworded.**
@@ -471,8 +469,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 2,
         name: 'A fifth car',
-        units: 54,
-        nights: 10,
+        priceId: 'fifth-car',
         effect: 'Comfortable at any occupancy this building will ever see.',
         fits: Object.freeze({ extraShafts: 2 }),
       }),
@@ -486,8 +483,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 1,
         name: 'Queue marshalling',
-        units: 5,
-        nights: 0,
+        priceId: 'queue-marshalling',
         effect: 'Someone in the lobby directing people. Cheap, and it works.',
         /*
          * A marshal changes how long each person takes to get through the doorway, which is exactly
@@ -506,8 +502,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 2,
         name: 'Staggered start times',
-        units: 10,
-        nights: 0,
+        priceId: 'staggered-starts',
         effect: 'Negotiated with four tenants. Flattens the 08:40 peak by a third.',
         /*
          * *By a third* is the tier's own figure, applied to the rate the day would otherwise have
@@ -522,8 +517,7 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
       Object.freeze({
         level: 3,
         name: 'Move a tenant floor',
-        units: 20,
-        nights: 4,
+        priceId: 'move-a-tenant',
         effect: 'The heaviest tenant comes down to floors 3–4. Fixes the cause.',
         /*
          * A real edit to the building's floor populations, on `shift/growth.ts`'s stated ground:
@@ -544,11 +538,22 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
  * The contract publishes the figure and this function derives it; `economy.test.ts` compares the
  * two. That is the difference between a lede that quotes a number and a lede that quotes the shop.
  */
-export function shopTotalUnits(): number {
+export function shopTotalUnits(schedule: PriceSchedule): number {
   return SHOP.reduce(
-    (total, category) => total + category.tiers.reduce((sum, tier) => sum + tier.units, 0),
+    (total, category) =>
+      total +
+      category.tiers.reduce((sum, tier) => sum + priceOf(schedule, tier.priceId).priceUnits, 0),
     0,
   );
+}
+
+/** What a shop tier costs and how long its works take — one lookup, one place (issue #366). */
+export function shopTierPrice(
+  schedule: PriceSchedule,
+  tier: ShopTier,
+): { readonly units: number; readonly nights: number } {
+  const priced = priceOf(schedule, tier.priceId);
+  return { units: priced.priceUnits, nights: priced.nights };
 }
 
 /** The category for an id, or `undefined`. */
@@ -817,6 +822,7 @@ export function shopTierState(
   tower: TowerEconomy,
   categoryId: ShopCategoryId,
   tier: ShopTier,
+  schedule: PriceSchedule,
 ): ShopTierState {
   const dayIdx = dayIndexOf(tower);
   const booking = bookingFor(tower, categoryId, tier.level);
@@ -836,13 +842,15 @@ export function shopTierState(
     if (owned < below) return { id: 'needs-below', needsLevel: below, pressable: false };
   }
   const purse = purseOf(tower);
-  if (purse < tier.units) {
-    return { id: 'short', shortBy: tier.units - purse, pressable: false };
+  /* One lookup, and the schedule is the only place a price comes from — issue #366. */
+  const { units, nights } = shopTierPrice(schedule, tier);
+  if (purse < units) {
+    return { id: 'short', shortBy: units - purse, pressable: false };
   }
-  if (tier.nights > 0 && daysOfBenefit(tower, tier.nights) <= 0) {
+  if (nights > 0 && daysOfBenefit(tower, nights) <= 0) {
     return { id: 'past-contract', pressable: false };
   }
-  if (tier.nights > 0 && legalStarts(tower, tier.nights).length === 0) {
+  if (nights > 0 && legalStarts(tower, nights).length === 0) {
     return { id: 'past-contract', pressable: false };
   }
   return { id: 'buyable', pressable: true };

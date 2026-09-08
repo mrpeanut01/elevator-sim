@@ -36,6 +36,8 @@ import {
 } from '@elevator-sim/core/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
 import { DEFAULT_PATTERN, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { probabilityWordIn } from '../campaign/words.js';
@@ -352,6 +354,7 @@ describe('trafficPlateOf', () => {
  */
 function resourcesWith(trafficProfiles: TrafficProfiles): BrowserResources {
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs: config.elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: config.dispatcherProfiles,

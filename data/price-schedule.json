@@ -20,7 +20,7 @@
       "id": "building",
       "order": 3,
       "name": "Building",
-      "typicalUnits": 18,
+      "typicalUnits": 20,
       "note": "The fabric: a new shaft or car, a faster or larger machine, a rezoned bank. The dearest end, and the only one that books long works."
     }
   ],
@@ -311,11 +311,10 @@
       "name": "A faster machine",
       "priceUnits": 10,
       "nights": 2,
-      "note": "THE CLEAREST CONFLICT THE SCHEDULE RESOLVES. The same purchase — make a machine faster — was priced three ways: the fix cases charge 8, 9 or 10 units for a 0.5 m/s bump and 12 for 1.0; `fixit/engine.ts#EDITOR_PRICING.speedUnitsPerHalfMps` charges 6; the campaign shop's machine tiers are 14, 25 and 40. A player paid a different price for the same metre per second depending on which screen they stood on. 10 is taken — the fix cases' mode — so the editor's step moves 6 to 10.",
+      "note": "THE CLEAREST CONFLICT THE SCHEDULE RESOLVES. The same purchase — make a machine faster — was priced three ways: the fix cases charge 8, 9 or 10 units for a 0.5 m/s bump and 12 for 1.0; `fixit/engine.ts#EDITOR_PRICING.speedUnitsPerHalfMps` charges 6; the campaign shop's machine tiers are 14, 25 and 40. A player paid a different price for the same metre per second depending on which screen they stood on. 10 is taken — the fix cases' mode — so the editor's step moves 6 to 10. The campaign shop's three machine tiers are re-specifications of the whole fleet to a named class and are separate rows below, on `larger-car-step`'s ground: widening one car and re-specifying the fleet are different acts.",
       "covers": [
         "building.cars[].set.ratedSpeedDeltaMps",
-        "editor.speed",
-        "shop.machines.1"
+        "editor.speed"
       ],
       "schema": {
         "type": "integer",
@@ -333,7 +332,7 @@
       "nights": 3,
       "note": "The campaign shop's own figure for 16-person cars, kept. The editor's per-two-places step is a separate row (`larger-car-step`), because re-specifying the fleet and widening one car are different acts.",
       "covers": [
-        "shop.cars"
+        "shop.cars.1"
       ],
       "schema": {
         "type": "integer",
@@ -397,6 +396,78 @@
         "min": 0,
         "max": 40,
         "default": 8
+      }
+    },
+    {
+      "id": "machines-4mps",
+      "tier": "building",
+      "name": "4.0 m/s machines",
+      "priceUnits": 14,
+      "nights": 2,
+      "note": "The campaign shop's own figure, kept. A fleet re-specification to a named class, which is a different act from `faster-machines`' per-car delta.",
+      "covers": [
+        "shop.machines.1"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 60,
+        "default": 14
+      }
+    },
+    {
+      "id": "machines-5mps",
+      "tier": "building",
+      "name": "5.0 m/s machines, softer ride",
+      "priceUnits": 25,
+      "nights": 3,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.machines.2"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 60,
+        "default": 25
+      }
+    },
+    {
+      "id": "machines-gearless",
+      "tier": "building",
+      "name": "Gearless machines, 8.0 m/s",
+      "priceUnits": 40,
+      "nights": 5,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.machines.3"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 80,
+        "default": 40
+      }
+    },
+    {
+      "id": "larger-cars-21",
+      "tier": "building",
+      "name": "21-person cars",
+      "priceUnits": 32,
+      "nights": 4,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.cars.2"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 60,
+        "default": 32
       }
     }
   ],

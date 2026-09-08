@@ -80,6 +80,8 @@ import {
   wearHeadOf,
 } from './economy.js';
 import { contractById } from '../shift/contracts.js';
+import { shopTierPrice } from './economy.js';
+import type { PriceSchedule } from '../pricing/types.js';
 
 /* -------------------------------------------------------------------------- *
  * The record
@@ -595,6 +597,8 @@ export type CampaignAction =
 export function applyCampaignAction(
   career: CampaignCareer,
   action: CampaignAction,
+  /* The price of anything bought here — `data/price-schedule.json`, GitHub issue #366. */
+  schedule: PriceSchedule,
 ): CampaignCareer {
   switch (action.kind) {
     case 'open-tower': {
@@ -620,9 +624,9 @@ export function applyCampaignAction(
         spends: [],
       }));
     case 'press-tier':
-      return pressTier(career, action.towerId, action.categoryId, action.level);
+      return pressTier(career, action.towerId, action.categoryId, action.level, schedule);
     case 'pick-start':
-      return pickStart(career, action.startIdx);
+      return pickStart(career, action.startIdx, schedule);
     case 'cancel-booking':
       return { ...career, pendingBooking: undefined };
     case 'answer-need':
@@ -752,19 +756,22 @@ function pressTier(
   towerId: string,
   categoryId: ShopCategoryId,
   level: number,
+  schedule: PriceSchedule,
 ): CampaignCareer {
   const tower = towerById(career, towerId);
   const tier = shopTierAt(categoryId, level);
   if (tower === undefined || tier === undefined) return career;
   if (bookingFor(tower, categoryId, level) !== undefined) return career;
-  if (purseOf(tower) < tier.units) return career;
-  if (tier.nights === 0) {
+  /* The price is the schedule's — issue #366. The booking records what was paid, as history. */
+  const { units, nights } = shopTierPrice(schedule, tier);
+  if (purseOf(tower) < units) return career;
+  if (nights === 0) {
     const booking: WorksBooking = {
       categoryId,
       level,
       startIdx: dayIndexOf(tower),
       nights: 0,
-      units: tier.units,
+      units,
     };
     return mapTower(career, towerId, (current) => ({
       ...current,
@@ -778,20 +785,25 @@ function pressTier(
  * § 8.4 step two. The money leaves the purse **here** — when it is booked, not when it goes live —
  * which is the third of § 8.2's buying rules and the reason `committedUnits` sums bookings.
  */
-function pickStart(career: CampaignCareer, startIdx: number): CampaignCareer {
+function pickStart(
+  career: CampaignCareer,
+  startIdx: number,
+  schedule: PriceSchedule,
+): CampaignCareer {
   const pending = career.pendingBooking;
   if (pending === undefined) return career;
   const tower = towerById(career, pending.towerId);
   const tier = shopTierAt(pending.categoryId, pending.level);
   if (tower === undefined || tier === undefined) return { ...career, pendingBooking: undefined };
-  if (!startIsLegal(tower, startIdx, tier.nights)) return career;
-  if (purseOf(tower) < tier.units) return { ...career, pendingBooking: undefined };
+  const { units, nights } = shopTierPrice(schedule, tier);
+  if (!startIsLegal(tower, startIdx, nights)) return career;
+  if (purseOf(tower) < units) return { ...career, pendingBooking: undefined };
   const booking: WorksBooking = {
     categoryId: pending.categoryId,
     level: pending.level,
     startIdx,
-    nights: tier.nights,
-    units: tier.units,
+    nights,
+    units,
   };
   return {
     ...mapTower(career, pending.towerId, (current) => ({

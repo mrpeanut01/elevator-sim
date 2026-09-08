@@ -41,6 +41,8 @@ import {
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import { BAND_COLORS, WAIT_BANDS, bandOf, waitBandsAt } from '../live/bands.js';
 import * as tokens from '../render/tokens.js';
 import type { VizRecording } from '../contract/types.js';
@@ -482,6 +484,7 @@ function resourcesOf(): BrowserResources {
   });
   const trafficProfiles = parseTrafficProfiles(readData('traffic-profiles.json'));
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: parseDispatcherProfiles(readData('dispatcher-profiles.json')),

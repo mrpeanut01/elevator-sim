@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import {
   BUILDING_COPY,
   CALENDAR_GLYPHS,
@@ -65,6 +67,7 @@ const DISPATCHERS = [
 
 function inputOf(career: CampaignCareer, patch: Partial<CampaignInput> = {}): CampaignInput {
   return {
+    schedule: shippedPriceSchedule(),
     career,
     buildings: BUILDINGS,
     dispatchers: DISPATCHERS,
@@ -247,7 +250,7 @@ describe('the building desk (§ 8.2)', () => {
   });
 
   it('draws the renewal with its allowance, its offer and § 8.9’s reasoning', () => {
-    const career = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' });
+    const career = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' }, shippedPriceSchedule());
     const view = buildingView(inputOf(career))!;
     expect(view.need?.allowance).toBe('1 of 3 missed days used · standard');
     // 17 of 18 cleared is 94%, which § 8.9 moves by +1: 4 u a day becomes 5.
@@ -274,14 +277,14 @@ describe('the building desk (§ 8.2)', () => {
     expect(view.options!.rows.find((row) => row.id === 'leave')?.cost).toBe('free');
 
     // On a well-off tower the same option is affordable, so the dimming is about the purse.
-    const rich = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' });
+    const rich = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' }, shippedPriceSchedule());
     expect(
       buildingView(inputOf(rich))!.options!.rows.find((row) => row.id === 'refurbish')?.affordable,
     ).toBe(true);
   });
 
   it('heads the condition card by § 8.3’s three thresholds, and says the trips behind it', () => {
-    const career = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' });
+    const career = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' }, shippedPriceSchedule());
     const view = buildingView(inputOf(career))!;
     expect(view.condition.head).toBe('Service window due');
     expect(view.condition.headId).toBe('due');
@@ -297,6 +300,7 @@ describe('the building desk (§ 8.2)', () => {
     const bought = applyCampaignAction(
       { ...openingCareer('eta'), towers: [{ ...openingCareer('eta').towers[0]!, day: 3, carry: 60 }] },
       { kind: 'press-tier', towerId: 'c1', categoryId: 'doors', level: 1 },
+      shippedPriceSchedule(),
     );
     const view = buildingView(inputOf(bought))!;
     const doors = view.fitted.rows.find((row) => row.categoryId === 'doors')!;
@@ -464,7 +468,7 @@ describe('the contract sheet (§ 8.3, § 8.4)', () => {
       towerId: 'c1',
       categoryId: 'machines',
       level: 1,
-    });
+    }, shippedPriceSchedule());
     const prompting = contractView(inputOf(pressed))!;
     expect(prompting.month.prompt).toContain('Pick the night 4.0 m/s goes in');
     expect(prompting.month.prompt).toContain('2 nights of works');
@@ -482,7 +486,7 @@ describe('the contract sheet (§ 8.3, § 8.4)', () => {
       [],
     );
 
-    const booked = applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 11 });
+    const booked = applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 11 }, shippedPriceSchedule());
     const view = contractView(inputOf(booked))!;
     expect(view.month.prompt).toBeUndefined();
     const machines = view.shop.categories.find((category) => category.id === 'machines')!;
@@ -530,7 +534,7 @@ describe('the contract sheet (§ 8.3, § 8.4)', () => {
 
 describe('one record, three screens (§ 16 rule 14)', () => {
   it('has all three agree about the day, the record and the purse', () => {
-    const career = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' });
+    const career = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' }, shippedPriceSchedule());
     const input = inputOf(career);
     const towers = towersView(input);
     const desk = buildingView(input)!;
@@ -551,12 +555,12 @@ describe('one record, three screens (§ 16 rule 14)', () => {
   });
 
   it('moves all three when one of them writes the record', () => {
-    const before = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c1' });
+    const before = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c1' }, shippedPriceSchedule());
     const after = applyCampaignAction(before, {
       kind: 'set-dispatcher',
       towerId: 'c1',
       dispatcherId: 'mine',
-    });
+    }, shippedPriceSchedule());
     expect(towersView(inputOf(after)).rows[0]?.order.dispatcherId).toBe('mine');
     expect(buildingView(inputOf(after))?.order.view.dispatcherId).toBe('mine');
     // A saved dispatcher gets the prototype's own line for one of yours.
@@ -599,8 +603,8 @@ describe('a works day takes one car out of service (issue #353, after #264)', ()
       towerId: 'c1',
       categoryId: 'machines',
       level: 1,
-    });
-    return applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 5 });
+    }, shippedPriceSchedule());
+    return applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 5 }, shippedPriceSchedule());
   }
 
   it('says a car is out on every works cell of both grids, and where the player meets the cost', () => {
@@ -639,6 +643,7 @@ describe('a works day takes one car out of service (issue #353, after #264)', ()
     const pressed = applyCampaignAction(
       { ...base, towers: [{ ...base.towers[0]!, day: 3, carry: 100 }] },
       { kind: 'press-tier', towerId: 'c1', categoryId: 'shafts', level: 1 },
+      shippedPriceSchedule(),
     );
     const view = contractView(inputOf(pressed))!;
     const offers = view.month.weeks.flatMap((week) => week.cells).filter((cell) => cell.mark === '+');
@@ -792,7 +797,7 @@ describe('§ 8.8’s offers, and the gate on ambition', () => {
       expect(row.cta).toBe('Not yet');
       expect(row.refusal).toBe('No free slot — 14 more standing opens the next one.');
     }
-    expect(applyCampaignAction(opening, { kind: 'take-offer', contractId: 'c2' })).toBe(opening);
+    expect(applyCampaignAction(opening, { kind: 'take-offer', contractId: 'c2' }, shippedPriceSchedule())).toBe(opening);
   });
 
   it('refuses on a tower one miss from ending once a slot is free, and takes an offer when neither blocks', () => {
@@ -803,14 +808,14 @@ describe('§ 8.8’s offers, and the gate on ambition', () => {
     const offered = towersView(inputOf(earned)).offers.rows.find((row) => row.contractId === 'c2');
     expect(offered?.takeable).toBe(true);
     expect(offered?.cta).toBe('Take it');
-    const taken = applyCampaignAction(earned, { kind: 'take-offer', contractId: 'c2' });
+    const taken = applyCampaignAction(earned, { kind: 'take-offer', contractId: 'c2' }, shippedPriceSchedule());
     expect(taken.towers.map((entry) => entry.id)).toEqual(['c1', 'c2']);
     expect(taken.openTowerId).toBe('c2');
     expect(taken.towers[1]?.rate).toBe(5);
     expect(taken.towers[1]?.dispatcherId).toBe('collective');
     /* Held now, so it is no longer offered; and a second take of the same contract moves nothing. */
     expect(towersView(inputOf(taken)).offers.rows.map((row) => row.contractId)).not.toContain('c2');
-    expect(applyCampaignAction(taken, { kind: 'take-offer', contractId: 'c2' })).toBe(taken);
+    expect(applyCampaignAction(taken, { kind: 'take-offer', contractId: 'c2' }, shippedPriceSchedule())).toBe(taken);
     /*
      * A standard month allows three misses; a tower at its allowance is one miss from ending. Day
      * 16 with three misses is twelve cleared days — 24 − 9 = 15 standing, so the slot is open and
@@ -820,6 +825,6 @@ describe('§ 8.8’s offers, and the gate on ambition', () => {
     const blocked = towersView(inputOf(risky)).offers.rows.find((row) => row.contractId === 'c2');
     expect(blocked?.takeable).toBe(false);
     expect(blocked?.refusal).toBe('A tower is one miss from ending. Fix that before adding another.');
-    expect(applyCampaignAction(risky, { kind: 'take-offer', contractId: 'c2' })).toBe(risky);
+    expect(applyCampaignAction(risky, { kind: 'take-offer', contractId: 'c2' }, shippedPriceSchedule())).toBe(risky);
   });
 });

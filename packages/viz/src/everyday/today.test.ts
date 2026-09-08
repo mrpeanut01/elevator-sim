@@ -20,6 +20,8 @@ import {
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import type { BrowserResources } from '../dev/data.js';
 import { initialState, resolvedBuildingOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
@@ -235,6 +237,7 @@ function resources300(): BrowserResources {
   });
   const trafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),

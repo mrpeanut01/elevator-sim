@@ -19,6 +19,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
+
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import {
   parseBuilding,
   parseDispatcherProfiles,
@@ -68,6 +70,7 @@ function resourcesOf(): BrowserResources {
   });
   const trafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),

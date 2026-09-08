@@ -11,6 +11,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
@@ -23,8 +25,8 @@ import { worksHeldCarRefsOf, worksHeldCarsOf, worksTodayOf } from './works.js';
 function towerUnderWorks(): CampaignTower {
   const base = openingCareer('eta');
   const opened = { ...base, towers: [{ ...base.towers[0]!, day: 3, carry: 100 }] };
-  const pressed = applyCampaignAction(opened, { kind: 'press-tier', towerId: 'c1', categoryId: 'machines', level: 1 });
-  const booked = applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 5 });
+  const pressed = applyCampaignAction(opened, { kind: 'press-tier', towerId: 'c1', categoryId: 'machines', level: 1 }, shippedPriceSchedule());
+  const booked = applyCampaignAction(pressed, { kind: 'pick-start', startIdx: 5 }, shippedPriceSchedule());
   const tower = booked.towers[0]!;
   return { ...tower, day: 6 };
 }

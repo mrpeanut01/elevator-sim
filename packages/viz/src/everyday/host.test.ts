@@ -21,6 +21,8 @@ import {
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import { RUSH_SEED, RUSH_TEMPLATE_ID } from './rush.js';
 import { REPLAY_COPY } from './replay.js';
 import { RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID } from '../shift/week.js';
@@ -75,6 +77,7 @@ function resourcesOf(): BrowserResources {
   });
   const trafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
   return {
+    priceSchedule: shippedPriceSchedule(),
     elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),
