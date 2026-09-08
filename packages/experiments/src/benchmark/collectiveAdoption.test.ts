@@ -96,7 +96,12 @@ describe('§ D209 § 2 — the ladders', () => {
     // to be able to see that it is a decision. Widening § D209 to include them retroactively would
     // change what § D210 and § D212 were decided against, which is the one thing a pre-registration
     // is for.
-    expect(later).toEqual(['chancery-house', 'crown-hotel', 'st-jude-hospital']);
+    expect(later).toEqual([
+      'burj-class-reference',
+      'chancery-house',
+      'crown-hotel',
+      'st-jude-hospital',
+    ]);
   });
 
   it('descends, and never changes building within a ladder', () => {

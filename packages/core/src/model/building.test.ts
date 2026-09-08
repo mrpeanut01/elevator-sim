@@ -44,6 +44,7 @@ function requireBank<TCar extends CarLike>(building: Building<TCar>, bankId: str
 
 /** What `data/buildings/` actually contains, pinned so a config edit cannot pass silently. */
 const EXPECTED = [
+  { id: 'burj-class-reference', type: 'mixed-use', floors: 165, banks: 6, cars: 57, entrances: ['G'], transfers: ['G', '1', '43', '44', '76', '77', '123', '124'], zones: 0, population: 3198 },
   { id: 'chancery-house', type: 'office', floors: 19, banks: 1, cars: 6, entrances: ['G'], transfers: [], zones: 0, population: 612 },
   { id: 'crown-hotel', type: 'hotel', floors: 24, banks: 1, cars: 5, entrances: ['G'], transfers: [], zones: 1, population: 866 },
   { id: 'garden-apartments', type: 'residential', floors: 6, banks: 1, cars: 2, entrances: ['G'], transfers: [], zones: 0, population: 120 },
@@ -55,7 +56,7 @@ const EXPECTED = [
 ] as const;
 
 describe('createBuilding over the shipped buildings', () => {
-  it('builds all eight', () => {
+  it('builds all nine', () => {
     expect(config.buildings.map((b) => b.id)).toEqual(EXPECTED.map((e) => e.id));
   });
 
@@ -432,6 +433,7 @@ describe('boarding a floor that more than one bank serves', () => {
     }
 
     expect(shared).toEqual({
+      'burj-class-reference': ['G', '1', '43', '44', '76', '77', '123', '124'],
       'mixed-use-high-rise': ['G', '31'],
       'secure-tower': ['G'],
       'vertical-city': ['G', '2', '26', '27', '51', '52', '76', '77'],

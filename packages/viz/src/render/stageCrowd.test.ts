@@ -120,17 +120,31 @@ function stageFor(id: string, canvas: { readonly width: number; readonly height:
  * shafts are the subject. Their landing rows in the right gutter carry the whole claim, which is
  * `render/riderFigures.ts`'s stated degradation: **aggregate, never remove.**
  */
-const NO_ROOM_FOR_A_LOBBY = new Set(['mixed-use-high-rise', 'vertical-city']);
+/*
+ * The Burj-class reference tower joins them, and for a third reason worth naming — GitHub issue
+ * **#376**. It draws 57 shafts over 165 floors, so it has no room for a lane at the viewer's own
+ * canvas; and unlike the other two it **disagrees with itself across canvases**, reserving one at
+ * the narrower laptop size and not at the wider one. That is not a crowd-lane defect, it is the
+ * stage's drawing at 165 floors, which is § D527's fifth measurement and **#377's** — the issue
+ * that carries the zoned or scrolled stage and the handoff deviation it is recorded as. #376 says
+ * in terms that the drawing is not its to decide, so this building is excused the lane here and
+ * the disagreement is #377's evidence rather than this file's failure.
+ */
+const NO_ROOM_FOR_A_LOBBY = new Set([
+  'burj-class-reference',
+  'mixed-use-high-rise',
+  'vertical-city',
+]);
 
 describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
-  it('reserves a lane on six of the eight shipped buildings, at the viewer’s own canvas', () => {
+  it('reserves a lane on six of the nine shipped buildings, at the viewer’s own canvas', () => {
     const withLane = BUILDING_IDS.filter((id) => stageFor(id, SHIPPED_CANVAS).riderLane !== undefined);
     expect([...withLane].sort()).toStrictEqual(
       BUILDING_IDS.filter((id) => !NO_ROOM_FOR_A_LOBBY.has(id))
         .slice()
         .sort(),
     );
-    // Six, and before the change it was one — and that one was the empty building.
+    // Six of the nine; before the change it was one, and that one was the empty building.
     expect(withLane).toHaveLength(6);
   });
 
@@ -157,8 +171,16 @@ describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
      * is left, so these numbers are the ones the layout produced before the lane existed:
      * everything fits except Vertical City, which hides 2 at a desktop canvas and 9 at a laptop one
      * and says so through `RS-05`'s notice.
+     *
+     * **And except the Burj-class reference tower, which hides 24 and 31** — GitHub issue #376. 57
+     * shafts over 165 floors do not fit any canvas this project draws, and the figure is pinned
+     * here rather than excused because it is the sharpest statement of the problem **#377** exists
+     * to solve: § D527's fifth measurement is the stage's drawing, and a tower that hides 24 of its
+     * 57 machines at a desktop canvas is what says a zoned or scrolled stage is needed rather than
+     * preferred. `RS-05`'s notice still fires, so nothing is hidden silently.
      */
     const hidden: Record<string, readonly [number, number]> = {
+      'burj-class-reference': [24, 31],
       'chancery-house': [0, 0],
       'crown-hotel': [0, 0],
       'garden-apartments': [0, 0],

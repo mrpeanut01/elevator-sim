@@ -581,9 +581,9 @@ describe('the loader refuses to accept an unroutable building in silence', () =>
     expect(tower.warnings.map((warning) => warning.code)).toEqual([]);
   });
 
-  it('leaves all eight shipped buildings loading clean', async () => {
+  it('leaves all nine shipped buildings loading clean', async () => {
     const config = await loadConfig(REAL_DATA_DIR);
-    expect(config.buildings).toHaveLength(8);
+    expect(config.buildings).toHaveLength(9);
     const connectivityCodes: readonly string[] = [
       WARNING_CODES.unreachableFromEntrance,
       WARNING_CODES.unroutableInterfloor,

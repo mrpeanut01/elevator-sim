@@ -201,6 +201,7 @@ describe('loadConfig against the real data/ directory', () => {
 
   it('loads every shipped building, in filename order', () => {
     expect(config.buildings.map((building) => building.id)).toEqual([
+      'burj-class-reference',
       'chancery-house',
       'crown-hotel',
       'garden-apartments',

@@ -35,7 +35,7 @@ fix cases and forty proof cases*. **Four are right and one is wrong.**
 
 | content type | key | ships today | derived from |
 |---|---|---|---|
-| Buildings | `buildings` | **8** | `.json` files in [`data/buildings/`](../data/buildings/), and pinned both ways by `packages/viz/src/fixtures.test-helper.ts#BUILDING_IDS` against `readdirSync` |
+| Buildings | `buildings` | **9** | `.json` files in [`data/buildings/`](../data/buildings/), and pinned both ways by `packages/viz/src/fixtures.test-helper.ts#BUILDING_IDS` against `readdirSync` |
 | Campaign stages | `campaign-stages` | **10** | `stages` in [`data/campaign.json`](../data/campaign.json) |
 | Contracts (the daily loop's scenarios) | `contracts` | **8** | `CONTRACTS` in `packages/viz/src/shift/contracts.ts` — `c1`–`c8` |
 | Fix-a-building cases | `fix-cases` | **18** | `cases` in [`data/fixit-cases.json`](../data/fixit-cases.json) |
@@ -167,7 +167,7 @@ independently**.
 
 | content type | key | today | **target** | how the target is derived | play-hours it adds |
 |---|---|---|---|---|---|
-| Buildings | `buildings` | 8 | **12** | § 4.3 | 0 directly; multiplies every other row |
+| Buildings | `buildings` | 9 | **12** | § 4.3 | 0 directly; multiplies every other row |
 | Contracts | `contracts` | 8 | **12** | one per shipped building — `docs/12` § 4.7's own rule, *a shipped building with no contract is a scenario the reader can never take* | 4 × 3 clean days × 1 800 s = 21 600 s = 12 watch-min × 5 = **+1.00** |
 | Campaign stages | `campaign-stages` | 10 | **14** | one per building, plus the two stages that teach a mechanic rather than a tower (stage 3 *Overwhelmed* and stage 7 *Tune it*, both on `midtown-office`). Today that rule gives exactly the shipped 10 | 4 × 900 s = 3 600 s = 2 watch-min × 5 = **+0.17** |
 | Fix cases | `fix-cases` | 18 | **44** | § 10.6 of the gameplay guide names **26** further cases by name, with authoring rules; 18 + 26. **16 of the 26 are authorable today** — § 5.2 | 26 × 7.67 min = **+3.32** |

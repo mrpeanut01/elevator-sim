@@ -703,9 +703,22 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
     // for it. Three buildings landed after this table was written and were invisible here.
     const named = new Set(PRINCIPAL_BANKS.map((bank) => bank.buildingId));
     const absent = [...config.buildingsById.keys()].filter((id) => !named.has(id)).sort();
-    expect(absent).toEqual(['chancery-house', 'crown-hotel', 'st-jude-hospital']);
+    expect(absent).toEqual([
+      'burj-class-reference',
+      'chancery-house',
+      'crown-hotel',
+      'st-jude-hospital',
+    ]);
 
     // And why each is absent, because "not covered" and "not coverable" are different statements.
+    //
+    // `burj-class-reference` is absent and **coverable**, which is the one of the four that names
+    // work rather than a limit. GitHub issue #376 authored it and took four of § D527's five
+    // measurements; the fifth of *this* table's kind — the Barney/CIBSE round trip per bank at
+    // 10 m/s over a rise of several hundred metres — is #376's third criterion and is **open**.
+    // `sim/oracle.test.ts` is wired to one building with a demand template of its own, so pointing
+    // it at a 165-floor tower with three sky lobbies and a double-deck shuttle is a piece of work
+    // rather than a parameter change, and a looser comparison would be a check that cannot fail.
     //
     // `crown-hotel` and `st-jude-hospital` are **not coverable by this oracle at all**: the
     // Barney/CIBSE round-trip-time calculation assumes one car specification per bank, and both
@@ -715,8 +728,10 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
     //
     // `chancery-house` IS coverable — six identical cars, one bank, no zoning — and is simply not
     // measured yet. That is an owed measurement rather than a modelling limit, and stating it here
-    // is what stops it being forgotten.
-    const coverable = ['chancery-house'];
+    // is what stops it being forgotten. `burj-class-reference` is the same kind of debt at a much
+    // larger size: every one of its six banks holds identical cars, so each is coverable, and
+    // GitHub issue #376's third criterion is exactly this measurement left open.
+    const coverable = ['burj-class-reference', 'chancery-house'];
     const notCoverable = ['crown-hotel', 'st-jude-hospital'];
     expect([...coverable, ...notCoverable].sort()).toEqual(absent);
     for (const id of notCoverable) {
@@ -730,14 +745,31 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
       // The claim is checked, not asserted: these buildings really do hold unlike cars.
       expect(specs.size, `${id} is uniform after all — it may now be coverable`).toBeGreaterThan(1);
     }
+    /*
+     * **Uniformity is checked per bank, and that was a correction** — GitHub issue #376.
+     *
+     * This counted specs across the *whole building* and required exactly one, which was right
+     * about `chancery-house` (one bank, six identical cars) by accident: with a single bank the two
+     * readings are the same number. The Barney/CIBSE calculation is **per bank** — that is what
+     * `PRINCIPAL_BANKS` is a list of — so a building whose every bank is internally uniform is
+     * coverable however its banks differ from each other. The reference tower is exactly that
+     * shape: six banks, three car specifications between them, and each bank uniform in itself.
+     *
+     * The whole-building reading would have called it uncoverable for a reason the oracle does not
+     * have, which is the opposite of what this guard is for.
+     */
     for (const id of coverable) {
       const building = config.buildingsById.get(id);
-      const specs = new Set(
-        (building?.banks ?? []).flatMap((bank) =>
+      expect(building, id).toBeDefined();
+      for (const bank of building?.banks ?? []) {
+        const specs = new Set(
           bank.cars.map((car) => `${String(car.ratedSpeedMps)}/${String(car.ratedLoadLb)}`),
-        ),
-      );
-      expect(specs.size, `${id} is no longer uniform — it may have stopped being coverable`).toBe(1);
+        );
+        expect(
+          specs.size,
+          `${id}/${bank.id} is no longer uniform — it may have stopped being coverable`,
+        ).toBe(1);
+      }
     }
   });
 

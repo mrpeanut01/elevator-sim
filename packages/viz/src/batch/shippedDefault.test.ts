@@ -37,7 +37,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { batchReport } from './report.js';
 import { runBatch } from './runBatch.js';
 import type { BatchRequest, BatchResources } from './types.js';
-import { PREFERRED_BATCH_BASELINE, PREFERRED_BATCH_CANDIDATE, preferredId } from '../dev/defaults.js';
+import { PREFERRED_BATCH_BASELINE,
+  PREFERRED_OPENING_BUILDINGS, PREFERRED_BATCH_CANDIDATE, preferredId } from '../dev/defaults.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
 const INDEX_HTML = fileURLToPath(new URL('../../index.html', import.meta.url));
@@ -73,7 +74,24 @@ function selectedOption(id: string): string {
  * follows that rather than naming a building.
  */
 function shippedDefaultRequest(): BatchRequest {
-  const building = config.buildings[0];
+  /*
+   * **The building a player actually opens on, not the one that sorts first** — GitHub issue #376.
+   *
+   * This read `config.buildings[0]`, and it agreed with the product only because `chancery-house`
+   * happened to be first in filename order. It is not how the product decides: `menu/menu.ts` and
+   * `dev/state.ts` resolve the opening building through `dev/defaults.ts#PREFERRED_OPENING_BUILDINGS`
+   * with file order as the *fallback*, which is § D134's shape from GitHub issue #99 — a rename
+   * drops to index 0 rather than breaking.
+   *
+   * A Burj-class reference building landing in `data/buildings/` sorts before `chancery-house` and
+   * made this file claim the shipped default was a 165-floor tower at 1.35 s a replication. The
+   * product never moved. **This is § D192's two-sites shape** — two answers to *what does a player
+   * open on* — caught by a new building rather than by a reader, so the second answer is deleted
+   * and this one asks the first.
+   */
+  const building =
+    config.buildings.find((one) => one.id === PREFERRED_OPENING_BUILDINGS[0]) ??
+    config.buildings[0];
   if (building === undefined) throw new Error('data/ ships no buildings');
   const profiles = config.dispatcherProfiles.profiles;
   const baseline = preferredId(PREFERRED_BATCH_BASELINE, profiles) ?? profiles[0]?.id ?? '';
