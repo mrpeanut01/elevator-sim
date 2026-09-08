@@ -110,6 +110,11 @@
  * helper has always summed.
  */
 
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
+
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -149,6 +154,70 @@ const DEV_ONLY_DOCUMENT = '/buildings/midtown-office.json';
 
 /** A document the bundle **does** emit, so the probe above cannot pass by the server being broken. */
 const SHIPPED_DOCUMENT = '/elevator-specs.json';
+
+/* -------------------------------------------------------------------------- *
+ * `charter S9`'s bundle budget, B2 — GitHub issue #238, `docs/31` § 3
+ * -------------------------------------------------------------------------- */
+
+/** Where `npm run build:web` puts the artifact players receive — `vite.config.ts` owns the name. */
+const DIST_WEB = fileURLToPath(new URL('../../dist-web', import.meta.url));
+
+/**
+ * **B2, in kilobytes of gzip.**
+ *
+ * `docs/31` § 3 gives 1 200 and then says, in bold, not to adopt it: *"Set it to the measured value
+ * plus 25 % on the first run and tighten it, rather than adopting this figure unmeasured."*
+ * Measured on `3404649`, 2026-09-07: **930.0 kB**. Plus 25 % is 1 162.5, so the budget is **1 160**
+ * — tighter than the unmeasured ceiling, which is the direction that document asked for.
+ *
+ * Tighten it when the bundle shrinks. Raising it is a visible edit a reviewer can refuse, which is
+ * the mechanism `docs/31` asks for in place of a vendor metric whose definition can move underneath
+ * the number.
+ */
+const BUNDLE_BUDGET_KB = 1_160;
+
+/** One shipped file and what it costs on the wire. */
+interface ShippedFile {
+  readonly path: string;
+  readonly rawBytes: number;
+  readonly gzipBytes: number;
+}
+
+/**
+ * Every file the build emits, gzipped, source maps excluded.
+ *
+ * `docs/31` defines B2 as *"total transferred bytes for the first load"* and then asks for
+ * something the wire cannot quite give: *"B2 is exact and deterministic. Bytes do not vary with
+ * runner load."* Collecting responses until interactive is truer to *first load* and is **not**
+ * deterministic — which reference documents and which worker have been fetched by that instant is a
+ * race, and a budget that moves under load is the flaky gate that section spends four paragraphs
+ * warning about, and which `BLOCKED_FRAME_GAP_MS` became (issue #335).
+ *
+ * So this is a strict **superset** of any first load: it counts both workers and all nine reference
+ * documents, some of which boot never fetches. A superset can only fail early, never late — it
+ * cannot let a regression through — and it is exactly deterministic, which is what B2 was
+ * specified for.
+ */
+function shippedFiles(dir: string = DIST_WEB): readonly ShippedFile[] {
+  const out: ShippedFile[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      out.push(...shippedFiles(full));
+      continue;
+    }
+    /* Excluded by `docs/31`'s own words, and never served to a player. */
+    if (entry.endsWith('.map')) continue;
+    const raw = readFileSync(full);
+    out.push({
+      path: relative(DIST_WEB, full),
+      rawBytes: raw.byteLength,
+      /* Level 9: the CDN compresses, and a budget must not be beaten by a weaker setting. */
+      gzipBytes: gzipSync(raw, { level: 9 }).byteLength,
+    });
+  }
+  return out;
+}
 
 let browser: Browser;
 let site: ShippedSite;
@@ -405,6 +474,91 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
         'directory and should cost a socket; 29 files each pay this, so a build hiding in here ' +
         'would multiply.',
     ).toBeLessThan(30_000);
+  });
+
+  /* ------------------------------------------------------------------------ *
+   * `charter S9`'s B2 — GitHub issue #238
+   * ------------------------------------------------------------------------ */
+
+  /**
+   * **The bundle budget, and which of the three this is.**
+   *
+   * `docs/22` § 4 states `charter S9` — *cold load to interactive under 3 s on a mid-range laptop*
+   * — with the instrument *"CI budget, failing the build"*, and records that the instrument does
+   * not exist. `docs/31` § 3 specifies three budgets so that it can. These cases are **B2 and only
+   * B2**, and saying which is not a hedge: that document is explicit that the other two cannot be
+   * plain assertions here.
+   *
+   * - **B1** (time to interactive ≤ 3 000 ms) *"gates only on a rolling comparison, never on a
+   *   single run … a single-run wall clock on a shared VM is a coin flip"*. It needs run history
+   *   this repository does not keep.
+   * - **B3** (main-thread block ≤ 800 ms) needs a CPU-throttle factor *"calibrated against a real
+   *   mid-range laptop once, and that calibration recorded with its date and machine"*. There is no
+   *   such machine here, and issue **#335** is the live record of what a wall-clock gate does
+   *   without one — `BLOCKED_FRAME_GAP_MS` red at 404.9 ms on a runner against 41 ms and 39 ms on
+   *   one host. It reproduced while this was being written, at **10 433 ms**, on a machine running
+   *   two vitest projects at once. The gate was right about the machine and says nothing about the
+   *   product, which is the whole of #335.
+   *
+   * So **`charter S9` stays partially instrumented**, and this file does not let the verdict read
+   * otherwise: `docs/22` § 6 forbids meeting a criterion by weakening it.
+   *
+   * **Here rather than in a file of its own**, because this file's header already claims the job —
+   * *"it asserts what the served artifact **is**"* — and a byte budget is exactly that. A new
+   * `*.browser.test.ts` that opened no page was written first and `dev/browserTier.test.ts`
+   * refused it in three different ways: every file in this tier launches Chromium, names a port,
+   * and serves the shipped bundle. The guard was right and the file was in the wrong place.
+   */
+  it(`ships no more than ${String(BUNDLE_BUDGET_KB)} kB gzipped — charter S9 B2`, () => {
+    const files = [...shippedFiles()].sort((a, b) => b.gzipBytes - a.gzipBytes);
+
+    /*
+     * The control, and not ceremony: this reads a directory, and a directory that was not built
+     * reads as zero bytes and passes a budget gloriously. That is issue #281 one level down — a
+     * tier that served an empty site and stayed green.
+     */
+    expect(files.length).toBeGreaterThan(5);
+    expect(files.some((file) => file.path === 'index.html')).toBe(true);
+    expect(files.some((file) => file.path.endsWith('.js'))).toBe(true);
+
+    const totalKb = files.reduce((sum, file) => sum + file.gzipBytes, 0) / 1000;
+
+    /*
+     * The table goes in the failure message rather than to `console.log`, because vitest 4
+     * intercepts the latter — the trap that made `honesty/measure.corpus.test.ts` necessary. A
+     * failure reading only *1 240 > 1 160* sends the next reader off to reproduce a measurement
+     * this run already has in hand.
+     */
+    const table = files
+      .map(
+        (file) =>
+          `  ${file.path.padEnd(40)}${(file.gzipBytes / 1000).toFixed(1).padStart(8)} kB gzip` +
+          `${(file.rawBytes / 1000).toFixed(1).padStart(10)} kB raw`,
+      )
+      .join('\n');
+
+    expect(
+      totalKb,
+      `the shipped bundle is ${totalKb.toFixed(1)} kB gzipped against a ` +
+        `${String(BUNDLE_BUDGET_KB)} kB budget (charter S9 B2, docs/31 § 3). What is in it:\n` +
+        `${table}\n` +
+        'If this is a dependency that arrived by accident, that is what B2 is for. If it is work ' +
+        'the product needs, raising the number is the visible edit docs/31 asks for — and docs/22 ' +
+        '§ 6 refuses meeting the budget by cutting a figure the run produced.',
+    ).toBeLessThanOrEqual(BUNDLE_BUDGET_KB);
+
+    /*
+     * **A ceiling with headroom, not a line the tree sits on.** A gate whose measurement equals its
+     * budget is red on the next commit whatever that commit does, and then gets an exemption —
+     * which `ci.yml`'s own words call *"where this class of problem goes to be forgotten"*. At
+     * 930 kB against 1 160 there is room; this goes red while there is still some.
+     */
+    expect(
+      totalKb,
+      `the bundle is inside its budget and has grown into the last tenth of it (${totalKb.toFixed(
+        1,
+      )} of ${String(BUNDLE_BUDGET_KB)} kB). Look at the growth rather than at the number.`,
+    ).toBeLessThanOrEqual(BUNDLE_BUDGET_KB * 0.9);
   });
 });
 
