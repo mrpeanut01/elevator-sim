@@ -92,13 +92,13 @@ import { loadBrowserResources, loadFixitCases, type BrowserResources } from '../
 import {
   affordabilityOf,
   classifyOutcome,
-  EDITOR_PRICING,
+  editorPricingFrom,
   emptyFixitState,
   fixedBadgeAfter,
   repairRowOf,
   budgetNoteOf,
   spendOf,
-  STANDING_EXTRAS,
+  standingExtrasFrom,
   stepCapacity,
   stepSpeed,
   toggleExtra,
@@ -113,6 +113,7 @@ import {
   measuredOf,
 } from '../fixit/run.js';
 import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
+import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { mountAsBuiltStage, type AsBuiltStage } from './asBuiltStage.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
@@ -186,6 +187,22 @@ let loadPromise: Promise<void> | undefined;
 const sessions = new Map<string, CaseSession>();
 let selectedId: string | undefined;
 let running = false;
+
+/**
+ * The price schedule these cases were loaded with — GitHub issue **#366**.
+ *
+ * Read off {@link loaded} rather than fetched again, so this screen and the parser that priced its
+ * repairs cannot disagree about what anything costs. It throws rather than defaulting: a screen
+ * drawing prices before its data arrived would draw zeroes, and a free repair is a worse lie than
+ * a crash.
+ */
+function scheduleNow(): PriceSchedule {
+  const schedule = loaded?.cases.schedule;
+  if (schedule === undefined) {
+    throw new Error('the fix-a-building screen asked for a price before its cases had loaded.');
+  }
+  return schedule;
+}
 
 /**
  * The runner every fixit run crosses on — module-scope, so its worker stays warm across mounts.
@@ -567,7 +584,7 @@ function mountFixit(
   function mainColumn(loadedFixit: LoadedFixit, entry: FixitCase): HTMLElement {
     const session = sessionOf(entry);
     if (session.asBuilt === undefined) measureAsBuilt(loadedFixit, entry);
-    const spend = spendOf(entry, session.state);
+    const spend = spendOf(entry, session.state, loadedFixit.cases.schedule);
     const summary = fixitSpendSummary(entry, spend);
 
     const main = el(doc, 'div', 'everyday-fixit-main');
@@ -746,7 +763,7 @@ function mountFixit(
     grid.style.cssText =
       'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;max-width:80ch';
     for (const repair of entry.repairs) {
-      const row = repairRowOf(entry, session.state, repair);
+      const row = repairRowOf(entry, session.state, repair, scheduleNow());
       grid.append(
         toggleRow(session, {
           className: 'everyday-fixit-repair',
@@ -756,13 +773,13 @@ function mountFixit(
           selected: row.selected,
           selectable: row.selectable,
           stateLine: fixitRepairStateLine(row),
-          toggle: () => toggleRepair(entry, session.state, repair.id),
+          toggle: () => toggleRepair(entry, session.state, repair.id, scheduleNow()),
         }),
       );
     }
-    for (const extra of STANDING_EXTRAS) {
+    for (const extra of standingExtrasFrom(scheduleNow())) {
       const selected = session.state.selectedExtraIds.includes(extra.id);
-      const affordability = affordabilityOf(entry, session.state, extra.costUnits);
+      const affordability = affordabilityOf(entry, session.state, extra.costUnits, scheduleNow());
       const selectable = selected || affordability.selectable;
       grid.append(
         toggleRow(session, {
@@ -778,7 +795,7 @@ function mountFixit(
               ? undefined
               : `short by ${String(affordability.shortByUnits)} u`,
           }),
-          toggle: () => toggleExtra(entry, session.state, extra.id),
+          toggle: () => toggleExtra(entry, session.state, extra.id, scheduleNow()),
         }),
       );
     }
@@ -890,10 +907,12 @@ function mountFixit(
 
     const body = el(doc, 'div');
     body.style.cssText = `display:grid;gap:${String(GAP.block)}px;padding:14px 16px`;
+    const pricing = editorPricingFrom(scheduleNow());
     const rows = fixitMachineryRows(
       session.state,
-      affordabilityOf(entry, session.state, EDITOR_PRICING.speedUnitsPerHalfMps).selectable,
-      affordabilityOf(entry, session.state, EDITOR_PRICING.capacityUnitsPerTwoPlaces).selectable,
+      affordabilityOf(entry, session.state, pricing.speedUnitsPerHalfMps, scheduleNow()).selectable,
+      affordabilityOf(entry, session.state, pricing.capacityUnitsPerTwoPlaces, scheduleNow()).selectable,
+      pricing,
     );
     for (const row of rows) {
       const line = el(doc, 'div', `everyday-fixit-stepper everyday-fixit-stepper-${row.key}`);
@@ -934,16 +953,16 @@ function mountFixit(
         if (running) return;
         session.state =
           row.key === 'speed'
-            ? stepSpeed(entry, session.state, -1)
-            : stepCapacity(entry, session.state, -1);
+            ? stepSpeed(entry, session.state, -1, scheduleNow())
+            : stepCapacity(entry, session.state, -1, scheduleNow());
         render();
       });
       plus.addEventListener('click', () => {
         if (running) return;
         session.state =
           row.key === 'speed'
-            ? stepSpeed(entry, session.state, 1)
-            : stepCapacity(entry, session.state, 1);
+            ? stepSpeed(entry, session.state, 1, scheduleNow())
+            : stepCapacity(entry, session.state, 1, scheduleNow());
         render();
       });
       const label = el(doc, 'span', undefined, row.label);
@@ -957,7 +976,7 @@ function mountFixit(
     }
     card.append(body);
 
-    const note = el(doc, 'div', 'everyday-fixit-budget-note', budgetNoteOf(entry, spendOf(entry, session.state)));
+    const note = el(doc, 'div', 'everyday-fixit-budget-note', budgetNoteOf(entry, spendOf(entry, session.state, scheduleNow())));
     note.style.cssText = [
       'padding:10px 16px',
       `border-top:1px solid ${C.ruleLight}`,
@@ -1045,7 +1064,7 @@ function mountFixit(
      * against the state the press was made in, never one the player edited while it ran.
      */
     const plan = fixitRunPlanOf(entry, session.state, resources);
-    const spend = spendOf(entry, session.state);
+    const spend = spendOf(entry, session.state, scheduleNow());
     ask = `${entry.id}:press`;
     runFailure = undefined;
     running = true;

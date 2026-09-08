@@ -23,51 +23,94 @@
  */
 
 import type { FixitCase, FixitExtra, FixitRepair, FixitState } from './types.js';
+import { priceOf } from '../pricing/parse.js';
+import type { PriceSchedule } from '../pricing/types.js';
 
-/** § 9's editor pricing. Dwell, zones, service ranges and parking are free — configuration. */
-export const EDITOR_PRICING = Object.freeze({
-  shaftUnits: 34,
-  speedUnitsPerHalfMps: 6,
-  capacityUnitsPerTwoPlaces: 8,
-});
+/**
+ * § 9's editor pricing, read off the schedule — GitHub issue **#366**.
+ *
+ * Dwell, zones, service ranges and parking are still free; what changed is where the three figures
+ * that are *not* free come from. This was three literals, and two of them disagreed with the rest
+ * of the tree about the same purchase:
+ *
+ * | | was | is | why |
+ * |---|---|---|---|
+ * | `shaftUnits` | 34 | 34 | one of **four** places that already said 34, so this one is only moved |
+ * | `speedUnitsPerHalfMps` | **6** | **10** | the fix cases charge 8, 9 or 10 for the same 0.5 m/s bump. A player paid 6 in the editor and 10 as a repair for one metre per second |
+ * | `capacityUnitsPerTwoPlaces` | 8 | 8 | kept, as its own schedule row: widening one car is a different act from re-specifying the fleet |
+ *
+ * The middle row is the conflict #366's second criterion is aimed at, and it is the reason this is
+ * a function of the schedule rather than a constant that a test cross-checks: a cross-check leaves
+ * two numbers in two places and hopes a guard notices, and this repository has a name for that.
+ */
+export function editorPricingFrom(schedule: PriceSchedule): {
+  readonly shaftUnits: number;
+  readonly speedUnitsPerHalfMps: number;
+  readonly capacityUnitsPerTwoPlaces: number;
+} {
+  return Object.freeze({
+    shaftUnits: priceOf(schedule, 'new-car').priceUnits,
+    speedUnitsPerHalfMps: priceOf(schedule, 'faster-machines').priceUnits,
+    capacityUnitsPerTwoPlaces: priceOf(schedule, 'larger-car-step').priceUnits,
+  });
+}
 
 /**
  * The five standing extras — offered in every case, none of them a fix, so the budget can be
  * spent badly (§ 10.2). They carry **no patch**, and `cases.test.ts` holds the refusal the other
  * way round: selecting every extra leaves the as-repaired run byte-identical to the as-built one.
  */
-export const STANDING_EXTRAS: readonly FixitExtra[] = Object.freeze([
-  {
-    id: 'traffic-survey',
-    name: 'A traffic survey',
-    costUnits: 3,
-    line: 'A week of counts, confirming what the figures on this page already show.',
-  },
-  {
-    id: 'landing-indicators',
-    name: 'Landing indicators',
-    costUnits: 4,
-    line: 'Tenants see the car coming. The car does not come sooner.',
-  },
-  {
-    id: 'car-interiors',
-    name: 'New car interiors',
-    costUnits: 5,
-    line: 'The wait feels shorter. It is not.',
-  },
-  {
-    id: 'call-out-cover',
-    name: 'Call-out cover',
-    costUnits: 6,
-    line: 'Somebody arrives faster when it breaks. Nothing here is broken.',
-  },
-  {
-    id: 'tenant-notices',
-    name: 'Tenant notices',
-    costUnits: 1,
-    line: 'A letter about the works. The letter is not the works.',
-  },
-]);
+const EXTRA_COPY: readonly { readonly id: string; readonly name: string; readonly line: string }[] =
+  Object.freeze([
+    {
+      id: 'traffic-survey',
+      name: 'A traffic survey',
+      line: 'A week of counts, confirming what the figures on this page already show.',
+    },
+    {
+      id: 'landing-indicators',
+      name: 'Landing indicators',
+      line: 'Tenants see the car coming. The car does not come sooner.',
+    },
+    {
+      id: 'car-interiors',
+      name: 'New car interiors',
+      line: 'The wait feels shorter. It is not.',
+    },
+    {
+      id: 'call-out-cover',
+      name: 'Call-out cover',
+      line: 'Somebody arrives faster when it breaks. Nothing here is broken.',
+    },
+    {
+      id: 'tenant-notices',
+      name: 'Tenant notices',
+      line: 'A letter about the works. The letter is not the works.',
+    },
+  ]);
+
+/**
+ * The five standing extras — offered in every case, none of them a fix, so the budget can be spent
+ * badly (§ 10.2). They carry **no patch**, and `cases.test.ts` holds the refusal the other way
+ * round: selecting every extra leaves the as-repaired run byte-identical to the as-built one.
+ *
+ * **The words are here and the prices are not** — GitHub issue **#366**. The lines are
+ * player-facing copy that `honesty/surfaces.ts` sweeps and that belongs beside the surface that
+ * draws them; the five numbers were a price list and now live in `data/price-schedule.json` with
+ * every other price. An extra the schedule does not price is refused rather than shipped free.
+ */
+export function standingExtrasFrom(schedule: PriceSchedule): readonly FixitExtra[] {
+  return EXTRA_COPY.map((copy) => {
+    const priced = schedule.extras.find((extra) => extra.id === copy.id);
+    if (priced === undefined) {
+      throw new Error(
+        `data/price-schedule.json prices no extra "${copy.id}". An extra with no price would be ` +
+          'offered free, which is the one thing a standing extra must never be (§ 10.2).',
+      );
+    }
+    return { id: copy.id, name: copy.name, costUnits: priced.priceUnits, line: copy.line };
+  });
+}
 
 /** Nothing selected, nothing bought. */
 export function emptyFixitState(): FixitState {
@@ -88,14 +131,28 @@ export interface FixitSpend {
   readonly machineryUnits: number;
 }
 
-export function spendOf(entry: FixitCase, state: FixitState): FixitSpend {
+/**
+ * What a selection costs — GitHub issue **#366** put the schedule in the signature.
+ *
+ * The third parameter is the one place this function is allowed to learn a price from. Before, two
+ * of the three sums here read module constants and the third read a number authored beside the
+ * repair, which is three price lists inside one function.
+ */
+export function spendOf(
+  entry: FixitCase,
+  state: FixitState,
+  schedule: PriceSchedule,
+): FixitSpend {
+  const pricing = editorPricingFrom(schedule);
   const repairs = entry.repairs.filter((repair) => state.selectedRepairIds.includes(repair.id));
-  const extras = STANDING_EXTRAS.filter((extra) => state.selectedExtraIds.includes(extra.id));
+  const extras = standingExtrasFrom(schedule).filter((extra) =>
+    state.selectedExtraIds.includes(extra.id),
+  );
   const repairUnits = repairs.reduce((sum, repair) => sum + repair.costUnits, 0);
   const extraUnits = extras.reduce((sum, extra) => sum + extra.costUnits, 0);
   const editorUnits =
-    state.speedSteps * EDITOR_PRICING.speedUnitsPerHalfMps +
-    state.capacitySteps * EDITOR_PRICING.capacityUnitsPerTwoPlaces;
+    state.speedSteps * pricing.speedUnitsPerHalfMps +
+    state.capacitySteps * pricing.capacityUnitsPerTwoPlaces;
   const shaftUnits = repairs
     .filter((repair) => repair.role === 'new-shaft')
     .reduce((sum, repair) => sum + repair.costUnits, 0);
@@ -150,8 +207,9 @@ export function affordabilityOf(
   entry: FixitCase,
   state: FixitState,
   costUnits: number,
+  schedule: PriceSchedule,
 ): { readonly selectable: boolean; readonly shortByUnits: number } {
-  const total = spendOf(entry, state).totalUnits + costUnits;
+  const total = spendOf(entry, state, schedule).totalUnits + costUnits;
   const shortBy = total - entry.budgetUnits;
   return { selectable: shortBy <= 0, shortByUnits: Math.max(0, shortBy) };
 }
@@ -161,41 +219,63 @@ export function affordabilityOf(
  * never offers the press ({@link affordabilityOf} disables it), and a reducer that trusted the
  * panel would be one mis-wired button away from an over-budget run.
  */
-export function toggleRepair(entry: FixitCase, state: FixitState, repairId: string): FixitState {
+export function toggleRepair(
+  entry: FixitCase,
+  state: FixitState,
+  repairId: string,
+  schedule: PriceSchedule,
+): FixitState {
   const repair = entry.repairs.find((candidate) => candidate.id === repairId);
   if (repair === undefined) return state;
   if (state.selectedRepairIds.includes(repairId)) {
     return { ...state, selectedRepairIds: state.selectedRepairIds.filter((id) => id !== repairId) };
   }
-  if (!affordabilityOf(entry, state, repair.costUnits).selectable) return state;
+  if (!affordabilityOf(entry, state, repair.costUnits, schedule).selectable) return state;
   return { ...state, selectedRepairIds: [...state.selectedRepairIds, repairId] };
 }
 
-export function toggleExtra(entry: FixitCase, state: FixitState, extraId: string): FixitState {
-  const extra = STANDING_EXTRAS.find((candidate) => candidate.id === extraId);
+export function toggleExtra(
+  entry: FixitCase,
+  state: FixitState,
+  extraId: string,
+  schedule: PriceSchedule,
+): FixitState {
+  const extra = standingExtrasFrom(schedule).find((candidate) => candidate.id === extraId);
   if (extra === undefined) return state;
   if (state.selectedExtraIds.includes(extraId)) {
     return { ...state, selectedExtraIds: state.selectedExtraIds.filter((id) => id !== extraId) };
   }
-  if (!affordabilityOf(entry, state, extra.costUnits).selectable) return state;
+  if (!affordabilityOf(entry, state, extra.costUnits, schedule).selectable) return state;
   return { ...state, selectedExtraIds: [...state.selectedExtraIds, extraId] };
 }
 
 /** Buy or return one +0.5 m/s step. Capped live at what the remaining budget allows (§ 10.3). */
-export function stepSpeed(entry: FixitCase, state: FixitState, delta: 1 | -1): FixitState {
+export function stepSpeed(
+  entry: FixitCase,
+  state: FixitState,
+  delta: 1 | -1,
+  schedule: PriceSchedule,
+): FixitState {
   const next = state.speedSteps + delta;
   if (next < 0) return state;
-  if (delta > 0 && !affordabilityOf(entry, state, EDITOR_PRICING.speedUnitsPerHalfMps).selectable) {
+  const speedPrice = editorPricingFrom(schedule).speedUnitsPerHalfMps;
+  if (delta > 0 && !affordabilityOf(entry, state, speedPrice, schedule).selectable) {
     return state;
   }
   return { ...state, speedSteps: next };
 }
 
 /** Buy or return one +2-place step. Same cap, § 9's other price. */
-export function stepCapacity(entry: FixitCase, state: FixitState, delta: 1 | -1): FixitState {
+export function stepCapacity(
+  entry: FixitCase,
+  state: FixitState,
+  delta: 1 | -1,
+  schedule: PriceSchedule,
+): FixitState {
   const next = state.capacitySteps + delta;
   if (next < 0) return state;
-  if (delta > 0 && !affordabilityOf(entry, state, EDITOR_PRICING.capacityUnitsPerTwoPlaces).selectable) {
+  const placePrice = editorPricingFrom(schedule).capacityUnitsPerTwoPlaces;
+  if (delta > 0 && !affordabilityOf(entry, state, placePrice, schedule).selectable) {
     return state;
   }
   return { ...state, capacitySteps: next };
@@ -499,6 +579,7 @@ export function repairRowOf(
   entry: FixitCase,
   state: FixitState,
   repair: FixitRepair,
+  schedule: PriceSchedule,
 ): {
   readonly selected: boolean;
   readonly selectable: boolean;
@@ -506,7 +587,7 @@ export function repairRowOf(
   readonly refusal: string | undefined;
 } {
   const selected = state.selectedRepairIds.includes(repair.id);
-  const affordability = affordabilityOf(entry, state, repair.costUnits);
+  const affordability = affordabilityOf(entry, state, repair.costUnits, schedule);
   const selectable = selected || affordability.selectable;
   return {
     selected,

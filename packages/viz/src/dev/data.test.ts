@@ -43,6 +43,7 @@ const EXPECTED_FETCHES = [
   '/dispatcher-profiles.json',
   '/elevator-specs.json',
   '/fixit-cases.json',
+  '/price-schedule.json',
   '/reference-runs.json',
   '/scenario-goals.json',
   '/traffic-profiles.json',
@@ -120,7 +121,11 @@ describe('the documents the viewer fetches by a fixed name', () => {
     // rather than deleting this.
     const VITE_HASH = /-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/u;
     const misread = EXPECTED_FETCHES.filter((path) => VITE_HASH.test(path));
-    expect(misread).toEqual(['/dispatcher-profiles.json', '/traffic-profiles.json']);
+    expect(misread).toEqual([
+      '/dispatcher-profiles.json',
+      '/price-schedule.json',
+      '/traffic-profiles.json',
+    ]);
 
     // And every one of them is a fixed path with nothing to bust a cache with — no hash that
     // changes with the bytes, no query string. That is the property that makes `immutable` wrong.

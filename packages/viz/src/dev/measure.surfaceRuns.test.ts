@@ -57,6 +57,8 @@ import {
 } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import { emptyFixitState, toggleRepair } from '../fixit/engine.js';
 import { fixitContextOf, parseFixitCases } from '../fixit/parse.js';
 import { fixitRunPlanOf } from '../fixit/run.js';
@@ -128,6 +130,7 @@ function shippedCases(): readonly FixitCase[] {
   return parseFixitCases(
     dataFile('fixit-cases.json'),
     fixitContextOf({
+      schedule: shippedPriceSchedule(),
       buildings: RESOURCES.entries.map((entry) => entry.resolved),
       trafficProfiles: RESOURCES.trafficProfiles,
       dispatcherProfiles: RESOURCES.dispatcherProfiles,
@@ -140,7 +143,7 @@ function diagnosedState(entry: FixitCase): FixitState {
   const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
   return diagnosed === undefined
     ? emptyFixitState()
-    : toggleRepair(entry, emptyFixitState(), diagnosed.id);
+    : toggleRepair(entry, emptyFixitState(), diagnosed.id, shippedPriceSchedule());
 }
 
 interface Row {

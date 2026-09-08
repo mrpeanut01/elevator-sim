@@ -23,6 +23,8 @@
  * Buildings are named by display name, dispatch changes by what they do.
  */
 
+import type { PriceSchedule } from '../pricing/types.js';
+
 /** Which legs the complaint is measured over. */
 export interface ComplaintScope {
   /**
@@ -161,6 +163,14 @@ export interface FixitCase {
 export interface FixitCases {
   readonly version: number;
   readonly cases: readonly FixitCase[];
+  /**
+   * The schedule these cases were priced with — GitHub issue **#366**.
+   *
+   * Carried on the set rather than fetched again by each screen, so a surface that has the cases
+   * has the prices, and there is no second load to go stale against the first. Every price a
+   * player sees on a fix-a-building screen comes from here.
+   */
+  readonly schedule: PriceSchedule;
 }
 
 /** A standing extra — offered in every case, priced, and deliberately without a patch (§ 10.2). */

@@ -85,6 +85,7 @@ const WEB_DATA_FILES: readonly string[] = Object.freeze([
   'campaign.json',
   'scenario-goals.json',
   'fixit-cases.json',
+  'price-schedule.json',
   'reference-runs.json',
   'proof-cases.json',
 ]);

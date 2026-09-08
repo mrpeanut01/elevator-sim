@@ -32,6 +32,8 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { parseCampaign } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
 import { fixitContextOf, parseFixitCases } from '../fixit/parse.js';
+import { parsePriceSchedule } from '../pricing/parse.js';
+import type { PriceSchedule } from '../pricing/types.js';
 import type { FixitCases } from '../fixit/types.js';
 import { parseProofCases, type ProofCaseSet } from '../gauntlet/proofCases.js';
 import { validatePublishedGoalRates, type PublishedGoalRates } from '../scenario/published.js';
@@ -283,11 +285,26 @@ export async function loadReferenceRuns(
   return parseReferenceRuns(raw, buildingNameOf);
 }
 
+/**
+ * `data/price-schedule.json`, fetched and parsed — GitHub issue **#366**, § D525 clause 2.
+ *
+ * One price for one change, in one file, so the same purchase costs the same on every screen.
+ * Fetched rather than imported, on this directory's own convention: no module in `src/` imports a
+ * `data/` document, and a bundled schedule would be the one price list nobody could swap.
+ */
+export async function loadPriceSchedule(): Promise<PriceSchedule> {
+  return parsePriceSchedule(await fetchJson('/price-schedule.json'));
+}
+
 export async function loadFixitCases(resources: BrowserResources): Promise<FixitCases> {
-  const raw = await fetchJson('/fixit-cases.json');
+  const [raw, schedule] = await Promise.all([
+    fetchJson('/fixit-cases.json'),
+    loadPriceSchedule(),
+  ]);
   return parseFixitCases(
     raw,
     fixitContextOf({
+      schedule,
       buildings: resources.buildings,
       trafficProfiles: resources.trafficProfiles,
       dispatcherProfiles: resources.dispatcherProfiles,

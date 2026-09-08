@@ -72,6 +72,8 @@ import {
 } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import {
   COMPLAINT_GONE_PCT,
@@ -135,6 +137,7 @@ beforeAll(async () => {
   cases = parseFixitCases(
     raw,
     fixitContextOf({
+      schedule: shippedPriceSchedule(),
       buildings: resources.entries.map((entry) => entry.resolved),
       trafficProfiles: resources.trafficProfiles,
       dispatcherProfiles: resources.dispatcherProfiles,
@@ -177,7 +180,7 @@ function legsKey(run: RecordedRun): string {
 function diagnosedState(entry: FixitCase): FixitState {
   const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
   if (diagnosed === undefined) throw new Error('no diagnosed repair');
-  const state = toggleRepair(entry, emptyFixitState(), diagnosed.id);
+  const state = toggleRepair(entry, emptyFixitState(), diagnosed.id, shippedPriceSchedule());
   expect(state.selectedRepairIds, 'the diagnosed fix must be affordable').toContain(diagnosed.id);
   return state;
 }
@@ -629,7 +632,7 @@ describe.each(PINNED)('case $id', (pinned) => {
       expect(measurement.complaintAfter).toBeCloseTo(pinned.after, 1);
 
       // And the classification agrees: the case is FIXED with its authored head.
-      const outcome = classifyOutcome(entry, measurement, spendOf(entry, state));
+      const outcome = classifyOutcome(entry, measurement, spendOf(entry, state, shippedPriceSchedule()));
       expect(outcome.kind).toBe('fixed');
       expect(outcome.head).toBe(entry.result.head);
     },

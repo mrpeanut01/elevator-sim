@@ -8,6 +8,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import {
   demandDisclosureOf,
   parseFixitCases,
@@ -19,6 +21,8 @@ import {
 import type { FixitCase } from './types.js';
 
 const CONTEXT: FixitContext = {
+  /* The shipped schedule, not a fixture — a fixture would be the seventh price list (issue #366). */
+  schedule: shippedPriceSchedule(),
   floorIdsByBuilding: new Map([['tower', ['G', '2', '3', '4']]]),
   profileIds: new Set(['standing-order']),
   bandByBuilding: new Map([['tower', { min: 3, max: 7 }]]),
@@ -54,10 +58,10 @@ function validCase(): Record<string, unknown> {
     diagnosis: { text: 'The cars park at the wrong end.', reasoning: 'Every long wait began that way.' },
     budgetUnits: 12,
     repairs: [
-      { id: 'r-diagnosed', role: 'diagnosed', name: 'Spread the fleet', costUnits: 0, effect: 'A setting; the waits above are the target.', patch: { dispatcher: { idle: { parkingStrategy: 'stay' } } } },
-      { id: 'r-costly', role: 'costly-fix', name: 'Re-gear the machines', costUnits: 10, effect: 'Shortens the worst wait; the parking stays.', patch: { building: { cars: [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.5 } }] } } },
-      { id: 'r-cheap', role: 'cheap-fix', name: 'Trim the dwell', costUnits: 2, effect: 'Moves the mean a little.', patch: { building: { cars: [{ carIds: ['*'], set: { dwellHallCallS: 2.5 } }] } } },
-      { id: 'r-shaft', role: 'new-shaft', name: 'A new shaft · beyond a repair budget', costUnits: 34, effect: 'A capital conversation with the owner.', patch: { building: { addCars: [{ bankId: 'main', copyCarId: 'A', id: 'B' }] } } },
+      { id: 'r-diagnosed', role: 'diagnosed', name: 'Spread the fleet', effect: 'A setting; the waits above are the target.', patch: { dispatcher: { idle: { parkingStrategy: 'stay' } } } },
+      { id: 'r-costly', role: 'costly-fix', name: 'Re-gear the machines', effect: 'Shortens the worst wait; the parking stays.', patch: { building: { cars: [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.5 } }] } } },
+      { id: 'r-cheap', role: 'cheap-fix', name: 'Trim the dwell', effect: 'Moves the mean a little.', patch: { building: { cars: [{ carIds: ['*'], set: { dwellHallCallS: 2.5 } }] } } },
+      { id: 'r-shaft', role: 'new-shaft', name: 'A new shaft · beyond a repair budget', effect: 'A capital conversation with the owner.', patch: { building: { addCars: [{ bankId: 'main', copyCarId: 'A', id: 'B' }] } } },
     ],
     result: { head: 'Fixed.', body: 'Nothing was bought.' },
   };
@@ -116,20 +120,65 @@ describe('parseFixitCases', () => {
     expect(violations.join('\n')).toContain('"costly-fix" repairs');
   });
 
+  /**
+   * § 10.6 rule 2's two prices, driven through the **patch** rather than through a number.
+   *
+   * Since GitHub issue #366 a repair has no authored `costUnits`: its price is the sum of the
+   * schedule prices of the changes its patch buys. So the way to make a diagnosed repair too dear
+   * is to have it buy something dear, which is what a case author would actually do wrong — and it
+   * exercises `pricing/repairPrice.ts` on the way, where setting a number did not.
+   */
   it('prices the diagnosed fix 0–9 and the shaft at an unaffordable 34', () => {
     const costly = violationsOf(
       fileWith((entry) => {
-        ((entry['repairs'] as { costUnits: number }[])[0] as { costUnits: number }).costUnits = 10;
+        /* The diagnosed repair buys a new car — 34 u, far past the 0–9 a diagnosis may cost. */
+        (entry['repairs'] as Record<string, unknown>[])[0]!['patch'] = {
+          building: { addCars: [{ bankId: 'main', copyCarId: 'A', id: 'C' }] },
+        };
       }),
     );
     expect(costly.join('\n')).toContain('0–9');
+
     const cheapShaft = violationsOf(
       fileWith((entry) => {
-        ((entry['repairs'] as { costUnits: number }[])[3] as { costUnits: number }).costUnits = 12;
+        /* And the new-shaft repair buys a dwell trim, so it is neither 34 nor unaffordable. */
+        (entry['repairs'] as Record<string, unknown>[])[3]!['patch'] = {
+          building: { cars: [{ carIds: ['*'], set: { dwellHallCallS: 2.5 } }] },
+        };
       }),
     );
-    expect(cheapShaft.join('\n')).toContain('it is 34 in every case');
+    expect(cheapShaft.join('\n')).toContain('data/price-schedule.json prices it 34 in every case');
     expect(cheapShaft.join('\n')).toContain('visible and unaffordable');
+  });
+
+  /**
+   * **A price authored beside a repair is refused, not ignored** — GitHub issue #366.
+   *
+   * Silently dropping it would let an author go on writing a number that does nothing, which is the
+   * stale-refusal shape `CLAUDE.md` records: a field that looks live and is not.
+   */
+  it('refuses a costUnits authored beside a repair', () => {
+    const violations = violationsOf(
+      fileWith((entry) => {
+        (entry['repairs'] as Record<string, unknown>[])[0]!['costUnits'] = 3;
+      }),
+    );
+    expect(violations.join('\n')).toContain('Prices live in data/price-schedule.json');
+  });
+
+  /**
+   * **A repair that changes something nothing prices cannot be bought**, so it is refused at load
+   * rather than shipped at a silent zero.
+   */
+  it('refuses a repair whose patch the schedule prices nothing for', () => {
+    const violations = violationsOf(
+      fileWith((entry) => {
+        (entry['repairs'] as Record<string, unknown>[])[0]!['patch'] = {
+          dispatcher: { answer: { aFieldNobodyPrices: 1 } },
+        };
+      }),
+    );
+    expect(violations.join('\n')).toContain('prices nothing for');
   });
 
   it('refuses a repair with no patch — a purchase that fixes nothing is an extra', () => {

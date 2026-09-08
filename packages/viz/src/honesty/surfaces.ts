@@ -248,7 +248,8 @@ import { OPERATIONAL_ZONING_NOTE } from '../editor/editorEdits.js';
 import { previewGeometry } from '../editor/editorPreview.js';
 import { summariseReport, validateBuilding, type ValidationReport } from '../editor/editorValidate.js';
 import {
-  STANDING_EXTRAS,
+  editorPricingFrom,
+  standingExtrasFrom,
   budgetNoteOf,
   classifyOutcome,
   emptyFixitState,
@@ -328,6 +329,8 @@ import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
 import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
 import { describeFrame, suppressionSentenceOf } from '../render/describeFrame.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+import { repairPriceUnits } from '../pricing/repairPrice.js';
 import { buildLayout } from '../render/layout.js';
 import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { overlayViewOf } from '../render/overlay.js';
@@ -6562,7 +6565,7 @@ const FIXIT_COVERS: readonly string[] = [
   'fixit/engine.ts#classifyOutcome',
   'fixit/engine.ts#budgetNoteOf',
   'fixit/engine.ts#repairRowOf',
-  'fixit/engine.ts#STANDING_EXTRAS',
+  'fixit/engine.ts#standingExtrasFrom',
   'fixit/engine.ts#BASIS_LINE',
   /*
    * GitHub issue #350's second basis line and the choice between the two: the outcome's `basis`
@@ -6640,10 +6643,10 @@ function fixitSearchCase(context: HonestyContext): FixitCase {
     },
     budgetUnits: 12,
     repairs: [
-      { id: 's-diagnosed', role: 'diagnosed', name: 'Let the idle fleet wait along its stops', costUnits: 0, effect: 'A setting, and the long waits above are the target.', patch: repairPatch },
-      { id: 's-costly', role: 'costly-fix', name: 'Re-gear the machines', costUnits: 10, effect: 'Faster climbs shorten the worst wait; the parking stays.', patch: repairPatch },
-      { id: 's-cheap', role: 'cheap-fix', name: 'Trim the door dwell', costUnits: 2, effect: 'A second off every stop moves the mean a little.', patch: repairPatch },
-      { id: 's-shaft', role: 'new-shaft', name: 'A new shaft · beyond a repair budget', costUnits: 34, effect: 'A capital conversation with the owner, not a work order.', patch: repairPatch },
+      { id: 's-diagnosed', role: 'diagnosed', name: 'Let the idle fleet wait along its stops', costUnits: repairPriceUnits(shippedPriceSchedule(), repairPatch), effect: 'A setting, and the long waits above are the target.', patch: repairPatch },
+      { id: 's-costly', role: 'costly-fix', name: 'Re-gear the machines', costUnits: repairPriceUnits(shippedPriceSchedule(), repairPatch), effect: 'Faster climbs shorten the worst wait; the parking stays.', patch: repairPatch },
+      { id: 's-cheap', role: 'cheap-fix', name: 'Trim the door dwell', costUnits: repairPriceUnits(shippedPriceSchedule(), repairPatch), effect: 'A second off every stop moves the mean a little.', patch: repairPatch },
+      { id: 's-shaft', role: 'new-shaft', name: 'A new shaft · beyond a repair budget', costUnits: repairPriceUnits(shippedPriceSchedule(), repairPatch), effect: 'A capital conversation with the owner, not a work order.', patch: repairPatch },
     ],
     result: {
       head: 'The building is awake.',
@@ -6657,10 +6660,12 @@ const FIXIT: SurfaceAdapter = {
   covers: FIXIT_COVERS,
   render(this: SurfaceAdapter, context) {
     const seeds: TextSeed[] = [];
+    /* One schedule for the whole sweep — GitHub issue #366, the same one the parser prices with. */
+    const schedule = shippedPriceSchedule();
     const entry = fixitSearchCase(context);
 
     /* ---- the standing extras: every name and every line, authored in the engine ---- */
-    for (const extra of STANDING_EXTRAS) {
+    for (const extra of standingExtrasFrom(schedule)) {
       seeds.push({ field: `extra.${extra.id}.name`, text: extra.name, role: 'label', provenance: 'authored' });
       seeds.push({ field: `extra.${extra.id}.line`, text: extra.line, role: 'prose', provenance: 'authored' });
     }
@@ -6687,11 +6692,11 @@ const FIXIT: SurfaceAdapter = {
 
     /* ---- affordability and the budget notes, on states the reducers themselves build ---- */
     const empty = emptyFixitState();
-    let spent = toggleRepair(entry, empty, 's-costly');
-    spent = toggleExtra(entry, spent, 'tenant-notices');
+    let spent = toggleRepair(entry, empty, 's-costly', schedule);
+    spent = toggleExtra(entry, spent, 'tenant-notices', schedule);
     for (const state of [empty, spent]) {
       for (const repair of entry.repairs) {
-        const row = repairRowOf(entry, state, repair);
+        const row = repairRowOf(entry, state, repair, schedule);
         seeds.push({ field: `repair.${repair.id}.price`, text: row.priceLine, role: 'label' });
         if (row.refusal !== undefined) {
           seeds.push({ field: `repair.${repair.id}.refusal`, text: row.refusal, role: 'reason' });
@@ -6699,7 +6704,7 @@ const FIXIT: SurfaceAdapter = {
       }
       seeds.push({
         field: 'budget.note',
-        text: budgetNoteOf(entry, spendOf(entry, state)),
+        text: budgetNoteOf(entry, spendOf(entry, state, schedule)),
         role: 'prose',
         provenance: 'authored',
       });
@@ -6719,7 +6724,7 @@ const FIXIT: SurfaceAdapter = {
       ['mean-wait', meanEntry],
     ] as const) {
       const measurement = measuredOf(subject, context.comparisonRecording, context.recording);
-      const outcome = classifyOutcome(subject, measurement, spendOf(subject, empty));
+      const outcome = classifyOutcome(subject, measurement, spendOf(subject, empty, schedule));
       seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
       seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
       seeds.push({ field: `outcome.${name}.basis`, text: outcome.basis, role: 'reason', provenance: 'authored' });
@@ -6756,15 +6761,15 @@ const FIXIT: SurfaceAdapter = {
     /* ---- the basis a demand-side repair earns — a fixed outcome on a pair that changed crowd ---- */
     seeds.push({
       field: 'outcome.demand.basis',
-      text: classifyOutcome(entry, { ...flatSameCrowd(), sameCrowd: false }, spendOf(entry, empty)).basis,
+      text: classifyOutcome(entry, { ...flatSameCrowd(), sameCrowd: false }, spendOf(entry, empty, schedule)).basis,
       role: 'reason',
       provenance: 'authored',
     });
-    const worse = classifyOutcome(entry, flat, spendOf(entry, empty));
+    const worse = classifyOutcome(entry, flat, spendOf(entry, empty, schedule));
     const short = classifyOutcome(
       entry,
       { ...flat, complaintGonePct: 30, restDeltaPoints: 0 },
-      spendOf(entry, empty),
+      spendOf(entry, empty, schedule),
     );
     const over = classifyOutcome(entry, flat, {
       repairUnits: 34,
@@ -6854,7 +6859,12 @@ const FIXIT: SurfaceAdapter = {
       ['affordable', empty, true],
       ['at-budget', { ...empty, speedSteps: 1, capacitySteps: 1 }, false],
     ] as const) {
-      for (const row of fixitMachineryRows(machineState, affordable, affordable)) {
+      for (const row of fixitMachineryRows(
+        machineState,
+        affordable,
+        affordable,
+        editorPricingFrom(schedule),
+      )) {
         seeds.push({ field: `machines.${where}.${row.key}.label`, text: row.label, role: 'label', provenance: 'authored' });
         seeds.push({ field: `machines.${where}.${row.key}.readout`, text: row.readout, role: 'observation' });
         seeds.push({ field: `machines.${where}.${row.key}.priced`, text: row.priced, role: 'label' });
@@ -6865,9 +6875,9 @@ const FIXIT: SurfaceAdapter = {
     for (const [where, state] of [
       ['nothing', empty],
       ['repairs', spent],
-      ['machinery', stepSpeed(entry, empty, 1)],
+      ['machinery', stepSpeed(entry, empty, 1, schedule)],
     ] as const) {
-      const summary = fixitSpendSummary(entry, spendOf(entry, state));
+      const summary = fixitSpendSummary(entry, spendOf(entry, state, schedule));
       seeds.push({ field: `spend.${where}.spent`, text: summary.spentLine, role: 'observation' });
       seeds.push({ field: `spend.${where}.committed`, text: summary.committedLine, role: 'observation' });
       seeds.push({ field: `spend.${where}.capital`, text: summary.capitalLine, role: 'observation' });
@@ -6877,7 +6887,7 @@ const FIXIT: SurfaceAdapter = {
     for (const [where, row] of [
       ['selected', { selected: true, refusal: undefined }],
       ['affordable', { selected: false, refusal: undefined }],
-      ['refused', { selected: false, refusal: repairRowOf(entry, spent, entry.repairs[3]!).refusal }],
+      ['refused', { selected: false, refusal: repairRowOf(entry, spent, entry.repairs[3]!, schedule).refusal }],
     ] as const) {
       seeds.push({
         field: `repair.state.${where}`,

@@ -1,5 +1,5 @@
 {
-  "$comment": "Fix-a-building cases — docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md §10, scored per ENGINE_CONTRACT.md §9 with the closed-form inputs replaced by two real single runs sharing the traffic seed (the spec's own basis line, §10.4). Each case names a shipped building and carries the as-built deltas that make the fault real, a complaint whose measure is computed from the runs and never authored, four repairs whose patches are real config changes, and the authored success copy. Every case was validated against a real run pair before shipping (§10.6 rule 6); packages/viz/src/fixit/cases.test.ts pins the measured numbers, so an effect line's quoted figure that stops reproducing turns the suite red rather than going quietly stale. Player-facing copy carries no engine identifier (GAMEPLAY §16 rule 11) — buildings are named by their display names, dispatch changes by what they do. The seeds and demand levels are choices, not measurements: each was picked so the authored fault is visible in one run at that operating point, and the validation test is what says the diagnosed fix clears the contract's two bars there.",
+  "$comment": "Fix-a-building cases — docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md §10, scored per ENGINE_CONTRACT.md §9 with the closed-form inputs replaced by two real single runs sharing the traffic seed (the spec's own basis line, §10.4). Each case names a shipped building and carries the as-built deltas that make the fault real, a complaint whose measure is computed from the runs and never authored, four repairs whose patches are real config changes, and the authored success copy. Every case was validated against a real run pair before shipping (§10.6 rule 6); packages/viz/src/fixit/cases.test.ts pins the measured numbers, so an effect line's quoted figure that stops reproducing turns the suite red rather than going quietly stale. Player-facing copy carries no engine identifier (GAMEPLAY §16 rule 11) — buildings are named by their display names, dispatch changes by what they do. The seeds and demand levels are choices, not measurements: each was picked so the authored fault is visible in one run at that operating point, and the validation test is what says the diagnosed fix clears the contract's two bars there.  PRICES LIVE IN data/price-schedule.json — GitHub issue #366. A repair's cost is the sum of the schedule prices of the changes its patch buys; a costUnits here is refused at load.",
   "version": 1,
   "cases": [
     {
@@ -79,7 +79,6 @@
           "id": "spread-the-idle-fleet",
           "role": "diagnosed",
           "name": "Let the idle fleet wait along its stops",
-          "costUnits": 0,
           "effect": "Spreads waiting cars through the floors they serve — a shuttle at each lobby instead of eight at the street. The 9 waits over a minute are the target, and it is a setting.",
           "patch": {
             "dispatcher": {
@@ -95,7 +94,6 @@
           "id": "regear-the-shuttles",
           "role": "costly-fix",
           "name": "Re-gear the shuttles for another half metre per second",
-          "costUnits": 10,
           "effect": "Every shuttle covers its three hundred metres sooner, so the 70 s worst wait shortens — but the cars still start from the street, and you are buying machinery to race a parking rule.",
           "patch": {
             "building": {
@@ -123,7 +121,6 @@
           "id": "quicker-doors",
           "role": "cheap-fix",
           "name": "Trim the door dwell at every stop",
-          "costUnits": 2,
           "effect": "A second or two off every stop moves the 23.1 s mean wait a little. The empty three-hundred-metre climb that makes the long waits is not a door.",
           "patch": {
             "building": {
@@ -145,7 +142,6 @@
           "id": "ninth-shuttle",
           "role": "new-shaft",
           "name": "A ninth shuttle · beyond a repair budget",
-          "costUnits": 34,
           "effect": "One more car on the sky-lobby run. That is a capital conversation with the owner — and eight parked at the wrong floor would become nine.",
           "patch": {
             "building": {
@@ -338,7 +334,6 @@
           "id": "redraw-by-headcount",
           "role": "diagnosed",
           "name": "Redraw the split by headcount — move one car across",
-          "costUnits": 6,
           "effect": "Two cars a side puts 585 people on each upper car instead of 1,170. The 341 s mean upstairs is the target; downstairs keeps the slack its own figures show.",
           "patch": {
             "building": {
@@ -418,7 +413,6 @@
           "id": "regear-the-upper-car",
           "role": "costly-fix",
           "name": "Re-gear the upper car for another metre per second",
-          "costUnits": 12,
           "effect": "The single upper car cycles sooner, so its 914 s worst wait shortens — but its queue is still one car's queue for 1,170 people, and this is the whole budget.",
           "patch": {
             "building": {
@@ -439,7 +433,6 @@
           "id": "snappier-doors",
           "role": "cheap-fix",
           "name": "Trim the door dwell across both banks",
-          "costUnits": 2,
           "effect": "A second off every stop moves the 341 s mean a little. The queue at the upper car is hundreds of seconds deep; its doors are not.",
           "patch": {
             "building": {
@@ -461,7 +454,6 @@
           "id": "fifth-shaft",
           "role": "new-shaft",
           "name": "A fifth shaft for the upper zone · beyond a repair budget",
-          "costUnits": 34,
           "effect": "A second car upstairs without taking one from downstairs. That is a capital conversation with the owner, and the redrawn split gets there without pouring concrete.",
           "patch": {
             "building": {
@@ -555,7 +547,6 @@
           "id": "push-the-idle-cars-apart",
           "role": "diagnosed",
           "name": "Push the idle cars apart",
-          "costUnits": 0,
           "effect": "Parks one idle car per stretch of the building instead of three together. The 7 waits over a minute from the flats are the target, and it is a setting.",
           "patch": {
             "dispatcher": {
@@ -571,7 +562,6 @@
           "id": "faster-machines",
           "role": "costly-fix",
           "name": "Re-plant all three machines for another half metre per second",
-          "costUnits": 8,
           "effect": "Each climb is quicker, so the 112 s worst wait shortens — but the cars still start it from the wrong floor, together, and this is most of the budget.",
           "patch": {
             "building": {
@@ -594,7 +584,6 @@
           "id": "shorter-door-hold",
           "role": "cheap-fix",
           "name": "Shorten the door hold at every landing",
-          "costUnits": 1,
           "effect": "A second off each stop moves the 48.9 s mean a little. The wait that prompted the letter is a car climbing five floors empty, not a door.",
           "patch": {
             "building": {
@@ -616,7 +605,6 @@
           "id": "fourth-lift",
           "role": "new-shaft",
           "name": "A fourth lift · beyond a repair budget",
-          "costUnits": 34,
           "effect": "A fourth car for six floors that already have three standing idle together. Measured on this very day it moves not one wait — the parking rule leaves it standing with the rest.",
           "patch": {
             "building": {
@@ -713,7 +701,6 @@
           "id": "dwell-that-reacts",
           "role": "diagnosed",
           "name": "A dwell that reacts to what is boarding",
-          "costUnits": 2,
           "effect": "Standard timing at every stop, extending only while people are still stepping aboard — the eleven-second hold survives only where a trolley is loading. The 28 waits over a minute are the target.",
           "patch": {
             "building": {
@@ -742,7 +729,6 @@
           "id": "regear-the-rank",
           "role": "costly-fix",
           "name": "Re-gear all five machines for another half metre per second",
-          "costUnits": 10,
           "effect": "Every trip travels quicker, so the 196 s worst wait shortens — but each stop still spends eleven seconds standing open, and the stops are where this day goes.",
           "patch": {
             "building": {
@@ -763,7 +749,6 @@
           "id": "fix-the-trolley-car-first",
           "role": "cheap-fix",
           "name": "Standard timing on the trolley car alone",
-          "costUnits": 3,
           "effect": "One car of five stops holding its doors, which moves the 30.4 s mean a little. The other four keep holding, and the queue at reception keeps forming.",
           "patch": {
             "building": {
@@ -785,7 +770,6 @@
           "id": "sixth-lift",
           "role": "new-shaft",
           "name": "A sixth lift · beyond a repair budget",
-          "costUnits": 34,
           "effect": "One more car on the rank, holding its doors eleven seconds like the other five. That is a capital conversation with the owner, and the doors would still own the day.",
           "patch": {
             "building": {
@@ -889,7 +873,6 @@
           "id": "wait-where-they-finish",
           "role": "diagnosed",
           "name": "Let a car wait where it finishes the trip",
-          "costUnits": 0,
           "effect": "A car that ends its run among the flats stays among them until the next call. The 6 waits over a minute are the target, and it is a setting.",
           "patch": {
             "dispatcher": {
@@ -903,7 +886,6 @@
           "id": "panels-at-the-sky-lobby",
           "role": "costly-fix",
           "name": "Destination panels at the sky lobby",
-          "costUnits": 8,
           "effect": "Panels group the sky-lobby crowd by floor before boarding. The crowd was never the letter — the letter is the empty climb behind the 74 s worst wait.",
           "patch": {
             "dispatcher": {
@@ -918,7 +900,6 @@
           "id": "quicker-tower-doors",
           "role": "cheap-fix",
           "name": "Trim the door dwell on the tower cars",
-          "costUnits": 2,
           "effect": "A second or so off every stop moves the 32.2 s mean a little. The empty climb from the sky lobby is not a door.",
           "patch": {
             "building": {
@@ -943,7 +924,6 @@
           "id": "fifth-tower-car",
           "role": "new-shaft",
           "name": "A fifth tower car · beyond a repair budget",
-          "costUnits": 34,
           "effect": "One more car for the flats — sent, like the other four, to wait at the sky lobby. That is a capital conversation with the owner.",
           "patch": {
             "building": {
@@ -1115,7 +1095,6 @@
           "id": "extend-a-second-car",
           "role": "diagnosed",
           "name": "Fit garage landing doors to a second shaft",
-          "costUnits": 9,
           "effect": "The second shaft already has the hoistway depth; two landing doors and a controller change split the garage crowd in half. The 21 waits over a minute are the target.",
           "patch": {
             "building": {
@@ -1213,7 +1192,6 @@
           "id": "regear-the-garage-car",
           "role": "costly-fix",
           "name": "Re-gear the garage car for another metre per second",
-          "costUnits": 12,
           "effect": "The garage car cycles quicker, so the 322 s worst shortens — but its queue is still half the building's arrivals on one car, and this is the whole budget.",
           "patch": {
             "building": {
@@ -1234,7 +1212,6 @@
           "id": "quicker-garage-doors",
           "role": "cheap-fix",
           "name": "Shorter doors on the garage car",
-          "costUnits": 3,
           "effect": "A second and a half off each of the garage car's stops moves the 70.0 s mean a little. The queue is hundreds of seconds deep; the doors are not.",
           "patch": {
             "building": {
@@ -1256,7 +1233,6 @@
           "id": "fifth-shaft",
           "role": "new-shaft",
           "name": "A fifth shaft down to the garage · beyond a repair budget",
-          "costUnits": 34,
           "effect": "A new car with garage landing doors from the start. The two fitted doors get there without pouring concrete, and concrete is a capital conversation.",
           "patch": {
             "building": {
@@ -1460,7 +1436,6 @@
           "id": "blank-the-low-landings",
           "role": "diagnosed",
           "name": "Blank the low-zone landings on the express cars",
-          "costUnits": 0,
           "effect": "The upper three cars pass the low floors without stopping — the run they were built for. The 4 waits over a minute are the target, and it is a setting.",
           "patch": {
             "building": {
@@ -1562,7 +1537,6 @@
           "id": "regear-the-express",
           "role": "costly-fix",
           "name": "Re-gear the express cars for another half metre per second",
-          "costUnits": 9,
           "effect": "The upper cars cover the tower sooner, so the 110 s worst shortens — but they still stop at every low floor on the way, and stops are the thing an express exists to avoid.",
           "patch": {
             "building": {
@@ -1585,7 +1559,6 @@
           "id": "trim-express-dwell",
           "role": "cheap-fix",
           "name": "Trim the door dwell on the express cars",
-          "costUnits": 2,
           "effect": "A second and a half off every stop moves the 19.0 s mean a little. The stops themselves are the letter.",
           "patch": {
             "building": {
@@ -1609,7 +1582,6 @@
           "id": "seventh-car",
           "role": "new-shaft",
           "name": "A seventh car for the upper zone · beyond a repair budget",
-          "costUnits": 34,
           "effect": "One more car upstairs, stopping everywhere like its three siblings. That is a capital conversation — and the free restriction gets there first.",
           "patch": {
             "building": {
@@ -1707,7 +1679,6 @@
           "id": "delivery-window",
           "role": "diagnosed",
           "name": "A delivery window in the porters' rota",
-          "costUnits": 1,
           "effect": "The cages move before the clinics open, and the two big cars return to standard door timing for the day. The 15 waits over a minute are the target, and the price is a rota.",
           "patch": {
             "building": {
@@ -1730,7 +1701,6 @@
           "id": "lock-one-car-to-goods",
           "role": "costly-fix",
           "name": "Lock one big car to goods all day",
-          "costUnits": 6,
           "effect": "One trolley car carries cages and nothing else, between the lower ground and the entrance. The other keeps its twenty-five-second hold, and the passenger group is a car short.",
           "patch": {
             "building": {
@@ -1809,7 +1779,6 @@
           "id": "quicker-passenger-doors",
           "role": "cheap-fix",
           "name": "Quicker doors on the three passenger cars",
-          "costUnits": 3,
           "effect": "A second and a half off the smaller cars' stops moves the 21.1 s mean a little. The letter is about the two cars that stand open, and they still do.",
           "patch": {
             "building": {
@@ -1833,7 +1802,6 @@
           "id": "goods-lift",
           "role": "new-shaft",
           "name": "A goods lift in its own shaft · beyond a repair budget",
-          "costUnits": 34,
           "effect": "The cages leave the passenger group for good. That is a capital conversation with the owner — the rota buys most of it for one unit.",
           "patch": {
             "building": {
@@ -1915,7 +1883,6 @@
           "id": "stagger-the-starts",
           "role": "diagnosed",
           "name": "Stagger the tenancy start times",
-          "costUnits": 2,
           "effect": "The nine upper-floor tenants spread their starts across the half hour, and this run watches the first cohort arrive into the same four cars. The 21 waits over a minute are the target, and the price is a memo.",
           "patch": {
             "building": {
@@ -1942,7 +1909,6 @@
           "id": "destination-panels",
           "role": "costly-fix",
           "name": "Destination panels in the lobby",
-          "costUnits": 10,
           "effect": "Panels group the nine o'clock crowd by floor before it boards. Whether that clears the 107 s worst is a bench question — the crowd is still seventeen hundred desks on one clock.",
           "patch": {
             "dispatcher": {
@@ -1957,7 +1923,6 @@
           "id": "trim-the-dwell",
           "role": "cheap-fix",
           "name": "Trim the door dwell across the group",
-          "costUnits": 2,
           "effect": "A second and a half off every stop moves the 32.8 s mean a little. The queue is the start time, not the doors.",
           "patch": {
             "building": {
@@ -1979,7 +1944,6 @@
           "id": "fifth-car",
           "role": "new-shaft",
           "name": "A fifth car · beyond a repair budget",
-          "costUnits": 34,
           "effect": "More steel against a twenty-minute crush that a memo dissolves. That is a capital conversation, and the owner will ask about the memo first.",
           "patch": {
             "building": {
@@ -2072,7 +2036,6 @@
           "id": "reprint-the-letters",
           "role": "diagnosed",
           "name": "List half the clinics for half past nine",
-          "costUnits": 2,
           "effect": "Three hundred keep the nine o'clock slot and the rest move to the later one; this run watches the nine o'clock cohort. The 10 waits over a minute are the target, and the price is a print run.",
           "patch": {
             "building": {
@@ -2091,7 +2054,6 @@
           "id": "split-the-group",
           "role": "costly-fix",
           "name": "Send more than one car when a clinic empties",
-          "costUnits": 8,
           "effect": "When more than a carful stands on one landing, the group splits the crowd across cars instead of sending one. It fights the surge; the letters cause it — and the 114 s worst was a letter.",
           "patch": {
             "dispatcher": {
@@ -2106,7 +2068,6 @@
           "id": "trim-the-dwell",
           "role": "cheap-fix",
           "name": "Trim the door dwell across the group",
-          "costUnits": 3,
           "effect": "A second and a half off every stop moves the 25.4 s mean a little. The nine o'clock wall is not a door.",
           "patch": {
             "building": {
@@ -2128,7 +2089,6 @@
           "id": "sixth-car",
           "role": "new-shaft",
           "name": "A sixth car · beyond a repair budget",
-          "costUnits": 34,
           "effect": "More steel against a surge the letters print twice a day. The owner will ask who wrote the letters.",
           "patch": {
             "building": {
@@ -2224,7 +2184,6 @@
           "id": "key-a-car-to-the-ballroom",
           "role": "diagnosed",
           "name": "Key one car to the ballroom run",
-          "costUnits": 0,
           "effect": "One car serves the street and the ballroom and nothing else while the conference is in. The 12 waits over a minute are the target, and it is a setting.",
           "patch": {
             "building": {
@@ -2314,7 +2273,6 @@
           "id": "destination-panels",
           "role": "costly-fix",
           "name": "Destination panels at reception",
-          "costUnits": 9,
           "effect": "Panels sort the reception crowd by floor before boarding. The letter is the 117 s worst wait coming down, and panels stand on the wrong side of that ride.",
           "patch": {
             "dispatcher": {
@@ -2329,7 +2287,6 @@
           "id": "hold-doors-longer",
           "role": "cheap-fix",
           "name": "Hold doors longer at busy landings",
-          "costUnits": 2,
           "effect": "Cars leave the ballroom fuller — and every other landing waits behind the same held doors. It trades the 33.0 s mean around, not away.",
           "patch": {
             "building": {
@@ -2350,7 +2307,6 @@
           "id": "sixth-lift",
           "role": "new-shaft",
           "name": "A sixth lift · beyond a repair budget",
-          "costUnits": 34,
           "effect": "One more car serving every floor, which the let-out fills one carload at a time like the rest. A capital conversation — the keyed car is free.",
           "patch": {
             "building": {
@@ -2513,7 +2469,6 @@
           "id": "lift-the-lockout",
           "role": "diagnosed",
           "name": "Lift the refurbishment lockout",
-          "costUnits": 5,
           "effect": "The surgical landing doors are re-certified and the bed cars serve their floors again. The 11 waits over a minute at the surgical floors are the target.",
           "patch": {
             "building": {
@@ -2603,7 +2558,6 @@
           "id": "dedicate-to-beds",
           "role": "costly-fix",
           "name": "Dedicate the two bed cars to beds all day",
-          "costUnits": 9,
           "effect": "The big cars serve only imaging, the entrance, theatres and critical care — and stop carrying the wards and outpatients at all. The 94.7 % everywhere else is what this spends.",
           "patch": {
             "building": {
@@ -2684,7 +2638,6 @@
           "id": "quicker-bed-car-doors",
           "role": "cheap-fix",
           "name": "Quicker doors on the two bed cars",
-          "costUnits": 2,
           "effect": "A second and a half off their stops, on the floors they still serve. The letter is about the floors they do not — and the 125 s worst is on one of those.",
           "patch": {
             "building": {
@@ -2707,7 +2660,6 @@
           "id": "sixth-car",
           "role": "new-shaft",
           "name": "A sixth car for the surgical stack · beyond a repair budget",
-          "costUnits": 34,
           "effect": "A new shaft to give theatres what the lockout took. The lockout costs five units to lift, and it is the lockout that took it.",
           "patch": {
             "building": {
@@ -2883,7 +2835,6 @@
           "id": "rephase-the-works",
           "role": "diagnosed",
           "name": "Re-phase the refit — one car out at a time",
-          "costUnits": 4,
           "effect": "The same works, twice the duration, two cars in service throughout. The 19 waits over a minute are the target, and the price is the contractor's re-mobilisation.",
           "patch": {
             "building": {
@@ -2978,7 +2929,6 @@
           "id": "night-working",
           "role": "costly-fix",
           "name": "Pay for night working",
-          "costUnits": 12,
           "effect": "The refit runs at night and all three upper cars are in service each morning. It works — at three times the price of re-phasing the 19 waits away.",
           "patch": {
             "building": {
@@ -3080,7 +3030,6 @@
           "id": "borrow-a-low-car",
           "role": "cheap-fix",
           "name": "Lend a low-zone car to the upper zone",
-          "costUnits": 0,
           "effect": "One low car re-ranges to the upper zone for the duration. The 100.0 % low-zone figure is the thing this spends.",
           "patch": {
             "building": {
@@ -3168,7 +3117,6 @@
           "id": "temporary-hoist",
           "role": "new-shaft",
           "name": "A temporary external hoist · beyond a repair budget",
-          "costUnits": 34,
           "effect": "Scaffold, a machine room in the yard, and a car on hire for the duration. The re-phased works cost four units.",
           "patch": {
             "building": {
@@ -3752,7 +3700,6 @@
           "id": "recommission-the-weighing",
           "role": "diagnosed",
           "name": "Re-commission the load weighing to the plate",
-          "costUnits": 6,
           "effect": "Every deck weighs against its own plated figure and boards its design load. The 8 waits over a minute are the target.",
           "patch": {
             "building": {
@@ -4253,7 +4200,6 @@
           "id": "regear-the-shuttles",
           "role": "costly-fix",
           "name": "Re-gear the shuttles for another half metre per second",
-          "costUnits": 10,
           "effect": "Each climb is quicker, so the 77 s worst shortens — but the decks still close their doors at five hundred pounds, and the queue is at the doors.",
           "patch": {
             "building": {
@@ -4281,7 +4227,6 @@
           "id": "trim-shuttle-dwell",
           "role": "cheap-fix",
           "name": "Trim the shuttle door dwell",
-          "costUnits": 2,
           "effect": "A second and a half off each stop moves the 17.3 s mean a little. The doors are not the plate.",
           "patch": {
             "building": {
@@ -4310,7 +4255,6 @@
           "id": "ninth-shuttle",
           "role": "new-shaft",
           "name": "A ninth shuttle · beyond a repair budget",
-          "costUnits": 34,
           "effect": "One more car reading the same wrong plate would carry three more people at a time. That is a capital conversation, and the plate costs six units to fix.",
           "patch": {
             "building": {
@@ -4403,7 +4347,6 @@
           "id": "key-the-service-car",
           "role": "diagnosed",
           "name": "Key the service car to the restaurant run",
-          "costUnits": 3,
           "effect": "The trolley car serves reception, the ballroom and the restaurant and nothing else over service. The 6 waits over a minute are the target.",
           "patch": {
             "building": {
@@ -4494,7 +4437,6 @@
           "id": "regear-guest-cars",
           "role": "costly-fix",
           "name": "Re-gear the four guest cars for another half metre per second",
-          "costUnits": 10,
           "effect": "Every trip is quicker, so the 79 s worst shortens — but the restaurant still queues behind the whole house for every car.",
           "patch": {
             "building": {
@@ -4518,7 +4460,6 @@
           "id": "hold-doors-longer",
           "role": "cheap-fix",
           "name": "Hold doors longer at the lunch landings",
-          "costUnits": 2,
           "effect": "Cars leave fuller and stop longer everywhere; it moves the 28.7 s mean around rather than away.",
           "patch": {
             "building": {
@@ -4539,7 +4480,6 @@
           "id": "restaurant-lift",
           "role": "new-shaft",
           "name": "A dedicated restaurant lift · beyond a repair budget",
-          "costUnits": 34,
           "effect": "Its own shaft, its own doors, its own queue. The service car does the same run for three units.",
           "patch": {
             "building": {
@@ -4656,7 +4596,6 @@
           "id": "one-car-per-call",
           "role": "diagnosed",
           "name": "One car per landing call",
-          "costUnits": 2,
           "effect": "The controller sends the best-placed car and keeps the rest for the next button. The 4 waits over a minute are the target, and it is a setting the controller always had.",
           "patch": {
             "dispatcher": {
@@ -4670,7 +4609,6 @@
           "id": "regear-tower-cars",
           "role": "costly-fix",
           "name": "Re-gear the four tower cars for another half metre per second",
-          "costUnits": 9,
           "effect": "Every trip is quicker — including the empty ones behind the 92 s worst, of which there are just as many.",
           "patch": {
             "building": {
@@ -4694,7 +4632,6 @@
           "id": "trim-tower-dwell",
           "role": "cheap-fix",
           "name": "Trim the tower cars' door dwell",
-          "costUnits": 1,
           "effect": "A second and a half off every stop moves the 23.6 s mean a little. The empty trips are not doors.",
           "patch": {
             "building": {
@@ -4719,7 +4656,6 @@
           "id": "fifth-tower-car",
           "role": "new-shaft",
           "name": "A fifth tower car · beyond a repair budget",
-          "costUnits": 34,
           "effect": "One more car for the controller to send along with all the others. A capital conversation — the setting costs two units.",
           "patch": {
             "building": {
@@ -4860,7 +4796,6 @@
           "id": "invoke-staggered-starts",
           "role": "diagnosed",
           "name": "Invoke the staggered-starts clause",
-          "costUnits": 3,
           "effect": "The new tenants take the later start their leases already allow, and this run watches the original population's morning. The 32 waits over a minute are the target.",
           "patch": {
             "building": {
@@ -4927,7 +4862,6 @@
           "id": "destination-panels",
           "role": "costly-fix",
           "name": "Destination panels in the lobby",
-          "costUnits": 13,
           "effect": "Panels group the crowd by destination before it boards a car. Whether that moves the 22.3 s mean is a bench question; the free clause is not.",
           "patch": {
             "dispatcher": {
@@ -4942,7 +4876,6 @@
           "id": "reactive-dwell",
           "role": "cheap-fix",
           "name": "A dwell that reacts to what is boarding",
-          "costUnits": 4,
           "effect": "Doors that close when boarding stops, instead of on a timer. It shaves at the 22.3 s mean; it does not shrink the crowd.",
           "patch": {
             "dispatcher": {
@@ -4958,7 +4891,6 @@
           "id": "seventh-shaft",
           "role": "new-shaft",
           "name": "A seventh shaft · beyond a repair budget",
-          "costUnits": 34,
           "effect": "The honest end of this case: the clause buys this morning back, and the building's growth eventually buys concrete. That is the owner's conversation, at a capital price.",
           "patch": {
             "building": {
@@ -5056,7 +4988,6 @@
           "id": "park-at-the-top",
           "role": "diagnosed",
           "name": "Park the idle cars at the top floor",
-          "costUnits": 0,
           "effect": "An idle car waits at the gym floor and meets the morning where it starts. The 3 waits over a minute are the target, and it is a setting.",
           "patch": {
             "dispatcher": {
@@ -5071,7 +5002,6 @@
           "id": "replant-the-machines",
           "role": "costly-fix",
           "name": "Re-plant both machines for another half metre per second",
-          "costUnits": 8,
           "effect": "Every climb is quicker, so the 80 s worst shortens — but the cars still start every gym run from the front door.",
           "patch": {
             "building": {
@@ -5093,7 +5023,6 @@
           "id": "shorter-door-hold",
           "role": "cheap-fix",
           "name": "Shorten the door hold at every landing",
-          "costUnits": 1,
           "effect": "A second off each stop moves the 30.9 s mean a little. The wait in the letter is a parked car, not a door.",
           "patch": {
             "building": {
@@ -5115,7 +5044,6 @@
           "id": "third-lift",
           "role": "new-shaft",
           "name": "A third lift · beyond a repair budget",
-          "costUnits": 34,
           "effect": "A third car for six floors, parked at the door with the first two. That is a capital conversation with the owner, and the parking rule is free.",
           "patch": {
             "building": {

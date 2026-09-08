@@ -144,6 +144,7 @@ const AUDITED_MODULES = [
   'viz/src/persist',
   'viz/src/playback',
   'viz/src/playthrough',
+  'viz/src/pricing',
   'viz/src/record',
   'viz/src/render',
   'viz/src/replay',

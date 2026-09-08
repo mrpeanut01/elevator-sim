@@ -41,6 +41,9 @@
  */
 
 import { probabilityWordIn } from '../campaign/words.js';
+import { priceOf } from '../pricing/parse.js';
+import { repairPriceUnits, unpricedPathsIn } from '../pricing/repairPrice.js';
+import type { PriceSchedule } from '../pricing/types.js';
 import type {
   BuildingPatch,
   CarPatch,
@@ -75,6 +78,15 @@ export class FixitCasesError extends Error {
 
 /** What the file is validated against. Derived by the caller from the loaded `data/`. */
 export interface FixitContext {
+  /**
+   * `data/price-schedule.json`, parsed — GitHub issue **#366**.
+   *
+   * Every repair's price is read off this rather than authored beside the repair. The case file
+   * carries no `costUnits` at all now; see `pricing/repairPrice.ts` for why, and for what moved.
+   * Injected rather than imported, on this file's own standing rule: the caller derives it from
+   * the same loaded `data/` that everything else here is checked against.
+   */
+  readonly schedule: PriceSchedule;
   /** Floor ids per shipped building id. A building missing from the map is not shipped. */
   readonly floorIdsByBuilding: ReadonlyMap<string, readonly string[]>;
   /** Dispatcher profile ids this build's `data/` carries. */
@@ -101,6 +113,7 @@ export interface FixitContext {
  * from Node without the browser loader.
  */
 export function fixitContextOf(input: {
+  readonly schedule: PriceSchedule;
   readonly buildings: readonly {
     readonly id: string;
     readonly trafficProfile: string;
@@ -116,6 +129,7 @@ export function fixitContextOf(input: {
     if (band !== undefined) bandByBuilding.set(building.id, band);
   }
   return {
+    schedule: input.schedule,
     floorIdsByBuilding: new Map(input.buildings.map((building) => [building.id, building.floors.map((floor) => floor.id)])),
     profileIds: new Set(input.dispatcherProfiles.profiles.map((profile) => profile.id)),
     bandByBuilding,
@@ -136,7 +150,17 @@ const READINGS = ['bad', 'mid', 'healthy'] as const;
 export const BUDGET_MIN_UNITS = 10;
 export const BUDGET_MAX_UNITS = 16;
 export const DIAGNOSED_MAX_UNITS = 9;
-export const NEW_SHAFT_UNITS = 34;
+/**
+ * **The new shaft's price, read off the schedule** — GitHub issue **#366**.
+ *
+ * This was a bare `34` here, and it was one of *four* places that independently said 34: every one
+ * of the eighteen cases' new-shaft repair, `fixit/engine.ts#EDITOR_PRICING.shaftUnits`, and the
+ * campaign shop's first Shafts tier. That unanimity is why the figure did not have to be drafted —
+ * it was already agreed and is only being moved. Nothing here may hold a second copy of it.
+ */
+export function newShaftUnits(schedule: PriceSchedule): number {
+  return priceOf(schedule, 'new-car').priceUnits;
+}
 
 /**
  * What makes a `symptom` a **figure** rather than a **sight** — GitHub issue #351, PM-FB2.
@@ -228,7 +252,7 @@ export function playerFacingStringsOf(entry: FixitCase): readonly (readonly [str
  */
 export function parseFixitCases(raw: unknown, context: FixitContext): FixitCases {
   const violations: string[] = [];
-  const decoded = decodeFile(raw, violations);
+  const decoded = decodeFile(raw, violations, context.schedule);
   if (decoded === undefined) throw new FixitCasesError(violations);
   const seen = new Set<string>();
   const cases: FixitCase[] = [];
@@ -247,7 +271,7 @@ export function parseFixitCases(raw: unknown, context: FixitContext): FixitCases
     cases.push(entry);
   }
   if (violations.length > 0) throw new FixitCasesError(violations);
-  return { version: decoded.version, cases };
+  return { version: decoded.version, cases, schedule: context.schedule };
 }
 
 function checkCase(where: string, entry: FixitCase, context: FixitContext): readonly string[] {
@@ -285,8 +309,12 @@ function checkCase(where: string, entry: FixitCase, context: FixitContext): read
   }
   const shaft = entry.repairs.find((repair) => repair.role === 'new-shaft');
   if (shaft !== undefined) {
-    if (shaft.costUnits !== NEW_SHAFT_UNITS) {
-      violations.push(`${where}: the new shaft costs ${String(shaft.costUnits)} u; it is 34 in every case.`);
+    const shaftUnits = newShaftUnits(context.schedule);
+    if (shaft.costUnits !== shaftUnits) {
+      violations.push(
+        `${where}: the new shaft costs ${String(shaft.costUnits)} u; data/price-schedule.json ` +
+          `prices it ${String(shaftUnits)} in every case.`,
+      );
     }
     if (shaft.costUnits <= entry.budgetUnits) {
       violations.push(
@@ -415,7 +443,7 @@ function strings(value: unknown): readonly string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 }
 
-function decodeFile(raw: unknown, violations: string[]): FixitCases | undefined {
+function decodeFile(raw: unknown, violations: string[], schedule: PriceSchedule): FixitCases | undefined {
   if (!isRecord(raw)) {
     violations.push('the file is not a JSON object.');
     return undefined;
@@ -427,13 +455,13 @@ function decodeFile(raw: unknown, violations: string[]): FixitCases | undefined 
   }
   const decoded: FixitCase[] = [];
   for (const [index, entry] of cases.entries()) {
-    const one = decodeCase(entry, `cases[${String(index)}]`, violations);
+    const one = decodeCase(entry, `cases[${String(index)}]`, violations, schedule);
     if (one !== undefined) decoded.push(one);
   }
-  return { version: num(raw['version']) ?? 0, cases: decoded };
+  return { version: num(raw['version']) ?? 0, cases: decoded, schedule };
 }
 
-function decodeCase(raw: unknown, at: string, violations: string[]): FixitCase | undefined {
+function decodeCase(raw: unknown, at: string, violations: string[], schedule: PriceSchedule): FixitCase | undefined {
   if (!isRecord(raw)) {
     violations.push(`${at}: is not an object.`);
     return undefined;
@@ -492,7 +520,7 @@ function decodeCase(raw: unknown, at: string, violations: string[]): FixitCase |
     figures: decodeFigures(raw['figures'], where, violations),
     diagnosis: { text: str(diagnosis['text']) ?? '', reasoning: str(diagnosis['reasoning']) ?? '' },
     budgetUnits: num(raw['budgetUnits']) ?? Number.NaN,
-    repairs: decodeRepairs(raw['repairs'], where, violations),
+    repairs: decodeRepairs(raw['repairs'], where, violations, schedule),
     result: { head: str(result['head']) ?? '', body: str(result['body']) ?? '' },
   };
 }
@@ -566,7 +594,12 @@ function decodeFigures(raw: unknown, where: string, violations: string[]): reado
   return figures;
 }
 
-function decodeRepairs(raw: unknown, where: string, violations: string[]): readonly FixitRepair[] {
+function decodeRepairs(
+  raw: unknown,
+  where: string,
+  violations: string[],
+  schedule: PriceSchedule,
+): readonly FixitRepair[] {
   if (!Array.isArray(raw)) {
     violations.push(`${where}: has no "repairs" array.`);
     return [];
@@ -582,13 +615,34 @@ function decodeRepairs(raw: unknown, where: string, violations: string[]): reado
       violations.push(`${where}: repairs[${String(index)}] role ${JSON.stringify(entry['role'])} is not one this build knows.`);
       continue;
     }
+    const patch = decodePatch(entry['patch'], `${where}: repairs[${String(index)}]`, violations);
+    /*
+     * **The price is read off the schedule, and an authored one is refused** — GitHub issue #366.
+     *
+     * A `costUnits` in the case file would be the second price for a change the schedule already
+     * prices, which is the whole of what this issue is about. Refused rather than ignored: silently
+     * dropping it would let an author keep writing a number that no longer does anything, which is
+     * the stale-refusal shape one level down.
+     */
+    if (entry['costUnits'] !== undefined) {
+      violations.push(
+        `${where}: repairs[${String(index)}] carries a costUnits. Prices live in ` +
+          'data/price-schedule.json now, one per change (GitHub issue #366) — delete the field.',
+      );
+    }
+    for (const path of unpricedPathsIn(schedule, patch)) {
+      violations.push(
+        `${where}: repairs[${String(index)}] changes "${path}", which data/price-schedule.json ` +
+          'prices nothing for. A repair nobody can be charged for is a repair nobody can buy.',
+      );
+    }
     repairs.push({
       id: str(entry['id']) ?? `repair-${String(index)}`,
       role: role as RepairRole,
       name: str(entry['name']) ?? '',
-      costUnits: num(entry['costUnits']) ?? Number.NaN,
+      costUnits: repairPriceUnits(schedule, patch),
       effect: str(entry['effect']) ?? '',
-      patch: decodePatch(entry['patch'], `${where}: repairs[${String(index)}]`, violations),
+      patch,
     });
   }
   return repairs;

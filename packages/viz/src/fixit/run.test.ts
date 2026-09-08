@@ -38,6 +38,8 @@ import {
 } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import { recordRun, type RecordedRun } from '../record/recordRun.js';
 
 import { emptyFixitState, toggleRepair } from './engine.js';
@@ -83,6 +85,7 @@ beforeAll(() => {
   cases = parseFixitCases(
     dataFile('fixit-cases.json'),
     fixitContextOf({
+      schedule: shippedPriceSchedule(),
       buildings: resources.entries.map((entry) => entry.resolved),
       trafficProfiles: resources.trafficProfiles,
       dispatcherProfiles: resources.dispatcherProfiles,
@@ -95,7 +98,7 @@ function diagnosedState(entry: FixitCase): FixitState {
   const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
   return diagnosed === undefined
     ? emptyFixitState()
-    : toggleRepair(entry, emptyFixitState(), diagnosed.id);
+    : toggleRepair(entry, emptyFixitState(), diagnosed.id, shippedPriceSchedule());
 }
 
 /** Boarding identity — the legs, never a window statistic. `fixit/cases.test.ts`'s own key. */
