@@ -322,6 +322,7 @@ packages/
 │   ├── scope/             — § D216: what a control may move and when, derived from the state's own keys
 │   ├── playthrough/       — § D217: the walk over the menu graph — every screen, every affordance
 │   ├── persist/          — § D217: the session a reload survives — the week, the settings, the selection
+│   ├── pricing/           — § D525 clause 2: one price schedule for every purchasable change, in `data/price-schedule.json` — the three tiers, their ladder, and what a fix-a-building repair costs
 │   ├── commissioning/    — § D219: the pre-week design phase — shafts, machine classes and rated speeds under a declared capital constraint, put back through the loader; retrofit is the constraint whose editable set is empty
 │   ├── everyday/          — the Everyday Mode shell: the page's entry point, the 212 px rail, the pinned bar, and the menu whose four tiles are the four modes
 │   └── dev/               — the Engineer surface the stage hands off to, and its editors (was the page's entry point until `everyday/boot.ts`)
