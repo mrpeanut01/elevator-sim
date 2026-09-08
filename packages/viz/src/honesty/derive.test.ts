@@ -43,6 +43,35 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The price schedule’s parser, validator and lookups — GitHub issue #366. Every literal in ' +
+        'these is a **load-time refusal addressed to whoever authored `data/price-schedule.json`** ' +
+        '("the new shaft costs 12 u; data/price-schedule.json prices it 34"), or a config path, or ' +
+        'a tier id. None of them reaches a player: the words a player reads about a price are the ' +
+        'change’s own `name`, which the FIXIT adapter drives through `standingExtrasFrom` and ' +
+        '`repairRowOf`, and the schedule’s `note` fields, which are provenance for a reviewer and ' +
+        'are drawn on no screen. `fixit/parse.ts`’s own exclusion three groups down is the same ' +
+        'argument for the same reason, and this is that file’s pricing half.',
+      ids: [
+        'pricing/parse.ts#parsePriceSchedule',
+        'pricing/parse.ts#violationsIn',
+        'pricing/parse.ts#priceOf',
+        'pricing/repairPrice.ts#pathsIn',
+        'pricing/repairPrice.ts#changesBought',
+        'pricing/repairPrice.ts#unpricedPathsIn',
+        'pricing/repairPrice.ts#repairPriceUnits',
+        /* Returns a number and a fetch; its only literals are the refusal above and a document path. */
+        'dev/data.ts#loadPriceSchedule',
+        'fixit/parse.ts#newShaftUnits',
+        /*
+         * Returns three numbers. `standingExtrasFrom` beside it is deliberately **not** here — it
+         * returns the five extras' names and lines, which are player copy and are driven by the
+         * FIXIT adapter, exactly as `STANDING_EXTRAS` was before #366 renamed it.
+         */
+        'fixit/engine.ts#editorPricingFrom',
+      ],
+    },
+    {
+      reason:
         'DOM-bound. These mount the page and author their status text inline, so they cannot be ' +
         'driven under Node — `boundaries.test.ts` confines the DOM to `dev/` precisely so the rest ' +
         'of the package stays testable without a jsdom. Their authored literals are swept ' +

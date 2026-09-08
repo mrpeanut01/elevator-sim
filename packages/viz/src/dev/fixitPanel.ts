@@ -38,8 +38,8 @@ import { el, fill } from './dom.js';
 import type { BrowserResources } from './data.js';
 import {
   BASIS_LINE,
-  EDITOR_PRICING,
-  STANDING_EXTRAS,
+  editorPricingFrom,
+  standingExtrasFrom,
   affordabilityOf,
   budgetNoteOf,
   classifyOutcome,
@@ -55,6 +55,7 @@ import {
 } from '../fixit/engine.js';
 import { FIXIT_RUN_SWITCHES, assertPairMatchesRepairs, figureValuesOf, fixitRunPlanOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
+import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
 
 import { createOffThreadRunner } from './offThreadRuns.js';
@@ -122,6 +123,21 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
   doc.body.append(root);
 
   let cases: FixitCases | undefined;
+
+/**
+ * The price schedule these cases were loaded with — GitHub issue **#366**.
+ *
+ * Read off {@link cases} rather than fetched again, so this panel and the parser that priced its
+ * repairs cannot disagree about what anything costs. Throws rather than defaulting: a panel drawing
+ * prices before its data arrived would draw zeroes, and a free repair is a worse lie than a crash.
+ */
+function scheduleNow(): PriceSchedule {
+  const schedule = cases?.schedule;
+  if (schedule === undefined) {
+    throw new Error('the fix-a-building panel asked for a price before its cases had loaded.');
+  }
+  return schedule;
+}
   let loadFailure: string | undefined;
   let selectedId: string | undefined;
   const sessions = new Map<string, CaseSession>();
@@ -305,7 +321,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
   function main(entry: FixitCase): HTMLElement {
     const session = sessionOf(entry);
     if (session.asBuilt === undefined) measureAsBuilt(entry);
-    const spend = spendOf(entry, session.state);
+    const spend = spendOf(entry, session.state, scheduleNow());
     const figures =
       session.asBuilt === undefined ? undefined : figureValuesOf(entry, session.asBuilt);
     return el(doc, 'div', {
@@ -363,7 +379,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
         el(doc, 'h2', { text: 'Quick repairs', style: h2Style() }),
         ...entry.repairs.map((repair) => repairToggle(entry, session, repair.id)),
         el(doc, 'h2', { text: 'Also on offer', style: h2Style() }),
-        ...STANDING_EXTRAS.map((extra) => extraToggle(entry, session, extra.id)),
+        ...standingExtrasFrom(scheduleNow()).map((extra) => extraToggle(entry, session, extra.id)),
         el(doc, 'h2', { text: 'Machinery, priced against the same budget', style: h2Style() }),
         stepperRow(entry, session, 'speed'),
         stepperRow(entry, session, 'capacity'),
@@ -407,7 +423,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
   function repairToggle(entry: FixitCase, session: CaseSession, repairId: string): HTMLElement {
     const repair = entry.repairs.find((candidate) => candidate.id === repairId);
     if (repair === undefined) return el(doc, 'div');
-    const row = repairRowOf(entry, session.state, repair);
+    const row = repairRowOf(entry, session.state, repair, scheduleNow());
     const button = el(doc, 'button', {
       // The class is the browser tier's handle (`fixit.browser.test.ts`); nothing styles it.
       className: 'fixit-repair',
@@ -439,7 +455,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
     button.setAttribute('aria-pressed', String(row.selected));
     button.disabled = !row.selectable;
     button.addEventListener('click', () => {
-      session.state = toggleRepair(entry, session.state, repair.id);
+      session.state = toggleRepair(entry, session.state, repair.id, scheduleNow());
       render();
     });
     return button;
@@ -462,10 +478,10 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
   }
 
   function extraToggle(entry: FixitCase, session: CaseSession, extraId: string): HTMLElement {
-    const extra = STANDING_EXTRAS.find((candidate) => candidate.id === extraId);
+    const extra = standingExtrasFrom(scheduleNow()).find((candidate) => candidate.id === extraId);
     if (extra === undefined) return el(doc, 'div');
     const selected = session.state.selectedExtraIds.includes(extra.id);
-    const affordability = affordabilityOf(entry, session.state, extra.costUnits);
+    const affordability = affordabilityOf(entry, session.state, extra.costUnits, scheduleNow());
     const selectable = selected || affordability.selectable;
     const button = el(doc, 'button', {
       className: 'fixit-extra',
@@ -500,7 +516,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
     button.setAttribute('aria-pressed', String(selected));
     button.disabled = !selectable;
     button.addEventListener('click', () => {
-      session.state = toggleExtra(entry, session.state, extra.id);
+      session.state = toggleExtra(entry, session.state, extra.id, scheduleNow());
       render();
     });
     return button;
@@ -508,8 +524,9 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
 
   function stepperRow(entry: FixitCase, session: CaseSession, which: 'speed' | 'capacity'): HTMLElement {
     const steps = which === 'speed' ? session.state.speedSteps : session.state.capacitySteps;
-    const price = which === 'speed' ? EDITOR_PRICING.speedUnitsPerHalfMps : EDITOR_PRICING.capacityUnitsPerTwoPlaces;
-    const canBuy = affordabilityOf(entry, session.state, price).selectable;
+    const pricing = editorPricingFrom(scheduleNow());
+    const price = which === 'speed' ? pricing.speedUnitsPerHalfMps : pricing.capacityUnitsPerTwoPlaces;
+    const canBuy = affordabilityOf(entry, session.state, price, scheduleNow()).selectable;
     const label =
       which === 'speed'
         ? `Rated speed · ${String(price)} u per half a metre per second · +${(steps * 0.5).toFixed(1)} m/s`
@@ -520,11 +537,11 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
     plus.disabled = !canBuy;
     if (!canBuy) plus.title = 'at the budget';
     minus.addEventListener('click', () => {
-      session.state = which === 'speed' ? stepSpeed(entry, session.state, -1) : stepCapacity(entry, session.state, -1);
+      session.state = which === 'speed' ? stepSpeed(entry, session.state, -1, scheduleNow()) : stepCapacity(entry, session.state, -1, scheduleNow());
       render();
     });
     plus.addEventListener('click', () => {
-      session.state = which === 'speed' ? stepSpeed(entry, session.state, 1) : stepCapacity(entry, session.state, 1);
+      session.state = which === 'speed' ? stepSpeed(entry, session.state, 1, scheduleNow()) : stepCapacity(entry, session.state, 1, scheduleNow());
       render();
     });
     return el(doc, 'div', {
@@ -561,7 +578,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
       const plan = fixitRunPlanOf(entry, session.state, host.resources);
       // The spend is bound here rather than read in the callback: the outcome is classified
       // against the state the press was made in, not against one the player edited meanwhile.
-      const spend = spendOf(entry, session.state);
+      const spend = spendOf(entry, session.state, scheduleNow());
       runner.start({
         runs: [
           { config: plan.asBuilt, ...FIXIT_RUN_SWITCHES },

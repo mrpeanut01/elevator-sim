@@ -18,7 +18,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { EDITOR_PRICING, emptyFixitState, spendOf } from '../fixit/engine.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
+import { editorPricingFrom, emptyFixitState, spendOf } from '../fixit/engine.js';
 import type { FixitCase, FixitState } from '../fixit/types.js';
 import { actionBarFor } from './actionBar.js';
 import {
@@ -150,18 +152,18 @@ describe('the § 3.3 refinement', () => {
 
 describe('the machinery rows', () => {
   it('prices from § 9’s constants, never from a literal', () => {
-    const [speed, capacity] = fixitMachineryRows(emptyFixitState(), true, true);
+    const [speed, capacity] = fixitMachineryRows(emptyFixitState(), true, true, editorPricingFrom(shippedPriceSchedule()));
     expect(speed.priced).toBe(
-      `${String(EDITOR_PRICING.speedUnitsPerHalfMps)} u per half a metre per second`,
+      `${String(editorPricingFrom(shippedPriceSchedule()).speedUnitsPerHalfMps)} u per half a metre per second`,
     );
     expect(capacity.priced).toBe(
-      `${String(EDITOR_PRICING.capacityUnitsPerTwoPlaces)} u per two places`,
+      `${String(editorPricingFrom(shippedPriceSchedule()).capacityUnitsPerTwoPlaces)} u per two places`,
     );
   });
 
   it('reads out what the steps bought and appends § 10.3’s cap while the budget refuses', () => {
     const state: FixitState = { ...emptyFixitState(), speedSteps: 2, capacitySteps: 1 };
-    const [speed, capacity] = fixitMachineryRows(state, false, false);
+    const [speed, capacity] = fixitMachineryRows(state, false, false, editorPricingFrom(shippedPriceSchedule()));
     expect(speed.readout).toBe('+1.0 m/s');
     expect(capacity.readout).toBe('+2 places');
     for (const row of [speed, capacity]) {
@@ -169,14 +171,14 @@ describe('the machinery rows', () => {
       expect(row.priced.endsWith(` · ${COPY.atBudget}`)).toBe(true);
       expect(row.canStepDown).toBe(true);
     }
-    expect(fixitMachineryRows(emptyFixitState(), true, true)[0].canStepDown).toBe(false);
+    expect(fixitMachineryRows(emptyFixitState(), true, true, editorPricingFrom(shippedPriceSchedule()))[0].canStepDown).toBe(false);
   });
 });
 
 describe('the running total', () => {
   it('splits spent from committed the way the prototype does, on the engine’s arithmetic', () => {
     const entry = caseOf('spend', 14);
-    const spend = spendOf(entry, { ...emptyFixitState(), speedSteps: 1 });
+    const spend = spendOf(entry, { ...emptyFixitState(), speedSteps: 1 }, shippedPriceSchedule());
     const summary = fixitSpendSummary(entry, spend);
     // Toggles only on the strip; the whole order on the card — both sums the engine's.
     expect(summary.spentLine).toBe(
@@ -189,7 +191,7 @@ describe('the running total', () => {
 
   it('names a steel-free order in the prototype’s own words', () => {
     const entry = caseOf('free');
-    const summary = fixitSpendSummary(entry, spendOf(entry, emptyFixitState()));
+    const summary = fixitSpendSummary(entry, spendOf(entry, emptyFixitState(), shippedPriceSchedule()));
     expect(summary.capitalLine).toBe(COPY.noCapital);
   });
 });

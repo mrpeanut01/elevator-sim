@@ -1,0 +1,430 @@
+{
+  "$comment": "One price schedule — GitHub issue #366, DECISIONS.md § D525 clause 2, docs/38 § 2.1. Every price a player pays for a change, in one place, so the same change costs the same in Scenario, in Career and in the fix-a-building editor. The figures are DRAFTED, not measured: a price is game feel and the ladder's ordering is the product owner's. Where two shipped lists already agreed the agreed figure is kept and said so; where they disagreed the disagreement is recorded in the entry's note. See packages/viz/src/pricing/parse.ts.",
+  "version": 1,
+  "tiers": [
+    {
+      "id": "dispatcher",
+      "order": 1,
+      "name": "Dispatcher",
+      "typicalUnits": 2,
+      "note": "How the cars are told to behave. Nothing is installed and nothing is cut, so it is the cheap end of the ladder and tuning is nearly free."
+    },
+    {
+      "id": "equipment",
+      "order": 2,
+      "name": "Equipment",
+      "typicalUnits": 9,
+      "note": "Settings and fittings on kit the building already has — door timings, sensors, landing panels. Dearer than telling the cars what to do, cheaper than changing the building."
+    },
+    {
+      "id": "building",
+      "order": 3,
+      "name": "Building",
+      "typicalUnits": 18,
+      "note": "The fabric: a new shaft or car, a faster or larger machine, a rezoned bank. The dearest end, and the only one that books long works."
+    }
+  ],
+  "changes": [
+    {
+      "id": "idle-parking",
+      "tier": "dispatcher",
+      "name": "Where idle cars wait",
+      "priceUnits": 0,
+      "nights": 0,
+      "note": "Free in every shipped list. Four fix cases price the idle strategy at 0 units and none prices it higher.",
+      "covers": [
+        "dispatcher.idle.parkingStrategy",
+        "dispatcher.idle.parkingFloorIndex",
+        "dispatcher.idle.repositionThresholdS",
+        "dispatcher.idle.repositionEnergyWeight"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 0
+      }
+    },
+    {
+      "id": "dispatch-rules",
+      "tier": "dispatcher",
+      "name": "How calls are assigned",
+      "priceUnits": 2,
+      "nights": 0,
+      "note": "The fix cases price an assignment-mode change at 2 units as a diagnosis and at 8 as a costly fix. 2 is taken: the 8 was a case where the same press also bought a split threshold, which is priced on its own row now.",
+      "covers": [
+        "dispatcher.dispatch.assignmentMode",
+        "dispatcher.dispatch.splitThresholdPassengers",
+        "dispatcher.weights"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 2
+      }
+    },
+    {
+      "id": "dwell-policy",
+      "tier": "dispatcher",
+      "name": "How long doors are told to hold",
+      "priceUnits": 3,
+      "nights": 0,
+      "note": "Telling the controller when to close, as opposed to re-fitting the door. Priced at 2 and 4 in the two cases that buy it; 3 is the midpoint.",
+      "covers": [
+        "dispatcher.answer.dwellPolicy",
+        "dispatcher.answer.dwellAdaptationGain",
+        "dispatcher.answer.maxDwellS"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 3
+      }
+    },
+    {
+      "id": "door-dwell",
+      "tier": "equipment",
+      "name": "Trim the door dwell",
+      "priceUnits": 2,
+      "nights": 0,
+      "note": "Set on doors already hung. Seventeen fix repairs buy it at 1, 2 or 3 units for the SAME settings — the clearest case in the tree of one change carrying three prices. 2 is the mode.",
+      "covers": [
+        "building.cars[].set.dwellHallCallS",
+        "building.cars[].set.dwellCarCallS"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 2
+      }
+    },
+    {
+      "id": "faster-doors",
+      "tier": "equipment",
+      "name": "Faster doors",
+      "priceUnits": 4,
+      "nights": 0,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.doors.1"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 30,
+        "default": 4
+      }
+    },
+    {
+      "id": "door-sensors",
+      "tier": "equipment",
+      "name": "Better sensors",
+      "priceUnits": 9,
+      "nights": 1,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.doors.2"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 30,
+        "default": 9
+      }
+    },
+    {
+      "id": "advance-opening",
+      "tier": "equipment",
+      "name": "Advance opening",
+      "priceUnits": 16,
+      "nights": 2,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.doors.3"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 40,
+        "default": 16
+      }
+    },
+    {
+      "id": "zone-the-tower",
+      "tier": "equipment",
+      "name": "Zone the tower",
+      "priceUnits": 6,
+      "nights": 1,
+      "note": "The campaign shop's own figure, kept. Grouping calls is a landing-side fitting rather than a cut shaft.",
+      "covers": [
+        "shop.control.1"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 30,
+        "default": 6
+      }
+    },
+    {
+      "id": "destination-panels",
+      "tier": "equipment",
+      "name": "Destination panels",
+      "priceUnits": 13,
+      "nights": 2,
+      "note": "Two lists agree on 13: the campaign shop's Control tier 2, and the dearest of the four fix repairs that install them. § D112's line is kept — TUNING a destination dispatcher is dispatcher-tier and nearly free; INSTALLING the panels is this row. NOTE FOR THE OWNER: issue #366's table lists panels under building while its prose puts them under equipment. Equipment is taken, because the prose cites § D112 and the table does not.",
+      "covers": [
+        "dispatcher.dispatch.callType",
+        "dispatcher.dispatch.passengerAssignment",
+        "shop.control.2"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 40,
+        "default": 13
+      }
+    },
+    {
+      "id": "full-destination",
+      "tier": "equipment",
+      "name": "Full destination dispatch",
+      "priceUnits": 24,
+      "nights": 3,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.control.3"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 50,
+        "default": 24
+      }
+    },
+    {
+      "id": "tenant-floors",
+      "tier": "equipment",
+      "name": "Move or stagger a tenancy",
+      "priceUnits": 2,
+      "nights": 4,
+      "note": "Three fix cases price a floor-population change at 2 or 3 units as a diagnosis; the shop prices moving a tenant floor at 20 with four nights. 2 is taken for the fix-case row and the shop's own row is kept separately below, because they are not the same act: staggering start times is a letter, and moving a tenant is a lease.",
+      "covers": [
+        "building.floorPopulations[]"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 2
+      }
+    },
+    {
+      "id": "queue-marshalling",
+      "tier": "equipment",
+      "name": "Queue marshalling",
+      "priceUnits": 5,
+      "nights": 0,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.tenants.1"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 30,
+        "default": 5
+      }
+    },
+    {
+      "id": "staggered-starts",
+      "tier": "equipment",
+      "name": "Staggered start times",
+      "priceUnits": 10,
+      "nights": 0,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.tenants.2"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 30,
+        "default": 10
+      }
+    },
+    {
+      "id": "move-a-tenant",
+      "tier": "building",
+      "name": "Move a tenant floor",
+      "priceUnits": 20,
+      "nights": 4,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.tenants.3"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 40,
+        "default": 20
+      }
+    },
+    {
+      "id": "rezone-bank",
+      "tier": "building",
+      "name": "Rezone a bank",
+      "priceUnits": 6,
+      "nights": 1,
+      "note": "Twelve fix repairs buy it between 0 and 12 units with no rule relating the price to how much is rezoned. 6 is the midpoint and the widest draft in this file.",
+      "covers": [
+        "building.banks[]"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 30,
+        "default": 6
+      }
+    },
+    {
+      "id": "faster-machines",
+      "tier": "building",
+      "name": "A faster machine",
+      "priceUnits": 10,
+      "nights": 2,
+      "note": "THE CLEAREST CONFLICT THE SCHEDULE RESOLVES. The same purchase — make a machine faster — was priced three ways: the fix cases charge 8, 9 or 10 units for a 0.5 m/s bump and 12 for 1.0; `fixit/engine.ts#EDITOR_PRICING.speedUnitsPerHalfMps` charges 6; the campaign shop's machine tiers are 14, 25 and 40. A player paid a different price for the same metre per second depending on which screen they stood on. 10 is taken — the fix cases' mode — so the editor's step moves 6 to 10.",
+      "covers": [
+        "building.cars[].set.ratedSpeedDeltaMps",
+        "editor.speed",
+        "shop.machines.1"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 60,
+        "default": 10
+      }
+    },
+    {
+      "id": "larger-cars",
+      "tier": "building",
+      "name": "Larger cars",
+      "priceUnits": 18,
+      "nights": 3,
+      "note": "The campaign shop's own figure for 16-person cars, kept. The editor's per-two-places step is a separate row (`larger-car-step`), because re-specifying the fleet and widening one car are different acts.",
+      "covers": [
+        "shop.cars"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 60,
+        "default": 18
+      }
+    },
+    {
+      "id": "new-car",
+      "tier": "building",
+      "name": "A new car in a new shaft",
+      "priceUnits": 34,
+      "nights": 8,
+      "note": "FOUR shipped lists independently say 34: every one of the eighteen fix cases' new-shaft repair, `fixit/parse.ts#NEW_SHAFT_UNITS`, `fixit/engine.ts#EDITOR_PRICING.shaftUnits`, and the campaign shop's Shafts tier 1. Nothing here is drafted — this figure was already unanimous and is only being moved.",
+      "covers": [
+        "building.addCars[]",
+        "editor.shaft",
+        "shop.shafts.1"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 60,
+        "default": 34
+      }
+    },
+    {
+      "id": "fifth-car",
+      "tier": "building",
+      "name": "A fifth car",
+      "priceUnits": 54,
+      "nights": 10,
+      "note": "The campaign shop's own figure, kept.",
+      "covers": [
+        "shop.shafts.2"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 80,
+        "default": 54
+      }
+    },
+    {
+      "id": "larger-car-step",
+      "tier": "building",
+      "name": "Two more places in a car",
+      "priceUnits": 8,
+      "nights": 2,
+      "note": "Kept from `fixit/engine.ts#EDITOR_PRICING.capacityUnitsPerTwoPlaces`. Deliberately a separate row from `larger-cars`: adding two places to a car in the editor and re-specifying the fleet to 16-person cars are different acts, so they are two changes at two prices rather than one change at two prices, which is what #366 forbids.",
+      "covers": [
+        "editor.capacityStep"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 40,
+        "default": 8
+      }
+    }
+  ],
+  "extras": [
+    {
+      "id": "tenant-notices",
+      "name": "Tenant notices",
+      "priceUnits": 1
+    },
+    {
+      "id": "traffic-survey",
+      "name": "A traffic survey",
+      "priceUnits": 3
+    },
+    {
+      "id": "landing-indicators",
+      "name": "Landing indicators",
+      "priceUnits": 4
+    },
+    {
+      "id": "car-interiors",
+      "name": "New car interiors",
+      "priceUnits": 5
+    },
+    {
+      "id": "call-out-cover",
+      "name": "Call-out cover",
+      "priceUnits": 6
+    }
+  ]
+}

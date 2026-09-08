@@ -47,6 +47,8 @@ import {
 } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { emptyFixitState, toggleRepair } from '../fixit/engine.js';
 import { fixitContextOf, parseFixitCases } from '../fixit/parse.js';
@@ -103,6 +105,7 @@ beforeAll(async () => {
   const cases = parseFixitCases(
     JSON.parse(await readFile(join(DATA_DIR, 'fixit-cases.json'), 'utf8')) as unknown,
     fixitContextOf({
+      schedule: shippedPriceSchedule(),
       buildings: resources.entries.map((candidate) => candidate.resolved),
       trafficProfiles: resources.trafficProfiles,
       dispatcherProfiles: resources.dispatcherProfiles,
@@ -124,7 +127,7 @@ beforeAll(async () => {
   const asBuiltPlan = fixitRunPlanOf(entry, emptyFixitState(), resources);
   const repairedPlan = fixitRunPlanOf(
     entry,
-    toggleRepair(entry, emptyFixitState(), diagnosed.id),
+    toggleRepair(entry, emptyFixitState(), diagnosed.id, shippedPriceSchedule()),
     resources,
   );
   before = recordRun(asBuiltPlan.asBuilt, FIXIT_RUN_SWITCHES);

@@ -9,12 +9,14 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+
 import {
   BASIS_LINE,
   COMPLAINT_GONE_PCT,
-  EDITOR_PRICING,
+  editorPricingFrom,
   REST_DROP_LIMIT_POINTS,
-  STANDING_EXTRAS,
+  standingExtrasFrom,
   affordabilityOf,
   budgetNoteOf,
   classifyOutcome,
@@ -81,25 +83,59 @@ const MEASURED: FixitMeasurement = {
 };
 
 describe('spend and the editor prices', () => {
-  it('prices the contract: shaft 34, speed 6 per half-metre, capacity 8 per two places', () => {
-    expect(EDITOR_PRICING).toEqual({ shaftUnits: 34, speedUnitsPerHalfMps: 6, capacityUnitsPerTwoPlaces: 8 });
+  /**
+   * **The editor's three prices, and the one that moved** — GitHub issue **#366**.
+   *
+   * This read *shaft 34, speed 6 per half-metre, capacity 8 per two places* and two of those are
+   * unchanged. The middle one is the conflict the schedule was written to end: the fix cases
+   * charge 8, 9 or 10 units for the same 0.5 m/s bump, so a player buying one metre per second
+   * paid **6** in the editor and **10** as a repair depending on which screen they were standing
+   * on. The schedule prices it once, at the cases' own mode, and the editor now reads that.
+   *
+   * The figures are asserted as literals rather than read back off the schedule, deliberately: a
+   * test that compared the schedule with itself would pass whatever the file said. This is the
+   * place a price change has to be looked at by a person.
+   */
+  it('prices the contract: shaft 34, speed 10 per half-metre, capacity 8 per two places', () => {
+    expect(editorPricingFrom(shippedPriceSchedule())).toEqual({
+      shaftUnits: 34,
+      speedUnitsPerHalfMps: 10,
+      capacityUnitsPerTwoPlaces: 8,
+    });
   });
 
+  /**
+   * The three sums, on a selection that lands **exactly** on this 12 u case's budget.
+   *
+   * It used to add a 1 u extra as well, and that no longer fits: #366 moved the editor's speed step
+   * from 6 u to 10, so a repair, an extra and a step come to 13 and the reducer correctly refuses
+   * the step. The extra is dropped rather than the budget raised — this file's other cases are
+   * written against 12 — and landing on the budget exactly is the more interesting arithmetic
+   * anyway, because it is the boundary `affordabilityOf` is about.
+   */
   it('sums repairs, extras and editor machinery, and counts the steel', () => {
-    let state = toggleRepair(CASE, emptyFixitState(), 'small-fix');
-    state = toggleExtra(CASE, state, 'tenant-notices');
-    state = stepSpeed(CASE, state, 1);
-    const spend = spendOf(CASE, state);
-    expect(spend).toEqual({ repairUnits: 2, extraUnits: 1, editorUnits: 6, totalUnits: 9, machineryUnits: 6 });
+    let state = toggleRepair(CASE, emptyFixitState(), 'small-fix', shippedPriceSchedule());
+    state = stepSpeed(CASE, state, 1, shippedPriceSchedule());
+    const spend = spendOf(CASE, state, shippedPriceSchedule());
+    expect(spend).toEqual({
+      repairUnits: 2,
+      extraUnits: 0,
+      editorUnits: 10,
+      totalUnits: 12,
+      machineryUnits: 10,
+    });
+
+    /* And an extra on top of that is refused, which is the boundary the sum just reached. */
+    expect(toggleExtra(CASE, state, 'tenant-notices', shippedPriceSchedule())).toBe(state);
   });
 
   it('counts a selected new shaft as machinery — § 10.4 asks how much of the spend was steel', () => {
     const state: FixitState = { ...emptyFixitState(), selectedRepairIds: ['shaft'] };
-    expect(spendOf(CASE, state).machineryUnits).toBe(34);
+    expect(spendOf(CASE, state, shippedPriceSchedule()).machineryUnits).toBe(34);
   });
 
   it('offers the five standing extras at the contract prices, none with a patch', () => {
-    expect(STANDING_EXTRAS.map((extra) => [extra.id, extra.costUnits])).toEqual([
+    expect(standingExtrasFrom(shippedPriceSchedule()).map((extra) => [extra.id, extra.costUnits])).toEqual([
       ['traffic-survey', 3],
       ['landing-indicators', 4],
       ['car-interiors', 5],
@@ -111,43 +147,48 @@ describe('spend and the editor prices', () => {
 
 describe('affordability — § 10.2', () => {
   it('refuses a selection that would go over budget, and says what it is short by', () => {
-    const state = toggleRepair(CASE, emptyFixitState(), 'dear-fix'); // 10 of 12 spent
-    const affordability = affordabilityOf(CASE, state, 34);
+    const state = toggleRepair(CASE, emptyFixitState(), 'dear-fix', shippedPriceSchedule()); // 10 of 12 spent
+    const affordability = affordabilityOf(CASE, state, 34, shippedPriceSchedule());
     expect(affordability.selectable).toBe(false);
     expect(affordability.shortByUnits).toBe(32);
-    const row = repairRowOf(CASE, state, CASE.repairs[3] as FixitCase['repairs'][number]);
+    const row = repairRowOf(CASE, state, CASE.repairs[3] as FixitCase['repairs'][number], shippedPriceSchedule());
     expect(row.refusal).toBe('short by 32 u — beyond a repair budget');
   });
 
   it('the new shaft is visible and never affordable, even with nothing else selected', () => {
-    const row = repairRowOf(CASE, emptyFixitState(), CASE.repairs[3] as FixitCase['repairs'][number]);
+    const row = repairRowOf(CASE, emptyFixitState(), CASE.repairs[3] as FixitCase['repairs'][number], shippedPriceSchedule());
     expect(row.selectable).toBe(false);
     expect(row.refusal).toContain('beyond a repair budget');
   });
 
   it('a reducer refuses what the panel could not offer, so the gate holds without the panel', () => {
-    const state = toggleRepair(CASE, emptyFixitState(), 'dear-fix');
-    expect(toggleRepair(CASE, state, 'shaft')).toBe(state);
-    expect(toggleExtra(CASE, state, 'car-interiors').selectedExtraIds).toEqual([]);
-    // 10 spent, a speed step (6) does not fit; a return below zero is refused too.
-    expect(stepSpeed(CASE, state, 1)).toBe(state);
+    const state = toggleRepair(CASE, emptyFixitState(), 'dear-fix', shippedPriceSchedule());
+    expect(toggleRepair(CASE, state, 'shaft', shippedPriceSchedule())).toBe(state);
+    expect(toggleExtra(CASE, state, 'car-interiors', shippedPriceSchedule()).selectedExtraIds).toEqual([]);
+    // 10 spent, a speed step (10) does not fit; a return below zero is refused too.
+    expect(stepSpeed(CASE, state, 1, shippedPriceSchedule())).toBe(state);
     const empty = emptyFixitState();
-    expect(stepCapacity(CASE, empty, -1)).toBe(empty);
+    expect(stepCapacity(CASE, empty, -1, shippedPriceSchedule())).toBe(empty);
   });
 
+  /**
+   * The arithmetic here moved with the schedule (#366): a speed step is 10 u rather than 6, so on
+   * this 12 u case one step fits and a second does not, where two used to fit exactly. The claim is
+   * unchanged — the stepper caps live at what the budget has left — and the numbers are spelled out
+   * so the next price change has to be looked at rather than absorbed.
+   */
   it('caps the steppers live at the remaining budget', () => {
     let state = emptyFixitState();
-    state = stepSpeed(CASE, state, 1); // 6
-    expect(stepCapacity(CASE, state, 1)).toBe(state); // 6 + 8 > 12
-    state = stepSpeed(CASE, state, 1); // would be 12
-    expect(state.speedSteps).toBe(2);
-    expect(stepSpeed(CASE, state, 1)).toBe(state);
+    state = stepSpeed(CASE, state, 1, shippedPriceSchedule()); // 10 of 12
+    expect(state.speedSteps).toBe(1);
+    expect(stepCapacity(CASE, state, 1, shippedPriceSchedule())).toBe(state); // 10 + 8 > 12
+    expect(stepSpeed(CASE, state, 1, shippedPriceSchedule())).toBe(state); // 10 + 10 > 12
   });
 });
 
 describe('the four outcomes — § 10.4, copy verbatim', () => {
   it('all three bars held: the authored result, and the case reads FIXED', () => {
-    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState()));
+    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()));
     expect(outcome.kind).toBe('fixed');
     expect(outcome.head).toBe('Fixed head.');
     expect(outcome.rows.map((row) => row.passed)).toEqual([true, true, true]);
@@ -163,9 +204,9 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
    */
   it('prints the demand basis when the legs say the crowd changed, on every outcome kind', () => {
     const changed = { ...MEASURED, sameCrowd: false };
-    expect(classifyOutcome(CASE, changed, spendOf(CASE, emptyFixitState())).basis).toBe(DEMAND_BASIS_LINE);
+    expect(classifyOutcome(CASE, changed, spendOf(CASE, emptyFixitState(), shippedPriceSchedule())).basis).toBe(DEMAND_BASIS_LINE);
     expect(
-      classifyOutcome(CASE, { ...changed, restAwayAfterPct: 90, restDeltaPoints: -6 }, spendOf(CASE, emptyFixitState())).basis,
+      classifyOutcome(CASE, { ...changed, restAwayAfterPct: 90, restDeltaPoints: -6 }, spendOf(CASE, emptyFixitState(), shippedPriceSchedule())).basis,
     ).toBe(DEMAND_BASIS_LINE);
     expect(DEMAND_BASIS_LINE).toContain('changed who arrives');
     expect(DEMAND_BASIS_LINE).not.toBe(BASIS_LINE);
@@ -188,7 +229,7 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
     const outcome = classifyOutcome(
       CASE,
       { ...MEASURED, restAwayAfterPct: 90, restDeltaPoints: -6 },
-      spendOf(CASE, emptyFixitState()),
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
     );
     expect(outcome.kind).toBe('building-worse');
     expect(outcome.head).toBe('The complaint is gone, and somebody else is paying for it.');
@@ -218,7 +259,7 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
     const outcome = classifyOutcome(
       CASE,
       { ...MEASURED, complaintGonePct: 40 },
-      spendOf(CASE, emptyFixitState()),
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
     );
     expect(outcome.kind).toBe('not-enough');
     expect(outcome.head).toBe('Better, and the complaint still stands.');
@@ -229,7 +270,7 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
     const outcome = classifyOutcome(
       CASE,
       { ...MEASURED, complaintGonePct: null },
-      spendOf(CASE, emptyFixitState()),
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
     );
     expect(outcome.kind).toBe('not-enough');
     expect(outcome.rows[0]?.verdict).toContain('nothing to remove');
@@ -240,7 +281,7 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
       ...CASE,
       complaint: { ...CASE.complaint, measure: { ...CASE.complaint.measure, kind: 'mean-wait' } },
     };
-    const outcome = classifyOutcome(meanCase, MEASURED, spendOf(CASE, emptyFixitState()));
+    const outcome = classifyOutcome(meanCase, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()));
     expect(outcome.rows[0]?.before).toBe('10.0 s over 40 boarded journeys');
     expect(outcome.rows[0]?.after).toBe('1.0 s over 41 boarded journeys');
   });
@@ -256,8 +297,8 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
    * are free"*, keying *free* on machinery spend rather than on spend.
    */
   it('the four budget notes are decided by the spend, not by the panel', () => {
-    expect(budgetNoteOf(CASE, spendOf(CASE, emptyFixitState()))).toContain('settings are free');
-    const machinery = spendOf(CASE, { ...emptyFixitState(), speedSteps: 1 });
+    expect(budgetNoteOf(CASE, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()))).toContain('settings are free');
+    const machinery = spendOf(CASE, { ...emptyFixitState(), speedSteps: 1 }, shippedPriceSchedule());
     expect(budgetNoteOf(CASE, machinery)).toContain('buying machinery');
     expect(
       budgetNoteOf(CASE, { repairUnits: 34, extraUnits: 0, editorUnits: 0, totalUnits: 34, machineryUnits: 34 }),
@@ -288,7 +329,7 @@ describe('a verdict may not claim more than the run measured — docs/20 defect 
     const better = classifyOutcome(
       CASE,
       { ...MEASURED, complaintGonePct: 40 },
-      spendOf(CASE, emptyFixitState()),
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
     );
     expect(better.head).toBe('Better, and the complaint still stands.');
   });
@@ -297,7 +338,7 @@ describe('a verdict may not claim more than the run measured — docs/20 defect 
     const nothing = classifyOutcome(
       CASE,
       { ...MEASURED, complaintGonePct: 0 },
-      spendOf(CASE, emptyFixitState()),
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
     );
     expect(nothing.kind).toBe('not-enough');
     expect(nothing.head).toBe('No change, and the complaint still stands.');
@@ -314,13 +355,13 @@ describe('a verdict may not claim more than the run measured — docs/20 defect 
     const none = classifyOutcome(
       CASE,
       { ...MEASURED, complaintGonePct: null },
-      spendOf(CASE, emptyFixitState()),
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
     );
     expect(none.head).toBe('No change, and the complaint still stands.');
   });
 
   it('leaves the authored “nothing was bought” punchline alone when nothing was bought', () => {
-    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState()));
+    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()));
     expect(outcome.body).toBe('Fixed body.');
   });
 
@@ -350,14 +391,14 @@ describe('the FIXED badge follows the latest run — docs/20 defect 16', () => {
    * `fixedBadgeAfter` itself), so a later run of the same case decides it in both directions.
    */
   it('is true exactly for a fixed outcome, and false for each of the other three kinds', () => {
-    const fixed = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState()));
+    const fixed = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()));
     expect(fixed.kind).toBe('fixed');
     expect(fixedBadgeAfter(fixed)).toBe(true);
 
     const notEnough = classifyOutcome(
       CASE,
       { ...MEASURED, complaintAfter: 10, complaintGonePct: 0 },
-      spendOf(CASE, emptyFixitState()),
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
     );
     expect(notEnough.kind).toBe('not-enough');
     expect(fixedBadgeAfter(notEnough)).toBe(false);
@@ -365,7 +406,7 @@ describe('the FIXED badge follows the latest run — docs/20 defect 16', () => {
     const worse = classifyOutcome(
       CASE,
       { ...MEASURED, restAwayAfterPct: 80, restDeltaPoints: -16 },
-      spendOf(CASE, emptyFixitState()),
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
     );
     expect(worse.kind).toBe('building-worse');
     expect(fixedBadgeAfter(worse)).toBe(false);

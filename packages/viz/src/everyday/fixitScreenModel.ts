@@ -12,7 +12,7 @@
  * `fixit/run.ts` (§ 10.6 — *"Each repair's one-line effect cites a number that is on screen"*,
  * and the screen may cite nothing the engine did not measure), and every numeral this module does
  * interpolate is either the engine's own spend arithmetic or § 9's prices read from
- * {@link EDITOR_PRICING} — never a literal.
+ * the schedule's own figures, passed in — never a literal (GitHub issue #366).
  *
  * ## The copy is the prototype's
  *
@@ -23,7 +23,7 @@
  * because the prototype's toy model ran instantly and never needed one.
  */
 
-import { EDITOR_PRICING, type FixitSpend } from '../fixit/engine.js';
+import type { FixitSpend } from '../fixit/engine.js';
 import type { FixitCase, FixitState } from '../fixit/types.js';
 import type { ActionBarModel } from './actionBar.js';
 
@@ -236,6 +236,8 @@ export function fixitMachineryRows(
   state: FixitState,
   canBuySpeed: boolean,
   canBuyCapacity: boolean,
+  /* The two prices, from `data/price-schedule.json` — GitHub issue #366. Never a literal. */
+  pricing: { readonly speedUnitsPerHalfMps: number; readonly capacityUnitsPerTwoPlaces: number },
 ): readonly [FixitMachineryRow, FixitMachineryRow] {
   const priced = (line: string, atBudget: boolean): string =>
     atBudget ? `${line} · ${FIXIT_SCREEN_COPY.atBudget}` : line;
@@ -245,7 +247,7 @@ export function fixitMachineryRows(
       label: FIXIT_SCREEN_COPY.speedLabel,
       readout: `+${(state.speedSteps * 0.5).toFixed(1)} m/s`,
       priced: priced(
-        `${String(EDITOR_PRICING.speedUnitsPerHalfMps)} u per half a metre per second`,
+        `${String(pricing.speedUnitsPerHalfMps)} u per half a metre per second`,
         !canBuySpeed,
       ),
       atBudget: !canBuySpeed,
@@ -256,7 +258,7 @@ export function fixitMachineryRows(
       label: FIXIT_SCREEN_COPY.capacityLabel,
       readout: `+${String(state.capacitySteps * 2)} places`,
       priced: priced(
-        `${String(EDITOR_PRICING.capacityUnitsPerTwoPlaces)} u per two places`,
+        `${String(pricing.capacityUnitsPerTwoPlaces)} u per two places`,
         !canBuyCapacity,
       ),
       atBudget: !canBuyCapacity,

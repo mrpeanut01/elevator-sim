@@ -53,6 +53,7 @@ import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 import { emptyFixitState, toggleRepair } from '../fixit/engine.js';
 import { FIXIT_RUN_SWITCHES, figureValuesOf, fixitRunPlanOf } from '../fixit/run.js';
 import type { FixitCase, FixitCases } from '../fixit/types.js';
+import type { PriceSchedule } from '../pricing/types.js';
 import { el, EYEBROW, CARD } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -99,6 +100,8 @@ interface LoadedTutorial {
    */
   readonly resources: BrowserResources;
   readonly entry: FixitCase;
+  /** The schedule the cases were priced with — GitHub issue #366. */
+  readonly schedule: PriceSchedule;
 }
 
 let loaded: LoadedTutorial | undefined;
@@ -123,7 +126,7 @@ function ensureLoaded(): Promise<void> {
     try {
       const browser = await loadBrowserResources();
       const cases = await loadFixitCases(browser);
-      loaded = { resources: browser, entry: entryOf(cases) };
+      loaded = { resources: browser, entry: entryOf(cases), schedule: cases.schedule };
     } catch (error) {
       loadFailure = error instanceof Error ? error.message : String(error);
     }
@@ -138,12 +141,15 @@ function ensureLoaded(): Promise<void> {
  * shipped file authors and `fixit/cases.test.ts` validates against a real run. A tutorial holding
  * its own copy of the repair id would be the second authored copy this module exists to avoid.
  */
-function diagnosedState(entry: FixitCase) {
+function diagnosedState(entry: FixitCase, schedule: PriceSchedule) {
   const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
   if (diagnosed === undefined) {
     throw new Error(`the tutorial's case "${entry.id}" has no diagnosed repair to show`);
   }
-  return { state: toggleRepair(entry, emptyFixitState(), diagnosed.id), repair: diagnosed };
+  return {
+    state: toggleRepair(entry, emptyFixitState(), diagnosed.id, schedule),
+    repair: diagnosed,
+  };
 }
 
 /**
@@ -158,7 +164,7 @@ function request(want: 'one' | 'pair', redraw: () => void): void {
   if (want === 'one' && session.asBuilt !== undefined) return;
   if (want === 'pair' && session.asRepaired !== undefined) return;
   if (ask === want || ask === 'pair') return;
-  const { entry, resources } = loaded;
+  const { entry, resources, schedule } = loaded;
   ask = want;
   runFailure = undefined;
   const asBuiltPlan = fixitRunPlanOf(entry, emptyFixitState(), resources);
@@ -178,7 +184,7 @@ function request(want: 'one' | 'pair', redraw: () => void): void {
     });
     return;
   }
-  const repaired = fixitRunPlanOf(entry, diagnosedState(entry).state, resources);
+  const repaired = fixitRunPlanOf(entry, diagnosedState(entry, schedule).state, resources);
   runner.start({
     runs: [
       { config: asBuiltPlan.asBuilt, ...FIXIT_RUN_SWITCHES },
