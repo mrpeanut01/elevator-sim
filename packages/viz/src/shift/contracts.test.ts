@@ -35,6 +35,27 @@ describe('the scenarios are the shipped buildings, one contract each', () => {
     }
   });
 
+/**
+ * Buildings that ship without a Career contract, and why — GitHub issue **#376**.
+ *
+ * The coverage rule below is *every shipped building has exactly one contract*, and its stated
+ * reason is that **a shipped building with no contract is a scenario the reader can never take**.
+ * That was true of all eight, and it stopped being the whole truth when a **reference** building
+ * landed: `burj-class-reference` exists so that § D527's five measurements have something to be
+ * taken on — the engine's cost at 165 floors, the oracle at 10 m/s, the escalators' hop count —
+ * and #376 says in terms that *which mode first uses the building* is not its to decide.
+ *
+ * So the choice was to author a ninth Career contract nobody asked for — a month's goals, pay and
+ * difficulty for a 165-floor tower, which is design work with an owner — or to say plainly that
+ * one building is not a scenario. This is the second, and it is a list rather than a silence: the
+ * set is asserted non-empty below, every member is asserted to ship, and every member is asserted
+ * to have no contract, so the exception cannot quietly widen into the rule.
+ *
+ * **A contract for this building would remove it from here**, which is the direction this is meant
+ * to move in.
+ */
+const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
+
   it('covers every shipped building exactly once', () => {
     // Both directions. A contract for a building that does not ship is the first suite's
     // failure; a shipped building with no contract is a scenario the reader can never take.
@@ -47,7 +68,23 @@ describe('the scenarios are the shipped buildings, one contract each', () => {
     // alphabetical load order. The curriculum is the design's to choose; the coverage is not.
     const sorted = (ids: readonly string[]): readonly string[] =>
       [...ids].sort((a, b) => a.localeCompare(b));
-    expect(sorted(CONTRACTS.map((contract) => contract.buildingId))).toEqual(sorted(BUILDING_IDS));
+    expect(sorted(CONTRACTS.map((contract) => contract.buildingId))).toEqual(
+      sorted(BUILDING_IDS.filter((id) => !REFERENCE_ONLY.has(id))),
+    );
+
+    /*
+     * The exception is asserted rather than merely applied: an empty set here would mean the
+     * filter above had quietly become a no-op, and the coverage rule would be back to passing
+     * because nothing was excluded rather than because everything was covered.
+     */
+    expect(REFERENCE_ONLY.size).toBeGreaterThan(0);
+    for (const id of REFERENCE_ONLY) {
+      expect(BUILDING_IDS, `${id} is excused a contract and does not ship`).toContain(id);
+      expect(
+        CONTRACTS.map((contract) => contract.buildingId),
+        `${id} is excused a contract and has one`,
+      ).not.toContain(id);
+    }
   });
 
   it('teaches zoning before transfers, which is the handoff’s order and not the filesystem’s', () => {

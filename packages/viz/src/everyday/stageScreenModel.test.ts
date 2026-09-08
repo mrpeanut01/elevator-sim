@@ -1622,7 +1622,8 @@ describe('the camera, measured per tower — GitHub issue #324', () => {
     const cramped = shippedTowers()
       .filter((tower) => !wholeTowerIsLegible(tower.floors, HEIGHTS.laptop))
       .map((tower) => tower.id);
-    expect(cramped).toEqual(['mixed-use-high-rise', 'vertical-city']);
+    /* Three since GitHub issue #376: a 165-floor tower is the clearest case there is. */
+    expect(cramped).toEqual(['burj-class-reference', 'mixed-use-high-rise', 'vertical-city']);
     for (const tower of shippedTowers()) {
       const chips = stageCameraChipsOf(tower.floors, HEIGHTS.laptop);
       expect(chips.length === 0, tower.id).toBe(!cramped.includes(tower.id));

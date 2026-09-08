@@ -76,6 +76,7 @@ export const PANEL_DISPATCHER_ID = 'destination-panel';
  * disagree, so a new building cannot arrive without the breadth suites covering it.
  */
 export const BUILDING_IDS = [
+  'burj-class-reference',
   'chancery-house',
   'crown-hotel',
   'garden-apartments',

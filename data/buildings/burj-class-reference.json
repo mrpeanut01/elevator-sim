@@ -1,0 +1,930 @@
+{
+  "$comment": "A Burj-class reference building — GitHub issue #376, DECISIONS.md § D527, docs/38 § 2.5. 165 levels, 57 lifts, 8 escalators, speeds to 10 m/s. THE ARITHMETIC, so nobody re-derives it: two basements (B2, B1) plus G and floors 1–162 is 165 levels, of which 163 are at or above ground. Floors 154–162 are mechanical and carry no population; 2–153 are populated, which is 152 floors, and the reference's 'about 154 populated floors' is honoured as a shape rather than transcribed floor by floor — the six sky-lobby levels (43/44, 76/77, 123/124) are transfer floors and carry no residents either. POPULATION AND MIX ARE AN ASSUMPTION, NOT A CITATION, which § D527 leaves to this file: the per-floor figures fall from 29 in the lower office zone to 12 in the upper residential one, summing to 3198, and no published occupancy for the reference tower was available to the author. THE FIGURE IS MEASURED RATHER THAN GUESSED: it is what this 57-lift arrangement serves at `office-standard` with a valid AWT. Measured over a 1 800 s window, seed 376, `collective`: 3 198 people give a 35 s mean wait, a 98 s 95th percentile and nothing undelivered; 5 307 saturate (175 s, AWT suppressed) and 10 614 leave 422 of 4 457 journeys unserved at a 791 s mean. So a published occupancy higher than this does not merely change a field — it says the reference tower's real lift count is not 57 on this arrangement, which is the kind of thing this building exists to expose. Declared as an assumption so a later citation replaces a stated one rather than a silent one. The traffic profile is office-standard because the lower half is offices and the profile library ships nothing mixed-use with a supertall's shape; that too is an assumption. The reference is a floor, not a ceiling (§ D527).",
+  "id": "burj-class-reference",
+  "name": "Burj-class reference tower",
+  "type": "mixed-use",
+  "trafficProfile": "office-standard",
+  "floors": [
+    {
+      "id": "B2",
+      "index": -2,
+      "heightM": -8.0,
+      "population": 0,
+      "isTransferFloor": false,
+      "label": "Lower car park and plant"
+    },
+    {
+      "id": "B1",
+      "index": -1,
+      "heightM": -4.0,
+      "population": 0,
+      "isTransferFloor": false,
+      "label": "Upper car park and loading"
+    },
+    {
+      "id": "G",
+      "index": 0,
+      "heightM": 0.0,
+      "population": 0,
+      "isEntrance": true,
+      "isTransferFloor": true,
+      "label": "Ground lobby (street entrance, lower deck boarding)"
+    },
+    {
+      "id": "1",
+      "index": 1,
+      "heightM": 4.0,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Ground lobby upper level (upper deck boarding)"
+    },
+    {
+      "id": "43",
+      "index": 43,
+      "heightM": 172.0,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby at 43 — lower deck"
+    },
+    {
+      "id": "44",
+      "index": 44,
+      "heightM": 176.0,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby at 43 — upper deck"
+    },
+    {
+      "id": "76",
+      "index": 76,
+      "heightM": 304.0,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby at 76 — lower deck"
+    },
+    {
+      "id": "77",
+      "index": 77,
+      "heightM": 308.0,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby at 76 — upper deck"
+    },
+    {
+      "id": "123",
+      "index": 123,
+      "heightM": 492.0,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby at 123 — lower deck"
+    },
+    {
+      "id": "124",
+      "index": 124,
+      "heightM": 496.0,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby at 123 — upper deck"
+    }
+  ],
+  "floorRanges": [
+    {
+      "fromIndex": 2,
+      "toIndex": 42,
+      "startHeightM": 8.0,
+      "floorToFloorM": 4.0,
+      "populationPerFloor": 29,
+      "idPattern": "{index}",
+      "label": "Lower zone — offices"
+    },
+    {
+      "fromIndex": 45,
+      "toIndex": 75,
+      "startHeightM": 180.0,
+      "floorToFloorM": 4.0,
+      "populationPerFloor": 26,
+      "idPattern": "{index}",
+      "label": "Zone 1 — offices over the first sky lobby"
+    },
+    {
+      "fromIndex": 78,
+      "toIndex": 122,
+      "startHeightM": 312.0,
+      "floorToFloorM": 4.0,
+      "populationPerFloor": 19,
+      "idPattern": "{index}",
+      "label": "Zone 2 — residential"
+    },
+    {
+      "fromIndex": 125,
+      "toIndex": 153,
+      "startHeightM": 500.0,
+      "floorToFloorM": 4.0,
+      "populationPerFloor": 12,
+      "idPattern": "{index}",
+      "label": "Zone 3 — residential and hotel over the third sky lobby"
+    },
+    {
+      "fromIndex": 154,
+      "toIndex": 162,
+      "startHeightM": 616.0,
+      "floorToFloorM": 4.0,
+      "populationPerFloor": 0,
+      "idPattern": "{index}",
+      "label": "Mechanical and spire plant — unpopulated"
+    }
+  ],
+  "totalPopulation": 3198,
+  "banks": [
+    {
+      "id": "shuttle",
+      "name": "Double-deck sky lobby shuttle",
+      "servesFloors": [
+        "G",
+        "1",
+        "43",
+        "44",
+        "76",
+        "77",
+        "123",
+        "124"
+      ],
+      "servesFloorPairs": [
+        [
+          "G",
+          "1"
+        ],
+        [
+          "43",
+          "44"
+        ],
+        [
+          "76",
+          "77"
+        ],
+        [
+          "123",
+          "124"
+        ]
+      ],
+      "cars": [
+        {
+          "id": "S1",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S2",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S3",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S4",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S5",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S6",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S7",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S8",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S9",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S10",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S11",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S12",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S13",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        },
+        {
+          "id": "S14",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 4.0
+        }
+      ]
+    },
+    {
+      "id": "local-lower",
+      "name": "Lower zone locals, and the car park",
+      "servesFloors": [
+        "B2",
+        "B1",
+        "G",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "32",
+        "33",
+        "34",
+        "35",
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42"
+      ],
+      "cars": [
+        {
+          "id": "L0-1",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L0-2",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L0-3",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L0-4",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L0-5",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L0-6",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L0-7",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L0-8",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L0-9",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L0-10",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        }
+      ]
+    },
+    {
+      "id": "local-zone1",
+      "name": "Zone 1 locals off the first sky lobby",
+      "servesFloors": [
+        "43",
+        "44",
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "50",
+        "51",
+        "52",
+        "53",
+        "54",
+        "55",
+        "56",
+        "57",
+        "58",
+        "59",
+        "60",
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75"
+      ],
+      "cars": [
+        {
+          "id": "L1-1",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L1-2",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L1-3",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L1-4",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L1-5",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L1-6",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L1-7",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L1-8",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L1-9",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L1-10",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        }
+      ]
+    },
+    {
+      "id": "local-zone2",
+      "name": "Zone 2 locals off the second sky lobby",
+      "servesFloors": [
+        "76",
+        "77",
+        "78",
+        "79",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "85",
+        "86",
+        "87",
+        "88",
+        "89",
+        "90",
+        "91",
+        "92",
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112",
+        "113",
+        "114",
+        "115",
+        "116",
+        "117",
+        "118",
+        "119",
+        "120",
+        "121",
+        "122"
+      ],
+      "cars": [
+        {
+          "id": "L2-1",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-2",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-3",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-4",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-5",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-6",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-7",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-8",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-9",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-10",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L2-11",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        }
+      ]
+    },
+    {
+      "id": "local-zone3",
+      "name": "Zone 3 locals, and the plant floors above",
+      "servesFloors": [
+        "123",
+        "124",
+        "125",
+        "126",
+        "127",
+        "128",
+        "129",
+        "130",
+        "131",
+        "132",
+        "133",
+        "134",
+        "135",
+        "136",
+        "137",
+        "138",
+        "139",
+        "140",
+        "141",
+        "142",
+        "143",
+        "144",
+        "145",
+        "146",
+        "147",
+        "148",
+        "149",
+        "150",
+        "151",
+        "152",
+        "153",
+        "154",
+        "155",
+        "156",
+        "157",
+        "158",
+        "159",
+        "160",
+        "161",
+        "162"
+      ],
+      "cars": [
+        {
+          "id": "L3-1",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L3-2",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L3-3",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L3-4",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L3-5",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L3-6",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L3-7",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "L3-8",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 7.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        }
+      ]
+    },
+    {
+      "id": "observation",
+      "name": "Observation express",
+      "servesFloors": [
+        "G",
+        "1",
+        "123",
+        "124"
+      ],
+      "cars": [
+        {
+          "id": "OB-1",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "OB-2",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "OB-3",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "OB-4",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        }
+      ]
+    }
+  ],
+  "transportModes": [
+    {
+      "$comment": "The escalator at the ground lobby, joining the two boarding decks a double-deck shuttle serves. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 4.0 m; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 4.0 / sin 30 = 8.00 m, so 16.0 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md.",
+      "id": "escalator-1",
+      "name": "The ground lobby escalator (G <-> 1)",
+      "connects": [
+        "G",
+        "1"
+      ],
+      "traversalTimeS": 19.2
+    },
+    {
+      "$comment": "The escalator at the first sky lobby, joining the two boarding decks a double-deck shuttle serves. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 4.0 m; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 4.0 / sin 30 = 8.00 m, so 16.0 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md.",
+      "id": "escalator-2",
+      "name": "The first sky lobby escalator (43 <-> 44)",
+      "connects": [
+        "43",
+        "44"
+      ],
+      "traversalTimeS": 19.2
+    },
+    {
+      "$comment": "The escalator at the second sky lobby, joining the two boarding decks a double-deck shuttle serves. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 4.0 m; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 4.0 / sin 30 = 8.00 m, so 16.0 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md.",
+      "id": "escalator-3",
+      "name": "The second sky lobby escalator (76 <-> 77)",
+      "connects": [
+        "76",
+        "77"
+      ],
+      "traversalTimeS": 19.2
+    },
+    {
+      "$comment": "The escalator at the third sky lobby, joining the two boarding decks a double-deck shuttle serves. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 4.0 m; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 4.0 / sin 30 = 8.00 m, so 16.0 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md.",
+      "id": "escalator-4",
+      "name": "The third sky lobby escalator (123 <-> 124)",
+      "connects": [
+        "123",
+        "124"
+      ],
+      "traversalTimeS": 19.2
+    }
+  ],
+  "notes": [
+    "57 lifts in six banks: one double-deck sky-lobby shuttle of 14 cars serving G/1 and all three sky-lobby pairs, four local banks (10, 10, 11 and 8) and four observation expresses. 14+10+10+11+8+4 = 57.",
+    "THERE ARE NO SERVICE LIFTS, and that is a finding about the model rather than a simplification. Five were declared at first, reaching every level as a real building's do. Two measurements refused them. **One**: while they served the passenger lobby they were the only banks spanning the entrance to the top, so the dispatcher never had to transfer anybody — the fourteen shuttle cars carried ZERO legs and `service-high`'s two carried 277 of 827 at a 624 s mean wait, with 1.03 legs a journey against `vertical-city`'s 1.65. **Two**: moved to the loading dock they still overlapped every local, and `config/buildingConnectivity.test.ts` requires every floor served by more than one bank to be declared a transfer floor — which would have made 148 of 165 floors transfer floors and emptied the concept. This model has no notion of a staff-only bank; `accessZones` gates floors, not banks. So the honest shape is a building without them, recorded here, rather than 148 floors mislabelled. The plant floors 154–162 are reached by `local-zone3`, so every level is still routable.",
+    "The three sky lobbies are at 43, 76 and 123, each a two-level transfer served by a double-deck shuttle — the arrangement the reference tower uses and the one § D131's paired stops model.",
+    "Escalators are eight, in four pairs, each joining the two boarding decks of a double-deck level. #376's fourth criterion measures their hop count before any capacity or direction is added: as modelled they are undirected and uncapacitated, and data/buildings/README.md's rule is that a declared mode with zero hops is a dead field.",
+    "FOUR ESCALATORS ARE DECLARED AND THE REFERENCE TOWER HAS EIGHT, which is #376's fourth criterion answered by measurement rather than by transcription. All 27 060 ordered floor pairs were routed: every one is reachable, 24 routes use an escalator, and with eight declared — a pair at each double-deck landing — **four of them took zero hops**. As modelled an escalator is an undirected, uncapacitated edge with a traversal time, so the second of an identical pair can never be chosen: the router takes one and the other is a dead field, which `data/buildings/README.md` forbids. So one edge per landing is declared, and the finding is recorded here rather than papered over. THIS IS THE MEASUREMENT § D527 ASKED FOR BEFORE ADDING CAPACITY OR DIRECTION: a second escalator can only change a decision once an escalator can be full or one-way, and until then declaring eight would be declaring four lies."
+  ]
+}

@@ -187,6 +187,6 @@ describe('double-deck pairing', () => {
         .filter((built) => built.isDoubleDeck)
         .map((built) => `${resolved.id}/${built.id}`),
     );
-    expect(doubleDeckBanks).toEqual(['vertical-city/shuttle']);
+    expect(doubleDeckBanks).toEqual(['burj-class-reference/shuttle', 'vertical-city/shuttle']);
   });
 });

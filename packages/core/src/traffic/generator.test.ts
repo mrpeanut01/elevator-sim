@@ -1129,8 +1129,9 @@ describe('access credentials', () => {
  * -------------------------------------------------------------------------- */
 
 describe('every shipped building generates a well-formed trace', () => {
-  it('covers all eight buildings', () => {
+  it('covers all nine buildings', () => {
     expect(config.buildings.map((b) => b.id).sort()).toEqual([
+      'burj-class-reference',
       'chancery-house',
       'crown-hotel',
       'garden-apartments',

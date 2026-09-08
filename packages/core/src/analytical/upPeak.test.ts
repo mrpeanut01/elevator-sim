@@ -853,15 +853,18 @@ describe('every shipped building is either analysable or explicit about why not'
     }
 
     // The sweep must not pass vacuously by refusing everything. As of the shipped data,
-    // 16 of the 17 banks are analysable; only Vertical City's double-deck shuttle between
-    // unpopulated sky lobbies is not. The three new members are the three single-bank
-    // buildings — Chancery House, Crown Hotel and St Jude Hospital — and all three analyse,
-    // including the two whose banks hold cars of unlike speed and capacity.
-    expect(analysed).toBe(16);
-    expect(refused).toBe(1);
-    // Exactly one bank exceeds the sanity bound on the default population: Mixed-Use
-    // High-Rise's shuttle, whose U is the sky lobby's own 260 rather than the 1014 it
-    // lifts. Every other bank's default U is the population it actually serves.
-    expect(implausible).toBe(1);
+    // 20 of the 23 banks are analysable. Three are not, and all three are double-deck shuttles
+    // between unpopulated sky lobbies: Vertical City's, and — since GitHub issue #376 — the
+    // Burj-class reference tower's, whose six banks otherwise all analyse. That the same shape
+    // is refused on a 165-floor building as on a 100-floor one is the useful part: the refusal
+    // is about the geometry rather than about the size.
+    expect(analysed).toBe(20);
+    expect(refused).toBe(3);
+    // Two banks exceed the sanity bound on the default population, and both for one reason: a
+    // shuttle's U is the sky lobby's own population rather than the crowd it lifts. Mixed-Use
+    // High-Rise's is 260 against the 1 014 it carries; the Burj-class reference tower's is its
+    // three sky lobbies' zero (they are transfer floors and hold nobody) against the 3 198 above
+    // them. Every other bank's default U is the population it actually serves.
+    expect(implausible).toBe(2);
   });
 });

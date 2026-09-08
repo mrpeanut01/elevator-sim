@@ -770,12 +770,22 @@ describe('the building spec', () => {
         id,
       ).toBe(true);
       /*
-       * And what replaces the dropped citation is the honest one. `specFromBuilding` cannot
-       * preserve an uneven floor pitch, so 21.2 s is not what this spec's geometry gives — and
-       * the emitted comment says so rather than reprinting a derivation that no longer holds.
+       * And what replaces the dropped citation is the honest one — **which of two it is depends on
+       * the building, and that was a finding rather than a foreseen case.**
+       *
+       * This asserted `SET BY HAND and NOT cited` for every building, and it was right about the
+       * only one that then had escalators: `specFromBuilding` cannot preserve an uneven floor
+       * pitch, so `vertical-city`'s 21.2 s is not what its round-tripped geometry gives, and the
+       * emitted comment says so rather than reprinting a derivation that no longer holds.
+       *
+       * The Burj-class reference tower (GitHub issue #376) is the first with a **uniform** pitch,
+       * and there the derivation survives the round trip intact — so the authoring layer emits the
+       * derived comment, correctly, and the old assertion failed on a building where nothing was
+       * wrong. The rule is therefore *one of the two, and never the source's own citation*, which
+       * is what the assertion above the loop already holds.
        */
       for (const mode of written) {
-        expect(mode.$comment, id).toMatch(/SET BY HAND and NOT cited/);
+        expect(mode.$comment, id).toMatch(/SET BY HAND and NOT cited|DERIVED by the building/);
       }
     }
     const tower = specFromBuilding(parseBuilding(read('buildings/vertical-city.json')), 'vertical-city');

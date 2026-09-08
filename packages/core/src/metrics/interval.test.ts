@@ -553,7 +553,8 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       .filter((value): value is number => value !== undefined);
 
     // The survey is the whole shipped set, not a subset that happens to prove the point.
-    expect(rows.length, detail).toBe(17);
+    // 23 since GitHub issue #376 added the Burj-class reference tower's six banks.
+    expect(rows.length, detail).toBe(23);
 
     // 56.5 s — a 26-person hospital car at 2.5 s — against a 29.0 s floor on Midtown Office.
     expect(Math.max(...rows.map((row) => row.maxReopenS)), detail).toBeCloseTo(56.5, 6);
@@ -562,12 +563,16 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       Math.min(...ceilings),
     );
 
-    // Seven of the seventeen sit at or above the fallback, so on those it would split one loading
-    // into two departures — the original defect, in the banks the fallback does not cover. The two
-    // new members are the two new buildings with an unlike car in the bank: a bank is as slow to
-    // load as its slowest car, and both of these hold one deliberately.
+    // Thirteen of the twenty-three sit at or above the fallback, so on those it would split one
+    // loading into two departures — the original defect, in the banks the fallback does not cover.
+    // Six of the thirteen arrived together with the Burj-class reference tower (GitHub issue #376),
+    // which is every one of its banks: at a 1.75 s transfer and 3 500–4 000 lb cars, a full load's
+    // dwell outlasts a one-floor round trip on all six, and on a 165-floor building that is the
+    // ordinary case rather than the exception. That is the clearest evidence yet for the sentence
+    // this test exists to hold: no constant is safe on all of them.
     const unsafe = rows.filter((row) => FALLBACK_DEPARTURE_GAP_S <= row.maxReopenS);
     expect(unsafe.map((row) => row.id).sort(), detail).toEqual([
+      ...['burj-class-reference/local-lower', 'burj-class-reference/local-zone1', 'burj-class-reference/local-zone2', 'burj-class-reference/local-zone3', 'burj-class-reference/observation', 'burj-class-reference/shuttle'],
       'crown-hotel/main',
       'mixed-use-high-rise/residential-local',
       'mixed-use-high-rise/shuttle',
@@ -587,6 +592,7 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       rows.filter((row) => row.minRoundTripS === undefined).map((row) => row.id).sort(),
       detail,
     ).toEqual([
+      ...['burj-class-reference/local-lower', 'burj-class-reference/local-zone1', 'burj-class-reference/local-zone2', 'burj-class-reference/local-zone3', 'burj-class-reference/observation', 'burj-class-reference/shuttle'],
       'crown-hotel/main',
       'mixed-use-high-rise/residential-local',
       'st-jude-hospital/main',

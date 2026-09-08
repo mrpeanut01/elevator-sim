@@ -8,8 +8,8 @@
  *
  * ## What is being claimed, in three parts
  *
- * 1. **The trace.** Three of the eight shipped buildings — `chancery-house`, `garden-apartments`
- *    and `midtown-office` — declare no `accessZones`. Their passenger traces must be identical at
+ * 1. **The trace.** Four of the nine shipped buildings — `burj-class-reference`,
+ *    `chancery-house`, `garden-apartments` and `midtown-office` — declare no `accessZones`. Their passenger traces must be identical at
  *    `wrongZoneShare` 0, at the shipped share, and at 1: same people, same times, same masses, same
  *    (absent) credentials, byte for byte.
  * 2. **The run.** So must the whole `runSimulation` result, which is the stronger claim: a trace
@@ -91,10 +91,15 @@ function runJson(buildingId: string, share: number | undefined, seed: bigint = S
 }
 
 describe('a building with no access zones is byte-identical at every share', () => {
-  it('names the three buildings from disk rather than from a list', () => {
+  it('names the four buildings from disk rather than from a list', () => {
     // Derived, so a ninth building that declares no zones joins this guard by existing — the
     // hand-written-list defect § D152 closed, applied to a fixture set.
-    expect(unzoned).toEqual(['chancery-house', 'garden-apartments', 'midtown-office']);
+    expect(unzoned).toEqual([
+      'burj-class-reference',
+      'chancery-house',
+      'garden-apartments',
+      'midtown-office',
+    ]);
     expect(zoned.length).toBe(5);
   });
 
