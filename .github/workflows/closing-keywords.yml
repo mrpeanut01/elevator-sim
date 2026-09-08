@@ -1,0 +1,72 @@
+# The negated-closing-keyword gate — GitHub issue #400.
+#
+# ## What this exists to stop
+#
+# Pull request #398 shipped half of issue #366 and said so in its own body — *"This PR does not
+# close #366."* GitHub closed #366 two seconds after the merge, because its closing-keyword parser
+# reads `close #366` and has no concept of the word *not* three characters earlier. The issue was
+# marked complete with four of five acceptance criteria unmet, and nothing produced an event saying
+# so; a human found it by reading the issue list.
+#
+# The shape is what makes it worth a gate rather than a convention: **the more carefully an author
+# disclaims, the more likely they are to trip it**, because a disclaimer is exactly where a keyword
+# and an issue number end up adjacent.
+#
+# ## Why this is the thing that makes it wait for green checks
+#
+# GitHub closes on merge, and nothing can make it close later. What can be arranged is that a pull
+# request carrying an accidental close **cannot reach a merge**: this repository's loop merges only
+# on `mergeStateStatus: CLEAN`, so a red check here is a close that does not happen. That is the
+# whole mechanism — the gate is upstream of the merge, because after the merge is too late.
+#
+# ## Shape
+#
+# `blocked-by.yml`'s, deliberately: a plain Node script with no dependencies under narrow
+# permissions, so it cannot fail for a reason unrelated to what it checks. No `npm ci`. The parsing
+# and the decision are pure functions in `scripts/closing-keywords.mjs`, driven against fixtures by
+# `packages/experiments/src/validation/closingKeywords.test.ts` — including the sentence above.
+#
+# ## Writing *about* this defect, which is the one awkward case
+#
+# This check refuses the sentence even inside a quotation, and that is deliberate rather than an
+# oversight: it cannot tell a quotation from an intention, GitHub cannot either, and a gate whose
+# whole purpose is preventing an irreversible act should fail closed. The pull request that
+# introduced this check tripped it on its own body, which is the best evidence it works.
+#
+# So quote the shape without reproducing the adjacency — write *does not close issue 366*, with the
+# number spelled out, or put the keyword and the reference on either side of a line break. The cost
+# is one reworded sentence; the cost of being lax is an issue closed with work still in it.
+#
+# `pull_request_target` is **not** used and must not be: this reads a pull request's body, which is
+# attacker-controlled text on a fork, and `pull_request_target` would hand that text a token with
+# write access. `pull_request` runs against the merge ref with a read-only token, which is all this
+# needs — it writes nothing and only ever fails the run.
+name: Closing keywords
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: closing-keywords-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: no negated closing keyword
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      - name: Read the body and the commits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/closing-keywords.mjs
