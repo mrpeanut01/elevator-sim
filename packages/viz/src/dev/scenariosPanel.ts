@@ -43,6 +43,7 @@ import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import { BLANK_SPEC } from '../authoring/buildingSpec.js';
 import { CONTRACTS, contractStatus, statLineOf } from '../shift/contracts.js';
+import { ladderTowersOf } from '../shift/ladder.js';
 import type { ContractStatus, ScenarioContract, WeekState } from '../shift/types.js';
 import { switchWeek } from '../shift/week.js';
 
@@ -451,7 +452,13 @@ export function mountScenarios(list: HTMLElement, context: MountContext): Panel 
   return {
     render(view: ViewAt): void {
       latest = view;
-      const cards = scenarioCardsOf(CONTRACTS, view.state.week, view.resources.buildings);
+      /*
+       * The **rung's** towers, not the as-built ones — `shift/ladder.ts#ladderTowersOf`. A scenario
+       * hands the player the tower its rung declares, so the card's stat line has to describe that
+       * tower or it is a caption over somebody else's building. Each contract names a distinct
+       * building, so the list still resolves by id exactly as before.
+       */
+      const cards = scenarioCardsOf(CONTRACTS, view.state.week, ladderTowersOf(view.resources));
       fill(list, ...cards.map(cardNode), ownNode());
     },
   };

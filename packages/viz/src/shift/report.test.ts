@@ -1087,7 +1087,8 @@ describe('the rest of the sheet', () => {
 
   it('says what is banked, and what is left to bank', () => {
     const report = reportOf(clean);
-    expect(report.contractLine).toContain('Scenario 2 — The morning rush');
+    // `c2` is *Scenario 4* since issue #382 re-ordered the ladder by measured day-1 difficulty.
+    expect(report.contractLine).toContain('Scenario 4 — The morning rush');
     expect(report.contractLine).toContain('clean shifts banked');
     expect(report.taught).toContain('Bank 1 more clean shift');
   });
@@ -1636,7 +1637,8 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
     const report = weekDay(sheetOf({ kind: 'week-day' }));
     expect(report.of).toBe('week-day');
     expect(report.title).toBe('Thursday — day 4');
-    expect(report.contractLine).toContain('Scenario 2 — The morning rush');
+    // `c2` is *Scenario 4* since issue #382 re-ordered the ladder by measured day-1 difficulty.
+    expect(report.contractLine).toContain('Scenario 4 — The morning rush');
     expect(report.contractLine).toContain('clean shifts banked');
     expect(report.streakLine).toContain('clean days in a row');
     expect(report.forecast.demand).toContain('more tenants than today');

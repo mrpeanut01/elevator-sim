@@ -5,8 +5,8 @@
  *
  * The handoff re-authors each building inline as a `PRESETS` entry with rounded floor heights and
  * populations. `docs/12-design-handoff.md` § 4.4 refuses that: the implementation uses
- * `data/buildings/*.json` verbatim — same ids, same order, same teaching point, same
- * `needClean` — and where a handoff stat line disagrees with the file, **the file wins**. So
+ * `data/buildings/*.json` verbatim — same ids, same teaching point — and where a handoff stat line
+ * disagrees with the file, **the file wins**. So
  * {@link CONTRACTS} carries the handoff's *prose* (which is the deliverable) and none of its
  * *numbers* (which are a prototype's), and {@link statLineOf} derives the numbers from the
  * building the reader is actually about to run.
@@ -20,6 +20,33 @@
  *
  * `contracts.test.ts` asserts the prose against the vendored copy is not attempted — the vendored
  * file is a record, not a fixture — so these strings are pinned here and reviewed against it.
+ *
+ * ## The order is this repository's now, and it is measured — GitHub issue #382
+ *
+ * The array used to be the handoff's order plus three appended buildings, and `docs/33` § 4.2
+ * measured what that added up to: day-1 miss rates of 0.00, 1.00, 0.23, 0.80, 1.00, 0.03, 0.30 and
+ * 0.00, which is trivial → unpassable → trivial, and **DC-6 red**. The order is now
+ * **non-decreasing in measured day-1 miss rate** — `docs/33` § 4.7 carries the table and the run —
+ * and it happens to be non-decreasing in bank count too (1, 1, 1, 1, 1, 2, 3, 7), which is the
+ * curriculum reading the same ramp gives: five single-bank buildings of rising subtlety, then two
+ * banks and a credential, then one transfer, then three.
+ *
+ * **The ids do not move with the order and never will.** `c1`–`c8` are names, and a saved week, a
+ * career tower, a `data/` row and this repository's own prose all hold them; renumbering would make
+ * an id mean two things. What moves is the array's order, each contract's `label` (which is its
+ * *position*, so `c6` is now *Scenario 2*) and `needClean` (the same 1, 2, 2, 2, 3, 3, 3, 3 ladder,
+ * re-attached to the new positions, because a stake that fell in the middle of the campaign would
+ * be a campaign with two finales). The deviation from the handoff's own order is recorded in
+ * `docs/12` § 4.7, which is where § 4.4 says a disagreement it does not cover belongs.
+ *
+ * ## What a contract hands the player is `data/contract-ladder.json`, not this file
+ *
+ * A scenario's **crowd** and the **tower it hands over** are declared per contract in
+ * `data/contract-ladder.json` and applied by `shift/ladder.ts`. That is why three briefs below
+ * describe a building `data/buildings/` does not hold: `c1` runs its block with one car and 234
+ * residents, `c2` runs its tower four tenths let, and `c6` runs five cars at 3.5 m/s. The stat line
+ * beside each card is drawn from `ladderTowersOf`, the same derivation the run is built from, so
+ * the card and the run cannot disagree about the tower.
  *
  * ## Every contract is open, and there is no state in which one is not
  *
@@ -48,7 +75,8 @@ import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 import type { ContractStatus, ScenarioContract, WeekState } from './types.js';
 
 /**
- * The handoff's five, in the handoff's order.
+ * The handoff's five, and three more, in **measured difficulty order** rather than the handoff's —
+ * see the module docstring and `docs/33` § 4.7.
  *
  * Frozen, and every member frozen: this is shared, read-only reference data of exactly the kind
  * CLAUDE.md invariant 7 says belongs in data rather than in code — and it *would* be in
@@ -93,31 +121,64 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     shiftLengthS: 3600,
   }),
   Object.freeze({
+    id: 'c6',
+    buildingId: 'chancery-house',
+    label: 'Scenario 2',
+    title: 'The headline address',
+    teaches: 'that spare cars are not the same as a short interval',
+    brief:
+      'Nineteen floors, 649 people and five cars at 3.5 m/s — the smallest crowd in the week on the tightest promise: a 25 s interval and a 20 s wait. You have about as much lift as you need and not a car to spare. Where the cars wait between bursts is the whole of this one.',
+    needClean: 2,
+    reward: 'Pre-positioning · Energy aware · one spare shaft',
+  }),
+  Object.freeze({
+    id: 'c8',
+    buildingId: 'st-jude-hospital',
+    label: 'Scenario 3',
+    title: 'The bed and the visitor',
+    teaches: 'that two cars in one bank can be the wrong car',
+    brief:
+      'A hospital never empties. Two of the five cars are bed lifts — bigger, slower, and the wrong answer to an ordinary hall call — and nothing in the configuration says so. Outpatients on floor 1 empties downward when a clinic ends, which is a crowd from the middle of the building rather than the lobby.',
+    needClean: 2,
+    reward: 'Destination dispatch · Fairness first · endless mode',
+  }),
+  Object.freeze({
     id: 'c2',
     buildingId: 'midtown-office',
-    label: 'Scenario 2',
+    label: 'Scenario 4',
     title: 'The morning rush',
     teaches: 'up-peak, and the gap between demand offered and carried',
     brief:
-      '1,710 people on twenty uniform floors with four geared cars. At the peak they all want the same thing at the same time, and the queue in the lobby is where you find out whether your dispatcher is any good.',
+      'A twenty-floor tower four tenths let — 675 tenants — on four geared cars. At the peak they all want the same thing at the same time, and the queue in the lobby is where you find out whether your dispatcher is any good. The floors above are empty for now, which is the only reason this is winnable.',
     needClean: 2,
     reward: 'Operational zoning · Capacity aware · one spare shaft',
   }),
   Object.freeze({
+    id: 'c7',
+    buildingId: 'crown-hotel',
+    label: 'Scenario 5',
+    title: 'Both ways at once',
+    teaches: 'demand with no dominant direction, and a car unlike its neighbours',
+    brief:
+      'Guests arrive and leave all day, so there is no rush hour to point a dispatcher at. Four guest cars share the shaft group with one service lift at 1.75 m/s — less than two thirds their speed. Send it to the wrong call and the guest waits for the slowest car in the building.',
+    needClean: 3,
+    reward: 'Split demand · Capacity aware · one spare shaft',
+  }),
+  Object.freeze({
     id: 'c3',
     buildingId: 'secure-tower',
-    label: 'Scenario 3',
+    label: 'Scenario 6',
     title: 'Two banks, one lobby',
     teaches: 'zoning, and calls nobody may legally answer',
     brief:
       'Thirty floors split across a low and a high bank, with credentialed floors above 21. A call a car cannot legally take looks nothing like a slow one — and must never be reported as one.',
-    needClean: 2,
+    needClean: 3,
     reward: 'Destination disclosure · Fairness first · one spare shaft',
   }),
   Object.freeze({
     id: 'c4',
     buildingId: 'mixed-use-high-rise',
-    label: 'Scenario 4',
+    label: 'Scenario 7',
     title: 'The sky lobby',
     teaches: 'transfers, and why a two-leg journey waits twice',
     brief:
@@ -137,52 +198,19 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
        * shuttle's 8 m/s is the file's own and is unchanged.
        */
       'Sixty floors, an 8 m/s shuttle and a sky lobby at 31. A rider changing cars is waiting twice and must be counted once — get that wrong and every figure below flatters you.',
-    needClean: 2,
+    needClean: 3,
     reward: 'Predictive balanced · Contract-net auction · two more shafts',
   }),
   Object.freeze({
     id: 'c5',
     buildingId: 'vertical-city',
-    label: 'Scenario 5',
+    label: 'Scenario 8',
     title: 'Vertical City',
     teaches: 'supertall traffic, and knowing when to stop',
     brief:
       'A hundred floors, 4,887 occupants, six local zones hanging off three two-level sky lobbies, and eight double-deck shuttles at 10 m/s. Every journey above floor 25 is two legs — three when the destination zone is anchored to the far lobby level. Clear three shifts here and the week simply keeps going.',
     needClean: 3,
     reward: 'Multi-round auction · Landing-panel destination dispatch · endless mode',
-  }),
-  Object.freeze({
-    id: 'c6',
-    buildingId: 'chancery-house',
-    label: 'Scenario 6',
-    title: 'The headline address',
-    teaches: 'that spare cars are not the same as a short interval',
-    brief:
-      'Nineteen floors, 612 people and six cars at 5 m/s — the smallest crowd in the week on the tightest promise: a 25 s interval and a 20 s wait. You have more lift than you need and it still is not free. Where the spare cars wait between bursts is the whole of this one.',
-    needClean: 3,
-    reward: 'Pre-positioning · Energy aware · one spare shaft',
-  }),
-  Object.freeze({
-    id: 'c7',
-    buildingId: 'crown-hotel',
-    label: 'Scenario 7',
-    title: 'Both ways at once',
-    teaches: 'demand with no dominant direction, and a car unlike its neighbours',
-    brief:
-      'Guests arrive and leave all day, so there is no rush hour to point a dispatcher at. Four guest cars share the shaft group with one service lift at 1.75 m/s — less than two thirds their speed. Send it to the wrong call and the guest waits for the slowest car in the building.',
-    needClean: 3,
-    reward: 'Split demand · Capacity aware · one spare shaft',
-  }),
-  Object.freeze({
-    id: 'c8',
-    buildingId: 'st-jude-hospital',
-    label: 'Scenario 8',
-    title: 'The bed and the visitor',
-    teaches: 'that two cars in one bank can be the wrong car',
-    brief:
-      'A hospital never empties. Two of the five cars are bed lifts — bigger, slower, and the wrong answer to an ordinary hall call — and nothing in the configuration says so. Outpatients on floor 1 empties downward when a clinic ends, which is a crowd from the middle of the building rather than the lobby.',
-    needClean: 3,
-    reward: 'Destination dispatch · Fairness first · endless mode',
   }),
 ]);
 

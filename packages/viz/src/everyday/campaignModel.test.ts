@@ -49,6 +49,7 @@ import {
   purseOf,
   type Difficulty,
 } from '../campaign/economy.js';
+import { CONTRACTS } from '../shift/contracts.js';
 import type { DayOutcome, GoalObservations } from '../shift/types.js';
 import { outcomeOf } from '../shift/week.js';
 import { readGoals } from '../shift/goals.js';
@@ -779,7 +780,9 @@ describe('§ 8.8’s offers, and the gate on ambition', () => {
     /* Garden Apartments is held; every other shipped building is priced since § D519 (GitHub issue
        #169 item 4), so all seven are on the table. */
     expect(ids).not.toContain('c1');
-    expect(ids).toEqual(['c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']);
+    // In `CONTRACTS`' own order, which is `docs/33` § 4.7's measured ramp since issue #382 — read
+    // from the list rather than transcribed, so a later rebalance moves this with it.
+    expect(ids).toEqual(CONTRACTS.map((contract) => contract.id).filter((id) => id !== 'c1'));
     expect(view.offers.caption).toBe('7 offers');
     expect(view.offers.empty).toBeUndefined();
     for (const row of view.offers.rows) {

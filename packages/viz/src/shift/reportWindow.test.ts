@@ -298,6 +298,16 @@ describe('the run the shift path actually asks for', () => {
         buildingId: 'garden-apartments',
         shiftLengthS: 3600,
         seed,
+        /*
+         * **Off a scenario, deliberately** — GitHub issue #382. The subject here is the window rule
+         * on a run whose peak-five-minute band holds nobody, and `EMPTY_BAND_SEEDS` are the seeds
+         * where the *shipped* building is that thin. Scenario 1's rung now runs Garden Apartments at
+         * the residential profile's declared maximum on a block let at 1.95, so its own day is no
+         * longer thin at all — the band holds 24 on the first of these seeds. That is a fact about
+         * the scenario and not about the window, so the probe runs the building as authored, which
+         * is what `playMode: 'free-play'` means.
+         */
+        playMode: 'free-play',
       };
       const plan = shiftRunConfigOf(RESOURCES, state);
 

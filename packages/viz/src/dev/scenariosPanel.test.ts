@@ -50,7 +50,11 @@ describe('every contract names a building that is actually loaded', () => {
     // rather than of the campaign when three contracts were appended (`docs/12` § 4.7).
     expect(cards).toHaveLength(CONTRACTS.length);
     expect(cards.map((card) => card.contractId)).toEqual(CONTRACTS.map((c) => c.id));
-    expect(cards.slice(0, 5).map((card) => card.contractId)).toEqual(['c1', 'c2', 'c3', 'c4', 'c5']);
+    // Read from the list rather than transcribed: the order is `docs/33` § 4.7's measured ramp
+    // since issue #382, and a card panel's job is to draw it, not to have an opinion about it.
+    expect(cards.slice(0, 5).map((card) => card.contractId)).toEqual(
+      CONTRACTS.slice(0, 5).map((contract) => contract.id),
+    );
     for (const card of cards) expect(card.resolved, card.contractId).toBe(true);
   });
 });
@@ -142,7 +146,9 @@ describe('the objective line counts what has been banked', () => {
       scenarioCardsOf(CONTRACTS, week, buildings).map((card) => [card.contractId, card]),
     );
     expect(byId.get('c2')?.objective).toBe('Clear 2 shifts — 1 of 2 banked');
-    expect(byId.get('c3')?.objective).toBe('Clear 2 shifts');
+    // `c3` asks for three since issue #382 re-attached `needClean` to the new positions — the same
+    // 1, 2, 2, 2, 3, 3, 3, 3 ladder, on a ramp that no longer falls in the middle.
+    expect(byId.get('c3')?.objective).toBe('Clear 3 shifts');
     expect(byId.get('c1')?.objective).toBe('Clear 1 shift');
   });
 

@@ -321,6 +321,27 @@ whose goal pass rates are measured over both 50-replication seed sets and publis
 `data/scenario-goals.json` like every other stage's — R12 applies to a scenario the design did not
 specify exactly as it applies to one it did.
 
+> **Amended 2026-09-09 — the order is no longer the handoff's** ([GitHub issue #382](https://github.com/mrpeanut01/elevator-sim/issues/382),
+> [`docs/33`](33-difficulty-curve.md) § 4.7). The paragraph above says *"same order"* and that
+> stopped being true on this commit. `docs/33` § 4.2 measured what the handoff's order plus three
+> appended contracts adds up to — day-1 miss rates of 0.00, 1.00, 0.23, 0.80, 1.00, 0.03, 0.30 and
+> 0.00, which is trivial → unpassable → trivial — and the product owner ruled the whole lifecycle
+> open. `CONTRACTS` is now ordered by **measured day-1 difficulty**: `c1`, `c6`, `c8`, `c2`, `c7`,
+> `c3`, `c4`, `c5`.
+>
+> **The deviation is recorded rather than absorbed, which is § 4.4's own rule**, and three clauses of
+> the paragraph above survive it exactly. The **ids** are unchanged — `c1`–`c8` are names, and a
+> saved week and a career tower hold them. The **teaching points** are unchanged, and so are all
+> eight buildings. And **the finale's reward has not moved**: `c5` still grants endless mode, and it
+> is still last, because the measurement put it there. What did move is each contract's `label`,
+> which is a *position* (`c6` is now *Scenario 2*), and `needClean`, re-attached to the new
+> positions as the same 1, 2, 2, 2, 3, 3, 3, 3 ladder so that the progression rule this section
+> names still holds.
+>
+> The handoff wins every disagreement about what the screen looks like, and this is not one: the
+> screen draws whatever order `CONTRACTS` holds. *Which order teaches best* is a claim about runs,
+> and `docs/33` § 4.7 settles it with 400 of them.
+
 ### 4.6 Four corrections to the prototype, found by implementing it
 
 The handoff is a working prototype, and four things in it do not survive being built against a real

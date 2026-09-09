@@ -87,6 +87,7 @@ import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts
 import { firstSessionContractFor } from '../shift/firstSession.js';
 import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import { SHIFT_EVENTS, eventById, shiftRunPatch, baseDemandOf } from '../shift/events.js';
+import { ladderTowerConfig, rungFor } from '../shift/ladder.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
@@ -1536,7 +1537,48 @@ export function shiftRunConfigOf(
    * the screen gates with `reviewCommissioning`, and a run is never unloadable.
    */
   const classes = commissionableClasses(specs);
-  const commissioned = commissionedBuilding(authored, state.commissioning, classes);
+  /*
+   * 2b-i — the fabric **the contract hands the player**, before the player's own choices.
+   *
+   * GitHub issue #382, `docs/33` § 4.7. A scenario's difficulty is declared in
+   * `data/contract-ladder.json`, and DC-R1 admits fabric as one of its three substrates; this is
+   * where that half of a rung reaches the run. It goes through `commissionedBuilding` rather than
+   * through an edit to `data/buildings/` because the eight buildings are reference fixtures before
+   * they are game levels — `benchmark/published.ts` pins intervals against `midtown-office` — and
+   * `shift/ladder.ts` argues that at length.
+   *
+   * **Before** `state.commissioning` and not after, so the player's own choice wins: a rung is the
+   * tower you are handed, not a ceiling on what you may do to it. A row with no `fabric` is the
+   * identity by construction — `commissionedBuilding` returns its input object when no bank's
+   * choice differs from what the building already stands as — so a contract that declares none runs
+   * the byte-identical building it ran before this line existed.
+   */
+  /*
+   * **A rung applies to a week's day and to nothing else.** `playMode` is the field that says which
+   * game this state belongs to (`scope/types.ts#PLAY_MODES`), and it exists precisely because
+   * `freePlay !== undefined` was *"the shape of fact that stops being true the day somebody adds a
+   * second writer"*. Free Play, Endless and a watched replay all run **the building as authored**:
+   * `watch/record.ts#stateFromWatchRecord` sets `playMode: 'free-play'`, and a filed record names a
+   * building, a dispatcher and a seed but no scenario, so a rung reaching it would replay somebody's
+   * posted run against a tower they never ran. Measured rather than reasoned about — the two shipped
+   * reference runs stopped reproducing the figures they were filed with.
+   *
+   * The **building** check inside {@link rungFor} is the second half, and it was found the same way:
+   * a `ViewerState` carries `buildingId` and `week.contractId` independently and they routinely
+   * disagree, so keyed on the contract alone Scenario 1's rung would let Midtown Office at Garden
+   * Apartments' occupancy.
+   */
+  const rung =
+    state.playMode === 'shift-week' ? rungFor(state.week.contractId, authored.id) : undefined;
+  /*
+   * The tower the contract hands over — the rung's occupancy and its bank choices — through the one
+   * derivation `shift/ladder.ts#ladderTowerConfig` holds, which is the same function the scenario
+   * card draws its stat line from. Two expressions for *what does this scenario hand me* is how a
+   * card comes to say `2 cars` over a run with one.
+   */
+  const asHanded =
+    rung === undefined ? authored : ladderTowerConfig(authored, rung.contractId, specs);
+  const commissioned = commissionedBuilding(asHanded, state.commissioning, classes);
 
   /*
    * 2c — § 8's kit, **after commissioning and before growth**, on 2b's own two arguments.
@@ -1611,9 +1653,29 @@ export function shiftRunConfigOf(
   const askInput = calendarAskInputOf(resources, state, authored);
   const demandTemplate = askInput.demandTemplateId as typeof pattern.demandTemplate;
   const rate = state.freePlay?.arrivalRatePctPop5min;
+  /*
+   * The contract's declared crowd, **under** Free Play's and over the profile's own `typical`.
+   *
+   * GitHub issue #382, `docs/33` § 4.7 — the demand half of a rung. The precedence is the same
+   * argument `shiftDemandTemplateId` makes about templates: Free Play's rate wins because it is the
+   * only one of the three a player typed, and the profile's `typical` stays the answer where no
+   * contract has an opinion. `pattern.demand` keeps its own rate where a pattern authored one, so a
+   * pattern spec is not silently overruled by a rung either.
+   *
+   * **Free Play never reaches this branch**, because `playMode` has already suppressed the rung
+   * above: a mode that exists to run the building as authored may not be handed a scenario's crowd,
+   * and `menu/enterFreePlay.ts` keeps the building's contract id on its fresh week to keep the label
+   * honest, so the contract id alone could not have told the two modes apart.
+   */
+  const rungRate =
+    rung === undefined || pattern.demand.arrivalRatePctPop5min !== undefined
+      ? undefined
+      : rung.arrivalRatePctPop5min;
   const asked =
     rate === undefined || rate === null
-      ? pattern.demand
+      ? rungRate === undefined
+        ? pattern.demand
+        : { ...pattern.demand, arrivalRatePctPop5min: rungRate }
       : { ...pattern.demand, arrivalRatePctPop5min: rate };
   /*
    * § 8's `tenants` tier, applied to the rate the day would otherwise have run at.

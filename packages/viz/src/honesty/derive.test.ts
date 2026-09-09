@@ -1320,6 +1320,22 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Refuses an illegal rung in `data/contract-ladder.json` — a rate outside its profile’s ' +
+        'declared range, a bank the building does not have, a machine at a speed its class ' +
+        'forbids — and every string it returns is addressed to a **content author**, not to a ' +
+        'player. GitHub issue #382. It is derived only because a refusal has to say what is wrong ' +
+        'in words, which the two-adjacent-words scanner reads as prose. No screen renders any of ' +
+        'it: `dev/data.ts` folds the list into `BrowserResources.warnings` beside a building’s own ' +
+        'cross-validation, which is the same disposition every other loader diagnostic in this ' +
+        'repository has, and `shift/ladder.test.ts` is where an issue is a failing test rather ' +
+        'than a sentence. Putting it in an adapter would be a coverage claim about words a player ' +
+        'can never reach — and the thing that *is* worth checking about this function, that it ' +
+        'refuses the right rungs, is asserted against the real `data/` rather than against its ' +
+        'wording.',
+      ids: ['shift/ladder.ts#contractLadderIssues'],
+    },
+    {
+      reason:
         'Returns the *facts* about why a goal cannot be judged and deliberately authors none of ' +
         'the words. Derived only because its literals are goal-kind ids and `GoalJudgement` keys, ' +
         'which the two-adjacent-words scanner reads as phrases. Carrying a sentence here would ' +

@@ -183,6 +183,7 @@ import {
 } from '../mode/plainLevers.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
+import { ladderTowersOf } from '../shift/ladder.js';
 import { runHorizonOf, wholeDayFor, wholeDayRun, type WholeDay } from '../shift/dayLength.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -1730,7 +1731,13 @@ export function createEverydayHost(
     trafficProfileById: (id) =>
       b.resources.trafficProfiles.profiles.find((profile) => profile.id === id),
     buildingSpecLine: (id) => {
-      const resolved = b.resources.buildings.find((building) => building.id === id);
+      /*
+       * The **rung's** tower where a contract runs this building — `shift/ladder.ts#ladderTowersOf`,
+       * the same derivation `dev/state.ts#shiftRunConfigOf` builds the run from. A spec line drawn
+       * from the as-built tower beside a run the rung re-let would be the caption defect this
+       * repository has closed a dozen times. A building no contract runs comes back untouched.
+       */
+      const resolved = ladderTowersOf(b.resources).find((building) => building.id === id);
       return resolved === undefined ? undefined : statLineOf(resolved);
     },
     campaign: () => career,

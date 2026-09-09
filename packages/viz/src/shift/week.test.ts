@@ -179,8 +179,10 @@ describe('banking a scenario', () => {
     const week = closeDay(openWeek('c1'), day(openWeek('c1'), 'met'));
     expect(week.completed).toEqual(['c1']);
     expect(week.cleared).not.toBeNull();
-    expect(week.cleared?.nextContractId).toBe('c2');
-    expect(week.cleared?.nextTitle).toBe('Scenario 2 — The morning rush');
+    // `c6` and not `c2`: the order is `docs/33` § 4.7's measured ramp since GitHub issue #382, and
+    // the ids do not move with it — `c6` is *Scenario 2* because a label is a position.
+    expect(week.cleared?.nextContractId).toBe('c6');
+    expect(week.cleared?.nextTitle).toBe('Scenario 2 — The headline address');
     expect(week.cleared?.reward).toBe(
       'Minimum estimated wait · Energy aware · one spare shaft',
     );

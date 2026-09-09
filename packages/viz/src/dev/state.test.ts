@@ -110,10 +110,29 @@ describe('the run builder', () => {
   });
 
   it('hands the run no demand override under the building’s own demand', () => {
-    // The comparable case: every published figure was measured with the building's own profile,
-    // so *the building's own demand* must be expressed by overriding nothing.
+    /*
+     * The comparable case: every published figure was measured with the building's own profile, so
+     * *the building's own demand* must be expressed by overriding nothing.
+     *
+     * **A contract's rung can write here and Scenario 1's does not** — GitHub issue #382.
+     * `data/contract-ladder.json` declares each scenario's crowd and `shiftRunConfigOf` writes it
+     * where Free Play's rate would go, so this assertion is now about two things at once: that
+     * `pattern: 'building'` writes nothing of its own, and that Garden Apartments is handed as
+     * built. The second arm below is what keeps them distinguishable — Scenario 4 is let at 0.395
+     * and its run says so — so a rung that quietly stopped reaching the run would fail there rather
+     * than pass silently here.
+     */
     const plan = shiftRunConfigOf(resources, { ...base(), pattern: 'building' });
     expect(plan.config.demand).toStrictEqual({});
+    const scenarioFour = shiftRunConfigOf(resources, {
+      ...base(),
+      buildingId: 'midtown-office',
+      week: { ...base().week, contractId: 'c2' },
+      pattern: 'building',
+    });
+    expect(
+      scenarioFour.building.floors.reduce((total, floor) => total + floor.population, 0),
+    ).toBeLessThan(1710);
   });
 
   it('carries the day’s event into the run and says what it withheld', () => {
