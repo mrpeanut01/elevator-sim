@@ -18,6 +18,14 @@ behind it, and Communication Services for the one mail this product sends.
 > every authenticated surface with no failing status code anywhere. Arming it found two defects that
 > reading it had not; [§ D308](../DECISIONS.md) is the account.
 
+> **`infra/` is not only Azure.** [`checks/`](checks/) holds one guard that deploys nothing: it
+> reads `.github/workflows/ci.yml` and asserts the properties that file states about itself — that
+> every Linux leg is a GitHub-hosted x86-64 runner named by a literal label, and that the step
+> failing a leg whose `uname -m` is not `x86_64` is still there. It lives here rather than under
+> `packages/` because it must be runnable by `node` with nothing installed, and it is gated by
+> `packages/experiments/src/validation/ciWorkflowMatrix.test.ts` because that is a project
+> `ci.yml` actually runs. GitHub issue #414.
+
 ---
 
 ## 0. Read this first: what has and has not been verified
