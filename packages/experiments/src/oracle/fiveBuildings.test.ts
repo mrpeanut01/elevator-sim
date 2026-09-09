@@ -726,11 +726,25 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
     // that averages a 3.0 m/s guest car with a 1.75 m/s service car is not the closed form; it is a
     // different calculation wearing its name.
     //
-    // `chancery-house` IS coverable — six identical cars, one bank, no zoning — and is simply not
-    // measured yet. That is an owed measurement rather than a modelling limit, and stating it here
-    // is what stops it being forgotten. `burj-class-reference` is the same kind of debt at a much
-    // larger size: every one of its six banks holds identical cars, so each is coverable, and
-    // GitHub issue #376's third criterion is exactly this measurement left open.
+    // `chancery-house` IS coverable — six identical cars, one bank, no zoning — and **is now
+    // measured**, in `remainingBuildings.test.ts`, at this file's own budget and seed base: raw
+    // +49.297 %, residual +0.074 %, `explained`, on a bank `analyzeUpPeak` raises no warning about
+    // at all. It stays out of `PRINCIPAL_BANKS` because this table is cited as *the five* in
+    // `docs/05-roadmap.md`, `docs/07-handoff.md` and GitHub issue #232's third acceptance
+    // criterion, and renaming a cited set is a larger change than adding a measurement.
+    // `remainingBuildings.test.ts` also asserts the complement of the list below, so a tenth
+    // building trips two guards rather than none.
+    //
+    // `crown-hotel` and `st-jude-hospital` are refused there too, by a run rather than by this
+    // comment — the residual is carried to the end and comes back at +7.592 % against a 4 %
+    // tolerance, and the disagreement is located in the per-stop fixed cost that averaging unlike
+    // cars produces. `CLAUDE.md` § "A stated refusal goes stale the same way" is why that is worth
+    // more than the sentence above it.
+    //
+    // `burj-class-reference` is the one debt left: every one of its six banks holds identical cars,
+    // so each is coverable, and GitHub issue #376's third criterion is exactly this measurement
+    // left open. Four of its six banks reduce to the closed form's scalars today; `shuttle` and
+    // `observation` throw on a zero served population.
     const coverable = ['burj-class-reference', 'chancery-house'];
     const notCoverable = ['crown-hotel', 'st-jude-hospital'];
     expect([...coverable, ...notCoverable].sort()).toEqual(absent);

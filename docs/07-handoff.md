@@ -661,6 +661,40 @@ Six further banks are measurable and covered by `oracle/deepCampaign.test.ts` (`
 Pushing the simplifications *into* the simulator via per-car config (huge acceleration, zero dwell)
 collapses its round trip onto the textbook figure at −0.4 %.
 
+#### The three shipped buildings the table above does not reach
+
+The table is five buildings because it was written when five shipped. The set went to eight
+([§ D213](../DECISIONS.md)) and to nine with the Burj-class reference tower, and the table was never
+extended — which is what GitHub issue #232's third acceptance criterion, *"a closed-form
+round-trip-time check like the existing five"*, is really asking about.
+`oracle/remainingBuildings.test.ts` closes three of the four, and they are three different kinds of
+answer rather than three more rows:
+
+| building | verdict | measured |
+|---|---|---|
+| `chancery-house` | **RECONCILED** — a sixth, on this table's own apparatus, seeds and n = 64 | raw +49.297 %, residual **+0.074 %**, and `analyzeUpPeak` raises **no warning at all** on it — the only shipped bank of which that is true |
+| `crown-hotel` | **REFUSED, by a run** | the apparatus is carried to the end rather than declined: raw +36.513 %, residual **+7.592 %** against the 4 % band, `explained: false` |
+| `st-jude-hospital` | **REFUSED TWICE, for free** | `heterogeneousGroup`, and a longest door reopen of 53.20 s against a shortest round trip of 29.56 s — no simulation runs |
+
+**Chancery House being the cleanest case in the shipped set and the one with no check is the finding
+rather than a detail.** Nineteen floors, six identical cars, one bank, uniform populations, uniform
+pitch. Every other bank that reduces at all raises at least one warning.
+
+**The two refusals are pinned to runs rather than to sentences**, which is the rule
+[`CLAUDE.md`](../CLAUDE.md) § *"A stated refusal goes stale the same way"* exists for. The
+Barney/CIBSE derivation assumes one car specification per bank; both of these hold unlike cars in one
+bank deliberately (§ D213 § 3, to avoid making every ward a transfer floor). **And which of the
+three warnings on Crown Hotel causes its residual is measured, not argued**: a counterfactual arm
+gives the one unlike car its neighbours' specification, holds the floors, populations, express zone,
+traffic profile and seeds fixed, and the uncited per-stop term falls from **4.50 s to 0.021 s** with
+`explained` flipping to true. That arm costs ~75 s on its own and is opt-in under
+`ELEVATOR_SIM_DEEP=1`, on `deepCampaign.test.ts`'s rule that a budget is moved rather than reduced.
+
+**One is still owed.** `burj-class-reference` is coverable — all six of its banks are internally
+uniform — and its closed-form measurement is GitHub issue #376's third criterion, left there rather
+than absorbed. Four of its six banks reduce today; `shuttle` and `observation` throw on a zero
+served population.
+
 ### Determinism
 
 Same seed under CRN gives **bit-identical** paired differences — exactly zero on all 23
@@ -914,7 +948,7 @@ directions (§ D32, § D33).
 | Track | State | Where |
 |---|---|---|
 | **Property-based fuzzing** | ✅ | `experiments/src/fuzz/` — generator, hand-written shrinker, six properties, 64-case always-on corpus, 2 000-case deep tier |
-| Analytical cross-validation, all five buildings | ✅ | `experiments/src/oracle/{fiveBuildings,bankCensus,deepCampaign}.test.ts` |
+| Analytical cross-validation, all five buildings | ✅ | `experiments/src/oracle/{fiveBuildings,bankCensus,deepCampaign,remainingBuildings}.test.ts` |
 | Physics verification | ✅ | `validation/physics.test.ts` |
 | Statistical self-validation | ✅ | `validation/{crnVarianceReduction,nullComparison,sequentialStopping,operatingPoint}.test.ts` |
 | Determinism regression | ✅ | `validation/goldenRuns.test.ts`, `fuzz/determinism.test.ts` |

@@ -187,6 +187,19 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
     reason: "CLAUDE.md's correctness oracle at full width — every measurable bank",
     scheduled: true,
   },
+  'packages/experiments/src/oracle/remainingBuildings.test.ts': {
+    gates: ['ELEVATOR_SIM_DEEP'],
+    reason:
+      'the first entry here that is a **partly** gated file, and the distinction is worth the ' +
+      'sentence: its checks on the three buildings the five-building table does not reach are ' +
+      'always-on, and one counterfactual arm is not — Crown Hotel with its single unlike car made ' +
+      'like the others, which is what attributes that building’s refusal to the heterogeneity ' +
+      'rather than to either of the other two warnings its bank raises. The uniform bank carries ' +
+      'proportionally more demand, so the arm costs ~75 s against ~8 s for the shipped one. It ' +
+      'rides the `oracle-campaign` job as a second step rather than a job of its own, being the ' +
+      'same apparatus at the same seeds as the campaign beside it — GitHub issue #232',
+    scheduled: true,
+  },
   'packages/experiments/src/validation/goldenRuns.test.ts': {
     gates: ['ELEVATOR_SIM_DEEP'],
     reason:
