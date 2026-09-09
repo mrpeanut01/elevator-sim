@@ -296,6 +296,24 @@ export function parseWrinkleLibrary(value: unknown): WrinkleLibrary {
     }
   }
 
+  /*
+   * `breakdown` must declare a derate window, because `shift/events.ts#BREAKDOWN_AT_FRACTION` reads
+   * `fromFraction` off it and `campaign/incidents.ts` schedules the car's return from that.
+   *
+   * Without this a `breakdown` that wrote `carsOutOfService` instead would parse cleanly, the
+   * constant would fall back to a literal, and the caption would schedule a return the run does not
+   * make — which is the second-source-of-truth defect that deriving the constant was meant to end,
+   * reachable through the very edit this library exists to enable. Review caught the fallback; this
+   * is what makes the fallback unnecessary.
+   */
+  const breakdown = templates.find((template) => template.id === 'breakdown');
+  if (breakdown !== undefined && breakdown.effect.derate === null) {
+    violations.push(
+      'template breakdown declares no derate window. `shift/events.ts#BREAKDOWN_AT_FRACTION` reads ' +
+        'its `fromFraction`, and `campaign/incidents.ts` tells the player when the car comes back.',
+    );
+  }
+
   const unexpressible: UnexpressibleWrinkle[] = array(
     raw['unexpressible'],
     'wrinkles.json.unexpressible',

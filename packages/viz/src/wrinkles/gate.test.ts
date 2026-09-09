@@ -55,6 +55,13 @@ function inputFor(wrinkleId: string, overrides: Partial<WrinkleGateInput> = {}):
     seed: SEED,
     durationS: 900,
     replications: MIN_REPLICATION_BUDGET,
+    /*
+     * `full-run` is what makes the sweep judgeable at all under the gate's complete-case rule.
+     * Garden Apartments' residential rate leaves the default peak-5-minute window empty on 2 of 50
+     * replications, so every arm reads 48/50 and every day is refused — measured, not assumed.
+     * `benchmark/matrixCells.ts` declares the same window on the same building for the same reason.
+     */
+    reportWindow: 'full-run',
     base: baseDemandOf(profile),
     ...overrides,
   };
@@ -134,6 +141,29 @@ describe('a day the gate could not read is not a day it discarded', () => {
     expect(verdict.earnsItsPlace).toBe(false);
     expect(verdict.reason).toMatch(/was not judged/);
     expect(verdict.reason).not.toMatch(/cosmetic/);
+    // The counts are in the sentence — `batch/report.ts` R13, *no estimate without its `n`*.
+    expect(verdict.reason).toMatch(/\d+\/\d+/);
+  }, 120_000);
+});
+
+describe('the gate will not average the replications that survived', () => {
+  it('refuses a cell where any arm drops even one replication — batch/report.ts R1', () => {
+    /*
+     * The default peak-5-minute window is empty on 2 of 50 replications at this building's
+     * residential rate, so every arm reads 48/50 — and the first draft of this gate averaged those
+     * 48 and kept nine days on them. `batch/report.ts` measured why that is wrong and rejected it:
+     * *"the traces that fall out are exactly the ones where the dispatchers differ most"*, so the
+     * surviving subset understates the difference. Two replications short of fifty is enough to
+     * refuse, which is the whole of R1 and is what this case pins.
+     *
+     * It is the same input as the sweep with `reportWindow` dropped, so the two cases together say
+     * that the window is what makes the sweep judgeable rather than anything about the wrinkles.
+     */
+    const { reportWindow: _dropped, ...withoutWindow } = inputFor('move-in:two-thirds');
+    const verdict = gateWrinkle(withoutWindow);
+    expect(verdict.judged, verdict.reason).toBe(false);
+    expect(verdict.reason).toMatch(/fewer than every replication/);
+    expect(verdict.reason).toMatch(/48\/50/);
   }, 120_000);
 });
 
@@ -159,10 +189,15 @@ describe('the gate discriminates — the case this file exists for', () => {
      */
     const { wrinkle: _ignored, ...sweep } = inputFor('ordinary');
     const verdicts = gateLibrary(WRINKLE_LIBRARY, sweep);
-    const kept = verdicts.filter((verdict) => verdict.earnsItsPlace);
-    const discarded = verdicts.filter((verdict) => !verdict.earnsItsPlace);
+    const judged = verdicts.filter((verdict) => verdict.judged);
+    const kept = judged.filter((verdict) => verdict.earnsItsPlace);
+    const discarded = judged.filter((verdict) => !verdict.earnsItsPlace);
     const rows = verdicts
-      .map((verdict) => `${verdict.earnsItsPlace ? 'keep' : 'drop'} ${verdict.wrinkleId}`)
+      .map(
+        (verdict) =>
+          `${verdict.judged ? (verdict.earnsItsPlace ? 'keep' : 'drop') : 'unjudged'} ` +
+          `${verdict.wrinkleId}`,
+      )
       .join('\n');
 
     expect(kept.length, `the gate kept nothing, which empties the library:\n${rows}`).toBeGreaterThan(
@@ -181,10 +216,21 @@ describe('the gate discriminates — the case this file exists for', () => {
       expect(verdict.reason, verdict.wrinkleId).toMatch(/excludes zero/);
     }
 
-    // Garden Apartments quotes on every arm, so every verdict here is a finding about its day
-    // rather than a day the gate could not read. The unjudged branch has its own case below.
-    for (const verdict of verdicts) {
-      expect(verdict.judged, `${verdict.wrinkleId}: ${verdict.reason}`).toBe(true);
+    /*
+     * **Some days are not judged even here, and that is the rule working rather than a gap.**
+     * `weekend` and the other rate-thinning wrinkles cut demand far enough that an arm drops a
+     * replication even over the full run, and the complete-case rule refuses those outright rather
+     * than averaging what held. What the sweep asserts is that such a day is reported as *not
+     * judged* — never as cosmetic, which § 17 says to discard on.
+     */
+    for (const verdict of verdicts.filter((candidate) => !candidate.judged)) {
+      expect(verdict.reason, verdict.wrinkleId).toMatch(/was not judged/);
+      expect(verdict.reason, verdict.wrinkleId).not.toMatch(/cosmetic/);
+      expect(verdict.earnsItsPlace, verdict.wrinkleId).toBe(false);
     }
+    expect(
+      judged.length,
+      `the gate could read none of the library at this operating point:\n${rows}`,
+    ).toBeGreaterThan(0);
   }, 120_000);
 });

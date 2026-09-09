@@ -29,6 +29,31 @@
  *    time* — so the pair whose order changed is put through a **paired-t interval on the candidate
  *    day**, and the day is kept only if that interval excludes zero.
  *
+ * ## Complete-case-or-nothing, which is `batch/report.ts`'s rule and was very nearly not kept here
+ *
+ * A replication counts only if its own summary quoted a mean, and this gate **refuses the day
+ * outright** unless *every* replication quotes on *every* arm on *both* days. It does not average
+ * the ones that held.
+ *
+ * That is `batch/report.ts`'s R1, and its argument is the reason rather than its authority being:
+ *
+ * > The rejected alternative is the tempting one — average the pairs that held and print the reduced
+ * > `n`. It is rejected because it is **selection on the outcome** … the traces that fall out are
+ * > exactly the ones where the dispatchers differ most. The surviving subset therefore understates
+ * > the difference in the regime a player is trying to fix, and it does so while displaying an
+ * > honest `n` — which makes it worse than a blank, not better.
+ *
+ * The first draft of this file did exactly that rejected thing while citing `report.ts` for it, and
+ * every one of the nine days it kept was kept on 44 to 48 pairs of 50. Review measured that. The
+ * bias runs the wrong way for a *content* gate in particular: the traces that drop out are the ones
+ * the dispatchers disagree on, so a day would be kept or discarded on the traces that agree.
+ *
+ * **The cost is that the caller must pick an operating point where the arms quote**, which is a real
+ * constraint and not a formality — at Garden Apartments' residential rate the peak-5-minute window
+ * is empty on 2 of 50 replications, so the whole sweep is unjudgeable until {@link
+ * WrinkleGateInput.reportWindow} is `'full-run'`. That is the same correction `benchmark/matrixCells.ts`
+ * makes to the same building for the same reason, and it is why the field is on the input at all.
+ *
  * The second clause is what stops this being a sort. A ranking computed from two means will differ
  * on almost every day if the means are close enough, and keeping a day on that basis would fill the
  * library with wrinkles that shuffle nothing a player could perceive and nothing this project would
@@ -59,7 +84,11 @@
 
 import { intervalContainsZero, pairedDifferenceEstimate } from '@elevator-sim/experiments/browser';
 import type { MeanEstimate } from '@elevator-sim/experiments/browser';
-import type { ResolvedBuilding, SimulationDemandOptions } from '@elevator-sim/core/browser';
+import type {
+  ResolvedBuilding,
+  SimulationDemandOptions,
+  WindowSelection,
+} from '@elevator-sim/core/browser';
 
 import { MIN_REPLICATION_BUDGET } from '../batch/report.js';
 import { runBatch } from '../batch/runBatch.js';
@@ -124,6 +153,14 @@ export interface WrinkleGateInput {
   readonly replications: number;
   /** The demand the day would have run at with no wrinkle. `baseDemandOf`'s output. */
   readonly base: ShiftDemandBase;
+  /**
+   * Which window each run's summary is computed over, or absent for the run's own default.
+   *
+   * Load-bearing rather than a pass-through: the default peak-5-minute window is empty often enough
+   * on a sparse building to make every day unjudgeable under the complete-case rule above. See the
+   * module docstring.
+   */
+  readonly reportWindow?: WindowSelection | undefined;
 }
 
 /** Raised when the gate cannot be run at all, as distinct from a day it refuses. */
@@ -146,11 +183,20 @@ function awtSamples(arm: BatchArmResult): readonly (number | null)[] {
   );
 }
 
-/** Arms with too few quotable replications to stand behind a mean, on either day. */
-function unquotableArms(result: BatchResult): readonly string[] {
-  return result.arms
-    .filter((arm) => awtSamples(arm).filter((value) => value !== null).length < 2)
-    .map((arm) => arm.armId);
+/**
+ * Arms that did not quote a mean on **every** replication, named with their counts.
+ *
+ * Not *"too few to average"* — `batch/report.ts`'s R1 is that a single dropped pair suppresses the
+ * row, because the pairs that drop are the ones the arms differ most on. See the module docstring.
+ */
+function shortArms(result: BatchResult): readonly string[] {
+  const out: string[] = [];
+  for (const arm of result.arms) {
+    const samples = awtSamples(arm);
+    const quotable = samples.filter((value) => value !== null).length;
+    if (quotable < samples.length) out.push(`${arm.armId} ${String(quotable)}/${String(samples.length)}`);
+  }
+  return out;
 }
 
 function rankingOf(result: BatchResult): readonly WrinkleArmStanding[] {
@@ -164,10 +210,14 @@ function rankingOf(result: BatchResult): readonly WrinkleArmStanding[] {
 }
 
 /**
- * The complete-case paired difference between two arms, over replications where **both** quoted.
+ * The paired difference between two arms.
  *
- * Complete-case rather than pairwise-deleted per arm, for `batch/report.ts`'s reason: a paired
- * interval over indices the two arms do not share is arithmetic on unrelated runs.
+ * Reached only after {@link shortArms} has found nothing, so by the time this runs every
+ * replication quotes on every arm and the pairing is total. The `null` guards below are therefore
+ * unreachable in the shipped path and are kept as a floor rather than as a filter — this function
+ * must not become the place that quietly averages survivors, which is what the module docstring is
+ * about. An earlier draft's docstring cited `batch/report.ts` for *"complete-case"* while doing the
+ * opposite of what that file means by it; the rule now lives one level up, where it can refuse.
  */
 function pairedAwt(result: BatchResult, firstId: string, secondId: string): MeanEstimate | null {
   const first = result.arms.find((arm) => arm.armId === firstId);
@@ -238,6 +288,7 @@ function requestOf(input: WrinkleGateInput, demand: SimulationDemandOptions): Ba
     arms: input.dispatcherProfileIds.map((id) => ({ armId: id, dispatcherProfileId: id })),
     arrivalRatePctPop5min: null,
     demand,
+    ...(input.reportWindow === undefined ? {} : { reportWindow: input.reportWindow }),
   };
 }
 
@@ -289,17 +340,18 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
    * Refuse before ranking, not after. A mean over no quotable replication is `NaN`, and ranking on
    * `NaN` does not fail — it silently returns the order the arms were declared in.
    */
-  const unquotable = [...new Set([...unquotableArms(candidate), ...unquotableArms(control)])];
-  if (unquotable.length > 0) {
+  const short = [...new Set([...shortArms(candidate), ...shortArms(control)])];
+  if (short.length > 0) {
     return {
       wrinkleId: input.wrinkle.id,
       earnsItsPlace: false,
       judged: false,
       reason:
-        `${input.wrinkle.id} was not judged: ${unquotable.join(', ')} quoted a mean on fewer than ` +
-        'two replications, so there is no ranking to compare and no paired interval to take. ' +
-        'Nothing here is a finding about the day itself — the gate could not read it. Run it on a ' +
-        'building and horizon where the arms quote before drawing any conclusion about this day.',
+        `${input.wrinkle.id} was not judged: ${short.join(', ')} quoted a mean on fewer than every ` +
+        'replication, and averaging the ones that held would be selection on the outcome — the ' +
+        'traces that drop are the ones the dispatchers differ most on (`batch/report.ts` R1). ' +
+        'Nothing here is a finding about the day itself. Run it at an operating point where every ' +
+        'arm quotes — on a sparse building that usually means reportWindow: full-run.',
       candidateRanking,
       controlRanking,
       swappedPair: null,
@@ -318,7 +370,8 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
       judged: true,
       reason:
         `${input.wrinkle.id} leaves the ranking exactly as the control day had it ` +
-        `(${controlOrder.join(' < ')}), so it is cosmetic — § 17.`,
+        `(${controlOrder.join(' < ')}) over ${String(input.replications)} paired replications, so ` +
+        'it is cosmetic — § 17.',
       candidateRanking,
       controlRanking,
       swappedPair: null,
@@ -359,10 +412,12 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
     judged: true,
     reason: resolvable
       ? `${input.wrinkle.id} puts ${winner} ahead of ${displaced}, which the control day had the ` +
-        `other way, and the paired interval on that pair excludes zero — it earns its place.`
+        `other way, and the paired interval on that pair over n = ${String(estimate.n)} excludes ` +
+        'zero — it earns its place.'
       : `${input.wrinkle.id} puts ${winner} ahead of ${displaced} on the means, but the paired ` +
-        'interval on that pair contains zero: the apparatus cannot resolve the swap, so ordering ' +
-        'the two on it is the failure mode CLAUDE.md names. Discarded.',
+        `interval on that pair over n = ${String(estimate.n)} contains zero: the apparatus cannot ` +
+        'resolve the swap, so ordering the two on it is the failure mode CLAUDE.md names. ' +
+        'Discarded.',
     candidateRanking,
     controlRanking,
     swappedPair: [winner, displaced],

@@ -89,9 +89,8 @@ import type { WrinkleEffect } from '../wrinkles/types.js';
 export const MAX_ARRIVAL_RATE_PCT_POP_5MIN = 25;
 
 /* -------------------------------------------------------------------------- *
- * The five effects
+ * The wrinkle effects the library is built from
  * -------------------------------------------------------------------------- */
-
 
 /**
  * Every wrinkle in the library, keyed by id — **built from `data/wrinkles.json`**, not authored
@@ -156,10 +155,28 @@ export const SHIFT_EVENTS = Object.freeze(
  * derate comes from `data/wrinkles.json`'s `breakdown.effect.derate.fromFraction`. Two sources for
  * one fact: editing the JSON moved the run and left the caption where it was, and
  * `campaign/incidents.test.ts` asserted the constant against itself so nothing could catch it.
- * Deriving it makes the disagreement unrepresentable, which is the same move `effectOfWrinkle`
- * makes for `writes`.
+ * Deriving it makes the disagreement unrepresentable — but only because `wrinkles/parse.ts` refuses
+ * a `breakdown` without a derate. The first draft of this derivation ended `?? 0.3`, which put the
+ * literal back the moment the library stopped carrying the window, and review caught it. Same move
+ * `effectOfWrinkle` makes for `writes`, with the load-time check that makes it true.
  */
-export const BREAKDOWN_AT_FRACTION: number = SHIFT_EVENTS.breakdown.effect.derate?.fromFraction ?? 0.3;
+export const BREAKDOWN_AT_FRACTION: number = breakdownAtFraction();
+
+function breakdownAtFraction(): number {
+  const derate = SHIFT_EVENTS.breakdown.effect.derate;
+  /*
+   * Throws rather than defaulting. A `?? 0.3` here reinstated the second source of truth this
+   * constant was derived to remove — silently, and exactly when the library stopped agreeing with
+   * it — which review found one commit after the derivation landed. `wrinkles/parse.ts` refuses a
+   * `breakdown` with no derate at load, so this is unreachable; it is the assertion that says so.
+   */
+  if (derate === null) {
+    throw new Error(
+      'data/wrinkles.json: template breakdown declares no derate, so there is no fraction to read.',
+    );
+  }
+  return derate.fromFraction;
+}
 
 /**
  * A library effect, plus the `writes` list `EventEffect` carries.
@@ -198,10 +215,19 @@ function effectOfWrinkle(effect: WrinkleEffect): EventEffect {
  * a caller that will not crash a returning player's history.
  */
 export function eventById(id: string): ShiftEvent | undefined {
-  const direct = (SHIFT_EVENTS as Readonly<Record<string, ShiftEvent | undefined>>)[id];
-  if (direct !== undefined) return direct;
-  const templateId = id.split(':')[0] ?? '';
-  return (SHIFT_EVENTS as Readonly<Record<string, ShiftEvent | undefined>>)[templateId];
+  /*
+   * `Object.hasOwn` rather than a bare index. `SHIFT_EVENTS` is built with `Object.fromEntries`, so
+   * it carries `Object.prototype`: `SHIFT_EVENTS['constructor']` is the `Object` function and
+   * `['toString']` is a function, neither of them `undefined`. `persist/validate.ts` accepts a
+   * restored day's `eventId` on exactly this predicate, so without the guard a session could name
+   * `constructor` as its wrinkle and be admitted. The `isOneOf` this replaced used
+   * `Array.includes` and had no such hole; found in review.
+   */
+  const own = (key: string): ShiftEvent | undefined =>
+    Object.hasOwn(SHIFT_EVENTS, key)
+      ? (SHIFT_EVENTS as Readonly<Record<string, ShiftEvent>>)[key]
+      : undefined;
+  return own(id) ?? own(id.split(':')[0] ?? '');
 }
 
 /**

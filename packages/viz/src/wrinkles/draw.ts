@@ -33,8 +33,9 @@
  * A template is chosen by `day mod pool.length` over the pool for that day's kind, so two days draw
  * the same template only when they are `pool.length` apart. With 18 weekday templates and 5 weekend
  * ones that is a gap of 18 calendar days for a weekday and — because weekend days fall in pairs
- * seven apart — 15 for a weekend. Both clear fourteen, and `draw.test.ts` asserts it by walking
- * every 14-day window over every weekday phase rather than by trusting this paragraph.
+ * seven apart — 15 for a weekend. Both clear fourteen, and it is checked rather than trusted in two places:
+ * `library.ts#assertRotates` refuses a library that breaks it at load, and `wrinkles.test.ts`
+ * walks every 14-day window over every weekday phase.
  *
  * A hash would have been the obvious choice and cannot make that promise: hashing distributes, it
  * does not space, and two days five apart colliding is exactly what a rotation rule forbids.

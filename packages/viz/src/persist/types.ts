@@ -267,8 +267,27 @@ export const SESSION_KEY = 'elevator-sim.session';
  * `wasDisplayOf` answers the em dash for a quantity yesterday never measured. Nothing supplies a
  * stand-in energy figure for a day nobody graded one on, which matters more here than it did for the
  * worst wait: the bar is `at-most`, so a fabricated zero would read as a day that passed it.
+ *
+ * ## Version 9 moves for a widened *value* a third time — the wrinkle a finished day drew
+ *
+ * § 17's wrinkle library (GitHub issue **#159**) makes `DayOutcome.eventId` a **drawn** id over
+ * `data/wrinkles.json` rather than one of `shift/types.ts#SHIFT_EVENT_IDS`' closed seven. No key is
+ * added or removed: a history entry looks exactly as it did, and its `eventId` now reads
+ * `shaft-out:morning` where it once read one of seven literals.
+ *
+ * A version-8 build's `validate.ts` checks that field against **its** closed list, so a session
+ * written here and met by that build is refused as *damaged* — the same false accusation the
+ * version-3 paragraph records, and reachable without a rollback: a cached bundle or a second tab
+ * opened before the deploy is a version-8 reader. § D408 is explicit that the number moves *"whether
+ * the novelty is a key or a value"*, so this is its fifth application rather than a fifth rule.
+ *
+ * Reading versions 1–8 here invents nothing, on the same evidence as version 5's and 8's: a history
+ * whose days carry one of the seven closed ids is the measured state of a week played before the
+ * library was data, and every one of those seven is still a template in `data/wrinkles.json` — so an
+ * old day resolves through `shift/events.ts#eventById` exactly as a new one does, and no stand-in is
+ * supplied for anything.
  */
-export const SESSION_SCHEMA_VERSION = 8;
+export const SESSION_SCHEMA_VERSION = 9;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -279,7 +298,7 @@ export const SESSION_SCHEMA_VERSION = 8;
  * since the last deploy.
  */
 export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([
-  1, 2, 3, 4, 5, 6, 7, 8,
+  1, 2, 3, 4, 5, 6, 7, 8, 9,
 ]);
 
 /* -------------------------------------------------------------------------- *

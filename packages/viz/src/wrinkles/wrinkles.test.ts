@@ -43,7 +43,9 @@ const wellFormed = (): Record<string, unknown> => ({
         arrivalRateMultiplier: 1.2,
         directionalSplit: null,
         carsOutOfService: 0,
-        derate: null,
+        // `breakdown` must carry one: `shift/events.ts#BREAKDOWN_AT_FRACTION` reads its
+        // `fromFraction` and `campaign/incidents.ts` tells the player when the car returns.
+        derate: id === 'breakdown' ? { cars: 1, fromFraction: 0.3, toFraction: 1 } : null,
       },
       axes: [],
     })),
@@ -173,6 +175,14 @@ describe('the parser refuses a library it cannot trust', () => {
         },
       ];
     }, /carries labels the note never renders/);
+  });
+
+  it('breakdown declares no derate window', () => {
+    refuses((doc) => {
+      const templates = doc['templates'] as Record<string, unknown>[];
+      const breakdown = templates.find((template) => template['id'] === 'breakdown');
+      (breakdown as { effect: Record<string, unknown> }).effect['derate'] = null;
+    }, /template breakdown declares no derate window/);
   });
 
   it('the unexpressible list has been emptied', () => {
