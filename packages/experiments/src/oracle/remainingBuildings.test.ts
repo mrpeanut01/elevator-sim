@@ -37,7 +37,9 @@
  *
  * ## Chancery House is the one shipped bank the closed form describes with no caveat
  *
- * `analyzeUpPeak` raises no warning on it at all. Every other one of the shipped banks that reduces
+ * `analyzeUpPeak` raises no warning on it at all. `burj-class-reference`'s `local-zone1` and
+ * `local-zone2` raise none either — review measured all 23 shipped banks, and an earlier draft of
+ * this sentence claimed uniqueness it had not checked. Every other shipped bank
  * raises at least one — `expressZone`, `nonUniformFloorPopulations`, `saturatedStops`,
  * `heterogeneousGroup`, `implausibleHandlingCapacity`, or several. Nineteen floors, six identical
  * cars, one bank, uniform populations, uniform pitch, no zoning. That the cleanest case in the
@@ -70,8 +72,9 @@
  * costs nothing at all: its refusal is decided from the configuration before a single replication
  * runs.
  *
- * One further arm is **opt-in** under `ELEVATOR_SIM_DEEP=1` — the counterfactual that attributes
- * Crown Hotel's residual, which costs ~75 s on its own for the reason stated on {@link DEEP}. The
+ * One further arm attributes Crown Hotel's residual — the counterfactual described below. It was
+ * opt-in under `ELEVATOR_SIM_DEEP=1` until review found the cost that justified gating it did not
+ * reproduce; it costs 4.7 s and runs always-on. The
  * split follows `deepCampaign.test.ts`: the budget is moved rather than reduced, and skipping it
  * skips it visibly.
  */
@@ -119,17 +122,29 @@ const PEAK_WINDOW_S = 900;
  * `deepCampaign.test.ts` § "Why a split rather than a cap" is the rule this follows: a replication
  * budget quietly reduced to fit a CI window is a weakened criterion that still gets published, so
  * the budget is **moved rather than reduced**. This arm runs at the same 64 replications on the same
- * seeds as everything else in this file, under `ELEVATOR_SIM_DEEP=1`.
+ * seeds as everything else in this file.
  *
  * ```sh
- * ELEVATOR_SIM_DEEP=1 npx vitest run --project experiments src/oracle/remainingBuildings.test.ts
+ * npx vitest run --project experiments src/oracle/remainingBuildings.test.ts
  * ```
  *
- * **What it costs, and why that is not obvious.** The uniform bank is five 3.0 m/s cars rather than
- * four plus a 1.75 m/s service car, so its closed-form handling capacity is higher, it is offered
- * `OVERLOAD_FACTOR ×` that higher figure, and it carries proportionally more passengers under a
- * demand that saturates by construction. Measured on this machine: **~75 s against ~8 s for the
- * shipped arm at the same `n`** — an order of magnitude, on a change of one car's specification.
+ * **It was gated behind `ELEVATOR_SIM_DEEP=1` on a cost that does not exist, and is not any more.**
+ * The gate's stated reason was that the uniform bank carries proportionally more demand and so
+ * costs *"~75 s against ~8 s for the shipped arm — an order of magnitude"*. Review re-measured it
+ * and neither figure reproduces: the two arms cost **5.20 s and 5.26 s**, a ratio of **1.01**, and
+ * the whole file goes **13.70 s → 18.41 s** with the arm switched on. The demand does move, by
+ * **+2.3 %** (16.605 → 16.994 %POP/5 min), which is not an order of magnitude and was never going
+ * to be one.
+ *
+ * That mattered rather than being untidy: this arm is the **only** evidence licensing this file's
+ * central claim about Crown Hotel, and it was being excluded from every pull-request run on the
+ * strength of a number nobody had re-derived. Four and a half seconds does not buy that. It runs
+ * always-on now.
+ *
+ * The `oracle-campaign` job still names this file with `ELEVATOR_SIM_DEEP=1` set. That step is now
+ * redundant rather than wrong — it re-runs a file that no longer reads the variable — and
+ * `.github/workflows/**` is a protected path this branch may not edit, so it is recorded here for
+ * whoever can.
  *
  * **A smaller `n` was tried and rejected on evidence rather than on taste.** At 4 replications the
  * control's own assertion fails, so the read-out is not settled there; it is not a boolean that can
@@ -141,7 +156,6 @@ const PEAK_WINDOW_S = 900;
  * limit that closes `st-jude-hospital` below. A big slow car is exactly the shape that defeats the
  * reconstruction, which is why the counterfactual is the fast one.
  */
-const DEEP = process.env['ELEVATOR_SIM_DEEP'] === '1';
 
 /**
  * The five ids `fiveBuildings.test.ts` reconciles.
@@ -211,8 +225,8 @@ function crownHotelWithAUniformBank(loaded: LoadedConfig): ResolvedBuilding {
   // The **fastest** car, chosen by measurement rather than by position. Taking `cars[0]` would give
   // the same answer today and silently give the opposite one if the file were ever reordered — and
   // the opposite one does not exist: a bank of five 1.75 m/s / 4 000 lb cars is refused by
-  // `departureGapBracket` before it can be reconciled, which is the measurement recorded on
-  // {@link DEEP}.
+  // `departureGapBracket` before it can be reconciled, which is the measurement recorded in this
+  // file's header.
   const reference = [...bank.cars].sort(
     (a, b) => Number(b['ratedSpeedMps'] ?? 0) - Number(a['ratedSpeedMps'] ?? 0),
   )[0];
@@ -268,7 +282,6 @@ beforeAll(async () => {
   }
 
   // The counterfactual arm: same seeds, same window, same everything but the car specifications.
-  if (!DEEP) return;
   const uniformConfig = configWith(config, crownHotelWithAUniformBank(config));
   const uniform = measureUpPeak({
     config: uniformConfig,
@@ -513,10 +526,9 @@ describe('Crown Hotel is refused, and the refusal is a run rather than a sentenc
     //
     // **That the cause is the averaging is measured and not argued, and the measurement is the
     // counterfactual below** — three warnings fire on this bank, so picking one of them by
-    // reasoning would be the stated-mechanism defect `CLAUDE.md` records. The control runs under
-    // `ELEVATOR_SIM_DEEP=1` for the cost stated on `DEEP`, and what it finds is that giving the one
-    // unlike car its neighbours' specification takes this term from 4.50 s to 0.021 s with the
-    // other two warnings untouched.
+    // reasoning would be the stated-mechanism defect `CLAUDE.md` records. What that control finds
+    // is that giving the one unlike car its neighbours' specification takes this term from 4.50 s
+    // to 0.021 s with the other two warnings untouched.
     const r = reconciliationOf('crown-hotel');
     const uncitedS = r.terms
       .filter((term) => term.assumptionIds.length === 0)
@@ -532,7 +544,7 @@ describe('Crown Hotel is refused, and the refusal is a run rather than a sentenc
     ).toBeLessThan(0.02);
   });
 
-  it.skipIf(!DEEP)('reconciles once the bank is made uniform, which is what attributes the residual', () => {
+  it('reconciles once the bank is made uniform, which is what attributes the residual', () => {
     // **The controlled arm, and the reason the mechanism above may be stated at all.** Three
     // warnings fire on this bank, so naming one of them as the cause by argument would be the
     // stated-mechanism defect. This changes exactly one of the three — car `S` gets `A`'s

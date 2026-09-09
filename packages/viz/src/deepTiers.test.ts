@@ -187,19 +187,22 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
     reason: "CLAUDE.md's correctness oracle at full width — every measurable bank",
     scheduled: true,
   },
-  'packages/experiments/src/oracle/remainingBuildings.test.ts': {
-    gates: ['ELEVATOR_SIM_DEEP'],
-    reason:
-      'the first entry here that is a **partly** gated file, and the distinction is worth the ' +
-      'sentence: its checks on the three buildings the five-building table does not reach are ' +
-      'always-on, and one counterfactual arm is not — Crown Hotel with its single unlike car made ' +
-      'like the others, which is what attributes that building’s refusal to the heterogeneity ' +
-      'rather than to either of the other two warnings its bank raises. The uniform bank carries ' +
-      'proportionally more demand, so the arm costs ~75 s against ~8 s for the shipped one. It ' +
-      'rides the `oracle-campaign` job as a second step rather than a job of its own, being the ' +
-      'same apparatus at the same seeds as the campaign beside it — GitHub issue #232',
-    scheduled: true,
-  },
+  /*
+   * `packages/experiments/src/oracle/remainingBuildings.test.ts` was registered here as a partly
+   * gated file and is **not gated any more** — GitHub issue #232, corrected in review.
+   *
+   * Its counterfactual arm sat behind `ELEVATOR_SIM_DEEP=1` on a stated cost of *"~75 s against
+   * ~8 s for the shipped arm"*. Re-measured, the two arms cost 5.20 s and 5.26 s and the whole
+   * file goes 13.70 s → 18.41 s with the arm on. That arm is the only evidence licensing the
+   * file's central claim about Crown Hotel, so four and a half seconds was a bad trade and it
+   * runs always-on.
+   *
+   * **The `oracle-campaign` job still names the file with `ELEVATOR_SIM_DEEP=1` set.** That step
+   * is redundant rather than wrong — it re-runs a file that no longer reads the variable — and
+   * `.github/workflows/**` is a protected path, so removing it is owed to whoever can edit one.
+   * This comment is here rather than an entry because the register is of *gated* tiers, and a
+   * file that reads no gate is not one.
+   */
   'packages/experiments/src/validation/goldenRuns.test.ts': {
     gates: ['ELEVATOR_SIM_DEEP'],
     reason:

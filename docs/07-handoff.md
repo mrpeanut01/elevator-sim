@@ -672,7 +672,7 @@ answer rather than three more rows:
 
 | building | verdict | measured |
 |---|---|---|
-| `chancery-house` | **RECONCILED** — a sixth, on this table's own apparatus, seeds and n = 64 | raw +49.297 %, residual **+0.074 %**, and `analyzeUpPeak` raises **no warning at all** on it — the only shipped bank of which that is true |
+| `chancery-house` | **RECONCILED** — a sixth, on this table's own apparatus, seeds and n = 64 | raw +49.297 %, residual **+0.074 %**, and `analyzeUpPeak` raises **no warning at all** on it, which is true of three shipped banks — this one and `burj-class-reference`'s `local-zone1` and `local-zone2` |
 | `crown-hotel` | **REFUSED, by a run** | the apparatus is carried to the end rather than declined: raw +36.513 %, residual **+7.592 %** against the 4 % band, `explained: false` |
 | `st-jude-hospital` | **REFUSED TWICE, for free** | `heterogeneousGroup`, and a longest door reopen of 53.20 s against a shortest round trip of 29.56 s — no simulation runs |
 
@@ -690,10 +690,20 @@ traffic profile and seeds fixed, and the uncited per-stop term falls from **4.50
 `explained` flipping to true. That arm costs ~75 s on its own and is opt-in under
 `ELEVATOR_SIM_DEEP=1`, on `deepCampaign.test.ts`'s rule that a budget is moved rather than reduced.
 
-**One is still owed.** `burj-class-reference` is coverable — all six of its banks are internally
-uniform — and its closed-form measurement is GitHub issue #376's third criterion, left there rather
-than absorbed. Four of its six banks reduce today; `shuttle` and `observation` throw on a zero
-served population.
+**One is still owed, and it is harder than an earlier draft of this paragraph said.**
+`burj-class-reference`'s closed-form measurement is GitHub issue #376's third criterion, left there
+rather than absorbed.
+
+That draft read *"coverable — all six of its banks are internally uniform … four of its six banks
+reduce today"*. Measured, **all six refuse**: `shuttle` and `observation` throw on a zero served
+population, and `local-lower`, `local-zone1`, `local-zone2` and `local-zone3` all throw
+`departureGapBracket` — *the longest door reopen (37.00 s) is not shorter than the shortest round
+trip (32.83 s / 29.68 s)*. That is the same ground on which `st-jude-hospital` is REFUSED two rows
+above, and the same error this table lists elsewhere as *cannot be measured this way at all*.
+
+Internal uniformity was the wrong test to infer coverability from: `st-jude-hospital` shows the
+bracket refusal is independent of heterogeneity. Whoever picks up #376's third criterion should
+expect to change the apparatus or the building, not to run a measurement that is waiting.
 
 ### Determinism
 
