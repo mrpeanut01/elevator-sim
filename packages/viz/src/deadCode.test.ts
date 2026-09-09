@@ -232,7 +232,11 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    */
   /*
    * -- § 17's content gate (GitHub issue #159). `gateWrinkle` is reached by `gateLibrary`, and
-   * `gateLibrary`'s driver is `wrinkles/gate.test.ts`. This is the honesty harness's shape exactly:
+   * `gateLibrary`'s driver is `wrinkles/gate.test.ts`, which **calls it** — the sweep case drives
+   * `gateLibrary` rather than mapping `gateWrinkle` itself, and that is the correction rather than
+   * the design: the first draft of this entry said the same sentence while the test re-implemented
+   * the loop, so the export had no caller at all and this allowlist was excusing a claim that was
+   * not true. Review caught it. This is the honesty harness's shape exactly:
    * an offline instrument whose only consumer is the suite that runs it, recorded as the named
    * exemption it is rather than wired to a screen it has no business on. § 17 calls the gate
    * *offline* in terms — it runs the baseline dispatchers over a candidate day, which is a study

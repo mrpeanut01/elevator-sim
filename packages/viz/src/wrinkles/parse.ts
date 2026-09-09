@@ -66,8 +66,15 @@ export const REQUIRED_TEMPLATE_IDS: readonly string[] = Object.freeze([
   'breakdown',
   /* `campaign/calendar.ts` books it, and `campaign/incidents.ts` returns the booking. */
   'coach-party',
-  /* `shift/calendar.ts`'s periods book these three by id. */
+  /* `shift/calendar.ts`'s `moving-week` period books it by id. */
   'move-in',
+  /*
+   * Named as literals by `shift/types.ts#SHIFT_EVENT_IDS`, which types every calendar booking and
+   * every `SHIFT_EVENTS` lookup by hand. Neither is booked by a shipped period today — this list
+   * said all three were, which was a claim a reader could have checked and would have found false.
+   * They stay required because the union still names them and a library without them would make
+   * `SHIFT_EVENTS[id]`'s type a lie.
+   */
   'fire-drill',
   'conference',
 ]);

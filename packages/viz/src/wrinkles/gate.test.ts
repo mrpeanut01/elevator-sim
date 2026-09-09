@@ -19,7 +19,7 @@ import { MIN_REPLICATION_BUDGET } from '../batch/report.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { baseDemandOf } from '../shift/events.js';
 import { everyWrinkle } from './draw.js';
-import { WrinkleGateError, gateWrinkle, type WrinkleGateInput } from './gate.js';
+import { WrinkleGateError, gateLibrary, gateWrinkle, type WrinkleGateInput } from './gate.js';
 import { WRINKLE_LIBRARY } from './library.js';
 
 /** Garden Apartments: the cheapest shipped building, so the whole library fits in one case. */
@@ -107,6 +107,36 @@ describe('the gate reads a day the way § 17 asks', () => {
   });
 });
 
+describe('a day the gate could not read is not a day it discarded', () => {
+  it('says it was not judged, rather than calling an unmeasured day cosmetic', () => {
+    /*
+     * `midtown-office` at 900 s saturates under every shipped dispatcher: **no** arm quotes a mean
+     * on **any** replication (§ D158 measured 0 of 50 there). Before this branch existed the gate
+     * ranked three `NaN` means, `Array.prototype.sort` left them in declaration order on both days,
+     * the orders matched, and the verdict read *"leaves the ranking exactly as the control day had
+     * it (eta < collective < nearest-car), so it is cosmetic — § 17"*. § 17's instruction for a
+     * cosmetic day is **discard it**, so that sentence would have had a content author delete days
+     * on the strength of a ranking that was the order the arms were declared in.
+     *
+     * The case is here rather than as a note because the sweep above runs on the one building where
+     * every arm quotes, so nothing else in this file enters the branch.
+     */
+    const building = requireBuilding(config, 'midtown-office');
+    const profile = config.trafficProfilesById.get(building.trafficProfile);
+    if (profile === undefined) throw new Error('no traffic profile');
+    const verdict = gateWrinkle({
+      ...inputFor('ordinary'),
+      buildingId: 'midtown-office',
+      building,
+      base: baseDemandOf(profile),
+    });
+    expect(verdict.judged, verdict.reason).toBe(false);
+    expect(verdict.earnsItsPlace).toBe(false);
+    expect(verdict.reason).toMatch(/was not judged/);
+    expect(verdict.reason).not.toMatch(/cosmetic/);
+  }, 120_000);
+});
+
 describe('the gate discriminates — the case this file exists for', () => {
   it('keeps some of the shipped library and discards the rest, over a real building', () => {
     /*
@@ -119,7 +149,16 @@ describe('the gate discriminates — the case this file exists for', () => {
      * and pinning it would turn a content edit into a test failure that says nothing about the
      * gate. What is pinned is that the instrument separates.
      */
-    const verdicts = everyWrinkle(WRINKLE_LIBRARY).map((wrinkle) => gateWrinkle(inputFor(wrinkle.id)));
+    /*
+     * Through `gateLibrary`, which is the sweep, rather than re-implementing its loop here. This
+     * case mapped `everyWrinkle` over `gateWrinkle` in its first draft, which left `gateLibrary`
+     * with no caller anywhere while two docstrings said this file drove it — the defect
+     * `draw.ts` records catching on `pairIsRotated`, committed in the same directory. Review
+     * caught it; `deadCode.test.ts` could not, because a `PUBLIC_API_ONLY` entry had already
+     * excused it.
+     */
+    const { wrinkle: _ignored, ...sweep } = inputFor('ordinary');
+    const verdicts = gateLibrary(WRINKLE_LIBRARY, sweep);
     const kept = verdicts.filter((verdict) => verdict.earnsItsPlace);
     const discarded = verdicts.filter((verdict) => !verdict.earnsItsPlace);
     const rows = verdicts
@@ -140,6 +179,12 @@ describe('the gate discriminates — the case this file exists for', () => {
       expect(verdict.swappedPair, verdict.wrinkleId).not.toBeNull();
       expect(verdict.estimate, verdict.wrinkleId).not.toBeNull();
       expect(verdict.reason, verdict.wrinkleId).toMatch(/excludes zero/);
+    }
+
+    // Garden Apartments quotes on every arm, so every verdict here is a finding about its day
+    // rather than a day the gate could not read. The unjudged branch has its own case below.
+    for (const verdict of verdicts) {
+      expect(verdict.judged, `${verdict.wrinkleId}: ${verdict.reason}`).toBe(true);
     }
   }, 120_000);
 });

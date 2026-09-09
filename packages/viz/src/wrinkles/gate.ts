@@ -29,10 +29,20 @@
  *    time* — so the pair whose order changed is put through a **paired-t interval on the candidate
  *    day**, and the day is kept only if that interval excludes zero.
  *
- * The second clause is the one that makes this a gate rather than a sort. A ranking computed from
- * two means will differ on almost every day if the means are close enough, and keeping a day on
- * that basis would fill the library with wrinkles that shuffle nothing a player could perceive and
- * nothing this project would be allowed to report.
+ * The second clause is what stops this being a sort. A ranking computed from two means will differ
+ * on almost every day if the means are close enough, and keeping a day on that basis would fill the
+ * library with wrinkles that shuffle nothing a player could perceive and nothing this project would
+ * be allowed to report.
+ *
+ * **What clause 2 measures, precisely, and what it does not.** The interval is taken on the
+ * *candidate* day alone: it answers *are these two arms separable on this day*, not *is the
+ * difference between the two days' orderings larger than noise*. A pair that is within noise on the
+ * control day and separable on the candidate day is therefore kept, although some of the "swap" may
+ * be control-day noise. The instrument for the stronger question is a difference-of-differences —
+ * `benchmark/published.ts` publishes one under `difference-of-differences/absolute`
+ * ([§ D280](../../../../DECISIONS.md)) — and it is **not** used here. The claim this gate makes is
+ * the weaker one, said in the weaker words, because an overstated mechanism is the defect
+ * `docs/05-roadmap.md`'s standing requirement records seven sites of.
  *
  * **`ttdMeanS` is not used and AWT is**, although the learned-control work reaches for TTD: a
  * ranking here is *which dispatcher wins*, and every shipped surface that orders dispatchers orders
@@ -54,7 +64,7 @@ import type { ResolvedBuilding, SimulationDemandOptions } from '@elevator-sim/co
 import { MIN_REPLICATION_BUDGET } from '../batch/report.js';
 import { runBatch } from '../batch/runBatch.js';
 import type { BatchArmResult, BatchRequest, BatchResources, BatchResult } from '../batch/types.js';
-import { baseDemandOf, shiftRunPatch } from '../shift/events.js';
+import { shiftRunPatch } from '../shift/events.js';
 import { serviceEventsFor } from '../shift/incidents.js';
 import type { ShiftDemandBase } from '../shift/events.js';
 import type { ShiftEvent } from '../shift/types.js';
@@ -74,6 +84,24 @@ export interface WrinkleGateVerdict {
   readonly wrinkleId: string;
   /** `true` only when the ranking moved **and** the move is resolvable. */
   readonly earnsItsPlace: boolean;
+  /**
+   * Whether the gate was able to read the two days at all.
+   *
+   * `false` means **not judged**, which is a different fact from *judged and discarded* and the
+   * distinction is load-bearing: § 17 says to *discard* a cosmetic day, so a content author acting
+   * on `earnsItsPlace: false` would delete a day the gate never measured. Both are `false` on
+   * `earnsItsPlace`; only one of them is a finding about the day.
+   *
+   * It went in because the gate got this wrong. With no quotable replication every arm's mean is
+   * `NaN`, `Array.prototype.sort`'s comparator returns `NaN`, the spec treats that as `+0` and the
+   * input order survives on **both** days — so the rankings matched, and the verdict read
+   * *"leaves the ranking exactly as the control day had it (eta < collective < nearest-car), so it
+   * is cosmetic"*, quoting the arms' declaration order as though it were a measurement. Reproduced
+   * at `midtown-office` / 900 s, where all three arms are unquotable and every day read cosmetic.
+   * That is CLAUDE.md's saturation rule inverted: *"if a configuration saturates, flag it and
+   * suppress the AWT interval"*.
+   */
+  readonly judged: boolean;
   /** The reader's sentence. Says which clause failed when one did. */
   readonly reason: string;
   readonly candidateRanking: readonly WrinkleArmStanding[];
@@ -116,6 +144,13 @@ function awtSamples(arm: BatchArmResult): readonly (number | null)[] {
   return arm.replications.map((replication) =>
     replication.awtIsValid ? replication.metrics.awtS : null,
   );
+}
+
+/** Arms with too few quotable replications to stand behind a mean, on either day. */
+function unquotableArms(result: BatchResult): readonly string[] {
+  return result.arms
+    .filter((arm) => awtSamples(arm).filter((value) => value !== null).length < 2)
+    .map((arm) => arm.armId);
 }
 
 function rankingOf(result: BatchResult): readonly WrinkleArmStanding[] {
@@ -250,6 +285,28 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
   const candidateRanking = rankingOf(candidate);
   const controlRanking = rankingOf(control);
 
+  /*
+   * Refuse before ranking, not after. A mean over no quotable replication is `NaN`, and ranking on
+   * `NaN` does not fail — it silently returns the order the arms were declared in.
+   */
+  const unquotable = [...new Set([...unquotableArms(candidate), ...unquotableArms(control)])];
+  if (unquotable.length > 0) {
+    return {
+      wrinkleId: input.wrinkle.id,
+      earnsItsPlace: false,
+      judged: false,
+      reason:
+        `${input.wrinkle.id} was not judged: ${unquotable.join(', ')} quoted a mean on fewer than ` +
+        'two replications, so there is no ranking to compare and no paired interval to take. ' +
+        'Nothing here is a finding about the day itself — the gate could not read it. Run it on a ' +
+        'building and horizon where the arms quote before drawing any conclusion about this day.',
+      candidateRanking,
+      controlRanking,
+      swappedPair: null,
+      estimate: null,
+    };
+  }
+
   const candidateOrder = candidateRanking.map((standing) => standing.armId);
   const controlOrder = controlRanking.map((standing) => standing.armId);
   const same = candidateOrder.every((armId, index) => armId === controlOrder[index]);
@@ -258,6 +315,7 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
     return {
       wrinkleId: input.wrinkle.id,
       earnsItsPlace: false,
+      judged: true,
       reason:
         `${input.wrinkle.id} leaves the ranking exactly as the control day had it ` +
         `(${controlOrder.join(' < ')}), so it is cosmetic — § 17.`,
@@ -282,6 +340,7 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
     return {
       wrinkleId: input.wrinkle.id,
       earnsItsPlace: false,
+      judged: true,
       reason:
         `${input.wrinkle.id} moved ${displaced} out of place for ${winner}, and too few ` +
         'replications quoted a mean on both arms for a paired interval to be taken — so whether ' +
@@ -297,6 +356,7 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
   return {
     wrinkleId: input.wrinkle.id,
     earnsItsPlace: resolvable,
+    judged: true,
     reason: resolvable
       ? `${input.wrinkle.id} puts ${winner} ahead of ${displaced}, which the control day had the ` +
         `other way, and the paired interval on that pair excludes zero — it earns its place.`
@@ -325,5 +385,3 @@ export function gateLibrary(
 ): readonly WrinkleGateVerdict[] {
   return everyWrinkle(library).map((wrinkle) => gateWrinkle({ ...input, wrinkle }));
 }
-
-export { baseDemandOf };

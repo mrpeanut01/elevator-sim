@@ -298,18 +298,17 @@ describe('the instrument reproduces the builder it stands in for', () => {
 
   it('measures a day whose own scheduled event changes nothing', () => {
     /*
-     * Derived rather than assumed, and **searched** rather than pinned — GitHub issue #159. This
-     * asserted `eventFor(1, 0)` when the rota was five `if`s over `day % 5` and day 1 was an
-     * ordinary Monday. § 17's rotation draw moved it: day 1 now draws `move-in`, and a test that
-     * had hard-coded the day would have failed for the right reason and told the reader the wrong
-     * one. What the surrounding suite actually needs is *some* weekday whose own wrinkle changes
-     * nothing, so that a period's result is the period's; so it looks for one, and fails saying
-     * that none exists if the library ever stops carrying an `ordinary`-shaped day.
+     * Day 1, and **still day 1** — GitHub issue #159. This was briefly rewritten to search days
+     * 1–28 for any quiet weekday, on the premise that § 17's rotation draw had moved `ordinary` off
+     * day 1. It had not: `wrinkles/draw.ts` indexes on `day - 1` precisely so that day 1 draws the
+     * one wrinkle that changes nothing, which is § 20.13, and `wrinkles.test.ts` pins it as the
+     * first entry of the four-week schedule. The search version passed while checking something
+     * weaker than what this block needs — every case around it uses `monday()`, which *is* day 1 —
+     * so the precondition that matters had quietly stopped being guarded.
      */
-    const quiet = Array.from({ length: 28 }, (_, i) => i + 1).find(
-      (day) => eventFor(day, 0).effect.changesNothing,
+    expect(eventFor(1, 0).effect.changesNothing, 'day 1 must be a day a period can be measured against').toBe(
+      true,
     );
-    expect(quiet, 'no weekday inside a month draws a wrinkle that changes nothing').toBeDefined();
   });
 });
 

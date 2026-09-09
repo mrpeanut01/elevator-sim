@@ -25,7 +25,12 @@
  * mix genuinely swung, a rate genuinely raised. That is the assertion a caption cannot pass, and it
  * is the most important test in this directory.
  *
- * ## The five, and what each one writes
+ * ## What each wrinkle writes
+ *
+ * **Twenty-five rows now, and the table below is the seven the code still names.** § 17's library
+ * lives in `data/wrinkles.json` since GitHub issue #159, so this is no longer the list of what a
+ * day can be — it is the list `SHIFT_EVENT_IDS` types, which is the calendar's bookings and the
+ * campaign's two draws. `wrinkles/` owns the rest.
  *
  * | event | effect | engine field |
  * |---|---|---|
@@ -53,7 +58,7 @@
  * A car that never returns is a smaller building for a day; a car that rejoins two thirds of the way
  * through is a group that has to absorb a loss and then re-balance around the return.
  *
- * `carsOutOfService` remains, is `0` on all five events, and is **not** dead: it is the right
+ * `carsOutOfService` remains, is `0` on every row of the library, and is **not** dead: it is the right
  * instrument for *"this car is not in the building today"*, `shiftRunPatch` still maps it, and
  * `events.test.ts` still drives it. An event that wants a whole-shift hold declares one.
  */
@@ -87,66 +92,6 @@ export const MAX_ARRIVAL_RATE_PCT_POP_5MIN = 25;
  * The five effects
  * -------------------------------------------------------------------------- */
 
-/**
- * The mix during a drill: almost everybody heading for the lobby.
- *
- * Not `0/1/0`. A drill empties the building, but the shares are normalised by `normalizeSplit`
- * anyway and a pure-outgoing trace would remove interfloor and incoming demand entirely, which is
- * a *different experiment* rather than a busier one — the closed-form oracle's pure up-peak in
- * mirror image. A tenth each keeps the building recognisable.
- */
-const DRILL_SPLIT: DirectionalSplit = Object.freeze({
-  incoming: 0.1,
-  outgoing: 0.8,
-  interfloor: 0.1,
-});
-
-/**
- * The mix during a conference: half the demand is floor-to-floor.
- *
- * The design's note is the reason this is a distinct event rather than "more traffic": *"Interfloor
- * traffic all afternoon, which no up-peak strategy is tuned for."* Raising the *level* would not
- * test that; raising the *interfloor share* does, and CLAUDE.md's tuning discipline says the same
- * thing from the other side — *"the optimum for up-peak is not the optimum for down-peak"*.
- */
-const CONFERENCE_SPLIT: DirectionalSplit = Object.freeze({
-  incoming: 0.25,
-  outgoing: 0.25,
-  interfloor: 0.5,
-});
-
-/**
- * The mix while a coach party unloads: the lobby fills with people going up.
- *
- * The up-peak's own shape — `data/traffic-profiles.json` authors the office morning at roughly this
- * incoming share — so the coach party is *the morning rush arriving at a hotel* rather than a mix
- * this file made up. Not `1.0` incoming, because the guests already upstairs do not stop moving.
- */
-const COACH_SPLIT: DirectionalSplit = Object.freeze({
-  incoming: 0.8,
-  outgoing: 0.1,
-  interfloor: 0.1,
-});
-
-/**
- * Where in the run the red-tagged car goes, as a fraction of its length — *"this morning"*.
- *
- * Three tenths rather than the start, so the player sees the building whole before it loses a car
- * and the loss is a thing that happens on the stage rather than a fact about the day's fabric. A
- * fraction for `EventEffect.derate`'s own reason: a shift is 15 to 120 minutes and a clock time
- * would name an hour most shifts do not contain.
- */
-export const BREAKDOWN_AT_FRACTION = 0.3;
-
-/** No effect, said out loud. See {@link EventEffect.changesNothing}. */
-const NO_EFFECT: EventEffect = Object.freeze({
-  changesNothing: true,
-  arrivalRateMultiplier: null,
-  directionalSplit: null,
-  carsOutOfService: 0,
-  derate: null,
-  writes: Object.freeze([]),
-});
 
 /**
  * Every wrinkle in the library, keyed by id — **built from `data/wrinkles.json`**, not authored
@@ -202,6 +147,19 @@ export const SHIFT_EVENTS = Object.freeze(
     ]),
   ),
 ) as Readonly<Record<ShiftEventId, ShiftEvent>>;
+
+/**
+ * When a campaign breakdown takes its car, as a fraction of the run.
+ *
+ * **Read off the library rather than restated — GitHub issue #159.** It was the literal `0.3`, and
+ * `campaign/incidents.ts` computes the dock's *"back at"* caption from it while the run's actual
+ * derate comes from `data/wrinkles.json`'s `breakdown.effect.derate.fromFraction`. Two sources for
+ * one fact: editing the JSON moved the run and left the caption where it was, and
+ * `campaign/incidents.test.ts` asserted the constant against itself so nothing could catch it.
+ * Deriving it makes the disagreement unrepresentable, which is the same move `effectOfWrinkle`
+ * makes for `writes`.
+ */
+export const BREAKDOWN_AT_FRACTION: number = SHIFT_EVENTS.breakdown.effect.derate?.fromFraction ?? 0.3;
 
 /**
  * A library effect, plus the `writes` list `EventEffect` carries.

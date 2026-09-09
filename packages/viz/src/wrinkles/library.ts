@@ -21,7 +21,7 @@
  *
  * The cost is stated rather than hidden: this is the **only** JSON import in the repository, so it
  * is a convention of one, and `data/wrinkles.json` is consequently in the bundle whether or not a
- * screen draws a wrinkle. It is about nine kilobytes.
+ * screen draws a wrinkle. It is about nineteen kilobytes, twelve minified.
  *
  * ## No `DECISIONS.md` number, and why not
  *
@@ -51,6 +51,7 @@ import type { WrinkleLibrary } from './types.js';
  */
 /**
  * How far ahead the rotation is checked at load. Four weeks of every weekday phase.
+ *
  *
  * The window slides, so a horizon of `n` checks every 14-day window that starts inside it. Twenty-eight
  * is two full cycles of the shorter (weekend) pool, which is where a too-small pool shows up first.

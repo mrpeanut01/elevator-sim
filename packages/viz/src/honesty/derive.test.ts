@@ -49,14 +49,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'document broke ("two templates share an id", "the pool for that kind of day is too ' +
         'small"), or a gate verdict naming the pair whose order moved. None of them reaches a ' +
         'player. The words a player reads about a wrinkle are its `name` and its composed `note`, ' +
-        'and those are seeded — every concrete one, not only every template — by the EVENT ' +
-        'adapter through `everyWrinkle`. `pricing/parse.ts`’s exclusion below is the same ' +
+        'and those are seeded — every concrete one, not only every template — by the ' +
+        '`SHIFT_REPORT` adapter through `everyWrinkle`. `pricing/parse.ts`’s exclusion below is the same ' +
         'argument for the same reason. `eventById` is here for the narrower one: it resolves a ' +
         'stored id to a wrinkle and returns it, and the only prose the classifier finds in it is ' +
         'the `writes` field names `effectOfWrinkle` derives — `demand.arrivalRatePctPop5min` is a ' +
         'config path, and the tooltip that draws `writes` is seeded through `SHIFT_EVENTS`. ' +
         '`REQUIRED_TEMPLATE_IDS` is a list of ids with a comment per entry naming the caller that ' +
-        'reaches it; the ids are `data/` keys and the comments are addressed to a reviewer.',
+        'reaches it; the ids are `data/` keys and the comments are addressed to a reviewer. ' +
+        '`BREAKDOWN_AT_FRACTION` is a number the classifier reaches only because it now reads its ' +
+        'value off `SHIFT_EVENTS` rather than restating it, which is the fix for a second source ' +
+        'of truth, not a new string.',
       ids: [
         'wrinkles/parse.ts#parseWrinkleLibrary',
         'wrinkles/parse.ts#REQUIRED_TEMPLATE_IDS',
@@ -64,6 +67,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'wrinkles/gate.ts#gateWrinkle',
         'wrinkles/gate.ts#gateLibrary',
         'shift/events.ts#eventById',
+        'shift/events.ts#BREAKDOWN_AT_FRACTION',
       ],
     },
     {
