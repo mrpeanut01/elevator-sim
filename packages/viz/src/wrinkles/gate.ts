@@ -189,12 +189,20 @@ function awtSamples(arm: BatchArmResult): readonly (number | null)[] {
  * Not *"too few to average"* — `batch/report.ts`'s R1 is that a single dropped pair suppresses the
  * row, because the pairs that drop are the ones the arms differ most on. See the module docstring.
  */
-function shortArms(result: BatchResult): readonly string[] {
+function shortArms(result: BatchResult, requested: number, day: string): readonly string[] {
   const out: string[] = [];
   for (const arm of result.arms) {
-    const samples = awtSamples(arm);
-    const quotable = samples.filter((value) => value !== null).length;
-    if (quotable < samples.length) out.push(`${arm.armId} ${String(quotable)}/${String(samples.length)}`);
+    const quotable = awtSamples(arm).filter((value) => value !== null).length;
+    /*
+     * Against `requested`, not against the arm's own recorded length. Those agree today — `runBatch`
+     * gives every arm exactly `request.replications` entries and `armConfigOf` throws rather than
+     * skipping — but an arm that recorded nothing would read `0 < 0` and pass a guard whose whole
+     * job is to stop a `NaN` reaching the ranking. The count the caller asked for is the one the
+     * rule is about.
+     */
+    if (quotable < requested) {
+      out.push(`${arm.armId} ${String(quotable)}/${String(requested)} on the ${day} day`);
+    }
   }
   return out;
 }
@@ -340,7 +348,10 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
    * Refuse before ranking, not after. A mean over no quotable replication is `NaN`, and ranking on
    * `NaN` does not fail — it silently returns the order the arms were declared in.
    */
-  const short = [...new Set([...shortArms(candidate), ...shortArms(control)])];
+  const short = [
+    ...shortArms(candidate, input.replications, 'candidate'),
+    ...shortArms(control, input.replications, 'control'),
+  ];
   if (short.length > 0) {
     return {
       wrinkleId: input.wrinkle.id,
@@ -393,11 +404,19 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
     return {
       wrinkleId: input.wrinkle.id,
       earnsItsPlace: false,
-      judged: true,
+      /*
+       * **Not judged**, and this used to say `judged: true`, which was the flag lying in the one
+       * branch it was invented for. Reaching here means no paired interval could be taken at all,
+       * which is the same state as an arm that never quoted: the day is unmeasured, not discarded,
+       * and § 17's instruction for a discarded day is to delete it. Unreachable while
+       * {@link shortArms} holds — it guarantees a complete pairing — and it is the floor for when
+       * that stops being true, so it must be right rather than merely consistent.
+       */
+      judged: false,
       reason:
-        `${input.wrinkle.id} moved ${displaced} out of place for ${winner}, and too few ` +
-        'replications quoted a mean on both arms for a paired interval to be taken — so whether ' +
-        'the move is real is unmeasured, and an unmeasured move is not a kept day.',
+        `${input.wrinkle.id} was not judged: it moved ${displaced} out of place for ${winner}, ` +
+        `but of ${String(input.replications)} replications too few quoted a mean on both arms for ` +
+        'a paired interval to be taken, so whether the move is real is unmeasured.',
       candidateRanking,
       controlRanking,
       swappedPair: [winner, displaced],

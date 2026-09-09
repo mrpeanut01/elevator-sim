@@ -125,8 +125,10 @@ describe('a day the gate could not read is not a day it discarded', () => {
      * cosmetic day is **discard it**, so that sentence would have had a content author delete days
      * on the strength of a ranking that was the order the arms were declared in.
      *
-     * The case is here rather than as a note because the sweep above runs on the one building where
-     * every arm quotes, so nothing else in this file enters the branch.
+     * The case is here rather than as a note because it reaches the branch on a building where the
+     * arms quote *nothing*, which is the extreme the sweep below cannot show: that sweep enters the
+     * same branch on six of thirty-eight wrinkles, but through demand thinned by the wrinkle rather
+     * than through a building that saturates. Both routes matter and only one of them is content.
      */
     const building = requireBuilding(config, 'midtown-office');
     const profile = config.trafficProfilesById.get(building.trafficProfile);
