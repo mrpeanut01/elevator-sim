@@ -127,8 +127,13 @@ describe('a day the gate could not read is not a day it discarded', () => {
      *
      * The case is here rather than as a note because it reaches the branch on a building where the
      * arms quote *nothing*, which is the extreme the sweep below cannot show: that sweep enters the
-     * same branch on six of thirty-eight wrinkles, but through demand thinned by the wrinkle rather
-     * than through a building that saturates. Both routes matter and only one of them is content.
+     * same branch too, but through demand thinned by the wrinkle rather than through a building
+     * that saturates. Both routes matter and only one of them is content.
+     *
+     * No count is given for how many wrinkles take the second route. The previous wording said six
+     * of thirty-eight, which was true when written and pinned by nothing — a library edit or a
+     * moved weight vector changes it, and it would then be false in place, which is the defect this
+     * very sentence replaced one revision earlier.
      */
     const building = requireBuilding(config, 'midtown-office');
     const profile = config.trafficProfilesById.get(building.trafficProfile);
@@ -165,7 +170,18 @@ describe('the gate will not average the replications that survived', () => {
     const verdict = gateWrinkle(withoutWindow);
     expect(verdict.judged, verdict.reason).toBe(false);
     expect(verdict.reason).toMatch(/fewer than every replication/);
-    expect(verdict.reason).toMatch(/48\/50/);
+    /*
+     * **The day label is part of the assertion, and that is the point of pinning it.** This read
+     * `/48\/50/`, which matched the string before the guard was corrected as well as after — so
+     * reverting `shortArms` to compare against each arm's own recorded length, or to dedupe the two
+     * days into one entry, left every case green. Review measured that (`revert-check` →
+     * `still_passed`) rather than inferring it. Naming the day is the half of that fix a test can
+     * reach: the other half — `quotable < requested`, which defends against an arm that recorded
+     * nothing — is unreachable through this function's inputs, because `runBatch` cannot produce
+     * that state and `gateWrinkle` takes no injectable result. That half is guarded by its own
+     * docstring and by nothing else, and this comment is where that is admitted.
+     */
+    expect(verdict.reason).toMatch(/48\/50 on the candidate day/);
   }, 120_000);
 });
 
