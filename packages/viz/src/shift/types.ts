@@ -281,7 +281,17 @@ export interface EventEffect {
 
 /** One day's twist: the design's name and note, plus what it does to the run. */
 export interface ShiftEvent {
-  readonly id: ShiftEventId;
+  /**
+   * A template id from `data/wrinkles.json`, or a drawn wrinkle's composed id.
+   *
+   * **Widened from `ShiftEventId` by GitHub issue #159**, and the narrowing is not gone — it moved.
+   * The library is data now, so a literal union cannot be derived from it; the ids shipped code
+   * still names by hand are held by `wrinkles/parse.ts#REQUIRED_TEMPLATE_IDS`, which refuses a
+   * library missing one at load time. {@link ShiftEventId} stays exactly what it was and still
+   * types every one of those literals — what it no longer claims is to be the *whole* set, which
+   * stopped being true the moment a twenty-sixth wrinkle could be added without editing a module.
+   */
+  readonly id: string;
   /** Verbatim from `design.html` :1419–1426. */
   readonly name: string;
   /** Verbatim from `design.html` :1419–1426. */
@@ -612,7 +622,15 @@ export interface DayOutcome {
   readonly day: number;
   readonly dayIdx: number;
   readonly weekday: Weekday;
-  readonly eventId: ShiftEventId;
+  /**
+   * The wrinkle this day actually drew — a **drawn** id, so it may name a template's chosen axis
+   * values (`shaft-out:morning`) and not only a template.
+   *
+   * Widened from `ShiftEventId` by GitHub issue #159. A calendar *booking* is still a
+   * `ShiftEventId`, because a period books a template by a literal id and indexes `SHIFT_EVENTS`
+   * with it; a finished day records what was drawn, and the library that draws it is data.
+   */
+  readonly eventId: string;
   readonly arrived: number;
   readonly carried: number;
   /** The sparkline's bar height, and the *best day so far* figure. An observation. */

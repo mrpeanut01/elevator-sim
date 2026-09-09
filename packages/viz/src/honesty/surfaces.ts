@@ -485,6 +485,8 @@ import { observationsAt } from '../live/observations.js';
 import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf } from '../shift/contracts.js';
 import { bankingRefusalFor, LOADED_RUN_CANNOT_BANK, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
+import { everyWrinkle } from '../wrinkles/draw.js';
+import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
@@ -3103,6 +3105,16 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/goals.ts#bestLineFor',
     'shift/events.ts#SHIFT_EVENTS',
     'shift/events.ts#eventFor',
+    /*
+     * The wrinkle library's composed notes — GitHub issue #159. `SHIFT_EVENTS` renders each
+     * template at its **first** axis value, so seeding it alone would leave every other window of
+     * `shaft-out` and every other pace of `evacuation-drill` unswept: strings a player meets on a
+     * day the rotation reaches, produced by `composeWrinkle` and drawn by the same brief. The loop
+     * below seeds `everyWrinkle`, which is all of them.
+     */
+    'wrinkles/draw.ts#everyWrinkle',
+    'wrinkles/draw.ts#composeWrinkle',
+    'wrinkles/draw.ts#drawWrinkle',
     'shift/events.ts#shiftRunPatch',
     'shift/week.ts#closeDay',
     'shift/contracts.ts#CONTRACTS',
@@ -3458,6 +3470,16 @@ const SHIFT_REPORT: SurfaceAdapter = {
       context.trafficProfiles.profiles.find(
         (candidate) => candidate.id === context.building.trafficProfile,
       ) ?? context.trafficProfiles.profiles[0];
+    /*
+     * Every concrete wrinkle, not only every template — GitHub issue #159. A template's note
+     * carries `{axis}` placeholders and `SHIFT_EVENTS` renders it at the first value of each; the
+     * other renderings are strings a player meets on a day the rotation reaches, so they are
+     * seeded here from the same function the day is drawn with.
+     */
+    for (const wrinkle of everyWrinkle(WRINKLE_LIBRARY)) {
+      seeds.push({ field: `WRINKLES.${wrinkle.id}.name`, text: wrinkle.name, role: 'label' });
+      seeds.push({ field: `WRINKLES.${wrinkle.id}.note`, text: wrinkle.note, role: 'prose' });
+    }
     for (const event of Object.values(SHIFT_EVENTS)) {
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.name`, text: event.name, role: 'label' });
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.note`, text: event.note, role: 'prose' });

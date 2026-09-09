@@ -1,0 +1,700 @@
+{
+  "$comment": "The wrinkle library — GitHub issue #159, GAMEPLAY_AND_NAVIGATION.md § 17. A day's twist is a row here rather than a literal in shift/events.ts, which is CLAUDE.md invariant 7 pointed at content. Every template's effect is expressed ONLY in fields the engine actually reads (arrivalRateMultiplier, directionalSplit, carsOutOfService, derate), because a template that named an effect nothing consumes would be a caption that lies about the picture under it — the defect shift/events.ts was written to prevent. Three of the six wrinkle kinds § 17 names are therefore NOT here and are recorded in `unexpressible` with the seam each one needs. The figures are DRAFTED, not measured: a wrinkle is game feel, and the ladder is the product owner's. See packages/viz/src/shift/wrinkles.ts.",
+  "version": 1,
+  "unexpressible": [
+    {
+      "kind": "doors slowed on one car",
+      "needs": "A per-car door-timing override on the run. `EventEffect` reaches cars only through `carsOutOfService` and `derate`, both of which remove a car rather than slow one, so a `doors-slowed` template would render a note no passenger experiences."
+    },
+    {
+      "kind": "a sky lobby closed",
+      "needs": "A service-zoning override on the run. Closing a transfer floor is a `BuildingConfig` change (service zoning), and `EventEffect` writes demand and car availability only. Collapsing it into a directional split would be a different day wearing the name."
+    },
+    {
+      "kind": "a floor's occupancy spiked",
+      "needs": "A per-floor population override on the run. Occupancy is building fabric; the nearest reachable lever is the whole-building directional mix, which moves every floor at once and so does not describe one floor spiking."
+    }
+  ],
+  "templates": [
+    {
+      "id": "ordinary",
+      "name": "An ordinary day",
+      "note": "Nothing booked. The building is the only thing in the way.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": true,
+        "arrivalRateMultiplier": null,
+        "directionalSplit": null,
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    },
+    {
+      "id": "move-in",
+      "name": "Move-in day",
+      "note": "A tenant is hauling boxes up — one car is tied up {window}, then rejoins.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": null,
+        "directionalSplit": null,
+        "carsOutOfService": 0,
+        "derate": {
+          "cars": 1,
+          "fromFraction": 0,
+          "toFraction": 0.6666666666666666
+        }
+      },
+      "axes": [
+        {
+          "id": "window",
+          "values": [
+            {
+              "id": "two-thirds",
+              "label": "for the first two thirds of the shift",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0,
+                "toFraction": 0.6666666666666666
+              }
+            },
+            {
+              "id": "first-half",
+              "label": "for the first half of the shift",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0,
+                "toFraction": 0.5
+              }
+            },
+            {
+              "id": "middle",
+              "label": "through the middle of the shift",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0.25,
+                "toFraction": 0.75
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fire-drill",
+      "name": "Fire drill",
+      "note": "Twenty minutes where the whole building wants to be in the lobby at once.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.6,
+        "directionalSplit": {
+          "incoming": 0.1,
+          "outgoing": 0.8,
+          "interfloor": 0.1
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": [
+        {
+          "id": "intensity",
+          "values": [
+            {
+              "id": "full",
+              "label": "",
+              "arrivalRateMultiplier": 1.6
+            },
+            {
+              "id": "partial",
+              "label": "",
+              "arrivalRateMultiplier": 1.3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conference",
+      "name": "Conference on the middle floors",
+      "note": "Interfloor traffic all afternoon, which no up-peak strategy is tuned for.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": null,
+        "directionalSplit": {
+          "incoming": 0.25,
+          "outgoing": 0.25,
+          "interfloor": 0.5
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": [
+        {
+          "id": "size",
+          "values": [
+            {
+              "id": "full-floor",
+              "label": "",
+              "directionalSplit": {
+                "incoming": 0.25,
+                "outgoing": 0.25,
+                "interfloor": 0.5
+              }
+            },
+            {
+              "id": "half-floor",
+              "label": "",
+              "directionalSplit": {
+                "incoming": 0.3,
+                "outgoing": 0.3,
+                "interfloor": 0.4
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weekend",
+      "name": "Weekend goods run",
+      "note": "A trickle of demand and a lot of furniture. Enjoy it while it lasts.",
+      "days": "weekend",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 0.45,
+        "directionalSplit": null,
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    },
+    {
+      "id": "breakdown",
+      "name": "A lift failed its safety check",
+      "note": "The inspector red-tagged a car this morning. It stays out until somebody brings it back.",
+      "days": "campaign",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": null,
+        "directionalSplit": null,
+        "carsOutOfService": 0,
+        "derate": {
+          "cars": 1,
+          "fromFraction": 0.3,
+          "toFraction": 1
+        }
+      },
+      "axes": []
+    },
+    {
+      "id": "coach-party",
+      "name": "Coaches booked in",
+      "note": "Forty people and their luggage arrive at the front door together, and every one of them is going up.",
+      "days": "campaign",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.5,
+        "directionalSplit": {
+          "incoming": 0.8,
+          "outgoing": 0.1,
+          "interfloor": 0.1
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    },
+    {
+      "id": "shaft-out",
+      "name": "A shaft is out",
+      "note": "Maintenance have a car {window}. The rest of the group covers.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": null,
+        "directionalSplit": null,
+        "carsOutOfService": 0,
+        "derate": {
+          "cars": 1,
+          "fromFraction": 0,
+          "toFraction": 0.5
+        }
+      },
+      "axes": [
+        {
+          "id": "window",
+          "values": [
+            {
+              "id": "morning",
+              "label": "for the first half of the shift",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0,
+                "toFraction": 0.5
+              }
+            },
+            {
+              "id": "afternoon",
+              "label": "from halfway to the end of the shift",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0.5,
+                "toFraction": 1
+              }
+            },
+            {
+              "id": "most-of-day",
+              "label": "for all but the last stretch of the shift",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0,
+                "toFraction": 0.85
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "two-cars-down",
+      "name": "Two cars down",
+      "note": "A controller fault took two cars off the group before anybody arrived. They are back once the engineer has been.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": null,
+        "directionalSplit": null,
+        "carsOutOfService": 0,
+        "derate": {
+          "cars": 2,
+          "fromFraction": 0.0,
+          "toFraction": 0.7
+        }
+      },
+      "axes": []
+    },
+    {
+      "id": "caterers",
+      "name": "Caterers in early",
+      "note": "Trolleys and crates through the front door {when}, all of it going up.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.35,
+        "directionalSplit": {
+          "incoming": 0.75,
+          "outgoing": 0.1,
+          "interfloor": 0.15
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": [
+        {
+          "id": "when",
+          "values": [
+            {
+              "id": "before-the-rush",
+              "label": "before the rush",
+              "arrivalRateMultiplier": 1.35
+            },
+            {
+              "id": "into-the-rush",
+              "label": "right into the rush",
+              "arrivalRateMultiplier": 1.55
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "goods-inward",
+      "name": "Goods inward all morning",
+      "note": "Deliveries are being walked floor to floor rather than sent up once.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.15,
+        "directionalSplit": {
+          "incoming": 0.3,
+          "outgoing": 0.2,
+          "interfloor": 0.5
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    },
+    {
+      "id": "evacuation-drill",
+      "name": "Unannounced evacuation",
+      "note": "Nobody was told. The building empties {pace}.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.8,
+        "directionalSplit": {
+          "incoming": 0.05,
+          "outgoing": 0.85,
+          "interfloor": 0.1
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": [
+        {
+          "id": "pace",
+          "values": [
+            {
+              "id": "all-at-once",
+              "label": "all at once",
+              "arrivalRateMultiplier": 1.8
+            },
+            {
+              "id": "floor-by-floor",
+              "label": "floor by floor",
+              "arrivalRateMultiplier": 1.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shift-change",
+      "name": "Shift change",
+      "note": "One crowd leaving as another arrives, and the lobby has to do both at once.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.45,
+        "directionalSplit": {
+          "incoming": 0.45,
+          "outgoing": 0.45,
+          "interfloor": 0.1
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": [
+        {
+          "id": "overlap",
+          "values": [
+            {
+              "id": "tight",
+              "label": "",
+              "arrivalRateMultiplier": 1.45
+            },
+            {
+              "id": "staggered",
+              "label": "",
+              "arrivalRateMultiplier": 1.2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "quiet-morning",
+      "name": "A quiet morning",
+      "note": "Half the building is working from home. The cars have time on their hands.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 0.6,
+        "directionalSplit": null,
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": [
+        {
+          "id": "depth",
+          "values": [
+            {
+              "id": "half",
+              "label": "",
+              "arrivalRateMultiplier": 0.6
+            },
+            {
+              "id": "thin",
+              "label": "",
+              "arrivalRateMultiplier": 0.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "contractors",
+      "name": "Contractors on site",
+      "note": "A fit-out crew is working upstairs — one car is theirs {window}, and they use it between floors all day.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": null,
+        "directionalSplit": {
+          "incoming": 0.25,
+          "outgoing": 0.2,
+          "interfloor": 0.55
+        },
+        "carsOutOfService": 0,
+        "derate": {
+          "cars": 1,
+          "fromFraction": 0.2,
+          "toFraction": 0.9
+        }
+      },
+      "axes": [
+        {
+          "id": "window",
+          "values": [
+            {
+              "id": "most-of-day",
+              "label": "for most of the day",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0.2,
+                "toFraction": 0.9
+              }
+            },
+            {
+              "id": "afternoon",
+              "label": "from midday",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0.5,
+                "toFraction": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "all-hands",
+      "name": "All-hands upstairs",
+      "note": "Everybody is wanted on one floor at the same time.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.5,
+        "directionalSplit": {
+          "incoming": 0.35,
+          "outgoing": 0.1,
+          "interfloor": 0.55
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    },
+    {
+      "id": "audit-day",
+      "name": "Auditors in",
+      "note": "Four of them, on every floor in turn, carrying boxes of paper.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.1,
+        "directionalSplit": {
+          "incoming": 0.2,
+          "outgoing": 0.2,
+          "interfloor": 0.6
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    },
+    {
+      "id": "flu-day",
+      "name": "Half the floor is off",
+      "note": "Something is going round. Fewer people, and the ones who came in are moving about.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 0.7,
+        "directionalSplit": {
+          "incoming": 0.3,
+          "outgoing": 0.3,
+          "interfloor": 0.4
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    },
+    {
+      "id": "open-day",
+      "name": "Open day",
+      "note": "Visitors all morning, none of whom know which floor they want.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.4,
+        "directionalSplit": {
+          "incoming": 0.6,
+          "outgoing": 0.15,
+          "interfloor": 0.25
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": [
+        {
+          "id": "turnout",
+          "values": [
+            {
+              "id": "busy",
+              "label": "",
+              "arrivalRateMultiplier": 1.4
+            },
+            {
+              "id": "quiet",
+              "label": "",
+              "arrivalRateMultiplier": 1.15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "late-finish",
+      "name": "A late finish",
+      "note": "A deadline upstairs means everybody leaves at once, late, and together.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 1.3,
+        "directionalSplit": {
+          "incoming": 0.1,
+          "outgoing": 0.75,
+          "interfloor": 0.15
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    },
+    {
+      "id": "lift-service",
+      "name": "Scheduled lift service",
+      "note": "The service engineer has a car booked {window}. It was on the calendar.",
+      "days": "weekday",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": null,
+        "directionalSplit": null,
+        "carsOutOfService": 0,
+        "derate": {
+          "cars": 1,
+          "fromFraction": 0.35,
+          "toFraction": 0.8
+        }
+      },
+      "axes": [
+        {
+          "id": "window",
+          "values": [
+            {
+              "id": "mid-shift",
+              "label": "across the middle of the shift",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0.35,
+                "toFraction": 0.8
+              }
+            },
+            {
+              "id": "early",
+              "label": "first thing",
+              "derate": {
+                "cars": 1,
+                "fromFraction": 0,
+                "toFraction": 0.4
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weekend-quiet",
+      "name": "A slow Sunday",
+      "note": "Almost nobody in, and the few who are have the place to themselves.",
+      "days": "weekend",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 0.3,
+        "directionalSplit": null,
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    },
+    {
+      "id": "weekend-works",
+      "name": "Weekend works",
+      "note": "Quiet on the landings and busy between floors — the works only happen when nobody is in.",
+      "days": "weekend",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 0.55,
+        "directionalSplit": {
+          "incoming": 0.2,
+          "outgoing": 0.2,
+          "interfloor": 0.6
+        },
+        "carsOutOfService": 0,
+        "derate": {
+          "cars": 1,
+          "fromFraction": 0.1,
+          "toFraction": 0.9
+        }
+      },
+      "axes": []
+    },
+    {
+      "id": "weekend-move-out",
+      "name": "A weekend move-out",
+      "note": "One tenant is leaving and everything they own is going down.",
+      "days": "weekend",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 0.65,
+        "directionalSplit": {
+          "incoming": 0.15,
+          "outgoing": 0.7,
+          "interfloor": 0.15
+        },
+        "carsOutOfService": 0,
+        "derate": {
+          "cars": 1,
+          "fromFraction": 0.15,
+          "toFraction": 0.75
+        }
+      },
+      "axes": []
+    },
+    {
+      "id": "weekend-event",
+      "name": "Something on upstairs",
+      "note": "A booking on one of the upper floors — a thin, steady stream all day, and all of it going up.",
+      "days": "weekend",
+      "effect": {
+        "changesNothing": false,
+        "arrivalRateMultiplier": 0.8,
+        "directionalSplit": {
+          "incoming": 0.7,
+          "outgoing": 0.2,
+          "interfloor": 0.1
+        },
+        "carsOutOfService": 0,
+        "derate": null
+      },
+      "axes": []
+    }
+  ]
+}

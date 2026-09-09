@@ -68,6 +68,9 @@ import type {
 
 import { carsToDerate, type BankedBuilding, type CarRef, type Incident } from './incidents.js';
 import type { EventEffect, ShiftEvent, ShiftEventId } from './types.js';
+import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
+import { composeWrinkle, drawWrinkle } from '../wrinkles/draw.js';
+import type { WrinkleEffect } from '../wrinkles/types.js';
 
 /**
  * `traffic.arrivalRatePctPop5min`'s declared ceiling, from `core`'s own `TRAFFIC_PARAMETERS`.
@@ -146,186 +149,118 @@ const NO_EFFECT: EventEffect = Object.freeze({
 });
 
 /**
- * The seven events, keyed by id — five the week's rota draws and two the campaign's. Names and
- * notes of the five are the design's own (`design.html` :1419–1426),
- * verbatim **except** where a caption named something the run does not contain: the fire drill's
- * *"14:00"* (§ D175), the ordinary day's *"Tuesday"*, and the ordinary day's second person. Each
- * deviation is argued at its own entry, and `events.test.ts` holds the weekday rule against every
- * entry rather than against the one that broke it.
+ * Every wrinkle in the library, keyed by id — **built from `data/wrinkles.json`**, not authored
+ * here.
  *
- * A frozen record over every {@link ShiftEventId} rather than a lookup that may miss: a sixth
- * event added without an effect is a compile error, which is the only way the answer to *what does
- * this do to the run* stays one somebody gave.
+ * This was a frozen object literal of seven events until GitHub issue **#159**, and
+ * `GAMEPLAY_AND_NAVIGATION.md` § 17 is why it is not one now:
+ *
+ * > the wrinkle library must be data so a day is a row rather than code
+ *
+ * The names and notes of the original five are still the design's own (`design.html` :1419–1426),
+ * verbatim except where a caption named something the run does not contain — the fire drill's
+ * *"14:00"* (§ D175), the ordinary day's *"Tuesday"* and its second person. Those deviations moved
+ * into the library's rows with the text; nothing was re-argued, and `events.test.ts` still holds the
+ * weekday rule against every entry rather than against the one that broke it.
+ *
+ * **What replaced the compile error.** A `Record<ShiftEventId, ShiftEvent>` made a missing effect a
+ * type error, which was the only reason the answer to *what does this do to the run* stayed one
+ * somebody gave. A library loaded from data cannot make that promise to the type system, so it is
+ * made to the loader instead: `wrinkles/parse.ts` refuses a document whose effect fields disagree
+ * with its own `changesNothing`, and refuses one missing any id shipped code names as a literal.
+ * The check is the same check; it fails at startup rather than at `tsc`, loudly and with a list.
+ *
+ * **Keyed by template id, not by drawn id.** A drawn wrinkle composes its template's id with the
+ * axis values it chose (`shaft-out:morning`), and this table holds the *template*, with each axis
+ * at its base effect. That is what `SHIFT_EVENTS[booked]` needs: a calendar books
+ * `move-in`, not one particular window of it.
+ *
+ * **Typed by {@link ShiftEventId} although it holds every template**, which is deliberate and is
+ * the division of labour between this constant and the library. Code that names an id *as a
+ * literal* — a calendar booking, the campaign's two draws — indexes this table and gets a
+ * `ShiftEvent` rather than a `ShiftEvent | undefined`, because `REQUIRED_TEMPLATE_IDS` refuses at
+ * load time a library missing any of those seven. Code that wants *any* wrinkle does not come here
+ * at all: it asks `wrinkles/draw.ts`. Typing the table by the wider key would have made every one
+ * of those literal lookups optional at twenty call sites, to express a possibility the loader has
+ * already ruled out.
  */
-export const SHIFT_EVENTS: Readonly<Record<ShiftEventId, ShiftEvent>> = Object.freeze({
-  'move-in': Object.freeze({
-    id: 'move-in',
-    name: 'Move-in day',
-    /*
-     * The design's note ends *"until 11:30"*, and this event could not say *until* anything: a
-     * time-boxed derate is a `BuildingConfig.serviceEvents` schedule, `shift/` did not own the
-     * building the runner receives, and `outOfServiceCarIds` holds a car for the whole run. So the
-     * note was rewritten to *"for the whole shift"*, which was true and was a narrowing.
-     *
-     * `incidents.ts` owns that seam now, so the car genuinely returns and the note can say so. It
-     * says it as a **fraction of the shift** rather than as an hour, because 11:30 is outside every
-     * shipped shift length — a shift is 15 to 120 minutes from 06:00 — and a caption naming an hour
-     * the run does not contain is the defect § D175 corrected on the fire drill.
-     */
-    note: 'A tenant is hauling boxes up — one car is tied up for the first two thirds of the shift, then rejoins.',
-    effect: Object.freeze({
-      changesNothing: false,
-      arrivalRateMultiplier: null,
-      directionalSplit: null,
-      /*
-       * `0` here and a derate instead, which is a change of mechanism rather than of duration.
-       *
-       * A car that never comes back is a smaller building for a day. A car that rejoins two thirds
-       * of the way through is a group that has to absorb a loss and then re-balance around the
-       * return — which is the thing a player is being asked to plan for, and the thing the design's
-       * *"until"* was describing.
-       */
-      carsOutOfService: 0,
-      derate: Object.freeze({ cars: 1, fromFraction: 0, toFraction: 2 / 3 }),
-      writes: Object.freeze(['serviceEvents']),
-    }),
-  }),
-  'fire-drill': Object.freeze({
-    id: 'fire-drill',
-    /*
-     * The design calls it *"Fire drill, 14:00"*. There is no 14:00 in a shift that runs 06:00 to
-     * 06:30 (§ D175), and a caption naming an hour the run does not contain is the thing the
-     * honesty card exists to prevent. The hour is dropped; the drill is what it always was.
-     */
-    name: 'Fire drill',
-    note: 'Twenty minutes where the whole building wants to be in the lobby at once.',
-    effect: Object.freeze({
-      changesNothing: false,
-      arrivalRateMultiplier: 1.6,
-      directionalSplit: DRILL_SPLIT,
-      carsOutOfService: 0,
-      derate: null,
-      writes: Object.freeze(['demand.arrivalRatePctPop5min', 'demand.directionalSplit']),
-    }),
-  }),
-  conference: Object.freeze({
-    id: 'conference',
-    name: 'Conference on the middle floors',
-    note: 'Interfloor traffic all afternoon, which no up-peak strategy is tuned for.',
-    effect: Object.freeze({
-      changesNothing: false,
-      arrivalRateMultiplier: null,
-      directionalSplit: CONFERENCE_SPLIT,
-      carsOutOfService: 0,
-      derate: null,
-      writes: Object.freeze(['demand.directionalSplit']),
-    }),
-  }),
-  ordinary: Object.freeze({
-    id: 'ordinary',
-    /*
-     * The design calls it *"An ordinary Tuesday-shaped day"*, and the weekday is dropped for the
-     * fire drill's reason one unit up (§ D175, two entries above). `eventFor` is keyed on
-     * `day % 5`, so day 1 — `openWeek`'s own `dayIdx: 0`, which `weekdayOf` names **Monday** — is
-     * an ordinary day; `everyday/today.ts#todayOf` builds `dayLabel` and `wrinkle` in one call, so
-     * the name put *MONDAY · DAY 1* and *Tuesday* into a single record, drawn on the front-door
-     * lede and again on the report header.
-     *
-     * It named no demand shape either, which is the part worth saying: this event's effect is
-     * `NO_EFFECT`, so *"Tuesday-shaped"* described nothing the engine reads. A caption naming a day
-     * the run does not contain is the same defect as one naming an hour it does not contain.
-     */
-    name: 'An ordinary day',
-    /*
-     * The handoff's sentence with its pronoun removed — `docs/20` defect 7, and the same deviation
-     * `live/honesty.ts#casualTitle` argues at length. This note is drawn on the left rail's L5,
-     * which keeps describing **the player's own day** while a stranger's run plays on the stage; a
-     * second person there is a sentence addressed to a reader who is, at that moment, watching
-     * somebody else, and § 14.1 calls the word a defect in that mode without asking who it meant.
-     * Third person costs the line nothing and needs no branch to stay correct.
-     */
-    note: 'Nothing booked. The building is the only thing in the way.',
-    effect: NO_EFFECT,
-  }),
-  weekend: Object.freeze({
-    id: 'weekend',
-    name: 'Weekend goods run',
-    note: 'A trickle of demand and a lot of furniture. Enjoy it while it lasts.',
-    effect: Object.freeze({
-      changesNothing: false,
-      arrivalRateMultiplier: 0.45,
-      directionalSplit: null,
-      carsOutOfService: 0,
-      derate: null,
-      writes: Object.freeze(['demand.arrivalRatePctPop5min']),
-    }),
-  }),
-  /*
-   * **A lift failing its safety check** — the campaign's drawn incident (GitHub issue #169 item 1,
-   * § D507). The design file's `outage` need reads *"The inspector red-tagged car B this morning"*,
-   * so the car goes at a fixed point in the morning rather than at a drawn one: what § 8.3's odds
-   * decide is *whether*, and `campaign/incidents.ts#campaignEventFor` makes that draw on a stream
-   * derived from the day's own seed. `toFraction: 1` is `shift/incidents.ts`'s *it does not come
-   * back* — the only thing that brings it back is the answer the dock composes (§ 7.5), which
-   * travels on the run's intervention log as an in-service event of its own.
-   *
-   * The car is `events.ts#eventCarChoice`'s, the same total order every other derate uses, so the
-   * dock's caption names the car the run actually loses.
-   */
-  breakdown: Object.freeze({
-    id: 'breakdown',
-    name: 'A lift failed its safety check',
-    note: 'The inspector red-tagged a car this morning. It stays out until somebody brings it back.',
-    effect: Object.freeze({
-      changesNothing: false,
-      arrivalRateMultiplier: null,
-      directionalSplit: null,
-      carsOutOfService: 0,
-      derate: Object.freeze({ cars: 1, fromFraction: BREAKDOWN_AT_FRACTION, toFraction: 1 }),
-      writes: Object.freeze(['serviceEvents']),
-    }),
-  }),
-  /*
-   * **A coach party booked in** — the campaign's calendared incident (GitHub issue #169 item 1,
-   * § D507). The design's Crown Hotel quirk is *"Coaches arrive at 11 with forty people and
-   * luggage"* and its `event` need is *"Sixty guests and their luggage arrive inside twenty
-   * minutes"*. The engine has no timed burst — `docs/37` § 5.1 records that a burst is authored by
-   * lowering the baseline, and a campaign day has one baseline — so the honest expression is the
-   * day's: more people, and nearly all of them arriving at the lobby wanting to go up. The split is
-   * the up-peak's shape rather than a number invented here.
-   */
-  'coach-party': Object.freeze({
-    id: 'coach-party',
-    name: 'Coaches booked in',
-    note: 'Forty people and their luggage arrive at the front door together, and every one of them is going up.',
-    effect: Object.freeze({
-      changesNothing: false,
-      arrivalRateMultiplier: 1.5,
-      directionalSplit: COACH_SPLIT,
-      carsOutOfService: 0,
-      derate: null,
-      writes: Object.freeze(['demand.arrivalRatePctPop5min', 'demand.directionalSplit']),
-    }),
-  }),
-});
+export const SHIFT_EVENTS = Object.freeze(
+  Object.fromEntries(
+    WRINKLE_LIBRARY.templates.map((template) => [
+      template.id,
+      Object.freeze({
+        id: template.id,
+        name: template.name,
+        /* The base note with every axis rendered at its first value, so a booked template reads
+         * as a sentence rather than as a sentence with a `{window}` in it. */
+        note: composeWrinkle(
+          template,
+          template.axes.map((axis) => axis.values[0] as (typeof axis.values)[number]),
+        ).note,
+        effect: effectOfWrinkle(template.effect),
+      } satisfies ShiftEvent),
+    ]),
+  ),
+) as Readonly<Record<ShiftEventId, ShiftEvent>>;
 
 /**
- * Which event today is — the design's own schedule (`design.html` :1419–1426), unchanged.
+ * A library effect, plus the `writes` list `EventEffect` carries.
  *
- * Weekend wins outright on `dayIdx >= 5`; otherwise the slot is `day % 5`. The arithmetic is the
- * design's and is deliberately not "improved": it is what makes day 3 a move-in and day 5 a fire
- * drill, and a reader who plays the week twice gets the same week both times. Pure in `(day,
- * dayIdx)` and therefore replayable, which is the same property CLAUDE.md invariant 5 asks of a run.
+ * `writes` is **derived** rather than authored — see `wrinkles/types.ts#WrinkleEffect`. A template
+ * that declared its own could disagree with its own effect, and `events.test.ts` cross-checks the
+ * struct against the patch, so the disagreement would be a test failure about a field a human
+ * typed. Derived, it cannot happen.
+ */
+function effectOfWrinkle(effect: WrinkleEffect): EventEffect {
+  const writes: string[] = [];
+  if (effect.arrivalRateMultiplier !== null) writes.push('demand.arrivalRatePctPop5min');
+  if (effect.directionalSplit !== null) writes.push('demand.directionalSplit');
+  if (effect.derate !== null) writes.push('serviceEvents');
+  if (effect.carsOutOfService > 0) writes.push('outOfServiceCarIds');
+  return Object.freeze({
+    changesNothing: effect.changesNothing,
+    arrivalRateMultiplier: effect.arrivalRateMultiplier,
+    directionalSplit: effect.directionalSplit,
+    carsOutOfService: effect.carsOutOfService,
+    derate: effect.derate === null ? null : Object.freeze({ ...effect.derate }),
+    writes: Object.freeze(writes),
+  });
+}
+
+/**
+ * The wrinkle a recorded id names, or `undefined` if the library no longer holds it.
+ *
+ * Takes a **drawn** id as well as a template one: `shaft-out:morning` resolves to `shaft-out`, at
+ * that template's base effect. That is the right answer for the two callers — a campaign day
+ * rebuilding its run from a stored id, and a test asserting what a day drew — because both want
+ * *which wrinkle was this*, and neither re-runs the axis choice.
+ *
+ * Returns `undefined` rather than throwing, and the reason is that ids are data now: a saved day
+ * can name a template a later library dropped, and a caller that has to handle a missing wrinkle is
+ * a caller that will not crash a returning player's history.
+ */
+export function eventById(id: string): ShiftEvent | undefined {
+  const direct = (SHIFT_EVENTS as Readonly<Record<string, ShiftEvent | undefined>>)[id];
+  if (direct !== undefined) return direct;
+  const templateId = id.split(':')[0] ?? '';
+  return (SHIFT_EVENTS as Readonly<Record<string, ShiftEvent | undefined>>)[templateId];
+}
+
+/**
+ * The day's event — now § 17's rotation draw rather than a modulo-five rota.
+ *
+ * It was five `if`s over `day % 5`, which could not express any of § 17's three rotation rules and
+ * reached five of the twenty-five wrinkles the library now holds. `wrinkles/draw.ts` owns the
+ * choosing and states which of the three rules it can keep and which waits on a tower draw that
+ * does not exist yet.
+ *
+ * Still pure and total in `(day, dayIdx)`, which is the property `scheduledEventFor` promises its
+ * eleven callers and the one `briefView.ts` relies on when it says two players on day 3 meet the
+ * same wrinkle.
  */
 export function eventFor(day: number, dayIdx: number): ShiftEvent {
-  // The rota reaches five of the seven; `breakdown` and `coach-party` are the campaign's alone —
-  // `SHIFT_EVENT_IDS` says why beside them, and `campaign/incidents.ts` is their only chooser.
-  if (dayIdx >= 5) return SHIFT_EVENTS.weekend;
-  const slot = ((day % 5) + 5) % 5;
-  if (slot === 3) return SHIFT_EVENTS['move-in'];
-  if (slot === 0) return SHIFT_EVENTS['fire-drill'];
-  if (slot === 4) return SHIFT_EVENTS.conference;
-  return SHIFT_EVENTS.ordinary;
+  const drawn = drawWrinkle(WRINKLE_LIBRARY, day, dayIdx);
+  return { id: drawn.id, name: drawn.name, note: drawn.note, effect: effectOfWrinkle(drawn.effect) };
 }
 
 /* -------------------------------------------------------------------------- *

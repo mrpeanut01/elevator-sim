@@ -82,7 +82,7 @@ import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { firstSessionContractFor } from '../shift/firstSession.js';
 import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
-import { SHIFT_EVENTS, shiftRunPatch, baseDemandOf } from '../shift/events.js';
+import { SHIFT_EVENTS, eventById, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
@@ -415,7 +415,8 @@ export interface ViewerState {
    * argument: a setter would be a control that changed the day without running the day it belongs
    * to. Cleared where that field is cleared.
    */
-  readonly campaignEventId: ShiftEventId | undefined;
+  /* A drawn wrinkle id — widened with `ShiftEvent.id` by GitHub issue #159. */
+  readonly campaignEventId: string | undefined;
   /**
    * Which capital constraint the fabric is judged against — *retrofit*, *refurbishment*, *new build*.
    *
@@ -1527,7 +1528,7 @@ export function shiftRunConfigOf(
   const event =
     state.campaignEventId === undefined
       ? scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx)
-      : SHIFT_EVENTS[state.campaignEventId];
+      : (eventById(state.campaignEventId) ?? SHIFT_EVENTS.ordinary);
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
   /*

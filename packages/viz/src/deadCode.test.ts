@@ -152,6 +152,7 @@ const AUDITED_MODULES = [
   'viz/src/scope',
   'viz/src/shift',
   'viz/src/watch',
+  'viz/src/wrinkles',
 ] as const;
 
 /**
@@ -229,6 +230,18 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    * cli/commands/fuzz.ts). Recorded as the named exemption it is: an `elevator-sim honesty`
    * command is the C24-closing move, and inventing one is feature work, not an allowlist edit.
    */
+  /*
+   * -- § 17's content gate (GitHub issue #159). `gateWrinkle` is reached by `gateLibrary`, and
+   * `gateLibrary`'s driver is `wrinkles/gate.test.ts`. This is the honesty harness's shape exactly:
+   * an offline instrument whose only consumer is the suite that runs it, recorded as the named
+   * exemption it is rather than wired to a screen it has no business on. § 17 calls the gate
+   * *offline* in terms — it runs the baseline dispatchers over a candidate day, which is a study
+   * and not something a player waits for — so a shipped-runtime caller would be the defect here,
+   * not the fix. An `elevator-sim wrinkles` command is the closing move, and inventing one is
+   * feature work rather than an allowlist edit; § D118 closed fuzz's the same way.
+   */
+  'wrinkles/gateLibrary':
+    '§ 17’s content gate, swept over a library; its consumer is gate.test.ts, which drives it',
   'honesty/runHonestyCampaign':
     'the honesty harness’s driver; its consumer is the suite § D163 clause 2 was accepted on',
   'honesty/formatHonestyStats': 'formats the campaign tier summary for the suite that drives it',

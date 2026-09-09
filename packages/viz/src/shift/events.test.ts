@@ -39,7 +39,9 @@ import {
   shiftRunPatch,
 } from './events.js';
 import { serviceEventsFor, type Incident } from './incidents.js';
-import { SHIFT_EVENT_IDS, WEEKDAYS, type ShiftEventId } from './types.js';
+import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
+import { poolFor } from '../wrinkles/draw.js';
+import { SHIFT_EVENT_IDS, WEEKDAYS, type ShiftEvent, type ShiftEventId } from './types.js';
 
 const BUILDING_ID = 'midtown-office';
 const DURATION_S = 600;
@@ -56,13 +58,16 @@ function base(): { readonly ratePctPop5min: number; readonly split: ReturnType<t
   return baseDemandOf(profile);
 }
 
-function runWith(eventId: ShiftEventId | null): VizRecording {
+function runWith(event: ShiftEventId | ShiftEvent | null): VizRecording {
   const building = requireBuilding(config, BUILDING_ID);
   const demandBase = base();
+  // Takes a whole `ShiftEvent` as well as an id since GitHub issue #159, so the sweep below can
+  // drive a template the closed union does not name — which is now most of the library.
+  const resolved = typeof event === 'string' ? SHIFT_EVENTS[event] : event;
   const patch =
-    eventId === null
+    resolved === null
       ? { demand: {}, outOfServiceCarIds: [] as readonly string[], incidents: [] as readonly Incident[] }
-      : shiftRunPatch({ event: SHIFT_EVENTS[eventId], building, base: demandBase });
+      : shiftRunPatch({ event: resolved, building, base: demandBase });
 
   const fixture = fixtureConfig(config, {
     buildingId: BUILDING_ID,
@@ -147,24 +152,65 @@ beforeAll(async () => {
   control = runWith(null);
 }, 120_000);
 
-describe('the schedule is the design’s own', () => {
+describe('the schedule is § 17’s rotation draw', () => {
+  /*
+   * **This block asserted the design's modulo-five slot arithmetic until GitHub issue #159.**
+   * `eventFor(3, 2)` was `move-in` because `3 % 5` was the move-in slot, and three cases pinned
+   * that table. § 17 replaced the rota with a draw over `data/wrinkles.json`, so the arithmetic is
+   * gone on purpose and pinning it again would be asserting the thing that was removed.
+   *
+   * What replaces it is the rule § 17 actually states, which the old rota could not express at all:
+   * **no wrinkle template twice in fourteen days**. It is asserted by walking every 14-day window
+   * over every weekday phase rather than by trusting the pool arithmetic in `wrinkles/draw.ts`'s
+   * docstring — the two agree, and only one of them is a test.
+   */
   it('puts the weekend on the last two days of the week, whatever the day number', () => {
-    expect(eventFor(9, 5).id).toBe('weekend');
-    expect(eventFor(14, 6).id).toBe('weekend');
+    for (const [day, dayIdx] of [
+      [9, 5],
+      [14, 6],
+      [3, 5],
+      [28, 6],
+    ] as const) {
+      const drawn = eventFor(day, dayIdx);
+      expect(
+        poolFor(WRINKLE_LIBRARY, 'weekend').map((template) => template.id),
+        `day ${String(day)} idx ${String(dayIdx)} drew ${drawn.id}`,
+      ).toContain(drawn.id.split(':')[0]);
+    }
   });
 
-  it('reproduces the design’s slot arithmetic on the working days', () => {
-    expect(eventFor(3, 2).id).toBe('move-in');
-    expect(eventFor(5, 4).id).toBe('fire-drill');
-    expect(eventFor(4, 3).id).toBe('conference');
-    expect(eventFor(1, 0).id).toBe('ordinary');
-    expect(eventFor(2, 1).id).toBe('ordinary');
+  it('draws no wrinkle template twice inside fourteen days — § 17’s rotation rule', () => {
+    // Every weekday phase, because `dayIdx` and `day` advance together in play but are independent
+    // inputs, and a rule that held only when day 1 was a Monday would be a rule about day 1.
+    for (let phase = 0; phase < 7; phase += 1) {
+      for (let start = 1; start <= 40; start += 1) {
+        const seen = new Map<string, number>();
+        for (let day = start; day < start + 14; day += 1) {
+          const dayIdx = (day - 1 + phase) % 7;
+          const templateId = eventFor(day, dayIdx).id.split(':')[0] ?? '';
+          const earlier = seen.get(templateId);
+          expect(
+            earlier,
+            `phase ${String(phase)}: ${templateId} drawn on day ${String(earlier)} and again on ` +
+              `day ${String(day)}, inside fourteen`,
+          ).toBeUndefined();
+          seen.set(templateId, day);
+        }
+      }
+    }
   });
 
   it('is a pure function of (day, dayIdx), so a week replays', () => {
+    /*
+     * `toEqual` rather than `toBe`. This asserted identity when `eventFor` returned one of seven
+     * shared frozen objects; it now composes a wrinkle per call, so two calls are equal and not the
+     * same object. Equality is what *a week replays* means and what the old identity check stood in
+     * for — a caller that depended on the identity would have been depending on the table's
+     * implementation.
+     */
     for (let day = 1; day <= 30; day += 1) {
       for (let dayIdx = 0; dayIdx < 7; dayIdx += 1) {
-        expect(eventFor(day, dayIdx)).toBe(eventFor(day, dayIdx));
+        expect(eventFor(day, dayIdx)).toEqual(eventFor(day, dayIdx));
       }
     }
   });
@@ -349,6 +395,96 @@ describe('every event reaches the simulator', () => {
     const run = runWith('ordinary');
     expect(JSON.stringify(run)).toBe(JSON.stringify(control));
   });
+
+  /*
+   * **Every wrinkle in the library, not only the five with a case above — GitHub issue #159.**
+   *
+   * The five hand-written cases check what each of those events *means*: outgoing-dominant for a
+   * drill, interfloor for a conference. They cannot be written for a row somebody adds to
+   * `data/wrinkles.json` tomorrow, and the library is twenty-five rows now — so eighteen wrinkles
+   * would otherwise ship with no assertion that they reach the simulator at all. That is exactly
+   * the dead caption this module's docstring is about, one layer up: authoring moved to data and
+   * the check has to move with it.
+   *
+   * The claim checked is the weakest one that is still a claim about the run: **a wrinkle that says
+   * it changes the day changes it, in the direction it names.** A rate above one adds legs, a rate
+   * below one removes them, a derate idles a car inside its own window, and `changesNothing` is
+   * byte-identical to the control. It is deliberately not a claim about *how much*: that is game
+   * feel, it is the product owner's, and a threshold here would turn a balance change into a test
+   * failure.
+   */
+  it.each(WRINKLE_LIBRARY.templates.map((template) => [template.id, template] as const))(
+    '%s reaches the simulator in the direction it claims',
+    (id, template) => {
+      const event = SHIFT_EVENTS[id as ShiftEventId] ?? {
+        id: template.id,
+        name: template.name,
+        note: template.note,
+        effect: { ...template.effect, writes: [] },
+      };
+      const run = runWith(event as ShiftEvent);
+
+      if (template.effect.changesNothing) {
+        expect(JSON.stringify(run), `${id} claims to change nothing`).toBe(JSON.stringify(control));
+        return;
+      }
+
+      // Something moved. A wrinkle whose run is identical to the control is a caption.
+      expect(JSON.stringify(run), `${id} claims a change and produced the control's run`).not.toBe(
+        JSON.stringify(control),
+      );
+
+      const rate = template.effect.arrivalRateMultiplier;
+      if (rate !== null && rate > 1) {
+        expect(run.legs.length, `${id} raises the rate`).toBeGreaterThan(control.legs.length);
+      }
+      if (rate !== null && rate < 1) {
+        expect(run.legs.length, `${id} lowers the rate`).toBeLessThan(control.legs.length);
+      }
+
+      const derate = template.effect.derate;
+      if (derate !== null) {
+        const patch = shiftRunPatch({
+          event: event as ShiftEvent,
+          building: requireBuilding(config, BUILDING_ID),
+          base: base(),
+        });
+        expect(patch.incidents.length, `${id} declares a derate that reached no incident`).toBe(
+          derate.cars,
+        );
+        for (const incident of patch.incidents) {
+          const heldId = `${incident.car.bankId}-${incident.car.carId}`;
+          const opensAt = Math.round(incident.fromFraction * DURATION_S);
+          const closesAt = Math.round(incident.toFraction * DURATION_S);
+          const held = run.shafts.find((shaft) => shaft.carId === heldId);
+          expect(held, `${id}: ${heldId} is missing from the recording`).toBeDefined();
+          /*
+           * **Boards nobody, rather than moves not at all** — and the difference was measured
+           * rather than assumed. This asserted *no motion starts inside the window*, which is what
+           * the `move-in` case above asserts and which passes there because that window opens at
+           * `0`, when nothing is in flight. Three templates whose windows open mid-run failed it:
+           * `breakdown`, `contractors` and `lift-service`. A car told to go out of service partway
+           * through a run **finishes what it is doing** — it does not strand the passengers already
+           * aboard — so it keeps moving for as long as its current work takes.
+           *
+           * That is the right behaviour and the wrong assertion. What *is* true of every window,
+           * wherever it opens, is that the car takes no new work inside it, so that is what is
+           * checked. `incidents.test.ts` reaches the same claim from the other side.
+           */
+          const boardedInside = run.legs.filter((leg) => {
+            if (leg.carId !== heldId) return false;
+            const at = leg.boardedAt ?? Number.NEGATIVE_INFINITY;
+            return at >= opensAt && at < closesAt;
+          });
+          expect(
+            boardedInside,
+            `${id}: ${heldId} boarded somebody while it was out of service`,
+          ).toHaveLength(0);
+        }
+      }
+    },
+    120_000,
+  );
 });
 
 describe('which car is held is a decision, not a draw', () => {
