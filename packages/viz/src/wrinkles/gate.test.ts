@@ -185,6 +185,29 @@ describe('the gate will not average the replications that survived', () => {
   }, 120_000);
 });
 
+describe('sharing one control run across a sweep changes no verdict', () => {
+  it('gives a wrinkle the same answer through gateLibrary as through gateWrinkle alone', () => {
+    /*
+     * `gateLibrary` runs the control day **once** for the whole sweep rather than once per wrinkle,
+     * because `dayOf(input, null)` never reads `input.wrinkle` — so every wrinkle was re-simulating
+     * a byte-identical control. That is half the sweep's cost, and it was enough to push this file
+     * past its own per-case timeouts on a loaded machine.
+     *
+     * The saving is only safe if it changes no answer, and that is a claim about behaviour rather
+     * than about the code, so it is checked here rather than argued in the docstring. Both routes
+     * are driven for the same wrinkle and the whole verdict is compared — ranking, swapped pair,
+     * interval and reason, not merely the keep/discard bit.
+     */
+    const alone = gateWrinkle(inputFor('move-in:two-thirds'));
+    const { wrinkle: _ignored, ...sweep } = inputFor('ordinary');
+    const viaSweep = gateLibrary(WRINKLE_LIBRARY, sweep).find(
+      (verdict) => verdict.wrinkleId === 'move-in:two-thirds',
+    );
+    expect(viaSweep, 'the sweep did not reach move-in:two-thirds').toBeDefined();
+    expect(viaSweep).toEqual(alone);
+  }, 120_000);
+});
+
 describe('the gate discriminates — the case this file exists for', () => {
   it('keeps some of the shipped library and discards the rest, over a real building', () => {
     /*
