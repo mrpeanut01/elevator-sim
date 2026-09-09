@@ -1439,8 +1439,8 @@ so a reviewer can disagree with the reason rather than with the digit.
 | **S11 `.outbox.jsonl`** | **No horizon, and it is never swept** | Nothing in the product. It is a file on a developer's machine and is unreachable in production (§ 5.3). Stated rather than fixed, because the erasure route makes no claim over files on a development machine |
 | **D1 `elevator-sim.session`** | **Until the player clears it**, or the browser does | *Clear saved progress* on the settings screen — GitHub issue #229, `settingsScreen.ts:459`, a two-press arc whose second press calls `engineerBridge.clearSavedSession()` and then reloads. Also the browser's own site-data clear |
 | **D2 `elevator-sim.everyday-profile`** | **Until the player clears it**, or the browser does | The same control, in the same press: `store.clear()` runs immediately after the bridge call. The row's `ready` string names this slot's contents exactly — *"the solved cases and the ratings, and the name and picture above"* |
-| **D3 `elevator-sim:career`, `:career:refused`** | **Until the browser's own site-data clear** | **Not reached by *Clear saved progress*** — the handler removes two slots and this is not one of them (§ 16.6). Nothing else in the product removes it |
-| **D4 `elevator-sim.viewMode`, `.revealedTabs`** | **Until the browser's own site-data clear** | The same: not reached by *Clear saved progress* (§ 16.6). Interface state rather than progress, which is why it is the less troubling half of that finding |
+| **D3 `elevator-sim:career`, `:career:refused`** | **Until the player clears it** | ***Clear saved progress*** removes both keys and seals the store, so the running session cannot write the career back (§ 16.6). Was not reached until 2026-09-09 |
+| **D4 `elevator-sim.viewMode`, `.revealedTabs`** | **Until the browser's own site-data clear** | **Not reached by *Clear saved progress*, deliberately** — `dev/main.ts` calls both *disclosure, per-browser, and neither is progress*, so a control named for progress leaves them (§ 16.6) |
 | **D5 the bearer token** | The tab | Held in memory only (`menu/account.ts:73`); closing the page ends it |
 | **S13 problem reports** | § 16.5 | § 16.5 |
 | **S14 error reports** | **DRAFTED** — see § 16.2 | The sweep-on-write-and-boot mechanism § 5.2 already runs twice, if they land in this database at all |
@@ -1455,7 +1455,7 @@ exist.**
 |---|---|---|---|
 | **`DELETE /api/me`** | The account, and by cascade `sessions`, `login_tokens`, `entries`, `challenge_entries` — the set read out of `pg_constraint` rather than out of a list (§ 5.3) | Anything on the device; anything telemetry holds | **The route: yes** (`api.ts:333`). **A screen that presses it: no** |
 | **`POST /api/telemetry/forget`** | Telemetry rows for one `playerId` | The account; the device's other slots | **No** — there is no telemetry (§ 0 fact 1) |
-| ***Clear saved progress*** | D1 and D2 | Anything on the server; D3 and D4 (§ 16.6) | **Yes** (#229) |
+| ***Clear saved progress*** | D1, D2 and **D3** | Anything on the server; D4, which is disclosure rather than progress (§ 16.6) | **Yes** (#229) |
 
 **The first path's missing surface is the honest gap in this posture and it is not new.** § 11 has
 carried it since #254 landed: a route a player cannot press is not an erasure path a player can use.
@@ -1482,57 +1482,74 @@ unpublish what somebody has read, and it should not imply otherwise. So:
 
 **`LAWYER` — § 19 item 9.** This is the item most likely to come back changed.
 
-### 16.6 A finding: *Clear saved progress* clears two slots and the device holds six
+### 16.6 A finding, and its fix: *Clear saved progress* reached two slots of six
 
-**Measured on this tree, 2026-09-09.** `everyday/settingsScreen.ts:459`'s handler calls
-`bridge.clearSavedSession()` — which is `dev/main.ts:2635`, sealing the Engineer session and
-removing `elevator-sim.session` — and then `store.clear()`, which removes
-`elevator-sim.everyday-profile`. That is **two** slots.
+**Found while writing this section on 2026-09-09; fixed the same day.** This section recorded the
+defect and deliberately did not fix it, because a documentation lane rewriting a shipped promise is
+how a posture starts contradicting a product. It is kept in full below rather than replaced, because
+what it got right about the *shape* of the defect is what decided the fix.
 
-The origin holds **six**: those two, plus `elevator-sim:career`, `elevator-sim:career:refused`,
-`elevator-sim.viewMode` and `elevator-sim.revealedTabs` (§ 13.2, D1–D4; keys derived by grepping the
-literals rather than by reading a list).
+**What was measured.** `everyday/settingsScreen.ts`'s handler called `bridge.clearSavedSession()` —
+sealing the Engineer session and removing `elevator-sim.session` — and then `store.clear()`, which
+removed `elevator-sim.everyday-profile`. That is **two** slots, against **six** the origin holds
+(§ 13.2, D1–D4; keys derived by grepping the literals rather than by reading a list).
 
-**Two of the row's four strings disagree with each other, and that is the precise shape of it**
-(`everyday/settingsView.ts#CLEAR_PROGRESS_COPY`, `:441`).
+**Two of the row's four strings disagreed with each other**, and that was the precise shape of it:
 
-- The **`ready`** string enumerates, and its enumeration is **exactly right**: *"the week and its
-  banked days, the saved dispatchers, buildings and patterns, the solved cases and the ratings, and
-  the name and picture above"* — which is D1 and D2 and nothing else, correctly.
-- The **`cleared`** string summarises, and its summary **over-states**: *"Cleared. **Nothing this
-  device kept survives.**"* Four slots survive it, and one of them — the career — is progress in the
-  plainest sense of the word. `everyday/careerStore.ts` is reached from `everyday/host.ts:1374`, so
-  it is a live slot rather than a dormant one.
+- **`ready`** enumerated, and its enumeration was **exactly right** for the code — D1 and D2 and
+  nothing else.
+- **`cleared`** summarised, and its summary **over-stated**: *"Nothing this device kept survives."*
+  Four slots survived it, one of them the career, which is progress in the plainest sense.
 
-That split matters, because it says what kind of defect this is: not a control that does less than
-it was designed to, but **a summary sentence that is broader than the enumeration two states
-earlier**. The enumeration was written against the code; the summary was written against the
-intention.
+So it was **a summary sentence broader than the enumeration two states earlier**, not a control that
+did less than it was designed to. The enumeration was written against the code; the summary against
+the intention.
 
-**This is recorded and not fixed here, and the reason is the rule rather than the scope.** Changing
-that sentence or that handler is a change to a shipped player-facing surface, its honesty-corpus
-strings and #229's own acceptance criteria; a documentation lane rewriting a shipped promise is how a
-posture starts contradicting a product. What this section can do is refuse to build the posture on
-top of a claim that does not reproduce. **So § 16.3's rows say what each slot's deletion path
-actually is, and the notice (§ 15.5 item 6) says *what each one does and does not reach* rather than
-that clearing reaches everything.**
+#### Which of the two possible fixes, and why it was not the cheaper one
 
-**Two readings are possible and only one is checked.** Either the summary is wrong, or *kept* is
-meant as narrowly as the enumeration and the career, the view mode and the revealed tabs are not
-*"what this device kept"* — a reading the career slot makes hard to sustain. **Which it is has not
-been decided by anybody**, and naming a likely intention in place of a measurement is what
-[§ D256](../DECISIONS.md) refuses. It belongs to whoever owns #229's control. **`LAWYER` — § 19
-item 16**, because a notice may not repeat a product claim that this document has just measured as
-not reproducing.
+The section above left the choice open and said so. It has been made, and **the deciding evidence is
+a date rather than a preference**:
+
+- The handler and its copy landed **2026-09-06**, in a commit whose own subject reads *"Clear saved
+  progress clears **both slots** and seals the session"*. On that day two slots **were** every byte
+  of progress the device held, and `ready` was complete.
+- Career persistence landed **2026-09-07** — the next day, GitHub issue #375 — and nobody came back
+  to the clear control.
+
+So `ready`'s enumeration was **not a deliberate boundary**; it was a correct statement that went
+stale when something else landed, which is the defect class `CLAUDE.md` records for published
+numbers, stated mechanisms and stated refusals. Narrowing `cleared` to match it would have written
+the staleness into the product's promise and called the result honest.
+
+**So the handler was widened.** *Clear saved progress* now clears the career — both
+`elevator-sim:career` and the quarantined `:career:refused`, because a refused career is still a
+career this device kept — and `ready` names it. `cleared`'s *"nothing this device kept survives"* is
+true as written for everything the control claims.
+
+**D4 is left, and that is also a decision rather than an omission.** `dev/main.ts` calls
+`viewMode` and `revealedTabs` *"disclosure, both per-browser, and neither is progress"*, in its own
+words and before this question arose. A control named *Clear saved progress* that reset which tabs a
+player had revealed would be reaching past its name. They go with the browser's own site-data clear,
+and § 16.3 says so.
+
+**The seal is the half that is easy to miss.** #229's criterion is not *removes the bytes* — it is
+*"Clear saved progress works, **including preventing the running session from rewriting the store**"*.
+The host holds the career in memory and saves it on the player's next action, so a `clear` that only
+removed would be undone before the reload it is followed by. `CareerStore.clear()` seals first and
+removes second, which is `dev/main.ts#clearSavedSession`'s own order. Two cases in
+`campaign/careerPersist.test.ts` hold it, and both fail if the seal is taken out — checked by taking
+it out.
 
 ### 16.7 What a player who wants everything gone actually does today, end to end
 
 **Written as a walk-through rather than as a policy, because a deletion story that has never been
 walked is a deletion story with a gap in it.** Everything below is the tree as it is on 2026-09-09.
 
-1. **On the device.** Settings → *Clear saved progress* → press twice. Reaches D1 and D2, and
-   **not** D3 or D4 (§ 16.6). The rest of the origin goes with the browser's own *clear site data*,
-   which the player does themselves and this product cannot do for them.
+1. **On the device.** Settings → *Clear saved progress* → press twice. Reaches D1, D2 and **D3** —
+   the week, this side's own slot, and the career including a quarantined one — and seals each so
+   the running session cannot write any of them back before the reload. It does **not** reach D4,
+   which is disclosure rather than progress (§ 16.6). The rest of the origin goes with the browser's
+   own *clear site data*, which the player does themselves and this product cannot do for them.
 2. **The account.** `DELETE /api/me`, with a session bearer token, from `curl`. **There is no screen
    for it** (§ 16.4). A player who cannot use `curl` has no route at all today, and the honest
    consequence is that the deletion story is *incomplete* rather than *documented*.
@@ -1706,7 +1723,7 @@ decision needs a list.
 | **13** | 17.2 | **If consent is the basis, what happens below a jurisdiction's digital age?** § 14 and § 17 are not independent | Whether an age field exists at all |
 | **14** | 17.1 | **Facts 6 and 7** — a child publishing typed words, and a child's name on a public board. Do they need handling that the telemetry position does not reach? | #245's surface, and S2's |
 | **15** | 16.4 | **May this posture be published while account deletion is `curl`-only?** The route exists; no screen presses it | Whether a viz lane is a blocker for the notice |
-| **16** | 16.6 | ***Clear saved progress* clears two of the six slots this origin holds**, and its `cleared` string says *"Nothing this device kept survives"* while its `ready` string enumerates correctly. The notice may not repeat a claim measured as not reproducing | Whether the notice describes the control narrowly, or the control is fixed first |
+| **16** | 16.6 | **Resolved 2026-09-09 — the control was fixed rather than the notice narrowed.** *Clear saved progress* now reaches D1, D2 and D3 and seals each, so `cleared`'s *"nothing this device kept survives"* holds for everything it claims. What is left for a reviewer is narrower: **D4 (`viewMode`, `revealedTabs`) survives it deliberately**, so a notice saying *everything* would still over-state. Does the notice have to enumerate, or is *your saved progress* enough? | Whether the notice may say *progress* and leave interface state unsaid |
 | **17** | 5.1, 5.3 | **Accounts and board entries have no retention horizon** — *"an account nobody deletes is kept"*. Is a stated policy an acceptable answer where a period is expected? | Issue #202's AC2, and whether a horizon has to be invented |
 | **18** | 16.2 | **The error-report horizon is drafted and blank.** #242's runbook has to exist before a number here means anything | Whether #242 can ship before its runbook |
 | **19** | — | **Is anything in § 13.2 special-category?** The author's reading is no — no health, biometric, political or similar field exists — but the reading is a non-lawyer's | Whether a whole additional regime applies |
