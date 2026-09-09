@@ -997,7 +997,10 @@ describe('the rest of the sheet', () => {
     // tomorrow is 1.44/1.33 − 1 = 8.3 % busier than today, not 11 % — and a number on a forecast
     // card is a claim.
     const report = reportOf(clean, 4);
-    expect(report.forecast.name).toBe(SHIFT_EVENTS['fire-drill'].name);
+    // The event is read off the draw rather than named — GitHub issue #159. It was `fire-drill`
+    // under the `day % 5` rota; § 17's rotation draw picks from `data/wrinkles.json` and this case
+    // is about the growth figure, not about which wrinkle tomorrow is.
+    expect(report.forecast.name).toBe(eventFor(5, 4).name);
     expect(report.forecast.demand).toBe('+8.3% more tenants than today');
     expect(report.forecast.demand).not.toContain('+11');
     expect(report.nextDayName).toBe('Friday');
@@ -1016,10 +1019,17 @@ describe('the rest of the sheet', () => {
     const movingWeek = CALENDAR_PERIODS['moving-week'];
 
     it('names the period’s event, not the schedule’s, where the two disagree', () => {
-      // Today is Thursday, day 4; tomorrow is Friday, day 5, whose slot is `5 % 5 === 0` — a fire
-      // drill on the ordinary schedule. The period books a move-in, and the run tomorrow gets is
-      // built from the period.
-      expect(eventFor(5, 4).id).toBe('fire-drill');
+      /*
+       * Today is Thursday, day 4; tomorrow is Friday, day 5. The period books a `move-in` and the
+       * run tomorrow gets is built from the period rather than from the week.
+       *
+       * What day 5's *own* draw is stopped being this case's business at GitHub issue #159 — it was
+       * `fire-drill` because `5 % 5 === 0` was the drill slot, and § 17's draw does not work that
+       * way. What the case needs is that the two genuinely disagree, so that is what it asserts.
+       */
+      expect(eventFor(5, 4).id, 'the week already draws the move-in the period books').not.toBe(
+        'move-in',
+      );
       const report = reportOf(clean, 4, movingWeek);
       expect(report.forecast.name).toBe(SHIFT_EVENTS['move-in'].name);
       expect(report.forecast.note).toBe(SHIFT_EVENTS['move-in'].note);
@@ -1053,7 +1063,9 @@ describe('the rest of the sheet', () => {
        * period's to say*.
        */
       const report = reportOf(clean, 6, movingWeek);
-      expect(report.forecast.name).toBe(SHIFT_EVENTS.weekend.name);
+      // The week's own Sunday draw, whichever weekend wrinkle that is — issue #159. Naming
+      // `weekend` pinned one of five weekend templates and the point is the fallback, not the row.
+      expect(report.forecast.name).toBe(eventFor(7, 6).name);
       expect(report.nextDayName).toBe('Sunday');
     });
 
@@ -1061,7 +1073,7 @@ describe('the rest of the sheet', () => {
       // The regression guard. `null` is *no calendar*, and the card's answer must be byte-identical
       // to the one it gave before the period could reach it.
       expect(reportOf(clean, 4, null).forecast).toEqual(reportOf(clean, 4).forecast);
-      expect(reportOf(clean, 4, null).forecast.name).toBe(SHIFT_EVENTS['fire-drill'].name);
+      expect(reportOf(clean, 4, null).forecast.name).toBe(eventFor(5, 4).name);
     });
   });
 

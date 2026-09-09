@@ -58,6 +58,7 @@ import { initialMenuState, updateFreePlay, updateSettings } from '../menu/menu.j
 import { VIZ_SCHEMA_VERSION } from '../contract/types.js';
 import { DEFAULT_SETTINGS, PLAYBACK_SPEEDS, type MenuState } from '../menu/types.js';
 import { CONTRACTS } from '../shift/contracts.js';
+import { eventFor } from '../shift/events.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { WeekState } from '../shift/types.js';
 import {
@@ -156,6 +157,14 @@ const PERFECT = Object.freeze({
  * `openWeek()` would round-trip through a module that persisted nothing, because every field is
  * already at its default. This one is the fixture every restore assertion below is compared
  * against, and `is not a fresh week` is asserted before it is used.
+ *
+ * **The event ids come from `eventFor`, not from this file — GitHub issue #159.** They were the
+ * literals `'ordinary'` and `'move-in'`, which is what let the case below named *"accepts what the
+ * shipped constructors actually produce"* stop doing that without going red: § 17's rotation draw
+ * made `DayOutcome.eventId` a **drawn** id (`shaft-out:morning`), `persist/validate.ts` was still
+ * checking it against the closed seven, and every restore of a week played past day 1 was refused
+ * — which `session.ts` turns into a discarded week, streak, library and settings. A fixture that
+ * hand-writes what a constructor produces cannot catch a constructor that changed.
  */
 function playedWeek(): WeekState {
   const day1 = outcomeOf({
@@ -163,7 +172,7 @@ function playedWeek(): WeekState {
     recordRefusal: null,
     day: 1,
     dayIdx: 0,
-    eventId: 'ordinary',
+    eventId: eventFor(1, 0).id,
     arrived: 500,
     carried: 498,
     minutePct: 91.5,
@@ -174,7 +183,7 @@ function playedWeek(): WeekState {
     recordRefusal: null,
     day: 2,
     dayIdx: 1,
-    eventId: 'move-in',
+    eventId: eventFor(2, 1).id,
     arrived: 540,
     carried: 500,
     minutePct: 74.25,

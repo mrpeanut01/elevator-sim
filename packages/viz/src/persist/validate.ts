@@ -83,9 +83,9 @@ import type { SavedBuilding, SavedDispatcher, SavedPattern } from '../dev/state.
 import { validateBuilding } from '../editor/editorValidate.js';
 import { PLAYBACK_SPEEDS, type FreePlaySelection, type Settings } from '../menu/types.js';
 import { contractById } from '../shift/contracts.js';
+import { eventById } from '../shift/events.js';
 import {
   GOAL_OBSERVATION_IDS,
-  SHIFT_EVENT_IDS,
   WEEKDAYS,
   type ClearedAward,
   type DayOutcome,
@@ -215,7 +215,7 @@ function isKeyOf(table: Readonly<Record<string, true>>): FieldCheck {
       : at(path, `is ${typeName(value)}, not one of ${allowed.join(', ')}`);
 }
 
-/** One of a set some shipped module already declares — `WEEKDAYS`, `SHIFT_EVENT_IDS`. */
+/** One of a set some shipped module already declares — `WEEKDAYS`, `PLAYBACK_SPEEDS`. */
 function isOneOf(allowed: readonly unknown[], what: string): FieldCheck {
   return (value, path) =>
     allowed.includes(value) ? undefined : at(path, `is not one of the ${what} this build offers`);
@@ -404,7 +404,29 @@ const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.fr
   day: isIntegerAtLeast(1),
   dayIdx: isIntegerWithin(0, WEEKDAYS.length - 1),
   weekday: isOneOf(WEEKDAYS, 'weekdays'),
-  eventId: isOneOf(SHIFT_EVENT_IDS, 'shift events'),
+  /*
+   * A wrinkle this build still holds, rather than one of a closed list of seven — GitHub issue
+   * **#159**, and this check is the one the widening nearly broke.
+   *
+   * `DayOutcome.eventId` records what a finished day **drew**, and since § 17's rotation draw that
+   * is a drawn id (`shaft-out:morning`) rather than one of `SHIFT_EVENT_IDS`. Left as
+   * `isOneOf(SHIFT_EVENT_IDS, …)` this rejected every day but the three in the first three weeks
+   * whose draw happens to be one of the seven — and `session.ts` makes a restore all-or-nothing, so
+   * a player who had played two days lost the week, the streak, the banked days, the parked weeks
+   * and their settings on reload. Found in review, not by a test: `persist.test.ts`'s `playedWeek`
+   * hand-wrote its ids instead of asking `eventFor`, which is why a case named *"accepts what the
+   * shipped constructors actually produce"* stopped doing that without going red.
+   *
+   * `eventById` rather than a shape rule on the string, because the question a restore has to
+   * answer is *does this build still have that wrinkle* — the same question `isOneOf` was asking,
+   * against the library that now answers it. A day naming a template a later library dropped is
+   * refused exactly as before, which is the behaviour `session.ts`'s docstring describes for a
+   * renamed scenario.
+   */
+  eventId: (value, path) =>
+    typeof value === 'string' && eventById(value) !== undefined
+      ? undefined
+      : at(path, 'is not one of the wrinkles this build offers'),
   arrived: isIntegerAtLeast(0),
   carried: isIntegerAtLeast(0),
   minutePct: isNumberWithin(0, 100),

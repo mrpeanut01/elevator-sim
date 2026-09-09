@@ -277,7 +277,15 @@ export function openWeek(contractId: string = FIRST_CONTRACT_ID): WeekState {
 export interface DayOutcomeInput {
   readonly day: number;
   readonly dayIdx: number;
-  readonly eventId: ShiftEventId;
+  /**
+   * The wrinkle this day actually drew — a **drawn** id, so it may name a template's chosen axis
+   * values (`shaft-out:morning`) and not only a template.
+   *
+   * Widened from `ShiftEventId` by GitHub issue #159. A calendar *booking* is still a
+   * `ShiftEventId`, because a period books a template by a literal id and indexes `SHIFT_EVENTS`
+   * with it; a finished day records what was drawn, and the library that draws it is data.
+   */
+  readonly eventId: string;
   readonly arrived: number;
   readonly carried: number;
   /** The observation the sparkline and the *best day so far* figure both read. */

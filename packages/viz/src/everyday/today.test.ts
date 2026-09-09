@@ -26,6 +26,7 @@ import type { BrowserResources } from '../dev/data.js';
 import { initialState, resolvedBuildingOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { CALENDAR_PERIODS, periodOnDays, scheduledEventFor } from '../shift/calendar.js';
+import type { ShiftEvent } from '../shift/types.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
@@ -100,27 +101,56 @@ describe('the wrinkle is the day’s event, not this module’s choice', () => {
   });
 
   it('says nothing about a car on a day that holds none', () => {
-    // `ordinary` writes nothing: no cars out, no derate. There is no strip to draw.
-    const ordinary = recordFor(midtown, 2, 1);
-    expect(scheduledEventFor(NO_CALENDAR, 2, 1).id).toBe('ordinary');
+    /*
+     * A day whose wrinkle holds no car has no strip to draw. The day is **found rather than
+     * pinned** — GitHub issue #159: this named day 2, which was `ordinary` under the `day % 5`
+     * rota, and § 17's rotation draw over `data/wrinkles.json` decides which day is which now.
+     */
+    const quiet = weekdayWhere((event) => holdOf(event) === 0);
+    const ordinary = recordFor(midtown, quiet.day, quiet.dayIdx);
     expect(ordinary.outOfService).toBeUndefined();
   });
 });
 
+/** Cars a wrinkle takes off the group, whole-shift holds and timed derates alike. */
+function holdOf(event: ShiftEvent): number {
+  return event.effect.carsOutOfService + (event.effect.derate?.cars ?? 0);
+}
+
+/**
+ * The first weekday inside a month whose own wrinkle satisfies `wanted`.
+ *
+ * Days are **found rather than named** since GitHub issue #159. These cases used to say *day 2 is
+ * ordinary* and *day 3 is the move-in*, which were facts about the `day % 5` rota; § 17's rotation
+ * draw decides now, and a fixture that names a day goes stale on every library edit. Throws rather
+ * than skipping if no such day exists, because a suite that quietly stopped checking the strip is
+ * worse than one that fails.
+ */
+function weekdayWhere(wanted: (event: ShiftEvent) => boolean): { day: number; dayIdx: number } {
+  for (let day = 1; day <= 40; day += 1) {
+    const dayIdx = (day - 1) % 7;
+    if (dayIdx >= 5) continue;
+    if (wanted(scheduledEventFor(NO_CALENDAR, day, dayIdx))) return { day, dayIdx };
+  }
+  throw new Error('no weekday inside 40 days draws a wrinkle matching the fixture’s need');
+}
+
 describe('the badge names the car the run actually holds', () => {
   it('is `carsToDerate`’s own choice, so the brief and the kernel cannot disagree', () => {
-    // Day 3 is the move-in, whose effect derates one car for the first two thirds of the shift.
-    const moveIn = scheduledEventFor(NO_CALENDAR, 3, 2);
-    const held = moveIn.effect.carsOutOfService + (moveIn.effect.derate?.cars ?? 0);
-    expect(held).toBeGreaterThan(0);
-    const record = recordFor(midtown, 3, 2);
+    // A day whose wrinkle holds a car — found, not pinned, for the reason above.
+    const busy = weekdayWhere((event) => holdOf(event) > 0);
+    const held = holdOf(scheduledEventFor(NO_CALENDAR, busy.day, busy.dayIdx));
+    const record = recordFor(midtown, busy.day, busy.dayIdx);
     const choice = carsToDerate(midtown, held);
     expect(record.outOfService?.badge).toBe(choice.held.map((car) => car.carId).join(' · '));
   });
 
   it('defers to the event’s own note for *when*, rather than restating a duration', () => {
-    const record = recordFor(midtown, 3, 2);
-    expect(record.outOfService?.sentence).toContain(scheduledEventFor(NO_CALENDAR, 3, 2).note);
+    const busy = weekdayWhere((event) => holdOf(event) > 0);
+    const record = recordFor(midtown, busy.day, busy.dayIdx);
+    expect(record.outOfService?.sentence).toContain(
+      scheduledEventFor(NO_CALENDAR, busy.day, busy.dayIdx).note,
+    );
   });
 });
 
@@ -134,7 +164,9 @@ describe('the facts come from the resolved building', () => {
   });
 
   it('pairs each car’s capacity with what the working group lifts in one trip', () => {
-    const record = recordFor(garden, 2, 1);
+    // A day with every car working, found rather than named — issue #159, as above.
+    const whole = weekdayWhere((event) => holdOf(event) === 0);
+    const record = recordFor(garden, whole.day, whole.dayIdx);
     const cars = garden.banks.reduce((total, bank) => total + bank.cars.length, 0);
     const smallest = Math.min(
       ...garden.banks.flatMap((bank) => bank.cars.map((car) => car.designCapacityPersons)),
@@ -181,8 +213,16 @@ describe('the load reading', () => {
   });
 
   it('reads busier when a car goes out, on the same building and the same population', () => {
-    const quiet = recordFor(midtown, 2, 1);
-    const derated = recordFor(midtown, 3, 2);
+    /*
+     * One day with every car, one with a car out — both found rather than named, issue #159. This
+     * read `(2, 1)` against `(3, 2)`, which were `ordinary` and `move-in` under the `day % 5` rota.
+     * § 17's draw put a derate on day 2 and a demand-only wrinkle on day 3, so the pair inverted
+     * and the case failed for a reason that had nothing to do with the load reading.
+     */
+    const wholeDay = weekdayWhere((event) => holdOf(event) === 0);
+    const shortDay = weekdayWhere((event) => holdOf(event) > 0);
+    const quiet = recordFor(midtown, wholeDay.day, wholeDay.dayIdx);
+    const derated = recordFor(midtown, shortDay.day, shortDay.dayIdx);
     const perCarOf = (word: string): number =>
       Number((word.match(/^([\d,]+)/)?.[1] ?? '0').replace(/,/g, ''));
     expect(perCarOf(derated.load?.word ?? '')).toBeGreaterThan(perCarOf(quiet.load?.word ?? ''));

@@ -297,9 +297,18 @@ describe('the instrument reproduces the builder it stands in for', () => {
   });
 
   it('measures a day whose own scheduled event changes nothing', () => {
-    // Derived rather than assumed. Day 1 is an ordinary Monday today; if `eventFor`'s arithmetic
-    // moves, this says so rather than letting a period's result be an event's.
-    expect(SHIFT_EVENTS[eventFor(1, 0).id].effect.changesNothing).toBe(true);
+    /*
+     * Day 1, and **still day 1** — GitHub issue #159. This was briefly rewritten to search days
+     * 1–28 for any quiet weekday, on the premise that § 17's rotation draw had moved `ordinary` off
+     * day 1. It had not: `wrinkles/draw.ts` indexes on `day - 1` precisely so that day 1 draws the
+     * one wrinkle that changes nothing, which is § 20.13, and `wrinkles.test.ts` pins it as the
+     * first entry of the four-week schedule. The search version passed while checking something
+     * weaker than what this block needs — every case around it uses `monday()`, which *is* day 1 —
+     * so the precondition that matters had quietly stopped being guarded.
+     */
+    expect(eventFor(1, 0).effect.changesNothing, 'day 1 must be a day a period can be measured against').toBe(
+      true,
+    );
   });
 });
 
@@ -371,7 +380,10 @@ describe('one answer to what event a day is under — issue #135', () => {
     // any drift here would move every day of it.
     for (let day = 1; day <= 14; day += 1) {
       const dayIdx = (day - 1) % 7;
-      expect(scheduledEventFor(null, day, dayIdx), `day ${String(day)}`).toBe(
+      // `toEqual` rather than `toBe` since GitHub issue #159: `eventFor` composes a wrinkle per
+      // call rather than returning one of seven shared frozen objects, so two calls are equal and
+      // not the same object. Byte-identical is what this test means and what it still checks.
+      expect(scheduledEventFor(null, day, dayIdx), `day ${String(day)}`).toEqual(
         eventFor(day, dayIdx),
       );
     }
@@ -394,7 +406,23 @@ describe('one answer to what event a day is under — issue #135', () => {
       expect(booked.id, `day ${String(day)}`).toBe(named ?? schedule.id);
       if (booked.id !== schedule.id) differ.push(day);
     }
-    expect(differ).toEqual([1, 2, 4, 5, 6]);
+    /*
+     * Derived rather than pinned — GitHub issue #159. This read `[1, 2, 4, 5, 6]` when the rota was
+     * `day % 5` and day 3 happened to draw the very `move-in` the period books, so the two agreed
+     * there and day 3 was absent. § 17's draw moved that coincidence, and re-pinning the new list
+     * would only wait for the next library edit to break it — and deriving the list from the same
+     * two expressions the loop compares would restate the loop rather than check it. What the case
+     * is actually for is the non-vacuity the comment above worries about: the substantive assertion
+     * is the per-day one inside the loop, and this is the guard that keeps it from being vacuous.
+     *
+     * A day the period books differs now even where it books the very template the draw chose,
+     * because a booking names a template at its base and a draw names a template *and the axis
+     * values it picked* — `move-in` against `move-in:two-thirds`, which are two different windows
+     * and so two different runs.
+     */
+    expect(differ.length, 'the period changes no day, so this case proves nothing').toBeGreaterThan(
+      0,
+    );
   });
 
   it('hands the day back when a period names no event, rather than inventing a quiet one', () => {
@@ -422,13 +450,17 @@ describe('one answer to what event a day is under — issue #135', () => {
      * `shiftRunConfigOf` itself rather than through this file's harness, because the whole issue is
      * that the *description* and the *run* were two expressions and a harness is a third.
      *
-     * Day 5 on the ordinary schedule is a fire drill; `moving-week` books a move-in. Two different
-     * events, so two different runs. A `scheduledEventFor` that fell back to the schedule, or a
+     * Day 5's own wrinkle and the `move-in` `moving-week` books are two different events, so two
+     * different runs. A `scheduledEventFor` that fell back to the schedule, or a
      * `shiftRunConfigOf` that stopped consulting it, would make these identical.
+     *
+     * **Which** wrinkle day 5 draws is no longer named — GitHub issue #159. It was `fire-drill`
+     * under the `day % 5` rota; § 17's draw picks from the library and the case does not care, so
+     * it asserts the difference it depends on rather than a table it does not.
      */
     const friday = { ...monday(), week: { ...monday().week, day: 5, dayIdx: 4 } };
-    expect(eventFor(5, 4).id).toBe('fire-drill');
     expect(scheduledEventFor(CALENDAR_PERIODS['moving-week'], 5, 4).id).toBe('move-in');
+    expect(eventFor(5, 4).id, 'day 5 draws the very event the period books').not.toBe('move-in');
 
     const legs = (state: ViewerState): string => {
       const plan = shiftRunConfigOf(RESOURCES, state);

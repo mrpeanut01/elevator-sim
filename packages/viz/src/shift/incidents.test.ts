@@ -23,7 +23,7 @@ import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 
-import { SHIFT_EVENTS, shiftRunPatch, baseDemandOf } from './events.js';
+import { eventFor, SHIFT_EVENTS, shiftRunPatch, baseDemandOf } from './events.js';
 import { carsToDerate, serviceEventsFor, withIncidents, type Incident } from './incidents.js';
 
 /** Midtown Office: four cars in one bank, 1 710 people. A building where losing a car matters. */
@@ -132,10 +132,27 @@ describe('an incident is two service events', () => {
  * -------------------------------------------------------------------------- */
 
 describe('the incident reaches the simulation', () => {
-  /** The `move-in` day. `eventFor`'s schedule puts it on day 3, and its effect is the derate. */
+  /**
+   * A day whose draw is `move-in`, **found rather than pinned** — GitHub issue #159.
+   *
+   * This was day 3, because the old `day % 5` rota put `move-in` there. § 17's rotation draw over
+   * `data/wrinkles.json` moved it, and a fixture that names a day number is a fixture that goes
+   * stale every time the library gains a row. So it asks the draw which day, and fails saying that
+   * no weekday inside a month draws a `move-in` if the template ever leaves.
+   */
+  const dayDrawing = (templateId: string): { day: number; dayIdx: number } => {
+    for (let day = 1; day <= 40; day += 1) {
+      const dayIdx = (day - 1) % 7;
+      if (dayIdx >= 5) continue;
+      if (eventFor(day, dayIdx).id.split(':')[0] === templateId) return { day, dayIdx };
+    }
+    throw new Error(`no weekday inside 40 days draws ${templateId}`);
+  };
+
   const moveInDay = (): ViewerState => {
     const state = busy();
-    return { ...state, week: { ...state.week, day: 3, dayIdx: 3 } };
+    const { day, dayIdx } = dayDrawing('move-in');
+    return { ...state, week: { ...state.week, day, dayIdx } };
   };
 
   it('is the day the schedule says it is', () => {
@@ -173,15 +190,31 @@ describe('the incident reaches the simulation', () => {
     );
     expect(events.length, 'the grown building carries the incident').toBe(2);
 
+    /*
+     * The window is read off the drawn wrinkle rather than written here — GitHub issue #159. It was
+     * `0` and `1200`, the first two thirds of an 1 800 s shift, because `move-in` had one hard-coded
+     * window. The library parameterises it, so which window this day drew is the library's to say
+     * and the assertion is the one that matters either way: the car boards nobody inside it and
+     * somebody after it.
+     */
+    const state = moveInDay();
+    const derate = eventFor(state.week.day, state.week.dayIdx).effect.derate;
+    expect(derate, 'the drawn move-in carries no derate').not.toBeNull();
+    const opensAt = (derate?.fromFraction ?? 0) * 1800;
+    const closesAt = (derate?.toFraction ?? 0) * 1800;
+
     const out = events.find((event) => event.mode === 'out-of-service');
     const back = events.find((event) => event.mode === 'in-service');
-    expect(out?.atS).toBe(0);
-    expect(back?.atS).toBe(1200);
+    expect(out?.atS).toBe(opensAt);
+    expect(back?.atS).toBe(closesAt);
 
     const derated = `${out?.bankId ?? ''}-${out?.carId ?? ''}`;
     const legs = runOf(moveInDay()).recording.legs.filter((leg) => leg.carId === derated);
-    const inWindow = legs.filter((leg) => (leg.boardedAt ?? Number.POSITIVE_INFINITY) < 1200);
-    const afterWindow = legs.filter((leg) => (leg.boardedAt ?? -1) >= 1200);
+    const inWindow = legs.filter((leg) => {
+      const at = leg.boardedAt ?? Number.POSITIVE_INFINITY;
+      return at >= opensAt && at < closesAt;
+    });
+    const afterWindow = legs.filter((leg) => (leg.boardedAt ?? -1) >= closesAt);
 
     expect(inWindow.length, `${derated} boarded somebody while it was out of service`).toBe(0);
     expect(afterWindow.length, `${derated} never came back`).toBeGreaterThan(0);
@@ -195,7 +228,10 @@ describe('the incident reaches the simulation', () => {
      *
      * If this ever fails, every figure measured on a day without an incident has quietly moved.
      */
-    const ordinary = busy();
+    // The day is found rather than pinned, for the reason `dayDrawing` gives — issue #159.
+    const quiet = dayDrawing('ordinary');
+    const base = busy();
+    const ordinary: ViewerState = { ...base, week: { ...base.week, ...quiet } };
     expect(SHIFT_EVENTS.ordinary.effect.derate).toBeNull();
     const plan = shiftRunConfigOf(RESOURCES, ordinary);
     expect(plan.building.serviceEvents ?? []).toEqual([]);
