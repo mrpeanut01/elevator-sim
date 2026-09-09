@@ -952,13 +952,24 @@ finds them, and adding that row is the integrator's step.
 
 ### 9.1 This is a second consent, and bundling it with the first is forbidden
 
-A playtest collects personal data, and it collects a **kind the product deliberately never
-collects**. [`docs/26-telemetry-and-privacy.md`](26-telemetry-and-privacy.md) `docs/26 P-4` is *no
-free text, ever* — *"a player-authored string can contain anything, including somebody else's
-personal data, and there is no field in this schema it can reach"* — and `docs/26 P-2` is *name the
-run; do not describe it*. **Neither rule can be applied here.** A session is free text by
-construction: a voice, a face, a screen, and a person's sentences. You cannot re-derive what somebody
-said from a seed.
+A playtest collects personal data, and it collects a **kind the product's own instrument never
+collects**. [`docs/26-telemetry-and-privacy.md`](26-telemetry-and-privacy.md) `docs/26 P-4` says
+typed text is **composed, never captured** — a player may type words the product keeps, and every
+such string is composed on purpose for a destination they were shown, while *"no string a player
+typed is swept into a measurement, attached to a metric, or carried by an event they did not
+compose"* — and `docs/26 P-2` is *name the run; do not describe it*. **Neither rule can be applied
+here.** A session is content by construction: a voice, a face, a screen, and a person's sentences,
+and nobody composed a recording of themselves thinking aloud for a destination. You cannot re-derive
+what somebody said from a seed.
+
+**That paragraph was rewritten on 2026-09-09 and the change is worth two sentences, because this
+document was the only site outside `docs/26` quoting the old rule.** `docs/26 P-4` used to read *"no
+free text, ever"*, and the product owner rewrote it rather than excepting it (GitHub issue #242,
+`docs/26` § 1.1's correction note). A quotation of a withdrawn rule is a stale refusal wearing a
+citation, and this section's own argument is unaffected: what a playtest holds was never permitted
+by `docs/26 P-4` before the rewrite and is not permitted by it after, because P-4's positive half
+turns on a destination the person was shown and its obligations — a stated destination, a retention
+row, a deletion path (`docs/26` § 13.4) — are exactly what §§ 9.2–9.6 below already give a tester.
 
 So the posture is not extended; it is **paralleled, with the difference stated**:
 
@@ -966,7 +977,7 @@ So the posture is not extended; it is **paralleled, with the difference stated**
 |---|---|---|
 | Default | Off. Nothing before an explicit grant (`docs/26 P-1`) | Off. No recording before a signed grant |
 | What is held | Pointers: a seed, a configuration, a vocabulary member | **Content**: voice, screen, notes, quotes |
-| Free text | Forbidden outright | **Unavoidable**, and it is the instrument |
+| Typed and spoken content | Composed for a stated destination, or not held at all (`docs/26 P-4`); no telemetry event carries any | **Unavoidable**, and it is the instrument |
 | Identity | A browser-profile `playerId`, unjoined | A person, known to the recruiter (§ 9.6) |
 | Grant | One question, on first load | **Five separate asks** (§ 9.2), in writing and again on camera |
 

@@ -1,11 +1,38 @@
 # 26 — Telemetry and privacy
 
+> # ⚠ THIS DOCUMENT HAS NOT BEEN REVIEWED BY A LAWYER, AND IT MAY NOT GO LIVE UNTIL IT HAS
+>
+> **Part B (§§ 12–19) is a draft privacy posture written by a non-lawyer.** It is not legal advice,
+> it is not settled, and no sentence in it may be published to a player, quoted in a privacy notice,
+> put on a consent surface, or relied on as a compliance position until a qualified professional has
+> reviewed it and the review is recorded here.
+>
+> **The lawful basis in § 14 is deliberately undecided.** It is written as options with their
+> consequences, for a reviewer to choose between. A lane that reads one of those options as the
+> answer has misread the section. The same is true of § 17's position on children.
+>
+> **§ 19 is the reviewer's checklist** — every question this draft could not answer, in one table, so
+> the review is a list rather than a reading. **Nineteen items.** Where an item is also raised in
+> the body it is marked `LAWYER` at the point it arises, with the item number beside it.
+>
+> This is the product owner's own condition, stated on issue #202 on 2026-09-09: *"I draft the
+> posture … and it ships marked as requiring professional legal review before it goes live. I am not
+> able to make that call and the document will say so on its face. Nothing that touches player data
+> ships on my judgement alone."*
+
 **Status: M1 pre-production specification. Written 2026-08-24 on the charter programme branch,
 against issues #201 (the telemetry schema and the player KPI set) and #202 (privacy, consent and
-data retention).** Specification only — nothing here changes a `.ts` file, a `data/*.json` file or a
+data retention). Part B added 2026-09-09 for #202, under three owner rulings taken that day
+(§ 12.1).** Specification only — nothing here changes a `.ts` file, a `data/*.json` file or a
 shipped string, and **this document does not create a telemetry module.** A specification that
 ships a module is a production issue wearing a specification's clothes, and M1's own character
 clause ([`CHARTER_PROGRAMME.md`](../CHARTER_PROGRAMME.md) § M1) refuses it.
+
+**Three rules in Part A were changed by those rulings rather than excepted, and each carries its
+correction where it stands** — `docs/26 P-4` (§ 1.1), the read-route refusal (§ 8) and § 1.3's
+parking of the legal questions. A rule left saying one thing while the product does another is this
+repository's documented stale-refusal defect ([`CLAUDE.md`](../CLAUDE.md)), and it is the reason
+none of the three was handled with an exception list.
 
 **The posture in § 1 is [§ D412](../DECISIONS.md)** (2026-08-29). That entry is an anchor: it adopts
 the posture and the ordering this document argues, and it does **not** license the schema — § 11's
@@ -79,10 +106,18 @@ re-running them reproduces the correction rather than the fact.
 > **P-3 — The schema is the allowlist.** An event not in § 7's table does not ship. An event that
 > answers no question stated in § 6 does not ship. Both directions are tested (§ 7.6).
 >
-> **P-4 — No free text, ever.** Every field is a number, a boolean, or a member of a vocabulary
-> derived from the product. A player-authored string — a building name, a dispatcher name, a display
-> name — can contain anything, including somebody else's personal data, and there is no field in
-> this schema it can reach.
+> **P-4 — Typed text is composed, never captured.** A player may type words this product keeps —
+> a display name, a name for something they saved, a problem report. Every such string is
+> **composed on purpose, for a destination the player is shown before they send it**, and carries
+> the three things § 13.4 requires of one: a stated destination, a retention row, and a deletion
+> path. What is forbidden is the other direction: **no string a player typed is swept into a
+> measurement, attached to a metric, or carried by an event they did not compose.** So every field
+> in § 7's schema is still a number, a boolean, or a member of a vocabulary derived from the
+> product, and there is no field in it a typed string can reach — not because typed text is
+> forbidden, but because **a telemetry event is composed by nobody**, and a string harvested into
+> one was never offered to a destination. The hazard the old rule named is unchanged and is why the
+> three requirements exist: a typed string can contain anything, including somebody else's personal
+> data.
 >
 > **P-5 — The client records; it never judges.** Every classification an event carries — a verdict,
 > a refusal ground, a screen — is read from the shipped surface's own classification, not recomputed.
@@ -94,6 +129,42 @@ re-running them reproduces the correction rather than the fact.
 > refused, every mode, every screen and every figure behaves identically. A build whose telemetry
 > refusal breaks the game has not offered a choice, and a run whose result depends on whether
 > anybody was watching is not a run.
+
+#### P-4 was rewritten on 2026-09-09, and this is what it said before
+
+It read **"No free text, ever"**, and under it: *"Every field is a number, a boolean, or a member of
+a vocabulary derived from the product. A player-authored string — a building name, a dispatcher
+name, a display name — can contain anything, including somebody else's personal data, and there is
+no field in this schema it can reach."*
+
+**Rewritten rather than excepted**, on the product owner's ruling of 2026-09-09 (GitHub issue #242):
+*"An exception list would leave the rule saying one thing and the product doing another, which is the
+stale-refusal defect this project keeps catching."* Three issues need words a player typed — #245's
+problem report, #242's error monitoring, and the display name that already ships — and a rule
+carrying three carve-outs is a rule nobody reads past the headline.
+
+**Three things worth saying about the old wording, because two of them were already wrong when it
+was written and nobody noticed.**
+
+1. **The headline over-stated the body.** *No free text, ever* is a claim about the product; the
+   sentence under it is a claim about **this schema** — *"there is no field in this schema it can
+   reach"* — and that narrower claim is still true and still enforced (§ 7.4, § 7.6's third test).
+   The rewrite keeps the enforcement and drops the over-statement.
+2. **The product already held player-typed text on the day the rule was written.**
+   `users.display_name` is a string a person types, 2–32 characters, refused only for control and
+   formatting characters (`packages/server/src/http/api.ts#displayNameIssues`), **rendered on every
+   board a stranger can read**, and it has been there since [§ D241](../DECISIONS.md). A posture
+   whose headline said *ever* was describing a product that had some. The old rule's own § 2.2 row
+   named the display name as an example of what could not reach the schema, which is exactly right
+   and is not what the headline said.
+3. **The hazard was never wrong.** A typed string can carry somebody else's personal data, and the
+   rewrite does not soften that — it moves it from a prohibition to a set of obligations that
+   attach wherever typed text is kept (§ 13.4), because obligations survive the arrival of a fourth
+   feature and a prohibition with three carve-outs does not.
+
+Every other site that quoted the old wording is corrected on the same commit —
+[`docs/30-playtest-programme.md`](30-playtest-programme.md) § 9.1 quoted it in full and is the only
+one outside this file.
 
 **On the numbering, because this document has just created a collision and saying so is cheaper
 than discovering it.** The charter's pillars are `charter P1`–`charter P5`. These rules are
@@ -121,10 +192,20 @@ Three reasons, and the third is the one that is specific to this repository.
 
 ### 1.3 What this document is not
 
-**Not a legal opinion, and not a privacy notice.** It states a posture and the mechanisms that
-implement it. Whether consent is the correct lawful basis in a given jurisdiction, what a published
-notice must say, and whether the product needs an age statement are questions for the product owner;
-they are listed in § 11 as open, and they are human decisions rather than lane decisions.
+**Not a legal opinion.** It states a posture and the mechanisms that implement it. Whether consent
+is the correct lawful basis in a given jurisdiction, what a published notice must say, and whether
+the product needs an age statement are **not answered by anybody in this repository**.
+
+**That sentence used to end differently and the change is the point.** It read *"are questions for
+the product owner … human decisions rather than lane decisions"*, and § 11 parked all three. The
+product owner's ruling of 2026-09-09 on issue #202 declines that framing for himself as well: he is
+not able to make the call either, so the three questions are **drafted** in Part B — as options with
+their consequences, and never as answers — and the draft ships marked for professional review. What
+changed is not who decides; it is that the questions are now written down in a form somebody
+qualified can decide *from*, instead of being a bullet saying they are open.
+
+**Still not a privacy notice.** § 15 drafts the words a player would be shown and says where they
+go; the published notice is the reviewed version of that, and it does not exist yet.
 
 **Not a licence to collect the maximum this posture permits.** Every rule below is a ceiling. The
 schema in § 7 sits well under it, and a later proposal that fills the remaining headroom has to make
@@ -176,7 +257,7 @@ rather than into a silence.
 |---|---|
 | **IP addresses** | Never persisted today (§ 0, fact 3), and telemetry does not change that. The socket peer is used in memory for a rate-limit key and is dropped |
 | **Email addresses, in any telemetry row** | The address exists for one purpose — mailing a sign-in link — and joining it to behaviour would give it a second purpose it was not collected for. § 3 makes the join structurally impossible rather than merely forbidden |
-| **Any player-authored string** | P-4. Names of saved buildings, dispatchers, patterns and display names are free text |
+| **Any player-authored string** | P-4's second half. Names of saved buildings, dispatchers, patterns and display names are typed by a person, and none of them was composed for a telemetry event. That they are *permitted to exist* since 2026-09-09 does not make them collectable here: the destination a player was shown is a board or their own device, and this schema is neither |
 | **URLs, referrers and query strings** | A deep link is somebody sending a finding to somebody else, and it can carry anything. The entry *screen key* is collected; the URL is not |
 | **Device fingerprints** | No user-agent string, no screen or viewport size, no timezone, no language, no font or canvas probe, no hardware counters. A fingerprint is an identifier that survives the player deleting theirs, which makes § 4.3's withdrawal a lie |
 | **Geolocation, precise or coarse** | Answers no question in § 6 |
@@ -705,7 +786,12 @@ whole premise: a vocabulary retyped in a telemetry module is a vocabulary that g
 | `run` | `SubmittedRun` from `packages/server/src/leaderboard/submission.ts`, unchanged (§ 2.1) |
 
 **No field in this schema has an unbounded string type** except `buildId` and the two random ids.
-That is P-4 expressed as a type rather than as a rule, and § 7.6's third test asserts it.
+That is P-4's second half expressed as a type rather than as a rule, and § 7.6's third test asserts
+it. **The 2026-09-09 rewrite does not relax this by one field.** P-4 now permits typed text where a
+player composed it for a destination they were shown; nobody composes a telemetry event, so the
+schema's shape is unchanged and the test that pins it is unchanged. If a later proposal wants a
+typed string in an event, the thing it has to defeat is not P-4's headline — it is the absence of a
+destination the player was ever offered.
 
 ### 7.5 What a first session looks like on the wire
 
@@ -762,8 +848,22 @@ second origin declared at build time. `staticwebapp.config.json` ships `connect-
 policy before any code runs — the product's Content-Security-Policy is already the enforcement
 mechanism for § 10's non-goal 2, and it predates this document. Ingest is therefore
 `POST /api/telemetry` on the existing API and nowhere else, and § 3.3's and § 4.3's erasure is
-`POST /api/telemetry/forget` beside it, taking a `playerId` and nothing else. **Two routes, and no
-third** — a schema that acquires a read route acquires a way to look a player up.
+`POST /api/telemetry/forget` beside it, taking a `playerId` and nothing else.
+
+**This paragraph used to end *"Two routes, and no third — a schema that acquires a read route
+acquires a way to look a player up"*, and that refusal was lifted on 2026-09-09.** The product owner
+ruled on issue #250 that the product may read its own collected data back; the KPI dashboard is the
+first consumer, and the ruling names this line by its old address (`docs/26:765`). **The refusal is
+rewritten rather than annotated**, for `docs/26 P-4`'s reason one section up: a refusal left standing
+after it stops being the rule is the more dangerous half of this repository's stale-refusal defect —
+it tells the next reader not to build the thing that has just been authorised.
+
+**What the withdrawn sentence got right is kept, because it was a true consequence rather than a
+false one.** A read route *is* a way to look a player up, and saying so was correct. What was wrong
+was treating that as unanswerable. **§ 18 is the answer**: three routes rather than two — ingest,
+forget, and a read route that is bounded so that the lookup the old sentence feared is the one shape
+it cannot perform. Read § 18 before building any of it; the ruling made the dashboard possible and
+made this section's bound a requirement rather than a preference.
 
 **Unauthenticated, and deliberately.** No bearer token, no cookies — the session is a bearer token in
 an `Authorization` header and never a cookie, and `Access-Control-Allow-Credentials` appears nowhere
@@ -881,6 +981,13 @@ it.
    that the server re-simulates, and it carries no behavioural data at all.)*
 5. **No session replay, heatmap, pointer track or keystroke capture.**
 6. **No data sold, shared, exported or made available to a third party**, in raw or aggregate form.
+   **One thing this does not forbid, stated because it would otherwise read as a contradiction the
+   day #245 lands.** A player who writes a problem report and presses send is **publishing their own
+   words**, to a destination named on the surface they typed into — the owner's ruling of 2026-09-09
+   sends those reports to public issues in this repository. That is the player disclosing, not the
+   product sharing, and the distinction only holds while the surface says so **before** the press
+   and in plain words (§ 13.4, § 15.4). Take that sentence off the surface and this non-goal is
+   breached, which is why the sentence is a requirement of the ruling rather than a nicety.
 7. **No profiling of an individual.** No per-player view, no segmentation into cohorts a person
    belongs to by behaviour, no targeting of anything at anyone.
 8. **No collection outside the schema.** § 7's table is the allowlist and § 7.6's first test is how
@@ -900,10 +1007,14 @@ Recorded here because a specification that hides its own open items is the defec
 prevent.
 
 - ✅ **§ 1's posture is [§ D412](../DECISIONS.md)** (2026-08-29), which adopts it and nothing more.
-- **The lawful basis, the published privacy notice, and whether an age statement is needed** are
-  human decisions and are not taken here (§ 1.3). No data class in § 7 is special-category, and the
-  product's one existing moderation surface — a player-chosen display name on a board — is
-  already governed where it lives.
+- ~~**The lawful basis, the published privacy notice, and whether an age statement is needed** are
+  human decisions and are not taken here (§ 1.3).~~ — **moved to Part B on 2026-09-09, and moved is
+  not settled.** They are now drafted: the lawful basis as options in § 14, the notice's words and
+  placement in § 15, children in § 17. **Every one of them is flagged `LAWYER` in § 19 and none is
+  decided.** Struck through rather than deleted, on this document's own § 0 rule: a register whose
+  rows are silently rewritten is one nobody can date. The two substantive claims in the old bullet
+  survive the move and are re-checked in § 13: no data class in § 7 is special-category, and the
+  display name is governed where it lives.
 - **The visible-trouble threshold and dwell** (`docs/26 K1`) belong to the stage and are owed by M2.
   Until they exist, `charter S1` has a schema and no constant.
 - **The control registry** (`controlKey`) is owed by M2 with the controls.
@@ -928,6 +1039,682 @@ prevent.
 - **Nothing in this document has been built, and no part of it may be reported as an instrument that
   exists.** Until the code lands, every `charter S1`–`charter S4` claim stays recorded as
   **unevaluated**, exactly as `RISKS.md` R31 requires.
+- **Part B's own open items are in § 19 and not repeated here**, so that a reader does not have to
+  reconcile two registers of the same debt. § 19 is a checklist for a legal reviewer; this section
+  is a register of engineering debt, and the two are different audiences.
+
+---
+
+# Part B — the privacy posture for the whole product
+
+*Written 2026-09-09 for GitHub issue #202, under the three owner rulings in § 12.1. **Draft. Not
+reviewed. Not legal advice.** The banner at the top of this document is the condition it ships
+under, and § 19 is the reviewer's list.*
+
+---
+
+## 12. Why Part B is here, and what it governs
+
+### 12.1 The three rulings that produced it
+
+All three were made by the product owner on 2026-09-09 and each is quoted from the GitHub issue that
+carries it, because a ruling paraphrased is a ruling that drifts.
+
+| # | Issue | The ruling | What it changed here |
+|---|---|---|---|
+| **1** | **#242** | *"`docs/26` P-4 — no free text, ever — is **rewritten rather than excepted**. An exception list would leave the rule saying one thing and the product doing another."* | `docs/26 P-4` (§ 1.1), its correction note, § 2.2's row, § 7.4, and [`docs/30`](30-playtest-programme.md) § 9.1 |
+| **2** | **#250** | *"The product may read its own collected data back. The read route `docs/26:765` forbade is allowed."* — conditional on this posture: *"who may read it and how long it is kept are part of that posture, and the dashboard should not ship ahead of it."* | § 8's refusal, and § 18 |
+| **3** | **#202** | *"I draft the posture … and it ships marked as **requiring professional legal review before it goes live**. I am not able to make that call and the document will say so on its face."* | The banner, § 1.3, § 14, § 17, § 19 |
+
+A fourth ruling on **#245** is not a privacy ruling and binds Part B anyway: problem reports go to
+**public issues in this repository**, and *"the surface has to say, plainly and next to the box, that
+what they write will be publicly visible. That is a requirement of this ruling, not a nicety."*
+§ 13.4 and § 15.4 carry it.
+
+### 12.2 Why this is a Part of `docs/26` and not a new document
+
+The obvious alternative was a sibling document — a new numbered file under `docs/`, the next free
+number being 40 — and it was rejected for a reason this repository has a name for. (Named without a
+backtick and without its extension on purpose: `validation/citations.test.ts` resolves every
+backticked markdown path against disk, and a file this section exists to say was *not* created would
+fail that guard. The same fix its own header recommends for a decision number written in prose.)
+
+**Three of Part A's rules had to change whichever way this went** — `docs/26 P-4`, § 8's read-route
+refusal, and § 1.3's parking of the legal questions. A posture whose rules live in one file and
+whose corrections live in another is a rule saying one thing while the product does another, one
+directory over: a reader who finds § 8 finds *"two routes, and no third"* and has no reason to go
+looking for a second document that lifted it. Ruling 1 exists precisely to refuse that shape, and
+taking it seriously means the correction sits where the rule sits.
+
+Three supporting reasons, none of them decisive alone:
+
+- **`docs/26` is already the privacy home in practice.** It carries the account data (§ 5.3), the
+  board entries and their seeds (§ 2.1), the erasure route, the two on-device slots telemetry
+  introduces (§ 5.1) and the whole consent design (§ 4). Issue #202's own verification comments
+  score its acceptance criteria against this file, section by section.
+- **§ 11 is a register of what this document does not settle, and Part B is that register being
+  discharged.** Discharging it from another file would leave § 11 pointing at debt it no longer
+  owns.
+- **Six lanes are running in parallel on this repository today**, and the next free document number
+  is one any of them could also take. That is the weakest reason and it is real.
+
+**The cost, stated rather than hidden.** This file is now long, and a reader who wants the account
+posture must scroll past a telemetry schema that is not built. The mitigation is structural rather
+than apologetic: **Part A is the telemetry instrument, Part B is the product's posture**, the
+banner says so at the top, and § 13's inventory is the entry point for anybody who came here to
+find out what the product holds.
+
+### 12.3 The rule that stops the two halves drifting
+
+> **One item, one row, one home.** Part B does not restate a retention horizon Part A already
+> carries. **§ 5.1 owns the seven classes in its own table**; § 16 owns everything else, and points
+> at § 5.1 for those seven by name rather than repeating them.
+
+Two tables answering *how long is a session kept* is how they come to disagree, and a figure that
+went stale because two places carried it is the failure [`CLAUDE.md`](../CLAUDE.md) records against
+this repository more often than any other.
+
+---
+
+## 13. What is collected, itemised, and why
+
+### 13.1 How to read this section, and what was measured
+
+**Every row is a thing that exists on this tree today unless its Status says otherwise.** Three
+statuses are used and the difference matters more than any other column:
+
+- **SHIPS** — in the product now. The row cites the code.
+- **SPECIFIED** — designed in Part A, **no code**, and it may not be described to anybody as an
+  instrument that exists (§ 11).
+- **PROPOSED** — an open issue wants it and nothing is designed. The row exists so the posture is
+  written *before* the collection, which is § 1.2's whole argument.
+
+**The six facts in § 0 were re-measured on 2026-09-09 before this section was written**, because an
+inventory argued from an assumed starting state is an inventory of a different repository. Commands
+as published, results as found:
+
+| § 0 fact | Re-measured 2026-09-09 | Moved? |
+|---|---|---|
+| 1 — no telemetry or analytics code | `grep -ril telemetry packages/*/src --include='*.ts'` → **3 files**, all of them a test, a test's regex or a comment saying there is none; `analytics` → **2 files**, both tests. `grep -rin telemetry packages/server/src` → **6 lines**, every one a comment or a test regex | **no** — the claim (*no telemetry code, route, table or event*) holds; the file count moved when `validation/documentation.test.ts` gained the case that asserts it |
+| 2 — one piece of personal data, an email address | `users.email`; `normaliseEmail` is still its only writer (`store.ts:243`, `:414`, `:441`) | **no** |
+| 3 — no IP address persisted | `clientIp` reaches `limiters.perCaller.charge` (`api.ts:412`) and nothing else; `grep clientIp packages/server/src/store/store.ts` → **nothing** | **no** |
+| 4 — no request log | three `console.*` sites outside tests, all in `main.ts` — two boot lines (`:80`, `:388`) and one fatal (`:407`). None carries a request, an address or a name | **no** |
+| 5 — third-party trackers forbidden at the policy level | `packages/viz/staticwebapp.config.json:10` still ships `connect-src 'self'` | **no** |
+| 6 — no way to delete an account | `Store.deleteUser` (`store.ts:536`) under `DELETE /api/me` (`api.ts:333`, handler at `:785`) | **already corrected in § 0**, and it still reproduces |
+
+**One thing that has changed since § 0 was written and is not one of the six.** The old fact 3
+sentence said the socket peer *"is never handed to `Store`"*; that is still true, and the reason is
+now narrower than it was: `clientIpOf` records the caller's own text rather than any hop's
+observation ([§ D242](../DECISIONS.md), `serve.ts:413`), which changes what the value **is** without
+changing where it goes.
+
+### 13.2 The inventory
+
+**On the server.** Everything here is in `packages/server/src/store/store.ts`'s `SCHEMA`, which is
+one file and is the whole of what this product persists.
+
+| # | Item | Status | What it is | Why it is held |
+|---|---|---|---|---|
+| **S1** | `users.email` | **SHIPS** | An email address, normalised (trimmed, lower-cased) | The product's **only** credential is an emailed sign-in link ([§ D241](../DECISIONS.md)). Without an address there is no way to prove the same person is returning, and no way to send the link they asked for |
+| **S2** | `users.display_name` | **SHIPS** | **Player-typed**, 2–32 characters, refused only for control and formatting characters (`api.ts#displayNameIssues`) | A board row needs something to say other than an id. **It is public**: every leaderboard a stranger can open renders it |
+| **S3** | `users.display_name_chosen` | **SHIPS** | A boolean | Distinguishes a name a person typed from the `player-<hex>` placeholder an account gets before anybody signs in (`api.ts:656`). A screen that asked *choose a name* of somebody who had would be wrong |
+| **S4** | `users.id`, `users.created_at_ms` | **SHIPS** | A `randomUUID` and an epoch millisecond | The key everything else hangs off, and the row's own age |
+| **S5** | `sessions` | **SHIPS** | A bearer token, the account it names, an expiry | Keeps a signed-in player signed in. A table rather than a stateless token because **revocation is a `DELETE`** ([§ D214](../DECISIONS.md)) |
+| **S6** | `login_tokens` | **SHIPS** | A token **identity** (`jti`) and never the token | What makes a sign-in link single-use. The signature stays valid forever, so the row's absence is the only thing that can say a link was spent |
+| **S7** | `entries` | **SHIPS** | A board row: the seed, the run pointer as JSON, four measured figures, the served-leg count, the submission time, the account | The leaderboard. The **server's own replay** produces every figure; a client never sends one, because a denominator is the number a cheat would most want to choose |
+| **S8** | `challenge_entries` | **SHIPS** | The same shape over a challenge's seed set | The six engineering challenges' boards |
+| **S9** | `challenges` | **SHIPS** | Ids, a window, the issued configuration | Not personal data at all. Listed so the inventory is the whole schema and a reader can check it against `SCHEMA` |
+| **S10** | The rate-limit key | **SHIPS**, in memory | The caller's own text for its address, in a `FixedWindowLimiter` | Refusing a flood. **Never written** — § 0 fact 3, re-measured above |
+| **S11** | `.outbox.jsonl` | **SHIPS**, development only | Every mail the `OutboxMailer` sends, address in the clear, never swept | A developer needs to read the link they were mailed. **Unreachable in production**: `packages/server/src/bootstrap.ts:121` refuses to start when `NODE_ENV=production` and the mailer is an `OutboxMailer`, and the `Dockerfile` and `infra/azure/main.bicep` both set that variable. § 5.3 already names it |
+| **S12** | Telemetry rows | **SPECIFIED** (§ 7) | The batch envelope and its ten events, carrying `playerId`, `sessionId` and run pointers | `charter S1`–`charter S4`, and nothing else (§ 6) |
+| **S13** | Problem reports | **PROPOSED** (#245) | **Player-typed text**, plus the seed, the configuration, the build and the browser | A report the team can replay is worth more than one it cannot. **Destination: a public issue in this repository** (§ 12.1's fourth ruling) |
+| **S14** | Error reports | **PROPOSED** (#242) | A client or server error: message, stack, build, and whatever the runtime attaches | Nobody currently finds out when the deployed page throws |
+
+**On the player's device.** Every one of these is `window.localStorage` at the page's own origin. It
+is on their machine, it is readable by anybody who has that machine, and **none of it reaches the
+server unless the player posts a run**.
+
+| # | Slot | Status | What it holds | Why |
+|---|---|---|---|---|
+| **D1** | `elevator-sim.session` | **SHIPS** | The Engineer session, **and the saved library beside it**: buildings, dispatchers, patterns and machine classes, each with **the name the player typed** (`persist/types.ts#SavedLibrary`, `DroppedEntry`) | Work a player authored and cannot recover any other way — which is why `persist/` gives it the larger of the two character budgets |
+| **D2** | `elevator-sim.everyday-profile` | **SHIPS** | **The player-typed name and an avatar colour** (`profile.ts#EverydayProfile`), plus progress, units, default speed and the sound preference | The name and colour travel with every posted run; the four siblings are preferences, kept as siblings so a display preference cannot ride along with a submission ([§ D448](../DECISIONS.md)) |
+| **D3** | `elevator-sim:career`, `elevator-sim:career:refused` | **SHIPS** | Career progress, and the quarantine slot for an envelope this build refused | A career that persists across sessions ([§ D525](../DECISIONS.md) names the mode; the slot is `campaign/careerPersist.ts`'s). The quarantine exists so a refusal is inspectable rather than a deletion |
+| **D4** | `elevator-sim.viewMode`, `elevator-sim.revealedTabs` | **SHIPS** | Which Engineer view, and which tabs have been revealed | Interface state |
+| **D5** | The account bearer token | **SHIPS**, **in memory only** | The session token | `menu/account.ts:73` keeps it out of `localStorage` deliberately, and `dev/main.ts:1597` says a persistence layer may not widen that decision from a directory that does not own it. **Listed because its absence from the list would look like an omission** |
+| **D6** | `playerId`, consent state | **SPECIFIED** (§ 3.1, § 5.1) | 128 random bits, and one answer | Telemetry's unit, and the answer that gates it |
+
+**What is deliberately not collected** is § 2.2, and it is unchanged by any ruling in § 12.1. The
+one row that had to be re-argued is *any player-authored string*, and it is re-argued in place.
+
+### 13.3 Two things this inventory says that a reader should not skim past
+
+**The public field is `display_name` and there is exactly one of it.** A player can type their own
+legal name into it, and some will. The product cannot prevent that and should not pretend to; what
+it owes is that the field's own surface says the name is public **before** it is set, which § 15.3
+drafts. `LAWYER` — § 19 item 7.
+
+**The device holds more player-authored text than the server does.** D1 and D2 together hold every
+name a player has typed for a building, a dispatcher, a pattern, a machine class and themselves.
+None of it leaves the device except the profile's name and colour, which `everyday/profile.ts`
+states travel with every posted run. That is a good posture and it
+has a consequence people get wrong in both directions: it is **not** a reason to treat the device as
+out of scope (§ 16.3 gives it retention rows and a deletion path, which is issue #202's AC6), and it
+is **not** collection by this product either.
+
+### 13.4 The three things that attach to any typed string, anywhere
+
+This is `docs/26 P-4`'s positive half, stated once so that #245, #242 and any later feature inherit
+it rather than re-arguing it.
+
+> **T-1 — A destination, stated on the surface, before the press.** In plain words, next to the box,
+> in the player's own vocabulary. Not in a notice they could go and read; on the thing they are
+> typing into. For #245 this is *what you write here will be publicly visible* — the fourth ruling's
+> requirement.
+>
+> **T-2 — A retention row.** § 16 gains a row before the feature ships, with a horizon and the
+> mechanism that enforces it. A horizon with no mechanism is an intention (§ 5.2).
+>
+> **T-3 — A deletion path, and it is named on the same surface.** What happens if they want it gone,
+> and whether the product can actually do it. **Where it cannot, the surface says so before the
+> press** — a public issue in a public repository is the case where this bites, because the product
+> cannot unpublish a copy somebody has already read.
+
+**T-3 is the one that will get argued with**, so the argument is here. The temptation is to promise
+deletion because it reads better. A promise the product cannot keep is worse than the honest
+sentence, and this repository has the precedent in code rather than in principle: `fuzz-1000384` was
+closed *"by revoking a promise a withdrawn car cannot keep"* ([`CLAUDE.md`](../CLAUDE.md), Phase 8).
+
+---
+
+## 14. The lawful basis — options, consequences, and no decision
+
+> ### `LAWYER` — this whole section
+>
+> **Nothing below is chosen.** This is the part of the posture a non-lawyer must not invent, and the
+> product owner has said the same of himself (§ 12.1, ruling 3). What follows is the option set with
+> the engineering consequence of each, so that a reviewer is choosing between described things
+> rather than starting from a blank page.
+
+### 14.1 Four facts a reviewer needs before the options mean anything
+
+Stated first because three of the four change the answer, and none of them is obvious from the code.
+
+1. **There is no controller named anywhere in this repository.** No legal entity, no registered
+   address, no contact point for a data question. The repository is one person's GitHub account.
+   A notice cannot be written without this. **`LAWYER` — § 19 item 1.**
+2. **The deployed API runs in a United States region.** [`docs/16`](16-static-site-deployment.md)
+   § 0's *what is true now* table records the Container App at
+   `https://elevsim-app.salmonstone-4576d6f7.eastus2.azurecontainerapps.io` and the page at
+   `https://yellow-glacier-0ff81230f.7.azurestaticapps.net`; `infra/azure/main.bicep` defaults
+   `location` to the resource group's, so the region is a deployment choice rather than a constant
+   in the tree. Whoever reviews this needs to know where the database actually is on the day it
+   holds a row. **`LAWYER` — § 19 item 2.**
+3. **There are processors, and they are named.** Microsoft Azure (Container Apps, PostgreSQL flexible
+   server, the static host) and **Azure Communication Services** for the sign-in mail
+   (`packages/server/src/mail/acsMailer.ts`). No analytics vendor, no ad network, no CDN-hosted
+   script — enforced by `connect-src 'self'` (§ 8) rather than by policy. **`LAWYER` — § 19 item 3.**
+4. **The product may need more than one basis, and that is normal rather than a defect.** The email
+   address exists to deliver a thing the player asked for; the telemetry exists because the project
+   wants to know something. Those are different processing, and § 13.2 is itemised so that a basis
+   can be chosen **per item** instead of once for everything.
+
+### 14.2 The options for telemetry (S12) and error reports (S14)
+
+| Option | What it would mean here | The consequence, stated |
+|---|---|---|
+| **A — Consent** | What Part A already designs: § 4's ask, § 4.2's silent refusal, § 4.3's withdrawal-that-deletes | **Already specified and costed.** The cost is § 4.2's: the consent rate is unmeasurable and every KPI is measured on the consenting subset, with the bias published beside it. The ask must be genuinely free — § 10 non-goal 3 already forbids every dark pattern that would compromise it |
+| **B — Legitimate interests** | Measure without asking, offer an objection route instead of a consent one | **Whether it is available here at all is the reviewer's call and is not assumed.** What this project can say about it is engineering: it removes § 4.2's bias, which is the only thing it buys; it costs the product the sentence it currently gets to say — *nothing is collected without an explicit grant*; the ask in § 4 would be replaced by an objection route that has to be built and has no design; and it may not reach the device at all (§ 14.3) |
+| **C — Consent for telemetry, something else for error reports** | Split the two: measurement is optional, a crash report is arguably operational | Two asks, or one ask and one notice. The hazard is § 4.4's — a consent surface that acquires a second question is a consent surface that gets clicked through. If this is chosen, they are two surfaces, not two checkboxes |
+| **D — Neither: do not collect** | The KPI programme does not exist; `charter S1`–`charter S4` have no instrument and the M4 gate has no evidence | The honest option, and it is on the list because a list that omits *do nothing* is a list arguing for collection |
+
+**`LAWYER` — § 19 item 6**, and the two halves may be answered differently: telemetry (S12) and
+error reports (S14) are one row here only because they share a transport, not because they share a
+purpose.
+
+### 14.3 The question that survives whichever option is chosen
+
+**The question, asked and not answered: is *storing something on a player's device* governed by
+anything other than the personal-data question above?** The author's understanding is that in some
+jurisdictions it is treated separately, and that understanding is not worth relying on — it is
+recorded here as the reason the item exists on the checklist, not as a statement of law.
+
+**What this document can supply is the facts.** This product writes **six** slots today (§ 13.2,
+D1–D4) and would write **two** more (D6). None is for advertising, none is a tracker, none is read
+by any third party, and most of them hold work the player authored — a saved building, a career, a
+name. What a reviewer needs beyond that list is nothing this repository holds.
+
+It is flagged as its own item because it is the one a reader is most likely to assume was settled by
+choosing option A or B in § 14.2, and choosing one of those settles nothing about it.
+**`LAWYER` — § 19 item 4.**
+
+### 14.4 The account (S1–S8) and the board
+
+**The facts, and then the question.** The email address is used for one thing: delivering the
+sign-in link the player asked for (S1, § 0 fact 2). The board row exists because the player pressed
+*submit*, and every figure on it is the server's own replay rather than anything the client sent
+(S7). Neither is collected in order to learn something about the person.
+
+**Which basis that is, whether it is the same basis as telemetry's, and whether the board's public
+display of a typed name needs treatment of its own, is not decided here.** The shapes are different
+enough that a reviewer may well reach a different answer for the account than for § 14.2 — which is
+the whole reason § 13.2 is itemised. **`LAWYER` — § 19 items 5 and 7.**
+
+---
+
+## 15. What players are told, and where
+
+**Drafted copy.** None of it ships in this commit; every string here enters
+`packages/viz/src/honesty/surfaces.ts` on the commit that renders it, or `charter S8` is not met
+(§ 4.1). The wording is subject to § 19's review, and to the restatement rule in
+[`docs/23`](23-audiences-and-core-loop.md) § 1.4: a figure may be renamed or restated, never
+softened.
+
+### 15.1 Four places, and each is answering a different question
+
+| Where | When the player meets it | What it answers |
+|---|---|---|
+| **The consent ask** (§ 4.1) | Once, on first load, before any identifier exists | *Is anything being collected about me, and can I say no?* |
+| **The point of collection** | Next to the box, at the moment of typing | *Where do these words go?* (T-1) |
+| **The settings screen** | Whenever they look | *What is being kept, and how do I stop it and delete it?* |
+| **The published notice** | From a link on the settings screen and on the consent ask | *Everything else* — the controller, the processors, the retention table, the rights |
+
+**The consent ask may not cite this document by path** (§ 4.1, charter non-goal 8), and the notice
+is the only one of the four that may be long.
+
+### 15.2 The consent ask — drafted copy and the four states
+
+`docs/26` § 4.1 said what the question owes and drafted none of it, which is issue #202's AC5. This
+is the draft. Two answers, equally easy to give and equally easy to reach; no pre-tick, no *by
+continuing you agree*, no styling that makes one look like the way forward (§ 10 non-goal 3).
+
+> **Heading** — *Can we count how the game is going?*
+>
+> **Body** — *We would like to record which screens you reach, how long you play, and which building
+> and settings each run used. It stays on our own server and goes nowhere else.*
+>
+> *We do not record anything you type, your name, your email address, where you are, or what you do
+> on any other site. Saying no changes nothing about the game — every mode, every screen and every
+> number works exactly the same.*
+>
+> **Answers** — `No` · `Yes, count it`
+>
+> **Under both** — *You can change this later in Settings. Turning it off there also asks us to
+> delete what was already recorded.*
+
+**One word in that last line is doing work and is not a hedge.** *Asks* rather than *deletes*: the
+local half is immediate and the server half is a request that can fail (§ 4.3), and a consent screen
+that promised deletion outright would be making exactly the promise T-3 refuses (§ 13.4). It is the
+same sentence one state further on, in the withdrawn row below, said before the player has to rely
+on it.
+
+Four states, and the third is the one a design usually forgets:
+
+| State | What the player sees | What the product does |
+|---|---|---|
+| **unasked** | The question | Nothing is collected. **The screen behind it is fully usable** — § 4.4: no screen waits on an answer, and an unanswered question is a no |
+| **granted** | A settings row reading *Counting how the game is going: **on***, with a control to turn it off | Mints the `playerId`, begins the batch (§ 7.1) |
+| **refused** | The same row reading ***off***, and never the question again | Nothing. **Not even the refusal** (§ 4.2) |
+| **withdrawn** | *Off. What was recorded has been asked to be deleted.* | § 4.3's three steps, in order, including the honest sentence about the half that can fail |
+
+**The withdrawn state's sentence is drafted here because it is the one that can lie**, and § 4.3
+already requires it to say so: *"The local half is immediate. Deleting what reached our server is a
+request, and if you were offline it may not have arrived — in that case it is deleted when it ages
+out."* Blunt, and true. **`LAWYER` — § 19 item 8**, on whether that is an adequate description.
+
+### 15.3 The display name, at the point it is set
+
+One line beside the field, drafted: *This name is shown on every leaderboard. Anyone can read it, so
+use something you are happy to be seen.*
+
+It does not exist today. **`LAWYER` — § 19 item 7.**
+
+### 15.4 The problem report, at the point it is typed (#245)
+
+Two lines beside the box, drafted, and the first is the fourth ruling's requirement verbatim in
+substance:
+
+> *What you write here is posted publicly, as an issue in this game's public code repository.
+> Anyone can read it, and it stays there.*
+>
+> *We attach the seed, the building and the settings of the run you were on, plus the build and your
+> browser version, so we can reproduce it. We do not attach your name or your email address.*
+
+**The second line is a T-1 obligation and not a courtesy**: a report that silently carries a run
+pointer is collection the player did not compose. **`LAWYER` — § 19 items 9 and 10**, on the public
+destination and on whether anything else must be said before a child can press that button (§ 17).
+
+### 15.5 The published notice — what it must contain, not its words
+
+Drafted as a **contents list** rather than as copy, because a notice's wording is exactly the part a
+reviewer will rewrite and a draft that reads finished invites nobody to.
+
+1. Who the controller is, and how to reach them (**§ 19 item 1** — unknown today).
+2. Each item in § 13.2, in plain words, and why it is held.
+3. The lawful basis for each (**§ 19 items 5 and 6** — undecided today).
+4. The processors in § 14.1 fact 3, and where the data is (**§ 19 items 2 and 3**).
+5. The retention table, § 16, in the player's units rather than in constants.
+6. How to delete: § 16.4's three paths and § 16.7's walk-through, and what each one does and does
+   not reach.
+7. Rights, and how to exercise them (**§ 19 item 11**).
+8. The position on children, § 17 (**§ 19 items 12–14**).
+9. The date it was last changed, and what changed.
+
+**Item 9 is the one this repository is best placed to keep honest and most likely to drop.** A notice
+with no date is a notice nobody can tell has gone stale — and an undated claim going quietly out of
+date is the failure this repository catches most often about its own numbers
+([`CLAUDE.md`](../CLAUDE.md), and § 0's own struck-through fact 6).
+
+---
+
+## 16. Retention and deletion
+
+### 16.1 The rule this section obeys
+
+§ 12.3: one item, one row, one home. **§ 5.1 owns the seven classes in its own table** — raw events
+at 90 days, daily aggregates indefinitely, the `playerId`, the consent state, `sessions` at 30 days,
+`login_tokens` at 15 minutes, and accounts and board entries with no horizon — and this section does
+not restate any of them. What follows is everything § 5.1 does not carry, plus the two items that
+existed then and had no row.
+
+### 16.2 What is drafted rather than derived, and how to tell
+
+**Two of the horizons below are judgements and are marked so.** This repository has a documented
+history of published numbers that did not reproduce from the code that was supposed to produce them,
+and the mitigation is the same one `docs/26` § 5.1 used for its 90 days: say what the number is for,
+so a reviewer can disagree with the reason rather than with the digit.
+
+| Row | Derived or drafted | What would settle it |
+|---|---|---|
+| Session, sign-in link | **Derived** — they are constants: `SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000` (`store.ts:233`) and `LOGIN_TTL_MS = 15 * 60 * 1000` (`credentials.ts:82`) | Nothing. Read the constant |
+| Raw telemetry events, 90 days | **Derived**, in § 5.1, from `docs/26 K4`'s 7-day window plus a build-to-build trend | Already argued there |
+| Error reports (S14) | **DRAFTED** | What an incident actually needs: #242's runbook has to name a severity model and a first response, and the horizon is *long enough to work an incident and see whether the fix held*. Until that runbook exists, any figure here is a guess with a unit |
+| Problem reports (S13) | **NOT DRAFTED, and deliberately** | They are public issues in this repository, so their retention **is the repository's**, and a horizon written here would be a promise this posture cannot enforce. § 16.5 says what that means |
+
+### 16.3 The rows § 5.1 does not carry
+
+| Item | Horizon | What deletes it |
+|---|---|---|
+| **S2 `display_name`** | Lives with the account | `DELETE /api/me` (§ 5.3). No separate horizon: a name with no account is not reachable |
+| **S10 rate-limit key** | The limiter's own window, in memory | Process restart, and the window. Never written |
+| **S11 `.outbox.jsonl`** | **No horizon, and it is never swept** | Nothing in the product. It is a file on a developer's machine and is unreachable in production (§ 5.3). Stated rather than fixed, because the erasure route makes no claim over files on a development machine |
+| **D1 `elevator-sim.session`** | **Until the player clears it**, or the browser does | *Clear saved progress* on the settings screen — GitHub issue #229, `settingsScreen.ts:459`, a two-press arc whose second press calls `engineerBridge.clearSavedSession()` and then reloads. Also the browser's own site-data clear |
+| **D2 `elevator-sim.everyday-profile`** | **Until the player clears it**, or the browser does | The same control, in the same press: `store.clear()` runs immediately after the bridge call. The row's `ready` string names this slot's contents exactly — *"the solved cases and the ratings, and the name and picture above"* |
+| **D3 `elevator-sim:career`, `:career:refused`** | **Until the browser's own site-data clear** | **Not reached by *Clear saved progress*** — the handler removes two slots and this is not one of them (§ 16.6). Nothing else in the product removes it |
+| **D4 `elevator-sim.viewMode`, `.revealedTabs`** | **Until the browser's own site-data clear** | The same: not reached by *Clear saved progress* (§ 16.6). Interface state rather than progress, which is why it is the less troubling half of that finding |
+| **D5 the bearer token** | The tab | Held in memory only (`menu/account.ts:73`); closing the page ends it |
+| **S13 problem reports** | § 16.5 | § 16.5 |
+| **S14 error reports** | **DRAFTED** — see § 16.2 | The sweep-on-write-and-boot mechanism § 5.2 already runs twice, if they land in this database at all |
+
+### 16.4 The three deletion paths, and what each one reaches
+
+**They are three because the stores are three, and the design refuses to hold the join between them
+(§ 3.2). A single button that claimed to reach all three would be claiming a join that does not
+exist.**
+
+| Path | Reaches | Does not reach | Exists today? |
+|---|---|---|---|
+| **`DELETE /api/me`** | The account, and by cascade `sessions`, `login_tokens`, `entries`, `challenge_entries` — the set read out of `pg_constraint` rather than out of a list (§ 5.3) | Anything on the device; anything telemetry holds | **The route: yes** (`api.ts:333`). **A screen that presses it: no** |
+| **`POST /api/telemetry/forget`** | Telemetry rows for one `playerId` | The account; the device's other slots | **No** — there is no telemetry (§ 0 fact 1) |
+| ***Clear saved progress*** | D1 and D2 | Anything on the server; D3 and D4 (§ 16.6) | **Yes** (#229) |
+
+**The first path's missing surface is the honest gap in this posture and it is not new.** § 11 has
+carried it since #254 landed: a route a player cannot press is not an erasure path a player can use.
+It is worse now than it was, because a posture that says *you can delete your account* while the only
+way to do it is `curl` would be a stated remedy that is not reachable — the shape
+[`CLAUDE.md`](../CLAUDE.md) calls a stale refusal, pointed the other way. **The mail's sentence is
+pinned by `packages/server/src/mail/mailer.test.ts`, so the suite goes red on the commit that wires
+the control**, which is the mechanism that stops the notice and the product drifting apart. Wiring it
+belongs to whoever owns `settingsScreen.ts`. **`LAWYER` — § 19 item 15**, on whether a posture may be
+published while the account path is `curl`-only.
+
+### 16.5 Problem reports are public, and this posture cannot promise to delete them
+
+A report becomes an issue in a public repository. The product can delete a copy it holds; it cannot
+unpublish what somebody has read, and it should not imply otherwise. So:
+
+- **T-1 carries the weight** (§ 13.4, § 15.4): the surface says the words are public **before** the
+  press, in the ruling's own terms.
+- **The path is the platform's**, not this product's: a player asking for a report to be taken down
+  is asking a repository maintainer, and the notice says so rather than offering a button that
+  cannot do it.
+- **A report should not need to carry an identifier at all.** The run pointer is a seed and a
+  configuration (§ 2.1) and reproduces without knowing who sent it.
+
+**`LAWYER` — § 19 item 9.** This is the item most likely to come back changed.
+
+### 16.6 A finding: *Clear saved progress* clears two slots and the device holds six
+
+**Measured on this tree, 2026-09-09.** `everyday/settingsScreen.ts:459`'s handler calls
+`bridge.clearSavedSession()` — which is `dev/main.ts:2635`, sealing the Engineer session and
+removing `elevator-sim.session` — and then `store.clear()`, which removes
+`elevator-sim.everyday-profile`. That is **two** slots.
+
+The origin holds **six**: those two, plus `elevator-sim:career`, `elevator-sim:career:refused`,
+`elevator-sim.viewMode` and `elevator-sim.revealedTabs` (§ 13.2, D1–D4; keys derived by grepping the
+literals rather than by reading a list).
+
+**Two of the row's four strings disagree with each other, and that is the precise shape of it**
+(`everyday/settingsView.ts#CLEAR_PROGRESS_COPY`, `:441`).
+
+- The **`ready`** string enumerates, and its enumeration is **exactly right**: *"the week and its
+  banked days, the saved dispatchers, buildings and patterns, the solved cases and the ratings, and
+  the name and picture above"* — which is D1 and D2 and nothing else, correctly.
+- The **`cleared`** string summarises, and its summary **over-states**: *"Cleared. **Nothing this
+  device kept survives.**"* Four slots survive it, and one of them — the career — is progress in the
+  plainest sense of the word. `everyday/careerStore.ts` is reached from `everyday/host.ts:1374`, so
+  it is a live slot rather than a dormant one.
+
+That split matters, because it says what kind of defect this is: not a control that does less than
+it was designed to, but **a summary sentence that is broader than the enumeration two states
+earlier**. The enumeration was written against the code; the summary was written against the
+intention.
+
+**This is recorded and not fixed here, and the reason is the rule rather than the scope.** Changing
+that sentence or that handler is a change to a shipped player-facing surface, its honesty-corpus
+strings and #229's own acceptance criteria; a documentation lane rewriting a shipped promise is how a
+posture starts contradicting a product. What this section can do is refuse to build the posture on
+top of a claim that does not reproduce. **So § 16.3's rows say what each slot's deletion path
+actually is, and the notice (§ 15.5 item 6) says *what each one does and does not reach* rather than
+that clearing reaches everything.**
+
+**Two readings are possible and only one is checked.** Either the summary is wrong, or *kept* is
+meant as narrowly as the enumeration and the career, the view mode and the revealed tabs are not
+*"what this device kept"* — a reading the career slot makes hard to sustain. **Which it is has not
+been decided by anybody**, and naming a likely intention in place of a measurement is what
+[§ D256](../DECISIONS.md) refuses. It belongs to whoever owns #229's control. **`LAWYER` — § 19
+item 16**, because a notice may not repeat a product claim that this document has just measured as
+not reproducing.
+
+### 16.7 What a player who wants everything gone actually does today, end to end
+
+**Written as a walk-through rather than as a policy, because a deletion story that has never been
+walked is a deletion story with a gap in it.** Everything below is the tree as it is on 2026-09-09.
+
+1. **On the device.** Settings → *Clear saved progress* → press twice. Reaches D1 and D2, and
+   **not** D3 or D4 (§ 16.6). The rest of the origin goes with the browser's own *clear site data*,
+   which the player does themselves and this product cannot do for them.
+2. **The account.** `DELETE /api/me`, with a session bearer token, from `curl`. **There is no screen
+   for it** (§ 16.4). A player who cannot use `curl` has no route at all today, and the honest
+   consequence is that the deletion story is *incomplete* rather than *documented*.
+3. **The board rows.** Nothing separate: they cascade off the account (§ 5.3), read out of
+   `pg_constraint` rather than out of a list.
+4. **Telemetry.** Nothing to delete, because nothing is collected. When it is, it is
+   `POST /api/telemetry/forget` (§ 8) and the withdrawal control in Settings (§ 4.3).
+5. **A problem report.** Not deletable by this product at all (§ 16.5). It is a public issue and the
+   route is a maintainer's.
+6. **Asking a human instead of pressing a button.** **There is nowhere to write.** No contact point
+   exists anywhere in this repository (§ 14.1 fact 1), and a posture that expects a player to be able
+   to ask needs one to exist first.
+
+**Two of those six are gaps and both are on the checklist rather than hidden in prose** — step 2 as
+item 15, step 6 as item 1. The reason for walking it at all is that each individual mechanism reads
+fine in its own row, and only the walk shows that a player who simply wants out has one control, one
+`curl` command, and no address.
+
+---
+
+## 17. Children
+
+> ### `LAWYER` — this whole section
+>
+> **No position is taken.** What follows is the product's own facts, then the options a reviewer
+> chooses between, then the thing that makes the choice bind. A non-lawyer asserting an age position
+> would be the same defect as a non-lawyer choosing a lawful basis, and the product owner has ruled
+> that neither is his to make either (§ 12.1, ruling 3).
+
+### 17.1 The facts about this product a reviewer needs
+
+Each is a claim about the tree and can be checked.
+
+1. **It is a lift-traffic simulator.** The charter's audiences are a curious general player and a
+   lift-industry professional ([`docs/23`](23-audiences-and-core-loop.md)). Nothing in `data/`, the
+   art direction or the copy is aimed at children, and nothing is aimed away from them either.
+2. **There is no chat, no messaging, no comment, no profile page and no way for one player to send
+   anything to another.** The only thing one player sees of another is **a display name** (S2) —
+   on a board, and on a posted run they can replay (`packages/viz/src/watch/posted.ts:65`,
+   `:203`). A run replays from its seed and carries nothing about the person who took it.
+3. **No real money is ever asked for, and that is a charter non-goal rather than a present
+   absence**: no payment, no paywall, no advertising, no third-party tracker (§ 10 non-goals 1 and
+   2). **Said precisely, because the game does have a shop and a price ladder**: the currency is
+   *chimes*, earned by completing turns and spent on a mode's modifiers, *"nothing resetting on time,
+   no purchase shipping, and the ledger built so an add from outside is invisible to the play
+   surface"* ([§ D526](../DECISIONS.md), [§ D530](../DECISIONS.md)). An in-game price is not a
+   transaction, and a reviewer should be told the difference rather than left to find the shop.
+4. **There is no age question anywhere in the product**, and no field that could answer one.
+   Verified by grep on 2026-09-09.
+5. **An account requires an email address** (S1), which is the only route by which the product learns
+   anything durable about a person.
+6. **A player can publish typed words** once #245 ships (S13) — to a public repository, under
+   § 15.4's warning.
+7. **`display_name` is public** (S2), and a child may type their own name into it.
+
+Facts 6 and 7 are the two that carry the risk, and neither is telemetry's.
+
+### 17.2 The options
+
+| Option | What it would mean | The consequence |
+|---|---|---|
+| **A — Not directed at children; no age gate** | The product states it is not aimed at children and collects the same minimal set from everybody | Simplest, and it rests entirely on *not directed at* being the right characterisation, which is the reviewer's call rather than the author's. It does nothing about facts 6 and 7 |
+| **B — An age self-declaration before the consent ask** | A single question; below a threshold the telemetry ask is not shown and the answer is a no | Costs nothing in playability — § 4.2 already requires the game to be whole without consent. **But the age question is itself a collection**, it is unverifiable, and it puts a gate in front of the first screen, which § 4.4 forbids the consent surface from becoming. If chosen, it needs its own row in § 13.2 and its own retention row |
+| **C — A minimum age for the account only** | Anyone plays; an account needs a declared age | Confines the check to the one route that learns an address (fact 5), leaves anonymous play untouched, and still does nothing about fact 6 unless the report surface is account-gated |
+| **D — No telemetry consent asked of anybody** | Removes the child-consent question by removing the consent | Kills the KPI programme (§ 6) and with it the M4 gate's evidence. On the list because a list without it is a list arguing for collection |
+
+**A jurisdictional point the reviewer will already know and the author should not pretend to
+resolve**: where consent is the lawful basis, several regimes set a digital age below which a child's
+own consent is not sufficient. That interacts directly with § 14's option A, which is why these two
+sections are not independent. **`LAWYER` — § 19 items 12, 13 and 14.**
+
+### 17.3 What makes whichever option is chosen actually bind
+
+Whatever is decided, it needs a mechanism or it is an intention (§ 5.2's rule, applied to a policy
+instead of a horizon).
+
+- Option A binds through the **notice** and through nothing else, so its wording is the whole of it.
+- Options B and C bind through a **field**, which means a row in § 13.2, a retention row in § 16, a
+  screen, and strings in the honesty corpus. Cheapest to specify, most expensive to build.
+- Option D binds by **deletion** — the consent surface § 4 designs is not built — which is the only
+  option on the list whose mechanism is the absence of one, and the only one that cannot drift.
+- **None of them binds through good intentions**, and a posture that says *we do not intend children
+  to use this* with no mechanism should say that it is a statement rather than a control.
+
+---
+
+## 18. The read route — who and what may read collected data back
+
+Permitted by ruling 2 (§ 12.1), which lifted § 8's refusal. This section is that ruling's condition:
+*who may read it and how long it is kept are part of that posture.*
+
+### 18.1 The thing the old refusal was right about
+
+*"A schema that acquires a read route acquires a way to look a player up."* True, and unfixable in
+general. So the design is not *a read route that cannot be misused*; it is **three named readers,
+each with the narrowest shape that answers its question** (§ 18.2), and an explicit list of what may
+not read at all (§ 18.3).
+
+**The ruling's condition has two halves and this section owes both.** *Who may read it* is §§ 18.2
+and 18.3. *How long it is kept* is unchanged and lives where it already did — § 5.1's 90 days for
+raw events and its *indefinite* for aggregates, which § 5.4 earns by requiring an aggregate to carry
+no identifier, no pointer and no cell small enough to be one person. **A read route does not extend a
+horizon**, and a dashboard that wanted a longer one would be asking for § 5.1 to move rather than for
+§ 18 to.
+
+### 18.2 The three readers
+
+| # | Reader | What it may read | What bounds it |
+|---|---|---|---|
+| **R-1** | **The KPI dashboard** (#250, the first consumer) | **Aggregates only** — § 6's four KPIs and § 6.3's diagnostics, as dates, builds, counts and rates | § 5.4: an aggregate carries **no identifier, no run pointer, and no cell small enough to be one person**. **The minimum cell size is enforced in the route, not in the reader** — a dashboard that filters small cells is one query away from a dashboard that does not. A cell under it is **refused by name**, in the product's own idiom, exactly as a suppressed mean is |
+| **R-2** | **An analyst replaying a run** | Raw rows, **offline** | Already the design in § 2.1: *"replay is an analyst-initiated, offline operation over stored pointers, never work done on ingest"*. A pointer replays to a run and never to a person; there is no name on it and no key that reaches one (§ 3.2) |
+| **R-3** | **A player reading their own data** | Rows for one `playerId`, presented to the person whose device holds it | The id is 128 random bits from `crypto.getRandomValues` (§ 3.1) and is the only key. Requires: the existing `FixedWindowLimiter` on the route; **an unknown id and an id with no rows answer identically**, so the route cannot be used to test whether an id exists; and it reads and never writes |
+
+**R-3 is drafted, not required.** Whether the product owes a player a copy of their own data, and in
+what form, is a legal question. It is designed here so that the answer *yes* does not arrive later
+as a surprise with no shape to put it in. **`LAWYER` — § 19 item 11.**
+
+### 18.3 What may not read, and this list is the point of the section
+
+1. **No per-player view for the team.** § 10 non-goal 7 is unchanged by ruling 2. The dashboard reads
+   aggregates; nobody on this project gets a screen that shows one person's sessions.
+2. **No route keyed on an account.** A read keyed on `users.id` would be the join § 3.2 exists to
+   make impossible, arriving through the reader instead of through the writer.
+3. **No behavioural cohort.** Non-goal 7's second clause: no segmentation into groups a person
+   belongs to by how they played.
+4. **Nothing read back to the player as a figure about themselves.** § 6.4 and non-goal 4 — no score,
+   rank, streak or percentile. **R-3 is a copy of their rows, not a profile of their play**, and the
+   difference is that a copy makes no claim.
+5. **No third party**, in raw or aggregate form. Non-goal 6, and its one non-exception is § 10's
+   added clause about a player publishing their own words.
+
+### 18.4 Two consequences for #250
+
+**The dashboard may not ship ahead of this posture, and it also may not ship ahead of the
+instrument.** There is no telemetry (§ 0 fact 1, re-measured § 13.1), so a dashboard today would be
+a dashboard over an empty source — which is #340's finding and not this document's.
+
+**When it ships, it inherits § 6.4 whole**: not shown to a player, not compared across builds without
+an interval and the counts it was computed over, and not read as a criterion met. A dashboard is the
+surface on which a rate most easily becomes a verdict, and § 6.4's third bullet is the one that will
+be under the most pressure the first time a number moves.
+
+**And it needs a named owner, which is #250's own third criterion and is a privacy requirement as
+well as a review one.** R-1 is *a* reader rather than *anyone*; a dashboard nobody owns is a dashboard
+whose access nobody is deciding. **Who that is, is not named here** — this document does not staff the
+project — but the posture is that the answer exists in writing before the first table is published,
+beside the minimum cell size § 5.4 also defers.
+
+---
+
+## 19. The reviewer's checklist
+
+**Nineteen items.** Each is a question this draft could not answer, with the section it comes from
+and what turns on it. It is a checklist rather than prose because the review is a decision, and a
+decision needs a list.
+
+| # | § | The question | What turns on it |
+|---|---|---|---|
+| **1** | 14.1 | **Who is the controller?** No legal entity, address or contact point exists anywhere in this repository | A notice cannot be written at all. Blocks § 15.5 |
+| **2** | 14.1 | **Where is the data?** The deployed API is in a US Azure region; `main.bicep` leaves the region a deployment parameter | Transfer position, and what the notice says |
+| **3** | 14.1 | **The processors** — Azure (compute, database, static host) and Azure Communication Services (mail). Are they correctly characterised, and is anything missing? | The notice, and whatever agreements are needed |
+| **4** | 14.3 | **Does storing the six on-device slots need its own treatment**, separately from the personal-data question? | Whether the consent ask must cover the device at all, and whether a saved game is *strictly necessary* |
+| **5** | 14.4 | **The lawful basis for the account** (S1–S6) | The notice; whether anything about the sign-in flow changes |
+| **6** | 14.2 | **The lawful basis for telemetry** (S12) and **for error reports** (S14) — options A–D, and whether they may differ from each other | Whether § 4's consent design ships as specified, and whether #242 needs a second surface |
+| **7** | 13.3, 14.4, 15.3 | **The public display name.** A player may type their real name into a field every stranger can read. Is § 15.3's one line enough? | A shipped surface gains a sentence, or more than a sentence |
+| **8** | 15.2 | **The withdrawal sentence.** Is *"deleted when it ages out"* an adequate account of the half that can fail? | The consent surface's copy |
+| **9** | 15.4, 16.5 | **Problem reports are published to a public repository** and cannot be unpublished. Is the pre-press warning sufficient, and is *the path is the platform's* an acceptable answer on deletion? | Whether #245 ships in the ruled shape |
+| **10** | 15.4 | **The automatic attachment** on a problem report — seed, configuration, build, browser. Must the player see the exact payload before sending, rather than a description of it? | #245's surface |
+| **11** | 18.2 | **Does the product owe a player a copy of their own data**, and in what form? R-3 is designed and not required | Whether R-3 is built, and whether the account side needs an equivalent |
+| **12** | 17.2 | **Which of options A–D on children**, and is *not directed at children* the right characterisation of a lift simulator? | Everything downstream in § 17.3 |
+| **13** | 17.2 | **If consent is the basis, what happens below a jurisdiction's digital age?** § 14 and § 17 are not independent | Whether an age field exists at all |
+| **14** | 17.1 | **Facts 6 and 7** — a child publishing typed words, and a child's name on a public board. Do they need handling that the telemetry position does not reach? | #245's surface, and S2's |
+| **15** | 16.4 | **May this posture be published while account deletion is `curl`-only?** The route exists; no screen presses it | Whether a viz lane is a blocker for the notice |
+| **16** | 16.6 | ***Clear saved progress* clears two of the six slots this origin holds**, and its `cleared` string says *"Nothing this device kept survives"* while its `ready` string enumerates correctly. The notice may not repeat a claim measured as not reproducing | Whether the notice describes the control narrowly, or the control is fixed first |
+| **17** | 5.1, 5.3 | **Accounts and board entries have no retention horizon** — *"an account nobody deletes is kept"*. Is a stated policy an acceptable answer where a period is expected? | Issue #202's AC2, and whether a horizon has to be invented |
+| **18** | 16.2 | **The error-report horizon is drafted and blank.** #242's runbook has to exist before a number here means anything | Whether #242 can ship before its runbook |
+| **19** | — | **Is anything in § 13.2 special-category?** The author's reading is no — no health, biometric, political or similar field exists — but the reading is a non-lawyer's | Whether a whole additional regime applies |
+
+**Two things that are deliberately not on this list.** The **minimum aggregate cell size** (§ 5.4) is
+a statistical judgement this project can make for itself and owes before the first KPI table is
+published. The **90-day event horizon** is derived in § 5.1 from `docs/26 K4`'s window; a reviewer
+may of course move it, but it is not a question the product is asking.
 
 ---
 
@@ -970,3 +1757,27 @@ prevent.
   two registers, and `mode` is not an axis this schema splits a KPI on.
 - [§ D343](../DECISIONS.md) — a numbered series carries its document, which is why every criterion
   above reads `charter S…` and this document's own series is cited as `docs/26 K…`.
+
+### Part B's own sources
+
+- **The four owner rulings of 2026-09-09**, on GitHub issues **#242**, **#245**, **#250** and
+  **#202**, quoted in § 12.1. They are the whole authority for Part B, and they are quoted rather
+  than paraphrased for the reason [§ D256](../DECISIONS.md) gives about plausible sentences standing
+  in for measured ones.
+- [§ D405](../DECISIONS.md) — **why Part B takes no `DECISIONS.md` number.** Decision numbers are
+  allocated to a lane before it starts and this lane holds no block; a number taken from outside one
+  is the collision § D404 was written to stop. § D405's own test is whether the decision reaches past
+  the module that took it, and Part B's substance is either a ruling somebody else made (§ 12.1) or a
+  question explicitly left to a legal reviewer (§ 19) — neither of which is this lane's decision to
+  record. **Part B is itself the record**, and the three corrections it makes to Part A each carry
+  the ruling that caused them where the rule stands.
+- [`docs/30-playtest-programme.md`](30-playtest-programme.md) § 9 — the **second** consent, and the
+  one place in this repository that quoted `docs/26 P-4` in full. Corrected on the same commit as the
+  rewrite, and its § 9.1 remains the statement of how a playtest's data handling parallels this
+  posture rather than extending it.
+- `packages/server/src/store/store.ts` — the whole of what this product persists, in one `SCHEMA`
+  constant, which is what makes § 13.2's server half checkable rather than remembered.
+  `packages/server/src/http/api.ts#displayNameIssues` is S2's bound;
+  `packages/server/src/mail/acsMailer.ts` is § 14.1's named mail processor.
+- `packages/viz/src/persist/types.ts`, `everyday/profile.ts`, `everyday/settingsScreen.ts` and
+  `everyday/settingsView.ts` — the on-device half of § 13.2, and the control § 16.6 measures.
