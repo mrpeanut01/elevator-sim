@@ -359,6 +359,27 @@ describe('the published interval covers what it says it covers', () => {
   const COVERAGE_SEED = 20_260_727;
   /** PCG32 stream selector. Named and fixed, so this draw is one identified stream, not "the" RNG. */
   const COVERAGE_STREAM_ID = 1;
+  /*
+   * **100 000, and it is not the reason this case used to time out.**
+   *
+   * The case carried `}, 60_000)`, which was a **narrowing**: `vitest.config.ts` gives
+   * `experiments` `SIMULATING_TIMEOUT_MS` — 300 000 ms — so the annotation cut this case to a fifth
+   * of what the project had already derived for *does not fit vitest's default on a loaded
+   * machine*. Measured 2026-09-09 on `main` at load average ~3, the case costs **8.7 s** and the
+   * whole file 9.4 s. The ~63 s that made it red was a loaded reading, and `experiments` is the
+   * project whose docstring records an amplification of **about ninefold**: 8.7 × 9 ≈ 78 s, which
+   * clears 60 s and not much else. The annotation is removed rather than raised, so there is one
+   * budget for this question instead of two — see `wrinkles/gate.test.ts`'s header for the same
+   * argument made at greater length.
+   *
+   * **The trial count was considered as the cheaper lever and rejected on the arithmetic.** This
+   * case separates two coverages that differ by ~1.1 points (95.0 % against 93.9 %). The standard
+   * error of a coverage estimate is `sqrt(p(1-p)/TRIALS)`, so 100 000 trials gives ~0.069 points
+   * and the gap is ~16 standard errors. Ten thousand would give ~0.22 points — still separated, but
+   * the assertion's margin falls by a factor of three for about 0.8 s. The instruction was not to
+   * weaken an assertion, and a Monte-Carlo trial count is the assertion's precision rather than its
+   * runtime, so it stays where it is.
+   */
   const TRIALS = 100_000;
   const N = 26;
   const Z_95 = 1.959963984540054;
@@ -399,7 +420,7 @@ describe('the published interval covers what it says it covers', () => {
     );
     /* 100 000 inversions of the t CDF is a few seconds; the default 5 s timeout is not the
        statement being made here. */
-  }, 60_000);
+  });
 
   it('covers exactly 95 % analytically, which is the claim the Monte-Carlo estimates', () => {
     // Coverage of `mean ± q·s/√n` under normal differences is P(|T_{n-1}| ≤ q) = 2·F_{n-1}(q) − 1,
