@@ -213,8 +213,12 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * its sentence is gone and only *nothing posts* is left — so the owner follows the remaining
    * absence to **#221**, the issue that builds the press. A triage row still naming a closed issue
    * is the same defect as a register naming a closed absence, one level up.
+   *
+   * **And then it left, with its entry, on the commit that built the press.** #221's post block
+   * sits on the report screen and reaches the server through `EverydayHost.postRun`. The entry is
+   * gone from `EVERYDAY_SHELL_ABSENCES` and this row went with it in the same edit — which is what
+   * the second assertion below is for, and it is the direction that bites after a lane lands.
    */
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'Putting your run on the daily board', issue: 221 },
 
   /*
    * The stage. The camera was #283's, held there while it was open whether the whole-building

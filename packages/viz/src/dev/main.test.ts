@@ -1620,11 +1620,25 @@ describe('the submit path asks the predicate its own docstring names — GitHub 
    * nothing — the request is already gone. The ordering is the property; the presence is a
    * precondition for stating it.
    */
+  /*
+   * **The anchor moved on GitHub issue #221 and the property did not**, which is the distinction
+   * worth writing down rather than silently re-pointing.
+   *
+   * The ladder this test reads used to be the whole of `submitScore`. It is `postCurrentRun` now,
+   * because the Everyday report screen posts through the **same** function — one answer to *may
+   * this run be posted*, rather than a second ladder next door that would disagree the first time
+   * either gained a gate. `submitScore` is what is left: the Engineer menu's notice, its redraw and
+   * its board refetch, over that function's answer.
+   *
+   * So the slice below reads `postCurrentRun`, and the assertion is unchanged. A test that had been
+   * re-pointed *and* relaxed would be the thing this file exists to prevent; this one is re-pointed
+   * and says so.
+   */
   it('calls runIdentityIssues before it posts, not beside it', async () => {
     const source = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
-    const start = source.indexOf('async function submitScore()');
-    const end = source.indexOf('const menuHost: MenuPanelHost', start);
-    expect(start, 'submitScore is not declared the way this test reads it').toBeGreaterThan(0);
+    const start = source.indexOf('async function postCurrentRun()');
+    const end = source.indexOf('async function submitScore()', start);
+    expect(start, 'postCurrentRun is not declared the way this test reads it').toBeGreaterThan(0);
     expect(end, 'the end anchor moved').toBeGreaterThan(start);
 
     const body = source.slice(start, end);
@@ -1633,15 +1647,38 @@ describe('the submit path asks the predicate its own docstring names — GitHub 
 
     expect(
       asked,
-      'submitScore must ask runIdentityIssues itself. `menuHost.runState` disables the button, ' +
+      'postCurrentRun must ask runIdentityIssues itself. `menuHost.runState` disables the button, ' +
         'which is an affordance and not a gate — issue #21\'s own words about the refusals beside ' +
         'this one: "this is the backstop for every route that reaches the handler anyway".',
     ).toBeGreaterThan(-1);
-    expect(posted, 'submitScore no longer posts').toBeGreaterThan(-1);
+    expect(posted, 'postCurrentRun no longer posts').toBeGreaterThan(-1);
     expect(
       asked,
       'the predicate is asked after the request has already gone, which refuses nothing',
     ).toBeLessThan(posted);
+  });
+
+  /**
+   * **Both shells post through one ladder** — GitHub issue #221, and the reason the test above had
+   * to move its anchor.
+   *
+   * Asserted lexically because the seam is inside `boot()`, where no Node test can call it: the
+   * Everyday host binding is `postCurrentRun` itself rather than a second composition, and
+   * `submitScore` is that call plus this surface's own three writes. Two ladders would pass every
+   * other check in this repository while telling a player two different things about one run.
+   */
+  it('gives the Everyday shell the same posting ladder rather than a second one', async () => {
+    const source = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    expect(source).toContain('postRun: client === undefined ? undefined : () => postCurrentRun()');
+    const start = source.indexOf('async function submitScore()');
+    const end = source.indexOf('const engineerSettingsBridge', start);
+    expect(start, 'submitScore is not declared the way this test reads it').toBeGreaterThan(0);
+    expect(end, 'the end anchor moved').toBeGreaterThan(start);
+    const body = source.slice(start, end);
+    expect(body).toContain('await postCurrentRun()');
+    // And no second copy of the gate or the request: those live in one place or in none.
+    expect(body).not.toContain('runIdentityIssues(');
+    expect(body).not.toContain('client.submit(');
   });
 });
 

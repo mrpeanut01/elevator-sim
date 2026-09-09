@@ -157,6 +157,8 @@ import {
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
 import { FIGURE_NOTE_HANDLE, everydayReportViewOf } from '../everyday/reportView.js';
+// GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
+import { postRunViewOf } from '../everyday/postRun.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
@@ -265,7 +267,15 @@ import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
-import { BOARD_SCREEN_COPY, DAILY_BOARD_ABSENCE, dailyBoardViewOf } from '../everyday/boardScreen.js';
+import {
+  BOARD_SCREEN_COPY,
+  DAILY_BOARD_ABSENCE,
+  challengeTabViewOf,
+  dailyBoardViewOf,
+} from '../everyday/boardScreen.js';
+// The challenge tab's own wire shapes, restated as fixtures — see `challengeStates`.
+import type { ChallengeBoardPage } from '../menu/challenge.js';
+import type { EverydayChallengeToday } from '../everyday/host.js';
 import { CAMPAIGN_DOCK_COPY, campaignDockViewOf } from '../everyday/campaignDock.js';
 import { campaignIncidentOf } from '../campaign/incidents.js';
 import { carsToDerate } from '../shift/incidents.js';
@@ -10046,6 +10056,92 @@ function placeholderProofSet(
 const BOARD_NOTE = 'Every row here was replayed from its seed and re-measured before it appeared.';
 
 /** One posted row, with a plausible wait. Nothing here is authored copy: a name and a number. */
+/**
+ * The five states GitHub issue #221's challenge tab can be in, as inputs to its own view function.
+ *
+ * Typed against `challengeTabViewOf`'s parameter rather than written as a constant, so a state that
+ * stops existing goes red here instead of quietly leaving the sweep — `postRunStates`' rule, and
+ * for its reason.
+ *
+ * The prose below is **the server's**, restated here because no case in this corpus has a challenge
+ * server to ask. That is the same seeding the daily board's `unreachable` detail gets, and it is
+ * what makes the two obligations the wire carries — the ordering note and Compare's pointer —
+ * readable by the search rather than merely present in a type.
+ */
+function challengeStates(): readonly (readonly [string, EverydayChallengeToday | undefined])[] {
+  const challenge: ChallengeView = {
+    challenge: {
+      id: 'weekly-7',
+      name: 'The Monday climb',
+      brief: 'Everybody runs the same eight seeds on the same building. Only the dispatcher is yours.',
+      config: {
+        buildingId: 'midtown-office',
+        demandTemplateId: 'up-peak',
+        arrivalRatePctPop5min: 4,
+        durationS: 900,
+      },
+      seeds: ['1', '2', '3'],
+      opensAtMs: 0,
+      closesAtMs: 1,
+    },
+    state: 'open',
+    seedCount: 3,
+    opensInMs: null,
+    closesInMs: 3_600_000,
+    clockNote: 'This challenge shuts on the server’s clock, not on yours.',
+    dataHash: 'placeholder',
+    compare: {
+      note: 'Ordering this board is a fact about what was posted, never a claim that one dispatcher beats another. Compare is the only screen allowed to say that, and only with a paired interval that excludes zero.',
+      buildingId: 'midtown-office',
+      demandTemplateId: 'up-peak',
+      arrivalRatePctPop5min: 4,
+      durationS: 900,
+    },
+  };
+  const board = (entries: ChallengeBoardPage['entries']): ChallengeBoardPage => ({
+    challengeId: challenge.challenge.id,
+    challenge: challenge.challenge,
+    state: 'open',
+    dataHash: 'placeholder',
+    metric: 'meanAwtS',
+    seedCount: 3,
+    note: 'Each row is a mean over the whole seed set, with the runs and the rides behind it. No interval is published, because the players who posted are not a sample of anybody else.',
+    compare: challenge.compare,
+    entries,
+    entriesOnOtherData: 0,
+  });
+  const row = (displayName: string, dispatcherProfileId: string, meanAwtS: number): ChallengeBoardPage['entries'][number] => ({
+    id: `challenge-row-${displayName}`,
+    displayName,
+    dispatcherProfileId,
+    score: {
+      runs: 3,
+      legs: 936,
+      meanAwtS,
+      meanWt95S: meanAwtS * 2,
+      meanTtdMeanS: meanAwtS * 3,
+      meanPctOverLongWait: 2.4,
+      perSeed: [],
+    },
+    submittedAtMs: 0,
+  });
+  return [
+    ['asking', undefined],
+    ['noServer', { kind: 'no-server' }],
+    ['unreachable', { kind: 'unreachable', detail: 'The challenge service did not answer.' }],
+    ['indexOnly', { kind: 'index-only', challenge, detail: 'This challenge has not opened yet.' }],
+    ['empty', { kind: 'board', challenge, board: board([]) }],
+    [
+      'rows',
+      {
+        kind: 'board',
+        challenge,
+        board: board([row('A. Turing', 'eta', 18.2), row('G. Hopper', 'collective', 21.7)]),
+      },
+    ],
+  ];
+}
+
 function placeholderBoardEntry(
   displayName: string,
   awtS: number,
@@ -10142,6 +10238,12 @@ const GAUNTLET: SurfaceAdapter = {
     'everyday/boardScreen.ts#DAILY_BOARD_ABSENCE',
     // The daily tab's five states — driven below, all five, rather than the copy table alone.
     'everyday/boardScreen.ts#dailyBoardViewOf',
+    /*
+     * The challenge tab's five — GitHub issue #221's third criterion. Driven below on the daily
+     * tab's own ground, and the state to read twice is `index-only`: the challenge is on screen and
+     * only its ranking is missing, which is what an upcoming challenge looks like from here.
+     */
+    'everyday/boardScreen.ts#challengeTabViewOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -10467,6 +10569,56 @@ const GAUNTLET: SurfaceAdapter = {
         },
       ],
     ];
+    /*
+     * The challenge tab, in all five of its states — GitHub issue #221. Every one, on the daily
+     * board's own ground, and this tab carries two obligations the board beside it does not: the
+     * server's `note` and Compare's pointer travel in the body (§ D218 § 5 clauses 2 and 5) and are
+     * drawn rather than remembered, and every row prints both counts behind its mean.
+     *
+     * The rows carry a plausible figure and a real pair of counts rather than round ones, because a
+     * challenge row's whole content is a name, a dispatcher, a mean and what it was taken over.
+     */
+    for (const [state, today] of challengeStates()) {
+      const view = challengeTabViewOf(today, (id) => context.profiles.find((profile) => profile.id === id)?.name);
+      if (view.heading !== '') {
+        seeds.push({ field: `board.challenge.${state}.heading`, text: view.heading, role: 'label' });
+      }
+      view.lines.forEach((line, index) => {
+        seeds.push({
+          field: `board.challenge.${state}.line${String(index)}`,
+          text: line.text,
+          role: line.role === 'note' ? 'observation' : 'reason',
+        });
+      });
+      view.rows.forEach((row, index) => {
+        seeds.push({
+          field: `board.challenge.${state}.row${String(index)}.who`,
+          text: `${row.place}. ${row.displayName}`,
+          role: 'label',
+        });
+        seeds.push({ field: `board.challenge.${state}.row${String(index)}.driver`, text: row.driver, role: 'label' });
+        /*
+         * `estimate` with `countShown`, because the row prints its counts — R13's own rule about
+         * this flag, read off what the row *draws* rather than off what the wire holds. A challenge
+         * row that could not say `n` would be `estimate-without-n`, which is why there is no arm
+         * here that omits it.
+         */
+        seeds.push({
+          field: `board.challenge.${state}.row${String(index)}.figure`,
+          text: `${row.figure} ${row.count}`,
+          role: 'estimate',
+          countShown: true,
+        });
+      });
+      view.footnotes.forEach((line, index) => {
+        seeds.push({
+          field: `board.challenge.${state}.footnote${String(index)}`,
+          text: line.text,
+          role: line.role === 'note' ? 'observation' : 'reason',
+        });
+      });
+    }
+
     for (const [state, board] of dailyStates) {
       /*
        * Rendered as the **second** row's player, so every row state carries a `your run` row that
@@ -10568,6 +10720,59 @@ const GAUNTLET: SurfaceAdapter = {
  * the tomorrow button's note, and the stale-sheet warning — five claims about what this screen is
  * showing, none of which exist on the Engineer panel.
  */
+/**
+ * The seven states GitHub issue #221's post block can be in, as inputs to its own view function.
+ *
+ * A function rather than a constant so the type is checked against `postRunViewOf`'s parameter and
+ * a state that stops existing goes red here rather than silently dropping out of the sweep.
+ *
+ * The `posted` arm carries a placement sentence written here rather than one taken off a run: no
+ * case in this corpus has posted anything, and a state a player can reach is a state this search
+ * reads — the same argument the daily board's `unreachable` detail is seeded under.
+ */
+function postRunStates(): readonly {
+  readonly label: string;
+  readonly input: Parameters<typeof postRunViewOf>[0];
+}[] {
+  const ready = { hasRun: true, hasServer: true, signedIn: true, posting: false, outcome: undefined } as const;
+  return [
+    { label: 'ready', input: ready },
+    { label: 'posting', input: { ...ready, posting: true } },
+    { label: 'noServer', input: { ...ready, hasServer: false } },
+    { label: 'noRun', input: { ...ready, hasRun: false } },
+    { label: 'signedOut', input: { ...ready, signedIn: false } },
+    {
+      label: 'refused',
+      input: {
+        ...ready,
+        outcome: {
+          kind: 'refused',
+          detail: 'This run cannot be posted: it was played on a tower that has grown since day one.',
+        },
+      },
+    },
+    {
+      label: 'failed',
+      input: {
+        ...ready,
+        outcome: { kind: 'failed', detail: 'The board service did not answer.' },
+      },
+    },
+    {
+      label: 'posted',
+      input: {
+        ...ready,
+        outcome: {
+          kind: 'posted',
+          boardKey: 'personal:a-player',
+          placement: 'your own record log, because this run is not the day’s fixture',
+          entry: placeholderBoardEntry('A. Turing', 21.4),
+        },
+      },
+    },
+  ];
+}
+
 const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
   id: 'everyday/today.ts#todayOf',
   covers: [
@@ -10598,6 +10803,16 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/world.ts#WORLD_FIGURES_LABEL',
     'everyday/world.ts#WORLD_FIGURES_REASON',
     'everyday/world.ts#WORLD_FIGURES_ABSENT',
+    /*
+     * GitHub issue #221's post block, which sits on the report screen under the figures. All seven
+     * of its states are driven below rather than the copy table alone: the state most likely to say
+     * something a run cannot support is the one a developer never sees, which is this adapter's own
+     * argument for the daily board's five.
+     */
+    'everyday/postRun.ts#postRunViewOf',
+    'everyday/postRun.ts#POST_RUN_COPY',
+    /* The *no API origin* sentence, owned by the host because the host decides that arm. */
+    'everyday/host.ts#POST_RUN_NO_SERVER',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -10865,6 +11080,29 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         if (view.tomorrow !== undefined) {
           seeds.push({ field: `${where}.tomorrow.label`, text: view.tomorrow.label, role: 'label' });
           seeds.push({ field: `${where}.tomorrow.note`, text: view.tomorrow.note, role: 'prose' });
+        }
+        /*
+         * § 14's board, reached from the day that earned a row — GitHub issue #221. Seven states,
+         * every one of them, on the daily board's own ground: the pair that must never share a
+         * sentence here is *this shell refused it* against *the server refused it*, because only
+         * one of the two describes a request that was made.
+         *
+         * The `posted` arm's placement is the server's sentence and is deliberately one this
+         * adapter writes rather than one it draws off a fixture: there is no run in this corpus
+         * that has been posted, so the string a player would read is seeded rather than produced,
+         * which is what the daily board's `unreachable` detail is too.
+         */
+        for (const post of postRunStates()) {
+          const view = postRunViewOf(post.input);
+          seeds.push({ field: `${where}.post.${post.label}.eyebrow`, text: view.eyebrow, role: 'label' });
+          seeds.push({ field: `${where}.post.${post.label}.button`, text: view.label, role: 'label' });
+          view.lines.forEach((line, index) => {
+            seeds.push({
+              field: `${where}.post.${post.label}.line${String(index)}`,
+              text: line.text,
+              role: line.role === 'note' ? 'observation' : 'reason',
+            });
+          });
         }
         if (view.staleNote !== undefined) {
           seeds.push({ field: `${where}.stale`, text: view.staleNote, role: 'reason' });
@@ -11725,7 +11963,14 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     'everyday/buildNotes.ts#BUILD_NOTES_POINTER',
     /* GitHub issue #246's build line, reached through `view.build`; under the corpus, the unbuilt arm. */
     'release/version.ts#buildVersionLineOf',
-    'everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES',
+    /*
+     * `everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES` stood here until GitHub issue #221 emptied
+     * it — the post block on the report screen made its last row false, so the row and its triage
+     * entry went together. An empty array produces no prose, so `derive.test.ts` no longer finds it
+     * and a `covers` entry would be a coverage claim for nothing. The section is still drawn and
+     * still swept: it draws the `empty` line below, which is now the third register to reach that
+     * arm.
+     */
     'everyday/buildNotes.ts#REGISTER_EMPTY_LINE',
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
     /*

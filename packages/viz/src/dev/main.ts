@@ -51,12 +51,17 @@ import {
   type EngineerSettingsBridge,
 } from '../everyday/engineerBridge.js';
 import {
+  challengeTodayOf,
   createEverydayHost,
   dailyBoardOf,
   EVERYDAY_HOST,
+  POST_RUN_NO_SERVER,
   type EverydayHostBindings,
+  type EverydayPostOutcome,
 } from '../everyday/host.js';
 import { publishEverydayAccount } from '../everyday/accountPort.js';
+// The success sentence both shells say after a 201 — see `submitScore`.
+import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
@@ -167,7 +172,6 @@ import { systemClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
 import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
 import { assertSameCrowd } from '../record/crowd.js';
-import { wireInterventionsOf } from '../scope/switchWire.js';
 import { recordRun } from '../record/recordRun.js';
 import {
   DEFAULT_THEME,
@@ -260,6 +264,7 @@ import {
   buildingConfigOf,
   shiftDemandTemplateId,
   shiftSubmittedSelection,
+  runSubmissionOf,
   closedWeekOf,
   specsWithSaved,
   buildingNameOf,
@@ -1252,9 +1257,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
   const NO_SERVER_SIGN_IN =
     'This site has no account server behind it, so there is nowhere to sign in and nothing is ' +
     `sent anywhere. ${NO_SERVER_ROWS}`;
-  const NO_SERVER_POST =
-    'This site has no leaderboard server behind it, so this run cannot be posted. It is still on ' +
-    'screen and still in the report — nothing about it is lost.';
+  /*
+   * **One sentence, owned next door** — GitHub issue #221. This used to be a literal here, and the
+   * Everyday shell's post block needed the same claim about the same state; two literals for one
+   * state on two surfaces is exactly `honesty/agreement.ts#surfaces-disagree`'s shape, so the string
+   * moved to `everyday/host.ts` where the *no API origin* arm is decided and both shells read it.
+   */
+  const NO_SERVER_POST = POST_RUN_NO_SERVER;
   /**
    * What a redemption in flight says, on **both** surfaces — GitHub issue #336.
    *
@@ -2441,7 +2450,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * makes*: `awtIsValid` travels with the submission, so a client claiming a valid mean for a
    * diverging queue is caught as a wrong claim rather than silently corrected and ranked anyway.
    */
-  async function submitScore(): Promise<void> {
+  /**
+   * The whole of it, as an answer rather than as a notice — GitHub issue #221's write half.
+   *
+   * **Both shells post through this one function**, and that is the reason it exists rather than a
+   * tidying: the Everyday report screen and the Engineer menu's *Post this run* row must not come
+   * to different conclusions about whether one run may be posted. A second ladder next door would
+   * be a second answer to *is this run postable*, and the two would disagree the first time either
+   * gained a gate — which is `everyday/host.ts`'s own argument for taking calls rather than a
+   * client, applied one level in.
+   *
+   * It returns `EverydayPostOutcome` and writes nothing: no notice, no redraw, no board refetch.
+   * {@link submitScore} does all three below, and the Everyday screen does its own — the states are
+   * the same, and what a surface *draws* for each is the surface's.
+   */
+  async function postCurrentRun(): Promise<EverydayPostOutcome> {
     /*
      * Issue #21: all three of these were a bare `return`.
      *
@@ -2459,24 +2482,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     const recording = state.recording;
     if (recording === undefined) {
-      accountState = withNotice(
-        accountState,
-        'There is no finished run to post yet. Run a shift from Scenarios or Free play, then come ' +
+      return {
+        kind: 'refused',
+        detail:
+          'There is no finished run to post yet. Run a shift from Scenarios or Free play, then come ' +
           'back — the run on screen is what gets posted.',
-      );
-      drawMenu();
-      return;
+      };
     }
-    if (client === undefined) {
-      accountState = withNotice(accountState, NO_SERVER_POST);
-      drawMenu();
-      return;
-    }
+    if (client === undefined) return { kind: 'no-server', detail: NO_SERVER_POST };
     const token = accountState.token;
     if (token === undefined) {
-      accountState = withNotice(accountState, postingRefusal(accountState) ?? NO_SERVER_SIGN_IN);
-      drawMenu();
-      return;
+      return { kind: 'signed-out', detail: postingRefusal(accountState) ?? NO_SERVER_SIGN_IN };
     }
 
     /*
@@ -2523,20 +2539,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * posts one.
      */
     const notOurs = bankingRefusalFor(recording, simulatedRecording);
-    if (notOurs !== null) {
-      accountState = withNotice(accountState, `This run cannot be posted: ${notOurs}.`);
-      drawMenu();
-      return;
-    }
+    if (notOurs !== null) return { kind: 'refused', detail: `This run cannot be posted: ${notOurs}.` };
 
     const identity = runIdentityIssues(state, resources, 'ranked');
     if (identity.length > 0) {
-      accountState = withNotice(
-        accountState,
-        `This run cannot be posted: ${identity.map((issue) => issue.message).join('; ')}.`,
-      );
-      drawMenu();
-      return;
+      return {
+        kind: 'refused',
+        detail: `This run cannot be posted: ${identity.map((issue) => issue.message).join('; ')}.`,
+      };
     }
 
     /*
@@ -2545,60 +2555,52 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * claim by refusing the submission as a forgery.
      */
     const claim = claimedMetricsOf(recording.summary);
-    if (!claim.ok) {
-      accountState = withNotice(accountState, claim.detail);
-      drawMenu();
-      return;
-    }
+    if (!claim.ok) return { kind: 'refused', detail: claim.detail };
 
     // Same escalation as the sign-in path: the server this posts to is the one § D243 measured at
     // 28.7 s cold, and a primary action that goes quiet for half a minute reads as the dead button
     // #21 is about.
     const done = startWaiting('Posting this run…');
+    /*
+     * The body is `dev/state.ts#runSubmissionOf` — GitHub issue #221. It was written out here, and
+     * moving it is what lets a second surface post the same run and a test build the same body; the
+     * argument, the field-by-field reasoning and § D285/§ D318's two corrections all travelled with
+     * it. Nothing about what goes on the wire changed on that commit.
+     */
     const result = await client.submit(token, {
-      run: {
-        buildingId: state.buildingId,
-        dispatcherProfileId: state.dispatcherId,
-        // `state`, never `menuState.freePlay` — see {@link shiftSubmittedSelection}. These two lines
-        // read the menu until § D318, and the comment below already held the argument against it.
-        ...shiftSubmittedSelection(
-          resources,
-          state,
-          buildingConfigOf(resources, state.savedBuildings, state.buildingId),
-        ),
-        durationS: state.shiftLengthS,
-        // `state`, not `menuState.freePlay`, and the distinction is the same one the two lines above
-        // now obey: this is the window the run *was simulated with*, and the menu holds the window
-        // currently *selected*. They agree until somebody changes the selection after a run and
-        // before posting, and then only one of them describes the seed the server is about to
-        // replay. § D285.
-        windowStartS: state.windowStartS,
-        seed: state.seed.toString(),
-        /*
-         * § 11.5's rules and § 1.4's log, spread rather than written as `ruleRows: state.ruleRows`
-         * — GitHub issue #179.
-         *
-         * The spread is the same decision `shiftRunConfigOf` makes at the same two fields and for
-         * the same reason: `core` pins a run with no `interventions` key byte-identical to one built
-         * before the field existed, `profileWithRules` returns the profile by object identity for an
-         * empty list, and the server drops an empty list from its digest. Writing `[]` on the wire
-         * would be a claim the run never made, and would re-digest every score already posted.
-         *
-         * `state`, never the menu, for the reason the two lines above give: this is what the run was
-         * *simulated with*, and `runIdentityIssues` has already refused any state whose log holds a
-         * kind the wire may not carry.
-         */
-        ...(state.ruleRows.length === 0 ? {} : { ruleRows: state.ruleRows }),
-        ...(state.interventions.length === 0
-          ? {}
-          : { interventions: wireInterventionsOf(state.interventions, resources.dispatcherProfiles.profiles) }),
-      },
+      run: runSubmissionOf(resources, state),
       claimed: claim.claimed,
     });
     done();
+    if (!result.ok) return { kind: 'failed', detail: result.detail };
+    return {
+      kind: 'posted',
+      boardKey: result.value.boardKey,
+      placement: result.value.placement,
+      entry: result.value.entry,
+    };
+  }
+
+  /**
+   * The Engineer menu's *Post this run*, which is {@link postCurrentRun} plus this surface's own
+   * three writes — the notice, the redraw and the board refetch.
+   *
+   * Every sentence below is the outcome's own `detail`, unrewritten, except the success line, which
+   * this surface authors because it is the one thing the outcome does not carry as prose. The
+   * Everyday shell writes its own success line beside the server's `placement`; the two say the
+   * same thing about the same event and neither paraphrases a refusal.
+   */
+  async function submitScore(): Promise<void> {
+    const outcome = await postCurrentRun();
     accountState = withNotice(
       accountState,
-      result.ok ? 'Posted. The server replayed your seed and it reproduced.' : result.detail,
+      /*
+       * `POST_RUN_COPY.posted` rather than a literal — GitHub issue #221. This surface and the
+       * Everyday report screen say the same thing about the same event, and two literals for one
+       * claim is the drift `everyday/settingsView.ts` already quotes this very sentence as an
+       * example of. Every other arm is the outcome's own `detail`, carried.
+       */
+      outcome.kind === 'posted' ? POST_RUN_COPY.posted : outcome.detail,
     );
     drawMenu();
     /*
@@ -2617,7 +2619,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * whichever board happened to be selected would be this client guessing which board it is on —
      * and a row shown on the wrong board is a worse failure than a row shown a round-trip late.
      */
-    if (result.ok) void loadBoards();
+    if (outcome.kind === 'posted') void loadBoards();
   }
 
   /*
@@ -3873,6 +3875,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
               () => client.boards(),
               (key, metric) => client.board(key, metric),
               (key) => client.distribution(key),
+            ),
+    /*
+     * #221's write half. The composition is `postCurrentRun`, which the Engineer menu's own
+     * *Post this run* row also calls — one ladder, two surfaces, so the two cannot disagree about
+     * whether a run may be posted. `undefined` with no API origin, which is the honest *there is
+     * nowhere to post* and is a different sentence from a server that refused.
+     */
+    postRun: client === undefined ? undefined : () => postCurrentRun(),
+    /*
+     * **This binding and `accountActions` below are absent together, and a screen reads that.**
+     * `everyday/reportScreen.ts` decides whether to draw a live *Post this run* from
+     * `accountActions() !== undefined`, because the post binding cannot be asked *"would you
+     * work?"* without posting. The two are set from the same `client === undefined` here, three
+     * lines apart, so the reading is true — and it is true by this line rather than by a rule, so a
+     * future shell that wires one without the other owes the screen a better question than this
+     * one. Said here rather than only there, because this is the end that can break it.
+     */
+    /*
+     * #221's third criterion: the daily challenge, reachable without the Engineer menu. Two reads,
+     * composed next door for `dailyBoard`'s reason — this is client work, and a screen holding a
+     * client would be the third module `boundaries.test.ts` permits.
+     *
+     * The id asked for is the index's own `currentId`. Nothing here reads a clock, which is § D218
+     * § 3's guarantee in its mechanical form.
+     */
+    challengeToday:
+      client === undefined
+        ? undefined
+        : () =>
+            challengeTodayOf(
+              () => client.challenges(),
+              (id, metric) => client.challengeBoard(id, metric),
             ),
     /*
      * § D489's asking half, as four calls — GitHub issue #332. `undefined` on a build served with

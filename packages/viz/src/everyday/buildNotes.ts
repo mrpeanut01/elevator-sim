@@ -175,8 +175,21 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * So the row keeps its subject and loses its reason, and its triage row moves from #332 to #221,
    * which is the issue that will build the press. A register that had kept the old sentence would
    * be telling a signed-in player to go and find a door they are already through.
+   *
+   * **And it is deleted here, on the commit that built the press** — GitHub issue #221's first
+   * acceptance criterion. The last of it read *"nothing in this build puts a run on the board once
+   * you have, so from here it is something you read rather than something you enter"*, and the
+   * report screen's post block is what makes that false: `EverydayHost.postRun` reaches
+   * `menu/client.ts#submit` through `dev/main.ts#postCurrentRun`, the same ladder the Engineer
+   * menu's own row goes through. § D227's rule is that a refusal leaves on the commit that makes
+   * it false, and its triage row goes with it or the map becomes decoration — so both go here.
+   *
+   * **What is *not* claimed by that deletion, said before somebody reads it as one.** The
+   * challenge tab this issue also built is **read-only**, and its own absence is stated on the tab
+   * face (`boardScreen.ts#BOARD_SCREEN_COPY.challengeCannotPost`) rather than in this register,
+   * because it is a sentence about a screen a player is standing on rather than about the build.
+   * The register's job is the absences a player cannot see from where they are.
    */
-  'Putting your run on the daily board — the board reads, and today’s rows are other people’s runs replayed and re-measured before they appeared. You can sign in from Settings, and nothing in this build puts a run on the board once you have, so from here it is something you read rather than something you enter.',
   /*
    * **A sixth row left on the merge that registered the rush setup, the drawing board and the
    * tuner — and it left because that merge closed it, which is the one case this register has not
@@ -279,6 +292,15 @@ export function buildNotesViewOf(): BuildNotesView {
       heading: 'Across the whole build',
       note: 'Things missing from the game as a whole rather than from one screen.',
       entries: EVERYDAY_SHELL_ABSENCES,
+      /*
+       * **This arm was written when the register emptied** — GitHub issue #221. It had never been
+       * needed here, which is the interesting half: the two registers below carried it because they
+       * had emptied and this one had not, so a section whose last row left would have drawn a
+       * heading, a note and nothing at all — a heading as the only cue, which is exactly what the
+       * assertion in `buildNotes.test.ts` refuses. The arm is kept rather than the register deleted,
+       * on this file's standing rule: an empty register is a state that must keep being checked.
+       */
+      ...(EVERYDAY_SHELL_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
     {
       heading: 'Watching a run',

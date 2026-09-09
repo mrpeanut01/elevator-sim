@@ -334,9 +334,15 @@ describe('issue #112 — a board is re-read, and the screen is not latched shut'
      * deployment is the sentence saying nothing has been posted. The one action the surface exists
      * for returned success and the screen said the opposite.
      */
+    /*
+     * The condition is spelled off the outcome since GitHub issue #221 — `submitScore` is the
+     * Engineer surface's three writes over `postCurrentRun`'s answer, and `posted` is that answer's
+     * name for a 201. The property is the one the paragraph above states and is unchanged: the
+     * board is re-read exactly when the server accepted a run, and never otherwise.
+     */
     const body = await bodyOf('submitScore');
     expect(body).toContain('loadBoards()');
-    expect(body).toMatch(/if \(result\.ok\) void loadBoards\(\)/u);
+    expect(body).toMatch(/if \(outcome\.kind === 'posted'\) void loadBoards\(\)/u);
   });
 
   it('re-reads the challenge board after the server accepts a set, which it already did', async () => {

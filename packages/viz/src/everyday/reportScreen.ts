@@ -78,6 +78,9 @@ import {
   type HonestyPart,
 } from './reportView.js';
 import { openTowerOf } from '../campaign/career.js';
+import { everydayAccount, onEverydayAccount } from './accountPort.js';
+import { postRunViewOf } from './postRun.js';
+import type { EverydayPostOutcome } from './host.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayState } from './types.js';
@@ -133,6 +136,24 @@ function mountReportScreen(
 ): MountedEverydayScreen {
   const doc = host.ownerDocument;
   let alive = true;
+  /**
+   * The last press's answer, and whether one is in flight — GitHub issue #221.
+   *
+   * Mount state rather than `ViewerState`, on the same rule `continuity` above is held under: the
+   * answer is about *this reading of this sheet*, not about the run. Navigating away and back asks
+   * again, which is right — a *posted* line surviving a walk to the week would be a claim about a
+   * request that happened in a session the player has left behind.
+   */
+  let postOutcome: EverydayPostOutcome | undefined;
+  let posting = false;
+  /**
+   * The block on the page, so a press and an account change can repaint it alone.
+   *
+   * `undefined` until {@link drawSheet} has drawn one, and left standing when the sheet is redrawn
+   * because {@link drawSheet} always assigns it — a stale reference would repaint into a node the
+   * document no longer holds, which is a silent no-op and the worst shape of failure here.
+   */
+  let postBlock: HTMLElement | undefined;
 
   const root = el(doc, 'div', 'everyday-report');
   root.style.cssText = 'max-width:900px';
@@ -160,6 +181,13 @@ function mountReportScreen(
     const open = openTowerOf(context.host.campaign());
     reportBuildingName =
       open === undefined ? undefined : context.host.buildingById(open.buildingId)?.name;
+    /*
+     * The post block goes with the children on every path — cleared here rather than beside each
+     * `replaceChildren`, so a future early return cannot leave the reference pointing at a node the
+     * document has dropped. `drawSheet` assigns a fresh one; every other path leaves it `undefined`
+     * and `repaintPostBlock` is then a no-op rather than a write nobody sees.
+     */
+    postBlock = undefined;
     /* § 9.3: the rush's result is its own screen and never falls through to the day's sheet. */
     if (context.ctx === 'rush') {
       root.replaceChildren();
@@ -493,6 +521,10 @@ function mountReportScreen(
     }
     root.append(honesty);
 
+    /* ---- put it on the board — GitHub issue #221 ---- */
+    postBlock = drawPostBlock();
+    root.append(postBlock);
+
     /* ---- one button into tomorrow ---- */
     if (view.tomorrow !== undefined) {
       const onward = el(doc, 'div');
@@ -518,6 +550,109 @@ function mountReportScreen(
       onward.append(button, note);
       root.append(onward);
     }
+  }
+
+  /**
+   * § 14's board, reached from the day that earned a row — GitHub issue #221's first criterion,
+   * *"a completed run can be posted from the player-facing shell"*.
+   *
+   * **This is `EverydayHost.postRun`'s non-test caller**, and it is the whole of the reason that
+   * seam exists. Every sentence and every enabled/disabled decision is `postRun.ts`'s; this function
+   * draws them and owns the press, the in-flight flag and the redraw.
+   *
+   * The account is read through `everyday/accountPort.ts` rather than through the host, for the
+   * reason that port was built: the host's `onChange` is drained by `renderAll()` and no account
+   * path calls it, so a block that learned about signing in through the host would draw *sign in to
+   * post* at a player who just did. It subscribes on mount and repaints **this block only** — the
+   * report screen has no focused field of its own here, and a whole-screen redraw on a
+   * notification is the press-swallowing defect issue #106 documents.
+   */
+  function drawPostBlock(): HTMLElement {
+    const account = everydayAccount();
+    const view = postRunViewOf({
+      hasRun: context.host.recording() !== undefined,
+      // The binding, not a guess: `accountActions()` is `undefined` on exactly the builds served
+      // with no API origin, which is the same condition the post binding is absent under.
+      hasServer: context.host.accountActions() !== undefined,
+      signedIn: account?.token !== undefined,
+      posting,
+      outcome: postOutcome,
+    });
+    const block = el(doc, 'section', 'everyday-post');
+    block.style.cssText = `${WELL};margin-top:20px;padding:16px 18px;border-radius:${String(R.card)}px`;
+    const eyebrow = el(doc, 'p', 'everyday-post-eyebrow', view.eyebrow);
+    eyebrow.style.cssText = `${EYEBROW};margin:0`;
+    const button = el(doc, 'button', 'everyday-post-go', view.label);
+    button.type = 'button';
+    button.disabled = !view.pressable;
+    button.style.cssText = [
+      view.pressable ? 'cursor:pointer' : 'cursor:default',
+      'border:0',
+      `border-radius:${String(R.pill)}px`,
+      `background:${view.pressable ? C.sun : C.rule}`,
+      `color:${C.ink}`,
+      'padding:11px 20px',
+      'font-size:14px',
+      'font-weight:600',
+      'margin:12px 0 0',
+      view.pressable ? 'opacity:1' : 'opacity:0.55',
+    ].join(';');
+    button.addEventListener('click', () => {
+      // Guarded as well as disabled: `postRun.ts` says why both exist, and a keyboard route into a
+      // handler is exactly what issue #21 found behind the Engineer surface's own posting row.
+      if (!view.pressable || posting) return;
+      posting = true;
+      repaintPostBlock();
+      void context.host
+        .postRun()
+        .then((outcome) => {
+          postOutcome = outcome;
+        })
+        .catch((error: unknown) => {
+          /*
+           * A rejection is not a state the host promises, and the honest thing to draw for one is
+           * *the request did not complete* rather than nothing. `menu/client.ts` turns every
+           * transport failure into a `Failure`, so reaching here means a defect rather than a
+           * network — which is why the message is carried instead of being replaced with a
+           * reassuring sentence that would be a guess.
+           */
+          postOutcome = {
+            kind: 'failed',
+            detail: error instanceof Error ? error.message : String(error),
+          };
+        })
+        .finally(() => {
+          posting = false;
+          repaintPostBlock();
+        });
+    });
+    block.append(eyebrow, button);
+    for (const prose of view.lines) {
+      const node = el(doc, 'p', prose.className, prose.text);
+      node.style.cssText = `${prose.role === 'reason' ? BODY : QUIET};margin:10px 0 0;max-width:74ch`;
+      block.append(node);
+    }
+    return block;
+  }
+
+  /**
+   * Redraw **the post block and nothing else** — `everyday/accountPort.ts`'s own instruction to a
+   * listener, and the same rule applied to this block's own press.
+   *
+   * A full `render()` would rebuild the sheet, which costs two things this screen would rather keep:
+   * `viewNow()` rotates the sheet continuity, and every `<details>` fold a reader has opened closes.
+   * Neither is a consequence of somebody signing in, or of a run being posted, so neither should
+   * follow from one — which is issue #106's *"a press swallowed mid-`mousedown`, and focus taken off
+   * whatever the reader was on"* said about a fold instead of a field.
+   *
+   * A no-op when there is no block, which is every state that returns before {@link drawSheet} —
+   * an empty report, and the rush's own result screen.
+   */
+  function repaintPostBlock(): void {
+    if (!alive || postBlock === undefined) return;
+    const next = drawPostBlock();
+    postBlock.replaceWith(next);
+    postBlock = next;
   }
 
   /** One paragraph of the closing block, styled the one way every paragraph in it is styled. */
@@ -604,12 +739,19 @@ function mountReportScreen(
 
   render();
   const stopListening = context.host.subscribe(render);
+  /*
+   * The account, heard on its own channel — `everyday/accountPort.ts`. The host's `onChange` is
+   * drained by `renderAll()` and no account path calls it, so signing in on the settings screen and
+   * walking back here would otherwise leave the post block still saying *sign in to post*.
+   */
+  const stopAccount = onEverydayAccount(repaintPostBlock);
 
   return {
     unmount: () => {
       alive = false;
       reportBuildingName = undefined;
       stopListening();
+      stopAccount();
     },
     /**
      * § 3.3's report primary — `Your week` in the daily flow, and the campaign's is its **own**.
