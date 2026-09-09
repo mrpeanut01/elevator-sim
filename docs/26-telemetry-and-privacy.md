@@ -574,10 +574,11 @@ different decision from the one issue #254 asked for and is not taken here.
 ### 5.4 What makes an aggregate safe to keep forever
 
 Only this: **an aggregate carries no identifier, no run pointer and no cell small enough to be one
-person.** A KPI table row is a date, a build, a count and a rate. A minimum cell size is declared
-before the first table is published and a row under it is refused rather than published — and it is
-refused *by name*, in the product's own idiom: a cell that is too small says so, exactly as a
-suppressed mean does, rather than disappearing.
+person.** A KPI table row is a date, a build, a count and a rate. **The minimum cell size is declared in § 20.3**, which is
+the only place in this document that states it — this sentence deferred it until the first table was
+specified, and that has now happened. A row under the floor is refused rather than published, and it is refused *by name*, in the
+product's own idiom: a cell that is too small says so, exactly as a suppressed mean does, rather than
+disappearing.
 
 ---
 
@@ -1031,8 +1032,19 @@ prevent.
   repository's stale-refusal rule mechanised rather than restated.
 - **`CHARTER_PROGRAMME.md` § M4's *S1 through S5*** (§ 9.5) is a milestone-page correction this lane
   does not own.
-- **The minimum aggregate cell size** (§ 5.4) is declared before the first KPI table is published,
-  not here.
+- ~~**The minimum aggregate cell size** (§ 5.4) is declared before the first KPI table is published,
+  not here.~~ — **declared 2026-09-09 in § 20.3**, which states the figure and the grounds it rests
+  on. Struck through rather than deleted, on this document's own § 0 rule. A register that quietly drops a row it has
+  paid is one nobody can date; a register that keeps carrying a debt it has paid is decoration.
+- **The KPI dashboard's owner is not named** (§ 20.6). The role and the decisions that come with it
+  are specified; who holds it is a staffing question this document cannot answer, and the name is
+  owed **before the first table is published** rather than before the dashboard is built. Recorded
+  here because the last gap in this criterion was worse for being unrecorded: GitHub issue #201's
+  fifth criterion was unmet **and absent from this register**, so a reader consulting it to learn
+  what was left would not have learned that a criterion had been skipped.
+- **All four KPI baselines read `unmeasured`** (§ 20.4) and will until the instrument exists. The
+  protocol for taking them is specified, so that the first number is not argued about after it
+  exists.
 - **The recruited cohort itself** — how it is recruited, what it is told, and what it consents to —
   is the playtest programme's (#205), and a recruited cohort's consent is a different conversation
   from an anonymous player's.
@@ -1695,8 +1707,9 @@ be under the most pressure the first time a number moves.
 **And it needs a named owner, which is #250's own third criterion and is a privacy requirement as
 well as a review one.** R-1 is *a* reader rather than *anyone*; a dashboard nobody owns is a dashboard
 whose access nobody is deciding. **Who that is, is not named here** — this document does not staff the
-project — but the posture is that the answer exists in writing before the first table is published,
-beside the minimum cell size § 5.4 also defers.
+project — but the posture is that the answer exists in writing before the first table is published.
+**The dashboard's shape is now specified in § 20**, the owner's role in § 20.6, and the minimum cell
+size § 5.4 used to defer alongside it is declared in § 20.3.
 
 ---
 
@@ -1728,10 +1741,230 @@ decision needs a list.
 | **18** | 16.2 | **The error-report horizon is drafted and blank.** #242's runbook has to exist before a number here means anything | Whether #242 can ship before its runbook |
 | **19** | — | **Is anything in § 13.2 special-category?** The author's reading is no — no health, biometric, political or similar field exists — but the reading is a non-lawyer's | Whether a whole additional regime applies |
 
-**Two things that are deliberately not on this list.** The **minimum aggregate cell size** (§ 5.4) is
-a statistical judgement this project can make for itself and owes before the first KPI table is
-published. The **90-day event horizon** is derived in § 5.1 from `docs/26 K4`'s window; a reviewer
+**Two things that are deliberately not on this list.** The **minimum aggregate cell size** (§ 5.4)
+was a statistical judgement this project could make for itself, and it has: **§ 20.3 declares it.**
+Nothing about that decision is characterised here — not the figure, not how many grounds it rests on,
+not what they cover — because this line has gone stale three times doing exactly that, and a summary
+that restates is a summary that will. The **90-day event horizon** is derived in § 5.1 from `docs/26 K4`'s window; a reviewer
 may of course move it, but it is not a question the product is asking.
+
+---
+
+## 20. The KPI dashboard — the shape § 18.2 promised for R-1
+
+**Numbered after § 19 rather than beside § 18, deliberately.** This section extends the read route
+and belongs next to it by subject; putting it there would have moved § 19, and every ordinal in this
+repository is a name rather than a position ([`CLAUDE.md`](../CLAUDE.md), on the dead-seam count).
+A reader arriving from § 18.2 is sent here by name and loses nothing; a reader holding a citation to
+§ 19 would have lost it.
+
+### 20.1 What this is, and the two things it is not
+
+It is the specification GitHub issue #201's fifth criterion asks for, made possible by ruling 2
+(§ 12.1) and bounded by § 18. **It is not an instrument**: there is no telemetry in this tree (§ 0
+fact 1, re-measured § 13.1), so every panel below reads an empty source today, and § 18.4's sentence
+governs — the dashboard may not ship ahead of this posture and may not ship ahead of the thing it
+reads. **It is not a second definition of anything.** Every KPI here is § 6.2's, every diagnostic is
+§ 6.3's, every horizon is § 5.1's. A figure defined twice is `docs/26 P-5`'s failure, and the first
+time the two disagreed nobody would know which one the review had read.
+
+### 20.2 The panels
+
+Eight, and the set is not free: § 18.2 grants R-1 *"§ 6's four KPIs and § 6.3's diagnostics"*, so the
+panels are exactly those eight and a ninth needs § 18.2 to move first. Targets are the charter's, not
+this document's. Every baseline is refused today and § 20.4 says why.
+
+| # | Reads | Target | Baseline | Refused when | Grain |
+|---|---|---|---|---|---|
+| **P1** | `docs/26 K1` — reach, and time, to visible trouble | `charter S1` — median ≤ **90 s**, on a reach share high enough that the median is not survivorship (§ 6.2) | `unmeasured` — § 20.4 | either figure's cell is under § 20.3's floor; or the threshold and dwell constant does not yet exist (§ 11) | build × UTC month |
+| **P2** | `docs/26 K2` — first-session loop completion | `charter S2` — **60 %** of first sessions complete the five-beat chain | `unmeasured` — § 20.4 | the cell is under § 20.3's floor | build × UTC month |
+| **P3** | `docs/26 K3` — first-session length | `charter S3` — median **≥ 10 minutes** | `unmeasured` — § 20.4 | the cell is under § 20.3's floor | build × UTC month |
+| **P4** | `docs/26 K4` — day-one to seven-day return | `charter S4` — **25 %** of a day's cohort returns within 7 days | `unmeasured` — § 20.4 | the cohort is under § 20.3's floor, **or** the window has not closed — no cohort is drawn before *D*+8 (§ 6.2) | first-seen UTC day × build |
+| **P5** | Beat-drop profile | none — a diagnostic has no target (§ 6.1) | not applicable | any beat × screen cell under the floor, **and § 20.3's complement rule** | build × UTC month × beat × screen key |
+| **P6** | Refusal encounters | none | not applicable | any ground's cell under the floor | build × UTC month × refusal ground |
+| **P7** | Field cold load | none. **It may refute the CI budget's representativeness and can never satisfy `charter S9`** (§ 6.3) | not applicable | the cell is under the floor | build × UTC month |
+| **P8** | Screen reach | none. Not a `charter S10` instrument — that is [`TEST_MATRIX.md`](../TEST_MATRIX.md)'s journey rows | not applicable | any screen's cell under the floor | build × UTC month × screen key |
+
+**Four of the eight carry no target and that is the point of the column.** § 6.1 draws the line: a
+KPI is a figure the team steers by and may be a gate; a diagnostic explains why a KPI moved and may
+**not** be. A target column on P5–P8 would turn four explanations into four gates, which is the
+single most likely way this dashboard does damage.
+
+**Every panel is a rate or a median over a cell, and every cell carries its count and an interval.**
+That is § 6.4's second bullet, and it is the reason § 20.3's floor does not have to do statistical
+work as well as disclosure work.
+
+### 20.3 The minimum cell size
+
+**The minimum cell size is 20 people.** § 5.4 and § 11 both recorded this as owed before the first
+table was published; this is the declaration, and both stop registering it on this commit.
+
+**Ground 1 — disclosure.** § 5.4's rule is *no cell small enough to be one person*. The conventional
+floor for tabular disclosure control over people is 5. This is four times it, because the
+conventional 5 assumes a table published **once**, by an office with legal and procedural controls
+around the release; this one is re-drawn every month over an overlapping population by a small team
+with neither.
+
+**Ground 2 — differencing, which a floor does not fix.** A floor on each cell does not stop anyone
+subtracting two overlapping windows to recover the difference between them, and no choice of integer
+would. What answers it is the **grain column above**: cells are computed over fixed, pre-declared,
+non-overlapping calendar windows, and **the dashboard offers no arbitrary date range**. A date
+picker is the one feature that would defeat the floor while looking like a convenience, which is why
+it is named in § 20.7 rather than left to be noticed.
+
+**Why not 50, which is the integer already lying around.** [`CLAUDE.md`](../CLAUDE.md) budgets 50–200
+*replications* per configuration. That budget is about a simulation run under common random numbers,
+and § 6.4 already records that the paired-CRN discipline does not transfer to people — you cannot
+feed the same person to two builds. Borrowing its integer would be the same false transfer wearing a
+different hat, and a number is easier to borrow than a method, which is what makes it worth refusing
+in writing.
+
+**Ground 3 — the complement, which is the one a per-cell floor is blindest to.** A floor applied cell
+by cell does not stop a refused cell being *recovered by subtraction*, and this panel set contains
+exactly that path. § 20.2 requires every cell to carry its count, so **P2** publishes the number of
+first sessions that did not complete the chain for a build and a month; **P5** partitions those same
+sessions by beat and screen. Refuse one P5 cell for holding three people and its value is the P2
+total less the P5 cells still published — no overlapping window involved, and the floor satisfied at
+every step. **A floor on a cell is not a floor on what the table implies.**
+
+So the floor is applied to the **partition**, not to the cell:
+
+1. When any cell in a partition is refused, **at least one further cell in that partition is refused**
+   — chosen so that no refused value can be recovered from the published cells and any total this
+   dashboard publishes over the same base.
+2. **If fewer than two cells can be refused, the whole partition is refused.** A partition with one
+   publishable cell publishes nothing.
+3. **Every refusal inside a partition reads identically**, and a complement cell does *not* say it
+   is a complement. An earlier draft of this rule had it the other way round — labelling the two
+   causes differently, on the reasoning that a reader who cannot tell them apart cannot tell a quiet
+   month from a suppressed one. That reasoning is right about legibility and **wrong about
+   disclosure**, which is the direction that binds: a cell announcing itself as a complement
+   announces that it is *not* under the floor, and the bound on the cell it was suppressed to
+   protect tightens by whatever that cell actually holds. Take A = 3, B = 22, C = 100, D = 150 over
+   a published total of 275. Suppress A and B and label both *too small*, and each is known only to
+   be at most 19 while the pair sums to 25 — which puts A in [6, 19]. Label B *a complement* and B
+   is known to be **at least** 20 instead, so B lies in [20, 24] and A in [1, 5]. The label does not
+   merely narrow the bound, it moves it to a **disjoint** range: honest labelling says A is at least
+   six, and the complement label says A is at most five, which is the only one of the two that
+   contains A's true value of three. **The
+   cost is stated rather than hidden**: at cell level a reader cannot tell a quiet month from a
+   suppressed one, and the partition — not the cell — is where the refusal is explained.
+
+This is standard complementary suppression and it is written down because the draft of this section
+that lacked it *looked complete*: it named a differencing exposure, answered the window species, and
+left the within-table species unmentioned. It was caught in review rather than in use.
+
+**What the floor counts is distinct `playerId`s, never events.** P6 and P8 count encounters — a
+refusal drawn, a screen reached — and one person can produce twenty of either in one session. So a
+cell on those panels is measured against the number of distinct players behind it, and the event
+count it publishes is not what clears the floor. A floor stated in people and applied to events
+would be a floor of one person twenty times over, which is the disclosure it exists to prevent
+wearing the arithmetic of the thing that prevents it.
+
+**The floor is enforced in the route and not in the reader** (§ 18.2, R-1's bound). A cell under it is
+**refused by name**, in the product's own idiom — it says it is too small, exactly as a suppressed
+mean does — rather than being dropped, rounded, or quietly merged into its neighbour. A dashboard
+that filters small cells in the client is one query away from a dashboard that does not.
+
+**What the floor is not for.** It is not a precision bar. A cell of exactly 20 clears disclosure and
+is still far too small to steer by: a share over 20 has a 95 % half-width of up to ±0.220, so an
+observed 60 % is an interval running from 38 % to 82 % — it does not separate a month that clears
+`docs/26 K2` from one that misses it by twenty points. Precision is answered where it already was —
+by drawing the interval and the count beside the figure (§ 6.4) — and a reader who sees an interval
+that wide has been told the truth rather than protected from it.
+
+*An earlier draft of this paragraph said ±0.22 was "wider than the distance between any two of the
+charter's four targets", and that was **false**: `charter S2` at 60 % and `charter S4` at 25 % are
+the only two share-valued targets and they are 0.35 apart, which is wider rather than narrower. No
+other pair has a distance at all — `charter S1` is 90 s and `charter S3` is ten minutes, so the
+remaining pairs put a share beside a duration or a duration beside a duration on a different clock,
+and neither comparison has a common scale to be measured on. The conclusion held and the sentence supporting it did not, which is this document's own lesson
+about a stated mechanism arriving in the section that exists to state one. The half-width is now
+re-derived from the floor by `telemetryDashboard.test.ts` rather than transcribed.*
+
+### 20.4 The baselines, and why all four are refused
+
+**Every KPI baseline reads `unmeasured` today**, and the reason is § 0 fact 1: there is no telemetry,
+so no KPI has ever been computed. A number here would be invented. The cell says `unmeasured` rather
+than sitting blank on the same principle the rest of this document applies to a refused figure — a
+refusal states itself.
+
+**The protocol, so that the first number is not argued about after it exists.**
+
+1. A KPI's baseline is its value over the **first complete** window after ingest begins. A window
+   that began before the first event was received is not complete and is not a baseline.
+2. `docs/26 K4`'s baseline is the first cohort drawn no earlier than *D*+8 (§ 6.2), for the same
+   reason: a partial window is not a smaller measurement, it is a different one.
+3. A baseline is published **once**, with the counts it was computed over, and is not re-based when
+   the product changes. If a change makes the old baseline meaningless, a second baseline is
+   published **beside** it with its date and the reason, and the first is not deleted — § 0's rule
+   about tables whose rows are silently rewritten is what makes a baseline datable at all.
+4. **A baseline is not a target and not a gate.** The targets are the charter's four. A KPI above its
+   own baseline and below `charter S1`–`S4` has moved and has not passed, and § 6.4's third bullet
+   is the sentence that will be under pressure the first time that happens.
+
+### 20.5 The review — monthly, with an agenda and a written output
+
+**Monthly**, which is #250's own word for it, beginning in the month after the first complete window.
+Between reviews the dashboard is a source; at the review it is the input to one decision.
+
+**The agenda is four items and the fourth is the point of the other three.**
+
+1. Each panel against its target, read with its interval and its counts.
+2. The refused cells — which panels went unpublished this month, and whether the reason was the floor
+   (§ 20.3), a window that had not closed, or a constant that still does not exist (§ 11).
+3. What changed in the product that could explain a move, taken from the `buildId` on each panel
+   rather than from memory.
+4. **One decision: what changes, or explicitly nothing.** #250 states the job — *"to check the
+   success criteria and to decide what changes, not to admire the graphs"* — and *nothing changes*
+   is a legitimate output that has to be said out loud, because a review with no null outcome is a
+   review that will invent a finding.
+
+**The output is written, dated, and names the figures it read** — a note in this repository, not a
+screenshot. A screenshot of a dashboard is a measurement with no deriver, which is `RISKS.md` R38
+arriving through the review instead of through the prose.
+
+**A criterion that is met is raised, never weakened** (#250's fourth criterion). That is
+[`CLAUDE.md`](../CLAUDE.md)'s working agreement and [`docs/22-charter.md`](22-charter.md) § 4's rule.
+**Read with § 6.4's third bullet it needs one clause, or the two contradict each other**: this
+review may not declare `charter S1`–`charter S4` met, because they are met on a recruited cohort at
+the M4 gate and not on organic traffic. So the raise duty is discharged by **recording a candidate
+raise and referring it** — a panel that clears its target on organic traffic in three consecutive
+months is minuted as clearing it, and the raise is made where the criterion is decided. The
+prohibition needs no such clause and has none: **a target is never moved down**, at this review or
+anywhere else, whatever the month looks like.
+
+**What the review may not turn into.** Not a conversation about a person — § 18.3 item 1 is not
+suspended because eight people are in a room. Not a verdict on `charter S1`–`S4`, which are met on a
+recruited cohort at the M4 gate and not on organic traffic (§ 6.4).
+
+### 20.6 The owner
+
+**The role, and what it decides.** One named person owns R-1: who holds access to it, whether a panel
+is added or removed (which requires § 18.2 to move first), whether a refused cell may be published
+in some other aggregate form, and the signature on each month's written output.
+
+**Access may not be delegated.** Everything else in the list may be.
+
+**The holder is not named here, and the reason is not shyness.** This document does not staff the
+project (§ 18.4). What it can require, and does: **the name is written into this section before the
+first table is published**, and until it is, that is an unmet condition rather than an oversight —
+**registered in § 11**, where the rest of this document's engineering debt lives. § 18.4 states why
+this is a privacy requirement and not merely a review one: R-1 is *a* reader rather than *anyone*,
+and a dashboard nobody owns is a dashboard whose access nobody is deciding.
+
+### 20.7 What the dashboard may not become
+
+It inherits § 6.4 and § 18.3 whole. Four consequences are worth stating in this section's own terms,
+because each is a feature somebody will ask for and three of them are one afternoon's work:
+
+1. **No arbitrary date range.** § 20.3 ground 2 — the fixed window is what the floor rests on.
+2. **No drill-through from a cell to the rows behind it.** That reader is R-2, it is offline, and it
+   reads pointers rather than people (§ 18.2). A link from a dashboard cell to a row is R-1
+   acquiring R-2's licence without anyone deciding to grant it.
+3. **No cohort a person belongs to by how they played** — § 18.3 item 3, and it is the one most
+   likely to be proposed as an insight rather than as a read route.
+4. **Nothing on it is ever shown to a player** — § 6.4's first bullet and § 10 non-goal 4.
 
 ---
 
