@@ -32,6 +32,23 @@ export interface CareerStore {
   load(): CareerLoad;
   /** Write. Silently a no-op where storage is denied — the caller cannot fix that. */
   save(career: CampaignCareer): void;
+  /**
+   * Remove the career and **seal the store**, so nothing this session goes on to do writes it back.
+   *
+   * The seal is not belt-and-braces: it is GitHub issue **#229**'s own criterion — *"Clear saved
+   * progress works, **including preventing the running session from rewriting the store**"* — and
+   * `dev/main.ts#clearSavedSession` does the same thing for the session slot, sealing before it
+   * removes. Without it the host holds a career in memory and the player's next action saves it
+   * straight back over the deletion.
+   *
+   * Both keys go: {@link CAREER_STORAGE_KEY} and {@link CAREER_QUARANTINE_KEY}. A quarantined
+   * career is a career the player still has on this device, so a control that says *nothing this
+   * device kept survives* has to take it too.
+   *
+   * Sealing is one-way, and that is deliberate — the press is followed by a reload, and a sealed
+   * store's life ends with the page. There is no un-seal because there is no state to return to.
+   */
+  clear(): void;
 }
 
 function browserBacking(): SessionStore | undefined {
@@ -56,6 +73,8 @@ function browserBacking(): SessionStore | undefined {
 export function createCareerStore(backing: SessionStore | undefined): CareerStore {
   let memory: string | null = null;
   let quarantine: string | null = null;
+  /* Set by {@link CareerStore.clear}; every later `save` is a no-op. See that method's docstring. */
+  let sealed = false;
 
   /*
    * Every `SessionStore` method may throw — `persist/types.ts` says so, and a browser with site
@@ -96,6 +115,11 @@ export function createCareerStore(backing: SessionStore | undefined): CareerStor
       return loaded;
     },
     save: (career) => {
+      /*
+       * The seal, and it is checked before the encode rather than after — a sealed store does no
+       * work at all, so nothing here can throw or allocate on behalf of a career that is gone.
+       */
+      if (sealed) return;
       const bytes = encodeCareer(career);
       if (backing === undefined) {
         memory = bytes;
@@ -109,6 +133,20 @@ export function createCareerStore(backing: SessionStore | undefined): CareerStor
          * unaffected and still playable, and a notice on every action would be worse than the
          * silence. `profile.ts` takes the same position on the same failure.
          */
+      }
+    },
+    clear: () => {
+      /* Seal first, then remove — `dev/main.ts#clearSavedSession`'s order, for its reason. */
+      sealed = true;
+      memory = null;
+      quarantine = null;
+      if (backing === undefined) return;
+      for (const key of [CAREER_STORAGE_KEY, CAREER_QUARANTINE_KEY]) {
+        try {
+          backing.remove(key);
+        } catch {
+          /* Denied or quota. The seal still holds, so nothing writes the career back either way. */
+        }
       }
     },
   };

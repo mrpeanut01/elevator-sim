@@ -61,6 +61,7 @@ import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { buildNotesSummaryOf, buildNotesViewOf } from './buildNotes.js';
 import { engineerSettings, onEngineerSettingsProvided } from './engineerBridge.js';
 import { DEFAULT_EVERYDAY_PROFILE } from './profile.js';
+import { everydayCareerStore } from './careerStore.js';
 import { everydayProfileStore } from './profileStore.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
 import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
@@ -466,12 +467,19 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
         }
         if (clearStage !== 'armed') return;
         /*
-         * Both slots, in this order: the Engineer session is sealed and removed first so nothing
-         * it saves can outlive the press, then this side's own slot. Then the page is left —
-         * a sealed shell holding a week it will never save is not a state to keep playing in.
+         * **Three stores, each sealed before it is emptied**, then the page is left — a sealed
+         * shell holding a week it will never save is not a state to keep playing in.
+         *
+         * The career joined this list in GitHub issue #229's follow-up, and the reason it was
+         * missing is worth keeping: this handler landed on 2026-09-06 clearing *both slots*, which
+         * was the whole of the player's saved progress on that day. Career persistence landed on
+         * 2026-09-07 (#375). The enumeration was correct when written and nobody came back to it,
+         * so a control called *Clear saved progress* left the career — the plainest progress there
+         * is — sitting on the device while telling the player nothing survived.
          */
         bridge.clearSavedSession();
         store.clear();
+        everydayCareerStore().clear();
         clearStage = 'cleared';
         redrawClear();
         bridge.reloadPage();
