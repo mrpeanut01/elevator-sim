@@ -48,6 +48,15 @@ row. None of them is transcribed from another document.
 
 **Everything outside that table is a commitment**, and § 7 says which tier each commitment sits in.
 
+> **One row of that table stopped being true on 2026-09-09, and is marked rather than refreshed.**
+> *There is no automated accessibility sweep* was correct on `771e65f` and is not correct now:
+> GitHub issue **#407**, split from #239, added `packages/viz/src/everyday/accessibilitySweep.browser.test.ts`
+> — `axe-core` injected into the **served** bundle, over every screen `everyday/screens.ts` registers,
+> failing the build on a violation. The row is left where it stands because § 0's whole claim is that
+> its figures were *taken on a named commit*, and silently editing one would make the other eight
+> unreadable as measurements. § 6.2 below records which candidate was chosen and why, and § 9's
+> note under #239 records what the first run found.
+
 ### 0.1 The rule every clause obeys
 
 `docs/31` § 5 states the one rule it says this document may not weaken:
@@ -463,6 +472,19 @@ choice belongs to whoever builds it. One thing to check before committing to the
 `locator.ariaSnapshot()` is a `playwright-core` API and the version in this tree is pinned in the
 root `package.json`, so confirm the API against that pin rather than against the current release.
 
+> **Answered on 2026-09-09 by GitHub issue #407: the first column.** `axe-core` 4.13.0 is a root
+> devDependency and `packages/viz/src/everyday/accessibilitySweep.browser.test.ts` injects it into the
+> served bundle on each of the twenty screens `everyday/screens.ts` registers. The argument against
+> the cheaper column is the row this table already carries — a snapshot *"is a regression instrument
+> and not a conformance one"*, so it catches a control that **loses** its name and says nothing about
+> one that never had one, and every violation the first run found was of the second kind. The rule
+> set is **WCAG 2.1 Level A and AA**, selected by axe's own `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`
+> tags and read off axe at run time rather than transcribed. That set is chosen to be invariant
+> across § 1's Options A and B — 2.2 adds the six criteria § 1.2 prices and, at A and AA, relaxes
+> only SC 4.1.1 — so **running it takes no part of § 1's decision away from the product owner**.
+> Option C it cannot serve, deliberately: a rule set written here and tagged here would be the
+> unfalsifiable standard § 1.1 describes.
+
 ### 6.3 The zoom row, which is the cheapest thing in this document
 
 `docs/31` § 5 commits the product to laying out at **200 % browser zoom** at the 1280 px tier-1
@@ -600,6 +622,17 @@ coverage, which is the more dangerous half of the class [§ D227](../DECISIONS.m
 ⬜ **Issue #239** — owns `AX-3`, `AX-5`, `AX-7`, `AX-10` and `AX-14`, the five clauses recorded as
 failing, plus the automated sweep criterion handed over in § 6.5 and the screen-reader walkthrough in
 § 6.7. This document writes no acceptance criteria for it.
+
+> **The sweep half is discharged**, by #239's own split issue **#407**, on 2026-09-09 — see § 6.2's
+> note. What that sweep found is one line worth carrying here, because two of its four findings are
+> this document's own clauses arriving with a mechanical instrument for the first time: `select-name`
+> and `label` — nine unnamed `<select>` nodes from three call sites, and twenty-odd unnamed range and
+> number inputs, across the Career, building, Workshop, Design-a-building and Tune-the-tower screens,
+> all WCAG SC 4.1.2 — were **fixed**; `color-contrast` on all twenty screens (`AX-6`) and
+> `scrollable-region-focusable` on the shell's screen region (`AX-9`'s keyboard half) are
+> **recorded** in that file's `OUTSTANDING`
+> register with a ghost check holding each, because both remedies are decisions § 8 items 2 and 3
+> leave unmade. The five clauses above are unchanged and still #239's.
 
 ⬜ **`DECISIONS.md`** — one entry for the adoption of this standard, which is
 [§ D473](../DECISIONS.md); and one when the product owner answers § 1, because a conformance target

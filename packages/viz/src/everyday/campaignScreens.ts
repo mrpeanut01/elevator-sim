@@ -106,15 +106,26 @@ function note(doc: Document, text: string, className?: string): HTMLElement {
   return node;
 }
 
-/** A `<select>` over labelled options, with the current value selected. */
+/**
+ * A `<select>` over labelled options, with the current value selected.
+ *
+ * `name` is the control's accessible name and is required rather than optional — WCAG SC 4.1.2,
+ * axe's `select-name` rule, found by `accessibilitySweep.browser.test.ts`. Both call sites draw
+ * their heading as a sibling `<div>` in the wrapper above, which names nothing: a non-visual reader
+ * met two anonymous combo boxes on the Career and building screens, on the pair of controls
+ * § D427 makes reach the run. Making the parameter required is the half that stops the next
+ * `select` arriving without one.
+ */
 function select(
   doc: Document,
   className: string,
+  name: string,
   options: readonly { readonly value: string; readonly label: string }[],
   value: string,
   onPick: (next: string) => void,
 ): HTMLSelectElement {
   const node = el(doc, 'select', className);
+  node.setAttribute('aria-label', name);
   node.style.cssText = [
     `border:1px solid ${C.rule}`,
     `border-radius:${String(R.control)}px`,
@@ -280,6 +291,7 @@ function standingOrderControls(
   const dispatcher = select(
     doc,
     'everyday-campaign-dispatcher',
+    'Standing order: dispatcher',
     view.dispatchers.map((entry) => ({
       value: entry.id,
       label: entry.saved ? `${entry.name} — yours` : entry.name,
@@ -293,6 +305,7 @@ function standingOrderControls(
   const build = select(
     doc,
     'everyday-campaign-build',
+    'Standing order: what to buy',
     view.builds.map((entry) => ({ value: entry.id, label: entry.label })),
     view.buildId,
     (next) => {

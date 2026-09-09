@@ -180,6 +180,13 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     input.max = String(row.max);
     input.step = String(row.step);
     input.value = String(tune[row.key]);
+    /*
+     * The name the slider carries into the accessibility tree — WCAG SC 4.1.2, axe's `label` rule,
+     * found by `accessibilitySweep.browser.test.ts`. The `label` span above is a sibling rather than
+     * a `<label for>`, so the four sliders on this screen reached a non-visual reader unnamed.
+     * `row.label` is the sighted reader's own words, which is what SC 2.5.3 asks for.
+     */
+    input.setAttribute('aria-label', row.label);
     input.style.cssText = 'width:100%;margin-top:5px';
     input.addEventListener('input', () => {
       set({ [row.key]: Number(input.value) } as Partial<TuneState>);
