@@ -20,7 +20,14 @@ import { describe, expect, it } from 'vitest';
 
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
-import { editorPricingFrom, emptyFixitState, spendOf } from '../fixit/engine.js';
+import {
+  editorPricingFrom,
+  emptyFixitState,
+  parkingPriceUnits,
+  spendOf,
+  zonePriceUnits,
+} from '../fixit/engine.js';
+import { EDITOR_PARKING_STRATEGIES } from '../fixit/types.js';
 import type { FixitCase, FixitState } from '../fixit/types.js';
 import { actionBarFor } from './actionBar.js';
 import {
@@ -29,8 +36,10 @@ import {
   fixitBarModel,
   fixitCaseRailModel,
   fixitMachineryRows,
+  fixitParkingRow,
   fixitRepairStateLine,
   fixitSpendSummary,
+  fixitZoneRow,
 } from './fixitScreenModel.js';
 
 /** A minimal case — enough shape for the model, no claim about any shipped file. */
@@ -206,5 +215,121 @@ describe('the repair state line', () => {
     expect(fixitRepairStateLine({ selected: false, refusal: undefined })).toBe(
       COPY.stateAffordable,
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Section 10.3's zones and parking — issue #422
+ * -------------------------------------------------------------------------- */
+
+describe('the zoning row', () => {
+  const price = zonePriceUnits(shippedPriceSchedule());
+
+  /**
+   * **A building whose banks cannot overlap gets no row**, which is the § D219 half a screen owes:
+   * eight of the eighteen shipped cases are single-bank, and a stepper there would write a field and
+   * move no leg. `fixit/cases.test.ts` proves the ceiling is a fact about the fabric rather than a
+   * guess; this proves the model acts on it.
+   */
+  it('is absent entirely where the building has no ceiling', () => {
+    expect(fixitZoneRow(emptyFixitState(), 0, true, price)).toBeNull();
+    expect(fixitZoneRow(emptyFixitState(), 1, true, price)).not.toBeNull();
+  });
+
+  /**
+   * **The two refusals are two different sentences**, and this is the assertion that says so. A
+   * stepper at its building's ceiling with budget still in hand must not answer *at the budget*: it
+   * is the tower that has run out, not the money. `docs/20` defect 8 is that confusion made once.
+   */
+  it('tells the building’s ceiling apart from the budget’s', () => {
+    const atCeiling = fixitZoneRow({ ...emptyFixitState(), zoneOverlapFloors: 2 }, 2, true, price);
+    expect(atCeiling?.stepUpRefusal).toBe(COPY.zonesAtCeiling);
+    expect(atCeiling?.priced).not.toContain(COPY.atBudget);
+
+    const atBudget = fixitZoneRow(emptyFixitState(), 2, false, price);
+    expect(atBudget?.stepUpRefusal).toBe(COPY.noBudgetLeft);
+    expect(atBudget?.priced).toContain(COPY.atBudget);
+
+    const live = fixitZoneRow({ ...emptyFixitState(), zoneOverlapFloors: 1 }, 2, true, price);
+    expect(live?.stepUpRefusal).toBeUndefined();
+    expect(live?.canStepDown).toBe(true);
+  });
+
+  it('reads back the overlap in floors, and says the boundaries are as drawn at zero', () => {
+    expect(fixitZoneRow(emptyFixitState(), 3, true, price)?.readout).toBe(COPY.zonesNone);
+    expect(fixitZoneRow({ ...emptyFixitState(), zoneOverlapFloors: 1 }, 3, true, price)?.readout).toContain(
+      '+1 floor',
+    );
+    expect(fixitZoneRow({ ...emptyFixitState(), zoneOverlapFloors: 2 }, 3, true, price)?.readout).toContain(
+      '+2 floors',
+    );
+    /* The price is the schedule's and is stated once, whatever the step. */
+    expect(fixitZoneRow(emptyFixitState(), 3, true, price)?.priced).toBe(
+      `${String(price)} u ${COPY.zonesPriced}`,
+    );
+  });
+});
+
+describe('the parking row', () => {
+  const price = parkingPriceUnits(shippedPriceSchedule());
+
+  /**
+   * **The strategy the case already runs is not offered.** Measured in `fixit/cases.test.ts`:
+   * writing the standing order back moves not one leg, so offering it would be the inert control
+   * § D219 names. The `null` choice already says *leave it alone*.
+   */
+  it('drops the standing order from the choices, whichever one it is', () => {
+    for (const standing of EDITOR_PARKING_STRATEGIES) {
+      const row = fixitParkingRow(emptyFixitState(), standing, price);
+      expect(row.options.map((option) => option.value)).not.toContain(standing);
+      /* The absence is still offered, and it is the one selected on an untouched editor. */
+      expect(row.options[0]?.value).toBeNull();
+      expect(row.options[0]?.selected).toBe(true);
+      expect(row.options.length).toBe(EDITOR_PARKING_STRATEGIES.length);
+    }
+    /* A standing order outside the offered subset — three shipped cases park at a fixed floor. */
+    const whole = fixitParkingRow(emptyFixitState(), 'fixed-floor', price);
+    expect(whole.options.length).toBe(EDITOR_PARKING_STRATEGIES.length + 1);
+  });
+
+  /**
+   * GAMEPLAY § 16 rule 11: no engine identifier reaches a player.
+   *
+   * **Stated as *is not the identifier* rather than *does not contain it*, and the difference is a
+   * finding rather than a convenience.** A containment check written first went red on *back down at
+   * the lobby*, because `lobby` is an ordinary English word that the phrase for `lobby` is bound to
+   * use. What the rule forbids is a config value **standing in for** copy — the label being the id,
+   * or carrying a hyphenated one like `zone-center`, which no sentence would contain by accident.
+   * A check that also refuses the English word would push the copy away from the plainest wording
+   * available, which is the opposite of what § 16 is for.
+   */
+  it('draws every strategy in words rather than by its config value', () => {
+    const row = fixitParkingRow(emptyFixitState(), 'fixed-floor', price);
+    for (const option of row.options) {
+      for (const identifier of EDITOR_PARKING_STRATEGIES) {
+        expect(option.label, `${option.value ?? 'standing'} is an engine id`).not.toBe(identifier);
+        if (identifier.includes('-')) {
+          expect(option.label, `${option.value ?? 'standing'} shows an engine id`).not.toContain(
+            identifier,
+          );
+        }
+      }
+      /* And no label is a bare token at all — every one is a phrase. */
+      expect(option.label.split(' ').length).toBeGreaterThan(1);
+    }
+    expect(row.options.map((option) => option.label)).toEqual([
+      COPY.parkingStanding,
+      COPY.parkingStay,
+      COPY.parkingLobby,
+      COPY.parkingZone,
+    ]);
+  });
+
+  it('marks the chosen strategy and says the schedule’s price', () => {
+    const row = fixitParkingRow({ ...emptyFixitState(), parkingStrategy: 'lobby' }, 'stay', price);
+    expect(row.options.find((option) => option.value === 'lobby')?.selected).toBe(true);
+    expect(row.options.find((option) => option.value === null)?.selected).toBe(false);
+    expect(price).toBe(0);
+    expect(row.priced).toBe(COPY.parkingFree);
   });
 });

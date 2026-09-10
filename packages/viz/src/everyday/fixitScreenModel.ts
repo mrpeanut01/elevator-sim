@@ -24,7 +24,8 @@
  */
 
 import type { FixitSpend } from '../fixit/engine.js';
-import type { FixitCase, FixitState } from '../fixit/types.js';
+import { EDITOR_PARKING_STRATEGIES } from '../fixit/types.js';
+import type { EditorParkingStrategy, FixitCase, FixitState } from '../fixit/types.js';
 import type { ActionBarModel } from './actionBar.js';
 
 /**
@@ -92,6 +93,19 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   stepDown: 'return one step',
   /** Why *return one step* refuses — nothing has been bought on this row yet. */
   nothingToReturn: 'Nothing bought on this row yet, so there is nothing to give back.',
+  /* Section 10.3's zones and service ranges — issue #422. */
+  zonesLabel: 'Where the banks overlap',
+  zonesNone: 'the boundaries as drawn',
+  zonesAtCeiling:
+    'The banks already reach as far into each other as this building lets them; the next floor up belongs to no shaft.',
+  zonesPriced: 'once, whatever it moves',
+  /* Section 10.3's parking. */
+  parkingLabel: 'Where idle cars wait',
+  parkingStanding: 'as the standing order has it',
+  parkingFree: 'no charge — telling a controller where to send an empty car costs nothing',
+  parkingStay: 'where each one last stopped',
+  parkingLobby: 'back down at the lobby',
+  parkingZone: 'in the middle of its own zone',
   /** Why *buy one more step* refuses — § 10.3's budget cap, said on the control. */
   noBudgetLeft: 'The repair budget will not stretch to another step on this row.',
 } as const);
@@ -225,9 +239,10 @@ export interface FixitMachineryRow {
 }
 
 /**
- * The two machinery rows § 10.3 prices — rated speed and car capacity. Door dwell, zoning and the
- * elevation grid are § 10.3 controls this build deliberately does not draw; `fixitScreen.ts`'s
- * docstring carries that scoping and the reason.
+ * The two machinery rows § 10.3 prices — rated speed and car capacity. Door dwell and the elevation
+ * grid are § 10.3 controls this build deliberately does not draw; `fixitScreen.ts`'s docstring
+ * carries that scoping and the reason. **Zoning is no longer among them** — it is
+ * {@link fixitZoneRow}, issue #422.
  *
  * `canBuySpeed`/`canBuyCapacity` are the engine's affordability answers, passed in rather than
  * recomputed so this module holds no second opinion about what fits in a budget.
@@ -265,6 +280,133 @@ export function fixitMachineryRows(
       canStepDown: state.capacitySteps > 0,
     },
   ];
+}
+
+/* -------------------------------------------------------------------------- *
+ * Section 10.3's zones and parking — issue #422
+ * -------------------------------------------------------------------------- */
+
+/** The zoning stepper, worded. Absent entirely on a building whose ranges cannot be widened. */
+export interface FixitZoneRow {
+  readonly key: 'zones';
+  readonly label: string;
+  /** What the overlap buys so far, in floors — or the as-drawn phrase at zero. */
+  readonly readout: string;
+  readonly priced: string;
+  /**
+   * Why `+` is refused, or `undefined` while it is live.
+   *
+   * **Two refusals, never one**, and that is the whole reason this is not `atBudget: boolean` like
+   * the machinery rows. A stepper at its building's ceiling with nine units still in hand must not
+   * answer *at the budget*: it is the tower that has run out, not the money, and a player reading
+   * the wrong one goes looking for a repair to deselect. R3's cue rule on a stepper.
+   */
+  readonly stepUpRefusal: string | undefined;
+  readonly canStepDown: boolean;
+}
+
+/**
+ * The zoning row, or `null` where the building cannot take one — issue **#422**.
+ *
+ * `null` is the honest answer on eight of the eighteen shipped cases, every one of them a
+ * single-bank building: there is no neighbouring zone to overlap with, so every floor the bank could
+ * grow into it already serves. Drawing a stepper there would be a control that writes a field and
+ * moves no leg, which is § D219's defect. The ceiling comes from `fixit/run.ts#zoneOverlapCeilingOf`
+ * — derived from the run's own resolved building rather than counted here, so this module holds no
+ * second opinion about what the fabric allows, exactly as `canBuy` holds none about the budget.
+ */
+export function fixitZoneRow(
+  state: FixitState,
+  ceiling: number,
+  canBuy: boolean,
+  priceUnits: number,
+): FixitZoneRow | null {
+  if (ceiling <= 0) return null;
+  const atCeiling = state.zoneOverlapFloors >= ceiling;
+  const atBudget = state.zoneOverlapFloors === 0 && !canBuy;
+  const price = `${String(priceUnits)} u ${FIXIT_SCREEN_COPY.zonesPriced}`;
+  return {
+    key: 'zones',
+    label: FIXIT_SCREEN_COPY.zonesLabel,
+    readout:
+      state.zoneOverlapFloors === 0
+        ? FIXIT_SCREEN_COPY.zonesNone
+        : `+${String(state.zoneOverlapFloors)} ${state.zoneOverlapFloors === 1 ? 'floor' : 'floors'} each side`,
+    priced: atBudget ? `${price} · ${FIXIT_SCREEN_COPY.atBudget}` : price,
+    stepUpRefusal: atCeiling
+      ? FIXIT_SCREEN_COPY.zonesAtCeiling
+      : atBudget
+        ? FIXIT_SCREEN_COPY.noBudgetLeft
+        : undefined,
+    canStepDown: state.zoneOverlapFloors > 0,
+  };
+}
+
+/** One choice on the parking select. `value` is `null` for *leave it as the building has it*. */
+export interface FixitParkingOption {
+  readonly value: EditorParkingStrategy | null;
+  readonly label: string;
+  readonly selected: boolean;
+}
+
+/** The parking select, worded. */
+export interface FixitParkingRow {
+  readonly key: 'parking';
+  readonly label: string;
+  readonly priced: string;
+  readonly options: readonly FixitParkingOption[];
+}
+
+/**
+ * The parking row — issue **#422**.
+ *
+ * **The strategy the case already runs is not offered**, which is what `standing` is for. Measured
+ * on `zoning-starves-the-top`, whose standing order is `stay`: selecting `stay` moves not one leg,
+ * because it writes the value the run already carries. An option that cannot change the run is the
+ * inert control § D219 names, and a select is no safer a place to keep one than a slider is. The
+ * `null` choice already says *leave it alone*, so nothing is lost by dropping the duplicate.
+ *
+ * **No engine identifier reaches the player** (GAMEPLAY § 16 rule 11): `zone-center` is drawn as
+ * *in the middle of its own zone*. The words are `FIXIT_SCREEN_COPY`'s, where the honesty sweep
+ * reads them.
+ */
+export function fixitParkingRow(
+  state: FixitState,
+  standing: string,
+  priceUnits: number,
+): FixitParkingRow {
+  const words: Readonly<Record<EditorParkingStrategy, string>> = {
+    stay: FIXIT_SCREEN_COPY.parkingStay,
+    lobby: FIXIT_SCREEN_COPY.parkingLobby,
+    'zone-center': FIXIT_SCREEN_COPY.parkingZone,
+  };
+  const options: FixitParkingOption[] = [
+    {
+      value: null,
+      label: FIXIT_SCREEN_COPY.parkingStanding,
+      selected: state.parkingStrategy === null,
+    },
+  ];
+  for (const strategy of EDITOR_PARKING_STRATEGIES) {
+    if (strategy === standing) continue;
+    options.push({
+      value: strategy,
+      label: words[strategy],
+      selected: state.parkingStrategy === strategy,
+    });
+  }
+  return {
+    key: 'parking',
+    label: FIXIT_SCREEN_COPY.parkingLabel,
+    /*
+     * The price is drawn from the schedule and the sentence beside it is only reached at zero, which
+     * is what every shipped list prices `idle-parking` at. A row that said *no charge* over a
+     * non-zero figure would be the stale refusal § D227 is about, so the arm is keyed on the number.
+     */
+    priced:
+      priceUnits === 0 ? FIXIT_SCREEN_COPY.parkingFree : `${String(priceUnits)} u`,
+    options,
+  };
 }
 
 /**

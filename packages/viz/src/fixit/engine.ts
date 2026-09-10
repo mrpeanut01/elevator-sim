@@ -8,7 +8,7 @@
  * ## The contract's numbers, in one place
  *
  * `ENGINE_CONTRACT.md` § 9's editor pricing — a shaft 34 u, speed 6 u per 0.5 m/s, capacity 8 u
- * per 2 places, dwell/zones/service ranges/parking free — and § 10.4's three pass rows. The
+ * per 2 places, dwell free — and § 10.4's three pass rows. The
  * closed-form inputs are replaced by two real single runs sharing the traffic seed; the
  * **thresholds do not change** (§ 9's own preface): the complaint must be ≥ 80 % gone, the rest of
  * the building's away-inside-a-minute share must not fall by more than 2 points, and the spend
@@ -22,16 +22,22 @@
  * one panel can produce, and § 10.4 names four outcomes rather than three.
  */
 
-import type { FixitCase, FixitExtra, FixitRepair, FixitState } from './types.js';
+import type {
+  EditorParkingStrategy,
+  FixitCase,
+  FixitExtra,
+  FixitRepair,
+  FixitState,
+} from './types.js';
 import { priceOf } from '../pricing/parse.js';
+import { changesAtPaths } from '../pricing/repairPrice.js';
 import type { PriceSchedule } from '../pricing/types.js';
 
 /**
  * § 9's editor pricing, read off the schedule — GitHub issue **#366**.
  *
- * Dwell, zones, service ranges and parking are still free; what changed is where the three figures
- * that are *not* free come from. This was three literals, and two of them disagreed with the rest
- * of the tree about the same purchase:
+ * Dwell is still free; what changed is where the three figures that are *not* free come from. This
+ * was three literals, and two of them disagreed with the rest of the tree about the same purchase:
  *
  * | | was | is | why |
  * |---|---|---|---|
@@ -42,6 +48,19 @@ import type { PriceSchedule } from '../pricing/types.js';
  * The middle row is the conflict #366's second criterion is aimed at, and it is the reason this is
  * a function of the schedule rather than a constant that a test cross-checks: a cross-check leaves
  * two numbers in two places and hopes a guard notices, and this repository has a name for that.
+ *
+ * ## Zones and parking are priced here too, and not by this function — issue **#422**
+ *
+ * § 9 called them free. They are not, and the reason is #366's own rule rather than a decision this
+ * lane took: a rezone in the fix-it editor and a rezone bought as a repair are the same act, so they
+ * pay the same price, and that price is the schedule's `rezone-bank` (6 u). Parking keeps the word —
+ * `idle-parking` is 0 u in every shipped list — but it keeps it *by being priced at zero* rather than
+ * by being outside the ladder, which is the difference between a free change and an unpriced one.
+ *
+ * They are absent from this function because they are not **per-step** prices. A speed step is 10 u
+ * *each*; a rezone is 6 u however many floors it moves, which is the schedule's own finding about
+ * the twelve shipped repairs that buy one. {@link spendOf} charges them through
+ * `pricing/repairPrice.ts#changesAtPaths`, the same dedupe a repair's patch goes through.
  */
 export function editorPricingFrom(schedule: PriceSchedule): {
   readonly shaftUnits: number;
@@ -112,9 +131,37 @@ export function standingExtrasFrom(schedule: PriceSchedule): readonly FixitExtra
   });
 }
 
-/** Nothing selected, nothing bought. */
+/** Nothing selected, nothing bought, and the building's own zoning and parking left alone. */
 export function emptyFixitState(): FixitState {
-  return { selectedRepairIds: [], selectedExtraIds: [], speedSteps: 0, capacitySteps: 0 };
+  return {
+    selectedRepairIds: [],
+    selectedExtraIds: [],
+    speedSteps: 0,
+    capacitySteps: 0,
+    zoneOverlapFloors: 0,
+    parkingStrategy: null,
+  };
+}
+
+/**
+ * **The `covers` paths the editor's own two settings buy** — issue **#422**.
+ *
+ * Two strings rather than a patch, because that is genuinely all the state carries: the banks array
+ * a zoning step becomes is not built until `fixit/run.ts` plans the run, and manufacturing a
+ * patch-shaped object here purely so `pathsIn` could walk it back into these strings would be a
+ * second statement of the same fact.
+ *
+ * Neither path is invented for this screen. `building.banks[]` is the path twelve shipped repairs
+ * already buy `rezone-bank` with, and `dispatcher.idle.parkingStrategy` is the first of
+ * `idle-parking`'s four. That is what makes the editor pay a repair's price rather than a price of
+ * its own — `pricing/schedule.test.ts` refuses a second row covering a field already claimed, so
+ * reusing these is not merely allowed, it is the only thing the schedule permits.
+ */
+export function editorPathsOf(state: FixitState): readonly string[] {
+  const paths: string[] = [];
+  if (state.zoneOverlapFloors > 0) paths.push('building.banks[]');
+  if (state.parkingStrategy !== null) paths.push('dispatcher.idle.parkingStrategy');
+  return paths;
 }
 
 export interface FixitSpend {
@@ -150,9 +197,14 @@ export function spendOf(
   );
   const repairUnits = repairs.reduce((sum, repair) => sum + repair.costUnits, 0);
   const extraUnits = extras.reduce((sum, extra) => sum + extra.costUnits, 0);
+  const settingUnits = changesAtPaths(schedule, editorPathsOf(state)).reduce(
+    (sum, change) => sum + change.priceUnits,
+    0,
+  );
   const editorUnits =
     state.speedSteps * pricing.speedUnitsPerHalfMps +
-    state.capacitySteps * pricing.capacityUnitsPerTwoPlaces;
+    state.capacitySteps * pricing.capacityUnitsPerTwoPlaces +
+    settingUnits;
   const shaftUnits = repairs
     .filter((repair) => repair.role === 'new-shaft')
     .reduce((sum, repair) => sum + repair.costUnits, 0);
@@ -161,7 +213,15 @@ export function spendOf(
     extraUnits,
     editorUnits,
     totalUnits: repairUnits + extraUnits + editorUnits,
-    machineryUnits: editorUnits + shaftUnits,
+    /*
+     * **The two settings are in `editorUnits` and deliberately not here** — issue #422. § 10.4's
+     * spent row asks *how much of it was machinery*, and neither a redrawn boundary nor a parking
+     * rule cuts steel: `rezone-bank` books a night of works, and it books it against a controller
+     * and a landing sign rather than a shaft. Folding them in would make `budgetNoteOf` answer *you
+     * are buying machinery* to a player who bought a setting, which is `docs/20` defect 8 read the
+     * other way round.
+     */
+    machineryUnits: editorUnits - settingUnits + shaftUnits,
   };
 }
 
@@ -279,6 +339,70 @@ export function stepCapacity(
     return state;
   }
   return { ...state, capacitySteps: next };
+}
+
+/** What the schedule charges for the editor's zoning step, and for its parking rule. */
+export function zonePriceUnits(schedule: PriceSchedule): number {
+  return priceOf(schedule, 'rezone-bank').priceUnits;
+}
+export function parkingPriceUnits(schedule: PriceSchedule): number {
+  return priceOf(schedule, 'idle-parking').priceUnits;
+}
+
+/**
+ * Widen or narrow the overlap between the banks by one floor — issue **#422**.
+ *
+ * **Two ceilings, and they are refused for two different reasons.** The budget is one: the first
+ * floor of overlap is a rezone and costs `rezone-bank`, so a state that cannot afford 6 u cannot
+ * take the first step. `ceiling` is the other, and it belongs to the *building* —
+ * `run.ts#zoneOverlapCeilingOf` is the largest step that still moves a boundary, so a press past it
+ * would write a field and change nothing. The screen has to say which of the two refused it; a
+ * control that answered *at the budget* to a player who had 12 units left would be R3's cue rule on
+ * a stepper.
+ *
+ * **Only the first floor is charged.** The schedule prices a rezone flat, on its own measured
+ * ground: *"twelve fix repairs buy it between 0 and 12 units with no rule relating the price to how
+ * much is rezoned"*. So stepping 1 → 2 is free and stepping 2 → 0 refunds the 6.
+ */
+export function stepZoneOverlap(
+  entry: FixitCase,
+  state: FixitState,
+  delta: 1 | -1,
+  ceiling: number,
+  schedule: PriceSchedule,
+): FixitState {
+  const next = state.zoneOverlapFloors + delta;
+  if (next < 0 || next > ceiling) return state;
+  if (state.zoneOverlapFloors === 0 && next > 0) {
+    if (!affordabilityOf(entry, state, zonePriceUnits(schedule), schedule).selectable) return state;
+  }
+  return { ...state, zoneOverlapFloors: next };
+}
+
+/**
+ * Say where the idle cars wait, or hand the choice back to the standing order — issue **#422**.
+ *
+ * `null` is not a fourth strategy; it is *this editor has not touched it*, which is the state a case
+ * opens on. `emptyFixitState` takes no case and so cannot know what the case's profile carries, and
+ * a default that guessed one would edit the building by being drawn.
+ *
+ * Priced at `idle-parking`, which every shipped list puts at 0 u — so the affordability arm below
+ * never bites today and is written anyway, because the price is data and the reducer may not assume
+ * what the file says this week.
+ */
+export function setParkingStrategy(
+  entry: FixitCase,
+  state: FixitState,
+  strategy: EditorParkingStrategy | null,
+  schedule: PriceSchedule,
+): FixitState {
+  if (strategy === state.parkingStrategy) return state;
+  if (strategy !== null && state.parkingStrategy === null) {
+    if (!affordabilityOf(entry, state, parkingPriceUnits(schedule), schedule).selectable) {
+      return state;
+    }
+  }
+  return { ...state, parkingStrategy: strategy };
 }
 
 /* -------------------------------------------------------------------------- *

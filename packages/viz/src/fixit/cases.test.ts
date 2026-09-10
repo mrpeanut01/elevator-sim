@@ -81,6 +81,8 @@ import {
   classifyOutcome,
   emptyFixitState,
   spendOf,
+  stepSpeed,
+  stepZoneOverlap,
   toggleRepair,
   selectionKeepsTheCrowd,
 } from './engine.js';
@@ -91,10 +93,14 @@ import {
   fixitRunPlanOf,
   measuredOf,
   assertPairMatchesRepairs,
+  standingParkingOf,
+  zoneOverlapCeilingOf,
+  ZONE_OVERLAP_MAX,
   type FixitResources,
   type FixitRunPlan,
 } from './run.js';
-import type { FixitCase, FixitCases, FixitState } from './types.js';
+import { EDITOR_PARKING_STRATEGIES } from './types.js';
+import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from './types.js';
 import { recordRun, type RecordedRun } from '../record/recordRun.js';
 
 const SUITE_TIMEOUT = 300_000;
@@ -744,6 +750,162 @@ describe('the editor machinery is live where it is priced', () => {
         fixitRunPlanOf(entry, { ...emptyFixitState(), capacitySteps: 1 }, resources),
       );
       expect(legsKey(capacity.after), 'the capacity stepper moved no leg').not.toBe(base);
+    },
+    SUITE_TIMEOUT,
+  );
+
+  /**
+   * § 10.3's zones and service ranges — issue **#422**, and the same § D219 bar the two steppers
+   * above are held to. `zoning-starves-the-top` is the case for it by construction: its complaint is
+   * that the line between the banks was drawn by floor count while the heads are the other way
+   * round, so a control that moves that line either changes who is carried or does not exist.
+   *
+   * **Every rung, not just the first.** A stepper whose second press redraws the same array is two
+   * thirds inert, and `zoneOverlapCeilingOf` exists to stop the screen offering one — so the ceiling
+   * is asked for here and every step up to it is required to move the legs.
+   */
+  it(
+    'each floor of bank overlap moves the legs, all the way to the building ceiling',
+    () => {
+      const entry = caseOf('zoning-starves-the-top');
+      const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), resources).asBuilt;
+      const ceiling = zoneOverlapCeilingOf(asBuilt.building);
+      expect(ceiling, 'the two-bank case must offer the control at all').toBeGreaterThan(0);
+
+      const base = legsKey(recordRun(asBuilt, FIXIT_RUN_SWITCHES));
+      const seen = new Set<string>([base]);
+      for (let floors = 1; floors <= ceiling; floors += 1) {
+        const after = legsKey(
+          recordRun(
+            fixitRunPlanOf(entry, { ...emptyFixitState(), zoneOverlapFloors: floors }, resources)
+              .asRepaired,
+            FIXIT_RUN_SWITCHES,
+          ),
+        );
+        expect(after, `the zoning stepper moved no leg at +${String(floors)}`).not.toBe(base);
+        expect(seen.has(after), `+${String(floors)} redrew the run its predecessor already did`).toBe(
+          false,
+        );
+        seen.add(after);
+      }
+    },
+    SUITE_TIMEOUT,
+  );
+
+  /**
+   * **The ceiling is measured against the fabric, not asserted.** Both halves matter and each is the
+   * other's control:
+   *
+   * - where `zoneOverlapCeilingOf` reports 0, a maximum step must leave the run **byte-identical** —
+   *   which is what says the eight single-bank cases are refused the control for a real reason
+   *   rather than by a screen's guess;
+   * - where it reports more than 0, the same step must move the legs.
+   *
+   * Ten cases fall on one side and eight on the other, so neither arm is vacuous, and the pair is
+   * the § D219 refusal drawn both ways — a control that binds is offered, one that cannot is not.
+   */
+  it(
+    'binds exactly where the ceiling says it can, over every shipped case',
+    () => {
+      let bound = 0;
+      let refused = 0;
+      for (const entry of cases.cases) {
+        const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), resources).asBuilt;
+        const ceiling = zoneOverlapCeilingOf(asBuilt.building);
+        const stepped = fixitRunPlanOf(
+          entry,
+          { ...emptyFixitState(), zoneOverlapFloors: Math.max(ceiling, ZONE_OVERLAP_MAX) },
+          resources,
+        ).asRepaired;
+        const same = legsKey(recordRun(stepped, FIXIT_RUN_SWITCHES)) === legsKey(recordRun(asBuilt, FIXIT_RUN_SWITCHES));
+        if (ceiling === 0) {
+          expect(same, `"${entry.id}" reports no ceiling and yet the overlap moved its run`).toBe(true);
+          refused += 1;
+        } else {
+          expect(same, `"${entry.id}" reports a ceiling of ${String(ceiling)} and moved no leg`).toBe(false);
+          bound += 1;
+        }
+      }
+      /* Non-vacuity: this assertion is worthless if every case landed on one side. */
+      expect(bound, 'no shipped case can take a zoning step').toBeGreaterThan(0);
+      expect(refused, 'no shipped case refuses one, so the refusing arm proved nothing').toBeGreaterThan(0);
+    },
+    SUITE_TIMEOUT,
+  );
+
+  /**
+   * § 10.3's parking — issue **#422**. Free is not the same as inert, so **every strategy the screen
+   * offers on this case** is required to move the legs, not merely one of them.
+   *
+   * The offered set is the reason `standingParkingOf` exists. `zoning-starves-the-top` runs
+   * `collective`, which declares no idle section, so its standing order is the core's own `stay` —
+   * and selecting `stay` writes the value the run already carries and moves nothing. Measured, not
+   * assumed: the strategy this case already parks by is asserted below and then excluded, which is
+   * exactly what `fixitScreenModel.ts#fixitParkingRow` does with it.
+   */
+  it(
+    'every parking strategy the screen offers moves the legs',
+    () => {
+      const entry = caseOf('zoning-starves-the-top');
+      const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), resources).asBuilt;
+      const standing = standingParkingOf(asBuilt);
+      expect(standing, "this case's standing order is the core default").toBe('stay');
+      /* Narrowed by the assertion above, so the restating arm below can write it back. */
+      const standingOffered: EditorParkingStrategy = 'stay';
+      expect(standingOffered).toBe(standing);
+
+      const base = legsKey(recordRun(asBuilt, FIXIT_RUN_SWITCHES));
+      const offered = EDITOR_PARKING_STRATEGIES.filter((strategy) => strategy !== standing);
+      expect(offered.length, 'nothing is offered, so this test asserts nothing').toBeGreaterThan(0);
+      for (const strategy of offered) {
+        const after = legsKey(
+          recordRun(
+            fixitRunPlanOf(entry, { ...emptyFixitState(), parkingStrategy: strategy }, resources)
+              .asRepaired,
+            FIXIT_RUN_SWITCHES,
+          ),
+        );
+        expect(after, `parking at "${strategy}" moved no leg`).not.toBe(base);
+      }
+
+      /*
+       * The other half, and the reason the exclusion is not tidiness. Writing the standing order back
+       * is the inert press the select must never offer — recorded here so that a later change which
+       * makes it offerable again turns this red rather than shipping a dead option.
+       */
+      const restated = legsKey(
+        recordRun(
+          fixitRunPlanOf(entry, { ...emptyFixitState(), parkingStrategy: standingOffered }, resources)
+            .asRepaired,
+          FIXIT_RUN_SWITCHES,
+        ),
+      );
+      expect(restated, 'writing the standing order back changed the run').toBe(base);
+    },
+    SUITE_TIMEOUT,
+  );
+
+  /**
+   * The refusing arm, § D219's other half and `pricing/tiersReachTheRun.test.ts`'s shape: a control
+   * the budget cannot afford must leave the run **exactly** as built. A screen that priced the rezone
+   * and gated nothing would pass every assertion above and fail this one.
+   */
+  it(
+    'a rezone the budget cannot take leaves the run alone',
+    () => {
+      const entry = caseOf('zoning-starves-the-top');
+      const schedule = shippedPriceSchedule();
+      /* 12 u of budget, one 10 u speed step taken: the 6 u rezone no longer fits. */
+      const spent = stepSpeed(entry, emptyFixitState(), 1, schedule);
+      expect(spent.speedSteps).toBe(1);
+      const ceiling = zoneOverlapCeilingOf(fixitRunPlanOf(entry, emptyFixitState(), resources).asBuilt.building);
+      const after = stepZoneOverlap(entry, spent, 1, ceiling, schedule);
+      expect(after.zoneOverlapFloors, 'the reducer took a rezone the budget refuses').toBe(0);
+
+      /* And the run that produces is the speed step's alone — no boundary moved behind the refusal. */
+      expect(legsKey(recordRun(fixitRunPlanOf(entry, after, resources).asRepaired, FIXIT_RUN_SWITCHES))).toBe(
+        legsKey(recordRun(fixitRunPlanOf(entry, spent, resources).asRepaired, FIXIT_RUN_SWITCHES)),
+      );
     },
     SUITE_TIMEOUT,
   );

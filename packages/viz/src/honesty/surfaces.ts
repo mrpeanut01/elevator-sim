@@ -73,6 +73,8 @@ import {
   fixitBarModel,
   fixitCaseRailModel,
   fixitMachineryRows,
+  fixitParkingRow,
+  fixitZoneRow,
   fixitRepairStateLine,
   fixitSpendSummary,
 } from '../everyday/fixitScreenModel.js';
@@ -260,6 +262,8 @@ import { previewGeometry } from '../editor/editorPreview.js';
 import { summariseReport, validateBuilding, type ValidationReport } from '../editor/editorValidate.js';
 import {
   editorPricingFrom,
+  parkingPriceUnits,
+  zonePriceUnits,
   standingExtrasFrom,
   budgetNoteOf,
   classifyOutcome,
@@ -6701,6 +6705,8 @@ const FIXIT_COVERS: readonly string[] = [
   'everyday/fixitScreenModel.ts#fixitCaseRailModel',
   'everyday/fixitScreenModel.ts#fixitBarModel',
   'everyday/fixitScreenModel.ts#fixitMachineryRows',
+  'everyday/fixitScreenModel.ts#fixitZoneRow',
+  'everyday/fixitScreenModel.ts#fixitParkingRow',
   'everyday/fixitScreenModel.ts#fixitSpendSummary',
   'everyday/fixitScreenModel.ts#fixitRepairStateLine',
 ];
@@ -6967,6 +6973,57 @@ const FIXIT: SurfaceAdapter = {
         seeds.push({ field: `machines.${where}.${row.key}.label`, text: row.label, role: 'label', provenance: 'authored' });
         seeds.push({ field: `machines.${where}.${row.key}.readout`, text: row.readout, role: 'observation' });
         seeds.push({ field: `machines.${where}.${row.key}.priced`, text: row.priced, role: 'label' });
+      }
+    }
+
+    /*
+     * ---- § 10.3's zones and parking, issue #422 ----
+     *
+     * Both rows over the states that carry their **refusals**, because a refusal nobody renders is a
+     * refusal nobody has read. The zoning row is drawn at three ceilings on purpose: `0` is the
+     * eight single-bank cases' answer and returns `null`, `2` puts the stepper in the middle of its
+     * range, and stepping to the ceiling is the one arm that must say *the building stops here*
+     * rather than *the budget does*. The two are different sentences and only a seeded state proves
+     * both exist.
+     */
+    for (const [where, zoneState, ceiling, affordable] of [
+      ['as-drawn', empty, 2, true],
+      ['stepped', { ...empty, zoneOverlapFloors: 1 }, 2, true],
+      ['at-ceiling', { ...empty, zoneOverlapFloors: 2 }, 2, true],
+      ['at-budget', empty, 2, false],
+      ['no-ceiling', empty, 0, true],
+    ] as const) {
+      const row = fixitZoneRow(zoneState, ceiling, affordable, zonePriceUnits(schedule));
+      if (row === null) continue;
+      seeds.push({ field: `zones.${where}.label`, text: row.label, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `zones.${where}.readout`, text: row.readout, role: 'observation' });
+      seeds.push({ field: `zones.${where}.priced`, text: row.priced, role: 'label' });
+      if (row.stepUpRefusal !== undefined) {
+        seeds.push({ field: `zones.${where}.refusal`, text: row.stepUpRefusal, role: 'reason' });
+      }
+    }
+
+    /*
+     * The parking select over both standing orders the shipped cases actually run — the core's own
+     * `stay` on fifteen of the eighteen, and the `lobby` two of them patch in. The option list is a
+     * function of that value, so seeding one arm would sweep two of the three phrases and leave the
+     * third unread on whichever case runs it.
+     */
+    for (const standing of ['stay', 'lobby'] as const) {
+      const row = fixitParkingRow(
+        { ...empty, parkingStrategy: 'zone-center' },
+        standing,
+        parkingPriceUnits(schedule),
+      );
+      seeds.push({ field: `parking.${standing}.label`, text: row.label, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `parking.${standing}.priced`, text: row.priced, role: 'label' });
+      for (const option of row.options) {
+        seeds.push({
+          field: `parking.${standing}.option.${option.value ?? 'standing'}`,
+          text: option.label,
+          role: 'label',
+          provenance: 'authored',
+        });
       }
     }
 

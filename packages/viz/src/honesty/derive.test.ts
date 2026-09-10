@@ -119,6 +119,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * FIXIT adapter, exactly as `STANDING_EXTRAS` was before #366 renamed it.
          */
         'fixit/engine.ts#editorPricingFrom',
+        /*
+         * Issue #422's two prices, and its two paths. `zonePriceUnits` and `parkingPriceUnits`
+         * return one number each, off the schedule; `editorPathsOf` returns the `covers` paths the
+         * editor buys — `building.banks[]`, `dispatcher.idle.parkingStrategy` — which are dotted
+         * config paths on exactly the ground `survivorSpace.ts`'s are below: a path is not a
+         * sentence. What the player reads about either is `fixitScreenModel.ts#fixitZoneRow` and
+         * `#fixitParkingRow`, and the FIXIT adapter drives both.
+         */
+        'fixit/engine.ts#zonePriceUnits',
+        'fixit/engine.ts#parkingPriceUnits',
+        'fixit/engine.ts#editorPathsOf',
+        /*
+         * The parking vocabulary itself — `stay`, `lobby`, `zone-center`. Engine identifiers, and
+         * GAMEPLAY § 16 rule 11 forbids one reaching a player, which is why `fixitParkingRow` maps
+         * every one of them to a phrase before it is drawn. Seeding the ids here would put the
+         * exact strings the product refuses to show into the corpus as if they were copy.
+         */
+        'fixit/types.ts#EDITOR_PARKING_STRATEGIES',
       ],
     },
     {
@@ -1370,6 +1388,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/run.ts#measuredOf',
         'fixit/engine.ts#stepSpeed',
         'fixit/engine.ts#stepCapacity',
+        /*
+         * Issue #422's two reducers, on the two steppers' own ground: a `FixitState` in, a
+         * `FixitState` out, reaching prose only through `affordabilityOf`, which this adapter drives
+         * directly. What a player reads about either is the row, not the reducer.
+         */
+        'fixit/engine.ts#stepZoneOverlap',
+        'fixit/engine.ts#setParkingStrategy',
         'frame/overlay.ts#queueAt',
         'frame/overlay.ts#landingAssignmentsAt',
         'frame/sequence.ts#frameSequence',

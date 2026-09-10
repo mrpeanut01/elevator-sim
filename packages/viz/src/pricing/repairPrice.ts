@@ -91,8 +91,29 @@ export function changesBought(
   schedule: PriceSchedule,
   patch: RepairPatchShape,
 ): readonly PricedChange[] {
+  return changesAtPaths(schedule, pathsIn(patch));
+}
+
+/**
+ * The distinct changes a set of `covers` paths buys — {@link changesBought} with the patch walk
+ * taken off the front.
+ *
+ * It exists because the fix-it **editor** buys priced changes without ever holding a patch to walk:
+ * a zoning control carries a floor count and a parking control carries a strategy, and the banks
+ * array one of them becomes is not built until the run is planned (`fixit/run.ts`). Pricing that
+ * through {@link changesBought} would mean manufacturing a patch-shaped object purely to be walked
+ * back into the two strings it started as.
+ *
+ * Splitting it here rather than counting units in the engine is the point: the dedupe is the rule
+ * that a patch trimming both dwells has bought the doors **once**, and an editor that re-implemented
+ * it would be the second price list #366 exists to abolish. Both callers now share this one.
+ */
+export function changesAtPaths(
+  schedule: PriceSchedule,
+  paths: readonly string[],
+): readonly PricedChange[] {
   const found = new Map<string, PricedChange>();
-  for (const path of pathsIn(patch)) {
+  for (const path of paths) {
     const change = changeCovering(schedule, path);
     if (change !== undefined) found.set(change.id, change);
   }
