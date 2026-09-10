@@ -39,7 +39,17 @@
  *
  * {@link ShapeFor} makes each row's `fields` a `Record` over **that arm's own keys**, so a field
  * added to `ResolvedServiceModeEvent` and not described here will not compile, and a field
- * described here that the arm does not have will not either. {@link EffectDiscriminant} is derived
+ * described here that the arm does not have will not either.
+ *
+ * **The type argument sits on `Object.freeze<…>({…})` rather than on the `const`, and moving it is
+ * not a tidy-up.** Annotating the binding makes the literal an *argument* to `freeze`, whose
+ * parameter infers from it — so excess-property checking is lost and only the first of those two
+ * directions holds. A review measured that: a `shaftId` row on the `mode` arm compiled clean, and
+ * the only thing that noticed was a hand-written fixture in another package, at run time. With the
+ * argument here the same edit is `TS2353: 'shaftId' does not exist in type
+ * Readonly<Record<"atS" | "bankId" | "carId" | "mode", StoredEffectField>>`. A table that can
+ * require a field its arm never carries would refuse every well-formed record of that shape —
+ * GitHub issue #476's own defect, arriving through the description meant to prevent it. {@link EffectDiscriminant} is derived
  * as *the keys that appear on exactly one arm*, so a row cannot claim a discriminant that tells
  * nothing apart, and `storedEffect.test.ts` asserts the remaining direction — that every arm of the
  * union has a row — with a type-level check the compiler runs.
@@ -175,11 +185,11 @@ export interface ShapeFor<Discriminant extends EffectDiscriminant> {
  * `config/serviceEvent.ts` declares its guards in, so a refusal that lists them reads the same
  * twice.
  */
-export const STORED_EFFECT_SHAPES: {
+export const STORED_EFFECT_SHAPES = Object.freeze<{
   readonly mode: ShapeFor<'mode'>;
   readonly range: ShapeFor<'servesFloors'>;
   readonly derate: ShapeFor<'ratedLoadLb'>;
-} = Object.freeze({
+}>({
   mode: {
     discriminant: 'mode',
     does: 'a car’s service mode',

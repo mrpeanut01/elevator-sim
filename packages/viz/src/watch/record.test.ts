@@ -713,9 +713,29 @@ const SHARED_FIELDS = [
  * `noPropertyAccessFromIndexSignature` being **off** in `tsconfig.base.json` is what made the hole
  * reachable rather than theoretical: a dotted read of an index-signature bag compiles here.
  *
- * **What it still cannot see**, stated rather than left to be discovered: a reader that keeps its
- * `storedEffectIssue` call and hand-rolls a second check beside it. The exemption is file-granular,
- * as `deadCode.test.ts`'s registers are, and no regex over a file can be otherwise.
+ * **What it still cannot see**, stated rather than left to be discovered — and a review *measured*
+ * this list after the first draft of it understated the gap:
+ *
+ * - a reader that keeps its `storedEffectIssue` call and hand-rolls a second check beside it. The
+ *   exemption is file-granular, as `deadCode.test.ts`'s registers are, and no regex over a file can
+ *   be otherwise;
+ * - **four spellings that put something between the identifier and the property.** Every idiom
+ *   below needs `typeof` or `Array.isArray(` immediately followed by `IDENT.field`, so a
+ *   **destructure** (`const { carId, atS } = entry`), a **cast**
+ *   (`typeof (e as Eff).carId === 'string'`), **truthiness**
+ *   (`Boolean(e.carId) && !e.servesFloors`) and **optional chaining**
+ *   (`typeof e?.carId === 'string'`) all escape. Five probe readers were written under
+ *   `packages/viz/src/probe/`, each reading `serviceEvents` dotted and consulting nothing:
+ *   **one was flagged and four were not.** The cast is the natural spelling in this tree, where
+ *   `change` is `Record<string, unknown>`, so this is live rather than theoretical.
+ *
+ * **And the control below cannot fail on it**, which is the half worth saying out loud: the four
+ * control strings are the four idioms this pattern implements, so a green control distinguishes
+ * *the pattern is complete* from *the pattern matches what it was written from* not at all. That is
+ * this repository's recurring failure — a guard passing its own positive control — and naming it
+ * here is cheaper than discovering it from a defect. Widening the regex is not obviously the fix:
+ * keying on *reads `serviceEvents` and does not import `storedEffectIssue`* would catch all five
+ * shapes and is a different guard, so it is filed rather than half-done here.
  */
 function spellsItsOwnCheck(): RegExp {
   const alt = TELLING_FIELDS.join('|');
