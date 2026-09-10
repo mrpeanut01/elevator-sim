@@ -802,6 +802,56 @@ and it waits on the scenario schema (#365) rather than on this row. Recorded her
 test, because a deviation that hides its cost is the half of this register that goes stale first.
 
 
+### 4.16 The stage cannot draw a 165-floor tower, and its camera is not yet a way round that
+
+**The deviation, stated first.** The handoff's § 7 stage draws one cutaway of a whole building in a
+`60vh` canvas. At `burj-class-reference` — 165 floors, 6 banks, 57 cars — it cannot, and the product
+has no control that lets a player look at an arbitrary part of the tower. The handoff has **no row**
+for a zoned or scrolled stage, which is why this is recorded here: [`../CLAUDE.md`](../CLAUDE.md)
+keeps the handoff canonical for the interface, so an unrecorded departure is what § 4 exists to
+prevent.
+
+**The measurement, taken against a laid-out box rather than reasoned about** —
+`packages/viz/src/everyday/stage165Floors.browser.test.ts`, the browser tier, because `60vh` is a
+declaration until a viewport resolves it and `docs/28` § 8 item 7 already records that a real
+`rowPitch` *"comes from a laid-out box, which needs a browser"*:
+
+| viewport | canvas at `60vh` | legible floors | of 165 |
+|---|---|---|---|
+| 1280 × 800 | **480.0 px** | **35** | 21 % |
+| 1440 × 900 | **540.0 px** | **40** | 24 % |
+
+So roughly four fifths of the tower is off the stage at any moment.
+
+**The camera is the product's existing partial answer, and measuring it is what makes this a
+deviation rather than a defect.** [§ D505](../DECISIONS.md) draws band chips *only* on a tower the
+whole of which does not fit, so their presence **is** the product saying this tower is taller than
+this box — the honest-control shape `docs/28` § 5.5a describes. All three chips are offered here.
+
+**But none of the three is a free control**, and that is the gap:
+
+- `whole` draws all 165 in the box — about 3 px a floor, under `render/canvas.ts`'s 12 px glyph
+  pitch, so every row degrades to a bar.
+- `lobby` is a band **fixed at the entrance**.
+- `follow` is a band **centred on the fullest car** — it goes where the simulation goes, and nowhere
+  the player chooses. With no car carrying anybody it falls back to the lobby band, so on a quiet
+  stage the two positions are one band.
+
+A floor that is neither near the lobby nor currently under a full car **cannot be looked at legibly
+at all**. Measured through the shipped derivation: the reachable band is **40 of 165**.
+
+**What is deliberately not decided here.** Whether the answer is a scrollbar, a drag, a floor-number
+jump, or a zone picker keyed to the tower's own sky lobbies is design work with an owner this
+document does not have, and `docs/38` § 2.5 is the reason it is wanted. What is settled is that the
+handoff's single-cutaway assumption does not survive this building, and that the camera is a
+starting point rather than the answer — three fixed positions is a zoning mechanism with no way to
+aim it.
+
+**Why this row is not simply "make the canvas taller".** `60vh` is § 4's own deviation `RX-03`, and
+at 165 floors a legible pitch needs about **2 160 px** of canvas — nearly three times a 900 px
+viewport. There is no viewport this fits in, so the fix cannot be geometry.
+
+
 ## 5 — Definition of done
 
 The refactor is done when all of the following are true, and not before.
