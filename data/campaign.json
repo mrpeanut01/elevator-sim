@@ -1,5 +1,6 @@
 {
-  "generatedBy": "Authored. Validated at load by packages/viz/src/campaign/parse.ts against data/scenario-goals.json, against collectSearchSpace() and against data/buildings/. packages/viz/src/campaign/campaign.test.ts runs that validator over this file.",
+  "$comment": "THE SCENARIO SCHEMA'S BUDGET HALF \u2014 GitHub issue #365, docs/38-what-the-game-is.md \u00a7 2.1, DECISIONS.md \u00a7 D525 clause 1, and packages/viz/src/scenario/budget.ts for the shape and the argument. docs/38 \u00a7 2.1: \"that record, plus a budget, is the scenario schema\". Each stage below now carries a `budget`: what it opens with, and the ladder chimes can buy it up by. THERE IS DELIBERATELY NO GOAL, NO THRESHOLD, NO BAR AND NO DIFFICULTY ON A BUDGET \u2014 charter non-goal 6 and \u00a7 D345 forbid buying a verdict, so two players who post the same run read the same verdict whatever they paid, and scenario/budget.ts REFUSES an unknown key on a budget rather than ignoring it, because a field that does not exist cannot be authored. The survivor count that makes a budget a difficulty is #367's and is NOT here: a count is a measurement and these are choices, so it is keyed by (scenarioId, stepId) in its own published table the way data/scenario-goals.json is keyed by stage id, and every step below carries the stable id it will be keyed by. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed data/ values: THESE FIGURES ARE AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject, and the line that ruling asks for is drawn field by field. What is DERIVED, from data/price-schedule.json and from each stage's own editable set, is the ARITHMETIC: a base is the dearest change the stage's own dials can reach plus the cheapest tier's typical (2 u); step 1 lifts the budget to the dearest equipment change (full-destination, 24 u); step 2 lifts it to the dearest change on the whole ladder (fifth-car, 54 u); and every schema ceiling is what the whole schedule costs (357 u). What is CHOSEN is the RULE ITSELF \u2014 that a scenario opens one typical dispatcher change above its own dearest dial, and that the ladder has two rungs rather than one or four \u2014 and the chime price of each rung, set at one chime per unit bought because nothing measures an exchange rate and inventing a curve would be manufacturing precision. A price ladder is game feel, not a measurement, and no amount of arithmetic makes it one. So a reader disagreeing with a number here is disagreeing with a judgement, not correcting an error, and the lever is these fields rather than anything in code.",
+  "generatedBy": "Authored. Validated at load by packages/viz/src/campaign/parse.ts against data/scenario-goals.json, against collectSearchSpace(), against data/buildings/ and \u2014 for each stage's budget, GitHub issue #365 \u2014 against data/price-schedule.json. packages/viz/src/campaign/campaign.test.ts runs that validator over this file.",
   "contract": "docs/10-experience-layer-contract.md \u00a7 5.2 (the scenario shape), \u00a7 5.3 (the four fail states), \u00a7 5.4 (the seven-stage progression). Goals are SELECTED, never authored: every kind below appears in this stage's `goals` bucket in data/scenario-goals.json, and the bar each is judged against is the count that table published for the shipped setting on these same seeds. DECISIONS.md \u00a7 D160 \u2014 a rate of 0 or 1 is a fact for the brief, anything between is a batch goal, and there is no single-run goal left for a stage to carry.",
   "stages": [
     {
@@ -52,6 +53,50 @@
         "abandoned": "weights.waitTime",
         "stranded": "constraints.noDirectionReversal",
         "locked-out": null
+      },
+      "budget": {
+        "startingUnits": 4,
+        "note": "DERIVED: 4 u is \"How calls are assigned\" at 2 u \u2014 the dearest change on data/price-schedule.json that the 6 dials it offers can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"a call, a car, a wait\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 4,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 20,
+            "chimes": 20,
+            "note": "DERIVED: +20 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 20 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 20,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     },
     {
@@ -122,6 +167,50 @@
         "abandoned": "weights.starvation",
         "stranded": "answer.allowBypassIfSoleEligibleCar",
         "locked-out": null
+      },
+      "budget": {
+        "startingUnits": 4,
+        "note": "DERIVED: 4 u is \"How calls are assigned\" at 2 u \u2014 the dearest change on data/price-schedule.json that the 16 dials it offers can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"rise and fall, and the gap between demand offered and demand carried\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 4,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 20,
+            "chimes": 20,
+            "note": "DERIVED: +20 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 20 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 20,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     },
     {
@@ -188,6 +277,50 @@
         "abandoned": "weights.starvation",
         "stranded": "answer.allowBypassIfSoleEligibleCar",
         "locked-out": null
+      },
+      "budget": {
+        "startingUnits": 4,
+        "note": "DERIVED: 4 u is \"How calls are assigned\" at 2 u \u2014 the dearest change on data/price-schedule.json that the 16 dials it offers can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"saturation, and why a diverging queue has no average\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 4,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 20,
+            "chimes": 20,
+            "note": "DERIVED: +20 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 20 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 20,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     },
     {
@@ -265,6 +398,50 @@
         "abandoned": "weights.starvation",
         "stranded": "weights.zoneAffinity",
         "locked-out": "dispatch.callType"
+      },
+      "budget": {
+        "startingUnits": 15,
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u \u2014 the dearest change on data/price-schedule.json that the 23 dials it offers can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"service zoning, and a journey with two waits\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 15,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 9,
+            "chimes": 9,
+            "note": "DERIVED: +9 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 9 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 9,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     },
     {
@@ -333,6 +510,50 @@
         "abandoned": "weights.waitTime",
         "stranded": "dispatch.callType",
         "locked-out": "dispatch.callType"
+      },
+      "budget": {
+        "startingUnits": 15,
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u \u2014 the dearest change on data/price-schedule.json that the 6 dials it offers can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"access zoning, and the one problem no dial reaches\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 15,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 9,
+            "chimes": 9,
+            "note": "DERIVED: +9 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 9 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 9,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     },
     {
@@ -422,6 +643,50 @@
         "abandoned": "weights.starvation",
         "stranded": "dispatch.assignmentMode",
         "locked-out": "dispatch.callType"
+      },
+      "budget": {
+        "startingUnits": 15,
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u \u2014 the dearest change on data/price-schedule.json that the 35 dials it offers can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"that at a hundred floors the geometry decides more than the weights do\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 15,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 9,
+            "chimes": 9,
+            "note": "DERIVED: +9 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 9 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 9,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     },
     {
@@ -470,6 +735,50 @@
         "abandoned": "weights.starvation",
         "stranded": "answer.allowBypassIfSoleEligibleCar",
         "locked-out": null
+      },
+      "budget": {
+        "startingUnits": 15,
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u \u2014 the dearest change on data/price-schedule.json that every dimension the search space declares can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"that an improvement you cannot measure is not one\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 15,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 9,
+            "chimes": 9,
+            "note": "DERIVED: +9 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 9 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 9,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     },
     {
@@ -528,6 +837,50 @@
         "abandoned": "weights.starvation",
         "stranded": "answer.allowBypassIfSoleEligibleCar",
         "locked-out": null
+      },
+      "budget": {
+        "startingUnits": 4,
+        "note": "DERIVED: 4 u is \"How calls are assigned\" at 2 u \u2014 the dearest change on data/price-schedule.json that the 8 dials it offers can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"that spare cars are not the same as a short interval\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 4,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 20,
+            "chimes": 20,
+            "note": "DERIVED: +20 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 20 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 20,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     },
     {
@@ -586,6 +939,50 @@
         "abandoned": "weights.starvation",
         "stranded": "constraints.noDirectionReversal",
         "locked-out": "dispatch.callType"
+      },
+      "budget": {
+        "startingUnits": 15,
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u \u2014 the dearest change on data/price-schedule.json that the 8 dials it offers can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"demand with no dominant direction, and a car unlike its neighbours\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 15,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 9,
+            "chimes": 9,
+            "note": "DERIVED: +9 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 9 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 9,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     },
     {
@@ -648,6 +1045,50 @@
         "abandoned": "weights.starvation",
         "stranded": "answer.allowBypassIfSoleEligibleCar",
         "locked-out": "dispatch.callType"
+      },
+      "budget": {
+        "startingUnits": 15,
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u \u2014 the dearest change on data/price-schedule.json that the 8 dials it offers can reach \u2014 plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this scenario can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. The stage teaches \"that two cars in one bank can be the wrong car\", and at this rung that lesson is affordable and a new shaft is not.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 15,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 9,
+            "chimes": 9,
+            "note": "DERIVED: +9 u lifts the budget to 24, which is \"Full destination dispatch\" \u2014 the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 9 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 9,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" \u2014 the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
       }
     }
   ]

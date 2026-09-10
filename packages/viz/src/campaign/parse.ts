@@ -25,6 +25,20 @@
  * a bar taken from a different building. § D158's own operational finding is the same shape one
  * level down — *"a level validated at n = 20 can suppress at n = 50"*.
  *
+ * ## The budget is the fourteenth field, and it is refused rather than defaulted
+ *
+ * GitHub issue **#365**, `docs/38` § 2.1: *"that record, plus a budget, is the scenario schema."*
+ * The shape and every rule about it live in `scenario/budget.ts`, because the campaign is one of
+ * the schema's four authors rather than the schema. Two things this file adds on top of that
+ * module's rules:
+ *
+ * - **A stage with no budget does not parse.** Not a stage with an unlimited budget — a scenario's
+ *   difficulty is *"the number of affordable configurations that survive"* (§ D525 clause 4), so a
+ *   scenario with no budget has an unbounded space and no difficulty at all.
+ * - **Its suggested levers are affordable at the rung it opens on.** § 5.3 already refuses a lever
+ *   the stage does not let the player move; once a price exists, a lever the player cannot pay for
+ *   is the same defect with a price on it.
+ *
  * ## Nothing here knows what a dimension is called
  *
  * The declared dimension ids arrive as {@link CampaignContext.dimensionIds}, and the shipped caller
@@ -39,6 +53,8 @@ import { replicationSeed } from '@elevator-sim/experiments/browser';
 import { FAIL_STATES, type Campaign, type CampaignStage, type EditableDimensions, type FailState } from './types.js';
 import { probabilityWordIn } from './words.js';
 import { MAX_REPLICATION_BUDGET, MIN_REPLICATION_BUDGET } from '../batch/report.js';
+import type { PriceSchedule } from '../pricing/types.js';
+import { admitPurchase, budgetViolations, decodeScenarioBudget, rungsOf } from '../scenario/budget.js';
 import { GOAL_KINDS, GOAL_TAKES_THRESHOLD, goalLabel, type GoalKind, type GoalSpec } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario, PublishedSeedSet } from '../scenario/published.js';
 
@@ -73,6 +89,14 @@ export interface CampaignContext {
    * it is what decides whether a `locked-out` lever is required or refused.
    */
   readonly restrictedFloorIdsByBuilding: ReadonlyMap<string, readonly string[]>;
+  /**
+   * `data/price-schedule.json`, already validated by `pricing/parse.ts` — GitHub issue **#365**.
+   *
+   * A budget means nothing except against a ladder of prices, so every bound a stage's budget is
+   * checked against is re-derived from this document rather than written down in a stage. Injected
+   * like every other field here, so a test can check a budget against a fictional schedule.
+   */
+  readonly schedule: PriceSchedule;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -130,6 +154,8 @@ export function validateCampaign(campaign: Campaign, context: CampaignContext): 
     violations.push(...checkSeeds(where, stage, published));
     violations.push(...checkGoals(where, stage, published));
     violations.push(...checkLevers(where, stage, context));
+    violations.push(...budgetViolations(where, stage.budget, context.schedule));
+    violations.push(...checkLeversAreAffordable(where, stage, context));
   }
 
   return violations;
@@ -404,6 +430,40 @@ function checkLevers(
 }
 
 /**
+ * **Every suggested lever is affordable at the budget the stage opens on** — GitHub issue **#365**.
+ *
+ * {@link checkLevers} already refuses a lever the stage does not let the player move, on the
+ * ground that *"a hint pointing at a locked dial is worse than no hint"*. A lever the player may
+ * move and cannot pay for is the same hint with a price on it, and once a budget exists the second
+ * half is checkable. It is checked at the **base** rung, not at a bought one: `docs/38` § 2.1's
+ * ladder is optional and a player who never spends a chime must still be able to act on the hint
+ * the fail state gives them.
+ *
+ * The levers are priced **together**, because a fail state suggests one dial and a player who is
+ * shown four of them over one run may need to reach all four. `admitPurchase` charges distinct
+ * changes once, so four dials that are one change on the schedule cost one price.
+ */
+function checkLeversAreAffordable(
+  where: string,
+  stage: CampaignStage,
+  context: CampaignContext,
+): readonly string[] {
+  const suggested = FAIL_STATES.map((state) => stage.levers[state]).filter(
+    (lever): lever is string => lever !== null,
+  );
+  if (suggested.length === 0) return [];
+  const base = rungsOf(stage.budget)[0];
+  if (base === undefined) return [];
+  const admission = admitPurchase(context.schedule, base.units, suggested);
+  if (admission.admitted) return [];
+  return [
+    `${where}: its suggested levers cost ${String(admission.units)} units together and it opens ` +
+      `on ${String(base.units)}. A hint pointing at a dial the player cannot pay to move is the ` +
+      'locked-dial hint with a price on it.',
+  ];
+}
+
+/**
  * Whether a fail state can arise on this stage at all.
  *
  * Only `locked-out` is configuration-dependent, and it is **derived** from the building's own
@@ -481,11 +541,12 @@ function decodeStage(raw: unknown, at: string, violations: string[]): CampaignSt
   const holdoutSeeds = decodeSeedSet(raw['holdoutSeeds'], `${where}: "holdoutSeeds"`, violations);
   const goals = decodeGoals(raw['goals'], where, violations);
   const levers = decodeLevers(raw['levers'], where, violations);
+  const budget = decodeScenarioBudget(raw['budget'], where, violations);
 
   if (traffic === undefined) violations.push(`${where}: has no "traffic" object.`);
   if (dispatcher === undefined) violations.push(`${where}: has no "dispatcher" object.`);
   if (editable === undefined || seeds === undefined || holdoutSeeds === undefined) return undefined;
-  if (traffic === undefined || dispatcher === undefined) return undefined;
+  if (traffic === undefined || dispatcher === undefined || budget === undefined) return undefined;
 
   const brief = Array.isArray(raw['brief']) ? raw['brief'].filter((line): line is string => typeof line === 'string') : [];
   const rate = traffic['arrivalRatePctPop5min'];
@@ -503,6 +564,7 @@ function decodeStage(raw: unknown, at: string, violations: string[]): CampaignSt
     replications: typeof raw['replications'] === 'number' ? raw['replications'] : Number.NaN,
     goals,
     levers,
+    budget,
   };
 }
 

@@ -1142,6 +1142,26 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * the two seed sets are disjoint, which is the check that matters about it.
          */
         'gauntlet/proofCases.ts#benchSeedOf',
+        /*
+         * `scenario/budget.ts` — GitHub issue **#365**'s schema, and its two halves are excluded on
+         * two different grounds, which is why they are commented rather than listed silently.
+         *
+         * `decodeScenarioBudget` and `budgetViolations` are `campaign/parse.ts` one field over: they
+         * refuse a malformed budget in `data/campaign.json` to the person editing it — a step no
+         * price schedule can reach, an `activeWhen` that disagrees with the ladder, a goal authored
+         * on a budget — and `scenario/budget.test.ts` fires every one of them against the real
+         * shipped budget rather than a fixture.
+         *
+         * `admitPurchase`'s refusal is the other kind and the exclusion is narrower: it is written
+         * for a **player** — *"this change costs 13 units and the budget holds 4"* — and **no
+         * screen draws it yet**, because the surface that will is #233's re-authoring of the
+         * eighteen fix cases and #367's difficulty face. A string the sweep cannot see because
+         * nothing renders it is the shape `CLAUDE.md` names for the stranded count, and the rule is
+         * the same in both places: it enters an adapter on the commit that draws it, not before.
+         */
+        'scenario/budget.ts#admitPurchase',
+        'scenario/budget.ts#budgetViolations',
+        'scenario/budget.ts#decodeScenarioBudget',
         'scenario/published.ts#classOfCounts',
         'scenario/published.ts#validatePublishedGoalRates',
         'editor/editorValidate.ts#validateBuildingText',

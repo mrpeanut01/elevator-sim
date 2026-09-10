@@ -309,6 +309,8 @@ export async function loadCampaign(resources: BrowserResources): Promise<LoadedC
         ),
       ]),
     ),
+    /* One document, loaded once with the rest — see `BrowserResources.priceSchedule`. */
+    schedule: resources.priceSchedule,
   });
 
   return { campaign, published, space, dimensionHelp };

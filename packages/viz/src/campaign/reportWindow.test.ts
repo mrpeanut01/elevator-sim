@@ -62,6 +62,7 @@ import type { Campaign, CampaignStage } from './types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { runBatch } from '../batch/runBatch.js';
 import type { BatchReplication, BatchResources, BatchResult } from '../batch/types.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { asPerReplicationGoal, measureGoalRate } from '../scenario/goals.js';
 import type { PublishedGoalRates } from '../scenario/published.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
@@ -89,6 +90,8 @@ beforeAll(async () => {
         ),
       ]),
     ),
+    /* #365: a budget is checked against the shipped ladder, never against a fixture. */
+    schedule: shippedPriceSchedule(),
   };
   campaign = parseCampaign(
     JSON.parse(await readFile(join(DATA_DIR, 'campaign.json'), 'utf8')),

@@ -63,6 +63,7 @@ import { admitProfile } from './dimensions.js';
 import { editableIdsOf, parseCampaign, type CampaignContext } from './parse.js';
 import type { Campaign, CampaignStage } from './types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { isPerReplicationGoal, type GoalKind } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -149,6 +150,8 @@ beforeAll(async () => {
         ),
       ]),
     ),
+    /* #365: a budget is checked against the shipped ladder, never against a fixture. */
+    schedule: shippedPriceSchedule(),
   };
   campaign = parseCampaign(raw, context);
 }, 120_000);

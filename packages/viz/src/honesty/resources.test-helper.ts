@@ -21,6 +21,7 @@ import { collectSearchSpace } from '@elevator-sim/experiments/browser';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import type { HonestyResources } from './run.js';
@@ -65,6 +66,8 @@ export async function loadHonestyResources(
         ),
       ]),
     ),
+    /* #365: a budget is checked against the shipped ladder, never against a fixture. */
+    schedule: shippedPriceSchedule(),
   };
   const campaign = parseCampaign(rawCampaign, context);
 

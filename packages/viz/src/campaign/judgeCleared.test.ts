@@ -75,6 +75,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { runBatch } from '../batch/runBatch.js';
 import type { BatchResources } from '../batch/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { GOAL_KINDS, goalLabel } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
@@ -135,6 +136,8 @@ beforeAll(async () => {
         ),
       ]),
     ),
+    /* #365: a budget is checked against the shipped ladder, never against a fixture. */
+    schedule: shippedPriceSchedule(),
   };
   campaign = parseCampaign(
     JSON.parse(await readFile(join(DATA_DIR, 'campaign.json'), 'utf8')),
