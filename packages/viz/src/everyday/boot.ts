@@ -38,8 +38,20 @@
  * is the first thing a player would meet on their first swap.
  */
 
+/*
+ * **First, and the order is the mechanism** — GitHub issue #242. This module installs the page's
+ * two global fault listeners as its side effect, and a throw during another module's *evaluation*
+ * is only reported to a listener that is already installed. Import order in a module body is
+ * evaluation order, so this line being above the next one is the difference between a watcher that
+ * sees the boot failure this repository has already shipped once — a `let` declared below the
+ * sequence that assigns it, 2 100 tests green over a dead page — and one installed a fraction of a
+ * second too late to see anything. `faultWatch.test.ts` asserts the order, because a diff will not.
+ */
+import './faultWatch.js';
+
 import '../dev/main.js';
 
+import { CLIENT_FAULTS } from './faults.js';
 import { EVERYDAY_HOST } from './host.js';
 import { mountEverydayShell, type EverydayShell } from './shell.js';
 
@@ -187,7 +199,7 @@ export function closeEngineerMenuWhenReady(doc: Document): void {
 /** Mount the Everyday shell over an already-booting Engineer surface. */
 export function bootEveryday(doc: Document): EverydayShell {
   closeEngineerMenuWhenReady(doc);
-  return mountEverydayShell(doc, {
+  const shell = mountEverydayShell(doc, {
     /*
      * The data host's slot — `dev/main.ts` publishes into it at the end of its own boot, which is
      * strictly after this mount (its `main()` is async and this file runs synchronously after the
@@ -195,6 +207,18 @@ export function bootEveryday(doc: Document): EverydayShell {
      */
     host: EVERYDAY_HOST,
   });
+  /*
+   * From here a fault is a fault in a page the player can see, rather than one in a page that never
+   * arrived — GitHub issue #242. The two are different reports and the register cannot tell them
+   * apart without this line: `docs/27-flow-maps.md` F0 is the state where the data does not load,
+   * the shell covers the Engineer surface's own failure notice, and the player meets a working
+   * main menu whose every tile claims a boot that will never finish.
+   *
+   * After the mount rather than before it, and it costs nothing to say why: a mount that threw
+   * would leave the register still calling everything a start-up fault, which is what it would be.
+   */
+  CLIENT_FAULTS.shellMounted();
+  return shell;
 }
 
 /*

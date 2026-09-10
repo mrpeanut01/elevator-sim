@@ -154,3 +154,79 @@ describe('the server refuses to boot on an allowlist it cannot honour — § D33
     expect(booted.stderr).not.toMatch(/ELEVATOR_SIM_ALLOW_ORIGIN/u);
   });
 });
+
+/**
+ * **A real failure, in the real process, producing the real alert key** — GitHub issue #242, AC3.
+ *
+ * AC3 asks for an alert path *tested by triggering a real error*. The half that can be tested from
+ * a checkout is this one: that the thing an alert rule keys on is actually written, by the shipped
+ * entry point, on a failure nobody staged inside a unit test. The half that cannot is the rule
+ * itself, which lives in a subscription this repository has no credentials for; the runbook says so
+ * where an operator will read it.
+ *
+ * The failure used is the one this file already produces — a boot with no database. That is a
+ * genuine unhandled rejection out of `main()`, reaching the entry point's own `catch`, in a process
+ * spawned as `node dist/main.js`.
+ */
+describe('a failure that stops the process says so in the shape an alert keys on — #242', () => {
+  it('writes one fault line to stderr, and it names the boot', async () => {
+    const booted = await boot({
+      ELEVATOR_SIM_ORIGIN: SITE,
+      ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},previews`,
+    });
+
+    expect(booted.code).toBe(1);
+    /*
+     * The literal, because that is what a rule is written against. A test that read the marker back
+     * out of the constant that produced it could not fail when the constant moved, and the first
+     * anybody would know is an alert that had quietly stopped firing.
+     */
+    expect(booted.stderr).toContain('elevator-sim-fault at=boot kind=Error');
+    /* One line, not a stream of them: an alert on a boot failure must count boots. */
+    expect(booted.stderr.match(/elevator-sim-fault/gu)?.length).toBe(1);
+  });
+
+  it('says nothing about the failure beyond its class, on the line the alert reads', async () => {
+    const booted = await boot({
+      ELEVATOR_SIM_ORIGIN: SITE,
+      ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},previews`,
+    });
+
+    const line = booted.stderr
+      .split('\n')
+      .find((candidate) => candidate.startsWith('elevator-sim-fault'));
+    expect(line).toBe('elevator-sim-fault at=boot kind=Error');
+    /*
+     * The human-readable message is still printed, on its own line, and that is deliberate rather
+     * than an oversight — the two lines answer different questions. This one is what a query reads;
+     * the other is what a person reading a terminal needs in order to fix the configuration.
+     */
+    expect(booted.stderr).toMatch(/ELEVATOR_SIM_DB is not set/u);
+  });
+
+  it('goes to standard error, never to standard output', async () => {
+    const booted = await boot({
+      ELEVATOR_SIM_ORIGIN: SITE,
+      ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},previews`,
+    });
+
+    expect(booted.stdout).not.toContain('elevator-sim-fault');
+  });
+
+  /*
+   * The marker has to be distinguishable from the one ordinary line this server writes, because a
+   * rule keyed on `elevator-sim` alone would fire on every cold start — and this deployment cold
+   * starts constantly, at `minReplicas: 0`. Asserted against the real startup line rather than
+   * against a copy of it.
+   */
+  it('is distinguishable from the line a healthy start writes', async () => {
+    const booted = await boot({
+      ELEVATOR_SIM_ORIGIN: SITE,
+      ELEVATOR_SIM_ALLOW_ORIGIN: `${SITE},previews`,
+    });
+    expect(booted.stdout).not.toMatch(/listening/u);
+    expect('elevator-sim listening on 8080 — serving its own page').not.toContain(
+      'elevator-sim-fault',
+    );
+  });
+});

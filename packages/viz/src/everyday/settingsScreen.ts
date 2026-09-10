@@ -79,6 +79,8 @@ import { everydayCareerStore } from './careerStore.js';
 import { everydayProfileStore } from './profileStore.js';
 import { everydayTelemetry } from './telemetryPort.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
+/* GitHub issue #242 — the page's own fault count, read into the report the player composes. */
+import { CLIENT_FAULTS } from './faults.js';
 import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
 import { settingsScreenViewOf, type SettingsScreenView } from './settingsView.js';
 /* GitHub issue #245's report block — its words, its refusals and the address it opens. */
@@ -662,6 +664,13 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
      * argument rather than reaching for it.
      */
     browser: doc.defaultView?.navigator.userAgent,
+    /*
+     * The page's own register — GitHub issue #242. Read at compose time rather than captured once,
+     * so a fault that lands while the reader is typing is in the report they send. It is a plain
+     * tally of two numbers and can carry nothing an error said; `everyday/faults.ts` is where that
+     * is decided and enforced.
+     */
+    faults: CLIENT_FAULTS.tally(),
   });
 
   const supportHeading = el(doc, 'div', undefined, SUPPORT_COPY.heading);

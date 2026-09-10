@@ -18,6 +18,7 @@
 import { createServer, type IncomingMessage, type Server as NodeServer, type ServerResponse } from 'node:http';
 
 import type { Api, ApiRequest } from './api.js';
+import { serverFaultOf, type FaultReporter } from '../errors/faults.js';
 import {
   assetFor,
   cacheControlFor,
@@ -133,11 +134,58 @@ export interface ServeOptions {
    * budget, not an escape from it, and it is the weaker of the two failures.
    */
   readonly trustedHops?: number | undefined;
+  /**
+   * Where a request that failed is reported — GitHub issue #242, AC2.
+   *
+   * A port rather than a `console.error` in the `catch` below, for the reason every other decision
+   * in this file is stated: `serve.test.ts` can then bind a port, make a route throw, and read the
+   * fault as a value instead of capturing somebody's console. `main.ts` is the one module that
+   * builds a real one.
+   *
+   * Optional because the API is useful without it — `api.test.ts` drives `handle()` and never binds
+   * a port — and because a deployment that has nowhere to report to must still serve. What it may
+   * **not** be is a default that swallows: absent, a fault is unreported and that is a property of
+   * the caller's wiring, visible in one place, rather than a silence built into the transport.
+   *
+   * `errors/faults.ts` decides what a fault record carries; the short version is that it carries no
+   * message, no stack, no caller and no path — only the vocabulary this server authors — which is
+   * what lets it be written down while the lawful basis for error *reports* is still open.
+   */
+  readonly onFault?: FaultReporter | undefined;
 }
 
 export function serve(options: ServeOptions): NodeServer {
   const server = createServer((incoming, response) => {
-    void respond(options, incoming, response);
+    /*
+     * **The rejection this `catch` exists for is not hypothetical.** `respond` was called as a bare
+     * `void respond(...)`, so anything thrown outside its own two `try` blocks — building headers,
+     * `assetFor`, a `writeHead` on a response already written — became an unhandled rejection with
+     * no listener, and the caller received no bytes at all while the socket stayed open until it
+     * timed out. That exact shape is written up eighty lines below, where a `new URL('//')` did it.
+     *
+     * Two things happen here and they are separable on purpose: the fault is reported, and the
+     * socket is not left open. The answer is written by hand rather than through the header builder
+     * because whatever failed may be the header builder.
+     */
+    void respond(options, incoming, response).catch((error: unknown) => {
+      options.onFault?.(
+        serverFaultOf({
+          at: 'request',
+          error,
+          method: incoming.method ?? 'GET',
+          path: incoming.url ?? '/',
+        }),
+      );
+      if (response.writableEnded) return;
+      if (response.headersSent) {
+        response.destroy();
+        return;
+      }
+      response.writeHead(500, { 'content-type': 'application/json; charset=utf-8' });
+      response.end(
+        JSON.stringify({ error: 'internal-error', detail: 'The server failed to handle that request.' }),
+      );
+    });
   });
   server.listen(options.port);
   return server;
@@ -270,9 +318,18 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
   let result;
   try {
     result = await options.api(request);
-  } catch {
+  } catch (error: unknown) {
     // The message is not forwarded. An unhandled error's text is the server's internals, and a
     // stack trace in a response body is a gift to whoever provoked it.
+    //
+    // **It used to be `catch {` with no binding at all**, which is a different and worse thing: the
+    // error was not captured, not logged and not counted, so a route that threw produced this 500
+    // and complete silence in the container's log stream (GitHub issue #242). The binding is here
+    // for the reporter and for nothing else — what goes out to the caller is byte for byte what it
+    // was, and `errors/faults.ts` is what decides that no part of `error` reaches a log either.
+    options.onFault?.(
+      serverFaultOf({ at: 'request', error, method: request.method, path: request.path }),
+    );
     response.writeHead(500, headers);
     response.end(JSON.stringify({ error: 'internal-error', detail: 'The server failed to handle that request.' }));
     return;

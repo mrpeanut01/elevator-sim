@@ -133,8 +133,15 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
  * entry means the scanner has met a shape it cannot read, and an entry that stops reproducing means
  * a site moved and the registry is decoration. Today there is one, and it is a `setTimeout` inside
  * a helper — a socket that must not hang, closed `}, 2_000);` exactly as a test would be.
+ *
+ * **It moved from `:142` to `:143` on 2026-09-10** and nothing about it changed: GitHub issue #242
+ * added one import to that file, above the helper. That is a line-number pin behaving exactly as the
+ * paragraph above says it should — the entry stopped reproducing, the check went red, and somebody
+ * looked. A registry keyed on a line will do this on every edit upstream of the site, and the cost
+ * is the point rather than a defect: the alternative is a key that cannot tell a moved site from a
+ * deleted one.
  */
-const DECLINED_NUMERIC: readonly string[] = ['packages/server/src/http/serve.test.ts:142'];
+const DECLINED_NUMERIC: readonly string[] = ['packages/server/src/http/serve.test.ts:143'];
 
 /**
  * A pinned set of files that stands in for *one unit of this machine* — see `cohortRatio`.

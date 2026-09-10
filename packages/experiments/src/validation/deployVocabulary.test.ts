@@ -235,6 +235,15 @@ const EXCLUDED: readonly string[] = Object.freeze([
 const DISARM_CARRIERS: readonly string[] = Object.freeze([
   '.github/workflows/deploy-viz.yml',
   'docs/16-static-site-deployment.md',
+  /*
+   * The incident runbook — GitHub issue #242, added 2026-09-10. It joined this set the way a member
+   * is supposed to: it names the command precisely in order to say it is **not** the rollback, and
+   * the guard above caught its arrival and required somebody to look. That is the fifth file, and it
+   * is the first one written after § 355's correction rather than corrected by it — so it is the
+   * first evidence that the vocabulary held for a new document instead of only for the two that had
+   * already got it wrong.
+   */
+  'docs/40-incident-runbook.md',
   'infra/azure/swa/provision.sh',
   'packages/server/src/http/serve.ts',
 ]);

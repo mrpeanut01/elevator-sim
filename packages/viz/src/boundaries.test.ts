@@ -262,6 +262,13 @@ const isTest = (id: string): boolean => id.endsWith('.test.ts') || id.endsWith('
  */
 const EVERYDAY_SHELL_FILES = new Set([
   'everyday/boot.ts',
+  /*
+   * The page's two global fault listeners — GitHub issue #242. Here rather than in `everyday/`'s
+   * pure half for exactly the reason this set exists: it installs on a `window`, and the counting
+   * it feeds is `everyday/faults.ts`, which touches no document and is deliberately **not** on this
+   * list. That split is what lets the register be driven in this node tier at all.
+   */
+  'everyday/faultWatch.ts',
   'everyday/shell.ts',
   /* The fixit screen's DOM half — its words and decisions stay pure in fixitScreenModel.ts. */
   'everyday/fixitScreen.ts',

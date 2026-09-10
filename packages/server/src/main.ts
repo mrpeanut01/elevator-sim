@@ -10,9 +10,11 @@
  * happens when it is absent. `ELEVATOR_SIM_SECRET` has no default and never will (§ D214 § 5).
  */
 
+import { writeSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { bootstrap } from './bootstrap.js';
+import { faultLineOf, serverFaultOf, type FaultReporter } from './errors/faults.js';
 import { serve } from './http/serve.js';
 import {
   isPreviewOriginOf,
@@ -34,6 +36,65 @@ import { PgSql } from './store/sql.js';
  * to permit at all (§ D243).
  */
 export const NO_CROSS_ORIGIN = 'null';
+
+/**
+ * The one place a fault line is actually written — GitHub issue #242, AC2.
+ *
+ * **`writeSync` rather than `console.error`, and the reason is a truncation rather than a
+ * preference.** The two process-level handlers below report and then exit, and this container's
+ * stdout and stderr are pipes: writes to a pipe are asynchronous in Node, so a `console.error`
+ * immediately followed by `process.exit()` can be discarded before it leaves the process. That
+ * would lose exactly the line the exit exists to explain. `writeSync` on the standard-error
+ * descriptor has landed by the time it returns.
+ *
+ * **Module-private on purpose.** Its only caller is the constant below, so exporting it would put a
+ * function in this package's public surface whose one non-test caller is three lines down — the
+ * shape [`docs/05-roadmap.md`](../../../docs/05-roadmap.md)'s standing requirement counts instances
+ * of. What a test needs in order to check the wording is `faultLineOf`, which is exported from the
+ * module that decides it; what {@link reportProcessFaults} needs in order to be observable is its
+ * own injected reporter, which it takes as an argument.
+ */
+function faultReporterTo(write: (line: string) => void): FaultReporter {
+  return (fault) => {
+    write(`${faultLineOf(fault)}\n`);
+  };
+}
+
+/** The reporter the shipped process uses. */
+const STDERR_FAULTS = faultReporterTo((line) => {
+  writeSync(2, line);
+});
+
+/**
+ * Report the two faults a request never sees, and then die the way Node would have.
+ *
+ * **Installing these handlers changes what the process does, and the change is deliberately
+ * nothing.** Node's default for an unhandled rejection is to raise it as an uncaught exception,
+ * and its default for an uncaught exception is to print and exit non-zero — but *installing a
+ * listener suppresses that default*, so a handler that only logged would turn a crash into a
+ * process running on in an unknown state. Both handlers therefore exit 1, which is what would have
+ * happened anyway, with one line written first. Azure Container Apps restarts the revision either
+ * way; the difference is whether anybody can tell why.
+ *
+ * Exported and called from the entry-point guard below rather than run at module scope, because
+ * `main.ts` is imported by its own test and a test process that installed an exiting handler would
+ * take the suite with it.
+ */
+export function reportProcessFaults(
+  report: FaultReporter = STDERR_FAULTS,
+  exit: (code: number) => void = (code) => {
+    process.exit(code);
+  },
+): void {
+  process.on('unhandledRejection', (error: unknown) => {
+    report(serverFaultOf({ at: 'unhandled-rejection', error }));
+    exit(1);
+  });
+  process.on('uncaughtException', (error: unknown) => {
+    report(serverFaultOf({ at: 'uncaught-exception', error }));
+    exit(1);
+  });
+}
 
 /**
  * The PostgreSQL connection string, from the environment.
@@ -367,6 +428,10 @@ export async function main(env: Readonly<Record<string, string | undefined>>): P
     // header and reading it from the wrong end would hand every caller a free rate-limit key.
     // § D242 and `clientIpOf`'s own note say what each value costs.
     trustedHops,
+    // Where a request that threw is reported — GitHub issue #242, AC2. Until this line existed
+    // `serve.ts` caught every failure of every route with a `catch` that had no binding, so a 500
+    // left no trace anywhere, in a deployment that keeps no process between requests.
+    onFault: STDERR_FAULTS,
     static: viewer,
     // Set only in a split deployment, where it takes precedence over `static` for every page
     // request. Both are passed rather than one, because the bundle is still what this origin serves
@@ -400,11 +465,20 @@ export async function main(env: Readonly<Record<string, string | undefined>>): P
 
 // `import.meta.main` is the run-as-script check; the module is also imported by its test.
 if (import.meta.url === `file://${process.argv[1] ?? ''}`) {
+  // Before anything is opened, so a fault raised during boot is reported rather than printed by
+  // Node with no marker on it — GitHub issue #242.
+  reportProcessFaults();
   main(process.env).catch((error: unknown) => {
     // The message and nothing else. A missing secret must read as a configuration mistake with an
     // obvious fix, not as a crash.
     // eslint-disable-next-line no-console -- the failure path of a CLI entry point.
     console.error(error instanceof Error ? error.message : String(error));
+    // And the same failure again in the one shape an alert rule keys on. Both, rather than one:
+    // the line above is for a person reading a terminal and says what to fix, and this one is for
+    // a query and says only what this server is willing to write down about itself. A boot that
+    // fails is the failure that matters most on this deployment, because there is no process left
+    // to ask afterwards — GitHub issue #242.
+    STDERR_FAULTS(serverFaultOf({ at: 'boot', error }));
     process.exitCode = 1;
   });
 }

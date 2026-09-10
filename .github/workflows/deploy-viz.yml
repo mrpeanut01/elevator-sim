@@ -398,6 +398,51 @@ jobs:
           echo "url: ${{ steps.deploy.outputs.static_web_app_url }}"
           echo "its API: ${{ vars.ELEVATOR_SIM_API_ORIGIN }}"
 
+      # ---------------------------------------------------------------------
+      # The first thing in this pipeline that looks at the deployed page —
+      # GitHub issue #242, AC5.
+      #
+      # Every other assertion in this workflow runs in `build`, against
+      # `packages/viz/dist-web` on the runner's own disk, and then the artifact
+      # is uploaded and nothing looks at it again. `docs/16` § 11 step 4 states
+      # the rule this step exists to stop being a manual one: *verify what is
+      # served, not what the run said. A green run is a report about an upload.*
+      #
+      # The check itself is `scripts/dead-page.mjs`, whose decision is exported
+      # pure and driven against fixtures by
+      # `packages/experiments/src/validation/deadPage.test.ts`. It installs
+      # nothing — no `npm ci` here, and the script has no dependency — for the
+      # reason `blocked-by.mjs` gives: a check that guards a deploy may not
+      # depend on a build.
+      #
+      # It runs for previews as well as production, on the URL this very step's
+      # deploy produced. A preview that is dead is the same defect one
+      # environment earlier, and catching it there is the cheap half.
+      #
+      # What it does NOT catch is a bundle that is served correctly and throws;
+      # no HTTP probe can. That half is `everyday/builtBundle.browser.test.ts`,
+      # pre-merge, on the same artifact bytes. The two together are AC5.
+      # The same single value the `build` job pins, and for its reason: this job makes no
+      # measurement, so it needs no matrix — but a check that guards a deploy must not run on
+      # whatever Node the runner image happens to carry this month. No `cache: npm`, because
+      # nothing here installs: the script has no dependency, which is the whole point of it being
+      # a plain `.mjs` rather than a compiled module.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+
+      - name: The deployed page is alive
+        env:
+          SITE: ${{ steps.deploy.outputs.static_web_app_url }}
+          EXPECTED: ${{ vars.ELEVATOR_SIM_API_ORIGIN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SITE" ]; then
+            echo "::error::the upload reported no URL, so there is nothing to probe."
+            exit 1
+          fi
+          node scripts/dead-page.mjs "$SITE" "$EXPECTED"
+
   # ---------------------------------------------------------------------------
   # Tear down the preview when the pull request closes.
   # ---------------------------------------------------------------------------
