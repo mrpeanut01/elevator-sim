@@ -399,10 +399,27 @@ describe('the annotation census is derived from the tree, not transcribed', () =
     const directory = census.annotations.filter((one) => one.file.startsWith('packages/viz/'));
     const atSimulatingCeiling = directory.filter((one) => one.ms === 300_000).length;
 
+    /*
+     * The fourth row, derived like the three above it — **and it was the one that was not**.
+     *
+     * It read `| above 300 000 ms | 89 | 4 |` and the tree said 96, because nothing asserted it:
+     * `above its own ceiling` moved three times while this sat still. For the `viz` column the two
+     * rows are the **same predicate**, since that project's own ceiling *is* 300 000 ms, so the
+     * file contradicted itself two lines apart. The row earns its place only in the `viz-browser`
+     * column, where the ceiling is 120 000 and *above 300 000* is a genuinely different question.
+     *
+     * A stale figure inside the docstring written to stop stale figures is `RISKS.md` R38 at its
+     * least excusable, and it was found by a reviewer rather than by this loop — which is the
+     * argument for putting it in the loop.
+     */
+    const aboveSimulatingCeiling = (project: string): number =>
+      census.annotations.filter((one) => one.project === project && one.ms > 300_000).length;
+
     for (const claim of [
       `| annotations | ${viz?.total ?? 0} | ${browser?.total ?? 0} |`,
       `| above its own ceiling | **${viz?.above ?? 0}** | **${browser?.above ?? 0}** |`,
       `| at its own ceiling | ${viz?.at ?? 0} | ${browser?.at ?? 0} |`,
+      `| above 300 000 ms | ${aboveSimulatingCeiling('viz')} | ${aboveSimulatingCeiling('viz-browser')} |`,
       `**${directory.length}** timeout annotations in all, of which **${atSimulatingCeiling}**`,
     ]) {
       expect(

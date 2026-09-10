@@ -245,7 +245,9 @@ const CLOSER = /^(\s*)\}, ([A-Za-z0-9_.]+)\);\s*$/u;
  * {@link blankNonCode} has already turned such a comment into whitespace by the time these run —
  * which is also why widening this cannot count a docstring. That protection is `blankNonCode`'s,
  * not the pattern's, and it is why these stay as strict as `CLOSER`: the tree really does quote
- * `}, 600_000);` in prose, twice in `vitest.config.ts`'s own retraction.
+ * a closer in prose — `vitest.config.ts`'s own retraction quotes two, `}, 3_000_000);` and
+ * `}, 900_000);`. (Earlier drafts of this sentence said `}, 600_000);` twice; neither value appears
+ * there, and the shape is the point rather than the number.)
  */
 const MULTI_BRACE = /^(\s*)\},\s*$/u;
 const MULTI_ARGUMENT = /^(\s*)([A-Za-z0-9_.]+),?\s*$/u;
@@ -272,17 +274,58 @@ const STRING_LITERAL = /'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/u;
  * attribution began balancing parentheses. The census was wrong before this and could not say so.
  *
  * The `/`-is-ambiguous problem has no complete solution without parsing, so this uses the standard
- * heuristic: a regex may begin only where a *value* may not have just ended. That is exact for
- * every site in `packages/`, and the failure mode is conservative — a misread `/` blanks to the end
- * of its own line at worst, because an unterminated candidate is abandoned rather than run on.
+ * heuristic: a regex may begin only where a *value* may not have just ended — after an operator,
+ * an opening bracket, or one of the keywords below.
+ *
+ * **The keywords are not decoration, and leaving them out was a real defect.** A first draft looked
+ * only at the previous significant *character*, which misreads `return /…/`, `case /…/` and
+ * `typeof /…/` — and this tree has them: `everyday/units.test.ts:308` is
+ * `return /(?:` + '`' + `|')[^` + '`' + `']*m\/s/u.test(line)`, whose apostrophe then ate the
+ * `.test(line)` parentheses, and `batch/shippedDefault.test.ts:57` was left with a stray unmatched
+ * `)`. Thirteen files differed between the two readings and three ended with a wrong parenthesis
+ * balance. Since attribution now *depends* on that balance, an ordinary annotated `it(…, 600_001)`
+ * whose body contains `return /\brecordRun\s*\(/.test(s)` was dropped — a shape that already
+ * occurs twice in this tree, at `dev/mainThreadSimulation.test.ts:210` and `:257`.
+ *
+ * Measured before and after: the census is **identical** under both readings today
+ * (1 360 annotations, 29 unattributed, no site in one and not the other), so the correction is free
+ * and the defect it removes was latent rather than live. It was also **loud** rather than silent —
+ * a dropped candidate lands in `unattributed` and trips the no-unresolved-constant check — which is
+ * why it cost coverage rather than correctness.
+ *
+ * The failure mode is conservative in the one direction that matters: a misread `/` blanks **to the
+ * end of its own line and no further**, because a candidate that reaches a newline is abandoned. It
+ * is not restored — the line stays blanked — so a misread is a lost line rather than a lost file.
  */
+const REGEX_MAY_FOLLOW = new Set([
+  'return',
+  'typeof',
+  'case',
+  'in',
+  'of',
+  'new',
+  'delete',
+  'do',
+  'else',
+  'yield',
+  'void',
+  'throw',
+  'instanceof',
+  'await',
+]);
+
 function regexCanStartAt(source: string, index: number): boolean {
-  for (let back = index - 1; back >= 0; back -= 1) {
+  let back = index - 1;
+  for (; back >= 0; back -= 1) {
     const char = source[back] as string;
     if (char === ' ' || char === '\t' || char === '\n' || char === '\r') continue;
-    return '([{,;:=!&|?+-*%<>~^'.includes(char);
+    if ('([{,;:=!&|?+-*%<>~^'.includes(char)) return true;
+    break;
   }
-  return true;
+  if (back < 0) return true;
+  let end = back + 1;
+  while (back >= 0 && /[A-Za-z]/u.test(source[back] as string)) back -= 1;
+  return REGEX_MAY_FOLLOW.has(source.slice(back + 1, end));
 }
 
 export function blankNonCode(source: string): string {
