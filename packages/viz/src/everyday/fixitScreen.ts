@@ -133,6 +133,9 @@ import {
 import { solvedCaseSetOf } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
+/* GitHub issue #340: beat 3, from the four presses this screen offers. A no-op without consent. */
+import { everydayTelemetry } from './telemetryPort.js';
+import type { TelemetryControlKey } from '../telemetry/schema.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   EVERYDAY_COLORS as C,
@@ -565,7 +568,20 @@ function mountFixit(
       button.append(top, tower);
       button.addEventListener('click', () => {
         if (running) return;
+        /*
+         * A case that is already open is not a change. Guarded rather than emitted unconditionally,
+         * because a player re-pressing the row they are on would otherwise be filed as beat 3 and
+         * `docs/26 K2` would count a chain nobody completed.
+         */
+        const moved = selectedId !== row.id;
         selectedId = row.id;
+        if (moved) {
+          everydayTelemetry().record({
+            name: 'change_made',
+            controlKey: 'fixit-case',
+            screenKey: 'fixit',
+          });
+        }
         render();
         context.refreshBar();
       });
@@ -766,6 +782,7 @@ function mountFixit(
       const row = repairRowOf(entry, session.state, repair, scheduleNow());
       grid.append(
         toggleRow(session, {
+          controlKey: 'fixit-repair',
           className: 'everyday-fixit-repair',
           name: repair.name,
           priceLine: row.priceLine,
@@ -783,6 +800,7 @@ function mountFixit(
       const selectable = selected || affordability.selectable;
       grid.append(
         toggleRow(session, {
+          controlKey: 'fixit-extra',
           className: 'everyday-fixit-extra',
           name: extra.name,
           priceLine: `${String(extra.costUnits)} u`,
@@ -811,6 +829,15 @@ function mountFixit(
   }
 
   interface ToggleSpec {
+    /**
+     * Which kind of control this is — GitHub issue #340, `docs/26` § 7.4's `controlKey`.
+     *
+     * A field rather than a reading of {@link ToggleSpec.className}, which is what the first draft
+     * of this did: a class name is a presentation detail and deriving a telemetry vocabulary from
+     * one would make a stylesheet rename a silent change of meaning. It is the *kind* and not the
+     * repair's own id, and `telemetry/schema.ts#CONTROL_KEYS` says what that costs.
+     */
+    readonly controlKey: TelemetryControlKey;
     readonly className: string;
     readonly name: string;
     readonly priceLine: string;
@@ -865,6 +892,16 @@ function mountFixit(
       button.addEventListener('click', () => {
         if (running) return;
         session.state = spec.toggle();
+        /*
+         * § 7.2 E4 — beat 3 of `docs/26 K2`'s chain: *did the player change one thing?* After the
+         * state moves, so a press that changed nothing cannot emit; before the render, because a
+         * render can throw and a beat that happened is a beat that happened.
+         */
+        everydayTelemetry().record({
+          name: 'change_made',
+          controlKey: spec.controlKey,
+          screenKey: 'fixit',
+        });
         render();
       });
     }
@@ -949,12 +986,20 @@ function mountFixit(
           'line-height:1',
         ].join(';');
       }
+      /*
+       * § 7.2 E4 on both steppers — GitHub issue #340. The key is `FixitMachineryRow.key`, which is
+       * the row's own `'speed' | 'capacity'`, so the vocabulary is the product's rather than this
+       * handler's; the direction is deliberately not carried, on § 2.3's rule that a field which
+       * answers no question in § 6 does not ship — `docs/26 K2` asks whether beat 3 happened.
+       */
+      const steppedKey: TelemetryControlKey = row.key === 'speed' ? 'fixit-speed' : 'fixit-capacity';
       minus.addEventListener('click', () => {
         if (running) return;
         session.state =
           row.key === 'speed'
             ? stepSpeed(entry, session.state, -1, scheduleNow())
             : stepCapacity(entry, session.state, -1, scheduleNow());
+        everydayTelemetry().record({ name: 'change_made', controlKey: steppedKey, screenKey: 'fixit' });
         render();
       });
       plus.addEventListener('click', () => {
@@ -963,6 +1008,7 @@ function mountFixit(
           row.key === 'speed'
             ? stepSpeed(entry, session.state, 1, scheduleNow())
             : stepCapacity(entry, session.state, 1, scheduleNow());
+        everydayTelemetry().record({ name: 'change_made', controlKey: steppedKey, screenKey: 'fixit' });
         render();
       });
       const label = el(doc, 'span', undefined, row.label);

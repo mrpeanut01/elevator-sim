@@ -43,6 +43,30 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'Telemetry’s machinery, which renders nothing — GitHub issue #340. Each of these is derived ' +
+        'only because the two-adjacent-words scanner reaches a hyphenated key through it: the four ' +
+        'consent writers and the reader all touch `CONSENT_KEY`, which is `elevator-sim.telemetry`, ' +
+        'and `everydayTelemetry` reaches the `content-type` header its transport sets. None of them ' +
+        'composes a string a player reads, and by construction none of them can: `docs/26` P-4 says ' +
+        'every field in the schema is a number, a boolean or a member of a vocabulary derived from ' +
+        'the product, so there is no prose in the whole subsystem except the consent surface. That ' +
+        'surface is `telemetry/consentView.ts`, it is driven by the `TELEMETRY_CONSENT` adapter over ' +
+        'all four states and both storage arms, and § 4.1 makes its presence there a ship condition ' +
+        'rather than a choice. `UNEMITTED_EVENTS` is the register of events this build declares and ' +
+        'does not emit; it is addressed to whoever wires the next one and is asserted in both ' +
+        'directions by `telemetry/schema.test.ts`, never drawn.',
+      ids: [
+        'everyday/telemetryPort.ts#everydayTelemetry',
+        'telemetry/consent.ts#clearConsent',
+        'telemetry/consent.ts#grantConsent',
+        'telemetry/consent.ts#readConsent',
+        'telemetry/consent.ts#refuseConsent',
+        'telemetry/consent.ts#withdrawConsent',
+        'telemetry/schema.ts#UNEMITTED_EVENTS',
+      ],
+    },
+    {
+      reason:
         'The wrinkle library’s parser, its load-time rotation check and § 17’s content gate — ' +
         'GitHub issue #159. Every literal in these is addressed to whoever edited ' +
         '`data/wrinkles.json` or to whoever ran the gate: a load-time refusal naming the rule the ' +
@@ -1090,6 +1114,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * with the rest of that mount's copy.
          */
         'menu/types.ts#MENU_SCREENS',
+        /*
+         * Telemetry's own vocabularies and its one storage key — GitHub issue #340. All three are
+         * derived by the two-adjacent-words scanner and none is a sentence: `under-budget` is one
+         * member of `batch/report.ts#BatchVerdict`, `fixit-repair` is one of the five control kinds
+         * `docs/26` § 7.4 asks a `change_made` event to carry, and `elevator-sim.telemetry` is a
+         * `localStorage` key with a dot in it. What a player reads about any of this is
+         * `telemetry/consentView.ts`'s ask and settings row, which the `TELEMETRY_CONSENT` adapter
+         * drives over all four consent states and both storage arms.
+         */
+        'telemetry/schema.ts#BATCH_VERDICT_KINDS',
+        'telemetry/schema.ts#CONTROL_KEYS',
+        'telemetry/consent.ts#CONSENT_KEY',
         /*
          * The account screen's shape used to be here — `EMPTY_FORM`, `SIGNED_OUT` and
          * `MAX_DISPLAY_NAME` — and it is gone rather than moved.

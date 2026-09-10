@@ -83,6 +83,9 @@ import { postRunViewOf } from './postRun.js';
 import type { EverydayPostOutcome } from './host.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayScreenModule } from './screens.js';
+/* GitHub issue #340: beat 5's event and the refusal counter. A no-op without consent. */
+import { everydayTelemetry } from './telemetryPort.js';
+import type { ShapedDayReport } from '../shift/report.js';
 import type { EverydayState } from './types.js';
 import {
   BODY,
@@ -113,6 +116,16 @@ import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.
  * which is that module's stated rule and the reason it is not `ViewerState`'s to hold.
  */
 let continuity: SheetContinuity = NOTHING_FILED_YET;
+
+/**
+ * The last report whose verdict was filed as drawn — GitHub issue #340, `docs/26` § 7.2 E6.
+ *
+ * Module scope beside {@link continuity}, for that constant's own reason and one of its own: this
+ * screen is mounted and unmounted every time a player walks away and back, and the verdict they are
+ * looking at on the second visit is the one they were looking at on the first. A new run replaces
+ * the object, which is the signal — the same `!==` the shell watches a recording by.
+ */
+let verdictFiled: ShapedDayReport | undefined;
 
 /**
  * The Engineer tab strip's own words for the panels a lever can route to.
@@ -289,6 +302,55 @@ function mountReportScreen(
      * wrong*.
      */
     verdict.style.cssText = `font:700 15px ${TYPE.heading};margin-top:9px;color:${sheet.verdictColour}`;
+    /*
+     * § 7.2 E6 and § 7.3 E9 — `verdict_shown` and `refusal_shown`, GitHub issue #340.
+     *
+     * **Emitted where the words are appended, and classified from the report rather than from the
+     * view.** P-5: *"Every classification an event carries is read from the shipped surface's own
+     * classification, not recomputed."* The view that reaches this function has already flattened
+     * both classifications away — `ReportView` carries `verdictLine` and `verdictColour` but not
+     * the `cleared | missed | ungraded` token, and `FigureView` carries a class list but not
+     * `ReportFigure.tone` — so a line here that read the DOM's own classes would be recomputing a
+     * classification from its presentation, which is the shape P-5 forbids. The report is asked
+     * instead, and it is the same object this view was built from one function up.
+     *
+     * `verdict_shown`, not `verdict_read`: § 7.2 is explicit that whether a player read anything is
+     * not observable and a field claiming it *"would be the first false thing in the schema"*. What
+     * this says is that a verdict was drawn to a visible document.
+     *
+     * **Every figure's tone, including the ones that are not refusals.** § 7.3's question is *which
+     * refusals do players actually meet*, and the honest denominator for that is every figure drawn
+     * — a `withheld` count with no `plain` count beside it is a rate with no denominator. § D106's
+     * `unranked` travels for the same reason and is emphatically not a refusal.
+     */
+    const drawn = context.host.lastReport();
+    /*
+     * **Once per report, by object identity** — and this guard is not optional bookkeeping.
+     * `render()` is subscribed to every host notification, so an unguarded line here would emit a
+     * verdict and every figure again on each one, filling a session's whole budget from one screen
+     * and doing it while the player sat still. Identity is the right key rather than a boolean: a
+     * new run produces a new report object, and § 7.5's own worked session shows **two**
+     * `verdict_shown` events — the chain completes on the second, after the change — so a latch
+     * that fired once per session would make `docs/26 K2` unmeasurable.
+     *
+     * Module scope, like the stage's own once-a-session latch and for the same reason: a player who
+     * walks off the report and back is looking at the same drawn verdict.
+     */
+    if (drawn !== undefined && drawn !== verdictFiled) {
+      verdictFiled = drawn;
+      const telemetry = everydayTelemetry();
+      telemetry.record({
+        name: 'verdict_shown',
+        verdictKind: drawn.verdict,
+        refusalGround:
+          drawn.figures.find((figure) => figure.suppressionGround !== undefined)?.suppressionGround ??
+          null,
+        screenKey: 'report',
+      });
+      for (const figure of drawn.figures) {
+        telemetry.record({ name: 'refusal_shown', refusalKind: figure.tone, screenKey: 'report' });
+      }
+    }
     const lede = el(doc, 'p', 'everyday-report-lede', sheet.lede);
     lede.style.cssText = `${LEDE};margin:12px 0 0`;
     head.append(meta, title, verdict, lede);

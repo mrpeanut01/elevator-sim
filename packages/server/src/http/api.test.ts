@@ -1501,3 +1501,266 @@ describe('POST /api/boards/seed — GitHub issues #222 and #328, § D521 and § 
     }
   }, 600_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * Telemetry — GitHub issue #340
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Two routes, driven end to end against a real database — the acceptance criteria that ask for *a
+ * test that drives an event from emission to storage, and a second that proves retention removes
+ * it*.
+ *
+ * `telemetry/schema.test.ts` is where the allowlist and every refusal live; these are the claims a
+ * unit test structurally cannot make. Storage is asserted through the store rather than through the
+ * response, because a route that answered `202` and wrote nothing would satisfy any assertion made
+ * about a response alone.
+ */
+describe('telemetry', () => {
+  const SESSION = 'f'.repeat(32);
+
+  /** A batch of one player's events. The id shape is § 3.1's: 32 lower-case hex characters. */
+  function batchFor(playerId: string, events: readonly unknown[]): unknown {
+    return { schemaVersion: 1, buildId: 'testbuild1', playerId, sessionId: SESSION, events };
+  }
+
+  const RUN_POINTER = {
+    buildingId: 'garden-apartments',
+    dispatcherProfileId: 'collective',
+    demandTemplateId: 'rise-and-fall',
+    arrivalRatePctPop5min: 6,
+    durationS: 900,
+    windowStartS: null,
+    seed: '20260910',
+  };
+
+  it('carries a session from the first event to a stored row, with the fields it arrived with', async () => {
+    const player = `${'1'.repeat(28)}0001`;
+    expect(await server.store.telemetryEventCount(player)).toBe(0);
+
+    // § 7.5's own example, shortened: the beats a first session emits, in one flush.
+    const posted = await call('POST', '/api/telemetry', {
+      body: batchFor(player, [
+        { name: 'session_start', atMs: 0, entryScreenKey: 'menu' },
+        { name: 'cold_load', atMs: 900, msToInteractive: 2_100 },
+        { name: 'screen_entered', atMs: 4_300, screenKey: 'stage', fromScreenKey: 'menu' },
+        { name: 'trouble_visible', atMs: 38_200, run: RUN_POINTER, atRunS: 412 },
+        { name: 'verdict_shown', atMs: 138_000, verdictKind: 'cleared', refusalGround: null, screenKey: 'report' },
+        { name: 'session_end', atMs: 402_000, endReason: 'hidden' },
+      ]),
+    });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(202);
+    // The body says the batch was accepted and nothing else — no count, no id, no echo.
+    expect(bodyOf(posted)).toEqual({ ok: true });
+
+    expect(await server.store.telemetryEventCount(player)).toBe(6);
+
+    // And the rows are the events rather than a shape that merely counts. Read with SQL because
+    // there is no read route: § 18 gives the team aggregates and this project has not built them.
+    const rows = await storeSql.query(
+      'SELECT name, at_ms, fields_json, build_id, session_id FROM telemetry_events ' +
+        'WHERE player_id = $1 ORDER BY at_ms ASC',
+      [player],
+    );
+    expect(rows.rows.map((row) => String(row['name']))).toEqual([
+      'session_start',
+      'cold_load',
+      'screen_entered',
+      'trouble_visible',
+      'verdict_shown',
+      'session_end',
+    ]);
+    expect(Number(rows.rows[3]?.['at_ms'])).toBe(38_200);
+    expect(JSON.parse(String(rows.rows[3]?.['fields_json']))).toEqual({ run: RUN_POINTER, atRunS: 412 });
+    expect(String(rows.rows[0]?.['build_id'])).toBe('testbuild1');
+    expect(String(rows.rows[0]?.['session_id'])).toBe(SESSION);
+  });
+
+  it('never writes an account id, an address or a caller, whatever the request carries', async () => {
+    // `docs/26` § 3.2 as a run. The request is made **while signed in**, with the bearer token set
+    // and a fixed caller address, and none of the three reaches the row: the route reads no token,
+    // the schema has no field for an account, and `clientIp` reaches only the limiter.
+    const account = await signIn();
+    const player = `${'2'.repeat(28)}0002`;
+    const posted = await call('POST', '/api/telemetry', {
+      token: account.token,
+      ip: '203.0.113.7',
+      body: batchFor(player, [{ name: 'session_start', atMs: 0, entryScreenKey: 'menu' }]),
+    });
+    expect(posted.status).toBe(202);
+
+    const rows = await storeSql.query('SELECT * FROM telemetry_events WHERE player_id = $1', [player]);
+    const stored = JSON.stringify(rows.rows);
+    expect(stored).not.toContain(account.id);
+    expect(stored).not.toContain(account.email);
+    expect(stored).not.toContain(account.token);
+    expect(stored).not.toContain('203.0.113.7');
+    // And the columns themselves, so that assertion cannot pass merely because the values happened
+    // to be absent: there is no column an account could arrive in.
+    expect(Object.keys(rows.rows[0] ?? {}).sort()).toEqual([
+      'at_ms',
+      'build_id',
+      'fields_json',
+      'id',
+      'name',
+      'player_id',
+      'received_at_ms',
+      'session_id',
+    ]);
+  });
+
+  it('refuses a batch the schema does not accept, and stores none of it', async () => {
+    const player = `${'3'.repeat(28)}0003`;
+    const refused = await call('POST', '/api/telemetry', {
+      body: batchFor(player, [
+        { name: 'session_start', atMs: 0, entryScreenKey: 'menu' },
+        { name: 'session_start', atMs: 100, entryScreenKey: 'menu', note: 'I got stuck on floor 3' },
+      ]),
+    });
+    expect(refused.status).toBe(400);
+    expect(bodyOf(refused)['error']).toBe('invalid-batch');
+    // The whole batch, including the event that was fine. Accepting the good half would let a
+    // client's idea of the schema and the server's diverge without either finding out.
+    expect(await server.store.telemetryEventCount(player)).toBe(0);
+  });
+
+  it('forgets one player and touches nobody else, and says nothing about an account', async () => {
+    const kept = `${'4'.repeat(28)}0004`;
+    const going = `${'5'.repeat(28)}0005`;
+    for (const player of [kept, going]) {
+      const posted = await call('POST', '/api/telemetry', {
+        body: batchFor(player, [{ name: 'session_start', atMs: 0, entryScreenKey: 'menu' }]),
+      });
+      expect(posted.status).toBe(202);
+    }
+    expect(await server.store.telemetryEventCount(going)).toBe(1);
+
+    const forgotten = await call('POST', '/api/telemetry/forget', { body: { playerId: going } });
+    expect(forgotten.status, JSON.stringify(forgotten.body)).toBe(200);
+    expect(await server.store.telemetryEventCount(going)).toBe(0);
+    expect(await server.store.telemetryEventCount(kept)).toBe(1);
+
+    // The mirror of `DELETE /api/me`'s silence about telemetry: this route claims nothing about the
+    // account store either, because a response speaking for both would assert the join § 3.2 exists
+    // not to hold.
+    expect(String(bodyOf(forgotten)['detail'])).not.toMatch(/address|email|board|leaderboard/iu);
+  });
+
+  it('answers an id it has never seen exactly as it answers one it has just cleared', async () => {
+    // § 18.2's R-3 requirement one route early: an answer that differed would make this an oracle
+    // for whether an id exists, which is the lookup this design must not offer.
+    const seen = `${'6'.repeat(28)}0006`;
+    await call('POST', '/api/telemetry', {
+      body: batchFor(seen, [{ name: 'session_start', atMs: 0, entryScreenKey: 'menu' }]),
+    });
+    const cleared = await call('POST', '/api/telemetry/forget', { body: { playerId: seen } });
+    const unknown = await call('POST', '/api/telemetry/forget', {
+      body: { playerId: `${'7'.repeat(28)}0007` },
+    });
+    expect(unknown.status).toBe(cleared.status);
+    expect(JSON.stringify(unknown.body)).toBe(JSON.stringify(cleared.body));
+  });
+
+  it('refuses a `playerId` that is not 128 bits of hex', async () => {
+    for (const playerId of ['', 'ada@example.test', 'A'.repeat(32), 'a'.repeat(31)]) {
+      const refused = await call('POST', '/api/telemetry/forget', { body: { playerId } });
+      expect(refused.status, playerId).toBe(400);
+    }
+  });
+
+  it('sweeps a row past the ninety-day horizon on the next ingest, and keeps a fresh one', async () => {
+    const old = `${'8'.repeat(28)}0008`;
+    const fresh = `${'9'.repeat(28)}0009`;
+    const posted = await call('POST', '/api/telemetry', {
+      body: batchFor(old, [{ name: 'session_start', atMs: 0, entryScreenKey: 'menu' }]),
+    });
+    expect(posted.status).toBe(202);
+    expect(await server.store.telemetryEventCount(old)).toBe(1);
+
+    // Ninety days and a second. The clock is injected, so this is the horizon rather than a wait.
+    clock += 90 * 24 * 60 * 60 * 1000 + 1_000;
+
+    // Sweep-on-write: any ingest at all sweeps, so a second player's first event removes the first
+    // player's expired one. The fresh row is what says the sweep is bounded by the horizon rather
+    // than emptying the table.
+    const second = await call('POST', '/api/telemetry', {
+      body: batchFor(fresh, [{ name: 'session_start', atMs: 0, entryScreenKey: 'menu' }]),
+    });
+    expect(second.status).toBe(202);
+    expect(await server.store.telemetryEventCount(old)).toBe(0);
+    expect(await server.store.telemetryEventCount(fresh)).toBe(1);
+  });
+
+  it('sweeps at boot too, which is what closes sweep-on-write’s stated failure mode', async () => {
+    // § 5.2 names the hole out loud: a deployment nobody sends telemetry to never sweeps. This case
+    // is that deployment — one batch, then nothing for a quarter, then a restart. Its own database,
+    // because it advances a clock nobody else's assertions are reading.
+    const sql = new PgliteSql();
+    let bootClock = 1_800_000_000_000;
+    const mailer = new OutboxMailer(join(scratch, 'telemetry-boot-outbox.jsonl'));
+    const boot = async (): Promise<Server> =>
+      bootstrap({
+        dataDir: DATA_DIR,
+        sql,
+        env: { ELEVATOR_SIM_SECRET: SECRET },
+        publicOrigin: 'https://elevator.example',
+        now: () => bootClock,
+        mailer,
+      });
+    const first = await boot();
+    try {
+      const player = `${'a'.repeat(28)}000a`;
+      const posted = await first.api({
+        method: 'POST',
+        path: '/api/telemetry',
+        query: new Map(),
+        body: batchFor(player, [{ name: 'session_start', atMs: 0, entryScreenKey: 'menu' }]),
+        token: undefined,
+        clientIp: '198.51.100.251',
+      });
+      expect(posted.status, JSON.stringify(posted.body)).toBe(202);
+      expect(await first.store.telemetryEventCount(player)).toBe(1);
+
+      bootClock += 90 * 24 * 60 * 60 * 1000 + 1_000;
+      // Nothing is posted. The only thing that happens is that the container restarts.
+      const restarted = await boot();
+      expect(await restarted.store.telemetryEventCount(player)).toBe(0);
+    } finally {
+      await sql.close();
+    }
+  }, 600_000);
+
+  it('bounds how often one caller may post, and says nothing about the game while refusing', async () => {
+    const player = `${'b'.repeat(28)}000b`;
+    const ip = '203.0.113.99';
+    let refusal: ApiResponse | undefined;
+    for (let n = 0; n < 80 && refusal === undefined; n += 1) {
+      const response = await call('POST', '/api/telemetry', {
+        ip,
+        body: batchFor(player, [{ name: 'session_start', atMs: 0, entryScreenKey: 'menu' }]),
+      });
+      if (response.status === 429) refusal = response;
+    }
+    expect(refusal, 'the caller budget never bound').toBeDefined();
+    expect(Number(bodyOf(refusal as ApiResponse)['retryAfterMs'])).toBeGreaterThan(0);
+    // `docs/26 P-6`: the refusal is about this endpoint and nothing a player can see.
+    expect(String(bodyOf(refusal as ApiResponse)['detail'])).toMatch(/Nothing about the game is affected/u);
+  });
+
+  it('shares that budget across both telemetry routes, so alternating does not double it', async () => {
+    const ip = '203.0.113.98';
+    const player = `${'c'.repeat(28)}000c`;
+    let refused = false;
+    for (let n = 0; n < 80 && !refused; n += 1) {
+      const response =
+        n % 2 === 0
+          ? await call('POST', '/api/telemetry', {
+              ip,
+              body: batchFor(player, [{ name: 'session_start', atMs: 0, entryScreenKey: 'menu' }]),
+            })
+          : await call('POST', '/api/telemetry/forget', { ip, body: { playerId: player } });
+      refused = response.status === 429;
+    }
+    expect(refused, 'alternating between the two routes escaped the shared budget').toBe(true);
+  });
+});

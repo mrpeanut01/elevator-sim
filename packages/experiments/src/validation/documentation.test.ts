@@ -1075,14 +1075,37 @@ describe('docs/05-roadmap.md § H-ACCESS-1 — the withdrawn coverage table is t
  * ## The lesson that shaped this file, and it is not "assert the command"
  *
  * S1's cell quoted a `grep -ril telemetry` over every package's `src`, and said the answer was
- * **0 files**. It is
- * **2** now — `server/src/http/api.ts` and its test, both of which exist to say *there is no
- * telemetry in this tree*. The claim never moved; the command did, because a word grep matches the
- * word used to **deny** the thing.
+ * **0 files**. It became **2** — `server/src/http/api.ts` and its test, both of which existed to
+ * say *there is no telemetry in this tree*. The claim never moved; the command did, because a word
+ * grep matches the word used to **deny** the thing.
  *
  * So the assertions below are written against **what each cell claims**, not against the literal
- * output of the command it quotes. For S1 that means stripping comments and string literals before
- * looking, which is the difference between an instrument and a tripwire.
+ * output of the command it quotes. That is the difference between an instrument and a tripwire, and
+ * it is why S1's case survived the day the claim itself reversed.
+ *
+ * ## S1's claim reversed on 2026-09-10, and this file's case was rewritten rather than deleted
+ *
+ * GitHub issue #340 built the instrument `docs/26-telemetry-and-privacy.md` had specified and left
+ * unbuilt. The case below used to assert **no** telemetry in code, in both directions, and its own
+ * failure message named the two ways out: *"Either the charter cell moves, or they do."* The charter
+ * cell moved. Two things about that are worth stating rather than leaving in a diff:
+ *
+ * - **The guard was edited on purpose and in the open, on the same commit as the code it stopped
+ *   guarding.** `CLAUDE.md`'s standing rule is that a gate is moved openly or not at all, and the
+ *   evasion this guard exists to catch is the other one: renaming a module so the scan stops
+ *   matching. Nothing here was renamed — `packages/viz/src/telemetry/` and
+ *   `packages/server/src/telemetry/` are named exactly that.
+ * - **The case did not become weaker, it changed subject.** It asserted an absence and now asserts a
+ *   presence, in the same two directions and with the same strippers: the tree really does hold a
+ *   client that emits, a route that receives and a table that stores, *in code rather than in
+ *   prose*, and the charter cell really does say the instrument exists. An assertion that had merely
+ *   been deleted would have left both halves free to drift, which is what happened to four rows of
+ *   this table before § D369.
+ *
+ * **What is deliberately not asserted here is that S1 to S4 are *met*.** The cells say
+ * *instrumented and unevaluated*, which is S8's own distinction, and nothing in this file may
+ * upgrade one: § 4's own rule is that no criterion is reported as met before its instrument exists,
+ * and the converse — an instrument is not a measurement — is the half a gate is most likely to blur.
  *
  * ## Both directions, per cell
  *
@@ -1133,35 +1156,116 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
     return found;
   };
 
-  it('S1–S4 — no telemetry in the tree, asked of code rather than of the word', () => {
-    const packages = join(ROOT, 'packages');
-    const naming = sourceFilesUnder(packages)
+  it('S1–S4 — the instrument exists in code rather than in prose, and the cell says so', () => {
+    /*
+     * **Non-test code only, and this exclusion is S1's own lesson arriving one level up.**
+     *
+     * A test file naming telemetry proves nothing about the product either way: when this case
+     * asserted an absence, its own title tripped it; now that it asserts a presence, a test suite
+     * would satisfy it without a shipped line existing. An instrument is non-test code by this
+     * repository's own standing rule, so that is what is looked at.
+     *
+     * Comments and string literals are stripped for the same reason they always were — the file
+     * that says *there is no telemetry here* must not read as telemetry — and it matters more in
+     * this direction, not less: prose about a subsystem is the cheapest possible way to fake one.
+     */
+    const naming = sourceFilesUnder(join(ROOT, 'packages'))
       .filter((path) => path.includes(`${sep}src${sep}`))
-      /*
-       * **Non-test code only, and this exclusion is S1's own lesson arriving one level up.**
-       *
-       * The first run of this case failed on exactly one file: *this* one, because the title string
-       * of the case below names telemetry in order to say there is none. That is the same shape as
-       * the two `server/src/http/api.ts` hits the charter cell now records — a word appearing in
-       * service of denying the thing.
-       *
-       * Excluding tests is principled rather than convenient: the charter's claim is that the tree
-       * holds no telemetry **instrument**, and an instrument is non-test code by this repository's
-       * own standing rule. A real one would still be caught, because the module it lives in is not
-       * a test.
-       */
       .filter((path) => !path.endsWith('.test.ts') && !path.endsWith('.test-helper.ts'))
-      .filter((path) => /telemetry|analytics|\bfunnel\b/iu.test(code(readFileSync(path, 'utf8'))))
-      .map((path) => path.slice(ROOT.length));
+      .filter((path) => /telemetry/iu.test(code(readFileSync(path, 'utf8'))))
+      .map((path) => path.slice(ROOT.length).split(sep).join('/'));
 
+    /*
+     * **The four parts of an instrument**, each named by the file that has to hold it. A funnel
+     * with no route is a client shouting into nothing; a route with no table receives and forgets;
+     * and a table nobody emits into is the dashboard-over-an-empty-source #340 was filed about.
+     *
+     * **The paths are assembled from segments rather than written out**, and the reason is a rule
+     * one directory up rather than a style: `boundaries.test.ts` reads this package's sources for
+     * the literal `packages/viz` and calls one a dependency of `experiments` on `viz` — `CLAUDE.md`
+     * invariant 6, which forbids exactly that. Its own comment says the check is *"import
+     * specifiers and package names only"* and it cannot tell a specifier from a path in a test's
+     * expectation, so this file already builds every `viz` path the same way (see the campaign
+     * directory in S5's case). Joining here keeps that check able to see a real import.
+     */
+    const path = (...segments: readonly string[]): string => segments.join('/');
+    for (const [half, file] of [
+      ['the client that composes the events', path('packages', 'viz', 'src', 'telemetry', 'schema.ts')],
+      ['the client that emits them from the player’s screens', path('packages', 'viz', 'src', 'everyday', 'shell.ts')],
+      ['the schema the route gates on', path('packages', 'server', 'src', 'telemetry', 'schema.ts')],
+      ['the store that holds them', path('packages', 'server', 'src', 'store', 'store.ts')],
+    ] as const) {
+      expect(
+        naming,
+        `S1–S4 claim an instrument and ${half} does not name one in code. Either it moved, or the ` +
+          'charter cell has to move back.',
+      ).toContain(file);
+    }
+
+    /*
+     * The route and the table, by name and in code. A `telemetry` mention in `api.ts` was what the
+     * *old* claim tolerated — two files that existed to say there was none — so a case asserting
+     * the new claim has to look for the thing itself rather than for the word.
+     *
+     * **Read raw, and that exception is the point rather than a shortcut.** A route *is* a string
+     * literal — `case 'POST /api/telemetry':` — so the stripper that protects the check above would
+     * erase the subject of this one. Comments still go, so a docstring describing a route this
+     * server does not serve cannot satisfy it.
+     */
+    const api = readFileSync(join(ROOT, 'packages', 'server', 'src', 'http', 'api.ts'), 'utf8').replace(
+      /\/\*[\s\S]*?\*\//gu,
+      ' ',
+    );
+    /*
+     * Quoted whole, both of them. `/POST \/api\/telemetry/` alone is satisfied by the *forget*
+     * route, so a tree that had lost ingest and kept deletion would pass — which this case caught
+     * when its own positive control removed the ingest route and nothing went red.
+     */
+    expect(api, 'no ingest route').toMatch(/'POST \/api\/telemetry'/u);
+    expect(api, 'no deletion route beside it — `docs/26` § 3.3’s second request').toMatch(
+      /'POST \/api\/telemetry\/forget'/u,
+    );
+    const store = readFileSync(join(ROOT, 'packages', 'server', 'src', 'store', 'store.ts'), 'utf8');
+    expect(store, 'no table to hold an event').toMatch(/CREATE TABLE IF NOT EXISTS telemetry_events/u);
+
+    // The other direction: the cell must be making the claim this case pins, and must not have
+    // quietly kept the retired one beside it.
+    const table = instrumentTable();
+    expect(table).toMatch(/S1 \| \*\*Yes — and unevaluated\*\*/u);
     expect(
-      naming,
-      'the charter says S1–S4 have no instrument — no funnel, no event chain, no session record. ' +
-        'These files name one in code rather than in prose. Either the charter cell moves, or they do.',
-    ).toEqual([]);
+      table,
+      'the charter still carries the sentence this instrument retired. A cell that claims both is ' +
+        'the stale refusal `CLAUDE.md` calls the more dangerous half.',
+    ).not.toMatch(/^\| S1 [^\n]*there is now no funnel/u);
+  });
 
-    // The other direction: the cell must still be making the claim this case pins.
-    expect(instrumentTable()).toMatch(/no funnel, no event chain and no session record/u);
+  it('S1–S4 — positive control: the scan reads code and not prose', () => {
+    /*
+     * Both strippers, driven. Without this the case above passes on a scan that matches anything:
+     * a comment naming telemetry would satisfy it, and *a comment naming telemetry* is precisely
+     * what the two `api.ts` hits were before #340 — the word used to deny the thing.
+     */
+    expect(code('/* telemetry lives here one day */\nexport const x = 1;\n')).not.toMatch(/telemetry/u);
+    expect(code("export const note = 'telemetry';\n")).not.toMatch(/telemetry/u);
+    expect(code('export const telemetryPort = 1;\n')).toMatch(/telemetry/u);
+  });
+
+  it('S1–S4 — an instrument is not a measurement, and the cell may not say it is', () => {
+    /*
+     * The one upgrade this table is most likely to make by accident. § 4's rule runs one way —
+     * *no criterion may be reported as met before its instrument exists* — and the converse is the
+     * half that has no rule written for it: an instrument that exists is not a cohort that has been
+     * measured. S8 is the only row entitled to say *met*, and it says why in its own cell.
+     */
+    const table = instrumentTable();
+    for (const criterion of ['S1', 'S2', 'S3', 'S4'] as const) {
+      const row = new RegExp(`^\\| ${criterion} \\|([^\n]*)$`, 'mu').exec(table)?.[1] ?? '';
+      expect(row, `${criterion} has no row in the form this case reads`).not.toBe('');
+      expect(row, `${criterion} reports itself met; it is instrumented and unevaluated`).not.toMatch(
+        /currently met|and met\b/u,
+      );
+      expect(row).toMatch(/unevaluated/u);
+    }
   });
 
   it('S5 — the stage count the cell publishes is the stage count the campaign ships', () => {

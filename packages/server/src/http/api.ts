@@ -95,6 +95,7 @@ import { boardDistributionOf, type AxisObservation } from '../leaderboard/distri
 import { submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
 import { seedDailyBoard } from '../leaderboard/seed.js';
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
+import { ID_PATTERN, batchIssues, type TelemetryBatch } from '../telemetry/schema.js';
 import {
   BOARD_METRICS,
   NoSuchUserError,
@@ -284,6 +285,34 @@ const LINKS_PER_EMAIL = { maxRequests: 10, windowMs: LOGIN_TTL_MS } as const;
  */
 const LINKS_PER_CALLER = { maxRequests: 30, windowMs: LOGIN_TTL_MS } as const;
 
+/**
+ * How many telemetry requests one **caller** may make in a quarter of an hour — GitHub issue #340.
+ *
+ * ## Why there is a number here at all
+ *
+ * The route is unauthenticated by design (`docs/26` § 8), so the only thing between it and an
+ * unbounded write loop is this. A batch is capped at sixty-four events and the body at
+ * {@link MAX_BODY_BYTES}, so this bounds the third dimension — how often.
+ *
+ * ## Why sixty
+ *
+ * `docs/26` § 8 requires the client to **batch per session and flush on `visibilitychange` and at a
+ * declared interval, never per event**, because the container runs at `minReplicas: 0` and a cold
+ * start on this deployment has been measured at 28.7 s and 32.2 s. An honest client therefore
+ * sends single figures of requests per session. Sixty in fifteen minutes is far above that and far
+ * below anything that looks like a loop — and it is *per caller*, so a shared office behind one
+ * address has room for a dozen people playing at once.
+ *
+ * The window matches {@link LINKS_PER_EMAIL}'s and {@link LINKS_PER_CALLER}'s, which is not a
+ * coincidence worth removing: three budgets on one window is one thing to reason about rather than
+ * three, and nothing here needs a different one.
+ *
+ * **A refusal costs the player nothing**, which is what makes this safe to set at all. § 8: *"treat
+ * total failure as normal"* — a dropped batch is a data point lost, § 9.2 already accounts for it,
+ * and `docs/26 P-6` means no screen behaves differently because of it.
+ */
+const TELEMETRY_PER_CALLER = { maxRequests: 60, windowMs: LOGIN_TTL_MS } as const;
+
 export function createApi(deps: ApiDeps): Api {
   /**
    * Per account, the earliest moment the next verification may start.
@@ -295,6 +324,16 @@ export function createApi(deps: ApiDeps): Api {
   const nextSubmitMs = new Map<string, number>();
   const linksPerEmail = new FixedWindowLimiter(LINKS_PER_EMAIL);
   const linksPerCaller = new FixedWindowLimiter(LINKS_PER_CALLER);
+  /*
+   * One budget across both telemetry routes, keyed on the caller — GitHub issue #340.
+   *
+   * Shared rather than one each, for {@link nextSubmitMs}'s reason: a caller alternating between
+   * two routes must not be able to double the load by doing so. Keyed on `clientIp` and never on
+   * the `playerId`, which is the whole point — a per-player budget would make an unauthenticated
+   * route bounded by a value the caller chooses, and would additionally require the limiter to
+   * remember which players exist, which is state § 3 does not want held.
+   */
+  const telemetryPerCaller = new FixedWindowLimiter(TELEMETRY_PER_CALLER);
   return async function handle(request: ApiRequest): Promise<ApiResponse> {
     const route = `${request.method} ${request.path}`;
     switch (route) {
@@ -366,6 +405,22 @@ export function createApi(deps: ApiDeps): Api {
         return submitChallenge(deps, request, nextSubmitMs);
       case 'GET /api/challenge-board':
         return challengeBoard(deps, request);
+      /*
+       * Telemetry — GitHub issue #340, `docs/26-telemetry-and-privacy.md` § 8.
+       *
+       * **Two routes, and both are outside the account API on purpose.** Neither reads
+       * `request.token`, neither calls {@link authenticate}, and neither takes any argument that
+       * could name an account. § 3.2: with no account id on the row and no bearer token on the
+       * request, the join between a behavioural record and an address does not exist to be made.
+       *
+       * `POST /api/telemetry` is ingest. `POST /api/telemetry/forget` is § 3.3's **second
+       * request** — the one a client sends beside `DELETE /api/me` while it holds both keys, so
+       * that the server never has to.
+       */
+      case 'POST /api/telemetry':
+        return ingestTelemetry(deps, request, telemetryPerCaller);
+      case 'POST /api/telemetry/forget':
+        return forgetTelemetry(deps, request, telemetryPerCaller);
       default:
         return { status: 404, body: { error: 'no-such-route', detail: `Nothing is served at ${route}.` } };
     }
@@ -739,9 +794,17 @@ async function me(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
  * client holds both keys at that moment and the server never has to hold the join. So this route
  * deletes the account and every table that cascades off it — four today, and read out of
  * `pg_constraint` by `store.test.ts` rather than counted anywhere — and **claims nothing about the
- * other store**. There is no telemetry in this tree yet (§ 0, fact 1), so the second request has no
- * endpoint to reach today; when it does, it is a second route rather than a second branch of this
- * one, or the join this design exists to avoid would be back.
+ * other store**.
+ *
+ * **That second request now exists, and it is {@link forgetTelemetry} — a second route rather than
+ * a second branch of this one** (GitHub issue #340). This paragraph used to end *"there is no
+ * telemetry in this tree yet (§ 0, fact 1), so the second request has no endpoint to reach
+ * today"*, and that sentence is corrected rather than deleted, because it was the reason the
+ * design looked incomplete and a reader who remembers it should be able to see what closed it.
+ * What has **not** changed is anything this route says or does: it still takes no `playerId`, it
+ * still answers with no mention of telemetry, and `api.test.ts` still asserts that its response
+ * says nothing about the other store. A route that spoke for both would be asserting exactly the
+ * join § 3.2 exists not to hold.
  *
  * ## What is deliberately not cleared, which is the half worth arguing
  *
@@ -1118,6 +1181,154 @@ async function challengeBoard(deps: ApiDeps, request: ApiRequest): Promise<ApiRe
               'data and are on a separate board. They are not shown here, because a run this ' +
               'server can no longer reproduce cannot sit in the same order as one it can.',
           }),
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ telemetry */
+
+/**
+ * Receive a batch of events — `POST /api/telemetry`, GitHub issue #340.
+ *
+ * ## What is *not* in this function, and each absence is the design
+ *
+ * **No {@link authenticate}.** It never reads `request.token`, and there is no branch on which it
+ * could: `docs/26-telemetry-and-privacy.md` § 3.2 says a telemetry request never carries a session
+ * token, because sending one would create the join the whole identity design exists to prevent.
+ * That is a stronger statement than *we would not look* — there is nothing to look at.
+ *
+ * **No account, no address, and no IP in anything written.** `request.clientIp` reaches exactly one
+ * consumer, the limiter's in-memory key, exactly as it does on the sign-in route. It is never
+ * handed to `Store` (§ 0, fact 3, and telemetry does not change it).
+ *
+ * **No computation.** § 2.1: *"Ingest writes rows and computes nothing."* A run pointer is a seed
+ * and a configuration, and re-deriving a figure from one is an analyst's offline operation, never
+ * work done here — a route that replayed on ingest would put an unauthenticated caller in command
+ * of this server's CPU, which is what `MIN_SUBMIT_INTERVAL_MS` exists to bound on the routes that
+ * do simulate.
+ *
+ * ## The order is budget, then shape, then write — the opposite of {@link requestLink}'s
+ *
+ * There the shape check is first because it costs nothing and has no side effect, so a typo is
+ * answered without spending anybody's budget. Here the shape check walks up to sixty-four events,
+ * so it is the expensive part of the request, and a caller that could fail it repeatedly for free
+ * would have found a way to spend this process's CPU without ever being counted.
+ *
+ * ## What a refusal says, and what it costs the player
+ *
+ * `400` with the issues, so a client that is one field out is told which field rather than being
+ * told *no*. **Nothing a player sees depends on the answer** — `docs/26 P-6`, and § 8's *"treat
+ * total failure as normal"* — which is what makes this route free to be strict.
+ */
+async function ingestTelemetry(
+  deps: ApiDeps,
+  request: ApiRequest,
+  limiter: FixedWindowLimiter,
+): Promise<ApiResponse> {
+  const retryMs = limiter.charge(request.clientIp ?? 'unattributed', deps.now());
+  if (retryMs !== undefined) return tooMuchTelemetry(retryMs);
+
+  const issues = batchIssues(request.body);
+  if (issues.length > 0) return { status: 400, body: { error: 'invalid-batch', issues } };
+
+  const batch = request.body as TelemetryBatch;
+  const receivedAtMs = deps.now();
+  await deps.store.recordTelemetry(
+    batch.events.map((event) => {
+      const { name, atMs, ...fields } = event;
+      return {
+        playerId: batch.playerId,
+        sessionId: batch.sessionId,
+        buildId: batch.buildId,
+        name,
+        atMs,
+        fields,
+        receivedAtMs,
+      };
+    }),
+  );
+  /*
+   * `202`, and the body says only that the batch was accepted. Not a count, not an id, not an echo
+   * of what arrived: a response describing the batch would be a second copy of it travelling back
+   * to a caller that already has it, and an id would be a handle to a row § 18 gives nobody a route
+   * to read.
+   */
+  return { status: 202, body: { ok: true } };
+}
+
+/**
+ * Delete every event for one `playerId` — `POST /api/telemetry/forget`, GitHub issue #340.
+ *
+ * ## This is the second of `docs/26` § 3.3's two requests
+ *
+ * A player pressing *delete my data* while signed in sends **two independent requests**: `DELETE
+ * /api/me`, authenticated by the session token, which deletes the account; and this one, carrying
+ * the `playerId`, which deletes the telemetry. The server sees two deletions and no relationship
+ * between them, because the client holds both keys at that moment and the server never has to.
+ * Signed out, only this one fires, and it is enough — § 3.2 means the telemetry never referenced
+ * the account anyway.
+ *
+ * It is also § 4.3's withdrawal, which **deletes rather than stops**: turning the setting off sends
+ * exactly this request and then clears the local slot.
+ *
+ * ## Unauthenticated, and what that does and does not expose
+ *
+ * The `playerId` is the only key and there is nothing else it could be: 128 bits from
+ * `crypto.getRandomValues`, held in one `localStorage` slot on one device, derived from nothing
+ * about the person. So the worst a caller who is not its owner can do is delete rows belonging to
+ * an id they would first have to guess — 2^128 of them — and what they would achieve by guessing is
+ * *less data collected*, which is the direction this posture already prefers. Requiring a
+ * credential to be forgotten would mean minting one, and a credential for erasure is a second
+ * identifier that outlives the first.
+ *
+ * **An unknown id and an id with no rows answer identically**, which is § 18.2's R-3 requirement
+ * arriving one route early: an answer that differed would make this an oracle for whether an id
+ * exists. The response therefore says nothing about how many rows there were.
+ */
+async function forgetTelemetry(
+  deps: ApiDeps,
+  request: ApiRequest,
+  limiter: FixedWindowLimiter,
+): Promise<ApiResponse> {
+  const retryMs = limiter.charge(request.clientIp ?? 'unattributed', deps.now());
+  if (retryMs !== undefined) return tooMuchTelemetry(retryMs);
+
+  const body = request.body as Partial<Record<'playerId', unknown>> | null;
+  const playerId = typeof body?.playerId === 'string' ? body.playerId : '';
+  if (!ID_PATTERN.test(playerId)) {
+    return {
+      status: 400,
+      body: {
+        error: 'invalid-player-id',
+        issues: ['playerId must be 32 lower-case hexadecimal characters'],
+      },
+    };
+  }
+  await deps.store.forgetTelemetry(playerId);
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      /*
+       * What was removed, in the player's own words and **without claiming anything about the other
+       * store** — the mirror of `DELETE /api/me`'s silence about this one (§ 3.3). It also does not
+       * say how many rows there were, which is what keeps the two answers identical.
+       */
+      detail:
+        'Anything recorded about how this browser was playing has been deleted. Nothing about an ' +
+        'account is touched by this: that is a separate request.',
+    },
+  };
+}
+
+/** The refusal both telemetry routes share, carrying the wait a caller can act on. */
+function tooMuchTelemetry(retryMs: number): ApiResponse {
+  return {
+    status: 429,
+    body: {
+      error: 'too-many-requests',
+      retryAfterMs: retryMs,
+      detail: 'That is more requests than this endpoint accepts. Nothing about the game is affected.',
     },
   };
 }

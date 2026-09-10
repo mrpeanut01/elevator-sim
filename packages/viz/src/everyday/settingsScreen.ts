@@ -77,6 +77,7 @@ import { engineerSettings, onEngineerSettingsProvided } from './engineerBridge.j
 import { DEFAULT_EVERYDAY_PROFILE } from './profile.js';
 import { everydayCareerStore } from './careerStore.js';
 import { everydayProfileStore } from './profileStore.js';
+import { everydayTelemetry } from './telemetryPort.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
 import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
 import { settingsScreenViewOf, type SettingsScreenView } from './settingsView.js';
@@ -177,6 +178,17 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   let durable: boolean | undefined;
   /** Where *Clear saved progress* is in its two-press arc — GitHub issue #229. */
   let clearStage: 'ready' | 'armed' | 'cleared' = 'ready';
+  /**
+   * The telemetry recorder — GitHub issue #340. The same page-wide instance the shell holds, for
+   * `everydayProfileStore`'s reason one line up: two recorders would be two sessions for one visit.
+   */
+  const telemetry = everydayTelemetry();
+  /**
+   * The last consent write's answer, on {@link durable}'s footing and for the same reason: a
+   * browser that will not keep the answer has to say so, or the row will silently ask again next
+   * time and the player will think they answered.
+   */
+  let telemetryDurable: boolean | undefined;
 
   /**
    * The four account effects, or `undefined` on a build served with no API origin — GitHub issue
@@ -197,6 +209,8 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       clearStage,
       account: everydayAccount(),
       accountServer: actions !== undefined,
+      telemetryConsent: telemetry.consent(),
+      telemetryDurable,
     });
 
   let view = viewNow();
@@ -406,7 +420,16 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   playingRegion.style.cssText = 'display:grid;gap:9px';
   root.append(playingHeading, playingRegion);
 
-  /* ---- THIS DEVICE — statements of fact, never controls ---- */
+  /*
+   * ---- THIS DEVICE — the facts, then the two controls ----
+   *
+   * This heading's comment used to read *statements of fact, never controls*, and it was true of
+   * the section until GitHub issue #229 put the clear row in it. It is corrected rather than
+   * deleted, because the rule it was expressing still holds of the **facts** below and is what
+   * keeps them from growing a button: a statement of fact with a control beside it stops being a
+   * statement. The section now holds two controls, both of which are about this device rather than
+   * about how a run reads — the consent row (#340) and the clear row (#229).
+   */
   const deviceHeading = el(doc, 'div', undefined, view.device.heading);
   deviceHeading.style.cssText = `${EYEBROW};margin:26px 0 10px`;
   const deviceRegion = el(doc, 'div', 'everyday-settings-device');
@@ -440,6 +463,76 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
    * while the Engineer session port is still booting, then `Clear`, then `Press again to clear`,
    * then `Cleared` for the instant before the page reloads.
    */
+  /*
+   * The consent row — GitHub issue #340, `docs/26-telemetry-and-privacy.md` §§ 4.3 and 15.2.
+   *
+   * Rebuilt whole on every press for the clear row's reason: its pill has two faces and its note
+   * has three arms, and a targeted update over four moving strings is four chances to leave one
+   * behind.
+   *
+   * **The press is the only place a withdrawal can start**, which is § 4.3's *"reachable from the
+   * same place as the ask, at any time"* and its stronger half: withdrawal **deletes** rather than
+   * stops, and a pause is not offered because a pause is a state a player has to remember they are
+   * in. So there are exactly two transitions here — off to on is a grant, on to off is a
+   * withdrawal — and no third.
+   */
+  /*
+   * `…-telemetry-row` rather than `…-telemetry`, because the pill inside it is
+   * `everyday-settings-${row.id}` and `row.id` is `telemetry` — the two would have carried the
+   * same class, and a selector meaning *the control* would have matched the box around it. The
+   * browser tier found that by reading a face and getting the whole row's text back.
+   */
+  const telemetryRegion = el(doc, 'div', 'everyday-settings-telemetry-row');
+  function redrawTelemetry(): void {
+    view = viewNow();
+    const row = view.device.telemetry;
+    telemetryRegion.replaceChildren();
+    const box = el(doc, 'div', 'everyday-settings-fact');
+    box.style.cssText = [
+      'display:flex',
+      'align-items:center',
+      'gap:14px',
+      'padding:13px 16px',
+      `border:1px solid ${C.rule}`,
+      `border-radius:${String(ROW_RADIUS_PX)}px`,
+      `background:${C.cardSunk}`,
+    ].join(';');
+    const text = el(doc, 'div');
+    text.style.cssText = 'min-width:0';
+    const label = el(doc, 'div', undefined, row.label);
+    label.style.cssText = 'font-size:14px;font-weight:600';
+    const note = el(doc, 'div', 'everyday-settings-telemetry-note', row.note);
+    note.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px;max-width:64ch`;
+    text.append(label, note);
+    box.append(text);
+
+    const pill = el(doc, 'button', `everyday-settings-${row.id}`, row.value);
+    pill.type = 'button';
+    pill.style.cssText = [
+      'margin-left:auto',
+      'flex:none',
+      'cursor:pointer',
+      `border:1.5px solid ${row.on ? C.sun : C.rule}`,
+      `background:${row.on ? C.sun : C.cardSunk}`,
+      `color:${row.on ? C.ink : C.warmGrey}`,
+      `border-radius:${String(R.pill)}px`,
+      'padding:7px 15px',
+      `font:500 12px ${TYPE.mono}`,
+    ].join(';');
+    pill.addEventListener('click', () => {
+      /*
+       * § 4.3's three steps live in the recorder, in order — stop emitting including anything
+       * queued, send the one deletion request naming the id, clear the local slot — because two of
+       * the three are about a queue and a transport this screen does not have. What is here is the
+       * press and the redraw.
+       */
+      telemetryDurable = row.on ? telemetry.withdraw() : telemetry.grant();
+      redrawTelemetry();
+    });
+    box.append(pill);
+    telemetryRegion.append(box);
+  }
+
   const clearRegion = el(doc, 'div', 'everyday-settings-clear');
   function redrawClear(): void {
     view = viewNow();
@@ -501,6 +594,21 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
         bridge.clearSavedSession();
         store.clear();
         everydayCareerStore().clear();
+        /*
+         * The fourth slot — GitHub issue #340. Named in `CLEAR_PROGRESS_COPY.ready` on this same
+         * commit, which is what the copy's own docstring demands of anything added here.
+         *
+         * **It clears rather than withdraws, and the distinction is the one `armed` promises.**
+         * That row says *nothing is sent anywhere first*, so this press may not make a network
+         * request; a withdrawal does, because § 4.3 requires it to ask the server to delete. So a
+         * player who wants both presses both rows, and what this press leaves behind — rows on a
+         * server that no longer have an id on this device to name them — is the case § 4.3 already
+         * covers: the retention horizon is what eventually deletes them.
+         *
+         * Clearing rather than withdrawing also returns the question to `unasked`, which is right:
+         * a device that has been wiped has not been asked.
+         */
+        telemetry.clear();
         clearStage = 'cleared';
         redrawClear();
         bridge.reloadPage();
@@ -510,7 +618,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     clearRegion.append(row);
   }
 
-  root.append(deviceHeading, deviceRegion, clearRegion);
+  root.append(deviceHeading, deviceRegion, telemetryRegion, clearRegion);
 
   /* ---------------------------------------------------------------- *
    * REPORT A PROBLEM — GitHub issue #245
@@ -999,6 +1107,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
 
   redrawIdentity();
   redrawPlaying();
+  redrawTelemetry();
   redrawClear();
   redrawAccount();
   const stopWaiting = onEngineerSettingsProvided(() => {

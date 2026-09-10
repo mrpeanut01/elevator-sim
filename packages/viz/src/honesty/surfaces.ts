@@ -361,6 +361,8 @@ import { initialState, shiftRunConfigOf, tomorrowFactsOf } from '../dev/state.js
 import { tomorrowBriefingOf } from '../shift/tomorrow.js';
 import { describeQueue, planQueueRow } from '../render/riderQueue.js';
 import { AWT_ID, ENERGY_ID, TTD_ID, WT95_ID, runSummaryFigures, windowClause } from '../render/runSummary.js';
+/* GitHub issue #340's consent surface — the ask and its settings row, both pure. */
+import { consentAskViewOf, consentRowViewOf } from '../telemetry/consentView.js';
 import { goalReport } from '../scenario/goalReport.js';
 import { goalLabel, GOAL_BLOCKER } from '../scenario/goals.js';
 import type { PublishedScenario } from '../scenario/published.js';
@@ -12287,6 +12289,77 @@ const EVERYDAY_WATCHING: SurfaceAdapter = {
   },
 };
 
+/* -------------------------------------------------------------------------- *
+ * The consent ask and its settings row — `docs/26` §§ 4 and 15.2
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The words a player meets when they are asked whether the game may count how it is going — GitHub
+ * issue #340, `telemetry/consentView.ts`.
+ *
+ * **Entering this corpus is a ship condition rather than a nicety.** `docs/26` § 4.1's fifth bullet:
+ * *"Every string it draws goes into `packages/viz/src/honesty/surfaces.ts` before it ships, or
+ * `charter S8` is not met — a surface that renders strings and is absent from the corpus is not
+ * finished."* And § 4.1's fourth bullet is what the corpus then enforces: the ask *"obeys the
+ * charter's non-goal 8: no section number, no filename, no code identifier"*, and may not cite the
+ * document it comes from by path. `internal-notation` is the property that decides that, and it
+ * reaches this adapter because `PLAYER_FACING_DIRECTORIES` names `telemetry/`.
+ *
+ * ## Every state, including the two that draw nothing
+ *
+ * The ask is `undefined` on `granted`, `refused` and `withdrawn` — § 10 non-goal 3's *no repeated
+ * asking after a refusal* — so three of the four arms contribute no ask strings. They are still
+ * driven, because the *row* speaks in all four and the row's note has three arms of its own: the
+ * ordinary one, the withdrawn sentence about the half that can fail, and the one a browser that
+ * refuses storage gets. Seeding only the arm that draws the most would leave two sentences a player
+ * can meet unswept, which is `EVERYDAY_SIGN_IN_LINK`'s own lesson about its settled arm.
+ *
+ * **Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`.** It costs nothing here and
+ * the reason is worth stating rather than inheriting: this adapter seeds a heading, a body, two
+ * button faces and a note, with no figure, no count, no band and no verdict among them, so there is
+ * no wording whose injected fault it could take off another surface wherever it sat.
+ */
+const TELEMETRY_CONSENT: SurfaceAdapter = {
+  id: 'telemetry/consentView.ts#consentAskViewOf',
+  covers: [
+    'telemetry/consentView.ts#consentAskViewOf',
+    'telemetry/consentView.ts#consentRowViewOf',
+    'telemetry/consentView.ts#CONSENT_COPY',
+    'telemetry/consentView.ts#CONSENT_ROW_COPY',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+    for (const state of ['unasked', 'granted', 'refused', 'withdrawn'] as const) {
+      const ask = consentAskViewOf(state);
+      if (ask !== undefined) {
+        seeds.push(
+          { field: `consent.${state}.heading`, text: ask.heading, role: 'label' },
+          { field: `consent.${state}.body`, text: ask.body, role: 'prose' },
+          { field: `consent.${state}.notCollected`, text: ask.notCollected, role: 'prose' },
+          { field: `consent.${state}.no`, text: ask.no, role: 'label' },
+          { field: `consent.${state}.yes`, text: ask.yes, role: 'label' },
+          { field: `consent.${state}.later`, text: ask.later, role: 'prose' },
+        );
+      }
+      /*
+       * Both storage arms on every state. `durable: false` is a browser that will not keep the
+       * answer, which is a state a player can be in on any of the four and draws a different note.
+       */
+      for (const durable of [true, false]) {
+        const row = consentRowViewOf(state, durable);
+        const arm = durable ? 'kept' : 'not-kept';
+        seeds.push(
+          { field: `consent.row.${state}.${arm}.label`, text: row.label, role: 'label' },
+          { field: `consent.row.${state}.${arm}.note`, text: row.note, role: 'prose' },
+          { field: `consent.row.${state}.${arm}.value`, text: row.value, role: 'label' },
+        );
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -12470,11 +12543,17 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    */
   EVERYDAY_TUTORIAL,
   /*
-   * Appended last in turn — GitHub issue #245's report block. The fault-ordering rule is free here
+   * Appended in turn — GitHub issue #245's report block. The fault-ordering rule is free here
    * for the sign-in banner's reason rather than the tutorial's: this adapter seeds no figure, no
    * band and no verdict, so there is no wording whose fault it could take off an earlier surface.
    */
   EVERYDAY_SUPPORT,
+  /*
+   * And last — GitHub issue #340's consent ask and its settings row. The rule costs nothing here
+   * for the reason the adapter's own docstring gives: it seeds no figure, no count, no band and no
+   * verdict, so there is no wording whose fault it could take off another surface.
+   */
+  TELEMETRY_CONSENT,
 ]);
 
 /* -------------------------------------------------------------------------- *
@@ -12498,7 +12577,23 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
  * loosened three times asserts nothing"*, reached by way of a guard that cries about legitimate
  * cases until somebody loosens it to stop the noise.
  */
-const PLAYER_FACING_DIRECTORIES: readonly string[] = Object.freeze(['everyday/', 'campaign/']);
+const PLAYER_FACING_DIRECTORIES: readonly string[] = Object.freeze([
+  'everyday/',
+  'campaign/',
+  /*
+   * `telemetry/` joined on GitHub issue #340, and it is the narrowest of the three: exactly one
+   * module in it renders a string a player reads — `consentView.ts`, the consent ask and its
+   * settings row — and `docs/26` § 4.1 makes that surface's entry into this gate a **ship
+   * condition** rather than a preference, because the ask *"obeys the charter's non-goal 8: no
+   * section number, no filename, no code identifier"* and this is the property that decides it.
+   *
+   * Nothing else under `telemetry/` reaches the gate, and that is a property of the rule rather
+   * than of this list: a surface is player-facing when a declaration it **drives** lives in one of
+   * these directories, and the schema, the consent slot and the recorder are driven by no adapter.
+   * They are classified in `derive.test.ts`'s exclusions with their own reasons.
+   */
+  'telemetry/',
+]);
 
 /**
  * The surface ids whose strings a player reads — **derived from the adapters, never listed.**

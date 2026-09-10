@@ -61,7 +61,7 @@ starting state is a posture about a different repository. Verified 2026-08-24.
 
 | # | Claim | Command / site | Result |
 |---|---|---|---|
-| 1 | **There is no telemetry or analytics code anywhere in this tree** | `grep -ril telemetry packages/*/src --include='*.ts'` and the same for `analytics` | was **0 files** each; `telemetry` is now **2 files / 6 lines**, every one of them prose — see the note below |
+| 1 | ~~**There is no telemetry or analytics code anywhere in this tree**~~ — **closed 2026-09-10**, see below | `grep -ril telemetry packages/*/src --include='*.ts'` and the same for `analytics` | was **0 files** each, then **2 files / 6 lines** of prose; the instrument now exists and the fact is struck |
 | 2 | **The product already stores exactly one piece of personal data** — an email address, for the sign-in link | `users.email` in `packages/server/src/store/store.ts`; `normaliseEmail` is its only writer | one column, one purpose |
 | 3 | **No IP address is persisted anywhere** | `clientIp` reaches exactly one consumer — `limiters.perCaller.charge(...)` in `packages/server/src/http/api.ts` — which is an in-memory `FixedWindowLimiter`. It is never handed to `Store` | never written |
 | 4 | **The server writes no request log** | the only `console.*` calls outside tests are two boot lines and one fatal in `packages/server/src/main.ts` | no access log |
@@ -80,8 +80,14 @@ regex: there is still **no telemetry code, no telemetry route, no telemetry tabl
 event**, which is the claim. The command is left exactly as published, because a measurement whose
 command is retuned until it gives the old answer is the defect this table exists to prevent — the
 honest move is to re-measure and say what moved. `analytics` is still 0 files.
+*(That paragraph is a record of 2026-08-24 and every clause in it is false today; the paragraph
+below says what moved and when.)*
 
-**Fact 6 was the one that was wrong, and it is the one that has since moved.** It is struck through
+**Fact 1 stopped being true on 2026-09-10, and this is what closed it.** GitHub issue #340 built the implementation this document designed: `packages/viz/src/telemetry/` holds the schema, the consent slot, the batching recorder and the ask's words; `packages/viz/src/everyday/` emits § 7's events from the player's own screens; `POST /api/telemetry` and `POST /api/telemetry/forget` receive and erase; and `telemetry_events` holds the rows under § 5.2's sweep, on ingest and at boot. The row above is **struck through rather than rewritten**, on this table's own rule: what § 0 recorded on 2026-08-24 is what was true on 2026-08-24, and a table whose rows are silently rewritten is one nobody can use to date a claim.
+
+**The command is still not retuned, and now it says the opposite thing.** `grep -ril telemetry packages/*/src` returns a directory in each of two packages plus every emitter, and `grep -rin telemetry packages/server/src` no longer finds only comments. The measurement that replaced it is a run rather than a grep: `packages/experiments/src/validation/documentation.test.ts` asks the **code** — comments and string literals stripped — whether the four halves of an instrument exist, and asserts `docs/22-charter.md` § 4's S1 cell against the answer in both directions. That cell now reads *instrumented and unevaluated*, which is the distinction S8 already made and the one this document's § 6.4 insists on: a KPI moving is evidence, never a verdict.
+
+**Fact 6 was the one that was wrong, and it is the one that had already moved.** It is struck through
 rather than deleted, because a measurement table whose rows are silently rewritten when the tree
 changes is a table nobody can use to date a claim: what § 0 recorded on 2026-08-24 is what was true
 on 2026-08-24, and the correction belongs beside it. GitHub issue #254 built the route this document
@@ -342,8 +348,15 @@ authenticated route, the account named by the session token and by nothing else 
 carry — landed for issue #254 (§ 5.3). It deletes the account and the four tables that cascade off
 it, and **says nothing about telemetry in its response**, which is this section's shape rather than
 an omission: a route that spoke for the other store would be claiming exactly the join this design
-exists not to hold. There is no telemetry endpoint to be the second request, because there is no
-telemetry (§ 0, fact 1). When there is one, it is a second route.
+exists not to hold.
+
+**That second request exists as of 2026-09-10** (GitHub issue #340), and it is a second route
+rather than a second branch, as this paragraph said it would have to be: `POST /api/telemetry/forget`
+takes a `playerId` and nothing else, reads no session token, and answers an id it has never seen
+exactly as it answers one it has just cleared. `DELETE /api/me` is unchanged and still says nothing
+about telemetry — `api.test.ts` asserts that in both directions — so the two stores are still
+erased by two requests the server sees no relationship between. The sentence this replaced read
+*"there is no telemetry endpoint to be the second request"*, which was true until that commit.
 
 ### 3.4 `sessionId`
 
@@ -1048,9 +1061,19 @@ prevent.
 - **The recruited cohort itself** — how it is recruited, what it is told, and what it consents to —
   is the playtest programme's (#205), and a recruited cohort's consent is a different conversation
   from an anonymous player's.
-- **Nothing in this document has been built, and no part of it may be reported as an instrument that
-  exists.** Until the code lands, every `charter S1`–`charter S4` claim stays recorded as
-  **unevaluated**, exactly as `RISKS.md` R31 requires.
+- ~~**Nothing in this document has been built, and no part of it may be reported as an instrument that
+  exists.**~~ — **built 2026-09-10** (GitHub issue #340): §§ 3, 4, 5 and 7 are code, and § 8's two routes
+  exist. Struck rather than deleted, on § 0's own rule. **The second half of the sentence is unchanged and
+  is now the whole of it**: every `charter S1`–`charter S4` claim stays recorded as **unevaluated**, because
+  an instrument is not a measurement and no cohort has been recruited. What #340 did *not* build is named
+  in its own report rather than here: `rerun_same_crowd` has no shipped emitter and is registered as such
+  in `telemetry/schema.ts#UNEMITTED_EVENTS`, asserted in both directions; § 6.2's **dwell** is still owed by
+  M2 with the stage, so `docs/26 K1` fires on the stage's own alarm threshold and on no wall-clock dwell;
+  and § 18's read route is unbuilt, which is #250's.
+- **The consent surface may not be turned on until Part B has been reviewed**, and nothing in the code
+  enforces that — a deployment turns it on by serving a build with an API origin tag. The client is
+  built, the words are drafted, and the decision to show them to a person is the product owner's
+  condition on this document's own face.
 - **Part B's own open items are in § 19 and not repeated here**, so that a reader does not have to
   reconcile two registers of the same debt. § 19 is a checklist for a legal reviewer; this section
   is a register of engineering debt, and the two are different audiences.
@@ -1147,7 +1170,7 @@ as published, results as found:
 
 | § 0 fact | Re-measured 2026-09-09 | Moved? |
 |---|---|---|
-| 1 — no telemetry or analytics code | `grep -ril telemetry packages/*/src --include='*.ts'` → **3 files**, all of them a test, a test's regex or a comment saying there is none; `analytics` → **2 files**, both tests. `grep -rin telemetry packages/server/src` → **6 lines**, every one a comment or a test regex | **no** — the claim (*no telemetry code, route, table or event*) holds; the file count moved when `validation/documentation.test.ts` gained the case that asserts it |
+| 1 — no telemetry or analytics code *(refuted 2026-09-10 by GitHub issue #340; the row below is the 2026-09-09 measurement and is left as the dated record it is)* | `grep -ril telemetry packages/*/src --include='*.ts'` → **3 files**, all of them a test, a test's regex or a comment saying there is none; `analytics` → **2 files**, both tests. `grep -rin telemetry packages/server/src` → **6 lines**, every one a comment or a test regex | **no** — the claim (*no telemetry code, route, table or event*) holds; the file count moved when `validation/documentation.test.ts` gained the case that asserts it |
 | 2 — one piece of personal data, an email address | `users.email`; `normaliseEmail` is still its only writer (`store.ts:243`, `:414`, `:441`) | **no** |
 | 3 — no IP address persisted | `clientIp` reaches `limiters.perCaller.charge` (`api.ts:412`) and nothing else; `grep clientIp packages/server/src/store/store.ts` → **nothing** | **no** |
 | 4 — no request log | three `console.*` sites outside tests, all in `main.ts` — two boot lines (`:80`, `:388`) and one fatal (`:407`). None carries a request, an address or a name | **no** |
@@ -1495,7 +1518,7 @@ exist.**
 | Path | Reaches | Does not reach | Exists today? |
 |---|---|---|---|
 | **`DELETE /api/me`** | The account, and by cascade `sessions`, `login_tokens`, `entries`, `challenge_entries` — the set read out of `pg_constraint` rather than out of a list (§ 5.3) | Anything on the device; anything telemetry holds | **The route: yes** (`api.ts:333`). **A screen that presses it: no** |
-| **`POST /api/telemetry/forget`** | Telemetry rows for one `playerId` | The account; the device's other slots | **No** — there is no telemetry (§ 0 fact 1) |
+| **`POST /api/telemetry/forget`** | Telemetry rows for one `playerId` | The account; the device's other slots | **Yes**, since 2026-09-10 (#340) — the route, **and** a screen that presses it: the consent row on Settings, which is § 4.3's withdrawal |
 | ***Clear saved progress*** | D1, D2 and **D3** | Anything on the server; D4, which is disclosure rather than progress (§ 16.6) | **Yes** (#229) |
 
 **The first path's missing surface is the honest gap in this posture and it is not new.** § 11 has
@@ -1725,8 +1748,13 @@ as a surprise with no shape to put it in. **`LAWYER` — § 19 item 11.**
 ### 18.4 Two consequences for #250
 
 **The dashboard may not ship ahead of this posture, and it also may not ship ahead of the
-instrument.** There is no telemetry (§ 0 fact 1, re-measured § 13.1), so a dashboard today would be
-a dashboard over an empty source — which is #340's finding and not this document's.
+instrument.** That was written when there was no telemetry at all (§ 0 fact 1, as it then stood), so
+a dashboard would have been a dashboard over an empty source — which was #340's finding and not this
+document's. **#340 landed on 2026-09-10 and the instrument now exists**, so the second half of that
+sentence has stopped binding: the source is no longer empty. **The first half is unchanged and is
+now the whole of it** — the posture is drafted and marked as requiring legal review, and § 18's read
+route is still unbuilt, which is #250's own work. A dashboard needs a route that does not exist yet;
+what it no longer needs is an instrument.
 
 **When it ships, it inherits § 6.4 whole**: not shown to a player, not compared across builds without
 an interval and the counts it was computed over, and not read as a criterion met. A dashboard is the
@@ -1790,7 +1818,7 @@ A reader arriving from § 18.2 is sent here by name and loses nothing; a reader 
 ### 20.1 What this is, and the two things it is not
 
 It is the specification GitHub issue #201's fifth criterion asks for, made possible by ruling 2
-(§ 12.1) and bounded by § 18. **It is not an instrument**: there is no telemetry in this tree (§ 0
+(§ 12.1) and bounded by § 18. **It is not an instrument**, and until 2026-09-10 there was no telemetry in this tree at all (§ 0
 fact 1, re-measured § 13.1), so every panel below reads an empty source today, and § 18.4's sentence
 governs — the dashboard may not ship ahead of this posture and may not ship ahead of the thing it
 reads. **It is not a second definition of anything.** Every KPI here is § 6.2's, every diagnostic is
@@ -1913,8 +1941,11 @@ re-derived from the floor by `telemetryDashboard.test.ts` rather than transcribe
 
 ### 20.4 The baselines, and why all four are refused
 
-**Every KPI baseline reads `unmeasured` today**, and the reason is § 0 fact 1: there is no telemetry,
-so no KPI has ever been computed. A number here would be invented. The cell says `unmeasured` rather
+**Every KPI baseline reads `unmeasured` today**, and the reason moved on 2026-09-10 without the
+reading changing. It was § 0 fact 1 — there was no telemetry at all — and it is now § 4.2 and the
+absence of a cohort: the instrument exists, it collects only from players who have said yes, and
+nobody has recruited or measured anyone, so no KPI has ever been computed. A number here would be
+invented. The cell says `unmeasured` rather
 than sitting blank on the same principle the rest of this document applies to a refused figure — a
 refusal states itself.
 

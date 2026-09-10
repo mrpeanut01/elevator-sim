@@ -92,6 +92,12 @@ import { randomUUID } from 'node:crypto';
 import type { IssuedChallenge } from '../challenge/schedule.js';
 import type { ChallengeScore, SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
+/*
+ * The one horizon, imported rather than restated — GitHub issue #340. `docs/26` § 5.1 sets it and
+ * `telemetry/schema.ts` declares it; a second copy here would be a second answer to how long a raw
+ * event is kept, and the first time they disagreed the sweep would be enforcing neither.
+ */
+import { RAW_EVENT_RETENTION_MS } from '../telemetry/schema.js';
 import type { Sql, SqlResult } from './sql.js';
 
 /* -------------------------------------------------------------------------- *
@@ -217,6 +223,35 @@ export interface ChallengeEntryRow {
   readonly dispatcherProfileId: string;
   readonly score: ChallengeScore;
   readonly submittedAtMs: number;
+}
+
+/**
+ * One stored telemetry event — GitHub issue #340, `docs/26-telemetry-and-privacy.md` § 7.
+ *
+ * **There is no `userId` on this row and there is no reference to `users`**, and that absence is
+ * the design rather than an omission. § 3.2: *"A telemetry row never carries `users.id`, and a
+ * telemetry request never carries a session token."* With no account id on the row and no bearer
+ * token on the request, the join between a behavioural record and an email address **does not
+ * exist to be made** — by this team, or by anybody who later obtains the database. Adding a
+ * foreign key here would be the whole posture undone in one column.
+ *
+ * `receivedAtMs` is the **server's** clock and the only absolute one in the schema (§ 7.1): the
+ * client sends session-elapsed milliseconds and no wall clock at all. It is what orders sessions
+ * relative to one another and what {@link Store.recordTelemetry}'s sweep reads.
+ */
+export interface TelemetryEventRow {
+  readonly id: string;
+  /** § 3.1's browser-profile id: 128 random bits, minted after consent and derived from nothing. */
+  readonly playerId: string;
+  /** § 3.4: 128 bits per session, in the client's memory only. Groups a batch; dies with the tab. */
+  readonly sessionId: string;
+  readonly buildId: string;
+  readonly name: string;
+  /** Session-elapsed milliseconds, rounded to 100 ms by the client. Never a wall clock. */
+  readonly atMs: number;
+  /** The event's own fields, as § 7's table gives them. Validated before the row is written. */
+  readonly fields: Readonly<Record<string, unknown>>;
+  readonly receivedAtMs: number;
 }
 
 /** How a board is ordered. Never a composite: § D106 — energy is an axis, never a score. */
@@ -357,6 +392,20 @@ export class Store {
     await applyMigrations(options.sql, options.now);
     const store = new Store(options);
     await store.#ensureHouseUser();
+    /*
+     * The retention horizon's second half — `docs/26-telemetry-and-privacy.md` § 5.2, GitHub issue
+     * #340.
+     *
+     * `recordTelemetry` sweeps on the way past every ingest, which is the mechanism this file
+     * already uses for expired sessions and spent sign-in links. Its stated failure mode is real:
+     * **a deployment nobody sends telemetry to never sweeps**, so an instance that stops being
+     * played retains until something writes to it again. This closes it. A Container App at
+     * `minReplicas: 0` boots often, which for once is an advantage.
+     *
+     * After the migrations, necessarily — the table has to exist before it can be swept — and
+     * awaited, so a container that cannot sweep does not start pretending it has.
+     */
+    await store.#sweepTelemetry();
     return store;
   }
 
@@ -959,6 +1008,114 @@ export class Store {
     );
   }
 
+  /* ------------------------------------------------------------ telemetry */
+
+  /**
+   * Write a batch of events, and sweep the horizon on the way past — GitHub issue #340.
+   *
+   * ## Two statements, and the second one is `docs/26` § 5.2's whole mechanism
+   *
+   * *"A horizon with no mechanism is an intention."* This deployment has no scheduler and no cron,
+   * so the sweep is the one this file already runs twice: `consumeLoginToken` deletes expired
+   * tokens on the way past a redemption, and `userForSession` deletes an expired session as it
+   * refuses it, *"so the table does not grow a permanent tail"*. Telemetry does the same thing on
+   * every ingest.
+   *
+   * The sweep is a **second statement and is not atomic with the insert**, deliberately. It deletes
+   * only rows past {@link RAW_EVENT_RETENTION_MS}, which the insert could not have written, so
+   * there is no interleaving in which one undoes the other — the same argument `consumeLoginToken`
+   * makes about the rows its own first statement could not have accepted.
+   *
+   * **Sweep-on-write alone has a stated failure mode**: a deployment nobody uses never sweeps. That
+   * is why {@link Store.open} runs the sweep too — a Container App at `minReplicas: 0` boots often,
+   * which for once is an advantage.
+   *
+   * ## One statement per batch rather than one per event
+   *
+   * The route is unauthenticated and a batch may carry sixty-four events, so sixty-four round trips
+   * would make an accepted batch a multiplier on the database rather than on the wire. The `VALUES`
+   * list is built from the batch's own length and every value is **bound**, never interpolated:
+   * the only thing the template literal contributes is `($1, $2, …)`, which carries no caller data
+   * at all.
+   *
+   * ## What it does not do
+   *
+   * It computes nothing. § 2.1: *"Ingest writes rows and computes nothing"* — replay is an
+   * analyst-initiated, offline operation over stored pointers, never work done here. And it reads
+   * nothing before writing, which is why this member is absent from the read-then-write enumeration
+   * `concurrency.test-helper.ts` derives.
+   */
+  async recordTelemetry(events: readonly Omit<TelemetryEventRow, 'id'>[]): Promise<void> {
+    if (events.length === 0) return;
+    const parameters: unknown[] = [];
+    const rows = events.map((event) => {
+      const at = parameters.length;
+      parameters.push(
+        randomUUID(),
+        event.playerId,
+        event.sessionId,
+        event.buildId,
+        event.name,
+        event.atMs,
+        JSON.stringify(event.fields),
+        event.receivedAtMs,
+      );
+      return `($${String(at + 1)}, $${String(at + 2)}, $${String(at + 3)}, $${String(at + 4)}, $${String(at + 5)}, $${String(at + 6)}, $${String(at + 7)}, $${String(at + 8)})`;
+    });
+    await this.#sql.query(
+      `INSERT INTO telemetry_events (id, player_id, session_id, build_id, name, at_ms, fields_json, received_at_ms) VALUES ${rows.join(', ')}`,
+      parameters,
+    );
+    await this.#sweepTelemetry();
+  }
+
+  /**
+   * Delete every event for one `playerId` — § 4.3's withdrawal and § 3.3's second request.
+   *
+   * **The id is the only key, and there is nothing else it could be.** § 3.1's `playerId` is 128
+   * bits from `crypto.getRandomValues` written to one `localStorage` slot; the row carries no
+   * account id and the request carries no session token, so this statement cannot be pointed at a
+   * person even by somebody who wanted to.
+   *
+   * Returns nothing, on {@link Store.deleteUser}'s ground: the caller has nothing to branch on. An
+   * id with no rows and an id that was never minted are the same outcome here, which is also what
+   * keeps the route from being an oracle for whether an id exists.
+   */
+  async forgetTelemetry(playerId: string): Promise<void> {
+    await this.#sql.query('DELETE FROM telemetry_events WHERE player_id = $1', [playerId]);
+  }
+
+  /**
+   * How many events are stored, or how many for one player. **For the tests, and for nothing else.**
+   *
+   * There is no read route here and § 18 does not put one in this class: § 18.2's three readers are
+   * an aggregate query, an offline replay and a player reading their own rows, and none of them is
+   * *count everything*. This exists so that `api.test.ts` can drive an event from emission to
+   * storage and prove the retention sweep removed it — a test that asserted storage by asserting
+   * the absence of an error would be asserting nothing.
+   */
+  async telemetryEventCount(playerId?: string): Promise<number> {
+    const result =
+      playerId === undefined
+        ? await this.#sql.query('SELECT COUNT(*) AS n FROM telemetry_events')
+        : await this.#sql.query('SELECT COUNT(*) AS n FROM telemetry_events WHERE player_id = $1', [playerId]);
+    return Number(result.rows[0]?.['n'] ?? 0);
+  }
+
+  /**
+   * Delete every event received longer ago than {@link RAW_EVENT_RETENTION_MS} — § 5.1's 90 days,
+   * enforced rather than documented.
+   *
+   * **Private, and it takes no horizon.** The constant is imported from the one module that
+   * declares it, so there is no path on which a caller — a route, a test, a later refactor — sets
+   * its own retention. A horizon a caller can choose is a horizon the schema does not have.
+   */
+  async #sweepTelemetry(): Promise<void> {
+    await this.#sql.query('DELETE FROM telemetry_events WHERE received_at_ms <= $1', [
+      this.#now() - RAW_EVENT_RETENTION_MS,
+    ]);
+  }
+
   /* --------------------------------------------------------------- shared */
 
   /**
@@ -1195,6 +1352,33 @@ CREATE TABLE IF NOT EXISTS challenge_entries (
 );
 CREATE INDEX IF NOT EXISTS challenge_entries_board
   ON challenge_entries (challenge_id, data_hash, mean_awt_s);
+
+-- Telemetry, and the one table in this schema with no reference to \`users\` -- GitHub issue #340,
+-- docs/26-telemetry-and-privacy.md section 3.2. A telemetry row never carries an account id, so the
+-- join between a behavioural record and an email address does not exist to be made. Erasure spans
+-- the two stores as two independent requests (section 3.3), which is a client behaviour and not a
+-- server one; that is the whole trick, and a foreign key here would undo it.
+--
+-- \`fields_json\` holds the event's own fields as section 7's table gives them, validated by
+-- telemetry/schema.ts before the row is written. A column per field would be a second declaration
+-- of that table, and the first time the two disagreed nobody would know which one was the schema.
+CREATE TABLE IF NOT EXISTS telemetry_events (
+  id              TEXT PRIMARY KEY,
+  player_id       TEXT NOT NULL,
+  session_id      TEXT NOT NULL,
+  build_id        TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  -- Session-elapsed milliseconds. BIGINT for every other _ms column's reason, and because a
+  -- narrower type would be a second bound beside the schema's own.
+  at_ms           BIGINT NOT NULL,
+  fields_json     TEXT NOT NULL,
+  -- The server's own clock, and the only absolute one in this table (section 7.1). The retention
+  -- sweep reads it, so it is indexed.
+  received_at_ms  BIGINT NOT NULL
+);
+-- The two questions asked of this table: forget one player, and sweep everything past the horizon.
+CREATE INDEX IF NOT EXISTS telemetry_events_player ON telemetry_events (player_id);
+CREATE INDEX IF NOT EXISTS telemetry_events_received ON telemetry_events (received_at_ms);
 `;
 
 /* -------------------------------------------------------------------------- *
@@ -1295,6 +1479,45 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
     version: 2,
     name: 'entries.baseline_profile_id, null on every row a player posted',
     sql: 'ALTER TABLE entries ADD COLUMN IF NOT EXISTS baseline_profile_id TEXT;',
+  }),
+  /*
+   * GitHub issue #340: the telemetry table, and the first migration in this list that adds a
+   * **table** rather than a column.
+   *
+   * That difference is worth naming, because it is the reason the statement below is a duplicate
+   * of a block in {@link SCHEMA} rather than a reference to it. Migrations 1 and 2 could be
+   * `ALTER … IF NOT EXISTS` and do nothing on a database created today, because migration 0 gives
+   * a fresh database the column. The same is true here — a fresh database gets `telemetry_events`
+   * from {@link SCHEMA} and this entry is a no-op — but a database created before this commit ran
+   * migration 0 already, and `CREATE TABLE IF NOT EXISTS` inside a migration that has been
+   * recorded never runs again. So the table has to exist in both places.
+   *
+   * Splitting it out of {@link SCHEMA} instead was refused for a mechanical reason:
+   * `concurrency.test-helper.ts#schemaFacts` reads the shipped schema as *the first string literal
+   * in this file containing `CREATE TABLE`*, so a table declared only in a migration would be
+   * invisible to the concurrency audit — a table the audit cannot see is a table it reports no
+   * risk about, and silence that looks like a clean result is the one failure mode an audit may
+   * not have.
+   *
+   * Idempotent throughout, like every other entry, which is what makes a retry after a crash
+   * between the commit and the next statement harmless.
+   */
+  Object.freeze({
+    version: 3,
+    name: 'telemetry_events, for a database that predates it',
+    sql:
+      'CREATE TABLE IF NOT EXISTS telemetry_events (\n' +
+      '  id              TEXT PRIMARY KEY,\n' +
+      '  player_id       TEXT NOT NULL,\n' +
+      '  session_id      TEXT NOT NULL,\n' +
+      '  build_id        TEXT NOT NULL,\n' +
+      '  name            TEXT NOT NULL,\n' +
+      '  at_ms           BIGINT NOT NULL,\n' +
+      '  fields_json     TEXT NOT NULL,\n' +
+      '  received_at_ms  BIGINT NOT NULL\n' +
+      ');\n' +
+      'CREATE INDEX IF NOT EXISTS telemetry_events_player ON telemetry_events (player_id);\n' +
+      'CREATE INDEX IF NOT EXISTS telemetry_events_received ON telemetry_events (received_at_ms);',
   }),
 ]);
 

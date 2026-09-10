@@ -115,7 +115,14 @@ import type {
  * of `menu/client.js` are exactly `dev/main.ts` and `honesty/surfaces.ts`, and it exempts type
  * imports by name. The row shape crosses this façade; the transport does not.
  */
-import type { BoardDistribution, BoardEntry, BoardPage, BoardsPage, Result } from '../menu/client.js';
+import type {
+  BoardDistribution,
+  BoardEntry,
+  BoardPage,
+  BoardsPage,
+  Result,
+  RunSubmission,
+} from '../menu/client.js';
 // Wire shapes only, from the module that restates them for the browser. `menu/challenge.ts` holds
 // no client and reads no clock, so this crosses the same line the row shapes above do.
 import type { ChallengeBoardPage, ChallengeIndex, ChallengeView } from '../menu/challenge.js';
@@ -166,6 +173,7 @@ import {
   buildingConfigOf,
   drivingProfileOf,
   resolvedBuildingOf,
+  runSubmissionOf,
   shiftDemandTemplateId,
   shiftLengthForContract,
   specsWithSaved,
@@ -959,6 +967,28 @@ export interface EverydayHost {
    * `runId` is *not* that signal: § 1.4's re-simulation is the same run's record growing.
    */
   recording(): VizRecording | undefined;
+
+  /**
+   * The run on the stage as a **pointer** — GitHub issue #340, `docs/26` § 2.1.
+   *
+   * *"A run is fully reconstructible from a small tuple of ids, a rate, a duration, a window and a
+   * seed"*, and the type for that tuple already exists: `menu/client.ts#RunSubmission`, which is
+   * what `postRun` puts on the wire. Telemetry names the run and stores nothing derived from it, so
+   * this is what an event carries, and a second pointer shape *"would be two answers to what is a
+   * run, and the first time they disagreed the disagreement would be invisible."*
+   *
+   * **`undefined` unless the pointer is provably about the run on screen.** `dev/state.ts`'s builder
+   * reads the *selection*, and its own docstring says the selection can drift from the recording —
+   * a select moved after a run and before posting names a seed the run did not use. So this answers
+   * `undefined` whenever the shell did not simulate the recording on screen (a watched run, a
+   * replay, a record loaded from a file), and a caller emits nothing rather than an event about a
+   * different run. § 9.2 already says a missing event can only subtract from a KPI.
+   *
+   * The two Everyday spreads `SubmittedRun` carries are dropped by the schema rather than here —
+   * `telemetry/schema.ts#TelemetryRunPointer` says why — so this returns the submission's own shape
+   * and the projection happens where the refusal is argued.
+   */
+  runPointer(): RunSubmission | undefined;
 
   /**
    * § 7.4's **second** recording — who the player is racing, and the rival's finished day.
@@ -1841,6 +1871,13 @@ export function createEverydayHost(
     careerNotice: () => careerLoadNotice,
     savedDispatchers: () => b.state().savedDispatchers,
     recording: () => b.state().recording,
+    /*
+     * GitHub issue #340. Built from the two bindings that already exist rather than from a new one:
+     * `resources` and `state()` are what `runSubmissionOf` takes, and `runIsOwn()` is the shell's
+     * own answer to *is the recording on screen the one this shell simulated* — the same question
+     * `dev/main.ts`'s posting gate asks first, asked here through the binding instead of restated.
+     */
+    runPointer: () => (b.runIsOwn() ? runSubmissionOf(b.resources, b.state()) : undefined),
     /*
      * Straight through, both of them. The whole of § 7.4's decision — which profile, whether it can
      * honestly be run, whether the request is even made — is `dev/ghostRun.ts#ghostPlanOf`'s, and a

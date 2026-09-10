@@ -156,6 +156,35 @@ class InterceptingSql implements Sql {
 
 const AS_IS = async (text: string): Promise<string> => text;
 
+/**
+ * The versions `store.ts` actually ships, read out of its own source.
+ *
+ * **Derived rather than written down, and that is a repair rather than a convenience.** Six cases
+ * below used to carry the literal `[0, 1, 2]`, so the commit that added migration 3 (GitHub issue
+ * #340's telemetry table) failed all six on the same assertion — a suite reporting six defects
+ * where there were none, and where the honest answer was *the list grew and every case still
+ * holds*. The list has one home, which is the argument this file already makes about migration 0
+ * being `SCHEMA` by reference.
+ *
+ * It is read the same way `concurrency.test-helper.ts` reads the schema, and for the reason stated
+ * above: neither `SCHEMA` nor `MIGRATIONS` is exported, and exporting one to satisfy a test would
+ * put a symbol in this package's surface that nothing outside this file calls.
+ *
+ * **The derivation is checked before it is trusted.** `numbers its migrations from 0, contiguously,
+ * with no repeats` is the case that fails if this regex ever reads the wrong block — an empty match
+ * there is an empty list here, and a case asserting the register equals `[]` would pass over a
+ * database that had applied nothing. The non-empty assertion below is what stops that.
+ */
+const SHIPPED_VERSIONS: readonly number[] = (() => {
+  const source = readFileSync(new URL('./store.ts', import.meta.url), 'utf8');
+  const block = /const MIGRATIONS[\s\S]*?\n\]\);/u.exec(source)?.[0] ?? '';
+  const versions = [...block.matchAll(/version:\s*(\d+)/gu)].map((match) => Number(match[1]));
+  if (versions.length === 0) {
+    throw new Error('migrations.test.ts: no migration versions found in store.ts; this scan is blind');
+  }
+  return Object.freeze(versions);
+})();
+
 /* -------------------------------------------------------------------------- *
  * The list, and what an empty database gets
  * -------------------------------------------------------------------------- */
@@ -186,11 +215,9 @@ describe('an empty database', () => {
   it('records every migration, in order, on the injected clock', async () => {
     const sql = await emptyDatabase();
     await Store.open({ sql, now: () => CLOCK });
-    expect(await register(sql)).toEqual([
-      { version: 0, appliedAtMs: CLOCK },
-      { version: 1, appliedAtMs: CLOCK },
-      { version: 2, appliedAtMs: CLOCK },
-    ]);
+    expect(await register(sql)).toEqual(
+      SHIPPED_VERSIONS.map((version) => ({ version, appliedAtMs: CLOCK })),
+    );
   });
 
   it('gets migration 0 unchanged, so `legs` arrives `NOT NULL` from the schema and not from the ALTER', async () => {
@@ -208,11 +235,9 @@ describe('an empty database', () => {
     await Store.open({ sql, now: () => clock });
     clock = CLOCK + 86_400_000;
     await Store.open({ sql, now: () => clock });
-    expect(await register(sql)).toEqual([
-      { version: 0, appliedAtMs: CLOCK },
-      { version: 1, appliedAtMs: CLOCK },
-      { version: 2, appliedAtMs: CLOCK },
-    ]);
+    expect(await register(sql)).toEqual(
+      SHIPPED_VERSIONS.map((version) => ({ version, appliedAtMs: CLOCK })),
+    );
   });
 
   it('writes the version row before the migration, which is the whole race design', async () => {
@@ -220,7 +245,7 @@ describe('an empty database', () => {
     const sql = new InterceptingSql(inner, AS_IS);
     await Store.open({ sql, now: () => CLOCK });
     const migrations = sql.execs.filter((text) => text.includes('INSERT INTO schema_migrations'));
-    expect(migrations).toHaveLength(3);
+    expect(migrations).toHaveLength(SHIPPED_VERSIONS.length);
     for (const text of migrations) {
       // A loser's batch has to abort on the primary key before its DDL runs. If the migration ever
       // moves in front of the row that claims it, that stops being true and this fails.
@@ -252,7 +277,7 @@ describe('a database created before `entries.legs`', () => {
   it('applies exactly the missing migrations and adds the column nullable', async () => {
     const sql = await databaseBeforeLegs();
     await Store.open({ sql, now: () => CLOCK });
-    expect((await register(sql)).map((r) => r.version)).toEqual([0, 1, 2]);
+    expect((await register(sql)).map((r) => r.version)).toEqual(SHIPPED_VERSIONS);
     // Nullable here and `NOT NULL` on a database created today. The divergence is real, it is the
     // price of applying migration 0 unchanged, and it is measured rather than left to be found:
     // this is the only kind of database that can hold a row with no count.
@@ -299,12 +324,14 @@ describe('a database at a recorded version', () => {
     await sql.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at_ms BIGINT NOT NULL);');
     await sql.query('INSERT INTO schema_migrations (version, applied_at_ms) VALUES ($1, $2)', [0, CLOCK - 1]);
     await Store.open({ sql, now: () => CLOCK });
-    expect(await register(sql)).toEqual([
-      // Untouched: a recorded version is never re-applied and never restamped.
-      { version: 0, appliedAtMs: CLOCK - 1 },
-      { version: 1, appliedAtMs: CLOCK },
-      { version: 2, appliedAtMs: CLOCK },
-    ]);
+    expect(await register(sql)).toEqual(
+      SHIPPED_VERSIONS.map((version) => ({
+        version,
+        // Untouched: a recorded version is never re-applied and never restamped. Every version
+        // after it is applied on this open's clock.
+        appliedAtMs: version === 0 ? CLOCK - 1 : CLOCK,
+      })),
+    );
     expect(await legsColumn(sql)).toEqual({ present: true, nullable: true });
   });
 
@@ -349,11 +376,14 @@ describe('a migration that fails', () => {
     );
     await expect(Store.open({ sql: broken, now: () => CLOCK })).rejects.toThrow();
     await Store.open({ sql: inner, now: () => CLOCK + 60_000 });
-    expect(await register(inner)).toEqual([
-      { version: 0, appliedAtMs: CLOCK },
-      { version: 1, appliedAtMs: CLOCK + 60_000 },
-      { version: 2, appliedAtMs: CLOCK + 60_000 },
-    ]);
+    expect(await register(inner)).toEqual(
+      // Version 0 is the one the failed open did record; everything after it is applied on the
+      // second open's clock, which is what "retries rather than skips" looks like in the register.
+      SHIPPED_VERSIONS.map((version) => ({
+        version,
+        appliedAtMs: version === 0 ? CLOCK : CLOCK + 60_000,
+      })),
+    );
     expect(await legsColumn(inner)).toEqual({ present: true, nullable: true });
   });
 
@@ -393,7 +423,7 @@ describe('two openers racing', () => {
     expect(raced).toBe(true);
     // One row per version. The loser's `INSERT` hit the primary key, its batch rolled back, it
     // asked whether the version was recorded, and it was.
-    expect((await register(inner)).map((r) => r.version)).toEqual([0, 1, 2]);
+    expect((await register(inner)).map((r) => r.version)).toEqual(SHIPPED_VERSIONS);
     // And the store the loser handed back is usable, which is the point of recovering rather than
     // failing: a container that lost a startup race must still serve.
     expect(await store.board('daily:2026-09-01', 'awtS', 10)).toEqual([]);
@@ -418,7 +448,7 @@ describe('two openers racing', () => {
     expect(raced).toBe(true);
     const marker = await inner.query(`SELECT to_regclass('loser_marker') AS present`);
     expect(marker.rows[0]?.['present'] ?? null).toBeNull();
-    expect((await register(inner)).map((r) => r.version)).toEqual([0, 1, 2]);
+    expect((await register(inner)).map((r) => r.version)).toEqual(SHIPPED_VERSIONS);
   });
 });
 
@@ -437,7 +467,7 @@ describe('the register', () => {
       return text;
     });
     await Store.open({ sql: refusing, now: () => CLOCK });
-    expect((await register(inner)).map((r) => r.version)).toEqual([0, 1, 2]);
+    expect((await register(inner)).map((r) => r.version)).toEqual(SHIPPED_VERSIONS);
   });
 
   it('rethrows when the table really is not there, rather than pressing on blind', async () => {

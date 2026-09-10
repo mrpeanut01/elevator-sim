@@ -313,6 +313,13 @@ const EVERYDAY_SHELL_FILES = new Set([
   'everyday/briefScreen.ts',
   'everyday/reportScreen.ts',
   'everyday/weekScreen.ts',
+  /*
+   * Telemetry's DOM half — GitHub issue #340. `telemetry/` is pure: the schema, the consent slot,
+   * the batching recorder and the ask's words are all drivable by a node test. This file is the
+   * four things only a browser has — `localStorage`, `crypto.getRandomValues`, `fetch` and the
+   * `<meta>` tag naming the API origin — and it is the only place any of them is reached.
+   */
+  'everyday/telemetryPort.ts',
 ]);
 
 /** A shell entry point: `dev/` wholesale, and the Everyday shell's DOM-owning files. */

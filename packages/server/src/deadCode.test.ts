@@ -63,6 +63,7 @@ const AUDITED_MODULES = [
   'server/src/leaderboard',
   'server/src/mail',
   'server/src/store',
+  'server/src/telemetry',
 ] as const;
 
 /**
@@ -116,6 +117,12 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   // check-then-act in `recordEntry` acquired a losing branch; the class is how `submit` tells
   // that outcome from a server failure without matching on a message.
   ['NoSuchUserError', 'server/src/http/api.ts', 'import'],
+  // GitHub issue #340's two telemetry routes. `api.ts` is the non-test caller of the gate and the
+  // id shape it refuses on; `store.ts` is the non-test caller of the retention horizon, which is
+  // imported rather than restated so the sweep and the posture cannot disagree about ninety days.
+  ['batchIssues', 'server/src/http/api.ts', 'import'],
+  ['ID_PATTERN', 'server/src/http/api.ts', 'import'],
+  ['RAW_EVENT_RETENTION_MS', 'server/src/store/store.ts', 'import'],
   ['signInUrlFor', 'server/src/bootstrap.ts', 'same file'],
   ['SIGN_IN_FRAGMENT_KEY', 'server/src/bootstrap.ts', 'same file'],
   ['bearerOf', 'server/src/http/serve.ts', 'same file'],

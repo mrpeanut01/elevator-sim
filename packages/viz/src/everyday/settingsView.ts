@@ -130,6 +130,13 @@ import { DEFAULT_STAGE_SIM_PER_REAL_S, STAGE_SPEEDS } from './stageScreenModel.j
  * rule, and `everyday/units.ts#UNITS_ROW_COPY`'s placement one row down.
  */
 import { DEFAULT_SOUND_ON, SOUND_ROW_COPY, type SoundPreference } from './audio.js';
+/*
+ * The consent row's words — GitHub issue #340. Beside the mechanism they describe rather than
+ * here, which is § D227's rule and this file's own habit with the Units and Sound rows: a note
+ * kept away from the thing it is about is a stale claim waiting to happen.
+ */
+import { consentRowViewOf } from '../telemetry/consentView.js';
+import type { TelemetryConsent } from '../telemetry/consent.js';
 import {
   DEFAULT_EVERYDAY_UNITS,
   UNITS_ROW_COPY,
@@ -393,7 +400,7 @@ function signInViewOf(input: SettingsScreenInput): SettingsSignInView {
 
 /** One shipped toggle row — label, one-clause effect, and the pill's two faces. */
 export interface SettingsToggleView {
-  readonly id: 'motion' | 'units' | 'default-speed' | 'sound';
+  readonly id: 'motion' | 'units' | 'default-speed' | 'sound' | 'telemetry';
   readonly label: string;
   /** § 16's register: what the row does, in one clause. */
   readonly note: string;
@@ -458,7 +465,7 @@ export const CLEAR_PROGRESS_COPY = Object.freeze({
    * this.
    */
   ready:
-    'Forgets everything this device keeps: the week and its banked days, the career and the towers you hold, the saved dispatchers, buildings and patterns, the solved cases and the ratings, and the name and picture above. Press twice.',
+    'Forgets everything this device keeps: the week and its banked days, the career and the towers you hold, the saved dispatchers, buildings and patterns, the solved cases and the ratings, the name and picture above, and your answer to the counting question. Press twice.',
   armed: 'Press again and it is gone. There is no undo, and nothing is sent anywhere first.',
   cleared:
     'Cleared. Nothing this device kept survives. The day on screen finishes as it stands and is not saved; the page reloads to start fresh.',
@@ -488,6 +495,17 @@ export interface SettingsScreenView {
   readonly device: {
     readonly heading: 'THIS DEVICE';
     readonly facts: readonly SettingsFactView[];
+    /**
+     * The consent row — GitHub issue #340, `docs/26-telemetry-and-privacy.md` § 15.2.
+     *
+     * **In *This device* rather than in *Playing*, and the section is the argument.** The other
+     * three toggles change how a run reads or sounds; this one is about what this browser sends,
+     * which is the same subject as the facts above it and the clear row below it. It is also the
+     * only row in that section besides the clear that is a control, which is why the heading's own
+     * comment — *statements of fact, never controls* — is now wrong about two rows rather than one
+     * and is corrected where it stands in `settingsScreen.ts`.
+     */
+    readonly telemetry: SettingsToggleView;
     /** The clear row — GitHub issue #229. Always present; its stage says whether it can act. */
     readonly clear: SettingsClearView;
   };
@@ -650,6 +668,24 @@ export interface SettingsScreenInput {
    * a form pointed at nothing.
    */
   readonly accountServer?: boolean | undefined;
+  /**
+   * The telemetry consent state — `telemetry/consent.ts`, GitHub issue #340.
+   *
+   * Optional and read as `'unasked'`, which is not a convenience: `unasked` **is** the state a
+   * device that has never been asked is in, and § 4.4 makes an unanswered question a no. So a
+   * caller that forgets this field draws exactly what a fresh device draws, which is the one
+   * default here that cannot mislead.
+   */
+  readonly telemetryConsent?: TelemetryConsent | undefined;
+  /**
+   * Whether the consent answer survived the tab — the same fact {@link durable} carries about the
+   * profile, about a different slot.
+   *
+   * `false` is a browser that will not let the game remember the answer, so it will ask again next
+   * time and nothing is recorded meanwhile. Read as `true` when absent, because a caller that has
+   * not written anything has nothing to report about whether the write survived.
+   */
+  readonly telemetryDurable?: boolean | undefined;
 }
 
 /** § 15.1's screen for this state. Total; every sentence a player can meet starts here. */
@@ -780,6 +816,10 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
             'cannot be turned off, and it is why the boards are worth reading.',
         },
       ],
+      telemetry: {
+        id: 'telemetry',
+        ...consentRowViewOf(input.telemetryConsent ?? 'unasked', input.telemetryDurable ?? true),
+      },
       clear: clearRowOf(bridgeAbsent ? 'booting' : (input.clearStage ?? 'ready')),
     },
   };
