@@ -16,7 +16,30 @@
 # Every deploying job is guarded by `if: vars.AZURE_SWA_NAME != ''`. **That variable is now set**
 # (2026-08-08), so the deploying jobs run. Unset, this workflow still runs on every push and pull
 # request, still builds the site, still asserts the artifact, and deploys nothing — which is why
-# `gh variable delete AZURE_SWA_NAME` is a complete rollback rather than half of one.
+# `gh variable delete AZURE_SWA_NAME` is a complete *disarm* rather than half of one.
+#
+# ## Disarming is not a rollback, and these two lines called it one — GitHub issue #355
+#
+# Deleting that variable stops **future** deploys. The bytes currently being served are untouched by
+# it and stay untouched, so it recovers nothing from a bad build. It is in fact the opposite of a
+# recovery: with the variable gone the `deploy` job below never runs, so the one mechanism that could
+# replace the bad page has been switched off and the incident is permanent until somebody re-arms.
+#
+# **The revert is `docs/16-static-site-deployment.md` § 11**, and it follows from this file rather
+# than from anywhere else: the only write to the live site is `deploy`'s `action: upload` step, which
+# ships the artifact `build` made **in the same run**, in the `viz-production` environment, whose
+# deployment branch policy names exactly `main`. So a revert is a run on `main` whose build job
+# produces the artifact you want — a `git revert` and then `workflow_dispatch`, which carries no
+# `paths:` filter. § 11 has the commands, the failure modes and the API half.
+#
+# `packages/experiments/src/validation/deployVocabulary.test.ts` now holds both halves: no file in
+# the tree may equate the disarm command with a rollback, both files that once did must still say
+# that it is not one, the carrier set is derived from disk so a new site cannot escape by not being
+# on a list, and the four properties § 11 reasons from are asserted against this file's own parse.
+#
+# That guard's first red was on the sentence above it: the prohibition was originally worded with
+# the very copula it prohibits, so a rule against the claim contained the claim. Worth keeping in
+# the record — the check is a pattern over English, and English can express the claim by accident.
 #
 # The split is still deliberate and is still the shape `infra/README.md` § 0 uses: the useful half
 # ran from the first commit, the half that touches an external system waited for a human. It also
@@ -26,7 +49,8 @@
 # real token exchange can show, and it was, twice (§ D308).
 #
 # Arm it:    ./infra/azure/swa/provision.sh          (sets six variables, in an enforced order)
-# Disarm it: gh variable delete AZURE_SWA_NAME       (instant, and this is the rollback)
+# Disarm it: gh variable delete AZURE_SWA_NAME       (instant; the live page is untouched)
+# Revert it: docs/16-static-site-deployment.md § 11  (this is the one that moves the live page)
 #
 # ## Three values have to agree, and this file holds one of them
 #
