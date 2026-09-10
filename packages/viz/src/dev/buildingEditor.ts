@@ -90,6 +90,7 @@ import {
   floorIdOf,
   isEntranceFloor,
   lowestFloorOf,
+  machinesWithin,
   nextTransportModeId,
   nextZoneId,
   occupancyAt,
@@ -1651,7 +1652,14 @@ export function mountBuildingEditor(
     for (const [key, band] of Object.entries(current.bandByCar)) {
       if (Number(key) < cars) bands[Number(key)] = band;
     }
-    patch({ cars, bandByCar: bands });
+    /*
+     * And the machine hung in that shaft, for exactly the same reason — GitHub issue #420. This
+     * surface has no per-shaft machine control of its own, but it opens the same `BuildingSpec` the
+     * drawing board writes, so a design carrying a pin can arrive here and have its shaft count
+     * moved. `machinesWithin` is the rule the comment above states, held in one place rather than
+     * copied.
+     */
+    patch({ cars, bandByCar: bands, machineByCar: machinesWithin(current.machineByCar, cars) });
   });
 
   elements.addZone.addEventListener('click', () => {

@@ -73,13 +73,18 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { parseElevatorSpecs } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
+import { BLANK_SPEC, machineAt } from '../authoring/buildingSpec.js';
+import { classesFromSpecs } from '../authoring/machineSpec.js';
 import { DIFFICULTIES } from '../campaign/economy.js';
+import { DATA_DIR } from '../fixtures.test-helper.js';
 import { campaignTestGoals } from './campaignModel.js';
-import { DESIGNER_ABSENCES } from './designerModel.js';
+import { DESIGNER_ABSENCES, withShaftMachine } from './designerModel.js';
 import { RUSH_ABSENCES, RUSH_SCREEN_COPY, rushBarModel } from './rushScreenModel.js';
 
 const sourceOf = (relative: string): string =>
@@ -186,6 +191,61 @@ describe('a refusal that outlived the thing it refused — GitHub issue #423', (
     expect(sourceOf('./designerScreen.ts')).toContain('spec.transportModes');
     for (const row of DESIGNER_ABSENCES) {
       expect(row, 'an escalator row is back in the register without the docstring coming back').not.toContain('escalator');
+    }
+  });
+
+  it('does not say a design carries one class, and the model carries one per shaft', () => {
+    /*
+     * **A sixth, arriving with the feature rather than two weeks after it** — GitHub issue #420.
+     * This file's four were caught by somebody reading twice; this one is registered on the commit
+     * that makes it false, which is what § D227 asks for and what the escalator case above cost by
+     * not doing.
+     *
+     * The sentence is `designerModel.ts`'s own third deviation from § 13 — it argued that a
+     * per-shaft picker would be *"five controls writing the same setting"*, which was § D219 read
+     * correctly against a model with one machine in it. `BuildingSpec.machineByCar` is that model
+     * changed, so the argument is now a retraction rather than a claim.
+     */
+    onlyInRetraction(
+      sourceOf('./designerModel.ts'),
+      'One machine class for the design, not one per shaft',
+      'designerModel.ts',
+    );
+
+    /*
+     * The other half, and the half that makes this a guard rather than a grep. Three facts, each of
+     * which would have to be undone for the retraction to become wrong again: the model carries a
+     * machine per shaft, the panel writes it, and the register no longer refuses it. If the feature
+     * is ever genuinely removed these go red and whoever removes it is asked to say so, rather than
+     * quietly putting the sentence back.
+     */
+    const hydraulic = classesFromSpecs(
+      parseElevatorSpecs(
+        JSON.parse(readFileSync(join(DATA_DIR, 'elevator-specs.json'), 'utf8')) as unknown,
+      ),
+    ).find((entry) => entry.id === 'hydraulic');
+    expect(hydraulic, 'the shipped hydraulic class').toBeDefined();
+    const pinned = withShaftMachine(BLANK_SPEC, 1, hydraulic);
+    expect(machineAt(pinned, 1).specClass, 'the model no longer holds one machine').toBe(
+      'hydraulic',
+    );
+    expect(machineAt(pinned, 0).specClass, 'and an unpinned shaft still follows the design').toBe(
+      BLANK_SPEC.specClass,
+    );
+    /*
+     * **This line is a grep and is not the guard for the picker → model seam.** It passes when the
+     * listener writes the wrong car index, and it passes when no listener is attached at all — an
+     * independent review found exactly that hole, and the seam had nothing else standing over it.
+     * What drives the seam is `standaloneScreens.browser.test.ts`'s *writes one shaft's machine
+     * from its own picker*, on the page, through the shipped `<select>`; what drives the value the
+     * listener resolves is `designerModel.test.ts`'s `shaftPickOf` case. This one only says the
+     * screen still names the writer, which is what the retraction above needs.
+     */
+    expect(sourceOf('./designerScreen.ts')).toContain('withShaftMachine');
+    for (const row of DESIGNER_ABSENCES) {
+      expect(row, 'a class-per-shaft row is back without the docstring coming back').not.toContain(
+        'machine class per shaft',
+      );
     }
   });
 

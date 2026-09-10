@@ -127,7 +127,10 @@ import {
   designerFigures,
   designerPlateRows,
   designerReading,
+  designerShaftNote,
+  designerShaftRows,
   designerWarnings,
+  withShaftMachine,
 } from '../everyday/designerModel.js';
 import { RAIL_DRAWER_COPY, railModel, sublineFor } from '../everyday/rail.js';
 import {
@@ -8243,6 +8246,9 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/designerModel.ts#designerWarnings',
     'everyday/designerModel.ts#designerPlateRows',
     'everyday/designerModel.ts#designerCapacityLine',
+    /* § 13.3 per shaft — GitHub issue #420, driven on the `mixed` arm seeded below. */
+    'everyday/designerModel.ts#designerShaftRows',
+    'everyday/designerModel.ts#designerShaftNote',
     /*
      * `designerReading` is deliberately **not** claimed. It authors no prose: it reads
      * `SpecBankAnalysis.reading`, which is `authoring/buildingSpec.ts`'s own arm of § 10's
@@ -8366,11 +8372,41 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     const refused: typeof sized = { ...sized, cars: 1, noLobby: { 0: true }, bandByCar: { 0: [sized.floors, sized.floors] } };
     /* A design past its class's ceiling, for § 10's first warning — both numbers, named. */
     const overClass: typeof sized = { ...sized, specClass: 'hydraulic', floors: 40, ratedSpeedMps: 0.75, ratedLoadLb: 2500 };
+    /*
+     * **A design whose shafts do not all carry the same machine** — GitHub issue #420. The arm is
+     * here rather than folded into `sized` because the two are different products: `sized` is the
+     * document's own fleet, and this is that fleet with one more machine in it.
+     *
+     * **`sized` is not the homogeneous half, and this comment used to say it was.** It read *"Both
+     * are states a player produces, and only one of them draws `designerShaftNote`"*, which is
+     * false on every shipped building whose document authored more than one lift:
+     * `specFromBuilding` derives a pin for each car unlike the headline, so `crown-hotel`'s service
+     * lift, `st-jude-hospital`'s two and the tall towers' many are pinned straight off the document
+     * and `sized` draws the note by itself. What is true of both arms is narrower — `mixed` draws
+     * the note with one more shaft in it than `sized` does, so the arm *adds* a machine rather than
+     * introducing the sentence, and on the buildings authored with one lift throughout it is the
+     * arm that introduces it. § D227: a sentence that has gone false leaves on the commit that
+     * makes it false.
+     *
+     * The pin is the **first** shaft and the class is the shipped hydraulic, so it exists on every
+     * building the corpus draws from; `withShaftMachine` snaps its two steps into that class's own
+     * ladder, which is the same rule the design's class chips follow one panel up. That snap is
+     * also why this arm reliably *differs* from the design rather than merely being pinned — a pin
+     * byte-equal to the design draws nothing, which is what `designerShaftNote` counts. It lands on
+     * hydraulic's own rungs, which no shipped building's design sits on: measured, including
+     * `garden-apartments`, whose design *is* hydraulic and whose 0.63 m/s snaps down to 0.50.
+     */
+    const mixed: typeof sized = withShaftMachine(
+      sized,
+      0,
+      classes.find((entry) => entry.id === 'hydraulic') ?? classes[0],
+    );
 
     for (const [arm, drawn] of [
       ['sized', sized],
       ['refused', refused],
       ['over-class', overClass],
+      ['mixed', mixed],
     ] as const) {
       const analysis = upPeakAnalysisOf(drawn, specs);
       for (const figure of designerFigures(drawn, analysis)) {
@@ -8435,6 +8471,30 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         text: designerCapacityLine(drawn),
         role: 'observation',
       });
+      /*
+       * § 13.3's per-shaft rows, in both preferences for the plate's own reason: a shaft's figure
+       * carries a rated speed, and `Units` reaches it. The note is a `reason` — it exists to say
+       * which shafts the plate above does **not** describe, which is R3's exemption for a refusal
+       * that has to name what it is refusing — and is drawn only where there is one.
+       */
+      for (const units of EVERYDAY_UNITS) {
+        for (const row of designerShaftRows(drawn, classes, units)) {
+          seeds.push({
+            field: `designer.${arm}.shaft.${row.label}.${units}.class`,
+            text: row.className,
+            role: 'label',
+          });
+          seeds.push({
+            field: `designer.${arm}.shaft.${row.label}.${units}.figure`,
+            text: row.figure,
+            role: 'observation',
+          });
+        }
+      }
+      const shaftNote = designerShaftNote(drawn);
+      if (shaftNote !== '') {
+        seeds.push({ field: `designer.${arm}.shaftNote`, text: shaftNote, role: 'reason' });
+      }
       const reading = designerReading(analysis);
       if (reading !== '') {
         seeds.push({ field: `designer.${arm}.reading`, text: reading, role: 'prose' });
@@ -12307,7 +12367,14 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
      */
     'everyday/stageScreenModel.ts#STAGE_ABSENCES',
     'everyday/rushScreenModel.ts#RUSH_ABSENCES',
-    'everyday/designerModel.ts#DESIGNER_ABSENCES',
+    /*
+     * `everyday/designerModel.ts#DESIGNER_ABSENCES` stood here until GitHub issue #420 emptied it —
+     * the machine-per-shaft pickers made its last row false, so the row and its triage entry went
+     * together. An empty array produces no prose, so `derive.test.ts` no longer finds it and a
+     * `covers` entry would be a coverage claim for nothing; it is the shell's case exactly, one
+     * register over. The section is still drawn and still swept, as the `empty` line below — which
+     * is now the fourth register to reach that arm.
+     */
     'campaign/career.ts#CAMPAIGN_ABSENCES',
     /* GitHub issue #375: the career-load refusals, drawn on the towers screen. */
     'campaign/careerPersist.ts#decodeCareer',

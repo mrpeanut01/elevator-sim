@@ -395,6 +395,28 @@ export interface SpecCarry {
   readonly notes?: readonly string[] | undefined;
 }
 
+/**
+ * **The machine hung in one shaft** — a class and the two steps within it, which is the smallest
+ * thing that is a legal lift.
+ *
+ * It is a *triple* rather than a class id for § 10.1's reason, stated as a control rather than as a
+ * table: speed and load are steps **within** a class, so a shaft given a class while keeping the
+ * design's speed would be holding a speed outside its own band, and `config/parse.ts` refuses that
+ * document. A per-shaft class alone would therefore be a picker whose other two thirds silently
+ * write an illegal record — which is the same defect as a picker that writes nothing, one step
+ * further along.
+ *
+ * The doors, the transfer time and the deck geometry are deliberately **not** here. Those are the
+ * fields {@link SpecCarry} holds verbatim off the authored document, and no control on either
+ * surface writes one; putting them in this type would be claiming an editor that does not exist.
+ */
+export interface SpecMachine {
+  /** Elevator class id in `data/elevator-specs.json`. */
+  readonly specClass: string;
+  readonly ratedSpeedMps: number;
+  readonly ratedLoadLb: number;
+}
+
 /** The editor's whole state. Flat, total, slider-shaped. */
 export interface BuildingSpec {
   readonly id: string;
@@ -432,9 +454,34 @@ export interface BuildingSpec {
   /** Per-floor overrides of {@link occupancyPct}, keyed by floor number (1 = first above lobby). */
   readonly occupancyByFloor: Readonly<Record<number, number>>;
   readonly cars: number;
+  /**
+   * The design's machine — the one every shaft carries unless {@link machineByCar} says otherwise.
+   *
+   * These three are the *default*, not the building's only answer. They were the only answer until
+   * GitHub issue **#420**, and the register said so on the player's own screen: *"a design carries
+   * one class, one rated speed and one rated load for the whole building, so a picker on each shaft
+   * would be five controls writing the same setting"*. That entry left on the commit that made it
+   * false (§ D227).
+   */
   readonly specClass: string;
   readonly ratedSpeedMps: number;
   readonly ratedLoadLb: number;
+  /**
+   * A machine hung in one shaft rather than the design's, keyed by car index — **sparse**, exactly
+   * as `bandByCar` is sparse, and absent means *the design's*.
+   *
+   * Sparse rather than an array of `cars` entries because the two states are genuinely different
+   * and the difference is what {@link buildingSummary} and {@link validateSpec} read: a shaft with
+   * no pin **follows** the design controls, and a shaft with a pin does not. A dense array would
+   * make every shaft look pinned the moment the design's class chip moved, and a reader who had
+   * pinned nothing would find their design control had stopped reaching four of five shafts.
+   *
+   * Read through {@link machineAt}, never directly, so that a pin on a shaft the building no longer
+   * has cannot be mistaken for a machine. `specFromBuilding` fills it from the authored fleet, which
+   * is why `crown-hotel`'s geared service lift and `st-jude-hospital`'s two classes survive being
+   * opened here rather than being flattened onto the fastest car.
+   */
+  readonly machineByCar: Readonly<Record<number, SpecMachine>>;
   /** Floor numbers that are transfer levels. An explicit list, not an *every N* rule. */
   readonly skyFloors: readonly number[];
   /** Per-car service band `[lowFloor, highFloor]` as floor numbers, when a reader pinned one. */
@@ -485,6 +532,7 @@ export const BLANK_SPEC: BuildingSpec = Object.freeze({
   specClass: 'geared-traction',
   ratedSpeedMps: 2.5,
   ratedLoadLb: 2500,
+  machineByCar: Object.freeze({}),
   skyFloors: Object.freeze([]),
   bandByCar: Object.freeze({}),
   noLobby: Object.freeze({}),
@@ -798,6 +846,144 @@ export function bandOf(spec: BuildingSpec, car: number): readonly [number, numbe
   const low = Math.max(lowest, Math.min(spec.floors, Math.min(pinned[0], pinned[1])));
   const high = Math.max(lowest, Math.min(spec.floors, Math.max(pinned[0], pinned[1])));
   return low === high ? [low, Math.min(spec.floors, low + 1)] : [low, high];
+}
+
+/**
+ * **The machine in one shaft** — its own pin, or the design's. The only way to ask.
+ *
+ * Every caller goes through here rather than reading `machineByCar` so that the sparse map has one
+ * reader and one meaning. It is `bandOf`'s shape for `bandByCar`, and for the same reason: a pin is
+ * a state a reader placed on a shaft, and a shaft that has none is not holding an empty pin — it is
+ * following the design.
+ */
+export function machineAt(spec: BuildingSpec, car: number): SpecMachine {
+  return spec.machineByCar[car] ?? designMachineOf(spec);
+}
+
+/** The design's own machine — the three controls, as one value. */
+export function designMachineOf(spec: BuildingSpec): SpecMachine {
+  return {
+    specClass: spec.specClass,
+    ratedSpeedMps: spec.ratedSpeedMps,
+    ratedLoadLb: spec.ratedLoadLb,
+  };
+}
+
+/** Whether this shaft carries a machine of its own rather than the design's. */
+export function machineIsPinned(spec: BuildingSpec, car: number): boolean {
+  return spec.machineByCar[car] !== undefined;
+}
+
+/**
+ * The pins that still have a shaft, after the shaft count moves.
+ *
+ * A pin on car 4 of a design cut down to three shafts is a machine hung in a shaft that does not
+ * exist: never written, invisible on every surface, and back the instant the reader drags the
+ * slider up again — *a pin they did not place*, which is the sentence `dev/buildingEditor.ts`
+ * already uses about `bandByCar` and the reason this function is that one's twin.
+ */
+export function machinesWithin(
+  machineByCar: Readonly<Record<number, SpecMachine>>,
+  cars: number,
+): Record<number, SpecMachine> {
+  const kept: Record<number, SpecMachine> = {};
+  for (const [key, machine] of Object.entries(machineByCar)) {
+    if (Number(key) < cars) kept[Number(key)] = machine;
+  }
+  return kept;
+}
+
+/** Whether two machines are the same lift. Field-wise, because `SpecMachine` is three fields. */
+function sameMachine(left: SpecMachine, right: SpecMachine): boolean {
+  return (
+    left.specClass === right.specClass &&
+    left.ratedSpeedMps === right.ratedSpeedMps &&
+    left.ratedLoadLb === right.ratedLoadLb
+  );
+}
+
+/**
+ * **How many shafts carry a machine that is not the design's** — the differences, not the pins.
+ *
+ * The distinction {@link machineIsPinned} deliberately does *not* make, and the one every sentence
+ * about the fleet has to. A pin is a **state** a reader placed on a shaft: it survives the design's
+ * chips moving, which is the whole of what {@link machineByCar} is sparse for. Whether the machine
+ * in it *differs* is a separate question, and it is the one a reader is being told the answer to
+ * when a surface says a shaft carries something else.
+ *
+ * They come apart in both directions, and each direction has shipped a false sentence:
+ *
+ * - {@link withShaftMachine} snaps the shaft's own steps into the class it is handed, so picking
+ *   the design's own class writes a pin byte-equal to the design. Two clicks from the shipped
+ *   `blank tower` button — geared traction's ladders make both snaps identities on `BLANK_SPEC` —
+ *   and the shaft carries exactly what the other three do.
+ * - A pin written while it *did* equal the design stops equalling it the moment a design chip
+ *   moves, which is precisely what {@link carryLosses}'s branch is gated on.
+ *
+ * So this counts by comparison against the design as it stands now, over the shafts the design
+ * actually has — {@link machinesWithin}'s bound, arrived at by the loop rather than by filtering,
+ * because a pin on a shaft that is gone is not a shaft that differs either.
+ */
+export function shaftsUnlikeDesign(spec: BuildingSpec): number {
+  const design = designMachineOf(spec);
+  let unlike = 0;
+  for (let car = 0; car < spec.cars; car += 1) {
+    if (!sameMachine(machineAt(spec, car), design)) unlike += 1;
+  }
+  return unlike;
+}
+
+/** A carried car's own machine, as the document authored it. */
+function machineOfCar(car: CarConfig, fallback: SpecMachine): SpecMachine {
+  return {
+    specClass: car.spec,
+    ratedSpeedMps: car.ratedSpeedMps ?? fallback.ratedSpeedMps,
+    ratedLoadLb: car.ratedLoadLb ?? fallback.ratedLoadLb,
+  };
+}
+
+/**
+ * **The machines a save would actually write**, one per shaft, in the order the shafts are written.
+ *
+ * **It mirrors {@link carriedCarOf}'s three branches rather than approximating them**, because a
+ * count that disagrees with the document is worse than no count: a surface saying *"2
+ * specifications"* over a building that saves with one is `RISKS.md` R38 at the shortest possible
+ * range. So a re-dealt fleet is {@link machineAt} throughout; a carried one whose design controls
+ * have moved is the design everywhere except its pins; and a carried one that has not moved is the
+ * document's own cars, again except its pins.
+ *
+ * Every sentence this module says about *how many different lifts this building has* reads this
+ * rather than the design triple, because the design triple stopped being the whole answer with
+ * {@link BuildingSpec.machineByCar} and a count taken off it would be a claim about one shaft
+ * presented as a claim about the fleet.
+ */
+export function writtenMachinesOf(spec: BuildingSpec): readonly SpecMachine[] {
+  const design = designMachineOf(spec);
+  const carried = carriedBanksOf(spec);
+  if (carried === undefined) {
+    const machines: SpecMachine[] = [];
+    for (let car = 0; car < spec.cars; car += 1) machines.push(machineAt(spec, car));
+    return machines;
+  }
+  const authoredHolds = carriedHardwareHolds(spec);
+  const machines: SpecMachine[] = [];
+  let index = 0;
+  for (const bank of carried) {
+    for (const car of bank.cars) {
+      const pinned = spec.machineByCar[index];
+      machines.push(pinned ?? (authoredHolds ? machineOfCar(car, design) : design));
+      index += 1;
+    }
+  }
+  return machines;
+}
+
+/** Machines as comparable strings — the unit every *how many specifications* count is taken in. */
+function machineKeysOf(machines: readonly SpecMachine[]): readonly string[] {
+  return machines.map(
+    (machine) =>
+      `${machine.specClass}/${String(machine.ratedSpeedMps)}/${String(machine.ratedLoadLb)}`,
+  );
 }
 
 /**
@@ -1563,11 +1749,18 @@ export function buildingFromSpec(
               : `Floors ${String(group.band[0])}–${String(group.band[1])}, no lobby`,
         servesFloors,
         cars: group.cars.map((car) => {
+          /*
+           * **Per shaft, through {@link machineAt}** — GitHub issue #420. This read the three
+           * design fields directly, so every car of a re-dealt fleet was the same lift and a
+           * per-shaft picker over it would have been five controls writing one setting, which is
+           * what `DESIGNER_ABSENCES` said and why the control was refused rather than drawn.
+           */
+          const machine = machineAt(spec, car);
           const config: Record<string, unknown> = {
             id: carLabelOf(car),
-            spec: spec.specClass,
-            ratedSpeedMps: spec.ratedSpeedMps,
-            ratedLoadLb: spec.ratedLoadLb,
+            spec: machine.specClass,
+            ratedSpeedMps: machine.ratedSpeedMps,
+            ratedLoadLb: machine.ratedLoadLb,
             doorType: 'centerOpening',
           };
           const transfer = transferSecondsFor(spec.type, options.specs);
@@ -1582,12 +1775,19 @@ export function buildingFromSpec(
     });
   };
 
+  /*
+   * The shaft index a carried car answers to, counted across the banks in declared order — the
+   * same order `specFromBuilding` reads them back in, which is what makes `machineByCar`'s keys
+   * mean one thing on both sides of the round trip. It is a running counter rather than a
+   * per-bank one because `BuildingSpec.cars` is the whole fleet.
+   */
+  let carriedIndex = 0;
   const banks: readonly BankConfig[] =
     carriedBanks === undefined
       ? derivedBanksOf()
       : carriedBanks.map((bank) => ({
           ...bank,
-          cars: bank.cars.map((car) => carriedCarOf(spec, car, floors, bank, options)),
+          cars: bank.cars.map((car) => carriedCarOf(spec, car, carriedIndex++, floors, bank, options)),
         }));
 
   /*
@@ -1640,6 +1840,14 @@ export function buildingFromSpec(
  * and all of them change the run. What the sliders *do* describe is class, speed and rated load, so
  * when {@link hardwareKeyOf} has moved those three are overwritten on every car and nothing else is.
  *
+ * **And one shaft's pin overrides that car alone, whether or not the design controls have moved** —
+ * GitHub issue #420, `BuildingSpec.machineByCar`. It is deliberately *outside* {@link hardwareKeyOf}:
+ * a pin is an addition to the carried document rather than a re-deal of it, so pinning shaft C on
+ * `crown-hotel` leaves the other four cars exactly as the document authored them. The pin is written
+ * only where it differs from the car as authored, which is what makes a freshly-read spec rebuild
+ * byte-identical — `specFromBuilding` fills `machineByCar` from those very cars, so on a round trip
+ * every pin equals its car and this function writes nothing at all.
+ *
  * **Two derived fields have to move with them or the document stops loading**, and both are
  * arithmetic the reader cannot be expected to do:
  *
@@ -1654,16 +1862,28 @@ export function buildingFromSpec(
 function carriedCarOf(
   spec: BuildingSpec,
   car: CarConfig,
+  index: number,
   floors: readonly FloorConfig[],
   bank: BankConfig,
   options: BuildingFromSpecOptions,
 ): CarConfig {
   const config: Record<string, unknown> = { ...car };
-  if (!carriedHardwareHolds(spec)) {
-    config['spec'] = spec.specClass;
-    config['ratedSpeedMps'] = spec.ratedSpeedMps;
-    config['ratedLoadLb'] = spec.ratedLoadLb;
-    if (car.ratedLoadLbPerDeck !== undefined) config['ratedLoadLbPerDeck'] = spec.ratedLoadLb / 2;
+  const design = designMachineOf(spec);
+  const pinned = spec.machineByCar[index];
+  const machine = pinned ?? design;
+  const writeHardware =
+    // The design controls moved: every car takes the design's machine, or its own pin where it has
+    // one. This is the re-deal `validateSpec` announces before the reader presses save.
+    !carriedHardwareHolds(spec) ||
+    // Or this one shaft is pinned to something the document did not author. `sameMachine` is what
+    // keeps a round trip byte-identical rather than merely equivalent: a pin read straight back off
+    // this car writes nothing, so `ratedLoadLbPerDeck` and every other derived field are untouched.
+    (pinned !== undefined && !sameMachine(pinned, machineOfCar(car, design)));
+  if (writeHardware) {
+    config['spec'] = machine.specClass;
+    config['ratedSpeedMps'] = machine.ratedSpeedMps;
+    config['ratedLoadLb'] = machine.ratedLoadLb;
+    if (car.ratedLoadLbPerDeck !== undefined) config['ratedLoadLbPerDeck'] = machine.ratedLoadLb / 2;
   }
   if (car.doubleDeck === true) {
     const separation = deckSeparationOf(bank, floors);
@@ -1856,8 +2076,31 @@ function carryLosses(spec: BuildingSpec): readonly string[] {
       `Saving now replaces the ${banksWord} and ${String(authoredCars)} cars this building was authored with${deckWord}. The shafts are re-dealt from the sliders instead: ${String(spec.cars)} car${spec.cars === 1 ? '' : 's'} in contiguous bands. Re-open the building to get the authored lifts back; nothing on disk has changed.`,
     );
   } else if (carriedBanksOf(spec) !== undefined && !carriedHardwareHolds(spec) && variants.size > 1) {
+    /*
+     * **The count of shafts this sentence does *not* apply to** — GitHub issue #420. The design's
+     * three controls write one specification onto every shaft that follows them, which was all of
+     * them until `machineByCar` existed; a shaft carrying its own machine keeps it through this
+     * edit, so *"all N the same machine"* would be false the moment one did. § D227: a refusal that
+     * outlives its own condition is worse than a missing one, because it tells the reader not to
+     * touch a control that works.
+     *
+     * **Counted by {@link shaftsUnlikeDesign} rather than by pin keys, and stated in the third
+     * person.** Both halves were wrong and both were about reading `machineByCar` as a set of keys.
+     * `carriedCarOf` writes `pinned ?? design` onto every car, so a pin equal to the design gets
+     * exactly what a following shaft gets — promising the reader it *keeps its own* would promise
+     * something this save does not do. And the pin is very often not the reader's: on
+     * `crown-hotel` opened untouched, `specFromBuilding` derives one for car 4's service lift
+     * straight off the document, and *"the 1 you have given"* was a second-person claim about a
+     * state nobody had touched.
+     */
+    const own = shaftsUnlikeDesign(spec);
+    const follow = Math.max(0, authoredCars - own);
+    const except =
+      own === 0
+        ? `so saving now gives all ${String(authoredCars)} the same machine`
+        : `so saving now gives the ${String(follow)} shaft${follow === 1 ? '' : 's'} that follow them the same machine. The ${String(own)} shaft${own === 1 ? '' : 's'} that carr${own === 1 ? 'ies' : 'y'} a machine of ${own === 1 ? 'its' : 'their'} own keep${own === 1 ? 's' : ''} it`;
     said.push(
-      `This building was authored with ${String(variants.size)} different lift specifications across its ${String(authoredCars)} cars. The class, speed and load controls here write one specification onto every car, so saving now gives all ${String(authoredCars)} the same machine. The banks, the doors and the deck geometry are kept.`,
+      `This building was authored with ${String(variants.size)} different lift specifications across its ${String(authoredCars)} cars. The class, speed and load controls here write one specification onto every shaft that follows the design, ${except}. The banks, the doors and the deck geometry are kept.`,
     );
   }
   const fabric = carriedFabricOf(spec);
@@ -2122,29 +2365,32 @@ export function occupancyLine(spec: BuildingSpec): string {
 /**
  * The handoff's summary line, § 1.3 M11.
  *
- * **The speed and the capacity are the sliders' values, and on a building whose cars differ they
- * are only the first car's.** That is said here rather than averaged, because a mean speed over a
- * bank of 10 m/s shuttles and 2.5 m/s locals describes no lift in the building. `validateSpec`
- * carries the count of distinct specifications and what moving a slider would do to them; this line
- * says which arm of that it is quoting.
+ * **The speed and the capacity are quoted from one lift, and on a building whose shafts differ the
+ * line says so and names which.** That is said here rather than averaged, because a mean speed over
+ * a bank of 10 m/s shuttles and 2.5 m/s locals describes no lift in the building. `validateSpec`
+ * carries what moving a design control would do to them; this line says which arm of that it is
+ * quoting.
+ *
+ * **The count is taken off {@link writtenMachinesOf} rather than off the carried document** — GitHub
+ * issue #420. It used to read the carried banks, which meant a design with no document behind it
+ * counted `1` by construction: pin one shaft of a blank tower to a hydraulic and this line went on
+ * saying *"4 cars at 2.50 m/s · 10 persons each"* about a building with two machines in it. A
+ * summary that cannot see the pin is `CLAUDE.md`'s stale refusal wearing a statistic.
  */
 export function buildingSummary(spec: BuildingSpec): string {
-  const carry = spec.carried;
-  const variants =
-    carry === undefined
-      ? 1
-      : new Set(
-          carry.banks.flatMap((bank) =>
-            bank.cars.map(
-              (car) =>
-                `${String(car.spec)}/${String(car.ratedSpeedMps ?? '')}/${String(car.ratedLoadLb ?? '')}`,
-            ),
-          ),
-        ).size;
+  const written = writtenMachinesOf(spec);
+  const variants = new Set(machineKeysOf(written)).size;
+  /*
+   * The fastest of what is written, not `spec.ratedSpeedMps`. The two agreed while the design's own
+   * triple was the only machine there was; a pin can be faster than it, and *"the fastest is …"*
+   * about a car that is not the fastest is the one thing this clause exists not to say.
+   */
+  const fastest = [...written].sort((left, right) => right.ratedSpeedMps - left.ratedSpeedMps)[0];
+  const quoted = fastest ?? designMachineOf(spec);
   const lifts =
-    carriedBanksOf(spec) !== undefined && variants > 1
-      ? `${String(spec.cars)} cars, ${String(variants)} specifications — the fastest is ${spec.ratedSpeedMps.toFixed(2)} m/s at ${String(personsOf(spec.ratedLoadLb))} persons`
-      : `${String(spec.cars)} cars at ${spec.ratedSpeedMps.toFixed(2)} m/s · ${String(personsOf(spec.ratedLoadLb))} persons each`;
+    variants > 1
+      ? `${String(spec.cars)} cars, ${String(variants)} specifications — the fastest is ${quoted.ratedSpeedMps.toFixed(2)} m/s at ${String(personsOf(quoted.ratedLoadLb))} persons`
+      : `${String(spec.cars)} cars at ${quoted.ratedSpeedMps.toFixed(2)} m/s · ${String(personsOf(quoted.ratedLoadLb))} persons each`;
   return (
     `${String(floorCountOf(spec))} floors · ${riseM(spec).toFixed(1)} m of travel · ` +
     `${String(totalPopulation(spec))} people · ${lifts}`
@@ -2571,6 +2817,12 @@ function normalize(spec: BuildingSpec): unknown {
     specClass: spec.specClass,
     ratedSpeedMps: spec.ratedSpeedMps,
     ratedLoadLb: spec.ratedLoadLb,
+    // Only the pins that still have a shaft, for `accessZones`' reason one field over: a machine
+    // hung in a shaft the design no longer has is never written, and a thing that is never written
+    // cannot make a building that saves differently.
+    machineByCar: Object.entries(machinesWithin(spec.machineByCar, spec.cars)).sort(([a], [b]) =>
+      a.localeCompare(b),
+    ),
     skyFloors: [...spec.skyFloors].sort((a, b) => a - b),
     bandByCar: Object.entries(spec.bandByCar).sort(([a], [b]) => a.localeCompare(b)),
     // Only the cars actually taken out of the lobby, so `{}` and `{ 0: false }` are the same
@@ -2720,16 +2972,38 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
     heights.length > 1 ? (heights[heights.length - 1] as number) - (heights[0] as number) : 3.6;
   const cars = config.banks.flatMap((bank) => bank.cars);
   /*
-   * **The fastest car, not the first one.** The three hardware sliders hold one class, one speed and
-   * one load between them, and a building whose cars differ has to be quoted by *some* car. It was
-   * the first, which is an accident of authoring order — and `buildingSummary` now says out loud
-   * *"the fastest is …"* on such a building, so the convention is a claim a reader can check rather
-   * than a coincidence. `??` guards a car that leaves the field to its class; every shipped car
-   * declares it.
+   * **The fastest car, not the first one.** The three design controls hold one class, one speed and
+   * one load between them, and the design's default has to be *some* car. It was the first, which is
+   * an accident of authoring order — and `buildingSummary` says out loud *"the fastest is …"* on a
+   * building whose shafts differ, so the convention is a claim a reader can check rather than a
+   * coincidence. `??` guards a car that leaves the field to its class; every shipped car declares
+   * it.
+   *
+   * **What it is no longer is a collapse** — GitHub issue #420. Until `machineByCar` existed this
+   * was the whole reading of the fleet: `crown-hotel`'s five cars across two classes came back as
+   * one machine, and every shaft the reader then saw was the fastest one. The headline is now the
+   * *default* and the cars that differ from it are pinned below, so what comes back is the fleet.
    */
   const headline = [...cars].sort(
     (left, right) => (right.ratedSpeedMps ?? 0) - (left.ratedSpeedMps ?? 0),
   )[0];
+  const headlineMachine: SpecMachine = {
+    specClass: headline?.spec ?? 'geared-traction',
+    ratedSpeedMps: headline?.ratedSpeedMps ?? 2.5,
+    ratedLoadLb: headline?.ratedLoadLb ?? 2500,
+  };
+  /*
+   * The shafts whose machine is not the default's, keyed by position across the banks in declared
+   * order — which is the order `buildingFromSpec` walks the carried banks in, and the order the
+   * elevation draws the shafts in when the bands are re-dealt. Only the ones that *differ* are
+   * written, so a homogeneous fleet reads back with an empty map and every shaft still follows the
+   * design's own controls.
+   */
+  const machineByCar: Record<number, SpecMachine> = {};
+  for (const [index, car] of cars.entries()) {
+    const machine = machineOfCar(car, headlineMachine);
+    if (!sameMachine(machine, headlineMachine)) machineByCar[index] = machine;
+  }
   // Design capacity is not recorded on a shipped building — it only has today's population. Taking
   // the tallest floor as ~90% let is the least-wrong inversion, and it is stated rather than hidden.
   const capacity = Math.max(10, Math.round(peak / 0.9 / 5) * 5);
@@ -2783,9 +3057,10 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
      * `SPEC_ROWS.cars.max` now clears the largest shipped fleet.
      */
     cars: Math.max(1, cars.length),
-    specClass: headline?.spec ?? 'geared-traction',
-    ratedSpeedMps: headline?.ratedSpeedMps ?? 2.5,
-    ratedLoadLb: headline?.ratedLoadLb ?? 2500,
+    specClass: headlineMachine.specClass,
+    ratedSpeedMps: headlineMachine.ratedSpeedMps,
+    ratedLoadLb: headlineMachine.ratedLoadLb,
+    machineByCar,
     /*
      * Above the lobby only, which is the sky-floor dot's own domain: the elevation draws that dot
      * inert on an entrance, and the lobby always is one. A transfer flag at or below the lobby — all

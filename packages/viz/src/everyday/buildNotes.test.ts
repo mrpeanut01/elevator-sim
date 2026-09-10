@@ -268,13 +268,21 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   { register: 'RUSH_ABSENCES', fragment: 'the standings', issue: 177 },
 
   /*
-   * The designer. All three are #177 § 5's, and there used to be five: the other two said the
+   * The designer. All three were #177 § 5's, and there used to be five: the other two said the
    * capability lives on the Engineer surface, which is an ownership boundary rather than an
    * absence. #283 asked whether they belonged in this register and the answer was no — they are
-   * hints beside the controls they qualify now, and this table is shorter by two rather than
+   * hints beside the controls they qualify now, and this table was shorter by two rather than
    * pointing at two more issues.
+   *
+   * **The last of the three left on the commit that built it** — GitHub issue **#420**, split from
+   * #177 as an issue of its own. Its row read
+   * `{ register: 'DESIGNER_ABSENCES', fragment: 'a machine class per shaft', issue: 177 }`, and the
+   * entry it owned refused the control on the grounds that five pickers would write one field.
+   * `BuildingSpec.machineByCar` is that field per shaft; the picker writes it, and the run changes
+   * on the legs (`authoring/authoring.test.ts`). Register entry and triage row went in one edit,
+   * which is exactly what this table's second assertion refuses to let happen separately — and the
+   * register is now empty, so the panel draws its `empty` line.
    */
-  { register: 'DESIGNER_ABSENCES', fragment: 'a machine class per shaft', issue: 177 },
 
   /*
    * The campaign. The incidents row — *"Incidents here are the two the building implies"*, issue
