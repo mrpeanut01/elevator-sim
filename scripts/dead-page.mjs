@@ -137,9 +137,50 @@ const SCRIPT_TYPES = Object.freeze([
   'module',
 ]);
 
-/** Strip HTML comments, so a comment naming a tag is not read as the tag. */
-function withoutComments(html) {
-  return html.replace(/<!--[\s\S]*?-->/gu, '');
+/**
+ * Where the comments are, as `[start, end)` spans — **not** a sanitiser, and the distinction is the
+ * point.
+ *
+ * This began as `html.replace(/<!--[\s\S]*?-->/gu, '')`, and CodeQL was right to flag it: that is
+ * the shape of an *incomplete multi-character sanitisation*, and a rule written for code that
+ * strips markup and then emits it. **This code never emits HTML** — it fetches the page this
+ * project itself deploys and reads two things out of it — so the injection the rule is about cannot
+ * happen here.
+ *
+ * The pattern was still wrong to use, for a reason that matters more to a monitor than the rule
+ * does: a fragile parse gives a **wrong answer about whether the site is alive**. A missed alarm is
+ * this script's worst outcome, and *the regex mis-handled a comment* is exactly how one arrives.
+ *
+ * So there is no stripping. The comment spans are computed once and every match is asked whether it
+ * lies inside one — which is decidable, testable, and cannot silently delete the text around a
+ * malformed comment the way a replace can.
+ *
+ * **What it still does not do, stated rather than implied**: this scans for `<!--` and knows
+ * nothing about tags, so a comment-like string inside an *attribute value* is read as an opener,
+ * exactly as the replace did. `deadPage.test.ts` asserts that as a limit rather than hiding it.
+ * Fixing it means tracking tag and attribute state — real HTML parsing — which is not proportionate
+ * for a monitor whose input is this project's own build output.
+ */
+function commentSpansOf(html) {
+  const spans = [];
+  let at = 0;
+  for (;;) {
+    const open = html.indexOf('<!--', at);
+    if (open < 0) return spans;
+    const close = html.indexOf('-->', open + 4);
+    /* An unterminated comment runs to the end of the document, which is what a browser does too. */
+    if (close < 0) {
+      spans.push([open, html.length]);
+      return spans;
+    }
+    spans.push([open, close + 3]);
+    at = close + 3;
+  }
+}
+
+/** Whether an offset falls inside any comment span. */
+function insideComment(spans, index) {
+  return spans.some(([from, to]) => index >= from && index < to);
 }
 
 /**
@@ -150,10 +191,13 @@ function withoutComments(html) {
  * made here once already — by the very commit that added the comment.
  */
 export function declaredApiOriginOf(html) {
-  const found = /<meta[^>]*name=["']elevator-sim-api["'][^>]*content=["']([^"']*)/u.exec(
-    withoutComments(html),
-  );
-  return found?.[1] ?? '';
+  const spans = commentSpansOf(html);
+  const pattern = /<meta[^>]*name=["']elevator-sim-api["'][^>]*content=["']([^"']*)/gu;
+  for (const found of html.matchAll(pattern)) {
+    if (insideComment(spans, found.index)) continue;
+    return found[1] ?? '';
+  }
+  return '';
 }
 
 /**
@@ -164,10 +208,11 @@ export function declaredApiOriginOf(html) {
  * never does. Sorted, so the check reports in a stable order and a test can compare a list.
  */
 export function assetPathsOf(html) {
-  const body = withoutComments(html);
+  const spans = commentSpansOf(html);
   const paths = new Set();
   const pattern = /(?:src|href)\s*=\s*["'](\/[^"'>]*)["']/gu;
-  for (const match of body.matchAll(pattern)) {
+  for (const match of html.matchAll(pattern)) {
+    if (insideComment(spans, match.index)) continue;
     const path = match[1];
     if (path === undefined) continue;
     if (!/\.(?:js|mjs|css)(?:\?|$)/u.test(path)) continue;

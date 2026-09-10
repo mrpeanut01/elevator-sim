@@ -76,6 +76,9 @@ import {
  * is about: a fixture read from the tree passes whenever the tree and the check drift together,
  * which is the failure mode of a check that reads its own subject.
  */
+/** The one script line, named so a case can compose a page without it rather than strip it out. */
+const SCRIPT_TAG = '    <script type="module" crossorigin src="/assets/index-bbb.js"></script>';
+
 const LIVE_HTML = [
   '<!doctype html>',
   '<html lang="en">',
@@ -89,7 +92,7 @@ const LIVE_HTML = [
   '    <div class="shell">',
   '      <header class="topbar"></header>',
   '    </div>',
-  '    <script type="module" crossorigin src="/assets/index-bbb.js"></script>',
+  SCRIPT_TAG,
   '  </body>',
   '</html>',
 ].join('\n');
@@ -295,9 +298,81 @@ describe('the assets the page references', () => {
   });
 
   it('reports a page that references no script at all', () => {
-    const html = LIVE_HTML.replace(/<script[^>]*><\/script>/u, '');
+    /*
+     * **Built by composition rather than by stripping a tag out with a regex.**
+     *
+     * This read `LIVE_HTML.replace(/<script[^>]*><\/script>/u, '')`, and CodeQL flagged it as a bad
+     * HTML filtering regexp — correctly on its own terms: that pattern does not match
+     * `</script >`. It was a fixture rather than a filter, so nothing was at risk; but a fixture
+     * built by *removing* a tag is a fixture whose contents depend on a regex being right, and this
+     * case then asserts on what is left. Composing the page without a script says what it means.
+     */
+    const html = LIVE_HTML.split('\n').filter((line) => line !== SCRIPT_TAG).join('\n');
     const probe: PageProbe = { ...alive(), page: ok('/', 'text/html', html), assets: [] };
     expect(deadPageIssues(probe)).not.toEqual([]);
+  });
+});
+
+describe('comments are located, not stripped — CodeQL on GitHub issue #242', () => {
+  /*
+   * **The replace this replaced was flagged, and the flag was right about the shape if not the
+   * risk.** `html.replace(/<!--[\s\S]*?-->/gu, '')` is an incomplete multi-character sanitisation.
+   * Nothing here emits HTML — this script fetches the page this project deploys and reads two
+   * things out of it — so the injection that rule is written for cannot happen.
+   *
+   * What *can* happen is the failure mode a monitor actually has: **a fragile parse gives a wrong
+   * answer about whether the site is alive.** These cases are about that, and each is one a
+   * strip-then-match would get wrong.
+   */
+
+  it('does not read a tag that is only mentioned in a comment', () => {
+    const html = `<!-- DO NOT ADD <meta name="elevator-sim-api" content="https://wrong.test" /> -->
+      <meta name="elevator-sim-api" content="https://right.test" />`;
+    expect(declaredApiOriginOf(html)).toBe('https://right.test');
+  });
+
+  it('reads a real tag that sits after an unterminated comment’s opener on the same line', () => {
+    /*
+     * A comment with no `-->` runs to the end of the document, which is what a browser does — so
+     * everything after it really is commented out, and the honest answer is nothing.
+     */
+    expect(declaredApiOriginOf('<!-- <meta name="elevator-sim-api" content="x" />')).toBe('');
+  });
+
+  it('does NOT distinguish a comment-like string inside an attribute, and that is a stated limit', () => {
+    /*
+     * **This case was written as a claim and is kept as a limit, because writing it is what showed
+     * the claim was false.**
+     *
+     * It first asserted that a `<!--` inside an attribute value would not be mistaken for a comment
+     * opener. It is — `commentSpansOf` scans for `<!--` with `indexOf` and knows nothing about
+     * tags, so on this input it produces the same wrong span the `replace` it replaced produced.
+     * The rewrite is better on malformed and unterminated comments and **no better here**.
+     *
+     * Telling the truth about that is worth more than deleting the case. What would fix it is
+     * tracking tag and attribute state — real HTML parsing — and that is not proportionate for a
+     * monitor whose input is **this project's own build output**: `index.html` plus what Vite emits
+     * from it, or something so wrong (an error page, a login wall) that every check fails anyway.
+     * An attribute carrying `<!--` is not in that input class.
+     *
+     * Asserted as it stands so the limit is visible and so a future parser change is noticed here
+     * rather than discovered. If this ever starts passing, the parse got better and this case
+     * should say so instead.
+     */
+    const html = `<div data-note="<!--"></div>
+      <meta name="elevator-sim-api" content="https://right.test" />
+      <div data-note="-->"></div>`;
+    expect(
+      declaredApiOriginOf(html),
+      'the span scan now sees through a comment-like attribute — say so here rather than leaving ' +
+        'this case asserting a limit that no longer exists',
+    ).toBe('');
+  });
+
+  it('ignores an asset referenced only inside a comment', () => {
+    const html = `<!-- <link rel="stylesheet" href="/assets/old.css" /> -->
+      <link rel="stylesheet" href="/assets/new.css" />`;
+    expect(assetPathsOf(html)).toEqual(['/assets/new.css']);
   });
 });
 
