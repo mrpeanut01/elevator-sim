@@ -201,10 +201,12 @@ export const RUSH_HOLD_LINE = Object.freeze({
  * implement, so the sentence needed no change — only the code behind it, which is why this is a
  * transcription after all). `bandsEyebrow` and `bestsEyebrow` are its eyebrows verbatim.
  *
- * `primaryInertLabel` is the third, it is a **bar** cell rather than a screen one, and it is here
- * on purpose: `honesty/surfaces.ts` seeds every entry of this table into the corpus and would not
- * have seen a constant of its own. A player-facing claim the search has never read is the thing
- * this repository counts.
+ * A third, `primaryInertLabel`, stood here and is **deleted** — see the comment where it was. The
+ * argument for putting it in this table was sound and is worth keeping: `honesty/surfaces.ts` seeds
+ * every entry into the corpus and would not have seen a constant of its own, and a player-facing
+ * claim the search has never read is the thing this repository counts. What that argument does not
+ * buy is the string being *true*. It was swept on every case of every run for as long as it was
+ * wrong, because no property compares a label against whether the thing it names exists.
  */
 export const RUSH_SCREEN_COPY = Object.freeze({
   eyebrow: 'ENDLESS RUSH',
@@ -233,17 +235,23 @@ export const RUSH_SCREEN_COPY = Object.freeze({
    */
   /** Drawn where a figure would be if a rush had ever run here. */
   noRun: '—',
-  /**
-   * What the § 3.3 primary is called while there is nothing behind it — GitHub issue #262.
+  /*
+   * **`primaryInertLabel` left this table on the commit that noticed it was lying** — GitHub issue
+   * #423, and it is the sharpest instance in that sweep.
    *
-   * § 3.3's own cell is *Start the rush*, and it stays the cell: {@link rushBarModel} substitutes
-   * this one only for the inert state, the way `fixitScreenModel.ts#fixitBarModel` substitutes
-   * *Running the day…* for its own. The reason it is worth a string is § 16 rule 4 — *a button
-   * does what it says* — and the accessibility half of #262: a `disabled` button is out of the tab
-   * order and carries no description, so its **name** is the only thing Chromium's AX tree had to
-   * offer about it, and before this it offered *Start the rush*.
+   * It read *'Start the rush — not built yet'*, and it was substituted by {@link rushBarModel} for
+   * the inert state while the engine was missing (#262). GitHub issue #220 built the engine (§ D515)
+   * and `rushBarModel` became `return base` — so from that commit the string had **no reader at
+   * all**. Its only two mentions in the tree were its own declaration and its own docstring.
+   *
+   * Two defects at once, which is why it is deleted rather than reworded. It is a player-facing
+   * constant with no non-test caller, which is CLAUDE.md's standing requirement and the twelfth
+   * instance this tree has recorded. And what it *said* was false: a string claiming a shipped
+   * feature is *not built yet*, sitting in the honesty corpus where the sweep reads it as a
+   * player-facing claim. Being swept is not being checked — no property compares a label against
+   * whether the thing it names exists — so it would have been read on every case of every run and
+   * found nothing wrong.
    */
-  primaryInertLabel: 'Start the rush — not built yet',
 } as const);
 
 /**
@@ -556,9 +564,17 @@ export const RUSH_BESTS: readonly RushBestView[] = Object.freeze([
  *
  * § 20.11 lists `RUSH_BESTS` by name among the authored fixtures, and gives each of them exactly
  * two ways to ship: *"Each needs a real source … or an explicit `FIXTURE` marker so nobody ships
- * them as truth."* The real source is the rush engine, which is not built. So the marker is the
- * only branch available, and a marker two clicks away in Settings is not a marker — it is a
- * different screen's sentence about this one.
+ * them as truth."* So the marker is the branch taken, and a marker two clicks away in Settings is
+ * not a marker — it is a different screen's sentence about this one.
+ *
+ * **This paragraph said the real source was unavailable *"because the rush engine is not built"*,
+ * and that stopped being true when GitHub issue #220 built it** (§ D515, `everyday/rush.ts`,
+ * `EverydayHost.startRush`). The rows are still fixtures, so the marker is still right — but the
+ * *reason* had changed, and a refusal that keeps its verdict while its reason rots is the harder
+ * half of this defect to see. What is actually missing now is a decision about what the five rows
+ * should become: two of them (`delft_vt`, `r_okonkwo`) read as accounts and there is no server
+ * behind them, so they cannot become measured runs without becoming something else. That question
+ * is GitHub issue #418's, and #222 owns the rows themselves.
  *
  * This screen is the **only** place the build prints another player's name against a figure. Every
  * other surface that could refuses in so many words: `world.ts#WORLD_FIGURES_REASON` on the front
@@ -572,9 +588,14 @@ export const RUSH_BESTS: readonly RushBestView[] = Object.freeze([
  * The primary's refusal was the same shape one screen up while it stood, and GitHub issue #207
  * drew the line this follows: **a refusal that belongs to a thing a player is looking at is drawn on that
  * thing; a register of what the build does not do is drawn once, somewhere a reader goes looking.**
- * Putting `RUSH_ABSENCES` back on this screen would re-litigate #207 and duplicate the panel; the
- * three entries about the missing engine do not belong beside a list of names. What belongs beside
- * the names is the one sentence that is about the names.
+ * Putting `RUSH_ABSENCES` back on this screen would re-litigate #207 and duplicate the panel. That
+ * register does not belong beside a list of names; what belongs beside the names is the one
+ * sentence that is about the names.
+ *
+ * This read *"the three entries about the missing engine"*. {@link RUSH_ABSENCES} holds **one**
+ * entry and it is about the standings rather than the engine — the engine rows left when #220 built
+ * it. A count written into prose beside the array it counts is `RISKS.md` R38 at the shortest
+ * possible range, which is why `everyday/staleRefusals.test.ts` now reads both.
  *
  * ## Why it says *not people*, and not merely *not measured*
  *
