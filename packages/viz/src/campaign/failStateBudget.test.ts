@@ -35,6 +35,13 @@
  * The conversion is a one-time calibration on a named machine, which is exactly what #335 asks for
  * and what a per-run stopwatch is not: load moves the milliseconds and cannot move the legs.
  *
+ * **The choice of unit was then confirmed by accident, which is better evidence than the argument
+ * for it.** The same measurement was taken twice on this container, on a quiet machine and on a
+ * busy one. The **legs are identical to the integer** in both — 19, 65, 417 at min, median and max
+ * — and the wall clock moved by about 2.8×, with `fixit/open`'s rate going 247.09 to 697.48 ms per
+ * thousand legs on unchanged code. A gate written in the second column would have gone red on the
+ * second run; the gate written in the first cannot.
+ *
  * **What the budget does and does not catch, said rather than implied.** It catches the change that
  * would actually hurt — a stage authored at a longer `durationS`, a heavier tower, or a higher
  * arrival rate — because all three arrive as legs. It does not catch `recordRun` itself getting

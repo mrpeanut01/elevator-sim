@@ -39,7 +39,7 @@
  *   npx vitest run --project viz packages/viz/src/dev/measure.surfaceRuns.test.ts
  * ```
  *
- * ## Two more surfaces, added for GitHub issue #410, and the count is the finding
+ * ## Three more surfaces, added for GitHub issue #410, and the membership is the finding
  *
  * Issue #410 inherits #238's clause about *"the three main-thread simulation surfaces"* and names
  * them: `dev/main.ts`'s § 1.4 re-simulate, `frame/overlay.ts` and `live/observations.ts`. That list
@@ -52,11 +52,20 @@
  *   are pure folds of a finished recording, drawn per frame. `frame/measure.perFrame.test.ts` is
  *   their instrument and `frame/perFrameBudget.test.ts` is their enforced bound.
  *
- * What the graph does find, and what the issue does not name, is **two** surfaces that construct a
- * `Simulation` on the thread that paints: {@link runChallenge} in `dev/main.ts` and `failStates` in
- * `dev/campaignPanel.ts`. `dev/mainThreadSimulation.test.ts` derives that set from the imports on
- * every shipped run, in both directions, so this docstring cannot go stale the way the issue's list
- * did. The two rows below are what they cost.
+ * What the graph does find, and what the issue does not name, is **three** surfaces that constructed
+ * a `Simulation` on the thread that paints: `dev/main.ts#runChallenge`, `dev/main.ts`'s
+ * `simulateRecord` binding for `everyday/host.ts#watchRun` — the Everyday Watch reproduction gate,
+ * which is issue #165's own defect still live on the shell `index.html` opens — and `failStates`
+ * in `dev/campaignPanel.ts`. The first two moved to a worker on #410 and the third is bounded in
+ * `campaign/failStateBudget.test.ts`, because 3–68 ms behind a message port is slower than 3–68 ms.
+ *
+ * `dev/mainThreadSimulation.test.ts` derives that set from the imports on every shipped run, in
+ * both directions, so **this** docstring cannot go stale the way the issue's list did: the register
+ * is the claim and this paragraph is a reading of it.
+ *
+ * The rows below are what all three cost, and they are kept after the move rather than deleted with
+ * it. A measurement is what says a bound is a bound and what would say a move stopped being worth
+ * its complexity, and neither question survives its own answer.
  *
  * Recorded here under [§ D405](../../../../DECISIONS.md): the decision this file takes — *measure
  * the surfaces rather than quote them* — binds nothing outside this module, and this docstring is
