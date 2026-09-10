@@ -149,12 +149,20 @@ Three rows carry an argument rather than a preference:
   boundary, and `runIdentity.test.ts` derives the sentence above from the allow-list rather than
   letting it be transcribed.
 
-  **One kind is refused, permanently, and the reason is a missing cause rather than a missing
-  field** (§ D486, `runIdentity.ts#ANSWER_INCIDENT_STAYS_REFUSED`). An `answer-incident` names
-  service events that `shift/incidents.ts` writes onto the *building* from the week's day and the
-  calendar; neither travels, so a replay built from ids alone would hold the answer and not the
-  thing answered — and the server would verify **that** run as honest. A refusal that prevents a
-  verified-but-wrong replay is a feature, and it stops being tracked as a gap.
+  **Three kinds are refused, and every one of them for a missing *cause* rather than a missing
+  field** (§ D486, GitHub issue #370; `core/src/sim/interventionWire.ts#INTERVENTION_WIRE` is the
+  table, and it answers for every declared kind so a new one cannot arrive undecided). An
+  `answer-incident` names service events that `shift/incidents.ts` writes onto the *building* from
+  the week's day and the calendar; neither travels, so a replay built from ids alone would hold the
+  answer and not the thing answered — and the server would verify **that** run as honest. A refusal
+  that prevents a verified-but-wrong replay is a feature, and it stops being tracked as a gap. The
+  two bought kinds are the same shape one substrate over: a purchase is made against a scenario
+  budget, no submission carries a budget, and a replay would hold the change and not the
+  entitlement to it — the board would rank a tower nobody could check the player could afford.
+
+  Each refused kind carries **its own** sentence on that table, which is a correction rather than a
+  convenience: both gates used to answer with the incident answer's reason whatever kind was
+  refused, and the day a second kind was refused that became a refusal naming the wrong ground.
 
 ---
 

@@ -546,3 +546,215 @@ describe('an unknown change kind is refused before any event fires', () => {
     ).toThrow(/reverse-gravity.*park-cars-lobby, switch-dispatcher, answer-incident, spread-cars/su);
   }, 60_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * The two bought kinds — GitHub issue #370
+ * -------------------------------------------------------------------------- */
+
+/**
+ * `equipment-change` and `building-change` — the changes the player *buys* mid-run.
+ *
+ * The same four properties every other kind is held to, and **a fifth that is theirs alone**: the
+ * crowd is held across the press. `docs/38` § 2.3's sentence is *"the crowd is the same crowd
+ * either side of the press"*, and a fabric change is the one kind that could break it, because
+ * fabric is an input to a building and a naive implementation would rebuild the building and
+ * re-draw the trace with it. It cannot happen here by construction — the effects ride the service
+ * schedule and the trace was drawn from the seed before the first event fired — and `crowdOf`
+ * asserts it rather than trusting the construction, because *"a refusal is pinned by a run, never
+ * by another sentence"* (§ D227) and so is a promise.
+ *
+ * The effects are **range** events on both arms, because a rezone is what the shipped schedule
+ * prices at both tiers — `zone-the-tower` in `equipment` and `rezone-bank` in `building` — and
+ * because narrowing a two-car bank's range on a residential tower is a suffix that cannot fail to
+ * move. `garden-apartments`/`collective` for the reason the file's header gives.
+ */
+describe('the bought kinds change the future, only the future, and never the crowd', () => {
+  const AT_S = 600;
+  const SEED = 20260726;
+
+  /**
+   * The crowd, as the trace drew it — every journey's first leg, projected onto the five facts
+   * that come from the demand streams and from nothing else: who, when, from where, to where, and
+   * how heavy. A dispatcher moves none of these and neither may a fabric change; a run that
+   * re-drew its trace would move all of them.
+   */
+  const crowdOf = (result: SimulationResult): string =>
+    JSON.stringify(
+      result.record.passengers
+        .filter((leg) => leg.legIndex === 0)
+        .map((leg) => [
+          leg.journeyId,
+          leg.journeyStartedAt,
+          leg.originFloorId,
+          leg.finalDestinationFloorId,
+          leg.massKg,
+        ])
+        .sort((left, right) => String(left[0]).localeCompare(String(right[0]))),
+    );
+
+  /** A rezone at 700 s: the bank stops serving its top two floors for the rest of the day. */
+  const rezone = { atS: 700, bankId: 'main', servesFloors: ['G', '2', '3', '4'] } as const;
+
+  const bought = (kind: 'equipment-change' | 'building-change'): RunInterventionConfig => ({
+    atS: AT_S,
+    change: {
+      kind,
+      changeId: kind === 'equipment-change' ? 'zone-the-tower' : 'rezone-bank',
+      name: kind === 'equipment-change' ? 'Zone the tower' : 'Re-zone a bank',
+      serviceEvents: [rezone],
+    },
+  });
+
+  for (const kind of ['equipment-change', 'building-change'] as const) {
+    it(`${kind} keeps every leg boarded before atS byte-identical, and moves the run after it`, () => {
+      const baseline = runSimulation(run('garden-apartments', 'collective', SEED));
+      const changed = runSimulation(
+        run('garden-apartments', 'collective', SEED, { interventions: [bought(kind)] }),
+      );
+
+      const prefix = (result: SimulationResult): string =>
+        JSON.stringify(
+          legsOf(result).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S),
+        );
+      // Non-vacuity: there are legs on both sides of the press, so neither half is an empty set
+      // agreeing with an empty set.
+      expect(
+        legsOf(baseline).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S).length,
+      ).toBeGreaterThan(0);
+      expect(prefix(changed)).toBe(prefix(baseline));
+      expect(JSON.stringify(legsOf(changed))).not.toBe(JSON.stringify(legsOf(baseline)));
+    }, 60_000);
+
+    it(`${kind} holds the crowd across the press — the trace is the seed's, not the fabric's`, () => {
+      const baseline = runSimulation(run('garden-apartments', 'collective', SEED));
+      const changed = runSimulation(
+        run('garden-apartments', 'collective', SEED, { interventions: [bought(kind)] }),
+      );
+      expect(crowdOf(baseline).length).toBeGreaterThan(2);
+      expect(crowdOf(changed)).toBe(crowdOf(baseline));
+      // …and the run really did change, so the equality above is a held crowd rather than an
+      // intervention that did nothing at all.
+      expect(JSON.stringify(legsOf(changed))).not.toBe(JSON.stringify(legsOf(baseline)));
+    }, 60_000);
+
+    it(`${kind} replays the same record to the same fingerprint (invariant 5)`, () => {
+      const record = (): SimulationConfig =>
+        run('garden-apartments', 'collective', SEED, { interventions: [bought(kind)] });
+      expect(fingerprint(runSimulation(record()))).toBe(fingerprint(runSimulation(record())));
+    }, 60_000);
+
+    it(`${kind} with no effects is the run it was — the stamp is the point`, () => {
+      // The purchase whose whole content is its price: on the record so the day's spend can be
+      // re-derived from it, changing nothing physical. `answer-incident`'s reassurance arm, one
+      // substrate over.
+      expect(
+        fingerprint(
+          runSimulation(
+            run('garden-apartments', 'collective', 20260810, {
+              interventions: [
+                {
+                  atS: AT_S,
+                  change: { kind, changeId: 'door-dwell', name: 'Re-set the doors', serviceEvents: [] },
+                },
+              ],
+            }),
+          ),
+        ),
+      ).toBe(fingerprint(runSimulation(run('garden-apartments', 'collective', 20260810))));
+    }, 60_000);
+
+    it(`${kind} refuses an effect scheduled before its own press, and names the kind`, () => {
+      const baseline = runSimulation(run('garden-apartments', 'collective', SEED));
+      const rewriting = runSimulation(
+        run('garden-apartments', 'collective', SEED, {
+          interventions: [
+            {
+              atS: AT_S,
+              change: {
+                kind,
+                changeId: 'rezone-bank',
+                name: 'a defective entry',
+                serviceEvents: [{ atS: 100, bankId: 'main', servesFloors: ['G', '2'] }],
+              },
+            },
+          ],
+        }),
+      );
+      const noun = kind === 'equipment-change' ? 'equipment change' : 'building change';
+      // The kind is named. The warning that used to stand here said *incident answer* for every
+      // refused effect whatever bought it, which would send a reader hunting an incident that
+      // never happened.
+      expect(rewriting.warnings.some((line) => line.includes(`buys ${noun} at 600 s`))).toBe(true);
+      expect(rewriting.warnings.some((line) => line.includes('before the press itself'))).toBe(true);
+      // The refusal is the whole effect: leg for leg, this is the baseline run.
+      expect(JSON.stringify(legsOf(rewriting))).toBe(JSON.stringify(legsOf(baseline)));
+    }, 60_000);
+
+    it(`${kind} throws on an effect naming a bank this run did not build`, () => {
+      expect(() =>
+        runSimulation(
+          run('garden-apartments', 'collective', SEED, {
+            interventions: [
+              {
+                atS: AT_S,
+                change: {
+                  kind,
+                  changeId: 'rezone-bank',
+                  name: 'a corrupt entry',
+                  serviceEvents: [{ atS: 700, bankId: 'sky', servesFloors: ['G'] }],
+                },
+              },
+            ],
+          }),
+        ),
+      ).toThrow(/bank "sky", which this run did not build/u);
+    }, 60_000);
+
+    it(`${kind} throws on a derate that is not a positive load — the third effect shape, checked`, () => {
+      // The derate arm of the vocabulary, reached through a bought change rather than through an
+      // answer, so the generalisation is exercised on all three effect shapes rather than on the
+      // one the tests above happen to use.
+      const change = {
+        kind,
+        changeId: 'larger-cars',
+        name: 'Fit larger cars',
+        serviceEvents: [{ atS: 700, bankId: 'main', carId: 'B', ratedLoadLb: 0, ratedLoadKg: 0 }],
+      } as unknown as RunInterventionConfig['change'];
+      expect(() =>
+        runSimulation(
+          run('garden-apartments', 'collective', SEED, { interventions: [{ atS: AT_S, change }] }),
+        ),
+      ).toThrow(/at 0 kg, which is not a positive load/u);
+    }, 60_000);
+  }
+
+  it('a bought change never reaches the intervention queue — its effects ride the service schedule', () => {
+    /*
+     * The negative control for `#onIntervention`'s new guard. A kind that carries effects is
+     * skipped by `#scheduleInterventions`, so the parking walk below it can never see one; the
+     * guard exists because the fall-through would otherwise have parked the fleet and called it a
+     * rezone. Asserted by the *absence* of a park: a run whose only entry is a bought change with
+     * no effects is byte-identical to one with no log at all, and a stray park walk would break
+     * that on a building whose profile authors no idle stage.
+     */
+    expect(
+      fingerprint(
+        runSimulation(
+          run('garden-apartments', 'collective', 20260811, {
+            interventions: [
+              {
+                atS: 600,
+                change: {
+                  kind: 'building-change',
+                  changeId: 'rezone-bank',
+                  name: 'x',
+                  serviceEvents: [],
+                },
+              },
+            ],
+          }),
+        ),
+      ),
+    ).toBe(fingerprint(runSimulation(run('garden-apartments', 'collective', 20260811))));
+  }, 60_000);
+});

@@ -88,6 +88,24 @@ export {
 
 export type { PatienceConfig, PatienceDistribution } from './patience.js';
 
+/**
+ * The wire’s one derivation — which kinds a submission can carry, why the rest cannot, and the
+ * single union both ends spell it in. See `sim/interventionWire.ts` for why it is in `core`.
+ */
+export {
+  CARRIED_INTERVENTION_KINDS,
+  INTERVENTION_WIRE,
+  interventionKindRefusal,
+} from './interventionWire.js';
+
+export type {
+  CarriedInterventionKind,
+  InterventionWireRule,
+  SwitchOnTheWire,
+  WireIntervention,
+  WireInterventionChange,
+} from './interventionWire.js';
+
 export {
   INTERVENTION_KINDS,
   isInterventionKind,

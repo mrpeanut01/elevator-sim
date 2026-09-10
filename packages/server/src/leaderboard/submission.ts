@@ -32,13 +32,16 @@
  */
 
 import {
+  CARRIED_INTERVENTION_KINDS,
   RULE_ACTION_WORDS,
   RULE_CONDITION_WORDS,
+  interventionKindRefusal,
   isInterventionKind,
   type RuleActionId,
   type RuleConditionId,
   type RuleRowConfig,
   type RunInterventionConfig,
+  type WireIntervention,
 } from '@elevator-sim/core';
 import { createHash } from 'node:crypto';
 
@@ -395,15 +398,19 @@ const MAX_INTERVENTIONS = 64;
  * Written this way round on `core`'s own precedent for `INTERVENTION_KINDS`: a kind added tomorrow
  * is refused here until somebody decides it can travel, where a deny-list would let it through
  * silently and the first symptom would be an honest player accused of a forgery.
- * {@link SubmittedRun.interventions} carries the reason each of the two refused kinds is out.
+ * {@link SubmittedRun.interventions} carries the reason each refused kind is out.
  * `spread-cars` joined `park-cars-lobby` when it landed (GitHub issue #352): the same control with
  * the opposite setting, carrying nothing but its instant.
+ *
+ * **`core`'s table, not a list of its own** — GitHub issues #370 and #371. This was a hand-written
+ * tuple, and `packages/viz`'s `scope/runIdentity.ts` held a second copy of it because § D215 § 3
+ * forbids `viz` importing this package; a test compared the two by reading this file's **source
+ * text**. That pair was two of six places the same set was written down, and the other four — the
+ * TypeScript unions — had no check over them at all. The answer now lives in
+ * `core/src/sim/interventionWire.ts`, which both packages already depend on, and the reason a kind
+ * does not travel is on its own row rather than borrowed from `answer-incident`'s.
  */
-export const SUBMITTABLE_INTERVENTION_KINDS: readonly string[] = Object.freeze([
-  'park-cars-lobby',
-  'spread-cars',
-  'switch-dispatcher',
-]);
+export const SUBMITTABLE_INTERVENTION_KINDS: readonly string[] = CARRIED_INTERVENTION_KINDS;
 
 /** Everything structurally wrong with a submitted rule list, or nothing. */
 function ruleRowIssues(rows: readonly RuleRowConfig[] | undefined): readonly string[] {
@@ -474,11 +481,14 @@ export interface SubmittedSwitch {
   readonly ruleRows?: readonly RuleRowConfig[] | undefined;
 }
 
-/** One entry of the log as the wire carries it: the two parking kinds bare, the switch as ids. */
-export interface SubmittedIntervention {
-  readonly atS: number;
-  readonly change: { readonly kind: 'park-cars-lobby' } | { readonly kind: 'spread-cars' } | SubmittedSwitch;
-}
+/**
+ * One entry of the log as the wire carries it: the two parking kinds bare, the switch as ids.
+ *
+ * **`core`'s union, re-exported** (#370, #371) — it and the three in `packages/viz` spelled the same
+ * arms with no drift test between them, and `core/src/sim/interventionWire.ts` now holds the one
+ * declaration against the allow-list with a compile-time assertion in both directions.
+ */
+export type SubmittedIntervention = WireIntervention;
 
 /** Everything structurally wrong with a submitted intervention log, or nothing. */
 function interventionIssues(log: readonly SubmittedIntervention[] | undefined): readonly string[] {
@@ -500,10 +510,18 @@ function interventionIssues(log: readonly SubmittedIntervention[] | undefined): 
     if (typeof kind !== 'string' || !isInterventionKind(kind)) {
       issues.push(`interventions[${index}].change.kind "${String(kind)}" is not a declared intervention kind`);
     } else if (!SUBMITTABLE_INTERVENTION_KINDS.includes(kind)) {
+      /*
+       * **This kind's own ground, from `core`'s table** — GitHub issue #370. The sentence used to
+       * end *"because an incident answer names an incident this server has no record of"*, which
+       * was the only refused kind's reason standing in for every refused kind. Two more landed with
+       * #370 and the sentence would have told an honest player their submission held an incident
+       * answer it did not hold — a refusal naming the wrong ground, which costs more than a vague
+       * one because it sends them looking for something they did not do.
+       */
       issues.push(
         `interventions[${index}] is a "${kind}", which a submission may not carry — ` +
-          `only ${SUBMITTABLE_INTERVENTION_KINDS.join(', ')} travel, because an incident answer ` +
-          'names an incident this server has no record of, and that refusal is permanent (§ D486)',
+          `only ${SUBMITTABLE_INTERVENTION_KINDS.join(', ')} travel, because ` +
+          `${interventionKindRefusal(kind) ?? 'this build does not say why'}`,
       );
     } else if (kind === 'switch-dispatcher') {
       const change = entry.change as Partial<SubmittedSwitch>;

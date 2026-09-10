@@ -625,13 +625,27 @@ describe('§ 7.6 — the intervention control', () => {
    * are the arms that need nothing the dock holds. And the register stays a constant that is
    * checked, on `screens.ts#UNBUILT_REASONS`'s rule: an entry that ever returns owes its sentence.
    */
-  it('composes no answered incident here — the dock does — and the register is empty', () => {
+  it('composes no answered incident here — the dock does — and the register says what is absent', () => {
     for (const switchTo of [undefined, { target: OTHER, driving: PLAIN }]) {
       for (const row of armsFor(switchTo).rows) {
         expect(row.change.kind).not.toBe('answer-incident');
       }
     }
-    expect(STAGE_ABSENCES).toEqual([]);
+    /*
+     * **The register was empty and holds one entry again** — GitHub issue #370. The sentence above
+     * says the constant is checked rather than deleted precisely so that this can happen, and the
+     * check has to move with it: an entry that is here is one that owes a run, so what is asserted
+     * is the entry *and* the fact it claims. A caller supplying no `works` gets no purchase row,
+     * which is the absence; the arm itself is built, which is why the sentence is narrow.
+     */
+    expect(STAGE_ABSENCES).toHaveLength(1);
+    expect(STAGE_ABSENCES[0]).toContain('no works to buy while the day plays');
+    for (const switchTo of [undefined, { target: OTHER, driving: PLAIN }]) {
+      for (const row of armsFor(switchTo).rows) {
+        expect(row.change.kind).not.toBe('equipment-change');
+        expect(row.change.kind).not.toBe('building-change');
+      }
+    }
   });
 
   it('stamps the latest change at or before the playhead, and nothing later', () => {
@@ -961,7 +975,7 @@ describe('the cutaway’s geometry', () => {
  * -------------------------------------------------------------------------- */
 
 describe('the stage’s own register of absences', () => {
-  it('is empty — the dock, the answer, the handover and the ghost have all been built — and stays checked', () => {
+  it('holds only what is genuinely absent — the four built subjects never come back', () => {
     /*
      * **Keyed on subjects rather than on section numbers** — GitHub issue #207 took the numbers off
      * every player-facing string. Every subject this register ever named is now asserted as an
@@ -978,7 +992,18 @@ describe('the stage’s own register of absences', () => {
      * `live/raceStrip.ts#RACE_FOOTER`, which is never conditional.
      */
     const joined = STAGE_ABSENCES.join('\n');
-    expect(STAGE_ABSENCES).toEqual([]);
+    /*
+     * **The register is no longer empty and the four subjects above are still gone**, which is the
+     * assertion that survived GitHub issue #370 rather than the count. `toEqual([])` stood here and
+     * would have made any honest new absence red — an emptiness check reads *nothing is missing*
+     * where the register's own rule is *what is missing says so*. What must not happen is one of
+     * the built four creeping back, and that is what the four negatives below are.
+     */
+    expect(STAGE_ABSENCES).toHaveLength(1);
+    expect(joined).toContain('no works to buy while the day plays');
+    // …and the one entry is narrow: it claims the *screen* offers none, never that the record
+    // cannot carry one, which would be false of a build whose `core` records both kinds.
+    expect(joined).not.toMatch(/no mid-run purchase|cannot be recorded/i);
     expect(joined).not.toMatch(/no decisions during a run/);
     expect(joined).not.toMatch(/handover/);
     expect(joined).not.toMatch(/ghost|rival/);

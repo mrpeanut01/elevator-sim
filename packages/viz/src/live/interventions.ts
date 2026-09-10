@@ -27,6 +27,8 @@ import {
   type RunInterventionConfig,
 } from '@elevator-sim/core/browser';
 
+import type { PriceSchedule, PricedChange } from '../pricing/types.js';
+
 import { clockAt } from './timeline.js';
 
 /**
@@ -171,6 +173,13 @@ function stampVerbOf(change: InterventionChange): string {
       return `switched to ${change.profile.name}`;
     case 'answer-incident':
       return `answered the incident — ${change.option}`;
+    case 'equipment-change':
+      // GitHub issue #370. The schedule's own tier word (*Equipment*) in the player's register, and
+      // the change's own authored name after it — never `changeId`, which is a key in a data file
+      // and is exactly what gameplay § 16 rule 11 forbids on this surface.
+      return `fitted new equipment — ${change.name}`;
+    case 'building-change':
+      return `changed the building — ${change.name}`;
   }
 }
 
@@ -240,4 +249,227 @@ export function interventionLogOf(
   return [...interventions]
     .sort((a, b) => a.atS - b.atS)
     .map((entry) => `${clockAt(entry.atS, dayStartS)} · ${stampVerbOf(entry.change)}`);
+}
+
+/* -------------------------------------------------------------------------- *
+ * The bought kinds — GitHub issue #370, `docs/38` § 2.3, § D525 clause 4
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Which tier of `data/price-schedule.json` records which intervention kind.
+ *
+ * **The map is the whole of the distinction between the two kinds**, and it lives here rather than
+ * in `core` because a tier is a *pricing* fact: `core` reads no schedule, carries `changeId` as an
+ * opaque string, and would have to learn the ladder to check this. Read off the shipped tier ids,
+ * never off a tier's `order` — `pricing/types.ts` makes the order data so that nothing branches on
+ * a name, and this table branches on the name deliberately, because a *record kind* is a wire
+ * vocabulary and re-keying it to a position would make a re-ordered ladder rewrite history.
+ *
+ * The `dispatcher` tier is deliberately absent and its absence is a decision: a dispatcher change
+ * mid-run is already a kind (`switch-dispatcher`, § 7.6), so a third kind meaning the same press
+ * would be two records for one act. A schedule that grows a fourth tier is refused by name at
+ * {@link worksKindOfTier} rather than guessed at.
+ */
+export const WORKS_KIND_BY_TIER: Readonly<
+  Record<string, 'equipment-change' | 'building-change'>
+> = Object.freeze({
+  equipment: 'equipment-change',
+  building: 'building-change',
+});
+
+/** The kind a tier's purchases are recorded as, or `undefined` for a tier no kind records. */
+export function worksKindOfTier(tierId: string): 'equipment-change' | 'building-change' | undefined {
+  return WORKS_KIND_BY_TIER[tierId];
+}
+
+/**
+ * The control's label for a purchase — the schedule's own name for the change, imperative because
+ * it is a button, with what it costs beside it.
+ *
+ * The price is **read from the schedule and never authored here**, which is #366's founding rule
+ * and the reason `data/fixit-cases.json` stopped carrying a `costUnits` per repair: two price lists
+ * is how the same change comes to cost three different things on three screens.
+ */
+export function worksLabelOf(change: PricedChange): string {
+  return `${change.name} · ${String(change.priceUnits)} units`;
+}
+
+/**
+ * What pressing a purchase does to the record, in one sentence — the parking arm's own shape, with
+ * the two facts that are this kind's alone: the day's fabric moves from this moment, and the crowd
+ * does not move at all.
+ *
+ * The second half is a **promise about the mechanism** and is pinned by a run rather than by this
+ * sentence (`core/src/sim/interventions.test.ts`, *holds the crowd across the press*), which is
+ * § D227's rule read the way it is meant: a control that states what it does owes a measurement,
+ * not a second sentence.
+ */
+export const WORKS_ARM_EXPLAINS =
+  'appends to today’s record at the playhead and re-simulates the day from the start — the ' +
+  'building changes from this moment on, everything before it is unchanged, and the same people ' +
+  'arrive at the same seconds either side of the press';
+
+/*
+ * **What a bought change costs the live path, measured — and it is not what GitHub issue #370
+ * assumed.**
+ *
+ * The issue reads *"a building change re-simulates more than a dispatcher switch"*, and it does
+ * not. Measured on this tree with `runSimulation` over the default 30-minute CIBSE template under
+ * `collective` at seed 20 260 726 — one warm-up then five timed runs, median of five, on an Apple
+ * M1 Max (10 cores, 32 GB, Node v26.5.0), which is the machine clause [§ D483](../../../../DECISIONS.md)
+ * requires of any test-cost figure:
+ *
+ * | building | no log | `switch-dispatcher` | `building-change` (a rezone) |
+ * |---|---|---|---|
+ * | `garden-apartments` | 3.8 ms | 2.6 ms | **1.8 ms** |
+ * | `midtown-office` | 97.0 ms | 94.6 ms | **80.6 ms** |
+ * | `vertical-city` | 357.2 ms | 354.5 ms | **325.2 ms** |
+ *
+ * **A bought change is the cheapest of the three at every size**, and the reason is structural
+ * rather than lucky: the whole day is re-simulated from t = 0 on *every* intervention (contract
+ * § 1.4), so the log's contents cannot change the number of simulations, and a narrowed bank then
+ * serves fewer legs than the same day served without it. There is no arm of this kind that costs
+ * more than a switch, because there is no arm of it that runs anything a switch does not.
+ *
+ * **The top of the range is bounded by § D527's second measurement rather than by this table.**
+ * That figure is **1.33–1.38 s** per 3 600 s replication at the Burj-class reference on the same
+ * machine (`record/burjReference.test.ts`), and it bounds the live path for every kind at once for
+ * the reason above. So the beat's ~400 ms threshold ({@link RECOMPUTING_BEAT}) is crossed by the
+ * *building*, never by what was bought on it: `vertical-city` is under it and the reference is over
+ * it, whichever kind the press was.
+ *
+ * Stated here and not asserted as a bound in a test, deliberately: a wall-clock assertion is a
+ * claim about a machine, and this repository's own rule is that such a figure is dated and named
+ * rather than turned into a gate that goes red on a loaded box. Measured 2026-09-10.
+ */
+
+/** What a rung learns about one mid-run purchase **before** anything is appended to the record. */
+export interface WorksAdmission {
+  readonly admitted: boolean;
+  /** What the schedule prices this change at. `0` when the schedule prices nothing for it. */
+  readonly priceUnits: number;
+  /** What this day's record has already committed — see {@link spentOnWorks}. */
+  readonly spentUnits: number;
+  /** The rung in force. */
+  readonly budgetUnits: number;
+  /** Why it is refused. Never `undefined` when {@link WorksAdmission.admitted} is `false`. */
+  readonly reason: string | undefined;
+}
+
+/**
+ * What a day's record has already spent on mid-run purchases, priced from the schedule.
+ *
+ * **Distinct by change id**, on `pricing/repairPrice.ts#changesBought`'s stated rule: a patch that
+ * trims both dwell settings has bought *one* change, and charging twice would invent a price the
+ * ladder does not hold. The same reading applies down the time axis — a player who re-zones a bank
+ * at 09:00 and re-zones it again at 11:00 has bought the rezone once and used it twice — and saying
+ * so here rather than assuming it is the point, because the opposite reading is equally arguable and
+ * only one of them can be the shipped one.
+ *
+ * An id the schedule does not price contributes **nothing** and is not guessed at, which is
+ * `admitPurchase`'s own treatment of an unpriced dimension; {@link admitWorks} is where an unknown
+ * id is refused, because a refusal belongs at the press and not in an arithmetic helper.
+ */
+export function spentOnWorks(
+  schedule: PriceSchedule,
+  interventions: readonly RunInterventionConfig[],
+): number {
+  const bought = new Map<string, number>();
+  for (const entry of interventions) {
+    const change = entry.change;
+    if (change.kind !== 'equipment-change' && change.kind !== 'building-change') continue;
+    const priced = schedule.changes.find((row) => row.id === change.changeId);
+    if (priced !== undefined) bought.set(priced.id, priced.priceUnits);
+  }
+  return [...bought.values()].reduce((sum, units) => sum + units, 0);
+}
+
+/** Everything {@link admitWorks} needs. */
+export interface WorksAdmissionInput {
+  /** The shipped ladder — `data/price-schedule.json`, parsed. */
+  readonly schedule: PriceSchedule;
+  /** The rung in force: the scenario's base plus whatever chimes have bought (`scenario/budget.ts`). */
+  readonly budgetUnits: number;
+  /** Today's record, so a second purchase is priced against what the first already spent. */
+  readonly interventions: readonly RunInterventionConfig[];
+  /** The change being bought — a `PricedChange.id`. */
+  readonly changeId: string;
+  /** Which kind the press would record, so a tier the id does not sit in is refused by name. */
+  readonly kind: 'equipment-change' | 'building-change';
+}
+
+/**
+ * May this budget pay for this mid-run change? — answered before anything is appended, and
+ * **naming the price and the budget** when it cannot.
+ *
+ * `scenario/budget.ts#admitPurchase` is the same question one substrate over — it prices a set of
+ * moved *search-space dimensions* against a rung — and this is deliberately not folded into it: the
+ * inputs are different (one change id against a running total, rather than a set of dials), the
+ * refusal has to name a running total that does not exist there, and § D528 clause 3 makes the
+ * budget a substrate of its own rather than a second opinion about dials. What is shared is the
+ * arithmetic that matters: both read every price from the schedule and neither writes one down.
+ *
+ * ## The three refusals, in the order they are decided
+ *
+ * 1. **An id the schedule does not price.** Refused rather than charged nothing, because a change
+ *    the ladder has never heard of is a record this build cannot re-derive a spend from — and
+ *    silently free is the worst of the three answers, since it would let a stored record buy the
+ *    tower for nothing. `pricing/parse.ts#priceOf` throws for the same reason; this returns the
+ *    sentence instead, because the caller is a screen.
+ * 2. **A change priced on a tier this kind does not record.** `equipment-change` says *this was
+ *    bought on the equipment rung*, and a record claiming a 20-unit building change was bought there
+ *    is a record whose spend does not reconcile. Refused by name.
+ * 3. **A rung that cannot cover it beside what the day has already spent.** The sentence names the
+ *    price, the budget and the amount already committed, because a refusal that says only *you
+ *    cannot afford this* leaves a player unable to tell a dear change from an exhausted purse.
+ */
+export function admitWorks(input: WorksAdmissionInput): WorksAdmission {
+  const { schedule, budgetUnits, changeId, kind } = input;
+  const spentUnits = spentOnWorks(schedule, input.interventions);
+  const priced = schedule.changes.find((row) => row.id === changeId);
+  if (priced === undefined) {
+    return {
+      admitted: false,
+      priceUnits: 0,
+      spentUnits,
+      budgetUnits,
+      reason:
+        `this build has no price for “${changeId}”, so there is no way to say what it would cost ` +
+        'today — and a change nobody can price is one nobody can be billed for honestly',
+    };
+  }
+  const recordedAs = worksKindOfTier(priced.tier);
+  if (recordedAs !== kind) {
+    return {
+      admitted: false,
+      priceUnits: priced.priceUnits,
+      spentUnits,
+      budgetUnits,
+      reason:
+        `“${priced.name}” is priced on the ${priced.tier} rung of the ladder, and this control buys ` +
+        `on the ${kind === 'equipment-change' ? 'equipment' : 'building'} rung — the day’s record ` +
+        'would say it was paid for somewhere it was not',
+    };
+  }
+  const alreadyBought = input.interventions.some(
+    (entry) =>
+      (entry.change.kind === 'equipment-change' || entry.change.kind === 'building-change') &&
+      entry.change.changeId === changeId,
+  );
+  // A change already on today's record costs nothing to repeat — {@link spentOnWorks}' distinct-by-id
+  // rule, read at the press so the two cannot disagree about what a second rezone costs.
+  const owed = alreadyBought ? 0 : priced.priceUnits;
+  if (spentUnits + owed <= budgetUnits) {
+    return { admitted: true, priceUnits: priced.priceUnits, spentUnits, budgetUnits, reason: undefined };
+  }
+  return {
+    admitted: false,
+    priceUnits: priced.priceUnits,
+    spentUnits,
+    budgetUnits,
+    reason:
+      `“${priced.name}” costs ${String(priced.priceUnits)} units and today’s budget holds ` +
+      `${String(budgetUnits)}, with ${String(spentUnits)} already spent on this day’s changes. ` +
+      'A wider budget is bought with chimes; the bar the day is judged against does not move with it.',
+  };
 }

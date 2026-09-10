@@ -388,9 +388,22 @@ export type TimeoutPolicy = (typeof TIMEOUT_POLICIES)[number];
  * `packages/viz`'s `watch/record.ts#recordUnreadableReason` refuses to re-ask a stored record
  * that names one, on the same footing it refuses an unknown rule condition.
  */
-export const INTERVENTION_KINDS = ['park-cars-lobby', 'switch-dispatcher', 'answer-incident', 'spread-cars'] as const;
+export const INTERVENTION_KINDS = [
+  'park-cars-lobby',
+  'switch-dispatcher',
+  'answer-incident',
+  'spread-cars',
+  'equipment-change',
+  'building-change',
+] as const;
 
 /**
+ * **Widened on GitHub issue #370**, and the sentence above about widening is the reason this is a
+ * one-line edit rather than a redesign. `sim/interventionWire.ts` is now the export that needs to
+ * *say* the type — it declares, per kind, whether a submission can carry it — so the paragraph
+ * below has been overtaken in its narrow claim and is kept because its rule is the one that
+ * decided the widening.
+ *
  * Deliberately **not** re-exported from `sim/index.ts` or `browser.ts`, and the absence is the
  * record of a review finding: it went out on both barrels with no consumer anywhere, which is a
  * barrel re-export standing in for a caller — the shape docs/05's standing requirement names.
@@ -465,6 +478,41 @@ export function isInterventionKind(id: string): id is InterventionKind {
  * refused loudly. `option` is the option's own player-facing words, carried so the stamp and the
  * report can say *what* was answered from the record alone — a spectator replaying the day gets the
  * same sentence — and it is authored copy, never an engine identifier.
+ *
+ * ## `equipment-change` and `building-change` — GitHub issue #370, `docs/38` § 2.3, § D525 clause 4
+ *
+ * The player buys a change to the tower *while the day plays*, and the press is stamped at the
+ * playhead like every other. Two kinds rather than one because the two are priced on **different
+ * rungs of one ladder** (`data/price-schedule.json`'s `equipment` and `building` tiers), and the
+ * record has to say which rung was paid on or the day's spend cannot be re-derived from it. The
+ * tier is a *pricing* fact and deliberately not an engine one — `core` reads no price schedule and
+ * must not learn to — so {@link InterventionChange.changeId} travels as an opaque id, exactly as
+ * `answer-incident`'s `option` travels as opaque copy, and `packages/viz/src/pricing/` is the only
+ * thing that resolves either to a number.
+ *
+ * **The effect is `ResolvedServiceEvent`, and that is the whole design decision.** `charter`
+ * non-goal 7 and `docs/38` § 4 forbid a second engine, and this engine already has exactly one
+ * plain-data vocabulary for *the building changing mid-run* — a car's mode, a bank's serving range,
+ * a car's rated load (§ D523). A second vocabulary for "equipment" would be a second engine for
+ * fabric, wrong the day either copy moved, which is the argument `#scheduleServiceEvents` already
+ * makes about why an incident answer may not apply `Car.setMode` itself. So both new kinds ride the
+ * one service schedule and add no event kind, no handler and no mechanism.
+ *
+ * **What that vocabulary can and cannot reach, said out loud rather than left to be discovered.**
+ * Of the shipped schedule's twenty-one `equipment` and `building` rows, the ones a mid-run effect
+ * reaches are the ones that move a bank's range (`zone-the-tower` at the equipment tier,
+ * `rezone-bank` at the building tier), a car's rated load (`larger-cars`, `larger-cars-21`) or a
+ * car's availability. The ones it does **not** reach are door timings and rated speed —
+ * `Car.doorConfig` and `Car.constraints` are frozen for the run by construction, and every motion
+ * profile and every `estimateCost` hypothetical is built against them — and anything that moves
+ * `floorPopulations`, which is refused for a different and stronger reason: the crowd is generated
+ * from the seed before the first event fires, and § 2.3's *"the crowd is the same crowd either side
+ * of the press"* is the property this kind exists to protect. A change the engine cannot carry is a
+ * change the pricing layer must not offer; `packages/viz/src/live/interventions.ts` holds that list
+ * and the reason for each, because it is the layer that reads the schedule.
+ *
+ * `name` is the player-facing words, `option`'s footing exactly: carried so the stamp and the
+ * report can say *what* was bought from the record alone, and never an engine identifier.
  */
 export type InterventionChange =
   | {
@@ -488,6 +536,35 @@ export type InterventionChange =
        * legal — an answer whose effect is reassurance alone still belongs on the record, because the
        * stamp is the point.
        */
+      readonly serviceEvents: readonly ResolvedServiceEvent[];
+    }
+  | {
+      readonly kind: 'equipment-change';
+      /**
+       * The priced change's id in `data/price-schedule.json` — **opaque here**. `core` reads no
+       * price schedule and this field is never resolved to a number in this package; it is the key
+       * `packages/viz/src/pricing/parse.ts#priceOf` looks the price up under, carried on the record
+       * so a day's spend can be re-derived from the record alone.
+       */
+      readonly changeId: string;
+      /** What the schedule calls it, in the player's own words. Never an engine identifier. */
+      readonly name: string;
+      /**
+       * What it does to the building, at or after the press: service events — a car's mode, a
+       * bank's range or a car's rated load (§ D523) — every car and bank located. Empty is legal
+       * for the same reason it is legal on an answer: the stamp is a fact about the day whatever
+       * the effect was, and a purchase whose effect this build cannot carry is refused where the
+       * price is read, not here.
+       */
+      readonly serviceEvents: readonly ResolvedServiceEvent[];
+    }
+  | {
+      readonly kind: 'building-change';
+      /** The priced change's id — {@link InterventionChange.changeId}'s footing, other tier. */
+      readonly changeId: string;
+      /** What the schedule calls it, in the player's own words. Never an engine identifier. */
+      readonly name: string;
+      /** What it does to the fabric, at or after the press. The equipment arm's field exactly. */
       readonly serviceEvents: readonly ResolvedServiceEvent[];
     };
 

@@ -45,6 +45,7 @@ import {
   type DispatcherProfile,
   type RuleRowConfig,
   type RunInterventionConfig,
+  type WireIntervention as CoreWireIntervention,
 } from '@elevator-sim/core/browser';
 
 import type { RuleRow } from '../authoring/ruleSpec.js';
@@ -84,14 +85,17 @@ export interface PostedRow {
   readonly legs: number | undefined;
 }
 
-/** One entry of the wire's log — `menu/client.ts#SubmittedIntervention`, restated for the reason above. */
-export interface WireIntervention {
-  readonly atS: number;
-  readonly change:
-    | { readonly kind: 'park-cars-lobby' }
-    | { readonly kind: 'spread-cars' }
-    | { readonly kind: 'switch-dispatcher'; readonly toProfileId: string; readonly ruleRows?: readonly WireRow[] | undefined };
-}
+/**
+ * One entry of the wire's log — **`core`'s union at this module's own row type**.
+ *
+ * `core/src/sim/interventionWire.ts` declares the arms once (GitHub issues #370, #371) and takes
+ * the row type as a parameter, precisely so that this module can keep the distinction it makes
+ * deliberately: a row read off a board is *strings until it is checked*, which is what
+ * {@link WireRow} is, while `switchWire.ts` and the server hold rows `core` has already typed.
+ * Flattening the two would have been the cost of sharing one union, and parameterising is what
+ * avoids it.
+ */
+export type WireIntervention = CoreWireIntervention<WireRow>;
 
 /** The subtitle a posted row carries — where it sits on the board it was read from. */
 export function postedSubtitleOf(place: number): string {

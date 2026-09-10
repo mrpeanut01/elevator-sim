@@ -1400,9 +1400,15 @@ const LIVE_RAIL: SurfaceAdapter = {
     seeds.push({ field: 'switchButton.title', text: SWITCH_PINS_NOTE, role: 'observation' });
     seeds.push({ field: 'interventionStamp.recomputing', text: RECOMPUTING_BEAT, role: 'observation' });
     /*
-     * One log carrying all four kinds, stamped across the run, so every stamp sentence enters the
-     * corpus at the playheads that can show it — and the deliberate `''` before the first, which is
-     * what keeps `interventionStampOf`'s temporal property met by construction.
+     * One log carrying **all six** kinds, stamped across the run, so every stamp sentence enters
+     * the corpus at the playheads that can show it — and the deliberate `''` before the first,
+     * which is what keeps `interventionStampOf`'s temporal property met by construction.
+     *
+     * The two bought kinds joined on GitHub issue #370, seeded with a shipped `changeId` and the
+     * schedule's own name for it. Their **price and refusal** are deliberately *not* seeded here:
+     * no screen draws them yet, and a string the corpus sweeps that nothing renders is coverage
+     * manufactured rather than earned — `derive.test.ts` carries the same reasoning for
+     * `scenario/budget.ts#admitPurchase`, and both enter an adapter on the commit that draws them.
      */
     const third = (recording.endedAt - recording.startedAt) / 3;
     const interventionLog = [
@@ -1420,6 +1426,24 @@ const LIVE_RAIL: SurfaceAdapter = {
         change: {
           kind: 'answer-incident',
           option: 'call the fitter out now',
+          serviceEvents: [],
+        } as const,
+      },
+      {
+        atS: recording.startedAt + third * 2.25,
+        change: {
+          kind: 'equipment-change',
+          changeId: 'zone-the-tower',
+          name: 'Zone the tower',
+          serviceEvents: [],
+        } as const,
+      },
+      {
+        atS: recording.startedAt + third * 2.5,
+        change: {
+          kind: 'building-change',
+          changeId: 'rezone-bank',
+          name: 'Re-zone a bank',
           serviceEvents: [],
         } as const,
       },
@@ -2956,6 +2980,22 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
        */
       interventions: [
         { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } },
+        /*
+         * And a bought change beside it — GitHub issue #370. Two presses rather than one, because
+         * the sheet's claim is *in time order* and a single line cannot show an ordering; and this
+         * kind rather than a third parking press, because its stamp is the one the sweep has never
+         * read. Effects are `[]`: this bundle renders a filed sheet from a recording it did not
+         * re-simulate, so an effect here would describe a day the numbers above it do not.
+         */
+        {
+          atS: (recording.startedAt + recording.endedAt) * 0.6,
+          change: {
+            kind: 'building-change',
+            changeId: 'rezone-bank',
+            name: 'Re-zone a bank',
+            serviceEvents: [],
+          },
+        },
       ],
       /*
        * And a **ruled** day, so the sheet's rule lines and its fallback sentence are in the corpus
@@ -12145,10 +12185,13 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
     /*
      * `everyday/stageScreenModel.ts#STAGE_ABSENCES` stood here until GitHub issue #171 (§ D507)
-     * emptied it. An empty array produces no prose, so `derive.test.ts` no longer finds it and a
-     * `covers` entry would be a coverage claim for nothing; the register itself is still drawn,
-     * as the section's `empty` line below.
+     * emptied it, and it is **back** because GitHub issue #370 put a sentence in it: an empty array
+     * produces no prose and is found by nothing, so the `covers` entry came out with the entries
+     * and goes back in with them. The register was drawn either way — as the section's `empty` line
+     * while it was empty, and as a seeded entry now — so what moved is the coverage claim rather
+     * than the rendering, which is what an emptied-and-refilled register is supposed to look like.
      */
+    'everyday/stageScreenModel.ts#STAGE_ABSENCES',
     'everyday/rushScreenModel.ts#RUSH_ABSENCES',
     'everyday/designerModel.ts#DESIGNER_ABSENCES',
     'campaign/career.ts#CAMPAIGN_ABSENCES',

@@ -38,6 +38,8 @@
  * the absence lexically, because *"we do not time out"* is a claim about every future edit.
  */
 
+import type { WireIntervention as CoreWireIntervention } from '@elevator-sim/core/browser';
+
 import type {
   ChallengeBoardPage,
   ChallengeBoardRow,
@@ -162,18 +164,14 @@ export interface SubmittedRuleRow {
  * and `scope/runIdentity.ts` refuses a state whose switch cannot be translated before it reaches
  * this shape. The server re-derives the vector through its own `profileWithRules`, exactly as it
  * does for the run's base profile.
+ *
+ * **`core`'s union at this module's own row type** — GitHub issues #370 and #371. The arms were
+ * spelled out here and in three other files, with no drift test over any of them;
+ * `core/src/sim/interventionWire.ts` declares them once and parameterises the row so this module
+ * keeps `SubmittedRuleRow`, which is deliberately looser than `core`'s `RuleRowConfig` because a
+ * submission's rows are strings until the server checks them.
  */
-export interface SubmittedIntervention {
-  readonly atS: number;
-  readonly change:
-    | { readonly kind: 'park-cars-lobby' }
-    | { readonly kind: 'spread-cars' }
-    | {
-        readonly kind: 'switch-dispatcher';
-        readonly toProfileId: string;
-        readonly ruleRows?: readonly SubmittedRuleRow[] | undefined;
-      };
-}
+export type SubmittedIntervention = CoreWireIntervention<SubmittedRuleRow>;
 
 export interface ClaimedMetrics {
   readonly awtS: number;
