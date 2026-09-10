@@ -15,6 +15,7 @@ import {
   positionAt,
   profileDuration,
   speedAt,
+  topSpeedFor,
   travelTime,
   velocityAt,
 } from './index.js';
@@ -804,7 +805,7 @@ describe('analytic consistency', () => {
  * -------------------------------------------------------------------------- */
 
 describe('direction', () => {
-  it('up and down travel mirror each other exactly', () => {
+  it('up and down travel mirror each other exactly under a SYMMETRIC envelope', () => {
     const up = buildProfile(38, GEARED);
     const down = buildProfile(-38, GEARED);
 
@@ -1139,5 +1140,252 @@ describe('properties over random profiles', () => {
       const fastTime = travelTime(distance, { ratedSpeedMps: faster, acceleration, jerk });
       expect(fastTime).toBeLessThanOrEqual(slowTime + 1e-12);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Two speeds — GitHub issue #444
+ *
+ * A car may descend more slowly than it climbs, by design (TWIN: about 7 m/s up,
+ * 4 m/s down) or because the air-pressure cap in data/elevator-specs.json bites
+ * above a supertall's travel. Absent a `descentSpeedMps` a car is symmetric, and
+ * that is the state every pinned run in this repository is in.
+ *
+ * The three claims below are the ones that would still pass on a defective
+ * implementation if they were written loosely, so each is written against the
+ * value the defect would really produce rather than against a direction:
+ *
+ *  - a cap that was ignored produces the *ascent* time, so the descent assertion
+ *    compares against `travelTime(+d, symmetric)` by exact equality and fails on
+ *    it, not against `toBeGreaterThan(0)`;
+ *  - a cap applied in both directions would pass any test that only looks at the
+ *    down leg, so the up leg is pinned to the symmetric car by exact equality;
+ *  - a cap applied to *every* profile regardless of the constraint would pass
+ *    both of those, so the symmetric arm asserts bit-identity over 2 000 random
+ *    envelopes rather than on one fixture.
+ * -------------------------------------------------------------------------- */
+
+/** TWIN, as Al-Kodmany records it: up to 7 m/s up, about 4 m/s down. */
+const TWIN: MotionConstraints = {
+  ratedSpeedMps: 7,
+  descentSpeedMps: 4,
+  acceleration: 1.2,
+  jerk: 1.2,
+};
+
+/** The same machine with no asymmetry declared — the negative control for every case below. */
+const TWIN_SYMMETRIC: MotionConstraints = {
+  ratedSpeedMps: 7,
+  acceleration: 1.2,
+  jerk: 1.2,
+};
+
+/** Long enough that both envelopes are `speedLimited`, so the cruise phase carries the difference. */
+const LONG_TRAVEL_M = 300;
+
+describe('two speeds (issue #444)', () => {
+  it('descends at the descent limit and climbs at the rated speed', () => {
+    const down = buildProfile(-LONG_TRAVEL_M, TWIN);
+    const up = buildProfile(LONG_TRAVEL_M, TWIN);
+
+    expect(down.topSpeedLimitMps).toBe(4);
+    expect(up.topSpeedLimitMps).toBe(7);
+    expect(down.peakSpeedMps).toBeCloseTo(4, 9);
+    expect(up.peakSpeedMps).toBeCloseTo(7, 9);
+    // Both still reach *their* limit; `reachesRatedSpeed` means the limit in force.
+    expect(down.reachesRatedSpeed).toBe(true);
+    expect(up.reachesRatedSpeed).toBe(true);
+  });
+
+  it('makes the down leg slower than the up leg by the whole of the speed difference', () => {
+    const downS = travelTime(-LONG_TRAVEL_M, TWIN);
+    const upS = travelTime(LONG_TRAVEL_M, TWIN);
+
+    // The value a cap that was silently ignored would produce. Exact equality, because a
+    // symmetric car and an asymmetric one running *up* solve identical arithmetic.
+    expect(upS).toBe(travelTime(LONG_TRAVEL_M, TWIN_SYMMETRIC));
+    expect(downS).not.toBe(upS);
+
+    /*
+     * Pinned rather than bounded. Both legs are `speedLimited`, so the whole difference is
+     * cruise arithmetic and is exact: the ramps consume `dRated` metres at each speed
+     * (`V·(2·Tj + Ta)`) and the rest cruises, giving
+     * `(300 − dRated₄)/4 + rampS₄ − (300 − dRated₇)/7 − rampS₇ = 29.642857142857153 s`.
+     * A bound of "greater than 30" was written first and was wrong by a third of a second,
+     * which is the argument for pinning: a band wide enough to be safe is wide enough to
+     * accept a defect.
+     */
+    expect(downS - upS).toBeCloseTo(29.642_857_142_857_153, 9);
+  });
+
+  it('leaves the UP leg untouched — the cap is not applied in both directions', () => {
+    // The check the loose version of the previous case would miss. An implementation that
+    // took `Math.min(rated, descent)` for every profile would pass "down is slower" and fail
+    // here, and this is the exact-equality form: not "close to", not "less than".
+    for (const distance of [0.5, 3.8, 12, 76.9, LONG_TRAVEL_M]) {
+      expect(travelTime(distance, TWIN)).toBe(travelTime(distance, TWIN_SYMMETRIC));
+      expect(buildProfile(distance, TWIN).duration).toBe(
+        buildProfile(distance, TWIN_SYMMETRIC).duration,
+      );
+    }
+  });
+
+  it('is byte-identical to the pre-#444 model when no descent speed is declared', () => {
+    /*
+     * The byte-identity proof, at the layer that decides it. Every pinned run in this
+     * repository is built from cars with no `descentSpeedMps`, so if the two directions of a
+     * symmetric envelope are bit-identical over the whole reference space, no pin can move.
+     *
+     * `toBe` on the full JSON of the profile rather than on the duration alone: a defect that
+     * moved only `peakSpeedMps`, only a phase boundary, or only the echoed constraints would
+     * survive a duration comparison and change what the renderer draws.
+     */
+    const rng = new Pcg32(20_260_910n);
+    for (let i = 0; i < 2000; i += 1) {
+      const constraints: MotionConstraints = {
+        ratedSpeedMps: 0.5 + rng.nextFloat() * 20,
+        acceleration: 0.4 + rng.nextFloat() * 1.1,
+        jerk: 0.4 + rng.nextFloat() * 1.2,
+      };
+      const distance = rng.nextFloat() * 500;
+
+      // Up and down solve the same arithmetic under a symmetric envelope.
+      expect(travelTime(-distance, constraints)).toBe(travelTime(distance, constraints));
+
+      const down = buildProfile(-distance, constraints);
+      const up = buildProfile(distance, constraints);
+      expect(down.topSpeedLimitMps).toBe(constraints.ratedSpeedMps);
+      expect(up.topSpeedLimitMps).toBe(constraints.ratedSpeedMps);
+      expect(down.duration).toBe(up.duration);
+      expect(down.peakSpeedMps).toBe(up.peakSpeedMps);
+      expect(down.kind).toBe(up.kind);
+
+      // And the echoed envelope carries exactly the three keys it carried before #444 — no
+      // `descentSpeedMps: undefined` for a strict structural comparison to trip over.
+      expect(Object.keys(up.constraints).sort()).toEqual([
+        'acceleration',
+        'jerk',
+        'ratedSpeedMps',
+      ]);
+    }
+  });
+
+  it('echoes a declared descent speed back on the profile and nothing else', () => {
+    expect(Object.keys(buildProfile(-10, TWIN).constraints).sort()).toEqual([
+      'acceleration',
+      'descentSpeedMps',
+      'jerk',
+      'ratedSpeedMps',
+    ]);
+  });
+
+  it('a descent speed equal to the rated speed is the same run as declaring none', () => {
+    /*
+     * Not a predicate, a run. A first draft of this change exported an
+     * `isDirectionallyAsymmetric(constraints)` helper for this question and **nothing outside a
+     * test ever called it** — `config/` reads `ResolvedCar.descentSpeedMps`'s own absence rule and
+     * `analytical/` may not import the physics at all — so it was deleted rather than shipped as
+     * the twelfth instance of this repository's signature defect. What the helper was for is
+     * asserted here directly, on the thing that matters: an equal pair produces bit-identical
+     * timings, so `descentSpeedMps: 7` on a 7 m/s car is not a configuration the run can tell
+     * from no descent speed at all.
+     */
+    const declaredEqual: MotionConstraints = { ...TWIN_SYMMETRIC, descentSpeedMps: 7 };
+    expect(travelTime(-LONG_TRAVEL_M, declaredEqual)).toBe(
+      travelTime(-LONG_TRAVEL_M, TWIN_SYMMETRIC),
+    );
+    expect(buildProfile(-LONG_TRAVEL_M, declaredEqual).topSpeedLimitMps).toBe(
+      buildProfile(-LONG_TRAVEL_M, TWIN_SYMMETRIC).topSpeedLimitMps,
+    );
+    // And `resolveCar` never produces that configuration in the first place — `resolveCar.test.ts`
+    // and `config/descentCap.test.ts` own the absence rule that makes it unreachable from data.
+  });
+
+  it('reports the limit in force through topSpeedFor, in both directions and at rest', () => {
+    expect(topSpeedFor(TWIN, 1)).toBe(7);
+    expect(topSpeedFor(TWIN, -1)).toBe(4);
+    // A stationary profile has no descent to limit; the rated speed is the honest answer and
+    // it is what the solver uses, so a zero-distance move cannot depend on which way it "went".
+    expect(topSpeedFor(TWIN, 0)).toBe(7);
+    expect(topSpeedFor(TWIN_SYMMETRIC, -1)).toBe(7);
+  });
+
+  it('refuses a descent limit that is not a finite positive number', () => {
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => assertMotionConstraints({ ...TWIN_SYMMETRIC, descentSpeedMps: bad })).toThrow(
+        RangeError,
+      );
+      expect(() => buildProfile(-10, { ...TWIN_SYMMETRIC, descentSpeedMps: bad })).toThrow(
+        RangeError,
+      );
+    }
+  });
+
+  it('accepts a descent limit ABOVE the rated speed — the refusal belongs to config', () => {
+    // Not a physics rule. `config/parse.ts` warns `descent-above-rated-speed` with a located
+    // path, which is where a judgement about a suspicious pair belongs; this module would only
+    // be able to throw, and throwing here would make a legal document unloadable.
+    const quickDown: MotionConstraints = { ...TWIN_SYMMETRIC, descentSpeedMps: 9 };
+    expect(() => assertMotionConstraints(quickDown)).not.toThrow();
+    expect(travelTime(-LONG_TRAVEL_M, quickDown)).toBeLessThan(
+      travelTime(LONG_TRAVEL_M, quickDown),
+    );
+  });
+});
+
+describe('travelTime is never called on an absolute distance (issue #444)', () => {
+  /*
+   * **A repository-wide guard, derived from disk rather than transcribed.**
+   *
+   * `travelTime(Math.abs(to - from), car)` reads correctly and is a real defect on any car
+   * with a descent limit: it prices a descent at the ascent speed. Two call sites had exactly
+   * that shape when #444 landed — the express return leg of the closed-form oracle in
+   * `analytical/validation.test.ts` and its twin in `experiments/oracle/upPeakCase.ts` — and
+   * both were descents written as absolute values, invisible for the whole life of the project
+   * because no car had two speeds.
+   *
+   * Nothing in a type system can catch a third: `number` is `number` whichever sign it carries.
+   * So the guard is a scan of the source, in the same spirit as `deadCode.test.ts`'s
+   * directory census — it can only be defeated by writing the defect in a form this pattern
+   * does not match, which is a different and much louder act than adding a plausible line.
+   */
+  it('holds across every package', async () => {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+
+    // `packages/` itself — this file sits four directories below it
+    // (`core/src/physics/motion/`), and the guard has no business outside the workspace.
+    const packagesDir = fileURLToPath(new URL('../../../..', import.meta.url));
+    const offenders: string[] = [];
+    const skip = new Set(['node_modules', 'dist', '.git', 'coverage', '.claude']);
+
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        if (skip.has(entry)) continue;
+        const path = join(dir, entry);
+        if (statSync(path).isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if (!entry.endsWith('.ts')) continue;
+        // This file and the two docstrings that name the defect quote the pattern on purpose.
+        if (path.endsWith('sCurve.test.ts')) continue;
+        if (path.endsWith(join('physics', 'motion', 'sCurve.ts'))) continue;
+        if (path.endsWith(join('physics', 'motion', 'types.ts'))) continue;
+        const source = readFileSync(path, 'utf8');
+        for (const [index, line] of source.split('\n').entries()) {
+          if (/travelTime\(\s*Math\.abs\(/u.test(line)) {
+            offenders.push(`${path}:${index + 1}`);
+          }
+        }
+      }
+    };
+    walk(packagesDir);
+
+    expect(
+      offenders,
+      'travelTime chooses the top speed from the sign of its argument; an absolute distance prices a descent at the ascent speed',
+    ).toEqual([]);
   });
 });

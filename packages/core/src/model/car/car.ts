@@ -166,9 +166,14 @@ export const CAR_DEFAULTS = Object.freeze({
  * anything about elevators. `car.*` ids resolve against a car in a building config,
  * `answer.*` against a dispatcher profile's answer stage.
  *
- * Rated speed, acceleration, jerk, the door timings and the car's **service mode** are not
- * here: they are already declared by `config/schema.ts` and `DOOR_PARAMETERS` respectively, and
- * a second declaration would be a second source of truth. `car.mode` is the newest of them and
+ * Rated speed, the descent limit, whether the cabin is pressurised, acceleration, jerk, the door
+ * timings and the car's **service mode** are not here: they are already declared by
+ * `config/schema.ts` and `DOOR_PARAMETERS` respectively, and a second declaration would be a
+ * second source of truth. The two newest — `descentSpeedMps` and `cabinPressurised`, GitHub issue
+ * #444 — are excluded for the same reason and for one more: neither is a dimension a *dispatcher*
+ * search may hold, because the air-pressure cap is a fact about the shaft and pressurising a
+ * cabin is a purchase, and a tuner that bought hardware to improve an objective would be
+ * measuring the budget rather than the dispatcher. `car.mode` is the newest of them and
  * the rule bites the same way — it is a `carConfigSchema` field with a `z.enum(SERVICE_MODES)`,
  * exactly as `doorType` is, so its schema (CLAUDE.md invariant 8) is declared there. It would
  * also be the wrong dimension for a dispatcher search to hold: a tuner that took its own fleet
@@ -322,6 +327,17 @@ export class Car implements CarLike {
     );
     this.constraints = Object.freeze({
       ratedSpeedMps: init.spec.ratedSpeedMps,
+      /*
+       * **Present only when the car actually has two speeds** (GitHub issue #444). `resolveCar`
+       * leaves `descentSpeedMps` absent on a symmetric car — an authored asymmetry that equals
+       * the rated speed, and an air-pressure cap that does not bite, both resolve to absent —
+       * so a spread here reproduces the exact three-key envelope every pinned run was built
+       * against, and `sim/simulation.test.ts`'s byte-identity arm is an equality rather than a
+       * tolerance.
+       */
+      ...(init.spec.descentSpeedMps === undefined
+        ? {}
+        : { descentSpeedMps: init.spec.descentSpeedMps }),
       acceleration: init.spec.acceleration,
       jerk: init.spec.jerk,
     });

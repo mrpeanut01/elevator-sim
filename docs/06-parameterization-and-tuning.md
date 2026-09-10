@@ -27,7 +27,9 @@ The industry-standard knobs, already captured in
 
 | Parameter | Typical range | Effect |
 |---|---|---|
-| `ratedSpeedMps` | 0.5–20.5 | Top speed; irrelevant on short hops |
+| `ratedSpeedMps` | 0.5–20.5 | Top speed **upwards**; irrelevant on short hops |
+| `descentSpeedMps` | 0.5–20.5, optional | Top speed downwards where the machine is asymmetric by design (TWIN: ~7 up, ~4 down). Omit for a car that descends as fast as it climbs, which is every shipped car |
+| `cabinPressurised` | boolean, default false | Lifts the air-pressure descent cap. Buys nothing on a bank below `airPressure.appliesAboveTravelM`, which is the point: it is a decision rather than a dominant buy |
 | `acceleration` | 0.6–1.2 m/s² | Dominates short-hop time |
 | `jerk` | 0.8–1.6 m/s³ | Comfort limit; dominates very short hops |
 | `motorStartDelayS` | ~0.5 | Fixed cost per start |

@@ -1303,6 +1303,20 @@ simplification, not a broken simulation. Implement that calculation
 as a test. If simulation and closed form diverge, assume the simulation is wrong until
 proven otherwise.
 
+**One configuration is exempt, and the exemption is mechanised rather than promised.** Since GitHub
+issue #444 a car may have two top speeds — a rated speed up and a lower descent limit, by design
+(TWIN) or by `data/elevator-specs.json`'s air-pressure cap above 300 m of travel. The published
+expression has exactly one `tv` and charges it twice, `2·(H·tv + tx)`, so it has nowhere to put the
+asymmetry; extending it here would mean validating the simulator against arithmetic no reference
+states, which is the circularity `analytical/`'s import discipline exists to prevent. So the
+expression is left exactly as CIBSE publishes it, `CLOSED_FORM_ASSUMPTIONS` carries the divergence
+as `symmetric-speed` (`bias: 'under'`), and `analyzeUpPeak` raises
+`UP_PEAK_WARNING_CODES.directionalSpeedAsymmetry` on any bank whose cars have one — so a residual
+measured there arrives with the reason attached rather than as a defect. **It is raised on no
+shipped building**, because every shipped car is symmetric, which is the difference between a
+disclaimer and a defect. Under a symmetric configuration the oracle agrees exactly as it did:
+`analytical/validation.test.ts` runs unchanged at its pinned tolerances.
+
 ## Modeling rules that are easy to get wrong
 
 - **Cars fill to 80% of rated capacity, not 100%.** Using 1.0 makes everything
@@ -1344,7 +1358,10 @@ proven otherwise.
 
 ## Reference data
 
-- [`data/elevator-specs.json`](data/elevator-specs.json) — elevator classes, capacities, timings
+- [`data/elevator-specs.json`](data/elevator-specs.json) — elevator classes, capacities, timings, and the
+  `airPressure` block: the descent cap above a declared travel and the cabin pressurisation that
+  lifts it. That block is not a property of a class, which is why it sits beside them rather than
+  inside one.
 - [`data/traffic-profiles.json`](data/traffic-profiles.json) — demand profiles by building type
 - [`data/dispatcher-profiles.json`](data/dispatcher-profiles.json) — cost term library and dispatcher weight vectors
 - [`data/buildings/`](data/buildings/) — test building configs; see its README for the schema

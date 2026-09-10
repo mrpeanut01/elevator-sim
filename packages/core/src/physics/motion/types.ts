@@ -20,17 +20,28 @@
  * always non-negative and the profile is symmetric in time. {@link MotionProfile.direction}
  * carries the sign, and the signed accessors (`positionAt`, `velocityAt`, `accelerationAt`,
  * `kinematicsAt`) apply it. The unsigned accessors (`distanceTravelledAt`, `speedAt`) return
- * the travel-frame magnitudes, so "speed never exceeds rated speed" is expressible without
- * an absolute value at every call site.
+ * the travel-frame magnitudes, so "speed never exceeds the limit in force" is expressible
+ * without an absolute value at every call site. **The limit in force**, not the rated speed:
+ * since GitHub issue #444 a down leg may be bound by {@link MotionConstraints.descentSpeedMps}
+ * instead, and {@link MotionProfile.topSpeedLimitMps} is the one the profile actually solved
+ * against.
  *
  * ## No new tunables
  *
- * {@link MotionConstraints} deliberately declares exactly the three fields
- * `ResolvedCar` already carries (`ratedSpeedMps`, `acceleration`, `jerk`), so a
- * `ResolvedCar` is structurally assignable to it and this module needs no dependency on
- * `config/`. The schema, ranges and defaults for those three numbers live where they belong
- * — `data/elevator-specs.json` and `config/schema.ts` (CLAUDE.md invariants 7 and 8). This
- * module introduces no tunable of its own.
+ * {@link MotionConstraints} deliberately declares exactly the fields `ResolvedCar` already
+ * carries (`ratedSpeedMps`, `descentSpeedMps`, `acceleration`, `jerk`), so a `ResolvedCar` is
+ * structurally assignable to it and this module needs no dependency on `config/`. The schema,
+ * ranges and defaults for those numbers live where they belong — `data/elevator-specs.json`
+ * and `config/schema.ts` (CLAUDE.md invariants 7 and 8). This module introduces no tunable of
+ * its own.
+ *
+ * ## Direction
+ *
+ * A car may have two top speeds (GitHub issue #444). Which one binds is read off the **sign of
+ * the displacement** the caller already passes — `buildProfile(target - here)` and
+ * `travelTime(to - from)` — so there is no second way of saying *down* that could disagree
+ * with the first. `travelTime(Math.abs(...))` is therefore a real bug on an asymmetric car and
+ * `sCurve.test.ts` holds a repository-wide guard against it.
  */
 
 /**
@@ -49,8 +60,38 @@ export type MotionDirection = -1 | 0 | 1;
  * this interface structurally; there is no conversion step.
  */
 export interface MotionConstraints {
-  /** Rated (top) speed, m/s. The speed the car cruises at when the trip is long enough. */
+  /**
+   * Rated (top) speed, m/s. The speed the car cruises at when the trip is long enough.
+   *
+   * **Upwards** since GitHub issue #444, and only nominally: absent a {@link descentSpeedMps}
+   * this is the top speed in both directions, which is what it has always meant and what every
+   * pinned run still runs at.
+   */
   readonly ratedSpeedMps: number;
+  /**
+   * Top speed **downwards**, m/s, when it differs from {@link ratedSpeedMps}.
+   *
+   * **Absent means symmetric**, and absent is the default: a car that declares nothing here
+   * descends at its rated speed, which is the model this project shipped until GitHub issue
+   * #444 and is why every pinned run is byte-identical across that change. `sCurve.test.ts`
+   * asserts that as an identity over random envelopes rather than as a claim.
+   *
+   * Two things make a car asymmetric, and neither is the machine:
+   *
+   * - **Air pressure.** Al-Kodmany (Buildings 2015, 5(3), 1070–1104) § 3.1.4 records that
+   *   *"because of the air-pressure problem, elevators continue to descend not faster than
+   *   10 m per second"* — a limit on the rate a sealed cabin may lose ambient pressure, not on
+   *   what the hoist can turn. `data/elevator-specs.json`'s `airPressure` block carries the
+   *   figure and the travel it applies above, and `config/parse.ts#resolveBuilding` is what
+   *   writes it onto a car.
+   * - **Design.** The same paper records TWIN as directionally asymmetric on purpose — up to
+   *   7 m/s up, about 4 m/s down. That is authored per car (`CarConfig.descentSpeedMps`).
+   *
+   * Strictly positive when present; **not** required to be below {@link ratedSpeedMps}, because
+   * refusing a faster descent here would be this module inventing a rule that belongs to the
+   * config layer, which warns about it with a located path.
+   */
+  readonly descentSpeedMps?: number | undefined;
   /** Peak magnitude of acceleration, m/s^2. Typically 0.8–1.2. */
   readonly acceleration: number;
   /** Peak magnitude of jerk (rate of change of acceleration), m/s^3. Typically 1.0–1.6. */
@@ -94,14 +135,20 @@ export type MotionPhaseName = (typeof MOTION_PHASE_NAMES)[number];
  *   and the acceleration trace is triangular. Rated acceleration is not reached, *except* at
  *   exactly the threshold distance `dSwitch = 2*A^3/J^2`, where the plateau has zero width
  *   and the triangle peaks at exactly rated acceleration.
- * - `accelerationLimited` — rated acceleration is reached but rated speed is not. `cruise`
+ * - `accelerationLimited` — rated acceleration is reached but the top speed is not. `cruise`
  *   is zero; the constant-acceleration phases are positive.
- * - `speedLimited` — rated speed is reached, and `cruise` is positive except at exactly the
+ * - `speedLimited` — the top speed is reached, and `cruise` is positive except at exactly the
  *   threshold distance, where it is zero. The constant-acceleration phases are positive only
- *   when the plateau opens, i.e. `ratedSpeedMps >= acceleration^2 / jerk`. A car rated below
- *   that (a hydraulic at `V = 0.5, A = 0.8, J = 0.8`, say) reaches rated speed on the jerk
+ *   when the plateau opens, i.e. `V >= acceleration^2 / jerk`. A car rated below
+ *   that (a hydraulic at `V = 0.5, A = 0.8, J = 0.8`, say) reaches its top speed on the jerk
  *   ramps alone, so `accelerate` and `decelerate` are zero and rated acceleration is never
  *   reached however long the trip is.
+ *
+ * **`V` here is {@link MotionProfile.topSpeedLimitMps}, not `ratedSpeedMps`** — the two are the
+ * same on every symmetric car and differ on a down leg of a car with a descent limit (GitHub
+ * issue #444). It matters at the plateau test rather than only in wording: a car at 7 m/s up and
+ * 0.5 m/s down with `A = 0.8, J = 0.8` sits on *opposite sides* of `V >= A^2/J` in the two
+ * directions, so its regime and its peak acceleration genuinely differ by direction.
  *
  * This is why {@link MotionProfile.reachesRatedAcceleration} is derived from the peak rather
  * than from `kind`: the two disagree at both ends of the acceleration-limited band.
@@ -166,8 +213,22 @@ export type MotionPhases = readonly [
 export interface MotionProfile {
   /** Which constraint binds. See {@link MotionProfileKind}. */
   readonly kind: MotionProfileKind;
-  /** The envelope this profile was built against. */
+  /**
+   * The envelope this profile was built against.
+   *
+   * `descentSpeedMps` is echoed back **only when the caller supplied one**, so a symmetric car's
+   * profile carries exactly the three keys it always carried and a structural comparison against
+   * a pre-#444 profile is an equality rather than an approximation.
+   */
   readonly constraints: MotionConstraints;
+  /**
+   * The top speed that actually bound this profile, m/s — {@link MotionConstraints.ratedSpeedMps}
+   * for an up or stationary move, `descentSpeedMps ?? ratedSpeedMps` for a down one.
+   *
+   * Read it rather than re-deriving it from `constraints` and `direction`: a second derivation is
+   * a second authority on which limit was in force, and this one is what the solver used.
+   */
+  readonly topSpeedLimitMps: number;
   /** Signed displacement from start to finish, metres. Negative for a down trip. */
   readonly displacementM: number;
   /** `Math.abs(displacementM)`. Non-negative. */
@@ -179,8 +240,10 @@ export interface MotionProfile {
   /** The seven phases. Collapsed phases are present with `duration === 0`. */
   readonly phases: MotionPhases;
   /**
-   * Highest speed actually reached, m/s. Equals `constraints.ratedSpeedMps`, to within
-   * last-bit rounding, exactly when `kind === 'speedLimited'`; strictly below it otherwise.
+   * Highest speed actually reached, m/s. Equals the top speed in force for this profile's
+   * direction — `constraints.ratedSpeedMps` going up, `constraints.descentSpeedMps ??
+   * constraints.ratedSpeedMps` going down — to within last-bit rounding, exactly when
+   * `kind === 'speedLimited'`; strictly below it otherwise.
    */
   readonly peakSpeedMps: number;
   /**
@@ -188,12 +251,21 @@ export interface MotionProfile {
    *
    * Equal to `constraints.acceleration` whenever the acceleration plateau opens. Strictly
    * below it in the `jerkLimited` regime (short hops), and *also* in the `speedLimited`
-   * regime when `ratedSpeedMps < acceleration^2 / jerk`, where the jerk ramps alone reach
-   * rated speed and the peak is `sqrt(ratedSpeedMps * jerk)`. Do not infer this from
+   * regime when `topSpeedLimitMps < acceleration^2 / jerk`, where the jerk ramps alone reach
+   * the top speed and the peak is `sqrt(topSpeedLimitMps * jerk)`. **{@link topSpeedLimitMps},
+   * not `ratedSpeedMps`**: the solver reads the direction's own limit, so a car with a descent
+   * limit can peak at a different acceleration going down than going up. Do not infer this from
    * {@link kind} — read it, or read {@link reachesRatedAcceleration}.
    */
   readonly peakAccelerationMps2: number;
-  /** True when the car reaches rated speed, i.e. `kind === 'speedLimited'`. */
+  /**
+   * True when the car reaches the top speed in force for its direction — that is, when
+   * {@link peakSpeedMps} is {@link topSpeedLimitMps} and `kind === 'speedLimited'`.
+   *
+   * On a car with a descent limit below its rated speed this is **not** *"reached
+   * `ratedSpeedMps`"* on a down leg, and cannot be: the car never does. It is *"reached the
+   * limit that applied"*, which is what every consumer of this flag was asking.
+   */
   readonly reachesRatedSpeed: boolean;
   /**
    * True when the car reaches rated acceleration — that is, when

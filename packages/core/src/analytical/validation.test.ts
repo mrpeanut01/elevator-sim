@@ -456,8 +456,9 @@ function kinematicRoundTrip(options: {
         transferSeconds: (alightingByFloor.get(index) ?? 0) * passengerTransferS,
       });
     }
-    // Express back down to the terminal.
-    flightS += travelTime(Math.abs(fromM - terminalHeightM), car.constraints);
+    // Express back down to the terminal. **Signed**, never `Math.abs`: the sign is what selects
+    // the descent limit on a car that has one (GitHub issue #444), and this leg is a descent.
+    flightS += travelTime(terminalHeightM - fromM, car.constraints);
 
     const fixedS = (destinations.length + 1) * fixedPerStopS;
     totalRoundTrip += dwellS + flightS + fixedS;

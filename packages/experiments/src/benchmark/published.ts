@@ -761,7 +761,131 @@ export interface UnpinnedInterval {
  *    considered and rejected was to reword the before/after so the scanner's regex stops matching
  *    it, which is evading a guard rather than answering it.
  */
+/** Shared by the fifteen `descentCapHeight.ts` entries in {@link UNPINNED_INTERVALS}. */
+const DESCENT_CAP_HEIGHT_REASON =
+  'Kind 4, a dated record rather than a pin — GitHub issue #444\'s height sweep, measured ' +
+  '2026-09-10 at n = 60, seed 20260910, by `main` in its own module. ' +
+  '`runDescentCapHeightStudy` is classified `no-intervals` in STUDY_ENTRY_POINTS for ' +
+  '`runCollectiveAdoptionStudy`\'s reason: it computes intervals, but the assertions its suite ' +
+  'makes on it are structural and a full sweep is eight heights times three arms times sixty ' +
+  'replications on two templates, which belongs in neither regeneratePins.ts nor ' +
+  'livenessSuite.ts. The whole table is re-derivable with ' +
+  '`node packages/experiments/dist/benchmark/descentCapHeight.js`, which is the difference ' +
+  'between a figure a reader can reproduce and one nobody can.';
+
 export const UNPINNED_INTERVALS: readonly UnpinnedInterval[] = Object.freeze([
+  /*
+   * **GitHub issue #444's height sweep — fifteen readings, one reason.** They are the table in
+   * `descentCapHeight.ts`'s header, and they are declared here rather than pinned because the
+   * study is classified `'no-intervals'` above. Read that entry for why. The reason is a shared
+   * constant rather than fifteen copies of one sentence, because fifteen copies is fifteen places
+   * for it to drift.
+   */
+  Object.freeze({
+    text: '−0.056 [−0.072, −0.041]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 2,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−0.852 [−1.122, −0.582]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 2,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−2.408 [−3.109, −1.707]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 2,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−3.466 [−4.626, −2.307]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 2,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−2.060 [−2.888, −1.232]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−3.096 [−4.282, −1.911]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−1.036 [−1.823, −0.250]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−3.951 [−5.391, −2.510]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−6.069 [−7.544, −4.593]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−2.118 [−2.599, −1.637]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−5.900 [−8.133, −3.667]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−9.252 [−11.339, −7.165]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−3.352 [−4.387, −2.317]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−0.637 [−3.037, +1.764]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
+  Object.freeze({
+    text: '−2.973 [−6.177, +0.231]',
+    file: 'benchmark/descentCapHeight.ts',
+    count: 1,
+    reason:
+      DESCENT_CAP_HEIGHT_REASON,
+  }),
   Object.freeze({
     text: '+1.950 [+0.975, +2.925]',
     file: 'benchmark/doubleDeck.ts',
@@ -969,6 +1093,16 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // half's `regeneratePins.ts`. It publishes no interval either — it prints what the five
     // counted — so it classifies here rather than in the pin table.
     runLivenessSuite: 'no-intervals',
+    // GitHub issue #444's height sweep: what the next speed class buys with the air-pressure
+    // descent cap in force and without it, over eight travels either side of the 300 m threshold.
+    // Classified for `runCollectiveAdoptionStudy`'s reason rather than pinned — it computes
+    // intervals, and the assertions `descentCapHeight.test.ts` makes on it are structural (the
+    // three arms resolve to the configurations claimed, the cabin buys *exactly* zero below the
+    // threshold replication by replication, a saturated row is refused rather than reported). Its
+    // digits are published as a dated record in its own header, and a full sweep is eight heights
+    // times three arms times sixty replications on two templates, which belongs in neither
+    // `regeneratePins.ts` nor `livenessSuite.ts`. Its non-test caller is `main` in its own module.
+    runDescentCapHeightStudy: 'no-intervals',
   });
 
 /* -------------------------------------------------------------------------- *

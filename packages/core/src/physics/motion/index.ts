@@ -39,6 +39,7 @@ export {
   profileDuration,
   sharedPrefixSeconds,
   speedAt,
+  topSpeedFor,
   travelTime,
   velocityAt,
 } from './sCurve.js';

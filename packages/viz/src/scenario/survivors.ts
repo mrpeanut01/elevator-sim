@@ -248,7 +248,7 @@ export interface SurvivorProvenance {
   /**
    * What the count is a count of, in one sentence, so a reader meets the scope beside the number.
    *
-   * Not decoration: this measurement reaches four of the schedule's twenty-four priced changes and
+   * Not decoration: this measurement reaches four of the schedule's twenty-five priced changes and
    * varies twenty-four of the search space's fifty-nine dimensions, and a survivor count read
    * without that is read as a claim about the whole ladder.
    */

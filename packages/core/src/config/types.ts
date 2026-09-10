@@ -194,6 +194,41 @@ export interface RealWorldAnchor extends Commented {
   readonly note?: string | undefined;
 }
 
+/**
+ * The air-pressure limit on **descent** — GitHub issue #444, `data/elevator-specs.json`'s
+ * `airPressure` block.
+ *
+ * Al-Kodmany (Buildings 2015, 5(3), 1070–1104) § 3.1.4: *"because of the air-pressure problem,
+ * elevators continue to descend not faster than 10 m per second."* The limit is on the rate a
+ * cabin may shed ambient pressure without hurting the ears of the people in it — it is not a
+ * property of the hoist, the ropes or the class, which is why it lives here and not on
+ * {@link ElevatorSpec}, and why it can be **bought off**: One World Trade Center answered it by
+ * pressurising the cars and releasing the pressure slowly.
+ *
+ * A run consults it in exactly one place — `config/parse.ts#resolveBuilding`, which knows a
+ * bank's travel and a car's rated speed and writes {@link ResolvedCar.descentSpeedMps}. Nothing
+ * downstream re-derives it.
+ */
+export interface AirPressureLimit extends Commented {
+  /**
+   * Travel above which the limit applies, metres. Below it the cabin has too little column to
+   * build a problem in and a car descends at its rated speed.
+   */
+  readonly appliesAboveTravelM: number;
+  /** Fastest permitted descent, m/s, above {@link appliesAboveTravelM}, in an unpressurised cabin. */
+  readonly descentCapMps: number;
+  /**
+   * Fastest permitted descent, m/s, in a **pressurised** cabin, or `null` for *no limit at all*.
+   *
+   * `null` is the honest reading of the source: the paper records pressurisation as the answer
+   * to the problem rather than as a higher number, so a figure here would be invented. The
+   * limit lifts and the machine's own rated speed binds again.
+   */
+  readonly pressurisedDescentCapMps: number | null;
+  /** Where the figures come from, and which of them are authored rather than cited. */
+  readonly source: string;
+}
+
 /** The whole of `data/elevator-specs.json`. */
 export interface ElevatorSpecs extends Commented {
   readonly version: number;
@@ -202,6 +237,14 @@ export interface ElevatorSpecs extends Commented {
   readonly conventions: ElevatorConventions;
   readonly classes: readonly ElevatorSpec[];
   readonly codeMinimumSpeedByRise: readonly CodeMinimumSpeed[];
+  /**
+   * The descent limit air pressure imposes, and the equipment that lifts it.
+   *
+   * Optional so that a hand-built `ElevatorSpecs` — fixtures, a bare class lookup — is still a
+   * valid one, and so that a data directory that declares none produces exactly the symmetric
+   * model this project shipped before GitHub issue #444.
+   */
+  readonly airPressure?: AirPressureLimit | undefined;
   readonly capacities: readonly CapacityEntry[];
   readonly doors: DoorTimings;
   readonly timing: ElevatorTiming;
@@ -1214,8 +1257,31 @@ export interface CarConfig extends Commented {
    * unless a {@link ServiceEventConfig} puts it back. See {@link BuildingConfig.serviceEvents}.
    */
   readonly mode?: ServiceMode | undefined;
-  /** Top speed, m/s. Defaults to the class typical. */
+  /** Top speed, m/s. Defaults to the class typical. Upwards; see {@link descentSpeedMps}. */
   readonly ratedSpeedMps?: number | undefined;
+  /**
+   * Top speed **downwards**, m/s, when the machine is asymmetric by design.
+   *
+   * Omit — and every shipped car does — for a car that descends as fast as it climbs, which is
+   * what this project modelled before GitHub issue #444 and what every pinned run still runs.
+   * Declared, it is the *design* asymmetry: the TWIN system Al-Kodmany records travels up to
+   * 7 m/s up and about 4 m/s down, and cannot be expressed at all without this field.
+   *
+   * It is **not** where the air-pressure cap is written. That is a property of the shaft's
+   * travel rather than of the machine, is applied by `resolveBuilding`, and is combined with
+   * this one by taking the lower: a TWIN in a supertall is limited by whichever binds first.
+   */
+  readonly descentSpeedMps?: number | undefined;
+  /**
+   * Whether the cabin is pressurised, so the air-pressure descent cap does not apply to it.
+   *
+   * Defaults to `false`. One World Trade Center's answer to the problem
+   * ({@link AirPressureLimit}), and the equipment `data/price-schedule.json` prices at the
+   * equipment tier. A car below `airPressure.appliesAboveTravelM` is unaffected either way —
+   * pressurising a cabin that was never capped buys nothing, which is the point of the control
+   * being a decision rather than a dominant buy.
+   */
+  readonly cabinPressurised?: boolean | undefined;
   /** Rated load. Imperial: unit is in the name. Defaults to the class low end. */
   readonly ratedLoadLb?: number | undefined;
   /** Defaults to `centerOpening`. */
@@ -1601,6 +1667,29 @@ export interface ResolvedCar {
    */
   readonly mode: ServiceMode;
   readonly ratedSpeedMps: number;
+  /**
+   * Top speed downwards, m/s — present **only when it differs from {@link ratedSpeedMps}**.
+   *
+   * Absent is the whole of *"this car is symmetric"*, and absent rather than equal on purpose:
+   * a `ResolvedCar` is structurally a `MotionConstraints`, so writing the rated speed here on
+   * every car would put a key on every profile envelope in the tree and make a pre-#444
+   * structural comparison approximate where it is currently exact. `sCurve.test.ts` and
+   * `resolveCar.test.ts` both assert the absence.
+   *
+   * The lower of the car's own {@link CarConfig.descentSpeedMps} and whatever the shaft's
+   * travel imposes through `elevator-specs.json`'s `airPressure` block — see
+   * {@link ResolveCarOptions.travelM}. Two limits, one field, because the run may only be told
+   * one number and the binding one is the smaller.
+   */
+  readonly descentSpeedMps?: number | undefined;
+  /**
+   * True when the car declares a pressurised cabin, so the air-pressure cap does not bind it.
+   *
+   * Present only when `true`, for the same reason {@link descentSpeedMps} is present only when
+   * it bites: an as-built car resolves to exactly the object it resolved to before this field
+   * existed.
+   */
+  readonly cabinPressurised?: boolean | undefined;
   /** m/s^2. */
   readonly acceleration: number;
   /** m/s^3. */

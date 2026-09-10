@@ -59,6 +59,7 @@ import type { ComplaintMeasure, ComplaintScope, FigureSpec, FixitCase, FixitPatc
 interface MutableCar {
   id: string;
   ratedSpeedMps?: number;
+  cabinPressurised?: boolean;
   ratedLoadLb?: number;
   dwellCarCallS?: number;
   dwellHallCallS?: number;
@@ -127,6 +128,19 @@ function applyBuildingPatch(doc: MutableBuildingDocument, patch: NonNullable<Fix
           throw new Error(`fixit: car "${car.id}" declares no ratedSpeedMps for a speed delta to add to.`);
         }
         car.ratedSpeedMps += carPatch.set.ratedSpeedDeltaMps;
+      }
+      /*
+       * **Pressurisation is written even when it changes nothing** — GitHub issue #444.
+       *
+       * A cabin fitted on a shaft the air-pressure cap does not reach is a real purchase with no
+       * effect on the legs, and `resolveBuilding` raises `pressurisation-buys-nothing` about it.
+       * Skipping the write where it would not bite would make the *config* lie about what the
+       * building has, and would hide the one state this control exists to let a player be wrong
+       * about. The seam earns its keep on the shafts where it does bite; it must be honest on
+       * the others.
+       */
+      if (carPatch.set.cabinPressurised !== undefined) {
+        car.cabinPressurised = carPatch.set.cabinPressurised;
       }
       if (carPatch.set.dwellCarCallS !== undefined) car.dwellCarCallS = carPatch.set.dwellCarCallS;
       if (carPatch.set.dwellHallCallS !== undefined) car.dwellHallCallS = carPatch.set.dwellHallCallS;

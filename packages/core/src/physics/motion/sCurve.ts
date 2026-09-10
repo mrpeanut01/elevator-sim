@@ -3,8 +3,16 @@
  *
  * # The profile
  *
- * A rest-to-rest move under three limits — rated speed `V`, rated acceleration `A`, rated
+ * A rest-to-rest move under three limits — top speed `V`, rated acceleration `A`, rated
  * jerk `J` — is the classical seven-phase S-curve:
+ *
+ * **`V` throughout this derivation is the top speed in force for the move's own direction**, which
+ * `topSpeedFor` selects: `constraints.ratedSpeedMps` going up or standing still, and
+ * `constraints.descentSpeedMps ?? constraints.ratedSpeedMps` going down (GitHub issue #444). On a
+ * symmetric car — every car that declares no descent limit, which is every shipped car — the two
+ * are the same number and every equation below reads exactly as it did before. `solveDurations`
+ * takes `V` as its own argument for that reason: the direction is decided once, at the entry
+ * point, from the sign of the displacement the caller already passes.
  *
  * ```
  * jerk+ → accel const → jerk− → cruise → jerk− → decel const → jerk+ → stop
@@ -120,7 +128,7 @@
  * # Why this matters
  *
  * (7) and (6) are the reason a fast car is not proportionally faster on short hops: a
- * one-floor move never gets near rated speed, so the rated-speed number in the spec sheet is
+ * one-floor move never gets near the top speed, so the rated-speed number in the spec sheet is
  * simply not in the answer. A simulator that used `D/V` would conclude that a 2.5 m/s car
  * beats a 1.0 m/s car by 2.5x in a six-storey building; the real figure is under 1.9x, and
  * for a single-floor hop under 1.2x. See docs/02-elevator-reference.md § Motion parameters,
@@ -164,8 +172,31 @@ function assertPositiveFinite(value: number, label: string): void {
  */
 export function assertMotionConstraints(constraints: MotionConstraints): void {
   assertPositiveFinite(constraints.ratedSpeedMps, 'constraints.ratedSpeedMps');
+  if (constraints.descentSpeedMps !== undefined) {
+    assertPositiveFinite(constraints.descentSpeedMps, 'constraints.descentSpeedMps');
+  }
   assertPositiveFinite(constraints.acceleration, 'constraints.acceleration');
   assertPositiveFinite(constraints.jerk, 'constraints.jerk');
+}
+
+/**
+ * The top speed in force for one direction of travel, m/s.
+ *
+ * `ratedSpeedMps` going up or standing still; `descentSpeedMps ?? ratedSpeedMps` going down.
+ * **The one place that rule is written**, so a caller that needs the limit without building a
+ * profile — a cost term, a report, a closed-form term — reads the same answer the solver used
+ * rather than re-deriving it and drifting.
+ *
+ * Pure, allocation-free and unvalidated: it is a selector, and every entry point that consumes
+ * it validates first.
+ */
+export function topSpeedFor(
+  constraints: MotionConstraints,
+  direction: MotionDirection,
+): number {
+  return direction < 0
+    ? (constraints.descentSpeedMps ?? constraints.ratedSpeedMps)
+    : constraints.ratedSpeedMps;
 }
 
 function assertFinite(value: number, label: string): void {
@@ -193,8 +224,13 @@ interface PhaseDurations {
  * Solve `(Tj, Ta, Tv)` for a non-negative distance. See the module header for the
  * derivation; equation numbers below refer to it.
  */
-function solveDurations(distance: number, constraints: MotionConstraints): PhaseDurations {
-  const { ratedSpeedMps: v, acceleration: a, jerk: j } = constraints;
+function solveDurations(
+  distance: number,
+  constraints: MotionConstraints,
+  topSpeedMps: number,
+): PhaseDurations {
+  const { acceleration: a, jerk: j } = constraints;
+  const v = topSpeedMps;
 
   if (distance <= 0) {
     return { kind: 'stationary', jerkTime: 0, accelTime: 0, cruiseTime: 0 };
@@ -277,7 +313,12 @@ export function buildProfile(displacementM: number, constraints: MotionConstrain
   assertMotionConstraints(constraints);
 
   const requested = Math.abs(displacementM);
-  const durations = solveDurations(requested, constraints);
+  // The limit is chosen from the **requested** sign rather than from the normalized `direction`
+  // below, so the underflow guard cannot change which envelope was solved. It does not matter
+  // numerically — a zero-distance profile has zero duration under either speed — and it keeps
+  // "which limit bound this move" a function of the caller's own argument.
+  const topSpeedMps = topSpeedFor(constraints, displacementM < 0 ? -1 : displacementM > 0 ? 1 : 0);
+  const durations = solveDurations(requested, constraints, topSpeedMps);
   const { jerkTime, accelTime, cruiseTime } = durations;
   const duration = 4 * jerkTime + 2 * accelTime + cruiseTime;
 
@@ -363,9 +404,16 @@ export function buildProfile(displacementM: number, constraints: MotionConstrain
     kind,
     constraints: Object.freeze({
       ratedSpeedMps: constraints.ratedSpeedMps,
+      // Spread rather than assigned, so a symmetric car's echoed envelope holds exactly the
+      // three keys it held before GitHub issue #444 — no `descentSpeedMps: undefined` for a
+      // strict structural comparison to trip over.
+      ...(constraints.descentSpeedMps === undefined
+        ? {}
+        : { descentSpeedMps: constraints.descentSpeedMps }),
       acceleration: constraints.acceleration,
       jerk: constraints.jerk,
     }),
+    topSpeedLimitMps: topSpeedMps,
     // `|| 0` normalizes `-0` to `0`, so a zero-distance down "trip" reports 0, not -0.
     displacementM: displacement || 0,
     distanceM: distance,
@@ -398,9 +446,20 @@ export function buildProfile(displacementM: number, constraints: MotionConstrain
 /**
  * Total travel time for a distance, without building a profile.
  *
- * `Math.abs(distanceM)` is used, so a signed displacement is accepted. This is the hot path
- * for `Car.estimateCost()`, which scores thousands of hypothetical journeys per dispatch
- * decision and needs the duration but not the trajectory; it allocates nothing.
+ * **Pass the signed displacement, never `Math.abs` of it.** The magnitude drives the physics,
+ * but the *sign* chooses which top speed binds — `ratedSpeedMps` up, `descentSpeedMps` down —
+ * exactly as it does in {@link buildProfile}, so `travelTime(Math.abs(to - from), car)` on a
+ * car with a descent limit silently prices a descent at the ascent speed. That was a real
+ * defect in two call sites when GitHub issue #444 landed (the express return leg of the
+ * closed-form oracle, in `analytical/validation.test.ts` and `experiments/oracle/upPeakCase.ts`),
+ * both of which were descents written as absolute values; `sCurve.test.ts` now holds a
+ * repository-wide guard so a third cannot be added quietly. On a symmetric car — every car
+ * that declares no `descentSpeedMps`, which is every shipped car — the two forms agree exactly,
+ * which is why the defect was invisible until a car had two speeds.
+ *
+ * This is the hot path for `Car.estimateCost()`, which scores thousands of hypothetical
+ * journeys per dispatch decision and needs the duration but not the trajectory; it allocates
+ * nothing.
  *
  * Equal to `profileDuration(buildProfile(distanceM, constraints))` to within floating-point
  * rounding — the tests assert exact equality on 2000 random cases.
@@ -410,7 +469,12 @@ export function buildProfile(displacementM: number, constraints: MotionConstrain
 export function travelTime(distanceM: number, constraints: MotionConstraints): number {
   assertFinite(distanceM, 'distanceM');
   assertMotionConstraints(constraints);
-  const { jerkTime, accelTime, cruiseTime } = solveDurations(Math.abs(distanceM), constraints);
+  const topSpeedMps = topSpeedFor(constraints, distanceM < 0 ? -1 : distanceM > 0 ? 1 : 0);
+  const { jerkTime, accelTime, cruiseTime } = solveDurations(
+    Math.abs(distanceM),
+    constraints,
+    topSpeedMps,
+  );
   return 4 * jerkTime + 2 * accelTime + cruiseTime;
 }
 

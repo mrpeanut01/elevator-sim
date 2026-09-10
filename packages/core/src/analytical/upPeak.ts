@@ -478,6 +478,35 @@ export function deriveUpPeakTerms(
     });
   }
 
+  /*
+   * **The closed form has one `tv`, and this is what says so out loud** — GitHub issue #444.
+   *
+   * `RTT = 2(H·tv + tx) + …` charges the climb and the descent at the same speed. A car with a
+   * lower descent limit — TWIN by design, or the air-pressure cap above a supertall's travel —
+   * takes longer coming down than that term pays for, and the expression has nowhere to put the
+   * difference. Extending it here would be publishing an asymmetric closed form no reference
+   * states and then validating the simulator against this project's own arithmetic, which is
+   * the circularity `analytical/`'s whole import discipline exists to prevent. So the expression
+   * is left as CIBSE publishes it and the disagreement is declared instead, exactly as the
+   * double-deck one above is.
+   *
+   * The predicate is a bare `!== undefined` rather than `physics/motion`'s
+   * `isDirectionallyAsymmetric`, and deliberately: this module may not import the physics it is
+   * the oracle for (see the file header), and it does not need to. `resolveCar` guarantees that
+   * `ResolvedCar.descentSpeedMps` is **absent** whenever the descent speed equals the rated one
+   * — that is the whole meaning of the field, stated on it in `config/types.ts` — so presence
+   * *is* asymmetry here. The physics module needs the fuller predicate because a hand-built
+   * `MotionConstraints` carries no such guarantee.
+   */
+  const asymmetric = cars.filter((car) => car.descentSpeedMps !== undefined);
+  if (asymmetric.length > 0) {
+    const first = asymmetric[0];
+    warnings.push({
+      code: UP_PEAK_WARNING_CODES.directionalSpeedAsymmetry,
+      message: `${asymmetric.length} car${asymmetric.length === 1 ? '' : 's'} in bank "${bank.id}" climb${asymmetric.length === 1 ? 's' : ''} at ${first?.ratedSpeedMps} m/s and descend${asymmetric.length === 1 ? 's' : ''} at ${first?.descentSpeedMps} m/s. This closed form charges one tv in both directions (2·(H·tv + tx)), so it understates the return half of every round trip; the published Barney/CIBSE expression has no asymmetric form and none is invented here. A simulated round trip for this bank is deliberately not comparable with this expression — see CLOSED_FORM_ASSUMPTIONS entry "symmetric-speed".`,
+    });
+  }
+
   if (Math.abs(expressRiseM) > SAMENESS_EPSILON) {
     warnings.push({
       code: UP_PEAK_WARNING_CODES.expressZone,

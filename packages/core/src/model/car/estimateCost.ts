@@ -36,7 +36,8 @@
  *
  * ```
  * motorStartDelayS                       brake lift and torque build
- * + travelTime(distance, constraints)    the real jerk-limited S-curve
+ * + travelTime(displacement, constraints) the real jerk-limited S-curve — **signed**, because
+ *                                         the sign selects the descent limit (issue #444)
  * + levelingSettleS                      levelling into the floor
  * ```
  *

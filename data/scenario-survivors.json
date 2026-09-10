@@ -8,7 +8,7 @@
     "measuredAt": "2026-09-10",
     "masterSeed": 20260910,
     "sampleSize": 12,
-    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, priced by data/price-schedule.json. 4 of 24 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 24 of 59 declared dimensions are priced and therefore varied. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
+    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, priced by data/price-schedule.json. 4 of 25 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 24 of 59 declared dimensions are priced and therefore varied. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
     "reachableChangeIds": [
       "idle-parking",
       "dispatch-rules",
@@ -25,6 +25,7 @@
       "tenant-floors",
       "queue-marshalling",
       "staggered-starts",
+      "cabin-pressurisation",
       "move-a-tenant",
       "rezone-bank",
       "faster-machines",

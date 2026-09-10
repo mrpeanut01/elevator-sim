@@ -1,5 +1,5 @@
 {
-  "$comment": "Elevator class reference data. See docs/02-elevator-reference.md for sources and rationale.",
+  "$comment": "Elevator class reference data, plus one block that is not about a class: airPressure is a property of a shaft's travel rather than of a machine, and it is here because it is the same reference file every consumer already loads. See docs/02-elevator-reference.md for sources and rationale, including its Descent is capped by air pressure section.",
   "version": 1,
   "units": {
     "speed": "m/s",
@@ -165,6 +165,13 @@
       "application": "Supertall shuttle, observation"
     }
   ],
+  "airPressure": {
+    "$comment": "AGENT'S PROPOSAL — GitHub issue #444. The descent limit air pressure imposes, and the equipment that lifts it. Read the MEASURED / CHOSEN split below field by field before treating any of it as a reference value; only one of the three numbers is cited. MEASURED (cited): descentCapMps 10.0, from Al-Kodmany, Buildings 2015, 5(3), 1070-1104, doi:10.3390/buildings5031070, s 3.1.4 verbatim — 'because of the air-pressure problem, elevators continue to descend not faster than 10 m per second'. The limit is on how fast a sealed cabin may shed ambient pressure without hurting the ears of the people inside, not on what the hoist can turn, which is why it is here rather than on a class and why it can be bought off. CHOSEN (an agent's, derived from the same paper and not stated by it): appliesAboveTravelM 300. The paper says passengers in very tall buildings 'might have just 30 s to adjust air pressure'; 30 s at the 10 m/s cap is 300 m of travel, so 300 is that sentence read as a distance. It is a round figure supporting a derivation, not a measurement, and the owner should read its consequence for the shipped set rather than the derivation: at 300 m exactly two shipped banks are above the threshold — vertical-city's shuttle at 307.5 m and burj-class-reference's shuttle and observation cars at 496.0 m — and every other bank in data/buildings/ is below it, the next highest being mixed-use-high-rise's shuttle at 126.0 m. So the threshold separates the two supertall towers from everything else, which is a game-design consequence and an owner's call: lower it towards ~120 m and the cap starts governing mixed-use-high-rise as well. CHOSEN (a refusal rather than a figure): pressurisedDescentCapMps null, meaning no cap at all. The paper records One World Trade Center answering the problem by pressurising the cars and releasing the pressure slowly, and Shanghai Tower fitting a pneumatic system; it records no residual speed limit for a pressurised cabin, so a number here would be invented. Null lets the machine's own rated speed bind again. NOT MEASURED and deliberately not modelled: the pressurisation kit's mass, its energy draw, and any effect on ascent. UNBOUND BY THIS BLOCK: every shipped car today. data/buildings/'s fastest is 10.0 m/s, which is exactly the cap, so no shipped run changes by a single leg — the block is a ceiling a player meets by buying past it, not a retrofit of the shipped towers.",
+    "appliesAboveTravelM": 300,
+    "descentCapMps": 10.0,
+    "pressurisedDescentCapMps": null,
+    "source": "Al-Kodmany, K. (2015). Tall Buildings and Elevators: A Review of Recent Technological Advances. Buildings 5(3), 1070-1104, doi:10.3390/buildings5031070, s 3.1.4. descentCapMps is quoted from it; appliesAboveTravelM is an agent's proposal derived from the same section's '30 s to adjust' and is not a figure the paper states; pressurisedDescentCapMps is null because the paper records pressurisation as the answer to the problem rather than as a higher limit."
+  },
   "codeMinimumSpeedByRise": [
     {
       "riseFtRange": [

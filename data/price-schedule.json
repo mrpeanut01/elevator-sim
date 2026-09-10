@@ -216,6 +216,24 @@
       }
     },
     {
+      "id": "cabin-pressurisation",
+      "tier": "equipment",
+      "name": "Pressurise the cabins",
+      "priceUnits": 11,
+      "nights": 2,
+      "note": "AGENT'S PROPOSAL \u2014 GitHub issue #444. A flat equipment row, which is what this issue's own body asks for and what the schedule already grants; #478's magnitude term is not needed and its block on this issue was mis-applied. MEASURED: nothing. No shipped list prices this change, because it did not exist before #444, so there is no agreed figure to keep and no disagreement to record \u2014 unlike every other row in this file. CHOSEN: 11 units and 2 nights. 11 sits between door-sensors (9 u, 1 night) and destination-panels (13 u, 2 nights), which is where the ladder puts it by kind: it is a fitting on kit the building already has \u2014 a pressure vessel and a bleed valve on an existing cabin \u2014 rather than a new machine or a new shaft, so it is above a sensor and below a landing-panel refit. 2 nights matches destination-panels, on the reasoning that a car is out of service while its cabin is worked on. Both figures are game feel and the ladder's ordering is the product owner's (see this file's own header). WHAT IT BUYS, and the reason it is not a dominant buy: it lifts the air-pressure descent cap in data/elevator-specs.json, which only binds a bank whose travel is above airPressure.appliesAboveTravelM and whose cars are rated faster than airPressure.descentCapMps. On every shipped building as built it buys exactly zero seconds, and the loader says so (pressurisation-buys-nothing). It becomes worth 11 units only after the player has bought speed the shaft cannot spend going down \u2014 which is the decision #444 exists to create.",
+      "covers": [
+        "building.cars[].set.cabinPressurised"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 40,
+        "default": 11
+      }
+    },
+    {
       "id": "tenant-floors",
       "tier": "equipment",
       "name": "Move or stagger a tenancy",

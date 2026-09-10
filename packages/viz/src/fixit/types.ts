@@ -63,6 +63,17 @@ export interface CarPatch {
   readonly set: {
     /** Added to the car's current rated speed — the contract prices speed in +0.5 m/s steps. */
     readonly ratedSpeedDeltaMps?: number | undefined;
+    /**
+     * Pressurise the cabin, lifting the air-pressure descent cap — GitHub issue #444.
+     *
+     * The only entry in this table that buys **nothing at all** on most buildings, on purpose:
+     * the cap only applies above `elevator-specs.json`'s `airPressure.appliesAboveTravelM` of
+     * travel, so on a bank shorter than that the run is byte-identical with it and without it
+     * and the loader says so (`pressurisation-buys-nothing`). That is the decision the issue
+     * exists to create — speed stops being a dominant buy once the money spent on it has
+     * somewhere it cannot be spent.
+     */
+    readonly cabinPressurised?: boolean | undefined;
     readonly dwellCarCallS?: number | undefined;
     readonly dwellHallCallS?: number | undefined;
   };

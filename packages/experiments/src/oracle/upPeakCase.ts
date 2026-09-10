@@ -609,7 +609,14 @@ export function kinematicRoundTrip(options: {
         transferSeconds: (alightingByFloor.get(index) ?? 0) * passengerTransferS,
       });
     }
-    flightS += travelTime(Math.abs(fromM - terminalHeightM), car.constraints);
+    /*
+     * **Signed, and the sign is the point** (GitHub issue #444). This is the express run back
+     * *down* to the terminal, and it used to be written `Math.abs(fromM - terminalHeightM)`.
+     * On every symmetric car the two agree exactly; on a car whose descent is capped below its
+     * rated speed the absolute form prices a descent at the ascent speed, which would have made
+     * this oracle quietly optimistic about exactly the leg the cap governs.
+     */
+    flightS += travelTime(terminalHeightM - fromM, car.constraints);
 
     const fixedS = (destinations.length + 1) * fixedPerStopS;
     totalRoundTrip += dwellS + flightS + fixedS;

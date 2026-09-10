@@ -200,6 +200,31 @@ as long as they are aboard. That choice is visible downstream — it is what mak
 full-load door hold 39.8 s, which is longer than Midtown Office's entire shortest round trip, and
 therefore why no single departure-clustering constant can serve every building.
 
+## Descent speed and cabin pressurisation
+
+Two optional car fields, GitHub issue #444. Omit both — and every shipped building does — for a car
+that descends exactly as fast as it climbs, which is the model this project ran on until they
+existed and is what every pinned run still runs.
+
+```json
+{ "id": "S1", "spec": "ultra-high-speed", "ratedSpeedMps": 14.0, "cabinPressurised": true }
+```
+
+| Field | On | Meaning |
+|---|---|---|
+| `descentSpeedMps` | car | Top speed **downwards**, where the machine is asymmetric by design. TWIN is about 7 m/s up and 4 m/s down, and cannot be written at all without this. Not where the air-pressure cap goes — that is a property of the shaft and is applied by the loader. |
+| `cabinPressurised` | car | The cabin holds pressure and releases it slowly, so `elevator-specs.json`'s `airPressure` descent cap does not apply to it. One World Trade Center's answer to the problem. |
+
+The cap itself is not authored per building. `elevator-specs.json`'s `airPressure` block says a car
+descends no faster than `descentCapMps` (10.0 m/s) once its bank's travel exceeds
+`appliesAboveTravelM` (300 m), unless the cabin is pressurised; `resolveBuilding` computes the bank's
+travel and applies it. Where a car declares its own `descentSpeedMps` as well, **the lower binds**.
+
+Three advisory warnings come out of it, and each names a state that is legal and probably not what
+the author meant: `descent-capped-by-air-pressure` (the cap is biting on this car),
+`descent-above-rated-speed` (a car quicker down than up — legal, and no reference asymmetry is of
+that sign) and `pressurisation-buys-nothing` (a cabin fitted where nothing was capping it).
+
 ## Double-deck cars
 
 ```json

@@ -116,6 +116,30 @@ export const WARNING_CODES = {
   noEntranceFloor: 'no-entrance-floor',
   unknownWeightSetProfile: 'unknown-weight-set-profile',
   /**
+   * The air-pressure cap in `elevator-specs.json`'s `airPressure` block binds this car: the
+   * bank's travel is above `appliesAboveTravelM`, the cabin is not pressurised, and the car is
+   * rated faster than `descentCapMps`. It climbs at its rated speed and descends at the cap.
+   *
+   * A **warning and never an error**, because the configuration is legal and the building is
+   * simulated exactly as declared — the run just does not go as fast down as the plate says.
+   * It is raised on no shipped building (`data/buildings/`'s fastest car is 10.0 m/s, which is
+   * the cap), which is the difference between a disclaimer and a defect, and the same
+   * distinction `missing-floor-pairs` above draws.
+   */
+  descentCappedByAirPressure: 'descent-capped-by-air-pressure',
+  /**
+   * A car declares `descentSpeedMps` **above** its `ratedSpeedMps`. Legal — nothing in the
+   * physics forbids a machine that is quicker down than up — and almost certainly a transposed
+   * pair, because every asymmetry the reference literature records is slower downwards.
+   */
+  descentAboveRatedSpeed: 'descent-above-rated-speed',
+  /**
+   * A car declares `cabinPressurised` where nothing is capping it — either the data directory
+   * declares no `airPressure` block, or the bank's travel is below the threshold, or the car is
+   * not rated above the cap. The purchase is inert on this building.
+   */
+  pressurisationBuysNothing: 'pressurisation-buys-nothing',
+  /**
    * The bank has double-deck cars and no `servesFloorPairs`, so **there is no deck geometry to
    * simulate** and the runtime runs the car as a single deck of the combined capacity.
    *
@@ -341,6 +365,37 @@ const conventionsSchema = z.strictObject({
     .max(1, 'design load factor must be <= 1; 0.8 is the traffic-analysis standard'),
 });
 
+/**
+ * `airPressure` — the descent cap and the equipment that lifts it (GitHub issue #444).
+ *
+ * Optional at the document level: a data directory that declares none gets exactly the
+ * symmetric model this project shipped before, which is what makes the block additive rather
+ * than a migration. `pressurisedDescentCapMps` is nullable and `null` means *no cap*, not
+ * *unknown* — see {@link AirPressureLimit}.
+ *
+ * The two figures are checked against each other here rather than in prose: a pressurised cap
+ * at or below the unpressurised one would be an equipment option that buys nothing or makes
+ * things worse, which is a data error and not a design choice.
+ */
+const airPressureSchema = z
+  .strictObject({
+    $comment: comment,
+    appliesAboveTravelM: positive,
+    descentCapMps: positive,
+    pressurisedDescentCapMps: positive.nullable(),
+    source: z.string().min(1),
+  })
+  .refine(
+    (limit) =>
+      limit.pressurisedDescentCapMps === null ||
+      limit.pressurisedDescentCapMps > limit.descentCapMps,
+    {
+      message:
+        'pressurisedDescentCapMps must be greater than descentCapMps, or null for no cap at all: pressurising a cabin has to lift the limit or it is an equipment option that buys nothing',
+      path: ['pressurisedDescentCapMps'],
+    },
+  );
+
 export const elevatorSpecsSchema = z
   .strictObject({
     $comment: comment,
@@ -348,6 +403,7 @@ export const elevatorSpecsSchema = z
     units: z.record(z.string(), z.string()),
     conventions: conventionsSchema,
     classes: z.array(elevatorSpecSchema).min(1, 'at least one elevator class is required'),
+    airPressure: airPressureSchema.optional(),
     codeMinimumSpeedByRise: z.array(
       z.strictObject({
         riseFtRange: z
@@ -1123,6 +1179,10 @@ export const carConfigSchema = z.strictObject({
   // (see `experiments/src/tuning/space/collect.ts`).
   mode: z.enum(SERVICE_MODES).optional(),
   ratedSpeedMps: positive.optional(),
+  // Two speeds, GitHub issue #444. Omitted is symmetric; the air-pressure cap is applied by
+  // `resolveBuilding`, which knows the shaft's travel, and is not authorable here.
+  descentSpeedMps: positive.optional(),
+  cabinPressurised: z.boolean().optional(),
   ratedLoadLb: positive.optional(),
   doorType: z.enum(DOOR_TYPES).optional(),
   acceleration: positive.optional(),

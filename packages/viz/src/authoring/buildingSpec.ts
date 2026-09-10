@@ -2703,9 +2703,14 @@ function readingOf(result: RoundTripResult): string {
  * message is not printed verbatim; see `upPeak.test.ts` for the pin that every code has an arm
  * here and no arm says a probability word.
  *
- * The default arm is reachable only if core ships a code this switch has no case for — the union
- * type turns that into a failing test (`upPeak.test.ts` iterates {@link UP_PEAK_WARNING_CODES})
- * before it becomes a silent gap. It names the code and claims nothing else.
+ * The default arm is reachable only if core ships a code this switch has no case for. **Nothing in
+ * the type system catches that** — `UpPeakWarning.code` is declared `string` rather than the union,
+ * so the compiler is happy with a missing arm — and the sentence that used to stand here said the
+ * opposite. What actually catches it is `upPeak.test.ts`, which reads this file off disk and
+ * iterates {@link UP_PEAK_WARNING_CODES}; that is a source scan rather than a type, and it earned
+ * its keep on GitHub issue #444, which added `directionalSpeedAsymmetry` to core and would have
+ * reached the default arm on a shipped code path with the compiler silent. The default names the
+ * code and claims nothing else.
  */
 function warningSentenceOf(warning: UpPeakWarning, analysis: UpPeakAnalysis): string {
   const result = analysis.result;
@@ -2746,6 +2751,12 @@ function warningSentenceOf(warning: UpPeakWarning, analysis: UpPeakAnalysis): st
         'This bank has double-deck cars and this is the single-deck round trip — it under-counts ' +
         'stops and over-states capacity, so a simulated day on this bank is deliberately not ' +
         'comparable with these figures.'
+      );
+    case UP_PEAK_WARNING_CODES.directionalSpeedAsymmetry:
+      return (
+        'Cars in this bank cannot descend as fast as they climb, and the closed form charges one ' +
+        'speed in both directions — the way down runs longer than these figures say, and a ' +
+        'simulated day on this bank is deliberately not comparable with them.'
       );
     case UP_PEAK_WARNING_CODES.expressZone: {
       const rise = analysis.expressRiseM.toFixed(1);
