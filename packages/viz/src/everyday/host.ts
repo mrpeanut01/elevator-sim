@@ -198,7 +198,12 @@ import type {
   WeekState,
 } from '../shift/types.js';
 import { nextDay } from '../shift/week.js';
-import { checkedRun, filedDayRuns } from '../watch/library.js';
+import {
+  filedDayRuns,
+  watchGateAfter,
+  watchGateBefore,
+  type CheckedRun,
+} from '../watch/library.js';
 import { postedRunOf } from '../watch/posted.js';
 import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
@@ -1239,14 +1244,29 @@ export interface EverydayHost {
    * **nothing is entered** and the row comes back carrying `blocked`, which is what a caller draws
    * in place of the button.
    *
-   * The returned row is therefore the answer to *did this work*, and a caller must read it: a
-   * `blocked` row means the shell is still showing the player's own day.
+   * The row handed to `settled` is therefore the answer to *did this work*, and a caller must read
+   * it: a `blocked` row means the shell is still showing the player's own day.
    *
-   * The gate runs a whole simulation on this thread — `dev/watchPanel.ts` states the same cost for
-   * the same press — which is why it is a press rather than something a picker does per row on
-   * open.
+   * ## Why it answers a callback instead of returning
+   *
+   * The gate runs a whole simulation, and since GitHub issue #410 that simulation is **not on the
+   * thread that paints**. `dev/watchPanel.ts` made the same move for #165 and this shell was left
+   * behind precisely because this contract was synchronous — which is the shape worth naming: a
+   * return type kept a defect alive on the shell `index.html` actually opens, for a wave, after the
+   * other shell's copy of it had been fixed.
+   *
+   * Measured before the move, on the population a player meets: 5 ms and 110 ms on the two shipped
+   * reference rows, and **1 943 ms** on a filed `vertical-city` day at 7 200 s, which
+   * `menu/types.ts#LONGEST_OFFERED_RUN_S` lets a player file and this picker then offers
+   * (`dev/measure.surfaceRuns.test.ts`). That last figure is nearly five times
+   * `dev/mainThreadFrames.test-helper.ts#BLOCKED_FRAME_GAP_MS`, the browser tier's own measured
+   * threshold for *the page has stopped painting*.
+   *
+   * `settled` is called **exactly once** per press, on every arm — the two rows the gate refuses
+   * without a run, the reproduction verdict, and a run that threw. A caller may therefore put a
+   * busy state up on the press and take it down in the callback with no fourth case to handle.
    */
-  watchRun(run: WatchableRun): WatchableRun;
+  watchRun(run: WatchableRun, settled: (checked: WatchableRun) => void): void;
 
   /**
    * A daily-board row as a spectator's row — GitHub issue #337, § 14.1's *"a board row is a run,
@@ -1363,10 +1383,24 @@ export interface EverydayHostBindings {
   /** `data/reference-runs.json`, fetched and parsed once — `dev/data.ts#loadReferenceRuns`. */
   loadReferenceRuns(): Promise<readonly WatchableRun[]>;
   /**
-   * Re-simulate a record on this thread — the reproduction gate's simulator, injected for
+   * Re-simulate a record **off** this thread — the reproduction gate's simulator, injected for
    * `watch/library.ts`'s stated reason: the gate must stay drivable with no worker and no canvas.
+   *
+   * Asynchronous since GitHub issue #410, and the shape is `dev/offThreadRuns.ts`'s rather than a
+   * `Promise` because that is what the shipped binding is: `dev/main.ts` hands in a
+   * `createOffThreadRunner` over `dev/shiftWorker.ts`, whose `onDone`/`onFailed` pair is
+   * deliberately **not** a promise — a superseded or cancelled ask calls neither, and a promise
+   * that never settles is a busy state that never comes down. A test binds a function that calls
+   * `done` synchronously, which is exactly as drivable as the old return value was.
+   *
+   * `honesty/agreement.ts` binds a refusal here, and it still does: this seam runs a simulation,
+   * and a corpus adapter that ran one would be measuring a different thing.
    */
-  simulateRecord(config: SimulationConfig): VizRecording;
+  simulateRecord(
+    config: SimulationConfig,
+    done: (recording: VizRecording) => void,
+    failed: (message: string) => void,
+  ): void;
   /** Enter the spectator state — `dev/main.ts#enterWatch`, unchanged and not re-implemented here. */
   enterWatch(run: WatchableRun, view: WatchingView, recording: VizRecording): void;
   /** Leave it, putting the snapshot back — `dev/main.ts#stopWatching`. */
@@ -1694,6 +1728,45 @@ export function createEverydayHost(
         ? NO_RUN_OBSERVATIONS
         : shiftObservationsOf(observationsAt(state.recording, simTimeS));
     return readGoals(goalsForDay(state.week.day, horizonOf(b)), observations);
+  };
+
+  /**
+   * Enter the spectator state if the gate passed, and hand the row back either way.
+   *
+   * Lifted out of {@link EverydayHost.watchRun} when that press moved off the painting thread
+   * (GitHub issue #410) because it is now reached from **three** places — the settled arm, the
+   * simulated arm, and neither of them may be a second copy of this decision. A row that comes
+   * back carrying `blocked` is a row the shell must not navigate to, and that is true whichever
+   * arm produced it.
+   */
+  const enterChecked = (checked: CheckedRun): WatchableRun => {
+    if (checked.run.blocked !== null || checked.recording === undefined) return checked.run;
+    /*
+     * The dispatcher's display name is resolved here rather than inside `watchingViewOf`, which
+     * loads nothing — `watch/view.ts`'s own split.
+     *
+     * **The honest lookup, and deliberately not `dev/state.ts#profileById`**, which the Engineer
+     * picker uses for the same cell. That function is *total*: an id it cannot find returns the
+     * **first shipped profile**, so a record naming a dispatcher this build no longer ships would
+     * put a name the record does not use under § 14.1's `THEIR DISPATCHER` — a false statement
+     * about the thing asked after, which is the rule {@link EverydayHost.dispatcherById}'s own
+     * docstring states. The state is unreachable in both shells (`recordUnreadableReason` refuses
+     * such a row before the gate runs), so this is the arm that is never taken being right rather
+     * than plausible; the id is what stands where a name would, because the id is what is true.
+     */
+    const record = checked.run.record;
+    const profile =
+      record === null
+        ? undefined
+        : allDispatchers(b.resources, b.state().savedDispatchers).find(
+            (candidate) => candidate.id === record.dispatcherId,
+          );
+    b.enterWatch(
+      checked.run,
+      watchingViewOf(checked.run, profile?.name ?? record?.dispatcherId ?? ''),
+      checked.recording,
+    );
+    return checked.run;
   };
 
   return {
@@ -2243,35 +2316,45 @@ export function createEverydayHost(
       return Object.freeze([...filed, ...references]);
     },
     postedRun: (entry, place) => postedRunOf(entry, place, b.resources),
-    watchRun: (run) => {
-      const checked = checkedRun(run, b.resources, b.state(), b.simulateRecord);
-      if (checked.run.blocked !== null || checked.recording === undefined) return checked.run;
+    watchRun: (run, settled) => {
       /*
-       * The dispatcher's display name is resolved here rather than inside `watchingViewOf`, which
-       * loads nothing — `watch/view.ts`'s own split.
+       * **The gate's two halves rather than `watch/library.ts#checkedRun`** — GitHub issue #410,
+       * and `dev/watchPanel.ts` made exactly this move for #165 on the Engineer picker.
        *
-       * **The honest lookup, and deliberately not `dev/state.ts#profileById`**, which the Engineer
-       * picker uses for the same cell. That function is *total*: an id it cannot find returns the
-       * **first shipped profile**, so a record naming a dispatcher this build no longer ships would
-       * put a name the record does not use under § 14.1's `THEIR DISPATCHER` — a false statement
-       * about the thing asked after, which is the rule {@link EverydayHost.dispatcherById}'s own
-       * docstring states. The state is unreachable in both shells (`recordUnreadableReason` refuses
-       * such a row before the gate runs), so this is the arm that is never taken being right rather
-       * than plausible; the id is what stands where a name would, because the id is what is true.
+       * `watchGateBefore` settles the two rows that need no run at all — already blocked, or a
+       * record this build cannot read — so those still answer without costing a simulation, and
+       * they answer through the same `settled` callback rather than through a second path. Only a
+       * row that reaches `simulate` runs anything, and that run is now asked for asynchronously,
+       * which is the whole of the change: this press used to seize the thread that paints for the
+       * length of a whole day's simulation, measured at up to 1 943 ms on a filed `vertical-city`
+       * day this picker offers (`dev/measure.surfaceRuns.test.ts`).
        */
-      const record = checked.run.record;
-      const profile =
-        record === null
-          ? undefined
-          : allDispatchers(b.resources, b.state().savedDispatchers).find(
-              (candidate) => candidate.id === record.dispatcherId,
-            );
-      b.enterWatch(
-        checked.run,
-        watchingViewOf(checked.run, profile?.name ?? record?.dispatcherId ?? ''),
-        checked.recording,
+      const gate = watchGateBefore(run, b.resources, b.state());
+      if (gate.kind === 'settled') {
+        settled(enterChecked(gate.checked));
+        return;
+      }
+      b.simulateRecord(
+        gate.config,
+        (recording) => {
+          settled(enterChecked(watchGateAfter(run, recording)));
+        },
+        (message) => {
+          /*
+           * A run that threw is a row that cannot be replayed, which is § 1.5's own outcome — so it
+           * takes § 1.5's own shape rather than a new one: `does-not-reproduce`, with the message
+           * naming what actually happened. `dev/watchPanel.ts` files the same refusal under the
+           * same ground, and it is a ground a caller already draws.
+           */
+          settled({
+            ...run,
+            blocked: {
+              ground: 'does-not-reproduce',
+              reason: `this day could not be re-simulated on this device — ${message}`,
+            },
+          });
+        },
       );
-      return checked.run;
     },
     watching: () => b.watching(),
     stopWatching: () => {

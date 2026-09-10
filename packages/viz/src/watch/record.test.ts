@@ -23,7 +23,8 @@ import { shiftRunConfigOf } from '../dev/state.js';
 import { CALENDAR_PERIODS, calendarDayFor, periodOnDays } from '../shift/calendar.js';
 import type { VizRecording } from '../contract/types.js';
 
-import { checkedRun, filedDayRuns, watchGateAfter, watchGateBefore } from './library.js';
+import { filedDayRuns, watchGateAfter, watchGateBefore } from './library.js';
+import { checkedRunForTest } from './gate.test-helper.js';
 import {
   PERIOD_BOOKS_THE_EVENT,
   WATCH_RECORD_CARRIES,
@@ -384,7 +385,7 @@ describe('the reproduction gate', () => {
     expect(record).toBeDefined();
     if (record === undefined) return;
     const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
-    const checked = checkedRun(
+    const checked = checkedRunForTest(
       rowFor(record, recording),
       RESOURCES,
       baseState(),
@@ -405,7 +406,7 @@ describe('the reproduction gate', () => {
       ...row,
       posted: { ...rowPosted, carried: rowPosted.carried + 3, minutePct: 7 },
     };
-    const checked = checkedRun(
+    const checked = checkedRunForTest(
       stale,
       RESOURCES,
       baseState(),
@@ -425,7 +426,7 @@ describe('the reproduction gate', () => {
     const record = watchRecordOf(baseState(), RESOURCES);
     if (record === undefined) return;
     const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
-    const checked = checkedRun(
+    const checked = checkedRunForTest(
       rowFor({ ...record, buildingId: 'no-such-tower' }, recording),
       RESOURCES,
       baseState(),
@@ -460,7 +461,7 @@ describe('the reproduction gate', () => {
     };
     const [row] = filedDayRuns([week], () => 'Garden Apartments');
     expect(row?.blocked?.ground).toBe('no-record');
-    const checked = checkedRun(
+    const checked = checkedRunForTest(
       row as WatchableRun,
       RESOURCES,
       baseState(),
@@ -472,75 +473,23 @@ describe('the reproduction gate', () => {
   });
 
   /*
-   * GitHub issue #165 split the gate so `dev/watchPanel.ts` could run its simulation on a worker
-   * while `everyday/host.ts#watchRun` keeps calling the whole thing. Two gates is exactly the
-   * divergence CLAUDE.md's standing requirement is about, and it would be invisible: both shells
-   * would answer, and only the rows they refuse would disagree. So the composition is required to
-   * agree with the halves on every arm the gate has — including the two that must **not** reach a
-   * simulation, which are asserted by handing in a simulator that throws.
+   * **A case stood here and is deleted, because its premise expired rather than its wording.**
+   *
+   * It asserted that the gate reached the same verdict *whether it is called whole or in halves*,
+   * on all four arms. That was worth a run while two shells took two routes: `dev/watchPanel.ts`
+   * called the halves so its simulation could go on a worker and `everyday/host.ts#watchRun` called
+   * the composition because its contract returned a row. Two gates is exactly the divergence
+   * CLAUDE.md's standing requirement is about, and it would have been invisible — both shells
+   * answer, and only the rows they refuse disagree.
+   *
+   * GitHub issue **#410** moved the Everyday press off the painting thread as well. Both shells
+   * call the halves, `watch/library.ts#checkedRun` was deleted for want of a non-test caller, and
+   * the only composition left is `watch/gate.test-helper.ts`'s — this suite's own convenience. A
+   * case comparing a helper with its own definition is a tautology wearing the shape of a check,
+   * which is worse than no case at all, so it is gone rather than reworded.
+   *
+   * The four arms are still covered: each has its own case above, driven through the helper, and
+   * the two that must refuse **before** they simulate are still asserted by handing in a simulator
+   * that throws.
    */
-  it('is the same gate whether it is called whole or in halves, on all four arms', () => {
-    const record = watchRecordOf(baseState(), RESOURCES);
-    expect(record).toBeDefined();
-    if (record === undefined) return;
-    const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
-    const good = rowFor(record, recording);
-    const goodPosted = postedResultOf(recording);
-    const stale: WatchableRun = { ...good, posted: { ...goodPosted, carried: goodPosted.carried + 3 } };
-    const unreadable = rowFor({ ...record, buildingId: 'no-such-tower' }, recording);
-    const [noRecord] = filedDayRuns(
-      [
-        {
-          ...baseState().week,
-          history: [
-            {
-              day: 1,
-              dayIdx: 0,
-              weekday: 'Monday' as const,
-              eventId: 'ordinary' as const,
-              arrived: 30,
-              carried: 30,
-              minutePct: 90,
-              readings: [],
-              record: null,
-              recordRefusal: null,
-              allMet: true,
-            },
-          ],
-        },
-      ],
-      () => 'Garden Apartments',
-    );
-    expect(noRecord).toBeDefined();
-    if (noRecord === undefined) return;
-
-    for (const [name, row, needsRun] of [
-      ['reproduces', good, true],
-      ['does-not-reproduce', stale, true],
-      ['unreadable-record', unreadable, false],
-      ['no-record', noRecord, false],
-    ] as const) {
-      const whole = checkedRun(row, RESOURCES, baseState(), (config) =>
-        needsRun
-          ? recordRun(config).recording
-          : (() => {
-              throw new Error(`the ${name} arm must refuse before it simulates`);
-            })(),
-      );
-      const gate = watchGateBefore(row, RESOURCES, baseState());
-      const halves =
-        gate.kind === 'settled'
-          ? gate.checked
-          : watchGateAfter(row, recordRun(gate.config).recording);
-      expect(gate.kind, `${name}: the halves disagree about whether a run is needed`).toBe(
-        needsRun ? 'simulate' : 'settled',
-      );
-      expect(halves.run.blocked, `${name}: the halves reached a different verdict`).toEqual(
-        whole.run.blocked,
-      );
-      expect(halves.recording === undefined, `${name}: one half kept a replay the other did not`).toBe(
-        whole.recording === undefined,
-      );
-    }
-  }, 120_000);
 });

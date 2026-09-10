@@ -12,9 +12,9 @@
  * | `shift/contracts.ts`, `week.ts`, `goals.ts`, `events.ts`, `growth.ts` | `dev/state.ts`'s `shiftRunConfigOf`, called by {@link runShift} |
  * | `shift/report.ts` | {@link closeShift}, and `dev/reportPanel.ts` |
  * | `authoring/*` | the four editor mounts, and `shiftRunConfigOf` |
- * | `record/decisionLog.ts` | `recordRun` — called by `dev/shiftWorker.ts` for the shift, and directly by {@link runChallenge} for a challenge's seeds |
+ * | `record/decisionLog.ts` | `recordRun`, called by `dev/shiftWorker.ts` — for the shift, for {@link runChallenge}'s seeds and for the Everyday Watch gate's `simulateRecord` binding, the last two since GitHub issue #410. **This file no longer imports `recordRun` at all**, which is the whole of what #410 bought here: every simulation this shell starts crosses a message port |
  * | `dev/shiftRunner.ts`, `dev/shiftWorker.ts` | {@link runShift} and {@link verifyCurrent}, which no longer simulate on this thread |
- * | `dev/offThreadRuns.ts` | `dev/fixitPanel.ts` and `dev/watchPanel.ts`, both handed {@link boot}'s one `spawnRunWorker` — GitHub issue #165 |
+ * | `dev/offThreadRuns.ts` | `dev/fixitPanel.ts` and `dev/watchPanel.ts`, both handed {@link boot}'s one `spawnRunWorker` — GitHub issue #165 — and {@link runChallenge}'s own runner, #410 |
  * | `dev/surfaces.ts` | {@link applyNavigation} |
  * | `frame/overlay.ts` | {@link drawStage} and the landing selector |
  * | `record/document.ts` | **Load recording**, **Save recording** and **Verify replay** |
@@ -174,7 +174,7 @@ import { nextLoopMark } from '../playback/loopMark.js';
 import { Playback, type LoopWindow } from '../playback/playback.js';
 import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
 import { assertSameCrowd } from '../record/crowd.js';
-import { recordRun } from '../record/recordRun.js';
+import { wireInterventionsOf } from '../scope/switchWire.js';
 import {
   DEFAULT_THEME,
   drawScene,
@@ -229,6 +229,7 @@ import {
   type BrowserResources,
 } from './data.js';
 import { mountFixitPanel } from './fixitPanel.js';
+import { createOffThreadRunner, type OffThreadRun } from './offThreadRuns.js';
 import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
@@ -1501,20 +1502,63 @@ function boot(ui: Elements, resources: BrowserResources): void {
   }
 
   /**
-   * Simulate every seed the challenge names, in the order it names them.
+   * The challenge's seeds, run **off the thread that paints** — GitHub issue #410.
    *
-   * Synchronous and blocking, deliberately: five 900-second runs are a few hundred milliseconds in
-   * this kernel, and a progress bar over something that fast is a lie about how long it took. If the
-   * seed count ever rises far enough for that to stop being true, the count is the thing to look at
-   * — `MAX_CHALLENGE_SEEDS` is 8 and the server's cooldown already scales with it.
+   * `dev/offThreadRuns.ts` over `dev/shiftWorker.ts`, the third near side of the seam issue #165
+   * built and the fourth caller of that factory. A challenge is a *set*, delivered in order and
+   * answered once, which is the exact unit that module's `OffThreadAsk` is: one press is one ask,
+   * and the seed pairing survives because the recordings come back in `runs`' order.
+   *
+   * ## The sentence this replaces, and what measuring it found
+   *
+   * It read: *"Synchronous and blocking, deliberately: five 900-second runs are a few hundred
+   * milliseconds in this kernel, and a progress bar over something that fast is a lie about how
+   * long it took."* Deleted rather than reworded, because a stated cost that has been measured and
+   * paid is § D227's stale refusal.
+   *
+   * `dev/measure.surfaceRuns.test.ts` is the run. Over every shipped building at
+   * `MAX_CHALLENGE_SEEDS` seeds and the 900 s every rotation cell uses today, a press costs **6 ms
+   * to 897 ms** — 897 on `burj-class-reference`, 596 on `vertical-city` — and at 7 200 s, which
+   * `leaderboard/submission.ts#ACCEPTED_DURATIONS_S` accepts and nothing in
+   * `menu/challenge.ts#challengeRunConfigs` refuses, **3 229 ms**. Two of those sit above
+   * `dev/mainThreadFrames.test-helper.ts#BLOCKED_FRAME_GAP_MS`, the browser tier's own measured
+   * threshold for *the page stopped painting*, and the last is eight times it.
+   *
+   * **The old sentence was right about the challenges the rotation ships and wrong about the
+   * surface.** Today's three cells are `midtown-office`, `chancery-house` and `crown-hotel` at
+   * 900 s — 47 ms to 111 ms for eight seeds, well inside what it claimed. But the building and the
+   * length are the **server's** to name and this build refuses neither, so the cost was measured on
+   * the cheap half of its own population. That is `dev/offThreadRuns.ts`'s Watch finding again, and
+   * it is the reason this moved rather than being bounded: a bound here would have to be a bound on
+   * a wire field this package does not own.
    */
+  const challengeRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+
+  /**
+   * The Everyday Watch gate's runner — the `simulateRecord` binding below, GitHub issue #410.
+   *
+   * Declared here beside the challenge's rather than at the binding, because both are `boot`'s and
+   * a reader looking for *what runs off this thread* should find them together. Its own runner and
+   * not the challenge's: one ask is one press, and a shared runner would let a challenge press
+   * silently supersede a watch press that was already in flight.
+   */
+  const everydayWatchRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+
   function runChallenge(): void {
     const view = challengeView.view;
     if (view === undefined) return;
+    /*
+     * The second half of the guard the row already carries — `menu/screens.ts` disables
+     * `challenge.run` while `running` is set, and this repeats it at the press because a disabled
+     * row is disabled on one surface. A second ask would supersede the first, and
+     * `dev/offThreadRuns.ts` drops the loser **silently**, so without this the page would sit on a
+     * busy row while the runs it was told about went nowhere.
+     */
+    if (challengeRunner.isRunning()) return;
     const dispatcherProfileId = menuState.challenge.dispatcherProfileId;
     const built = challengeRunConfigs(view, resources, dispatcherProfileId);
     if (!built.ok) {
-      challengeView = { ...challengeView, notice: built.detail, runsDone: 0 };
+      challengeView = { ...challengeView, notice: built.detail, runsDone: 0, running: false };
       challengeRecordings = [];
       drawMenu();
       return;
@@ -1526,17 +1570,76 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     challengeRecordings = [];
     challengeRanWith = dispatcherProfileId;
-    for (const run of built.runs) {
-      const recorded = recordRun(run.config, { recordDecisions: false });
-      challengeRecordings.push({ seed: run.seed, recording: recorded.recording });
+
+    /*
+     * A non-empty tuple, because that is what an ask is. `challengeRunConfigs` maps the seeds the
+     * server named and this package does not enforce `MIN_CHALLENGE_SEEDS`, so a challenge naming
+     * none is representable here — the old `for` loop simply did nothing on it, and this branch
+     * keeps that outcome rather than starting an ask with no runs, which `OffThreadAsk` types out.
+     */
+    const [first, ...rest] = built.runs;
+    if (first === undefined) {
+      challengeView = { ...challengeView, runsDone: 0, running: false };
+      drawMenu();
+      return;
     }
+    // Paired here rather than read back off each recording — see `challengeRecordings`.
+    const seeds = built.runs.map((run) => run.seed);
+    const asOffThread = (run: (typeof built.runs)[number]): OffThreadRun => ({
+      config: run.config,
+      outOfServiceCarIds: [],
+      /*
+       * `false`, which is what the synchronous loop passed. Not a saving taken in the move: a
+       * decision log is *in* the recording, so `true` would hand `challengeSubmissionOf` a
+       * different recording than the one this surface has always produced, and the server replays
+       * every seed against it.
+       */
+      recordDecisions: false,
+    });
+
     challengeView = {
       ...challengeView,
-      runsDone: challengeRecordings.length,
+      runsDone: 0,
+      running: true,
       notice: undefined,
       postRefusal: undefined,
     };
     drawMenu();
+
+    challengeRunner.start({
+      runs: [asOffThread(first), ...rest.map(asOffThread)],
+      onDone: (recordings) => {
+        challengeRecordings = recordings.map((recording, index) => ({
+          seed: seeds[index] ?? '',
+          recording,
+        }));
+        challengeView = {
+          ...challengeView,
+          runsDone: challengeRecordings.length,
+          running: false,
+          notice: undefined,
+          postRefusal: undefined,
+        };
+        drawMenu();
+      },
+      onFailed: (message) => {
+        /*
+         * A partial set is not a smaller score, so a run that threw discards the whole set rather
+         * than leaving what did land — `challengeSubmissionOf` refuses a short set anyway, and a
+         * count that stopped short would read as *press it again to finish* on a set that cannot
+         * be finished. The message is carried rather than rewritten, on `dev/watchPanel.ts`'s
+         * ground that it names what actually happened.
+         */
+        challengeRecordings = [];
+        challengeView = {
+          ...challengeView,
+          runsDone: 0,
+          running: false,
+          notice: `This challenge could not be run on this device — ${message}`,
+        };
+        drawMenu();
+      },
+    });
   }
 
   /**
@@ -2105,8 +2208,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * another, and post the first one's figures under the second one's name.
          */
         if (intent.field === 'dispatcherProfileId') {
+          /*
+           * **And it stops a set that is still running** — GitHub issue #410, and this is the
+           * defect moving the run off the thread creates rather than a tidiness. While the loop was
+           * synchronous this branch could not be reached during it; now it can, and an ask left in
+           * flight would land seconds later and refill `challengeRecordings` with runs of the
+           * dispatcher that was *just* discarded, under a select reading the new one.
+           * `challengeRanWith` would still name the old profile, so the post would be honest and
+           * the **screen** would not — a count of five beside a dispatcher none of the five used.
+           * `dev/offThreadRuns.ts#cancel` is silent by construction, which is exactly what is
+           * wanted: the ask is abandoned and its callbacks never run.
+           */
+          challengeRunner.cancel();
           challengeRecordings = [];
-          challengeView = { ...challengeView, runsDone: 0, postRefusal: undefined };
+          challengeView = {
+            ...challengeView,
+            runsDone: 0,
+            running: false,
+            postRefusal: undefined,
+          };
         }
         drawMenu();
         // The board is ordered by the server, so a new metric is a new request rather than a re-sort.
@@ -4075,7 +4195,36 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     loadReferenceRuns: () =>
       loadReferenceRuns((id: string) => buildingNameOf(resources, state.savedBuildings, id)),
-    simulateRecord: (config) => recordRun(config).recording,
+    /*
+     * **Off the thread that paints** — GitHub issue #410, and the last of this shell's three
+     * `recordRun` call sites to move.
+     *
+     * It used to read `(config) => recordRun(config).recording`, which put the Everyday Watch
+     * reproduction gate — a whole day's simulation — inside a click handler. That is the defect
+     * issue #165 closed on `dev/watchPanel.ts`, the Engineer picker one screen over, and it
+     * survived here because `EverydayHost.watchRun` returned a row and could not wait for one.
+     * Measured before the move: 5 ms and 110 ms on the two shipped reference rows, and **1 943 ms**
+     * on a filed `vertical-city` day at 7 200 s that this picker offers
+     * (`dev/measure.surfaceRuns.test.ts`).
+     *
+     * Its **own** runner rather than the Fix-a-building or Watch panels' — one ask is one press,
+     * and sharing a runner with a panel would let one shell's press supersede the other's silently.
+     * The `spawn` is the same one, which is what keeps the bundler seam in one place.
+     *
+     * `recordDecisions: true` — `recordRun`'s own default, which is what the synchronous binding
+     * used. It matters rather than being tidy: a recording's decision log is *in* the recording,
+     * so `false` would hand the stage a different replay than the gate compared, and this gate's
+     * whole job is deciding whether a record reproduces.
+     */
+    simulateRecord: (config, done, failed) => {
+      everydayWatchRunner.start({
+        runs: [{ config, outOfServiceCarIds: [], recordDecisions: true }],
+        onDone: ([recording]) => {
+          if (recording !== undefined) done(recording);
+        },
+        onFailed: failed,
+      });
+    },
     enterWatch: (run, view, recording) => {
       enterWatch(run, view, recording);
     },

@@ -26,16 +26,20 @@
  *
  * The reproduction gate has to run a simulation, and this module has to stay testable under plain
  * Node with no worker and no canvas — the whole of `dev/` exists because *a decision that needs a
- * document cannot be tested*. So {@link checkedRun} takes the simulator as a parameter and
- * `everyday/host.ts#watchRun` hands it `recordRun`. That also makes the gate's two branches
- * drivable without contriving a stale fixture: a test hands in a simulator that answers a
- * different run.
+ * document cannot be tested*. So the gate never runs one itself: it is two **halves**,
+ * {@link watchGateBefore} and {@link watchGateAfter}, and the caller does whatever it does in
+ * between. That also makes both branches drivable without contriving a stale fixture — a test
+ * simulates the config the first half hands it and feeds the second half whatever it likes.
  *
- * Since GitHub issue #165 the gate is also available as its two **halves** —
- * {@link watchGateBefore} and {@link watchGateAfter} — because `dev/watchPanel.ts` runs the
- * simulation on a worker and cannot hand in a synchronous function. {@link checkedRun} is those
- * halves composed, so there is still exactly one gate; a second copy of the decision is precisely
- * what would let one shell refuse a row the other watches.
+ * ## Both shells now call the halves, and the composition is gone
+ *
+ * GitHub issue #165 split them out because `dev/watchPanel.ts` runs the simulation on a worker and
+ * cannot hand in a synchronous function. A composed `checkedRun` stayed for the other caller,
+ * `everyday/host.ts#watchRun`, whose contract returned a row. Issue **#410** moved that press off
+ * the painting thread too — measured at up to 1 943 ms on a filed day its picker offers — so the
+ * composition lost its last non-test caller and was deleted rather than left as a seam nothing
+ * shipped reaches. There is still exactly one gate, which is the property that matters: a second
+ * copy of this decision is what would let one shell refuse a row the other watches.
  */
 
 import type { VizRecording } from '../contract/types.js';
@@ -226,12 +230,11 @@ export interface CheckedRun {
 /**
  * The half of the gate that needs no simulation — either a verdict already, or the config to run.
  *
- * Split out for GitHub issue #165, and the split is what lets one caller run the simulation on a
- * worker while the other keeps it synchronous. {@link checkedRun} is these two halves composed and
- * is still the whole gate; `dev/watchPanel.ts` calls the halves because its run is asynchronous
- * now, and `everyday/host.ts#watchRun` still calls the composition because its `EverydayHost`
- * contract is synchronous. **There is one gate either way** — the halves are not a second copy of
- * the decision, and `watch/record.test.ts` asserts the composition agrees with them.
+ * Split out for GitHub issue #165, so that a caller could run the simulation on a worker. Both
+ * shipped callers do now — `dev/watchPanel.ts` since #165 and `everyday/host.ts#watchRun` since
+ * #410 — so these halves **are** the gate rather than one of two ways to reach it, and the
+ * composition that used to sit below them is deleted. **There is one gate**, which is what stops
+ * one shell refusing a row the other watches.
  *
  * Two rows are refused here and cost no run at all, which is why this half exists as a half: a row
  * that is already blocked has nothing to re-simulate, and a record this build cannot read cannot
@@ -294,13 +297,14 @@ export function watchGateAfter(run: WatchableRun, recording: VizRecording): Chec
   return { run, recording };
 }
 
-export function checkedRun(
-  run: WatchableRun,
-  resources: BrowserResources,
-  base: ViewerState,
-  simulate: (config: SimulationConfig) => VizRecording,
-): CheckedRun {
-  const gate = watchGateBefore(run, resources, base);
-  if (gate.kind === 'settled') return gate.checked;
-  return watchGateAfter(run, simulate(gate.config));
-}
+/*
+ * `checkedRun` stood here — the two halves above composed around a caller-supplied simulator — and
+ * it is **deleted** rather than kept, GitHub issue #410.
+ *
+ * It existed for one caller: `everyday/host.ts#watchRun`, whose `EverydayHost` contract returned a
+ * row and so could not wait for a worker. #410 made that press asynchronous, both shells now call
+ * the halves, and a composition reachable from nothing outside its own tests is the shape
+ * CLAUDE.md's standing requirement is about — § D131 closed two of the deck API's five members the
+ * same way. The convenience the tests wanted is `watch/gate.test-helper.ts`, which says in its own
+ * docstring why it is not the shipped path.
+ */

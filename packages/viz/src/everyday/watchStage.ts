@@ -71,6 +71,29 @@ export const WATCH_ROWS_LEDE =
 /** The affordance, and § 1.5's rule is that a row that cannot be replayed loses it rather than dimming it. */
 export const WATCH_IT_LABEL = 'Watch it';
 
+/**
+ * What the button says while the record is being re-simulated — GitHub issue #410.
+ *
+ * A state that could not exist before that issue: the gate used to seize the thread that paints
+ * for the length of the run, so there was no frame in which a label could change. Off the thread
+ * there is, and a press that changed nothing on screen for two seconds would read as a dead button.
+ *
+ * It says *checking* rather than *running*, because that is what the press is: {@link WATCH_ROWS_LEDE}
+ * already tells the reader the record is re-simulated and compared, and the word this label needs
+ * is the one that says the answer is not in yet. It does **not** promise a duration — measured, the
+ * same press spans 5 ms to 1 943 ms across the rows this picker offers
+ * (`dev/measure.surfaceRuns.test.ts`), so any number here would be wrong for most of them.
+ *
+ * **Deliberately not in `honesty/surfaces.ts`' `covers`, and the corpus said so rather than a
+ * reader deciding it.** A `covers` entry was written beside {@link WATCH_IT_LABEL}'s and
+ * `honesty/derive.test.ts` refused it: the derivation looks for a **prose** literal — two adjacent
+ * alphabetic words — and this is one word and an ellipsis, so the entry would have been *"a
+ * coverage claim for nothing"*, in that case's own words. It is checked where a one-word label can
+ * be: `watchStage.test.ts` asserts it is non-empty and free of § 14.1's first person, beside the
+ * three sentences it sits with.
+ */
+export const WATCH_CHECKING_LABEL = 'Checking…';
+
 /** What the block says when it holds no row at all. Not first-person — § 14.1. */
 export const NOTHING_TO_WATCH =
   'No day has been closed on this device yet, and the reference runs have not loaded.';

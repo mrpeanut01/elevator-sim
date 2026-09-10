@@ -75,7 +75,7 @@ import { DAILY_BOARD_METRIC, type EverydayChallengeToday, type EverydayDailyBoar
 import { everydayAccount } from './accountPort.js';
 import { everydayProgressWith } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
-import { WATCH_IT_LABEL } from './watchStage.js';
+import { WATCH_CHECKING_LABEL, WATCH_IT_LABEL } from './watchStage.js';
 import type { EverydayScreenHandle, EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext } from './shell.js';
 import {
@@ -331,6 +331,14 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
   let challenge: EverydayChallengeToday | undefined;
   /** Rows whose press the gate refused, by the server's row id, with the reason — GitHub issue #337. */
   const watchRefused = new Map<string, string>();
+  /**
+   * The row whose gate run is out, by the server's row id — or `undefined`. GitHub issue #410.
+   *
+   * The busy state a moved run makes drawable and the guard it makes necessary, both at once —
+   * `dev/watchPanel.ts` states the pair and `everyday/weekScreen.ts` holds the same field for the
+   * same press on the same host.
+   */
+  let watchChecking: string | undefined;
 
   const status = el(doc, 'div', BOARD_SCREEN_COPY.loading);
   status.style.cssText = NOTE;
@@ -740,23 +748,44 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
         row.style.flexWrap = 'wrap';
         row.append(why);
       } else {
-        const button = el(doc, 'button', entry.watch === 'yours' ? BOARD_SCREEN_COPY.dailyRowYours : WATCH_IT_LABEL);
+        const busy = watchChecking === entry.id;
+        const button = el(
+          doc,
+          'button',
+          entry.watch === 'yours'
+            ? BOARD_SCREEN_COPY.dailyRowYours
+            : busy
+              ? WATCH_CHECKING_LABEL
+              : WATCH_IT_LABEL,
+        );
         button.type = 'button';
         button.className = entry.watch === 'yours' ? 'everyday-board-row-yours' : 'everyday-board-row-watch';
-        button.disabled = entry.watch === 'yours';
+        button.disabled = entry.watch === 'yours' || busy;
         button.style.cssText = `border:1px solid ${C.rule};border-radius:${String(R.control)}px;background:transparent;padding:3px 9px;font-size:11.5px;color:${C.ink};cursor:${entry.watch === 'yours' ? 'default' : 'pointer'}`;
         if (entry.watch === 'watch') {
           const place = Number(entry.place);
           const source = board !== undefined && board.kind === 'board' ? board.rows.find((candidate) => candidate.id === entry.id) : undefined;
           button.addEventListener('click', () => {
             if (source === undefined) return;
-            const checked = context.host.watchRun(context.host.postedRun(source, place));
-            if (checked.blocked !== null) {
-              watchRefused.set(entry.id, checked.blocked.reason);
-              redraw();
-              return;
-            }
-            context.enterWatch();
+            /*
+             * Dropped rather than queued — GitHub issue #410. The gate's run is off the thread that
+             * paints now, so a second press can be delivered where a synchronous one could not, and
+             * two runs in flight over one `EverydayHost` would land the second's answer over a
+             * spectator state the first had already entered. `everyday/weekScreen.ts` holds the
+             * same field for the same press on the same host.
+             */
+            if (watchChecking !== undefined) return;
+            watchChecking = entry.id;
+            redraw();
+            context.host.watchRun(context.host.postedRun(source, place), (checked) => {
+              watchChecking = undefined;
+              if (checked.blocked !== null) {
+                watchRefused.set(entry.id, checked.blocked.reason);
+                redraw();
+                return;
+              }
+              context.enterWatch();
+            });
           });
         }
         row.append(button);

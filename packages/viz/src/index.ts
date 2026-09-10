@@ -54,7 +54,7 @@
  *
  * | Export | Non-test caller |
  * |---|---|
- * | {@link recordRun} | `src/dev/shiftWorker.ts`, which is where the browser viewer simulates — the shift (the UI readiness audit's B3 — it was `src/dev/main.ts` on the thread that paints) and, since GitHub issue #165, both Fix-a-building shells and Watch's reproduction gate through `src/dev/offThreadRuns.ts`; and `src/dev/main.ts#runChallenge` directly, for a challenge's seeds |
+ * | {@link recordRun} | `src/dev/shiftWorker.ts`, which is where the browser viewer simulates — the shift (the UI readiness audit's B3 — it was `src/dev/main.ts` on the thread that paints); and, through `src/dev/offThreadRuns.ts`, both Fix-a-building shells and the **Engineer** Watch picker's reproduction gate since GitHub issue #165, and `src/dev/main.ts#runChallenge`'s seed set since #410. Two callers are still on the thread that paints and both are registered with a verdict in `src/dev/mainThreadSimulation.test.ts`, which derives that set from the module graph rather than from this row: `src/dev/campaignPanel.ts#failStates`, **bounded** (`src/campaign/failStateBudget.test.ts`), and `src/dev/main.ts`'s `simulateRecord` binding for `src/everyday/host.ts#watchRun` — the **Everyday** Watch gate, which is #165's defect still live on the shell `index.html` opens, measured at up to 1 943 ms and **outstanding** |
  * | {@link overlayAt} | `src/dev/main.ts`'s draw loop, every animation frame; and `drawScene` draws its result |
  * | {@link landingAssignmentsAt} | `src/dev/main.ts`'s landing selector and its draw loop |
  * | {@link meansAreSuppressed} | three of them, which is the point: `overlayAt` here, `drawHeader` in `src/render/canvas.ts`, and `statusLine` in `src/dev/main.ts` — `D1` |

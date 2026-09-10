@@ -621,6 +621,19 @@ export interface ChallengeScreenInput {
   readonly notice?: string | undefined;
   /** How many of the challenge's seeds this browser has simulated. Never a fraction of one. */
   readonly runsDone: number;
+  /**
+   * Whether the seed set is being simulated **right now** — GitHub issue #410.
+   *
+   * The field exists because the run moved off the thread that paints. While it was synchronous
+   * there was no such state to draw and no way to reach it: the press blocked the page for the
+   * whole set, so no second click could be delivered and no other control could be touched. Off
+   * the thread both become possible, so the busy state a worker makes drawable is also the guard
+   * it makes necessary — `dev/watchPanel.ts` states the same pair for the same reason.
+   *
+   * Optional, and absent means *not running*, so every existing caller and fixture is unchanged
+   * and a surface that never runs a challenge does not have to say so.
+   */
+  readonly running?: boolean | undefined;
   /** Why the seed set cannot be posted, when it cannot. `runIdentity`'s idiom, one layer over. */
   readonly postRefusal?: string | undefined;
   readonly board?: ChallengeBoardPage | undefined;
@@ -1700,6 +1713,7 @@ function challengeBody(input: MenuViewInput): Body {
   const ran = challenge?.runsDone ?? 0;
   const complete = ran >= seeds;
   const open = view.state === 'open';
+  const running = challenge?.running === true;
 
   const rows: MenuAffordance[] = [
     {
@@ -1731,7 +1745,15 @@ function challengeBody(input: MenuViewInput): Body {
           : `${String(ran)} of ${String(seeds)} run on this browser`,
       kind: 'commit',
       scope: 'between-games',
-      enabled: true,
+      /*
+       * Disabled while the set is in flight — GitHub issue #410, and it is the re-entrancy guard
+       * rather than a courtesy. A second press would supersede the first ask, and
+       * `dev/offThreadRuns.ts` answers one ask and drops the loser silently, so the page would sit
+       * on a busy row while the runs it was told about went nowhere. The shell guards it a second
+       * time at the press, because a row that is only disabled is disabled on one surface.
+       */
+      enabled: !running,
+      ...(running ? { disabledWhy: CHALLENGE_RUNNING } : {}),
       intent: { kind: 'run-challenge' },
     },
     {
@@ -1792,6 +1814,21 @@ function challengeBody(input: MenuViewInput): Body {
  * replications and a paired interval that excludes zero. Compare is the only surface allowed to say
  * it, and this paragraph says so rather than implying otherwise by omission.
  */
+/**
+ * Why the run row is disabled while a set is in flight — GitHub issue #410.
+ *
+ * It says *the page is still yours*, because that is the thing the move bought and the thing a
+ * disabled button otherwise argues against: a player who has only ever met this control as a freeze
+ * reads a greyed-out primary as *wait*. `dev/batchPanel.ts` says the same sentence about the same
+ * seam. It does **not** promise a duration — measured on this container the shipped population
+ * spans 6 ms to 3 229 ms depending on the tower and the length the server named
+ * (`dev/measure.surfaceRuns.test.ts`), so any number here would be wrong for most of it.
+ */
+const CHALLENGE_RUNNING =
+  'The seeds are running. They are not on the thread that draws this page, so the menu stays ' +
+  'yours while they finish — and picking a different dispatcher stops them, because they would be ' +
+  'runs of something else.';
+
 const CHALLENGE_WITHOUT_ONE =
   'There is no challenge loaded. Here is what one is. Everybody gets the same building, the same ' +
   'run length and the same numbered seeds — a seed generates the same passengers arriving at the ' +

@@ -238,6 +238,19 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'R38\u2019s reason: the remedy is a derivation, never a pin',
     scheduled: true,
   },
+  'packages/viz/src/frame/measure.perFrame.test.ts': {
+    gates: ['PER_FRAME_OUT'],
+    reason:
+      'GitHub issue #410’s other half — the surface-runs deriver above asks what a *press* ' +
+      'costs the painting thread, and this asks what a **frame** does. `frame/overlay.ts` and ' +
+      '`live/observations.ts` are folds the draw loop runs sixty times a second and each claimed, ' +
+      'in prose and nowhere else, to be comfortably inside a frame budget. Both are, measured — ' +
+      'and a prose cost goes stale exactly the way the corpus counts do, so it rides in the same ' +
+      'job for RISKS.md R38’s reason: the remedy is a derivation, never a pin. The **enforced** ' +
+      'half is `frame/perFrameBudget.test.ts`, which is ungated and runs in the ordinary suite ' +
+      'because it is written in legs rather than milliseconds and so needs no quiet machine',
+    scheduled: true,
+  },
   'packages/viz/src/honesty/honesty.test.ts': {
     gates: ['ELEVATOR_SIM_HONESTY'],
     reason:

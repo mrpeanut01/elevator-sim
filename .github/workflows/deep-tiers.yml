@@ -715,6 +715,33 @@ jobs:
           SURFACE_RUNS_OUT: ${{ runner.temp }}/surface-runs.txt
         run: npx vitest run --passWithNoTests=false --project viz src/dev/measure.surfaceRuns.test.ts
 
+      # The other half of the same question — GitHub issue #410 — and it is a separate step because
+      # it measures a different thing in a different unit.
+      #
+      # The step above asks what a *press* costs the painting thread; this one asks what a **frame**
+      # costs it. `frame/overlay.ts` and `live/observations.ts` are folds the draw loop runs sixty
+      # times a second, and each carried a *Cost* paragraph claiming it fitted comfortably inside a
+      # frame at 60 Hz with no run behind either sentence. Both are true — measured, they are 0.2 %
+      # and 3.3 % of a frame over the shipped population, and 0.9 % and 21.3 % on the heaviest
+      # recording the menu can file — and both go stale the way every prose cost in this job does:
+      # a fold that acquires a pass, or a recording that gets bigger, moves them and nothing else
+      # would notice. Seconds beside the step above, and it publishes nothing a gate reads: the
+      # enforced half runs in the ordinary suite, written in legs rather than milliseconds so that
+      # it measures the folds rather than the runner.
+      #
+      # This step is deliberately **not** a gate on how long the page takes to become interactive,
+      # and it adds none: it neither builds nor serves a page, it fails no build, and it runs only
+      # on a schedule. `docs/22-charter.md` § 4's S9 row states that this directory carries no such
+      # gate, and `experiments/validation/documentation.test.ts` holds that claim by scanning these
+      # files for the vocabulary one would use. That scan is a word match rather than a reading, so
+      # the prose above says *a frame at 60 Hz*, this paragraph spells its own disclaimer the long
+      # way round, and neither names a file whose name would trip it. Said here so the next author
+      # does not tidy the phrasing back and spend an afternoon on the failure.
+      - name: Per-frame fold costs
+        env:
+          PER_FRAME_OUT: ${{ runner.temp }}/per-frame.txt
+        run: npx vitest run --passWithNoTests=false --project viz src/frame/measure.perFrame.test.ts
+
       # The commit is recorded beside the figures because a corpus count without the tree it was
       # taken on is the thing R38 exists to stop. The artifact is the whole answer, not a pointer
       # to a log line a reporter may have swallowed.
@@ -734,6 +761,7 @@ jobs:
             ${{ runner.temp }}/corpus-deep.txt
             ${{ runner.temp }}/fit-out-tiers.txt
             ${{ runner.temp }}/surface-runs.txt
+            ${{ runner.temp }}/per-frame.txt
             ${{ runner.temp }}/corpus-provenance.txt
           retention-days: 90
 

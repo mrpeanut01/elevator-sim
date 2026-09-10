@@ -39,9 +39,37 @@
  *   npx vitest run --project viz packages/viz/src/dev/measure.surfaceRuns.test.ts
  * ```
  *
+ * ## Three more surfaces, added for GitHub issue #410, and the membership is the finding
+ *
+ * Issue #410 inherits #238's clause about *"the three main-thread simulation surfaces"* and names
+ * them: `dev/main.ts`'s § 1.4 re-simulate, `frame/overlay.ts` and `live/observations.ts`. That list
+ * was re-derived from the module graph rather than transcribed, and **none of the three is a
+ * main-thread simulation today**:
+ *
+ * - `dev/main.ts`'s re-simulate is a worker round trip already — `interveneAt` calls `runShift`,
+ *   which is `dev/shiftRunner.ts` over `dev/shiftWorker.ts`, the UI readiness audit's B3;
+ * - `frame/overlay.ts#overlayAt` and `live/observations.ts#observationsAt` **never simulate**. They
+ *   are pure folds of a finished recording, drawn per frame. `frame/measure.perFrame.test.ts` is
+ *   their instrument and `frame/perFrameBudget.test.ts` is their enforced bound.
+ *
+ * What the graph does find, and what the issue does not name, is **three** surfaces that constructed
+ * a `Simulation` on the thread that paints: `dev/main.ts#runChallenge`, `dev/main.ts`'s
+ * `simulateRecord` binding for `everyday/host.ts#watchRun` — the Everyday Watch reproduction gate,
+ * which is issue #165's own defect still live on the shell `index.html` opens — and `failStates`
+ * in `dev/campaignPanel.ts`. The first two moved to a worker on #410 and the third is bounded in
+ * `campaign/failStateBudget.test.ts`, because 3–68 ms behind a message port is slower than 3–68 ms.
+ *
+ * `dev/mainThreadSimulation.test.ts` derives that set from the imports on every shipped run, in
+ * both directions, so **this** docstring cannot go stale the way the issue's list did: the register
+ * is the claim and this paragraph is a reading of it.
+ *
+ * The rows below are what all three cost, and they are kept after the move rather than deleted with
+ * it. A measurement is what says a bound is a bound and what would say a move stopped being worth
+ * its complexity, and neither question survives its own answer.
+ *
  * Recorded here under [§ D405](../../../../DECISIONS.md): the decision this file takes — *measure
- * the three surfaces rather than quote them* — binds nothing outside this module, and this
- * docstring is the record the working agreement asks for.
+ * the surfaces rather than quote them* — binds nothing outside this module, and this docstring is
+ * the record the working agreement asks for.
  */
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -59,10 +87,13 @@ import { describe, expect, it } from 'vitest';
 
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
+import { useCampaignFixture } from '../campaign/campaign.test-helper.js';
+import { demonstrationConfigFor } from '../campaign/stageRun.js';
 import { emptyFixitState, toggleRepair } from '../fixit/engine.js';
 import { fixitContextOf, parseFixitCases } from '../fixit/parse.js';
 import { fixitRunPlanOf } from '../fixit/run.js';
 import type { FixitCase, FixitState } from '../fixit/types.js';
+import { MAX_CHALLENGE_SEEDS, challengeRunConfigs, type ChallengeView } from '../menu/challenge.js';
 import { recordRun } from '../record/recordRun.js';
 import { watchRecordOf, watchRunConfigOf } from '../watch/record.js';
 import { parseReferenceRuns } from '../watch/reference.js';
@@ -147,12 +178,72 @@ function diagnosedState(entry: FixitCase): FixitState {
     : toggleRepair(entry, emptyFixitState(), diagnosed.id, shippedPriceSchedule());
 }
 
+/**
+ * A challenge as the server issues one, at the **most seeds this build will run**.
+ *
+ * Constructed rather than fetched, on `scope/probes.test-helper.ts#PROBE_CHALLENGE`'s stated
+ * ground: `viz` ships no challenge and must build with `packages/server` absent, so the wire shape
+ * is assembled here. Two things are chosen rather than copied, and both are what makes this the
+ * population rather than a sample of it:
+ *
+ * - the seed count is {@link MAX_CHALLENGE_SEEDS}, which is `viz`'s **own** bound on what a press
+ *   can be asked to run — `challengeRunConfigs` refuses above it — so this is the ceiling a player
+ *   can meet rather than the five the rotation happens to name today;
+ * - the building is swept over everything `data/buildings/` ships, because a challenge names a
+ *   building and the server's rotation is not this package's to know. A cost measured on the
+ *   cheapest tower is the stale-refusal shape `dev/offThreadRuns.ts` records about Watch.
+ *
+ * `durationS` is the caller's, because nothing in `challengeRunConfigs` bounds it and the sweep
+ * above therefore has a ceiling row as well as a per-building one.
+ */
+function challengeViewFor(buildingId: string, durationS: number): ChallengeView {
+  const config = Object.freeze({
+    buildingId,
+    demandTemplateId: 'rise-and-fall',
+    arrivalRatePctPop5min: 3,
+    durationS,
+  });
+  const seeds = Object.freeze(
+    Array.from({ length: MAX_CHALLENGE_SEEDS }, (_, index) => String(1001 + index)),
+  );
+  return Object.freeze({
+    challenge: Object.freeze({
+      id: `measure-${buildingId}`,
+      name: 'Measurement',
+      brief: 'Built here, because this package ships no challenge.',
+      config,
+      seeds,
+      opensAtMs: 0,
+      closesAtMs: 0,
+    }),
+    state: 'open' as const,
+    seedCount: seeds.length,
+    opensInMs: null,
+    closesInMs: 3_600_000,
+    clockNote: 'The server decides which challenge is open.',
+    dataHash: null,
+    compare: Object.freeze({ note: '', ...config }),
+  });
+}
+
 interface Row {
   readonly surface: string;
   readonly id: string;
   readonly blockingMs: number;
   readonly cloneOutMs: number;
   readonly cloneBackMs: number;
+  /**
+   * Legs the press simulated — the **load-independent** column, added for GitHub issue #410.
+   *
+   * Every other figure here is wall clock, and `vitest.config.ts#SIMULATING_TIMEOUT_MS` measured
+   * this repository's own amplification under load at about ninefold. So a budget in milliseconds
+   * asserted in the suite would measure the runner, which is issue #335 and which #410 names as
+   * the reason bounding is not the cheap option it looks like. A leg count is the same integer on
+   * every machine and rises with exactly the thing that makes a run expensive, so it is the unit a
+   * bound can be **enforced** in. This column is what pairs the two: it is published beside the
+   * milliseconds so a reader can see what a leg costs here before trusting a bound written in legs.
+   */
+  readonly legs: number;
 }
 
 function line(row: Row): string {
@@ -160,6 +251,7 @@ function line(row: Row): string {
     row.surface.padEnd(22),
     row.id.padEnd(30),
     `blocking=${row.blockingMs.toFixed(0)}ms`.padEnd(18),
+    `legs=${String(row.legs)}`.padEnd(13),
     `cloneOut=${row.cloneOutMs.toFixed(1)}ms`.padEnd(20),
     `cloneBack=${row.cloneBackMs.toFixed(1)}ms`,
   ].join(' ');
@@ -171,6 +263,7 @@ function summary(name: string, rows: readonly Row[]): string {
   const transport = rows
     .map((row) => row.cloneOutMs + row.cloneBackMs)
     .sort((a, b) => a - b);
+  const legs = rows.map((row) => row.legs).sort((a, b) => a - b);
   const total = blocking.reduce((sum, ms) => sum + ms, 0);
   return (
     `${name}: n=${String(rows.length)} ` +
@@ -180,13 +273,24 @@ function summary(name: string, rows: readonly Row[]): string {
     `sum=${total.toFixed(0)}ms | ` +
     `transport min=${(transport[0] ?? 0).toFixed(1)}ms ` +
     `median=${(transport[transport.length >> 1] ?? 0).toFixed(1)}ms ` +
-    `max=${(transport[transport.length - 1] ?? 0).toFixed(1)}ms\n`
+    `max=${(transport[transport.length - 1] ?? 0).toFixed(1)}ms | ` +
+    // The pairing a bound written in legs has to be read against — see `Row.legs`.
+    `legs min=${String(legs[0] ?? 0)} ` +
+    `median=${String(legs[legs.length >> 1] ?? 0)} ` +
+    `max=${String(legs[legs.length - 1] ?? 0)} ` +
+    `ms-per-1000-legs=${
+      legs.reduce((sum, n) => sum + n, 0) === 0
+        ? 'n/a'
+        : ((1000 * total) / legs.reduce((sum, n) => sum + n, 0)).toFixed(2)
+    }\n`
   );
 }
 
 describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting thread', () => {
+  const campaign = useCampaignFixture();
+
   it(
-    'measures Fix-a-building and Watch, and writes the figures where a reporter cannot eat them',
+    'measures every surface that simulates on the thread that paints, and writes the figures where a reporter cannot eat them',
     () => {
       const rows: Row[] = [];
 
@@ -205,6 +309,7 @@ describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting th
           surface: 'fixit/open',
           id: entry.id,
           blockingMs: asBuilt.ms,
+          legs: asBuilt.value.recording.legs.length,
           cloneOutMs: timed(() => structuredClone(plan.asBuilt)).ms,
           cloneBackMs: timed(() => structuredClone(asBuilt.value.recording)).ms,
         });
@@ -212,6 +317,7 @@ describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting th
           surface: 'fixit/press',
           id: entry.id,
           blockingMs: asBuilt.ms + asRepaired.ms,
+          legs: asBuilt.value.recording.legs.length + asRepaired.value.recording.legs.length,
           cloneOutMs:
             timed(() => structuredClone(plan.asBuilt)).ms +
             timed(() => structuredClone(plan.asRepaired)).ms,
@@ -238,6 +344,7 @@ describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting th
           surface: 'watch/press',
           id: run.id,
           blockingMs: recorded.ms,
+          legs: recorded.value.recording.legs.length,
           cloneOutMs: timed(() => structuredClone(config)).ms,
           cloneBackMs: timed(() => structuredClone(recorded.value.recording)).ms,
         });
@@ -267,6 +374,95 @@ describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting th
           surface: 'watch/press',
           id: 'filed-day/vertical-city@7200s',
           blockingMs: recorded.ms,
+          legs: recorded.value.recording.legs.length,
+          cloneOutMs: timed(() => structuredClone(config)).ms,
+          cloneBackMs: timed(() => structuredClone(recorded.value.recording)).ms,
+        });
+      }
+
+      /*
+       * **The challenge press** — GitHub issue #410. `dev/main.ts#runChallenge` builds the seed
+       * set with `challengeRunConfigs` and runs it in a `for` loop, and the loop is the row: a
+       * press is *n* runs, not one, and the surface's own docstring called them *"a few hundred
+       * milliseconds"* without ever running them. The pair measured here is exactly the pair the
+       * shell performs, which is `scope/probes.test-helper.ts`'s standard for this path.
+       *
+       * `recordDecisions: false` because that is what the shell passes. It is not a saving taken
+       * for the measurement: a decision log is *in* the recording, so timing the run with one
+       * would be timing a different run.
+       */
+      const challengePress = (buildingId: string, durationS: number): void => {
+        const built = challengeRunConfigs(
+          challengeViewFor(buildingId, durationS),
+          RESOURCES,
+          'collective',
+        );
+        if (!built.ok) return;
+        let blockingMs = 0;
+        let cloneOutMs = 0;
+        let cloneBackMs = 0;
+        let legs = 0;
+        for (const run of built.runs) {
+          const recorded = timed(() => recordRun(run.config, { recordDecisions: false }));
+          blockingMs += recorded.ms;
+          legs += recorded.value.recording.legs.length;
+          cloneOutMs += timed(() => structuredClone(run.config)).ms;
+          cloneBackMs += timed(() => structuredClone(recorded.value.recording)).ms;
+        }
+        rows.push({
+          surface: 'challenge/press',
+          id: `${buildingId}@${String(durationS)}s×${String(built.runs.length)}`,
+          blockingMs,
+          legs,
+          cloneOutMs,
+          cloneBackMs,
+        });
+      };
+
+      for (const building of RESOURCES.buildings) challengePress(building.id, 900);
+
+      /*
+       * **The ceiling, and it is a different row rather than a caveat on the ones above.** Nothing
+       * in `challengeRunConfigs` bounds `durationS` — it checks the building, the dispatcher, the
+       * template and the seed count and nothing else — so the length is the server's to name, and
+       * `leaderboard/submission.ts#ACCEPTED_DURATIONS_S` accepts 1 800, 3 600, 7 200 and a whole
+       * authored day above the 900 the rotation uses today. A cost measured only at 900 s is
+       * `dev/offThreadRuns.ts`'s own Watch finding again: a stated cost taken on the cheap half of
+       * its population.
+       */
+      challengePress('vertical-city', 7200);
+
+      /*
+       * **The campaign panel's fail-state replay** — the second surface #410 does not name.
+       * `dev/campaignPanel.ts#failStates` runs replication 0 again on this thread, *after* the
+       * batch it diagnoses has come back from `dev/batchWorker.ts`. So the panel already pays the
+       * worker's transport for the fifty and then blocks for one more run on top of it, which is
+       * the shape worth having a number for.
+       *
+       * One row per shipped stage, at the stage's own building, duration and arrival rate — the
+       * population is `data/campaign.json` and it is read rather than described.
+       */
+      const loaded = campaign.campaign;
+      for (const stage of loaded.stages) {
+        const building = RESOURCES.buildings.find((entry) => entry.id === stage.building);
+        const dispatcherProfile = RESOURCES.dispatcherProfiles.profiles.find(
+          (entry) => entry.id === 'collective',
+        );
+        if (building === undefined || dispatcherProfile === undefined) continue;
+        const config = demonstrationConfigFor({
+          stage,
+          building,
+          dispatcherProfile,
+          trafficProfiles: RESOURCES.trafficProfiles,
+          elevatorSpecs: RESOURCES.elevatorSpecs,
+          dispatcherProfiles: RESOURCES.dispatcherProfiles,
+        });
+        const recorded = timed(() => recordRun(config));
+        rows.push({
+          surface: 'campaign/fail-states',
+          id: stage.id,
+          blockingMs: recorded.ms,
+          legs: recorded.value.recording.legs.length,
           cloneOutMs: timed(() => structuredClone(config)).ms,
           cloneBackMs: timed(() => structuredClone(recorded.value.recording)).ms,
         });
@@ -276,8 +472,16 @@ describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting th
       // read like a fast surface.
       expect(rows.filter((row) => row.surface === 'fixit/open').length).toBeGreaterThan(0);
       expect(rows.filter((row) => row.surface === 'watch/press').length).toBeGreaterThan(0);
+      expect(rows.filter((row) => row.surface === 'challenge/press').length).toBeGreaterThan(0);
+      expect(rows.filter((row) => row.surface === 'campaign/fail-states').length).toBeGreaterThan(0);
 
-      const bySurface = ['fixit/open', 'fixit/press', 'watch/press'];
+      const bySurface = [
+        'fixit/open',
+        'fixit/press',
+        'watch/press',
+        'challenge/press',
+        'campaign/fail-states',
+      ];
       const body = [
         'surface runs — blocking wall clock against transport (structured clone both ways)',
         `node ${process.version}`,

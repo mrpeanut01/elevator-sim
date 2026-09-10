@@ -63,6 +63,7 @@ import {
   POST_RUN_NO_SERVER,
   EVERYDAY_HOST,
   type EverydayGhostRace,
+  type EverydayHost,
   type EverydayHostBindings,
 } from './host.js';
 
@@ -123,6 +124,27 @@ interface Harness {
   ghostRace: EverydayGhostRace;
 }
 
+/**
+ * `watchRun`, read as the one row it settles on.
+ *
+ * The press answers a callback rather than returning since GitHub issue #410, because the gate's
+ * simulation moved off the thread that paints. This helper is **not** a way of pretending it is
+ * still synchronous: it asserts that `settled` was called exactly once and that it was called
+ * before the press returned, both of which are contract clauses of the seam and neither of which
+ * the old return type could express. A binding that answered late — or twice — fails here rather
+ * than silently reading as the previous shape.
+ */
+function settledRun(host: EverydayHost, run: WatchableRun): WatchableRun {
+  const seen: WatchableRun[] = [];
+  host.watchRun(run, (checked) => {
+    seen.push(checked);
+  });
+  expect(seen, 'watchRun settled a different number of times than once').toHaveLength(1);
+  const only = seen[0];
+  if (only === undefined) throw new Error('unreachable — length was asserted above');
+  return only;
+}
+
 function harnessOf(
   state: ViewerState,
   flags?: Partial<{
@@ -180,7 +202,7 @@ function harnessOf(
         calls.push(`raceAgainst:${pick}`);
       },
       /*
-       * § 14.1's six, recorded rather than refused — GitHub issue #182. `watchRun`'s composition is
+       * § 14.1's six, recorded rather than refused — GitHub issue #182. `watchRun`'s gate is
        * driven below, and what it is asserted on is the *order* of these calls: the gate runs, and
        * `enterWatch` is reached only when it passed.
        */
@@ -188,9 +210,14 @@ function harnessOf(
         calls.push('loadReferenceRuns');
         return Promise.resolve(harness.references);
       },
-      simulateRecord: (config) => {
+      /*
+       * Answers synchronously, which is what the seam's own docstring says a test binds — the
+       * shipped one is a worker round trip (GitHub issue #410) and this one is the same contract
+       * with the wait taken out, so the ordering assertions below still read as an ordering.
+       */
+      simulateRecord: (config, done) => {
         calls.push('simulateRecord');
-        return harness.simulate(config);
+        done(harness.simulate(config));
       },
       enterWatch: (run) => {
         calls.push(`enterWatch:${run.id}`);
@@ -1319,7 +1346,7 @@ describe('§ 14.1 — the spectator entry', () => {
     h.simulate = () => recording;
     const host = createEverydayHost(h.bindings);
 
-    const answer = host.watchRun(rowOf(record, postedOf(recording)));
+    const answer = settledRun(host, rowOf(record, postedOf(recording)));
 
     expect(answer.blocked, 'a record that reproduces was refused').toBeNull();
     /* The order is the assertion: the gate runs, and the entry happens after it. */
@@ -1340,7 +1367,7 @@ describe('§ 14.1 — the spectator entry', () => {
     const host = createEverydayHost(h.bindings);
 
     const posted = postedOf(recording);
-    const answer = host.watchRun(rowOf(record, { ...posted, carried: posted.carried + 1 }));
+    const answer = settledRun(host, rowOf(record, { ...posted, carried: posted.carried + 1 }));
 
     expect(answer.blocked?.ground).toBe('does-not-reproduce');
     /* The reason names the figure that moved — a refusal that says only *no* sends a reader hunting. */
@@ -1361,7 +1388,7 @@ describe('§ 14.1 — the spectator entry', () => {
       ...rowOf(null, NO_FIGURES),
       blocked: { ground: 'no-record', reason: 'nothing to re-simulate' },
     };
-    expect(host.watchRun(blocked).blocked).not.toBeNull();
+    expect(settledRun(host, blocked).blocked).not.toBeNull();
     expect(h.calls).not.toContain('simulateRecord');
   });
 

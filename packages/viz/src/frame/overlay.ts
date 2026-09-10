@@ -34,13 +34,23 @@
  * `awtIsValid === false` — and never recomputed here. `UX.md` § 7.1 rule 4: two sources of
  * truth for "may I show this mean" is the failure this project exists to avoid.
  *
- * ## Cost
+ * ## Cost, and it is measured rather than asserted
  *
  * `recording.legs` is sorted by `arrivedAt`, so the scan starts at the first leg that could
  * matter and stops at `t`. A 900 s run of the largest shipped building holds a few thousand
- * legs; the whole computation is a single pass over the ones that had arrived, which is
- * comfortably inside a 60 Hz frame budget and needs no cache — and a cache is exactly what would
- * make this impure and break scrubbing backwards.
+ * legs; the whole computation is a single pass over the ones that had arrived, and it needs no
+ * cache — a cache is exactly what would make this impure and break scrubbing backwards.
+ *
+ * That paragraph used to end *"which is comfortably inside a 60 Hz frame budget"*, with no run
+ * behind it, and GitHub issue #410 is the clause that says a claim about a cost is measured rather
+ * than restated. Both halves now have one. `frame/measure.perFrame.test.ts` is the run: the worst
+ * call anywhere in the shipped population is **0.038 ms**, and on the heaviest recording the
+ * product can hand this fold — a `vertical-city` day at 7 200 s, 11 436 legs — **0.154 ms**, which
+ * is 0.9 % of a 16.7 ms frame. So the sentence was true, including at a ceiling nothing had looked
+ * at. And *a single pass* is now a **budget** rather than a description:
+ * `frame/perFrameBudget.test.ts` counts the legs this function reads and fails if it reads more
+ * than one per leg that had arrived. It is written in legs and not in milliseconds for that file's
+ * stated reason — a wall-clock gate on a shared runner measures the runner.
  */
 
 import type { Direction, SimTime } from '@elevator-sim/core/browser';

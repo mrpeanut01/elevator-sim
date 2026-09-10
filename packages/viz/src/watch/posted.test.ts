@@ -15,7 +15,8 @@ import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { switchWireOf } from '../scope/switchWire.js';
 
-import { checkedRun, watchGateBefore } from './library.js';
+import { watchGateBefore } from './library.js';
+import { checkedRunForTest } from './gate.test-helper.js';
 import { postedLogOf, postedRunOf, postedSubtitleOf } from './posted.js';
 import { watchRunConfigOf } from './record.js';
 import { CLAIM_EPSILON, claimDrift, claimOf, claimRefusalFor } from './reproduce.js';
@@ -91,7 +92,7 @@ describe('a board row as a watchable run — GitHub issue #337', () => {
 
   it('passes the gate on the claim the server measured, and enters with the replay', () => {
     const entry = measuredEntry(entryOf());
-    const checked = checkedRun(postedRunOf(entry, 1, RESOURCES), RESOURCES, baseState(), (config) => recordRun(config).recording);
+    const checked = checkedRunForTest(postedRunOf(entry, 1, RESOURCES), RESOURCES, baseState(), (config) => recordRun(config).recording);
     expect(checked.run.blocked).toBeNull();
     expect(checked.recording).toBeDefined();
   }, 120_000);
@@ -99,7 +100,7 @@ describe('a board row as a watchable run — GitHub issue #337', () => {
   it('refuses a claim one figure off, naming the figure, and never in the first person', () => {
     const entry = measuredEntry(entryOf());
     const off: BoardEntry = { ...entry, measured: { ...entry.measured, awtS: entry.measured.awtS + 0.5 } };
-    const checked = checkedRun(postedRunOf(off, 1, RESOURCES), RESOURCES, baseState(), (config) => recordRun(config).recording);
+    const checked = checkedRunForTest(postedRunOf(off, 1, RESOURCES), RESOURCES, baseState(), (config) => recordRun(config).recording);
     expect(checked.run.blocked?.ground).toBe('does-not-reproduce');
     expect(checked.recording).toBeUndefined();
     expect(checked.run.blocked?.reason).toContain('the mean wait (s)');

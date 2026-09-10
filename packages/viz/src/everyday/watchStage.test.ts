@@ -40,6 +40,7 @@ import {
   REPLAY_NOT_ON_STAGE,
   SPECTATOR_MAKES_NO_CHANGES,
   watchStageBarOf,
+  WATCH_CHECKING_LABEL,
   WATCH_IT_LABEL,
   WATCH_ROWS_HEADING,
   WATCH_ROWS_LEDE,
@@ -124,9 +125,18 @@ describe('the Everyday watching surface', () => {
     expect(bar.primary.inert).toBeUndefined();
   });
 
-  it('carries the picker’s own three sentences, and none of them is empty', () => {
-    for (const text of [WATCH_ROWS_HEADING, WATCH_ROWS_LEDE, WATCH_IT_LABEL]) {
+  it('carries the picker’s own four sentences, and none of them is empty', () => {
+    for (const text of [
+      WATCH_ROWS_HEADING,
+      WATCH_ROWS_LEDE,
+      WATCH_IT_LABEL,
+      // The fourth is GitHub issue #410's — a state the press could not have while it was
+      // synchronous, because there was no frame in which the label could change.
+      WATCH_CHECKING_LABEL,
+    ]) {
       expect(text.trim()).not.toBe('');
+      /* § 14.1: the word `you` on a watched run is a defect, and a busy label is no exception. */
+      expect(firstPersonWordsIn(text)).toEqual([]);
     }
     /* § 16 rule 2: the lede states the basis, which is the substitution § D407 argues. */
     expect(WATCH_ROWS_LEDE).toContain('re-simulates');

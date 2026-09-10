@@ -31,9 +31,10 @@
  *
  * The two rows blocked *without* a simulation — a day with no record, a record this build cannot
  * read — are still marked on open, because neither needs one. That split is now
- * `watch/library.ts#watchGateBefore`'s, with `#watchGateAfter` reading the recording;
- * `#checkedRun` is the two composed and remains the whole gate for the caller that runs
- * synchronously.
+ * `watch/library.ts#watchGateBefore`'s, with `#watchGateAfter` reading the recording. Those two
+ * halves **are** the gate now: a composed `#checkedRun` sat beside them for the caller that still
+ * ran synchronously, and GitHub issue #410 moved that caller — `everyday/host.ts#watchRun` — so the
+ * composition was deleted for want of a non-test caller.
  *
  * **This panel's run goes to `dev/shiftWorker.ts` through `dev/offThreadRuns.ts`** — GitHub issue
  * #165. The sentence that used to stand here put the run's cost at *"~0.2–1.5 s"* and it is

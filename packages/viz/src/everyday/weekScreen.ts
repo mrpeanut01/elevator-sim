@@ -32,10 +32,18 @@
  * is the thing § 3.1 gives this shell one screen region instead of.
  *
  * Every word in it is `everyday/watchStage.ts`' or `watch/`'s; this file draws them and forwards the
- * press. The press is two calls in a fixed order — `host.watchRun(row)` first, and
- * `context.enterWatch()` only if the row comes back unblocked — because § 1.5 refuses to replay
- * something approximate and a shell that entered the spectator context on a refused row would be
- * drawing a stranger's chrome over the player's own day.
+ * press. The press is two calls in a fixed order — `host.watchRun(row, …)` first, and
+ * `context.enterWatch()` only from inside its callback and only if the row comes back unblocked —
+ * because § 1.5 refuses to replay something approximate and a shell that entered the spectator
+ * context on a refused row would be drawing a stranger's chrome over the player's own day.
+ *
+ * **The callback is GitHub issue #410's and the ordering is unchanged by it.** That press used to
+ * return the row, which meant the gate's simulation ran inside the click handler — up to 1 943 ms
+ * of frozen page on a filed `vertical-city` day this picker offers
+ * (`dev/measure.surfaceRuns.test.ts`). It is a worker round trip now, so the fixed order is a fixed
+ * order across a callback rather than across two statements, and the row gains a busy face
+ * ({@link WATCH_CHECKING_LABEL}) and a re-entrancy guard that a synchronous press did not need
+ * because it could not be re-entered.
  */
 
 import type { ActionBarModel } from './actionBar.js';
@@ -64,6 +72,7 @@ import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.
 import type { EverydayState } from './types.js';
 import {
   NOTHING_TO_WATCH,
+  WATCH_CHECKING_LABEL,
   WATCH_IT_LABEL,
   WATCH_ROWS_HEADING,
   WATCH_ROWS_LEDE,
@@ -108,6 +117,15 @@ function mountWeek(
 
   /** A row the gate has since refused, by id — so the redraw shows the reason rather than the button. */
   const refused = new Map<string, WatchableRun>();
+
+  /**
+   * The row whose gate run is out, by id — or `undefined`. GitHub issue #410.
+   *
+   * `dev/watchPanel.ts` holds the same field for the same press and states the pair: the busy state
+   * a moved run makes possible **and** the guard a moved run makes necessary. A synchronous gate
+   * could not be re-entered because the press held the thread; an asynchronous one can.
+   */
+  let checking: string | undefined;
 
   const root = el(doc, 'div', 'everyday-week');
   root.style.cssText = 'max-width:900px';
@@ -307,8 +325,21 @@ function mountWeek(
      * loses it.
      */
     if (run.blocked === null) {
-      const watch = el(doc, 'button', 'everyday-week-watch-open', WATCH_IT_LABEL);
+      const busy = checking === run.id;
+      const watch = el(
+        doc,
+        'button',
+        'everyday-week-watch-open',
+        busy ? WATCH_CHECKING_LABEL : WATCH_IT_LABEL,
+      );
       watch.type = 'button';
+      /*
+       * Disabled only on the row whose run is out. Another row's button stays live and its press
+       * is dropped by {@link press} rather than queued — the guard is one place, and a disabled
+       * button on every row would say the page is busy when § 14.1's whole point, and the reason
+       * this moved, is that it is not.
+       */
+      watch.disabled = busy;
       watch.style.cssText = [
         'flex:none',
         'align-self:center',
@@ -339,13 +370,26 @@ function mountWeek(
    * outcome reached one interaction later than the ideal and stated rather than glossed.
    */
   function press(run: WatchableRun): void {
-    const checked = context.host.watchRun(run);
-    if (checked.blocked !== null) {
-      refused.set(run.id, checked);
-      render();
-      return;
-    }
-    context.enterWatch();
+    /*
+     * Dropped rather than queued — GitHub issue #410, and it is the guard the move makes necessary
+     * rather than a courtesy. While the gate was synchronous a second press could not be delivered:
+     * the first one had the thread. Now it can, and two presses would put two runs in flight over
+     * one `EverydayHost`, with the second's answer arriving over a spectator state the first had
+     * already entered. One press at a time, and `checking` is what a row draws instead of its
+     * button.
+     */
+    if (checking !== undefined) return;
+    checking = run.id;
+    render();
+    context.host.watchRun(run, (checked) => {
+      checking = undefined;
+      if (checked.blocked !== null) {
+        refused.set(run.id, checked);
+        render();
+        return;
+      }
+      context.enterWatch();
+    });
   }
 
   render();
