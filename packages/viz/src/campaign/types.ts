@@ -35,6 +35,7 @@
  * turns the campaign red.
  */
 
+import type { ScenarioBudget } from '../scenario/budget.js';
 import type { GoalSpec } from '../scenario/goals.js';
 import type { PublishedSeedSet } from '../scenario/published.js';
 
@@ -115,6 +116,19 @@ export interface CampaignStage {
    * violation, and a lever outside {@link StageDispatcher.editable} is a violation.
    */
   readonly levers: Readonly<Record<FailState, string | null>>;
+  /**
+   * § 2.1's *"plus a budget"* — GitHub issue **#365**, [§ D525](../../../../DECISIONS.md) clause 1.
+   *
+   * `docs/38` § 2.1: *"`data/campaign.json`'s stage record already carries everything but the
+   * budget … That record, plus a budget, is the scenario schema."* This is that field, and its
+   * shape is declared in `scenario/budget.ts` rather than here because the same shape is what the
+   * eighteen fix cases (#233), the six Engineer challenges (#227) and today's scenario are
+   * authored to. A campaign stage is one of the schema's four authors, not the schema.
+   *
+   * **Required, and refused rather than defaulted when it is absent.** A stage with no budget is
+   * not a stage with an unlimited one — `parse.ts` says so where it decodes it.
+   */
+  readonly budget: ScenarioBudget;
 }
 
 export interface Campaign {

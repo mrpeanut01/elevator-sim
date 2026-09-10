@@ -43,6 +43,7 @@ import type { Campaign, CampaignStage } from '../campaign/types.js';
 import { probabilityWordIn } from '../campaign/words.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { deriveProseLiterals } from '../honesty/derive.test-helper.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { goalReport } from '../scenario/goalReport.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
@@ -77,6 +78,8 @@ beforeAll(async () => {
         ),
       ]),
     ),
+    /* #365: a budget is checked against the shipped ladder, never against a fixture. */
+    schedule: shippedPriceSchedule(),
   };
   campaign = parseCampaign(
     JSON.parse(await readFile(join(DATA_DIR, 'campaign.json'), 'utf8')),

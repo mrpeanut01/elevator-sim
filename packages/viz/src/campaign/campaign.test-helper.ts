@@ -74,6 +74,7 @@ import { runBatch } from '../batch/runBatch.js';
 import type { BatchResources, BatchResult } from '../batch/types.js';
 import type { EditedVector } from '../controls/editedProfile.js';
 import { recordRun } from '../record/recordRun.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 
@@ -196,6 +197,8 @@ async function loadCampaign(): Promise<LoadedCampaign> {
         ),
       ]),
     ),
+    /* #365: a budget is checked against the shipped ladder, never against a fixture. */
+    schedule: shippedPriceSchedule(),
   };
   return {
     config,
