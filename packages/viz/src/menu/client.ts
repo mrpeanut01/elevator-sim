@@ -38,7 +38,7 @@
  * the absence lexically, because *"we do not time out"* is a claim about every future edit.
  */
 
-import type { WireIntervention as CoreWireIntervention } from '@elevator-sim/core/browser';
+import type { ChimeCompletion, WireIntervention as CoreWireIntervention } from '@elevator-sim/core/browser';
 
 import type {
   ChallengeBoardPage,
@@ -590,6 +590,24 @@ export interface LeaderboardClient {
    */
   submitChallenge(token: string, submission: ChallengeSubmission): Promise<Result<ChallengeEntryAccepted>>;
   challengeBoard(challengeId: string, metric: string): Promise<Result<ChallengeBoardPage>>;
+  /**
+   * The account's chime balance — GitHub issue **#368**, and **one number is the whole answer**.
+   *
+   * [§ D526](../../../../DECISIONS.md) clause 5: *the play surface reads one balance and posts two
+   * verbs, earn and spend, and never knows a source.* There is deliberately no method here that
+   * lists entries, asks where a chime came from, or reads a history — the server serves none, and
+   * a client that offered one would be the first thing a *where did this go* screen needed.
+   */
+  chimes(token: string): Promise<Result<number>>;
+  /**
+   * Bank a turn the player finished — the earn verb, and **there is no amount on it**.
+   *
+   * A purchase is, mechanically, a client naming an amount. This signature has nowhere to put one:
+   * the caller says *what it finished* and `data/chime-ledger.json` decides what that is worth on
+   * the server. The completion vocabulary is `core`'s and closed, so there is no string here that
+   * reaches a **source** either — the sign-in gift has no completion and cannot be asked for.
+   */
+  bankCompletion(token: string, completion: ChimeCompletion): Promise<Result<number>>;
 }
 
 /**
@@ -719,6 +737,18 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
   const user = (body: unknown): AccountSummary | undefined =>
     (body as Record<string, unknown> | null)?.['user'] as AccountSummary | undefined;
 
+  /**
+   * The ledger's answer — one whole number, and a 2xx shaped any other way is refused.
+   *
+   * A balance that came back as `undefined` and was drawn as `0` would put *you have no chimes yet*
+   * over an account that has some, which is a screen lying about a store rather than a client
+   * failing to read one. `call`'s `unexpected-response` is the honest arm.
+   */
+  const balance = (body: unknown): number | undefined => {
+    const value = (body as Record<string, unknown> | null)?.['balanceChimes'];
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  };
+
   return {
     // `() => null` rather than a shape check: there is nothing in the body a caller is allowed to
     // read, so a "wrong shape" refusal would be a distinction with nothing behind it.
@@ -742,6 +772,9 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
       call({ method: 'POST', url: `${base}/api/auth/redeem`, token: undefined, body: { token: linkToken } }, session),
     logout: (token) => call({ method: 'POST', url: `${base}/api/logout`, token, body: {} }, () => null),
     me: (token) => call({ method: 'GET', url: `${base}/api/me`, token, body: undefined }, user),
+    chimes: (token) => call({ method: 'GET', url: `${base}/api/chimes`, token, body: undefined }, balance),
+    bankCompletion: (token, completion) =>
+      call({ method: 'POST', url: `${base}/api/chimes/earn`, token, body: { completion } }, balance),
     setDisplayName: (token, displayName) =>
       call({ method: 'POST', url: `${base}/api/me/display-name`, token, body: { displayName } }, user),
     submit: (token, submission) =>

@@ -1799,12 +1799,12 @@ describe('the chime ledger over the wire', () => {
     for (let i = 0; i < 3; i += 1) {
       await call('POST', '/api/chimes/earn', {
         token: player.token,
-        body: { completion: 'scenario-cleared', band: 'single' },
+        body: { completion: 'scenario-cleared' },
       });
     }
     await call('POST', '/api/chimes/spend', {
       token: player.token,
-      body: { modifier: 'scenario-budget-step', steps: 1 },
+      body: { modifier: 'career-purse-top-up', steps: 1 },
     });
     const mine = await call('GET', '/api/chimes', { token: player.token });
     expect(Object.keys(bodyOf(mine))).toEqual(['balanceChimes']);
@@ -1844,7 +1844,21 @@ describe('the chime ledger over the wire', () => {
     });
     const greedy = await call('POST', '/api/chimes/earn', {
       token: player.token,
-      body: { completion: 'rush-wave-survived', chimes: 9999, amount: 9999, balanceChimes: 9999, price: '9.99' },
+      body: {
+        completion: 'rush-wave-survived',
+        chimes: 9999,
+        amount: 9999,
+        balanceChimes: 9999,
+        price: '9.99',
+        /*
+         * **And a `band`**, which is not a greedy extra field like the four above — it is a field
+         * this route really did read, until the review of PR #485 found the band was taken verbatim
+         * from the body of the account being paid (`chimes/ledger.ts#earnCompletion` holds the
+         * withdrawal). Asserted here rather than in a case of its own so that the claim under test
+         * is the one that matters: **the award does not move**, whatever the body says.
+         */
+        band: 'single',
+      },
     });
     expect(greedy.status).toBe(200);
     expect(bodyOf(greedy)['balanceChimes']).toEqual(bodyOf(paid)['balanceChimes']);
@@ -1855,7 +1869,7 @@ describe('the chime ledger over the wire', () => {
     const before = Number(bodyOf(await call('GET', '/api/chimes', { token: player.token }))['balanceChimes']);
     const refused = await call('POST', '/api/chimes/spend', {
       token: player.token,
-      body: { modifier: 'scenario-budget-step', steps: 1 },
+      body: { modifier: 'career-purse-top-up', steps: 1 },
     });
     expect(refused.status).toBe(409);
     expect(bodyOf(refused)['error']).toBe('not-enough-chimes');
@@ -1889,12 +1903,12 @@ describe('the chime ledger over the wire', () => {
     for (let i = 0; i < 3; i += 1) {
       await call('POST', '/api/chimes/earn', {
         token: player.token,
-        body: { completion: 'scenario-cleared', band: 'single' },
+        body: { completion: 'scenario-cleared' },
       });
     }
     const spent = await call('POST', '/api/chimes/spend', {
       token: player.token,
-      body: { modifier: 'scenario-budget-step', steps: 1 },
+      body: { modifier: 'career-purse-top-up', steps: 1 },
     });
     expect(spent.status).toBe(200);
     expect(Number(bodyOf(spent)['grantUnits'])).toBeGreaterThan(0);
@@ -1948,11 +1962,11 @@ describe('the chime ledger over the wire', () => {
     const player = await signIn();
     const claiming = await call('POST', '/api/scores', {
       token: player.token,
-      body: { ...honest(), modifiers: [{ sinkId: 'scenario-budget-step', steps: 2 }] },
+      body: { ...honest(), modifiers: [{ sinkId: 'career-purse-top-up', steps: 2 }] },
     });
     expect(claiming.status).toBe(422);
     expect(bodyOf(claiming)['error']).toBe('modifier-not-bought');
-    expect(String(bodyOf(claiming)['detail'])).toContain('scenario-budget-step');
+    expect(String(bodyOf(claiming)['detail'])).toContain('career-purse-top-up');
   });
 
   it('accepts the same run once the spend is real', async () => {
@@ -1960,17 +1974,17 @@ describe('the chime ledger over the wire', () => {
     for (let i = 0; i < 3; i += 1) {
       await call('POST', '/api/chimes/earn', {
         token: player.token,
-        body: { completion: 'scenario-cleared', band: 'single' },
+        body: { completion: 'scenario-cleared' },
       });
     }
     const spent = await call('POST', '/api/chimes/spend', {
       token: player.token,
-      body: { modifier: 'scenario-budget-step', steps: 1 },
+      body: { modifier: 'career-purse-top-up', steps: 1 },
     });
     expect(spent.status).toBe(200);
     const posted = await call('POST', '/api/scores', {
       token: player.token,
-      body: { ...honest(), modifiers: [{ sinkId: 'scenario-budget-step', steps: 1 }] },
+      body: { ...honest(), modifiers: [{ sinkId: 'career-purse-top-up', steps: 1 }] },
     });
     /* Whatever the verification says about the figures, it is no longer the modifier being refused. */
     expect(bodyOf(posted)['error']).not.toBe('modifier-not-bought');
@@ -1980,9 +1994,76 @@ describe('the chime ledger over the wire', () => {
     const player = await signIn();
     const bad = await call('POST', '/api/scores', {
       token: player.token,
-      body: { ...honest(), modifiers: 'scenario-budget-step' },
+      body: { ...honest(), modifiers: 'career-purse-top-up' },
     });
     expect(bad.status).toBe(400);
     expect(bodyOf(bad)['error']).toBe('invalid-submission');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The two write verbs are bounded — the review of PR #485, medium 6
+ * -------------------------------------------------------------------------- */
+
+describe('the chime write verbs are bounded like every other write on this surface', () => {
+  it('refuses an account that banks turns faster than anybody plays them', async () => {
+    /*
+     * **The defect this is written against was measured rather than imagined**: two hundred
+     * consecutive earns produced two thousand chimes and nothing was refused. That makes the spend
+     * route's balance check a guard on a number the caller sets, and it appends an unbounded number
+     * of rows to one account's ledger.
+     *
+     * Keyed on the **account** rather than on the caller's address, unlike the telemetry budget
+     * next door and for the opposite reason: the thing being protected is a per-account balance, an
+     * earn requires an account to have been verified by mail, and a per-address budget would refuse
+     * a school or an office where the accounts are real.
+     */
+    const player = await signIn();
+    let refusal: ApiResponse | undefined;
+    for (let n = 0; n < 200 && refusal === undefined; n += 1) {
+      const response = await call('POST', '/api/chimes/earn', {
+        token: player.token,
+        body: { completion: 'rush-wave-survived' },
+      });
+      if (response.status === 429) refusal = response;
+    }
+    expect(refusal, 'two hundred earns in a row and the ledger paid every one').toBeDefined();
+    expect(Number(bodyOf(refusal as ApiResponse)['retryAfterMs'])).toBeGreaterThan(0);
+  });
+
+  it('shares that budget with the spend verb, so alternating does not double it', async () => {
+    const player = await signIn();
+    let refused = false;
+    for (let n = 0; n < 200 && !refused; n += 1) {
+      const response =
+        n % 2 === 0
+          ? await call('POST', '/api/chimes/earn', {
+              token: player.token,
+              body: { completion: 'rush-wave-survived' },
+            })
+          : await call('POST', '/api/chimes/spend', {
+              token: player.token,
+              body: { modifier: 'rush-prefit', steps: 1 },
+            });
+      refused = response.status === 429;
+    }
+    expect(refused, 'alternating between the two verbs escaped the shared budget').toBe(true);
+  });
+
+  it('bounds one account without bounding another, which is what keying on the account means', async () => {
+    const noisy = await signIn();
+    for (let n = 0; n < 200; n += 1) {
+      const response = await call('POST', '/api/chimes/earn', {
+        token: noisy.token,
+        body: { completion: 'rush-wave-survived' },
+      });
+      if (response.status === 429) break;
+    }
+    const quiet = await signIn();
+    const theirs = await call('POST', '/api/chimes/earn', {
+      token: quiet.token,
+      body: { completion: 'rush-wave-survived' },
+    });
+    expect(theirs.status, 'one account exhausting its budget locked another out').toBe(200);
   });
 });

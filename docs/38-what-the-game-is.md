@@ -271,12 +271,22 @@ right change for, a contract that needs a bigger purse, a rush record that needs
 **Earned by completing a turn, never by a run's figures.** A scenario cleared, a contract day paid,
 a rush wave survived. Each pays a flat amount authored in `data/` (invariant 7). Harder scenarios
 may pay more, by their survivor-count band, because that is a property of the scenario and not of
-the run. **No chime is ever scaled by a wait figure or any quantity the run can suppress.** That is
+the run — **that permission is not taken up, and the shipped table pays every scenario the same**:
+`data/scenario-survivors.json` records survivor *counts* and no band, nothing turns a count into
+one, and a band the client chose was what the first attempt at this shipped (the review of PR #485;
+`packages/core/src/config/chimeLedger.ts` now refuses a `bands` key by name). A band becomes
+available when a scenario's pinned record carries one. **No chime is ever scaled by a wait figure or
+any quantity the run can suppress.** That is
 the argument [`32-game-design.md`](32-game-design.md) § 3.4 makes for standing, a tally of completed
 turns rather than a statistic over a run, and it is what keeps chimes outside charter non-goal 1.
 
 **Spent on modifiers, never on access.** Chimes buy budget: a scenario's budget up, a tower's purse
-up, a rush's between-round purse up or a pre-fitted start. That is GD13 clause 1's one permission, a
+up, a rush's between-round purse up or a pre-fitted start. **A scenario's budget is priced by the
+scenario** — § 2.1's *"in steps the scenario authors"* — so `data/campaign.json` holds that ladder
+and `data/chime-ledger.json` holds the other three; a price for one act in both documents is an
+authority defect, and the ledger's parser refuses one. **No screen spends a chime yet**: the tally
+is banked and shown, the prices are listed, and the panel that lists them says on its own face that
+nothing buys them, which is GitHub issues #371 and #372. That is GD13 clause 1's one permission, a
 limit on a configuration. Everything else in GD13 holds and is restated here so nobody reads the
 currency as relaxing it: chimes never open a mode, a screen, a building, a dispatcher, a case or a
 figure (GD9); they never buy a verdict, a retry the mode declares free, or relief on a measurement,
@@ -296,6 +306,15 @@ spend; the screen shows what is in the account and lets the player spend or earn
 that is the whole of its contract. Without an account the ledger is on this device alone and says
 so, in the shape the tree already uses for device-only artefacts, and a run played with device-only
 chimes can be played and not posted.
+
+**That last sentence is a requirement and is not built**, and it is flagged here because the first
+attempt shipped its *face* without its *store*: the Settings panel told a signed-out player their
+tally was kept on this device while `everyday/profile.ts` — `localStorage`'s owner — had no chime
+field, so the balance was a hard zero described as a ledger (the review of PR #485). The panel now
+says there is no tally until you sign in, which is true of this build and contradicts the paragraph
+above on purpose. What is missing is not code but a ruling: **what happens to a device balance when
+an account arrives** — merged, discarded, or which one wins — and a device ledger built without
+answering that would either silently double a balance or silently drop one.
 
 **No purchase ships, and the ledger is built so an add from outside is invisible to play.** A
 ledger has sources; today they are the three completions above. Any external add, a purchase or a
@@ -357,6 +376,10 @@ Named so the next lane does not discover it. None of it is built by this page.
   scenario, with its sampling method beside it where the space is sampled.
 - **A chime ledger on the account**, with its sources and sinks authored in `data/`, a device-only
   fallback that says so, and the server checking a posted modified run against a real spend.
+  **Partly built**: the ledger, the balance read, the earn, the spend route and the posted-run check
+  ship, and the balance is read by Settings and paid by a filed contract day. The **device-only
+  fallback** does not — see § 2.4 for the ruling it is waiting on — and **no screen spends a chime
+  yet**, which the panel that lists the prices says on its own face (#371, #372).
 - The stage's opening speed moves to a watching rung, reopening [§ D354](../DECISIONS.md)'s
   default, and a *skip to the end* control is added.
 - ~~Two new intervention kinds, equipment and building changes, on the run record.~~ **Built**

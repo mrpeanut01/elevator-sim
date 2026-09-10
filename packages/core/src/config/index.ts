@@ -85,11 +85,13 @@ export {
   chimeGrantUnits,
   chimeSinkById,
   chimeSpendPrice,
+  chimeSpendTableOf,
   parseChimeLedger,
   violationsInChimeLedger,
+  REFUSED_MODIFIER_KINDS,
+  CHIME_SCHEMA_UNITS,
 } from './chimeLedger.js';
 export type {
-  ChimeBand,
   ChimeCompletion,
   ChimeCurrency,
   ChimeEarnedBy,
@@ -97,7 +99,9 @@ export type {
   ChimeModifier,
   ChimeModifierKind,
   ChimeSchema,
+  ChimeSchemaUnit,
   ChimeSink,
+  ChimeSpendTable,
   ChimeSource,
 } from './chimeLedger.js';
 

@@ -86,23 +86,36 @@ export type ChimeOutcome =
 export type ChimeRefusal = 'unknown-completion' | 'unknown-modifier' | 'not-enough-chimes';
 
 /**
- * Bank a completed turn.
+ * Bank a completed turn, at the flat award the table names for it.
  *
- * `bandId` is the scenario's own pre-simulated survivor band (`docs/38` § 2.1), which is a property
- * of the scenario and known before anybody plays — so it may move an award where a run's figures
- * may not ([§ D526](../../../../DECISIONS.md) clause 2). An unknown band falls back to the source's
- * flat award rather than refusing, because a scenario that has not had its count pinned yet is a
- * content gap and not a reason to swallow a turn the player finished.
+ * ## The band that used to be here, and why it is not
+ *
+ * This function took a `bandId` and paid a scenario more for being hard, and this docstring called
+ * that band *"the scenario's own pre-simulated survivor band … a property of the scenario and known
+ * before anybody plays"*. **That was false about the code beside it.** The band arrived verbatim in
+ * the earn request's body — `http/api.ts` read `body.band` and passed it here — so a client could
+ * post `single` on the easiest scenario and be paid ten instead of four. Nor could it have been
+ * derived: `data/scenario-survivors.json` carries survivor **counts** and no band, nothing anywhere
+ * maps a count to one, and this route is never told which scenario was cleared.
+ *
+ * [§ D256](../../../../DECISIONS.md) decides what happens next — a stated mechanism is measured or
+ * **withdrawn**, and a second plausible sentence in its place is the same defect with new wording.
+ * So the argument is gone rather than validated, because a validated band is still a band the payee
+ * chose, and `data/chime-ledger.json`'s parser refuses a `bands` key by name so the table cannot
+ * grow one back without the mapping arriving with it.
+ *
+ * What would bring it back, in order: a band on each scenario's pinned record (or a boundary table
+ * turning `survivors` into one), a scenario id on the earn, and this function resolving the band
+ * from the record rather than from the request.
  */
 export async function earnCompletion(input: {
   readonly store: Store;
   readonly table: ChimeLedgerTable;
   readonly userId: string;
   readonly completion: ChimeCompletion;
-  readonly bandId?: string | undefined;
 }): Promise<ChimeOutcome> {
   const { table, completion } = input;
-  const award = chimeAwardFor(table, completion, input.bandId) ?? chimeAwardFor(table, completion);
+  const award = chimeAwardFor(table, completion);
   if (award === undefined) return { ok: false, reason: 'unknown-completion' };
   const source = table.sources.find(
     (candidate) => candidate.earnedBy === 'completion' && candidate.completion === completion,
@@ -227,12 +240,25 @@ export function claimedModifierIssues(value: unknown): readonly string[] {
  * says was bought. A modifier the account bought and this run does not claim is not an error; a
  * spend is permanent and a player may play a standard run afterwards.
  *
+ * ## Two bounds, and the second one was missing
+ *
+ * `ChimeSink.maxSteps` says *how many times **one run** may buy this*. `chimeSpendPrice` refuses a
+ * **spend** above it, and that was the whole of the enforcement — so an account that bought a sink
+ * twice at its cap could post a run claiming twice the cap and be believed, and `rush-prefit`,
+ * whose note is *"one step only — a building is fitted or it is not"*, accepted two. The
+ * accumulation is correct on the *spends*: a spend is permanent and a player plays many runs. It is
+ * the **claim** that is per-run, so the cap belongs here, which is why this needs the table.
+ *
+ * A sink the shipped table does not sell is unbacked whatever was bought, rather than being given
+ * an unknown cap and waved through.
+ *
  * Empty means every claim is backed. A non-empty answer is a refusal, and it names the sinks so the
  * player is told which claim the ledger cannot support rather than that something was wrong.
  */
 export function unbackedModifiers(
   claimed: readonly ClaimedModifier[],
   bought: readonly ChimeSpentModifier[],
+  table: ChimeLedgerTable,
 ): readonly string[] {
   const boughtSteps = new Map<string, number>();
   for (const spend of bought) {
@@ -244,7 +270,10 @@ export function unbackedModifiers(
   }
   const unbacked: string[] = [];
   for (const [sinkId, steps] of claimedSteps) {
-    if (steps > (boughtSteps.get(sinkId) ?? 0)) unbacked.push(sinkId);
+    const sink = chimeSinkById(table, sinkId);
+    if (sink === undefined || steps > sink.maxSteps || steps > (boughtSteps.get(sinkId) ?? 0)) {
+      unbacked.push(sinkId);
+    }
   }
   return Object.freeze(unbacked.sort((a, b) => a.localeCompare(b)));
 }

@@ -331,6 +331,36 @@ const LINKS_PER_CALLER = { maxRequests: 30, windowMs: LOGIN_TTL_MS } as const;
  */
 const TELEMETRY_PER_CALLER = { maxRequests: 60, windowMs: LOGIN_TTL_MS } as const;
 
+/**
+ * How many chime writes one **account** may make in a quarter of an hour — GitHub issue #368.
+ *
+ * ## Why there is a number here at all, and it was measured rather than imagined
+ *
+ * There was none, and every other write on this surface has one. The review of PR #485 probed it:
+ * **two hundred consecutive earns produced two thousand chimes and nothing was refused.** That is
+ * worse than an unbounded row count, though it is that too — it makes the spend route's overdraft
+ * check a guard on a number the caller can set to anything, so a ledger whose whole design is *no
+ * route accepts an amount* hands out any amount asked for, one flat award at a time.
+ *
+ * ## Why it is keyed on the account and not on the caller's address
+ *
+ * The opposite of {@link TELEMETRY_PER_CALLER}, and for the opposite reason. Telemetry is
+ * unauthenticated, so the address is the only key there is, and a per-player budget would be
+ * bounded by a value the caller chooses. An earn is authenticated by a link this server mailed, so
+ * the account **is** a key the caller cannot invent — and it is the thing being protected, because
+ * a balance belongs to an account. Keying on the address instead would refuse a school, an office
+ * or a household where the accounts are real, which is exactly the lockout `LINKS_PER_EMAIL`'s
+ * docstring spends its length avoiding.
+ *
+ * ## Why twenty
+ *
+ * A turn has to be *played* before it can be banked. The shortest is a rush wave, which
+ * `docs/38` § 2.3 measures in minutes; twenty in a quarter of an hour is far above anybody
+ * finishing turns and far below anything that looks like a loop. **A refusal costs a player
+ * nothing they earned**: the ledger is append-only and the turn can be banked on the next window.
+ */
+const CHIMES_PER_ACCOUNT = { maxRequests: 20, windowMs: LOGIN_TTL_MS } as const;
+
 export function createApi(deps: ApiDeps): Api {
   /**
    * Per account, the earliest moment the next verification may start.
@@ -352,6 +382,15 @@ export function createApi(deps: ApiDeps): Api {
    * remember which players exist, which is state § 3 does not want held.
    */
   const telemetryPerCaller = new FixedWindowLimiter(TELEMETRY_PER_CALLER);
+  /*
+   * One budget across both chime write verbs, keyed on the account — GitHub issue #368.
+   *
+   * Shared rather than one each, on {@link nextSubmitMs}'s rule: a caller alternating between two
+   * routes must not be able to double the load by doing so. The read verb is deliberately outside
+   * it — a `GET` writes nothing, and a screen that repaints on sign-in should not be able to spend
+   * an earn's budget.
+   */
+  const chimesPerAccount = new FixedWindowLimiter(CHIMES_PER_ACCOUNT);
   return async function handle(request: ApiRequest): Promise<ApiResponse> {
     const route = `${request.method} ${request.path}`;
     switch (route) {
@@ -450,9 +489,9 @@ export function createApi(deps: ApiDeps): Api {
       case 'GET /api/chimes':
         return chimeBalance(deps, request);
       case 'POST /api/chimes/earn':
-        return chimeEarn(deps, request);
+        return chimeEarn(deps, request, chimesPerAccount);
       case 'POST /api/chimes/spend':
-        return chimeSpend(deps, request);
+        return chimeSpend(deps, request, chimesPerAccount);
       default:
         return { status: 404, body: { error: 'no-such-route', detail: `Nothing is served at ${route}.` } };
     }
@@ -947,7 +986,7 @@ async function submit(
   }
   const claimed = submission.modifiers ?? [];
   if (claimed.length > 0) {
-    const unbacked = unbackedModifiers(claimed, await deps.store.chimeSpends(user.id));
+    const unbacked = unbackedModifiers(claimed, await deps.store.chimeSpends(user.id), deps.chimeLedger);
     if (unbacked.length > 0) {
       return {
         status: 422,
@@ -1046,13 +1085,29 @@ async function chimeBalance(deps: ApiDeps, request: ApiRequest): Promise<ApiResp
  * It also has no way to name a **source**. The completions are the three in `core`'s
  * `CHIME_COMPLETIONS`; the sign-in gift is a source with no completion and is written by the
  * redemption route, so nothing a client can compose reaches it.
+ *
+ * **And it no longer has a way to name a `band`.** It read `body.band` and passed it to the pricing
+ * function, so a client could post `single` on the easiest scenario and be paid ten instead of four
+ * — against a docstring in `chimes/ledger.ts` calling the band *a property of the scenario known
+ * before anybody plays*. It is withdrawn rather than validated ([§ D256](../../../../DECISIONS.md)),
+ * because a validated band is still a band the payee chose; `chimes/ledger.ts#earnCompletion` holds
+ * what would have to exist before an award may vary again.
+ *
+ * **Bounded, like every other write on this surface**, by {@link CHIMES_PER_ACCOUNT} — see there
+ * for the measurement that says why, and for why the key is the account rather than the address.
  */
-async function chimeEarn(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+async function chimeEarn(
+  deps: ApiDeps,
+  request: ApiRequest,
+  perAccount: FixedWindowLimiter,
+): Promise<ApiResponse> {
   const user = await authenticate(deps, request);
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to bank what you finished.' } };
   }
-  const body = request.body as Partial<Record<'completion' | 'band', unknown>>;
+  const limited = chargeChimeWrite(deps, user.id, perAccount);
+  if (limited !== undefined) return limited;
+  const body = request.body as Partial<Record<'completion', unknown>>;
   const completion = typeof body?.completion === 'string' ? body.completion : '';
   if (!(CHIME_COMPLETIONS as readonly string[]).includes(completion)) {
     return {
@@ -1063,13 +1118,11 @@ async function chimeEarn(deps: ApiDeps, request: ApiRequest): Promise<ApiRespons
       },
     };
   }
-  const band = typeof body?.band === 'string' ? body.band : undefined;
   const outcome = await earnCompletion({
     store: deps.store,
     table: deps.chimeLedger,
     userId: user.id,
     completion: completion as ChimeCompletion,
-    bandId: band,
   }).catch((error: unknown) => {
     if (error instanceof NoSuchUserError) return undefined;
     throw error;
@@ -1094,11 +1147,17 @@ async function chimeEarn(deps: ApiDeps, request: ApiRequest): Promise<ApiRespons
  * account bought (`chimes/ledger.ts#unbackedModifiers`). A receipt a client had to carry would be a
  * token that could be replayed, lost, or shared.
  */
-async function chimeSpend(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+async function chimeSpend(
+  deps: ApiDeps,
+  request: ApiRequest,
+  perAccount: FixedWindowLimiter,
+): Promise<ApiResponse> {
   const user = await authenticate(deps, request);
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to spend.' } };
   }
+  const limited = chargeChimeWrite(deps, user.id, perAccount);
+  if (limited !== undefined) return limited;
   const body = request.body as Partial<Record<'modifier' | 'steps', unknown>>;
   const sinkId = typeof body?.modifier === 'string' ? body.modifier : '';
   const steps = typeof body?.steps === 'number' ? body.steps : 1;
@@ -1136,6 +1195,30 @@ async function chimeSpend(deps: ApiDeps, request: ApiRequest): Promise<ApiRespon
   return {
     status: 200,
     body: { balanceChimes: outcome.balanceChimes, grantUnits: outcome.grantUnits ?? 0 },
+  };
+}
+
+/**
+ * Charge one chime write against the account's budget — GitHub issue #368.
+ *
+ * Keyed on the account rather than on `clientIp`, which is what makes it different from the
+ * telemetry charge next door; {@link CHIMES_PER_ACCOUNT} carries the argument. The refusal names a
+ * moment rather than a rule, because the caller is a screen that can try again.
+ */
+function chargeChimeWrite(
+  deps: ApiDeps,
+  userId: string,
+  perAccount: FixedWindowLimiter,
+): ApiResponse | undefined {
+  const retryMs = perAccount.charge(userId, deps.now());
+  if (retryMs === undefined) return undefined;
+  return {
+    status: 429,
+    body: {
+      error: 'too-many-chime-writes',
+      retryAfterMs: retryMs,
+      detail: 'That is more finished turns than anybody plays. Nothing is lost — try again shortly.',
+    },
   };
 }
 

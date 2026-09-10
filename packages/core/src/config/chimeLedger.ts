@@ -101,11 +101,52 @@ export type ChimeEarnedBy = (typeof CHIME_EARNED_BY)[number];
  * **configuration**, which is `docs/32` GD13 clause 1's single permission. A kind that opened a
  * mode, a screen, a building, a dispatcher, a case or a figure would be GD9, and there is no
  * spelling of it here.
+ *
+ * ## The one of the four that is **not** here, and the absence is the rule
+ *
+ * *A scenario's budget up* is missing on purpose. `docs/38` § 2.1 says a budget is bought up *"in
+ * steps **the scenario authors**"*, and the scenario does author them: `data/campaign.json` carries
+ * a `budget.steps` ladder per stage, each step with its own `addsUnits` and its own `chimes`, read
+ * by `packages/viz/src/scenario/budget.ts`. `data/scenario-survivors.json` then pre-simulates a
+ * survivor count against **those** rungs and records the `chimesSpent` of each.
+ *
+ * So a `budget-units` sink here would be a **second authority for a price that is already
+ * authored**, which is the defect this module's own docstring spends a paragraph refusing: *a
+ * player pays a different amount depending on which screen they are standing on … across a network
+ * boundary that stops being a display defect and becomes an authority defect.* It shipped anyway —
+ * a `scenario-budget-step` at 12 chimes for 8 units against the ladder's flat one chime per unit —
+ * and was caught by a reader rather than by a run, so the refusal is now mechanical:
+ * {@link REFUSED_MODIFIER_KINDS} names it and {@link parseChimeLedger} throws on it.
+ *
+ * **Why the ledger cannot simply price the rung instead, with the file and the line.** The rung is
+ * per scenario and per step, and the only parser for it is
+ * `packages/viz/src/scenario/budget.ts#decodeScenarioBudget` — in `packages/viz`, which
+ * `packages/server` may not import (`CLAUDE.md` invariant 6, and `boundaries.test.ts` asserts it).
+ * The server therefore has no way to resolve *(scenarioId, stepId) → chimes* without a second copy
+ * of the ladder, which is the authority defect again. Moving that parser into `core` is what would
+ * let a scenario rung be bought through the ledger; it is `#365`'s file and not this one's.
  */
-export const CHIME_MODIFIER_KINDS = ['budget-units', 'purse-units', 'prefit'] as const;
+export const CHIME_MODIFIER_KINDS = ['purse-units', 'prefit'] as const;
 
 /** One member of {@link CHIME_MODIFIER_KINDS}. */
 export type ChimeModifierKind = (typeof CHIME_MODIFIER_KINDS)[number];
+
+/**
+ * Kinds that are refused **by name**, with the document that owns the price named in the message.
+ *
+ * Kept apart from the unknown-kind refusal deliberately. *`unlock-building` is not something a
+ * chime buys* and *a budget is priced by the scenario, not here* are different sentences, and an
+ * author who reaches for the second one is not making a mistake about what chimes are for — they
+ * are about to duplicate a price. Telling them which file already holds it is the whole value.
+ */
+export const REFUSED_MODIFIER_KINDS: Readonly<Record<string, string>> = Object.freeze({
+  'budget-units':
+    'a scenario budget is priced by the scenario itself. data/campaign.json authors a budget.steps ' +
+    'ladder per stage, each step with its own addsUnits and its own chimes, and ' +
+    'data/scenario-survivors.json pre-simulates a survivor count against those rungs. A price here ' +
+    'as well is a second authority for one act, which is the defect chimeLedger.ts refuses at ' +
+    'length: a player pays a different amount depending on which screen they are standing on.',
+});
 
 /* -------------------------------------------------------------------------- *
  * The shapes
@@ -120,25 +161,44 @@ export type ChimeModifierKind = (typeof CHIME_MODIFIER_KINDS)[number];
  */
 export interface ChimeSchema {
   readonly type: 'integer';
-  readonly unit: 'chimes';
+  readonly unit: ChimeSchemaUnit;
   readonly min: number;
   readonly max: number;
   readonly default: number;
 }
 
 /**
- * A harder scenario paying more, by its **survivor-count band**.
+ * What an invariant-8 schema on this table can be denominated in.
  *
- * `docs/38` § 2.1 makes the survivor count a property of the scenario, pre-simulated and pinned
- * before it ships. That is why a band may move an award and a run's figures may not: the band is
- * known before anybody plays, so nothing the player does to the run can change what clearing it
- * pays. [§ D526](../../../../DECISIONS.md) clause 2 permits exactly this and nothing wider.
+ * **`chimes` is the only currency**, and the other three are counts rather than currencies: `units`
+ * is budget or purse units inside one run, `steps` is how many times a sink may be bought, `hours`
+ * is how long a gift waits. None of them is spendable outside the game, which is the line
+ * [§ D526](../../../../DECISIONS.md) clause 6 draws — a money unit has no spelling here and adding
+ * one is the change a reviewer refuses.
  */
-export interface ChimeBand {
-  readonly id: string;
-  readonly awardChimes: number;
-  readonly note: string;
-}
+export const CHIME_SCHEMA_UNITS = ['chimes', 'units', 'steps', 'hours'] as const;
+
+/** One member of {@link CHIME_SCHEMA_UNITS}. */
+export type ChimeSchemaUnit = (typeof CHIME_SCHEMA_UNITS)[number];
+
+/**
+ * **There is no band, and the withdrawal is the record** — the review of PR #485, medium 7.
+ *
+ * A `bands` array shipped on `earn-scenario-clear`, paying 4, 6 or 10 chimes by a scenario's
+ * *survivor-count band*, and `chimes/ledger.ts` described that band as *"a property of the scenario
+ * … known before anybody plays"*. It was not. The band arrived **verbatim in the request body**
+ * (`http/api.ts`'s earn route), `data/scenario-survivors.json` carries survivor **counts** and no
+ * band at all, nothing anywhere maps a count to one, and the server is never told which scenario
+ * was cleared. A client could post `single` on the easiest scenario and be paid 10 instead of 4.
+ *
+ * [§ D256](../../../../DECISIONS.md) is the rule that decides what to do about that: a stated
+ * mechanism is either measured or withdrawn, and offering a second plausible sentence in its place
+ * is the same defect with new wording. So the band is **withdrawn** rather than re-described, the
+ * award is flat, and {@link parseChimeLedger} refuses the key by name so it cannot return without
+ * the mapping arriving with it. What would bring it back, in order: a band on each scenario's
+ * pinned record (or a boundary table that turns `survivors` into one), a scenario id on the earn,
+ * and the server resolving the band from the record rather than from the request.
+ */
 
 /**
  * One place a chime can come from — **the ledger's own vocabulary, never the play surface's**.
@@ -155,10 +215,17 @@ export interface ChimeSource {
   /** Present exactly when {@link earnedBy} is `gift` — § D531's `x`, in hours away. */
   readonly awayHours: number | undefined;
   readonly awardChimes: number;
-  /** Empty on every source that has no bands. Never partial: a band set is all of them or none. */
-  readonly bands: readonly ChimeBand[];
   readonly note: string;
+  /** What the award may be tuned to — `CLAUDE.md` invariant 8. */
   readonly schema: ChimeSchema;
+  /**
+   * What {@link awayHours} may be tuned to. Present exactly when {@link awayHours} is.
+   *
+   * Invariant 8 asks a schema of *anything tunable*, and a gift's waiting time is as tunable as its
+   * award: a generic optimiser could search it, and the review of PR #485 named it as one of three
+   * that declared none.
+   */
+  readonly awaySchema: ChimeSchema | undefined;
 }
 
 /** What a sink grants, and it is always a limit on a configuration. */
@@ -175,10 +242,28 @@ export interface ChimeSink {
   readonly name: string;
   readonly priceChimes: number;
   readonly modifier: ChimeModifier;
-  /** How many times one run may buy this. At least one; a scenario cannot be bought down to free. */
+  /**
+   * How many times **one run** may buy this. At least one; a scenario cannot be bought down to free.
+   *
+   * Enforced in two places, and the second was missing until the review of PR #485: `chimeSpendPrice`
+   * refuses a spend above it, and `chimes/ledger.ts#unbackedModifiers` refuses a **claim** above it.
+   * Without the second, two spends at the cap let one run claim twice the cap.
+   */
   readonly maxSteps: number;
   readonly note: string;
+  /** What the price may be tuned to — `CLAUDE.md` invariant 8. */
   readonly schema: ChimeSchema;
+  /** What {@link ChimeModifier.grantUnits} may be tuned to. Invariant 8 again, and see {@link stepSchema}. */
+  readonly grantSchema: ChimeSchema;
+  /**
+   * What {@link maxSteps} may be tuned to.
+   *
+   * Three tunables on this table declared no schema — this, {@link grantSchema}'s field and a
+   * gift's `awayHours` — while the awards and the prices beside them did. Invariant 8 does not say
+   * *the figures somebody remembered*; it says *anything tunable*, and a cap a designer moves to
+   * pace a ladder is exactly that.
+   */
+  readonly stepSchema: ChimeSchema;
 }
 
 /** What the currency is called — [§ D530](../../../../DECISIONS.md). Data, so no screen spells it. */
@@ -252,22 +337,34 @@ function list(value: unknown, where: string): readonly unknown[] {
   return value;
 }
 
-function parseSchema(raw: unknown, where: string): ChimeSchema {
+/**
+ * One invariant-8 schema, denominated in the unit its own field is measured in.
+ *
+ * `chimes` for an award and a price; `units` for what a step grants; `steps` for a cap; `hours` for
+ * how long a gift waits. The unit is passed in rather than read and believed, so a schema cannot
+ * quietly re-denominate the field it describes — and **`chimes` is still the only currency the
+ * document may name**, which is the half [§ D530](../../../../DECISIONS.md) and
+ * [§ D526](../../../../DECISIONS.md) clause 6 turn on: a ledger denominated in anything spendable
+ * outside the game is the conversion clause 6 refuses. `units`, `steps` and `hours` are counts of
+ * things inside one run, not currencies, and none of them is spendable anywhere.
+ */
+function parseSchema(raw: unknown, where: string, unit: ChimeSchemaUnit): ChimeSchema {
   const entry = record(raw, where);
   strict(entry, ['type', 'unit', 'min', 'max', 'default'], where);
   const type = str(entry['type'], `${where}.type`);
-  const unit = str(entry['unit'], `${where}.unit`);
+  const declared = str(entry['unit'], `${where}.unit`);
   if (type !== 'integer') throw new ChimeLedgerError(`${where}.type: only "integer" is a chime.`);
-  if (unit !== 'chimes') {
+  if (declared !== unit) {
     throw new ChimeLedgerError(
-      `${where}.unit: only "chimes" is a chime. Units are money inside a mode and stay so ` +
+      `${where}.unit: this schema describes a field measured in "${unit}" and declares ` +
+        `"${declared}". Only "chimes" is a chime: units are money inside a mode and stay so ` +
         '(DECISIONS.md D530), and a ledger that could be denominated in anything else is the ' +
         'conversion D526 clause 6 refuses.',
     );
   }
   return {
     type: 'integer',
-    unit: 'chimes',
+    unit,
     min: int(entry['min'], `${where}.min`),
     max: int(entry['max'], `${where}.max`),
     default: int(entry['default'], `${where}.default`),
@@ -276,9 +373,23 @@ function parseSchema(raw: unknown, where: string): ChimeSchema {
 
 function parseSource(raw: unknown, where: string): ChimeSource {
   const entry = record(raw, where);
+  /*
+   * `bands` is refused **before** the strict check so that the message says why rather than saying
+   * *unrecognised key* — see {@link ChimeSource}'s neighbours for the withdrawal and what would
+   * have to exist before a band could come back.
+   */
+  if (entry['bands'] !== undefined) {
+    throw new ChimeLedgerError(
+      `${where}.bands: an award may not be banded. Nothing in this repository maps a survivor ` +
+        'count to a band: data/scenario-survivors.json carries counts and no band, no document ' +
+        'declares a boundary, and the earn route is never told which scenario was cleared — so a ' +
+        'band could only arrive from the client that is paid for it. DECISIONS.md D256: a stated ' +
+        'mechanism is measured or withdrawn, never re-worded.',
+    );
+  }
   strict(
     entry,
-    ['id', 'name', 'earnedBy', 'completion', 'awayHours', 'awardChimes', 'bands', 'note', 'schema'],
+    ['id', 'name', 'earnedBy', 'completion', 'awayHours', 'awardChimes', 'note', 'schema', 'awaySchema'],
     where,
   );
   const earnedBy = str(entry['earnedBy'], `${where}.earnedBy`);
@@ -292,7 +403,7 @@ function parseSource(raw: unknown, where: string): ChimeSource {
   }
   const completionRaw = entry['completion'];
   const awayRaw = entry['awayHours'];
-  const bandsRaw = entry['bands'];
+  const awaySchemaRaw = entry['awaySchema'];
   return {
     id: str(entry['id'], `${where}.id`),
     name: str(entry['name'], `${where}.name`),
@@ -301,31 +412,28 @@ function parseSource(raw: unknown, where: string): ChimeSource {
       completionRaw === undefined ? undefined : (str(completionRaw, `${where}.completion`) as ChimeCompletion),
     awayHours: awayRaw === undefined ? undefined : int(awayRaw, `${where}.awayHours`),
     awardChimes: int(entry['awardChimes'], `${where}.awardChimes`),
-    bands:
-      bandsRaw === undefined
-        ? []
-        : list(bandsRaw, `${where}.bands`).map((band, index) => {
-            const at = `${where}.bands[${String(index)}]`;
-            const one = record(band, at);
-            strict(one, ['id', 'awardChimes', 'note'], at);
-            return {
-              id: str(one['id'], `${at}.id`),
-              awardChimes: int(one['awardChimes'], `${at}.awardChimes`),
-              note: str(one['note'], `${at}.note`),
-            };
-          }),
     note: str(entry['note'], `${where}.note`),
-    schema: parseSchema(entry['schema'], `${where}.schema`),
+    schema: parseSchema(entry['schema'], `${where}.schema`, 'chimes'),
+    awaySchema:
+      awaySchemaRaw === undefined ? undefined : parseSchema(awaySchemaRaw, `${where}.awaySchema`, 'hours'),
   };
 }
 
 function parseSink(raw: unknown, where: string): ChimeSink {
   const entry = record(raw, where);
-  strict(entry, ['id', 'name', 'priceChimes', 'modifier', 'maxSteps', 'note', 'schema'], where);
+  strict(
+    entry,
+    ['id', 'name', 'priceChimes', 'modifier', 'maxSteps', 'note', 'schema', 'grantSchema', 'stepSchema'],
+    where,
+  );
   const modifierAt = `${where}.modifier`;
   const modifier = record(entry['modifier'], modifierAt);
   strict(modifier, ['kind', 'grantUnits'], modifierAt);
   const kind = str(modifier['kind'], `${modifierAt}.kind`);
+  const refused = REFUSED_MODIFIER_KINDS[kind];
+  if (refused !== undefined) {
+    throw new ChimeLedgerError(`${modifierAt}.kind: "${kind}" may not be priced here — ${refused}`);
+  }
   if (!(CHIME_MODIFIER_KINDS as readonly string[]).includes(kind)) {
     throw new ChimeLedgerError(
       `${modifierAt}.kind: "${kind}" is not something a chime buys. The kinds are ` +
@@ -341,7 +449,9 @@ function parseSink(raw: unknown, where: string): ChimeSink {
     modifier: { kind: kind as ChimeModifierKind, grantUnits: int(modifier['grantUnits'], `${modifierAt}.grantUnits`) },
     maxSteps: int(entry['maxSteps'], `${where}.maxSteps`),
     note: str(entry['note'], `${where}.note`),
-    schema: parseSchema(entry['schema'], `${where}.schema`),
+    schema: parseSchema(entry['schema'], `${where}.schema`, 'chimes'),
+    grantSchema: parseSchema(entry['grantSchema'], `${where}.grantSchema`, 'units'),
+    stepSchema: parseSchema(entry['stepSchema'], `${where}.stepSchema`, 'steps'),
   };
 }
 
@@ -449,19 +559,36 @@ export function violationsInChimeLedger(table: ChimeLedgerTable): readonly strin
       if (source.awayHours === undefined || source.awayHours < 1) {
         found.push(`source "${source.id}" is a gift and declares no whole hours away.`);
       }
-      if (source.bands.length > 0) {
-        found.push(`source "${source.id}" is a gift and carries bands. A gift is flat — D531.`);
-      }
     }
 
-    const bandIds = new Set<string>();
-    for (const band of source.bands) {
-      if (bandIds.has(band.id)) found.push(`source "${source.id}" has two "${band.id}" bands.`);
-      bandIds.add(band.id);
-      if (band.awardChimes < 1) {
-        found.push(`band "${band.id}" of "${source.id}" awards ${String(band.awardChimes)}.`);
+    /*
+     * Invariant 8 on the waiting time, both ways: a gift must declare one and a completion must
+     * not, or a schema would be describing a field that is not there.
+     */
+    if (source.awayHours === undefined) {
+      if (source.awaySchema !== undefined) {
+        found.push(`source "${source.id}" declares an awaySchema and no awayHours to schedule.`);
       }
-      inSchema(band.awardChimes, source.schema, `band "${band.id}" of "${source.id}"`);
+    } else if (source.awaySchema === undefined) {
+      found.push(
+        `source "${source.id}" waits ${String(source.awayHours)} hours and declares no schema for ` +
+          'it. CLAUDE.md invariant 8: anything tunable declares its type, range and default.',
+      );
+    } else {
+      inSchema(source.awayHours, source.awaySchema, `source "${source.id}"'s awayHours`);
+      if (source.awaySchema.default !== source.awayHours) {
+        found.push(
+          `source "${source.id}"'s awaySchema defaults to ${String(source.awaySchema.default)} and ` +
+            `the shipped value is ${String(source.awayHours)}. The default is the shipped figure, ` +
+            'not a second opinion.',
+        );
+      }
+    }
+    if (source.schema.default !== source.awardChimes) {
+      found.push(
+        `source "${source.id}"'s schema defaults to ${String(source.schema.default)} and it awards ` +
+          `${String(source.awardChimes)}. The default is the shipped figure, not a second opinion.`,
+      );
     }
   }
 
@@ -485,6 +612,25 @@ export function violationsInChimeLedger(table: ChimeLedgerTable): readonly strin
       );
     }
     inSchema(sink.priceChimes, sink.schema, `sink "${sink.id}"'s price`);
+    inSchema(sink.modifier.grantUnits, sink.grantSchema, `sink "${sink.id}"'s grantUnits`);
+    inSchema(sink.maxSteps, sink.stepSchema, `sink "${sink.id}"'s maxSteps`);
+    /*
+     * The default is the shipped figure — `pricing/parse.ts`'s rule, applied to all three. A
+     * schema whose default disagrees with the value beside it is two answers to *what does this
+     * ship as*, and a generic optimiser reading the schema would search around the wrong one.
+     */
+    for (const [what, value, schema] of [
+      ['price', sink.priceChimes, sink.schema],
+      ['grantUnits', sink.modifier.grantUnits, sink.grantSchema],
+      ['maxSteps', sink.maxSteps, sink.stepSchema],
+    ] as const) {
+      if (schema.default !== value) {
+        found.push(
+          `sink "${sink.id}"'s ${what} schema defaults to ${String(schema.default)} and the ` +
+            `shipped value is ${String(value)}. The default is the shipped figure, not a second opinion.`,
+        );
+      }
+    }
     if (sink.maxSteps < 1) found.push(`sink "${sink.id}" allows ${String(sink.maxSteps)} steps.`);
     if (sink.modifier.kind === 'prefit') {
       if (sink.modifier.grantUnits !== 0) {
@@ -516,18 +662,43 @@ export function violationsInChimeLedger(table: ChimeLedgerTable): readonly strin
  * `undefined` when the completion is not in {@link CHIME_COMPLETIONS} or nothing claims it — which
  * {@link violationsInChimeLedger} makes unreachable for a table that parsed, and which is still
  * returned rather than thrown so a caller that reaches it refuses rather than guesses.
+ *
+ * **Flat, and there is no second argument.** It took a `bandId` and paid a scenario more for being
+ * hard; the band was taken from the request body of the account being paid. See {@link ChimeSource}'s
+ * neighbouring docstring for the withdrawal and what would have to exist before an award may vary
+ * again — the shape to notice is that the argument is gone rather than validated, because a
+ * validated band is still a band the client chose.
  */
-export function chimeAwardFor(
-  table: ChimeLedgerTable,
-  completion: string,
-  bandId?: string | undefined,
-): number | undefined {
-  const source = table.sources.find(
+export function chimeAwardFor(table: ChimeLedgerTable, completion: string): number | undefined {
+  return table.sources.find(
     (candidate) => candidate.earnedBy === 'completion' && candidate.completion === completion,
-  );
-  if (source === undefined) return undefined;
-  if (bandId === undefined) return source.awardChimes;
-  return source.bands.find((band) => band.id === bandId)?.awardChimes;
+  )?.awardChimes;
+}
+
+/**
+ * The table **without its sources** — what a play-side module is allowed to hold.
+ *
+ * [§ D526](../../../../DECISIONS.md) clause 5 says the play surface never learns a source, and
+ * `packages/viz/src/boundaries.test.ts` greps for source **ids**. The review of PR #485 showed that
+ * grep being defeated by a property access: the panel imported the whole document, exported the
+ * parsed table, and `CHIME_LEDGER.sources[i].name` would have drawn a source's name to a player
+ * with nothing going red. A grep over names cannot catch a grep-free path to the same data, so the
+ * data is removed instead — this is what a play-side module imports, and there is no `sources` on
+ * it to reach.
+ */
+export interface ChimeSpendTable {
+  readonly currency: ChimeCurrency;
+  readonly sinks: readonly ChimeSink[];
+}
+
+/**
+ * Project a parsed table down to {@link ChimeSpendTable}.
+ *
+ * Deliberately the only way across: a play-side module calls this on the parse expression itself,
+ * so no binding on that side ever holds a table with sources on it.
+ */
+export function chimeSpendTableOf(table: ChimeLedgerTable): ChimeSpendTable {
+  return Object.freeze({ currency: table.currency, sinks: table.sinks });
 }
 
 /** The gift source, or `undefined` if this table ships none. Server-only: a gift has no completion. */

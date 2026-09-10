@@ -113,8 +113,7 @@ async function register(sql: Sql): Promise<readonly { version: number; appliedAt
   return found.rows.map((row) => ({ version: Number(row['version']), appliedAtMs: Number(row['applied_at_ms']) }));
 }
 
-/** Whether `entries` has the column, asked of the catalog rather than of a failed query. */
-/** Whether migration 3's table is there — asked of the catalog rather than of the register. */
+/** Whether migration 4's table is there — asked of the catalog rather than of the register. */
 async function chimeTable(sql: Sql): Promise<boolean> {
   const found = await sql.query(
     `SELECT 1 FROM information_schema.tables WHERE table_name = 'chime_entries'`,
@@ -122,6 +121,7 @@ async function chimeTable(sql: Sql): Promise<boolean> {
   return found.rows.length > 0;
 }
 
+/** Whether `entries` has the column, asked of the catalog rather than of a failed query. */
 async function legsColumn(sql: Sql): Promise<{ present: boolean; nullable: boolean }> {
   const found = await sql.query(
     `SELECT is_nullable FROM information_schema.columns WHERE table_name = 'entries' AND column_name = 'legs'`,
@@ -239,7 +239,9 @@ describe('an empty database', () => {
 
   it('creates the chime ledger, and leaves every account that predates it with nothing', async () => {
     /*
-     * Migration 3 — GitHub issue #368. Two halves, and the second is the one worth asserting: the
+     * Migration **4** — GitHub issue #368. It was written as 3 and so was #340's `telemetry_events`;
+     * telemetry merged first, so this one moved, and `MIGRATIONS`' own entry carries that note. Two
+     * halves, and the second is the one worth asserting: the
      * table arrives on a database that already holds an account, and that account's balance is
      * **zero** rather than a backfill. § D526 clause 2 forbids a balance derived from anything a run
      * measured, and the only figures a database this old holds are exactly that.

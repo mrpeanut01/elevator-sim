@@ -211,8 +211,11 @@ export {
   chimeGrantUnits,
   chimeSinkById,
   chimeSpendPrice,
+  chimeSpendTableOf,
   parseChimeLedger,
   violationsInChimeLedger,
+  REFUSED_MODIFIER_KINDS,
+  CHIME_SCHEMA_UNITS,
 } from './config/index.js';
 
 export type {
@@ -300,7 +303,6 @@ export type {
   TransportModeKind,
   TypicalMax,
   ValueRange,
-  ChimeBand,
   ChimeCompletion,
   ChimeCurrency,
   ChimeEarnedBy,
@@ -308,7 +310,9 @@ export type {
   ChimeModifier,
   ChimeModifierKind,
   ChimeSchema,
+  ChimeSchemaUnit,
   ChimeSink,
+  ChimeSpendTable,
   ChimeSource,
 } from './config/index.js';
 

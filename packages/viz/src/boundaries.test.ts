@@ -789,6 +789,52 @@ describe('§ D526 clause 5 — the balance is all the play surface knows', () =>
     ).toEqual([]);
   });
 
+  it('reaches no source list, which a name grep alone could not have told it', async () => {
+    /*
+     * **The hole the review of PR #485 measured, closed.** The rule above greps for source *ids*,
+     * and `everyday/chimesPanel.ts` imported the whole `data/chime-ledger.json` and exported the
+     * parsed table — so `CHIME_LEDGER.sources[i].name` drew a source's name to a player through one
+     * property access, spelling no id at all, with nothing going red. Four of the five ways a
+     * module could learn a source went uncaught; only a literal id was seen.
+     *
+     * A grep over names cannot catch a grep-free path to the same data, so this is a grep over the
+     * **path**: nothing in this package may reach a `.sources` at all — not off a parsed table, not
+     * off a raw JSON import. The panel's own half of the fix is in `core`
+     * (`chimeSpendTableOf`), which projects the sources away before the module holds anything, so
+     * the two rules together mean there is no binding here that has one and no expression here that
+     * could read one.
+     *
+     * Deliberately not narrowed to the ledger: `.sources` on any document in this package is the
+     * same shape, and a rule that named one file would be a rule about that file.
+     */
+    const reaching = /\.\s*sources\b/u;
+    const offenders = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter((file) => reaching.test(file.code))
+      .map((file) => file.id)
+      .sort((a, b) => a.localeCompare(b));
+    expect(
+      offenders,
+      'a module in the viewer reads a `.sources`. § D526 clause 5: the play surface never learns ' +
+        'where an entry came from, and a property access is a way of learning it that no grep over ' +
+        'source names can see. A module that needs the prices should import the projection — ' +
+        '`core`\u2019s `chimeSpendTableOf`, which `everyday/chimesPanel.ts` applies to the parse ' +
+        'expression itself so that nothing here ever holds a table with sources on it.',
+    ).toEqual([]);
+  });
+
+  it('positive control: that rule really catches a property access', () => {
+    /*
+     * Assembled rather than written out, on this block's own habit: the rule reads
+     * comment-stripped-but-string-intact source and exempts only tests by name, so spelling the
+     * expression here would make this file its first offender the day somebody widened the filter.
+     */
+    const reaching = /\.\s*sources\b/u;
+    const property = ['const paid = table', 'sources[0].name;'].join('.');
+    expect(reaching.test(property), 'the detector misses a property access').toBe(true);
+    expect(reaching.test('const rows = table.sinks.map(price);'), 'the detector is too wide').toBe(false);
+  });
+
   it('reads no ledger entry, and has no shape to put one in', async () => {
     /*
      * The other half of the same clause and the one a screen would breach first. A history, a
@@ -818,11 +864,21 @@ describe('§ D526 clause 5 — the balance is all the play surface knows', () =>
      * id here would make this file the first offender the day somebody widened the filter.
      */
     const sources = await chimeSourceIds();
+    /*
+     * **Every id, not the first one.** This read `expect(sources.length).toBeGreaterThan(2)` and
+     * then built one offending line out of `sources[0]`, which the review of PR #485 named as a
+     * vacuity guard that is itself vacuous: deleting a source left three and nothing went red, and
+     * an id the detector happened to miss would never have been tried. The existence of each
+     * shipped source is asserted where the table is parsed — `core`'s `chimeLedger.test.ts` requires
+     * a gift and one source per completion, so a deleted source is red there — and what this owes
+     * is that the **detector** works on all of them.
+     */
     expect(sources.length).toBeGreaterThan(2);
-    for (const id of sources) expect(id.startsWith('earn-') || id.startsWith('gift-')).toBe(true);
-
-    const wouldOffend = `const paid = ${JSON.stringify(sources[0] ?? '')};`;
-    expect(sources.some((id) => wouldOffend.includes(id))).toBe(true);
+    for (const id of sources) {
+      expect(id.startsWith('earn-') || id.startsWith('gift-'), id).toBe(true);
+      const wouldOffend = `const paid = ${JSON.stringify(id)};`;
+      expect(sources.some((candidate) => wouldOffend.includes(candidate)), id).toBe(true);
+    }
 
     /* And the completion vocabulary, which this rule must NOT catch, is genuinely different. */
     const completion = ['scenario', 'cleared'].join('-');

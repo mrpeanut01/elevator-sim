@@ -57,7 +57,14 @@ async function fixture(): Promise<{
   };
 }
 
-const scenarioSink = TABLE.sinks.find((sink) => sink.id === 'scenario-budget-step')!;
+/**
+ * The sink these cases spend on.
+ *
+ * It was `scenario-budget-step` until the review of PR #485 found that sink pricing an act
+ * `data/campaign.json` already prices; it is removed and the parser refuses the kind. The career
+ * purse is the dearest sink that still grants units, so the arithmetic below reads the same way.
+ */
+const purseSink = TABLE.sinks.find((sink) => sink.id === 'career-purse-top-up')!;
 
 describe('the chime ledger — issue #368', () => {
   it('starts at nothing, because a balance is what has been earned', async () => {
@@ -73,27 +80,20 @@ describe('the chime ledger — issue #368', () => {
     expect(second).toEqual({ ok: true, balanceChimes: 6 });
   });
 
-  it('pays a harder scenario more, by its band and not by its run', async () => {
+  it('pays every scenario the same, because no band survives and none could be trusted', async () => {
+    /*
+     * **The inverse of the case that used to be here**, and the inversion is the record. It asserted
+     * that a `single` band paid more than a `wide` one — true of the table, and the band it was paid
+     * against came out of the request body of the account being paid (the review of PR #485,
+     * medium 7). The award is flat now, and this asserts the flatness rather than deleting the case:
+     * a deleted one would let a band grow back with nothing watching.
+     */
     const { store, userId } = await fixture();
-    const wide = await earnCompletion({
-      store,
-      table: TABLE,
-      userId,
-      completion: 'scenario-cleared',
-      bandId: 'wide',
-    });
-    const single = await earnCompletion({
-      store,
-      table: TABLE,
-      userId,
-      completion: 'scenario-cleared',
-      bandId: 'single',
-    });
-    expect(wide.ok && single.ok).toBe(true);
-    /* The second award is the difference between the two balances, and it is the larger one. */
-    const wideAward = wide.ok ? wide.balanceChimes : 0;
-    const singleAward = (single.ok ? single.balanceChimes : 0) - wideAward;
-    expect(singleAward).toBeGreaterThan(wideAward);
+    const first = await earnCompletion({ store, table: TABLE, userId, completion: 'scenario-cleared' });
+    const second = await earnCompletion({ store, table: TABLE, userId, completion: 'scenario-cleared' });
+    expect(first.ok && second.ok).toBe(true);
+    const firstAward = first.ok ? first.balanceChimes : 0;
+    expect((second.ok ? second.balanceChimes : 0) - firstAward).toBe(firstAward);
   });
 
   it('refuses a spend the balance cannot cover, and writes nothing', async () => {
@@ -106,7 +106,7 @@ describe('the chime ledger — issue #368', () => {
       store,
       table: TABLE,
       userId,
-      sinkId: scenarioSink.id,
+      sinkId: purseSink.id,
       steps: 1,
     });
     expect(refused).toEqual({ ok: false, reason: 'not-enough-chimes' });
@@ -117,28 +117,28 @@ describe('the chime ledger — issue #368', () => {
   it('spends what the table charges and grants what the table grants', async () => {
     const { store, userId } = await fixture();
     for (let i = 0; i < 4; i += 1) {
-      await earnCompletion({ store, table: TABLE, userId, completion: 'scenario-cleared', bandId: 'single' });
+      await earnCompletion({ store, table: TABLE, userId, completion: 'scenario-cleared' });
     }
     const before = await store.chimeBalance(userId);
-    const spent = await spendOnModifier({ store, table: TABLE, userId, sinkId: scenarioSink.id, steps: 2 });
+    const spent = await spendOnModifier({ store, table: TABLE, userId, sinkId: purseSink.id, steps: 2 });
     expect(spent.ok).toBe(true);
-    expect(spent.ok ? spent.balanceChimes : -1).toBe(before - scenarioSink.priceChimes * 2);
-    expect(spent.grantUnits).toBe(scenarioSink.modifier.grantUnits * 2);
-    expect(await store.chimeSpends(userId)).toEqual([{ sinkId: scenarioSink.id, steps: 2 }]);
+    expect(spent.ok ? spent.balanceChimes : -1).toBe(before - purseSink.priceChimes * 2);
+    expect(spent.grantUnits).toBe(purseSink.modifier.grantUnits * 2);
+    expect(await store.chimeSpends(userId)).toEqual([{ sinkId: purseSink.id, steps: 2 }]);
   });
 
   it('refuses more steps than the sink sells, rather than clamping and charging for them', async () => {
     const { store, userId } = await fixture();
     for (let i = 0; i < 20; i += 1) {
-      await earnCompletion({ store, table: TABLE, userId, completion: 'scenario-cleared', bandId: 'single' });
+      await earnCompletion({ store, table: TABLE, userId, completion: 'scenario-cleared' });
     }
     const before = await store.chimeBalance(userId);
     const refused = await spendOnModifier({
       store,
       table: TABLE,
       userId,
-      sinkId: scenarioSink.id,
-      steps: scenarioSink.maxSteps + 1,
+      sinkId: purseSink.id,
+      steps: purseSink.maxSteps + 1,
     });
     expect(refused).toEqual({ ok: false, reason: 'unknown-modifier' });
     expect(await store.chimeBalance(userId)).toBe(before);
@@ -159,13 +159,13 @@ describe('the chime ledger — issue #368', () => {
      */
     const { store, userId } = await fixture();
     for (let i = 0; i < 2; i += 1) {
-      await earnCompletion({ store, table: TABLE, userId, completion: 'scenario-cleared', bandId: 'single' });
+      await earnCompletion({ store, table: TABLE, userId, completion: 'scenario-cleared' });
     }
-    const affordable = Math.floor((await store.chimeBalance(userId)) / scenarioSink.priceChimes);
+    const affordable = Math.floor((await store.chimeBalance(userId)) / purseSink.priceChimes);
     expect(affordable).toBe(1);
     const both = await Promise.all([
-      spendOnModifier({ store, table: TABLE, userId, sinkId: scenarioSink.id, steps: 1 }),
-      spendOnModifier({ store, table: TABLE, userId, sinkId: scenarioSink.id, steps: 1 }),
+      spendOnModifier({ store, table: TABLE, userId, sinkId: purseSink.id, steps: 1 }),
+      spendOnModifier({ store, table: TABLE, userId, sinkId: purseSink.id, steps: 1 }),
     ]);
     expect(both.filter((one) => one.ok)).toHaveLength(1);
     expect(await store.chimeBalance(userId)).toBeGreaterThanOrEqual(0);
@@ -212,33 +212,36 @@ describe('the sign-in gift — § D531', () => {
 
 describe('a posted modified run is checked against a real spend', () => {
   it('finds nothing unbacked when the claim is what was bought', () => {
-    expect(unbackedModifiers([{ sinkId: 'scenario-budget-step', steps: 2 }], [{ sinkId: 'scenario-budget-step', steps: 2 }])).toEqual([]);
+    expect(
+      unbackedModifiers([{ sinkId: purseSink.id, steps: 2 }], [{ sinkId: purseSink.id, steps: 2 }], TABLE),
+    ).toEqual([]);
   });
 
   it('accepts a claim spread over several spends of one sink', () => {
     expect(
       unbackedModifiers(
-        [{ sinkId: 'scenario-budget-step', steps: 2 }],
+        [{ sinkId: purseSink.id, steps: 2 }],
         [
-          { sinkId: 'scenario-budget-step', steps: 1 },
-          { sinkId: 'scenario-budget-step', steps: 1 },
+          { sinkId: purseSink.id, steps: 1 },
+          { sinkId: purseSink.id, steps: 1 },
         ],
+        TABLE,
       ),
     ).toEqual([]);
   });
 
   it('names a sink claimed further than it was bought', () => {
     expect(
-      unbackedModifiers([{ sinkId: 'scenario-budget-step', steps: 3 }], [{ sinkId: 'scenario-budget-step', steps: 2 }]),
-    ).toEqual(['scenario-budget-step']);
+      unbackedModifiers([{ sinkId: purseSink.id, steps: 3 }], [{ sinkId: purseSink.id, steps: 2 }], TABLE),
+    ).toEqual([purseSink.id]);
   });
 
   it('names a sink claimed and never bought at all', () => {
-    expect(unbackedModifiers([{ sinkId: 'rush-prefit', steps: 1 }], [])).toEqual(['rush-prefit']);
+    expect(unbackedModifiers([{ sinkId: 'rush-prefit', steps: 1 }], [], TABLE)).toEqual(['rush-prefit']);
   });
 
   it('does not mind a spend the run did not claim, because a spend is permanent', () => {
-    expect(unbackedModifiers([], [{ sinkId: 'rush-prefit', steps: 1 }])).toEqual([]);
+    expect(unbackedModifiers([], [{ sinkId: 'rush-prefit', steps: 1 }], TABLE)).toEqual([]);
   });
 
   it('refuses a claim that is not a list of modifiers before it reads any ledger', () => {
@@ -248,5 +251,68 @@ describe('a posted modified run is checked against a real spend', () => {
     expect(claimedModifierIssues([{ sinkId: 'a', steps: 0 }])).toHaveLength(1);
     expect(claimedModifierIssues([{ sinkId: 'a', steps: 1.5 }])).toHaveLength(1);
     expect(claimedModifierIssues(Array.from({ length: 17 }, () => ({ sinkId: 'a', steps: 1 })))).toHaveLength(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The per-run cap, enforced against the claim — the review of PR #485, medium 5
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **`ChimeSink.maxSteps` says *how many times one run may buy this*, and the claim check now says
+ * it too.**
+ *
+ * It capped each *spend* and never the *total*, so a player who bought a sink twice at its cap
+ * could post a run claiming twice the cap and be believed — and `rush-prefit`, whose whole note is
+ * *"one step only — a building is fitted or it is not"*, accepted two. A spend is permanent and
+ * accumulates across runs, which is correct; what may not accumulate is what **one run** claims.
+ * So the cap belongs on the claim, and the table has to be in hand to know it.
+ */
+describe('a claim is capped at what one run may buy, however many spends paid for it', () => {
+  it('refuses a claim above the cap even when twice the cap was bought', () => {
+    const sink = TABLE.sinks.find((candidate) => candidate.maxSteps > 1)!;
+    const cap = sink.maxSteps;
+    expect(
+      unbackedModifiers(
+        [{ sinkId: sink.id, steps: cap * 2 }],
+        [
+          { sinkId: sink.id, steps: cap },
+          { sinkId: sink.id, steps: cap },
+        ],
+        TABLE,
+      ),
+      'a run claimed twice the per-run cap and the ledger backed it',
+    ).toEqual([sink.id]);
+  });
+
+  it('refuses two steps of a sink that sells one, which is its own refusal in force', () => {
+    const prefit = TABLE.sinks.find((candidate) => candidate.maxSteps === 1)!;
+    expect(
+      unbackedModifiers(
+        [{ sinkId: prefit.id, steps: 2 }],
+        [
+          { sinkId: prefit.id, steps: 1 },
+          { sinkId: prefit.id, steps: 1 },
+        ],
+        TABLE,
+      ),
+    ).toEqual([prefit.id]);
+  });
+
+  it('still accepts a claim at the cap that was paid for in pieces', () => {
+    const sink = TABLE.sinks.find((candidate) => candidate.maxSteps > 1)!;
+    expect(
+      unbackedModifiers(
+        [{ sinkId: sink.id, steps: sink.maxSteps }],
+        Array.from({ length: sink.maxSteps }, () => ({ sinkId: sink.id, steps: 1 })),
+        TABLE,
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a sink this build does not sell rather than believing an unknown cap', () => {
+    expect(unbackedModifiers([{ sinkId: 'unlock-everything', steps: 1 }], [], TABLE)).toEqual([
+      'unlock-everything',
+    ]);
   });
 });

@@ -72,16 +72,20 @@ describe('data/chime-ledger.json — issue #368', () => {
     expect(gift).toBeDefined();
     expect(gift?.completion).toBeUndefined();
     expect(gift?.awayHours ?? 0).toBeGreaterThanOrEqual(1);
-    expect(gift?.bands ?? []).toEqual([]);
   });
 
-  it('bands a scenario by its survivor count and never by a run figure', () => {
+  it('pays a scenario flatly, because no band survives — see the block at the foot of this file', () => {
+    /*
+     * This case used to assert the opposite: that a `single` band paid more than a `wide` one. The
+     * band is withdrawn (the review of PR #485, medium 7) and the assertion is **inverted rather
+     * than deleted**, because the thing worth holding is that the award does not vary — a deleted
+     * case would let a second argument grow back on `chimeAwardFor` unnoticed.
+     */
     const table = shipped();
-    const scenario = table.sources.find((source) => source.completion === 'scenario-cleared');
-    expect(scenario?.bands.length ?? 0).toBeGreaterThan(1);
-    const single = chimeAwardFor(table, 'scenario-cleared', 'single') ?? 0;
-    const wide = chimeAwardFor(table, 'scenario-cleared', 'wide') ?? 0;
-    expect(single).toBeGreaterThan(wide);
+    expect(chimeAwardFor(table, 'scenario-cleared')).toBe(
+      table.sources.find((source) => source.completion === 'scenario-cleared')?.awardChimes,
+    );
+    expect(chimeAwardFor.length, 'chimeAwardFor grew an argument again').toBe(2);
   });
 
   it('gives every award and every price a note saying where the figure came from', () => {
@@ -97,8 +101,8 @@ describe('data/chime-ledger.json — issue #368', () => {
     }
   });
 
-  it('buys a budget in steps, and refuses more steps than it sells', () => {
-    const sink = chimeSinkById(shipped(), 'scenario-budget-step');
+  it('buys a purse in steps, and refuses more steps than it sells', () => {
+    const sink = chimeSinkById(shipped(), 'career-purse-top-up');
     expect(sink).toBeDefined();
     const one = chimeSpendPrice(sink!, 1) ?? 0;
     expect(chimeSpendPrice(sink!, 2)).toBe(one * 2);
@@ -170,7 +174,7 @@ describe('the ledger validator refuses what it claims to refuse', () => {
           (sinksOf(doc)[0]!['schema'] as Record<string, unknown>)['unit'] = 'usd';
         }),
       ),
-    ).toThrow(/only "chimes" is a chime/u);
+    ).toThrow(/describes a field measured in "chimes" and declares "usd"/u);
   });
 
   it('refuses a modifier kind that is not a limit on a configuration', () => {
@@ -254,5 +258,136 @@ describe('the ledger validator refuses what it claims to refuse', () => {
         }),
       ),
     ).toThrow(/A balance with no sink is a score/u);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * One price, and the scenario owns it — the review of PR #485, blocking 3
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A scenario's budget ladder is priced in `data/campaign.json` and may not be priced here.**
+ *
+ * The defect these controls exist for shipped and was caught by a reader rather than by a run: the
+ * table sold a `scenario-budget-step` at 12 chimes for 8 units while `data/campaign.json` already
+ * authored the same act, per scenario, at one chime per unit — and `data/scenario-survivors.json`
+ * pre-simulates against **campaign.json's** rungs. Two authorities for one price is the thing
+ * `chimeLedger.ts`'s own docstring spends ten lines refusing.
+ *
+ * Both directions, because a rule keyed on an absence passes vacuously the day the absence becomes
+ * a hole: the parser refuses the kind, **and** the ladder it defers to is asserted to be real.
+ */
+describe('the scenario authors its own budget price, and this table may not', () => {
+  it('ships no sink that prices a budget in units', () => {
+    expect(shipped().sinks.map((sink) => sink.modifier.kind)).not.toContain('budget-units');
+  });
+
+  it('refuses one by name, naming the document that owns the price', () => {
+    expect(() =>
+      parseChimeLedger(
+        brokenDocument((doc) => {
+          const sink = sinksOf(doc)[0]!;
+          (sink['modifier'] as Record<string, unknown>)['kind'] = 'budget-units';
+        }),
+      ),
+    ).toThrow(/data\/campaign\.json/u);
+  });
+
+  it('positive control: the ladder it defers to is really authored, and really in chimes', () => {
+    /*
+     * Read off `data/campaign.json` rather than transcribed, and asserted in the two ways that
+     * would catch the ladder quietly losing its prices: every step carries a whole number of
+     * chimes above zero, and there is more than one step to buy.
+     */
+    const campaign = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../../../data/campaign.json', import.meta.url)), 'utf8'),
+    ) as { stages: readonly { budget?: { steps?: readonly { chimes?: unknown }[] } }[] };
+    const steps = campaign.stages.flatMap((stage) => stage.budget?.steps ?? []);
+    expect(steps.length).toBeGreaterThan(1);
+    for (const step of steps) {
+      expect(typeof step.chimes === 'number' && Number.isInteger(step.chimes) && step.chimes > 0).toBe(
+        true,
+      );
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The band, withdrawn — the review of PR #485, medium 7
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **No source is banded, because nothing in this repository can say what band a scenario is in.**
+ *
+ * `ledger.ts` called the band *"a property of the scenario … known before anybody plays"*. It was
+ * not: the server took it verbatim from the request body, `data/scenario-survivors.json` carries
+ * counts and no band, and nothing anywhere maps a count to one. A claim that a mechanism exists
+ * when it does not is [§ D256](../../../../DECISIONS.md)'s own refusal, so the band is withdrawn
+ * rather than re-described — and the parser refuses the key, so it cannot come back without the
+ * mapping arriving with it.
+ */
+describe('no award is banded until something can say which band a scenario is in', () => {
+  it('ships no banded source', () => {
+    for (const source of shipped().sources) {
+      expect(Object.hasOwn(source, 'bands'), source.id).toBe(false);
+    }
+  });
+
+  it('refuses a band by name, saying what would have to exist first', () => {
+    expect(() =>
+      parseChimeLedger(
+        brokenDocument((doc) => {
+          sourcesOf(doc)[0]!['bands'] = [{ id: 'wide', awardChimes: 4, note: 'x' }];
+        }),
+      ),
+    ).toThrow(/Nothing in this repository maps a survivor count to a band/u);
+  });
+
+  it('positive control: the survivor table really does carry counts and really carries no band', () => {
+    const raw = readFileSync(
+      fileURLToPath(new URL('../../../../data/scenario-survivors.json', import.meta.url)),
+      'utf8',
+    );
+    expect(raw).toContain('"survivors"');
+    expect(raw).not.toContain('"band"');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Invariant 8 on every tunable, not only on the awards
+ * -------------------------------------------------------------------------- */
+
+/**
+ * `CLAUDE.md` invariant 8: *every tunable declares its schema — type, range, default*.
+ *
+ * The awards and the prices declared one. `grantUnits`, `maxSteps` and `awayHours` are tunables by
+ * the same test — a generic optimiser could search any of them — and declared none, which is the
+ * gap the review of PR #485 named. Each now carries its own, and the shipped value is the default
+ * rather than a second opinion (`pricing/parse.ts`'s rule).
+ */
+describe('every tunable declares its schema — invariant 8', () => {
+  it('declares one for what a step grants and for how many steps a run may buy', () => {
+    for (const sink of shipped().sinks) {
+      expect(sink.grantSchema.default, `${sink.id}.grantUnits`).toBe(sink.modifier.grantUnits);
+      expect(sink.stepSchema.default, `${sink.id}.maxSteps`).toBe(sink.maxSteps);
+      expect(sink.grantSchema.unit).toBe('units');
+      expect(sink.stepSchema.unit).toBe('steps');
+    }
+  });
+
+  it('declares one for how long a gift waits', () => {
+    const gift = chimeGiftSource(shipped());
+    expect(gift?.awaySchema?.default).toBe(gift?.awayHours);
+    expect(gift?.awaySchema?.unit).toBe('hours');
+  });
+
+  it('refuses a shipped value outside its own declared range', () => {
+    expect(() =>
+      parseChimeLedger(
+        brokenDocument((doc) => {
+          sinksOf(doc)[0]!['maxSteps'] = 99;
+        }),
+      ),
+    ).toThrow(/outside its own declared range/u);
   });
 });

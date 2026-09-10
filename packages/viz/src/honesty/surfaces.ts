@@ -8631,6 +8631,21 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
     'everyday/chimesPanel.ts#chimesPanelViewOf',
     'everyday/chimesPanel.ts#CHIMES_PANEL_COPY',
     /*
+     * The shipped price table's **spend half**, whose player-facing strings are the sink names and
+     * the prices drawn from them — both seeded per row below, out of `chimesPanelViewOf`'s own
+     * answer rather than off this constant, so what is swept is what the screen actually renders.
+     *
+     * It is `covers` rather than a seed of its own for that reason, and being here is deliberately
+     * **not** a claim that it is checked: wave T's lesson is that being in `covers` is not being
+     * swept, and what checks these words is the row loop below plus `chimesPanel.test.ts`, which
+     * asserts every price reads as a whole number of the currency's own singular or plural.
+     *
+     * There is no `sources` on it to reach — `core`'s `chimeSpendTableOf` projects them away before
+     * this package holds anything (§ D526 clause 5, and `boundaries.test.ts` forbids the property
+     * access that walked round the id grep).
+     */
+    'everyday/chimesPanel.ts#CHIME_PRICES',
+    /*
      * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
      * names — § D490. Both arms are reached below: all but one of the cases draw the device one, and
      * `not-durable` is signed in and named and draws the account one. A pair of sentences with one
@@ -8743,6 +8758,22 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        * shipped for a whole milestone and this corpus exists to catch.
        */
       ['muted', { profile: stored, reduceMotion: false, soundOn: false }],
+      /*
+       * GitHub issue #368's tally in the two arms a balance of zero cannot reach — the review of
+       * PR #485, medium 8. Every case above constructs no `chimeBalance`, so `balanceLineOf` drew
+       * its *you have no chimes yet* arm on all of them and **`You have 1 chime.` and `You have 40
+       * chimes.` were never swept at all**. That is the shape wave #483 recorded: a fixture snaps
+       * the value a player is most likely to have to the identity, and the arm that would meet the
+       * search is the one no case constructs.
+       *
+       * Two rather than one, because the singular is a **different string** rather than the same
+       * string with a different number in it — `data/chime-ledger.json` authors `one` and `many`
+       * and the panel picks between them, so a table that lost its singular would ship
+       * *You have 1 chimes.* with nothing reading it. Signed in on both, because a balance and the
+       * account note that explains where it lives are one state.
+       */
+      ['banked-one', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 1 }],
+      ['banked-many', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 40 }],
     ] as const;
 
     for (const [label, input] of cases) {
@@ -8772,6 +8803,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
         seeds.push({ field: `${label}.chimes.${row.id}.name`, text: row.name, role: 'label' });
         seeds.push({ field: `${label}.chimes.${row.id}.price`, text: row.price, role: 'label' });
       }
+      /*
+       * That none of those prices can be bought yet — seeded **by name**, because being reachable
+       * through a `covers` entry is not being swept (wave T's finding). A `reason`, not prose: it
+       * is a refusal this surface makes about its own rows, which is the role
+       * `signIn.notice` already carries for a sentence that explains why something is not offered.
+       */
+      seeds.push({ field: `${label}.chimes.spendRefusal`, text: chimes.spendRefusal, role: 'reason' });
       /*
        * The account block — § D489's asking half and § 15.1's signed-in one. `fieldValue` is
        * deliberately not seeded: it is the reader's own address, and `settingsView.ts` says why

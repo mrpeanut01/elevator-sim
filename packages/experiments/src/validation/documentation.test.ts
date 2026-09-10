@@ -2169,6 +2169,26 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
   const PURCHASE_MACHINERY =
     /paywall|checkout|stripe|paypal|braintree|adyen|storefront|microtransaction|in-app|\biap\b|\bsku\b|billing|invoice|payment|refund|entitlement|merchant|creditcard|cardnumber|currencycode|realmoney|cents\b|moneyamount|\busd\b|\beur\b|\bgbp\b/iu;
 
+  /**
+   * The **installed** half of the same refusal, and it is a different vocabulary on purpose.
+   *
+   * One regular expression ran against both source code and dependency names, which the review of
+   * PR #485 named: it caught `@stripe/stripe-js` because *stripe* happens to be a word a purchase
+   * writes as well as a vendor it installs, and missed `revenuecat`, `paddle` and a wallet SDK
+   * entirely, because those are things you *install* rather than things you *type*.
+   *
+   * The two cannot be merged, and `subscription` is the reason rather than a preference: it appears
+   * eight times in non-test source in this tree as an **event** subscription — `EverydayHost.subscribe`
+   * and its callers — so a code rule naming it would refuse the shell. A dependency called
+   * `something-subscriptions` has no such second meaning, so the word belongs here and not there.
+   * `purchase` is the same shape one step along: `scenario/budget.ts#admitPurchase` is a budget
+   * admitting a *change*, not a shop, and `react-native-purchases` is a shop.
+   * {@link PURCHASE_MACHINERY} still applies to manifests as well; this is added to it, so a vendor
+   * that renames itself into either vocabulary is caught by one of them.
+   */
+  const PURCHASE_VENDORS =
+    /revenuecat|lemonsqueezy|chargebee|recurly|gumroad|fastspring|xsolla|\bpaddle\b|square-?up|\bwallet\b|subscription|purchases?|applepay|googlepay|shopify|snipcart|\bcoinbase\b|\bplaid\b/iu;
+
   it('names none of a purchase’s machinery in code, anywhere under packages/', () => {
     /*
      * `documentation.test.ts:1136`'s shape, and its four moves kept: ask the code rather than the
@@ -2218,7 +2238,9 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
         ...Object.keys(manifest.devDependencies ?? {}),
       ];
       for (const name of named) {
-        if (PURCHASE_MACHINERY.test(name)) offenders.push(`${path.slice(ROOT.length)}: ${name}`);
+        if (PURCHASE_MACHINERY.test(name) || PURCHASE_VENDORS.test(name)) {
+          offenders.push(`${path.slice(ROOT.length)}: ${name}`);
+        }
       }
     }
     expect(
@@ -2244,6 +2266,29 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
 
     const quoted = "const note = 'there is no checkout in this product';";
     expect(PURCHASE_MACHINERY.test(code(quoted))).toBe(false);
+
+    /*
+     * And the vendors a purchase is **installed** from, which the code vocabulary above does not
+     * see and does not need to. Each is asserted against the manifest rule's own predicate rather
+     * than against the regular expression alone, because what the rule reads is a dependency name.
+     */
+    const installs = (name: string): boolean =>
+      PURCHASE_MACHINERY.test(name) || PURCHASE_VENDORS.test(name);
+    for (const vendor of [
+      '@stripe/stripe-js',
+      'react-native-purchases',
+      'revenuecat',
+      '@paddle/paddle-js',
+      'lemonsqueezy.ts',
+      '@solana/wallet-adapter',
+      'some-subscriptions-sdk',
+    ]) {
+      expect(installs(vendor), vendor).toBe(true);
+    }
+    /* And the names this workspace really declares are not caught by either. */
+    for (const real of ['vitest', 'typescript', '@elevator-sim/core', 'playwright', 'esbuild']) {
+      expect(installs(real), real).toBe(false);
+    }
 
     /* And the words this product legitimately uses are not in the vocabulary. */
     for (const allowed of [

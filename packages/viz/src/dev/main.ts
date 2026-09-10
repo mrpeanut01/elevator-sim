@@ -4069,6 +4069,50 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     postRun: client === undefined ? undefined : () => postCurrentRun(),
     /*
+     * The chime ledger's one read — GitHub issue #368, § D526 clause 5.
+     *
+     * `accountState` is read **at call time** rather than captured, on this literal's own rule: a
+     * screen opened before a sign-in and repainted after it must ask about the account that exists
+     * now. No token is no account, which is its own answer rather than a request that would come
+     * back 401 — `everyday/host.ts#EverydayChimeBalance` keeps those apart because *nobody is
+     * signed in* and *the server refused* are different sentences on a screen.
+     *
+     * Absent together with `accountActions` and for the same reason: both are `client === undefined`
+     * on a build served with no API origin, and a binding that existed and always refused is the
+     * shape this repository keeps paying for.
+     */
+    chimeBalance:
+      client === undefined
+        ? undefined
+        : async () => {
+            const token = accountState.token;
+            if (token === undefined) return { kind: 'signed-out' };
+            const answer = await client.chimes(token);
+            return answer.ok
+              ? { kind: 'balance', chimes: answer.value }
+              : { kind: 'unreachable', detail: answer.detail };
+          },
+    /*
+     * The earn verb — GitHub issue #368, and `everyday/host.ts#closeDay` is its caller.
+     *
+     * Fire and forget, deliberately: `closeDay` is a synchronous path that files a day, and a day
+     * that could fail to close because a network call failed would be a worse trade than a chime
+     * nobody banked. The ledger is append-only and the balance is re-read whenever Settings opens,
+     * so a dropped bank costs one award and corrupts nothing.
+     *
+     * Silent on refusal for the same reason it is silent on success: § D526 clause 3 keeps a
+     * currency figure off a results page, and a *could not bank that* notice on one would be the
+     * same figure wearing an apology.
+     */
+    bankCompletion:
+      client === undefined
+        ? undefined
+        : (completion) => {
+            const token = accountState.token;
+            if (token === undefined) return;
+            void client.bankCompletion(token, completion);
+          },
+    /*
      * **This binding and `accountActions` below are absent together, and a screen reads that.**
      * `everyday/reportScreen.ts` decides whether to draw a live *Post this run* from
      * `accountActions() !== undefined`, because the post binding cannot be asked *"would you

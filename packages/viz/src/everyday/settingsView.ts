@@ -623,6 +623,23 @@ export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
    * rail, two centimetres to the left — and duplicating a live control's description here would be
    * the two-wordings defect this array's own entries exist to prevent.
    */
+  /*
+   * **The chime spend is absent and is deliberately not registered here** — GitHub issue #368, and
+   * the review of PR #485's blocking 1.
+   *
+   * Nothing in this build spends a chime. The obvious move is a row in this register, and it is the
+   * wrong one for the reason the entry above gives: this section's contract is *rows this screen
+   * does not draw*, and the chime block **is** drawn, two centimetres up, listing what each
+   * modifier will cost. A refusal about a ladder belongs beside the ladder, so it is
+   * `chimesPanel.ts#ChimesPanelView.spendRefusal` — on the same face, in the same paint, seeded by
+   * name in `honesty/surfaces.ts` and asserted in `pricing/spendWidensTheBudget.test.ts`. A second
+   * wording down here would be the defect this array exists to prevent, and the one a player is
+   * least likely to read.
+   *
+   * The **read** and the **earn** are not absences at all any more: `settingsScreen.ts` asks the
+   * account for its balance and `everyday/host.ts#closeDay` banks a contract day, which is what
+   * `CLAUDE.md`'s *name the non-test caller* asks of both verbs.
+   */
 ]);
 
 /** What the view is computed from — the store's profile, the field's draft, and the two seams. */
@@ -766,7 +783,7 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
        */
       chimes: chimesPanelViewOf({
         balanceChimes: input.chimeBalance ?? 0,
-        home: signedIn ? 'account' : account === undefined ? 'booting' : 'device',
+        home: signedIn ? 'account' : account === undefined ? 'booting' : 'signed-out',
       }),
       signIn: signInViewOf(input),
       saveNotice:
