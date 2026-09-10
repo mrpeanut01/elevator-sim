@@ -242,7 +242,10 @@ function legsOf(stage: CampaignStage, edit: EditedVector | null): string {
   const base = requireDispatcher(config, stage.dispatcher.startingProfileId);
   let profile = base;
   if (edit !== null) {
-    const resolved = resolveEditedProfile(space, base, edit);
+    const resolved = resolveEditedProfile(space, base, edit, {
+      building: requireBuilding(config, stage.building),
+      elevatorSpecs: config.elevatorSpecs,
+    });
     if (!resolved.ok) throw new Error(resolved.reason);
     profile = resolved.profile;
   }

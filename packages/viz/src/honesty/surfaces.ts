@@ -2532,12 +2532,15 @@ function disclosureShapeOf(origin: DisclosureOrigin): {
 /**
  * A weight vector the player edited, admitted or refused **at the control**.
  *
- * Four points, and three of them are refusals, because the refusals are the strings: a dimension
- * the space does not declare, a value the dimension cannot hold, and a combination the declared
- * box admits and `core` refuses. `editedProfile.ts` names all three in its own docstring and says
- * the third *"is not a theoretical branch"* — one uniform draw in eight violates it.
+ * Five points, and four of them are refusals, because the refusals are the strings: a dimension
+ * the space does not declare, a value the dimension cannot hold, a combination the declared box
+ * admits and `core` refuses, and a combination `core` refuses **on this case's own cars**.
+ * `editedProfile.ts` names all four in its own docstring and says the third *"is not a
+ * theoretical branch"* — one uniform draw in eight violates it. The fourth is not a theoretical
+ * branch either: it is GitHub issue **#475**, four configurations a survivor sweep drew, admitted
+ * and then crashed on.
  *
- * The fourth is the admitted vector, whose profile carries a **name a report prints** —
+ * The fifth is the admitted vector, whose profile carries a **name a report prints** —
  * *"…(edited from collective)"* — which is the only string on this surface that is not a refusal.
  */
 const EDITED_PROFILE: SurfaceAdapter = {
@@ -2575,11 +2578,30 @@ const EDITED_PROFILE: SurfaceAdapter = {
             },
           ]
         : []),
+      /*
+       * The constraint no building-independent check can see — GitHub issue **#475**, and the
+       * fourth refusal `editedProfile.ts` names. `answer.maxDwellS` declares `[4, 30]` and every
+       * shipped car's larger base dwell is above 4, so the declared floor is infeasible on every
+       * building this corpus draws. Guarded by id for the reason the pair above is: a renamed
+       * dimension stops being driven rather than throwing.
+       */
+      ...(declared.has('answer.dwellPolicy') && declared.has('answer.maxDwellS')
+        ? [
+            {
+              label: 'dwell-below-the-doors',
+              edit: {
+                'answer.dwellPolicy': 'adaptive',
+                'answer.maxDwellS': 4,
+              } as EditedVector['values'],
+            },
+          ]
+        : []),
       { label: 'admitted', edit: {} },
     ];
 
+    const target = { building: context.building, elevatorSpecs: context.elevatorSpecs };
     for (const { label, edit } of edits) {
-      const admission = admitEditedVector(context.space, base, edit);
+      const admission = admitEditedVector(context.space, base, edit, target);
       if (admission.reason !== undefined) {
         seeds.push({ field: `admitEditedVector.${label}.reason`, text: admission.reason, role: 'reason' });
       }
@@ -2587,7 +2609,7 @@ const EDITED_PROFILE: SurfaceAdapter = {
         baseProfileId: base.id,
         profileId: `${base.id}-edited`,
         values: edit,
-      });
+      }, target);
       if (resolved.ok) {
         seeds.push({ field: `resolveEditedProfile.${label}.name`, text: resolved.profile.name, role: 'label' });
       } else {

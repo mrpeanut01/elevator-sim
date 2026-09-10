@@ -28,6 +28,22 @@ import { resolveEditedProfile, type EditedVector } from '../controls/editedProfi
 const fixture = useCampaignFixture();
 const { stageAt, publishedFor, requireProfile, playStage, playToVerdict } = fixture;
 
+/**
+ * A stage's building and its sensor specs, as `controls/editedProfile.ts#EditTarget`.
+ *
+ * GitHub issue **#475**: an edited vector is admissible **on a building**, never in the abstract,
+ * because `answer.maxDwellS` under an adaptive dwell policy is bounded by a car's door timings.
+ * Drawn from the same `resourcesFor` the played batches use, so the admission and the run cannot
+ * be about two different towers.
+ */
+function targetOf(stage: CampaignStage): {
+  readonly building: ReturnType<typeof fixture.resourcesFor>['building'];
+  readonly elevatorSpecs: ReturnType<typeof fixture.resourcesFor>['elevatorSpecs'];
+} {
+  const resources = fixture.resourcesFor(stage);
+  return { building: resources.building, elevatorSpecs: resources.elevatorSpecs };
+}
+
 describe('stage 2, played on an edited weight vector — the thing a dropdown could not do', () => {
   /**
    * The vector, and it is not a shipped profile.
@@ -217,11 +233,17 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
     // the rule a shipped profile is.
     const { space } = fixture;
     const stage = stageAt(1);
-    const outOfScope = resolveEditedProfile(space, requireProfile('collective'), {
-      baseProfileId: 'collective',
-      profileId: 'collective-edited',
-      values: { 'idle.parkingStrategy': 'lobby' },
-    });
+    const outOfScope = resolveEditedProfile(
+      space,
+      requireProfile('collective'),
+      {
+        baseProfileId: 'collective',
+        profileId: 'collective-edited',
+        values: { 'idle.parkingStrategy': 'lobby' },
+      },
+      /* The stage's own building — issue #475: an admission is about a vector *on* a building. */
+      targetOf(stage),
+    );
     expect(outOfScope.ok, outOfScope.ok ? '' : outOfScope.reason).toBe(true);
     if (!outOfScope.ok) return;
     const admission = admitProfile(

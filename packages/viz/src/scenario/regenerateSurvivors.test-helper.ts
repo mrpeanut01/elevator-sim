@@ -171,6 +171,9 @@ export async function measurePublishedSurvivors(
       space,
       schedule,
       baseline,
+      /* The same building and specs the batch runs on — issue #475. See `MeasureSurvivorsInput`. */
+      building: resources.building,
+      elevatorSpecs: resources.elevatorSpecs,
       profiles: config.dispatcherProfiles.profiles,
       sampleSize: SURVIVOR_SAMPLE_SIZE,
       masterSeed: SURVIVOR_MASTER_SEED,

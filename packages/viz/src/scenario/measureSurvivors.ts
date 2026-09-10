@@ -70,7 +70,11 @@
  * directory publishes, so no `DECISIONS.md` number is owed for it.
  */
 
-import type { DispatcherProfile } from '@elevator-sim/core/browser';
+import type {
+  DispatcherProfile,
+  ElevatorSpecs,
+  ResolvedBuilding,
+} from '@elevator-sim/core/browser';
 import type { SearchSpace } from '@elevator-sim/experiments/browser';
 
 import type { BatchReport } from '../batch/report.js';
@@ -119,13 +123,21 @@ export interface JudgedConfiguration {
 /**
  * A configuration the declared space admits and `core` refuses to build.
  *
- * **Found by this sweep rather than predicted by it**, and it is a real one:
- * `controls/editedProfile.ts#admitEditedVector` accepts a vector with
- * `answer.dwellPolicy: 'adaptive'` and a `answer.maxDwellS` below the car's own door timings,
- * `space.validate` returns no reason, and `model/car/car.ts` then throws
- * *"dwellPolicy \"adaptive\" requires maxDwellS >= the longer of …"* when the building is
- * constructed. The declared box is therefore **wider** than what the simulator will build, on a
- * pair of dials the price schedule sells at 3 units.
+ * **Empty on the shipped ladder since GitHub issue #475 was fixed, and kept because it is the
+ * instrument that found it.** The four this sweep first met were real:
+ * `controls/editedProfile.ts#admitEditedVector` accepted a vector with
+ * `answer.dwellPolicy: 'adaptive'` and an `answer.maxDwellS` below the car's own door timings,
+ * `space.validate` returned no reason — it cannot, being building-independent — and
+ * `model/car/car.ts` threw *"dwellPolicy \"adaptive\" requires maxDwellS >= the larger base
+ * dwell (5s)"* when the building was constructed. They had to be counted **out** of `examined`,
+ * which is honest for a survivor count and is not a fix.
+ *
+ * **That refusal is now taken at the draw** — `survivorSpace.ts` hands the sampler the building,
+ * so a vector this simulator cannot run on this scenario's cars is refused and redrawn rather than
+ * played. The field stays, and so does the count beside it, for two reasons: a **dropdown** profile
+ * can still fail to build on a particular building, and a category that is zero because it was
+ * fixed is only distinguishable from one that is zero because nobody looked if the count is still
+ * published. `admittedVectorsBuild.test.ts` is the guard that keeps it at zero for the dials.
  *
  * A configuration nobody can run is not a way through the scenario and it is not a failed attempt
  * either, so it is **excluded from `examined`** and counted here. Excluding it silently would put a
@@ -211,6 +223,17 @@ export interface MeasureSurvivorsInput {
   readonly published: PublishedScenario;
   readonly space: SearchSpace;
   readonly schedule: PriceSchedule;
+  /**
+   * The scenario's own building, resolved — issue **#475**.
+   *
+   * Carried rather than reached for through {@link MeasureSurvivorsInput.run}, which is a closure
+   * over resources this module cannot see. The sampler needs it to refuse a vector the cars will
+   * not accept, and it must be the **same** building the batch runs on or the draw would be
+   * filtered against one tower and played on another.
+   */
+  readonly building: ResolvedBuilding;
+  /** The sensor defaults those cars resolve against. See {@link MeasureSurvivorsInput.building}. */
+  readonly elevatorSpecs: ElevatorSpecs | undefined;
   /** The scenario's own baseline profile, resolved from `data/dispatcher-profiles.json`. */
   readonly baseline: DispatcherProfile;
   /** Every shipped profile, so the dropdown stratum is a population rather than a selection. */
@@ -252,8 +275,19 @@ export interface MeasureSurvivorsInput {
 export async function measureScenarioSurvivors(
   input: MeasureSurvivorsInput,
 ): Promise<readonly SurvivorTally[]> {
-  const { stage, published, space, schedule, baseline, profiles, sampleSize, masterSeed, run } =
-    input;
+  const {
+    stage,
+    published,
+    space,
+    schedule,
+    baseline,
+    building,
+    elevatorSpecs,
+    profiles,
+    sampleSize,
+    masterSeed,
+    run,
+  } = input;
   const reachable = reachableChangesOf(space, schedule);
 
   /* The countable stratum, played once. See the docstring on why once is enough. */
@@ -291,6 +325,8 @@ export async function measureScenarioSurvivors(
       space,
       schedule,
       baseline,
+      building,
+      elevatorSpecs,
       units: rung.units,
       sampleSize,
       seed,

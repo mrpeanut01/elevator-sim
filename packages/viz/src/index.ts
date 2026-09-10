@@ -128,7 +128,8 @@
  * | {@link disclosureClassOf} | `parityViolations`. **Inside the module only** — it is the classification the check is derived over, and a caller outside would be a second opinion about § 4's non-negotiable list |
  * | {@link VIEW_MODES}, {@link isViewMode} | `src/dev/main.ts`'s mode toggle, its URL key and its remembered preference |
  * | {@link resolveEditedProfile} | `armProfile` in `src/batch/runBatch.ts`, inside the worker, and `candidateProfileFor` in `src/dev/campaignPanel.ts`, before Run is enabled — **the same function on both sides**, which is what stops a pre-flight from passing what a run then rejects |
- * | {@link admitEditedVector} | `resolveEditedProfile`, and `dev/campaignPanel.ts` through it |
+ * | {@link admitEditedVector} | `resolveEditedProfile`, `dev/campaignPanel.ts` through it, and `sampleReachableConfigurations` in `src/scenario/survivorSpace.ts`, which asks it of every drawn vector before a rung's sample keeps one |
+ * | {@link EditTarget} | every caller of the two above — the building an edited vector will run on. Required rather than optional since GitHub issue #475: two `answer.*` dials are bounded by a **car**, so a gate asked without a building answers a narrower question than *"may a player set this?"* and admitted four configurations `core` then threw on |
  * | {@link valuesFromProfile} | `src/dev/campaignPanel.ts`'s editor, to open on the chosen profile's own point |
  * | {@link applyEdit} | `admitEditedVector`, in `src/controls/editedProfile.ts`. Inside the module only — every write goes through `applyControlEdit`, so a second entry point would be a second bounds check |
  *
@@ -662,4 +663,5 @@ export {
   type EditAdmission,
   type EditedProfileOutcome,
   type EditedVector,
+  type EditTarget,
 } from './controls/editedProfile.js';

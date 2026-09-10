@@ -316,9 +316,28 @@ describe('the sampling method is a measurement of the rung, not a policy', () =>
 
 describe('the draw is reproducible, affordable and live', () => {
   const baseline = () => fixture.requireProfile('collective');
+  /**
+   * The building the draw is admitted against — GitHub issue **#475**.
+   *
+   * A drawn vector is admissible **on a building**: `answer.maxDwellS` under an adaptive dwell
+   * policy is bounded by a car's own door timings, so the sampler cannot answer *"could the player
+   * have set this?"* without one. The first stage's own tower, through the same `resourcesFor` the
+   * played batches use, so the filter and the run are about the same cars.
+   */
+  const target = () => {
+    const resources = fixture.resourcesFor(fixture.campaign.stages[0] ?? fixture.stageAt(0));
+    return { building: resources.building, elevatorSpecs: resources.elevatorSpecs };
+  };
 
   it('draws the same configurations from the same seed and different ones from another', () => {
-    const request = { space: fixture.space, schedule, baseline: baseline(), units: 24, sampleSize: 8 };
+    const request = {
+      space: fixture.space,
+      schedule,
+      baseline: baseline(),
+      ...target(),
+      units: 24,
+      sampleSize: 8,
+    };
     const first = sampleReachableConfigurations({ ...request, seed: 4242 });
     const again = sampleReachableConfigurations({ ...request, seed: 4242 });
     const other = sampleReachableConfigurations({ ...request, seed: 4243 });
@@ -349,6 +368,7 @@ describe('the draw is reproducible, affordable and live', () => {
         space: fixture.space,
         schedule,
         baseline: baseline(),
+        ...target(),
         units,
         sampleSize: 12,
         seed: 991,
@@ -372,6 +392,7 @@ describe('the draw is reproducible, affordable and live', () => {
       space: fixture.space,
       schedule,
       baseline: baseline(),
+      ...target(),
       units: 54,
       sampleSize: 16,
       seed: 20_260_910,
@@ -381,7 +402,12 @@ describe('the draw is reproducible, affordable and live', () => {
       expect(Object.keys(configuration.values).length, 'a configuration that moves nothing').toBeGreaterThan(0);
       for (const id of Object.keys(configuration.values)) expect(priced.has(id), id).toBe(true);
       /* Live: every drawn vector is one the editor's own admission check would accept. */
-      const admission = admitEditedVector(fixture.space, baseline(), configuration.values);
+      const admission = admitEditedVector(
+        fixture.space,
+        baseline(),
+        configuration.values,
+        target(),
+      );
       expect(admission.admissible, admission.reason ?? '').toBe(true);
     }
   });
@@ -391,6 +417,7 @@ describe('the draw is reproducible, affordable and live', () => {
       space: fixture.space,
       schedule,
       baseline: baseline(),
+      ...target(),
       units: 4,
       sampleSize: 5,
       seed: 7,

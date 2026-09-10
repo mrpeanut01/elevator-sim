@@ -354,7 +354,16 @@ function armProfile(resources: BatchResources, arm: BatchArmRequest): Dispatcher
   }
   if (arm.edit === undefined) return profile;
 
-  const resolved = resolveEditedProfile(collectSearchSpace(), profile, arm.edit);
+  /*
+   * The building and its specs go with the vector — issue #475. Two of the `answer.*` dimensions
+   * are bounded by a **car** rather than by another dial, so a gate asked without them answers a
+   * narrower question than the one this line is about: whether *this* run builds. The resources
+   * this function already holds are the ones the run itself will use.
+   */
+  const resolved = resolveEditedProfile(collectSearchSpace(), profile, arm.edit, {
+    building: resources.building,
+    elevatorSpecs: resources.elevatorSpecs,
+  });
   if (!resolved.ok) {
     throw new BatchError(
       `arm "${arm.armId}" carries an edited weight vector that cannot be run: ${resolved.reason}`,

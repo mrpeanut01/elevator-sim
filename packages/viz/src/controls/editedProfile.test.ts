@@ -22,17 +22,35 @@ import type { DispatcherProfile, LoadedConfig } from '@elevator-sim/core';
 import { loadConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { DATA_DIR, requireDispatcher } from '../fixtures.test-helper.js';
-import { admitEditedVector, resolveEditedProfile, valuesFromProfile } from './editedProfile.js';
+import { DATA_DIR, requireBuilding, requireDispatcher } from '../fixtures.test-helper.js';
+import {
+  admitEditedVector,
+  resolveEditedProfile,
+  valuesFromProfile,
+  type EditTarget,
+} from './editedProfile.js';
 
 let config: LoadedConfig;
 let space: SearchSpace;
 let collective: DispatcherProfile;
+/**
+ * The building every case here admits **against** — GitHub issue **#475**.
+ *
+ * An admission is a question about a vector *on a building*, because two of the `answer.*` dials
+ * are bounded by a car rather than by another dial. `midtown-office` is the tower this
+ * repository's campaign leans on hardest, and the dwell cases below derive their bound from its
+ * cars rather than quoting one.
+ */
+let target: EditTarget;
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
   space = collectSearchSpace();
   collective = requireDispatcher(config, 'collective');
+  target = {
+    building: requireBuilding(config, 'midtown-office'),
+    elevatorSpecs: config.elevatorSpecs,
+  };
 });
 
 describe('an edit round-trips through the profile schema', () => {
@@ -42,7 +60,7 @@ describe('an edit round-trips through the profile schema', () => {
       baseProfileId: collective.id,
       profileId: 'collective-edited',
       values: { 'weights.waitTime': 3.25 },
-    });
+    }, target);
     expect(resolved.ok, resolved.ok ? '' : resolved.reason).toBe(true);
     if (!resolved.ok) return;
 
@@ -59,7 +77,7 @@ describe('an edit round-trips through the profile schema', () => {
       baseProfileId: collective.id,
       profileId: 'collective-edited',
       values: { 'weights.waitTime': 3.25 },
-    });
+    }, target);
     expect(resolved.ok).toBe(true);
     if (!resolved.ok) return;
     const base = candidateFromProfile(space, collective);
@@ -83,7 +101,7 @@ describe('an edit round-trips through the profile schema', () => {
       baseProfileId: collective.id,
       profileId: 'collective-edited',
       values: { 'weights.waitTime': 3.25 },
-    });
+    }, target);
     expect(resolved.ok).toBe(true);
     if (!resolved.ok) return;
     expect(resolved.profile.role).toBe(collective.role);
@@ -92,7 +110,7 @@ describe('an edit round-trips through the profile schema', () => {
 
 describe('an invalid edit is refused at the control, with a reason', () => {
   it('refuses a value outside the dimension’s declared range, quoting the bound', () => {
-    const admission = admitEditedVector(space, collective, { 'weights.waitTime': 99 });
+    const admission = admitEditedVector(space, collective, { 'weights.waitTime': 99 }, target);
     expect(admission.admissible).toBe(false);
     expect(admission.reason).toContain('weights.waitTime');
     // The bound is the schema's, printed. A refusal that says only "invalid" is not actionable.
@@ -100,7 +118,7 @@ describe('an invalid edit is refused at the control, with a reason', () => {
   });
 
   it('refuses a dimension the space does not declare, by name', () => {
-    const admission = admitEditedVector(space, collective, { 'weights.vibes': 1 });
+    const admission = admitEditedVector(space, collective, { 'weights.vibes': 1 }, target);
     expect(admission.admissible).toBe(false);
     expect(admission.reason).toContain('weights.vibes is not a dimension of this space.');
   });
@@ -111,7 +129,7 @@ describe('an invalid edit is refused at the control, with a reason', () => {
     // is actionable and "unavailable" is not — `controls/controls.ts`'s own words.
     const admission = admitEditedVector(space, collective, {
       'dispatch.commitmentPoint': 'on-door-open',
-    });
+    }, target);
     expect(admission.admissible).toBe(false);
     expect(admission.reason).toContain('dispatch.reassignmentPolicy');
   });
@@ -127,7 +145,7 @@ describe('an invalid edit is refused at the control, with a reason', () => {
     const admission = admitEditedVector(space, collective, {
       'dispatch.callType': 'destination-entry',
       'dispatch.assignmentTiming': 'deferred',
-    });
+    }, target);
     expect(admission.admissible).toBe(false);
     expect(admission.reason).toContain('the declared box is not the feasible set');
     expect(admission.reason).toContain('defer');
@@ -137,10 +155,10 @@ describe('an invalid edit is refused at the control, with a reason', () => {
     // Without this the test above would pass on a form that refused `destination-entry` outright,
     // and the claim being made — that the *combination* is what is infeasible — would be untested.
     expect(
-      admitEditedVector(space, collective, { 'dispatch.callType': 'destination-entry' }).admissible,
+      admitEditedVector(space, collective, { 'dispatch.callType': 'destination-entry' }, target).admissible,
     ).toBe(true);
     expect(
-      admitEditedVector(space, collective, { 'dispatch.assignmentTiming': 'deferred' }).admissible,
+      admitEditedVector(space, collective, { 'dispatch.assignmentTiming': 'deferred' }, target).admissible,
     ).toBe(true);
   });
 
@@ -149,7 +167,7 @@ describe('an invalid edit is refused at the control, with a reason', () => {
       baseProfileId: collective.id,
       profileId: 'collective-edited',
       values: { 'weights.waitTime': 99 },
-    });
+    }, target);
     expect(resolved.ok).toBe(false);
     if (resolved.ok) return;
     expect(resolved.reason).toContain('weights.waitTime');
@@ -164,7 +182,7 @@ describe('an invalid edit is refused at the control, with a reason', () => {
       baseProfileId: collective.id,
       profileId: '',
       values: { 'weights.waitTime': 1 },
-    });
+    }, target);
     expect(resolved.ok).toBe(false);
     if (resolved.ok) return;
     expect(resolved.reason).toContain('not authorable as a dispatcher profile');
