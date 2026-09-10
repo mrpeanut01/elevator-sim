@@ -123,6 +123,32 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The survivor count’s space walk and its schema — GitHub issue #367, § D525 clause 3. Two ' +
+        'different arguments, and both are the group above’s: `survivorSpace.ts`’s six are ' +
+        'reached by the classifier through **one** literal, `dispatcher.${parameter.id}`, which is ' +
+        'the dotted config path `data/price-schedule.json` prices a change over — a path, not a ' +
+        'sentence, and the same thing `shift/events.ts#eventById`’s `writes` names are excluded ' +
+        'for. `validatePublishedSurvivors`’s literals are **load-time refusals addressed to ' +
+        'whoever regenerated `data/scenario-survivors.json`** ("the count is keyed by a stable ' +
+        'step id and never by an array position"), which is `pricing/parse.ts#violationsIn`’s ' +
+        'exclusion one group up, word for word in its reasoning. The words a player reads about a ' +
+        'survivor count are `SURVIVOR_COPY` and `survivorSentenceFor`, and **those are driven** — ' +
+        'by the `SURVIVORS` adapter, over every scenario and every budget step the shipped table ' +
+        'holds. That split is the whole of why this exclusion is safe: the half that speaks to a ' +
+        'player is in the corpus and the half that speaks to a regenerator is here.',
+      ids: [
+        'scenario/survivors.ts#validatePublishedSurvivors',
+        'scenario/survivorSpace.ts#dimensionsCoveredBy',
+        'scenario/survivorSpace.ts#reachableChangesOf',
+        'scenario/survivorSpace.ts#unreachableChangeIdsOf',
+        'scenario/survivorSpace.ts#unpricedDimensionIds',
+        'scenario/survivorSpace.ts#bundleSpaceOf',
+        'scenario/survivorSpace.ts#dropdownConfigurationsOf',
+        'scenario/survivorSpace.ts#sampleReachableConfigurations',
+      ],
+    },
+    {
+      reason:
         'DOM-bound. These mount the page and author their status text inline, so they cannot be ' +
         'driven under Node — `boundaries.test.ts` confines the DOM to `dev/` precisely so the rest ' +
         'of the package stays testable without a jsdom. Their authored literals are swept ' +

@@ -332,6 +332,35 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   'everyday/campaignDockStrings':
     'every string of a dock view, for the first-person sweep that reads all nine states',
   'scenario/publishedScenarioFor': 'same instrument, same driver, same reason',
+
+  /*
+   * -- GitHub issue #367's survivor counts, the same published-number shape one file along:
+   * `measureScenarioSurvivors` produced `data/scenario-survivors.json`,
+   * `regenerateSurvivors.test-helper.ts` is the driver that can produce it again, and
+   * `survivorSweep.test.ts` — behind `ELEVATOR_SIM_SURVIVORS=deep` — is the guard that re-derives
+   * it. `validatePublishedSurvivors` and `dialShareInterval` are the always-on half's instruments:
+   * the schema every rule a scenario may not ship without is written in, and the exact binomial
+   * interval a reader needs before taking `0 of 12` for *nothing clears*. Both are consumed by
+   * `survivors.test.ts`, which is `coveredDeclarations`' ground — the guard is the consumer by
+   * design. A **shipped** caller for the first two would be the defect rather than the fix: a
+   * survivor count is pre-simulated, and a screen that recomputed one would be running a
+   * ten-scenario sweep while a player waited. What a screen calls is `survivorSentenceFor`, which
+   * has one: `honesty/surfaces.ts`'s SURVIVORS adapter.
+   *
+   * `unreachableChangeIdsOf` is the odd one and is here rather than wired: it names the priced
+   * changes a scenario run **cannot** apply, which is the bound this whole measurement is taken
+   * under. Its consumers are the regeneration driver, which writes it onto the table's own face,
+   * and `survivors.test.ts`, which asserts it partitions the schedule in both directions. A count
+   * published without it would read as a claim about the whole ladder.
+   */
+  'scenario/measureScenarioSurvivors':
+    'the instrument that produced data/scenario-survivors.json; its caller is the regeneration driver',
+  'scenario/validatePublishedSurvivors':
+    'the survivor table’s schema; its consumer is survivors.test.ts, which drives every clause',
+  'scenario/dialShareInterval':
+    'the sampled half’s exact binomial interval, derived at read time; the guard is its consumer',
+  'scenario/unreachableChangeIdsOf':
+    'the bound this measurement is taken under, published on the table and asserted by the guard',
   'scenario/CANDIDATE_SCENARIOS':
     'the driver’s and the guard’s shared scenario list (goalReport imports only CANDIDATE_GOALS)',
   /*

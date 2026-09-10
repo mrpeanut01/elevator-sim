@@ -366,6 +366,11 @@ import { consentAskViewOf, consentRowViewOf } from '../telemetry/consentView.js'
 import { goalReport } from '../scenario/goalReport.js';
 import { goalLabel, GOAL_BLOCKER } from '../scenario/goals.js';
 import type { PublishedScenario } from '../scenario/published.js';
+import {
+  SURVIVOR_COPY,
+  survivorSentenceFor,
+  type PublishedSurvivors,
+} from '../scenario/survivors.js';
 
 /* ---- the design refactor's surfaces: the shift layer, the four editors, the panels ---- */
 import {
@@ -684,6 +689,8 @@ export interface HonestyContext {
    * data. Assembled once, in `run.ts`, exactly the way `dev/main.ts` assembles it.
    */
   readonly bundleAt: (at: number) => FrameBundle;
+  /** `data/scenario-survivors.json` — GitHub issue #367's published counts. See `run.ts`. */
+  readonly survivors: PublishedSurvivors;
 }
 
 /** Just enough of `SearchSpace` for the controls surfaces, so the type does not cross a barrel. */
@@ -12332,6 +12339,77 @@ const EVERYDAY_WATCHING: SurfaceAdapter = {
   },
 };
 
+/**
+ * **The survivor count, on the scenario, in the player's words** — GitHub issue **#367**,
+ * `docs/38` § 2.1, [§ D525](../../../../DECISIONS.md) clause 3.
+ *
+ * Difficulty in this product is *the number of ways through*, and this is the surface that says so
+ * to a player. Every scenario and every budget step in `data/scenario-survivors.json` is rendered,
+ * which is one sentence per `(scenarioId, stepId)` — the key issue #365 shaped the budget steps to
+ * carry — plus the copy table the sentence is built from.
+ *
+ * ## Why the whole table on every case rather than the case's own scenario
+ *
+ * `run.ts#HonestyResources.survivors` carries the argument and it is worth repeating where the
+ * adapter is: the always-on tier sets `stageProbability: 0`, so `context.stage` is `undefined`
+ * there by construction. An adapter keyed to the case's stage would have spoken only in the deep
+ * tier — and the deep tier's **one-surface lead** over always-on is a property `honesty.test.ts`
+ * asserts (`campaign/judge.ts#judgeStage`, silent in one tier and loud in the other). A second
+ * stage-keyed surface would have moved that gap silently, which is exactly the class of change
+ * that column exists to make visible. The table is static content, identical on every case, so
+ * seeding all of it is both honest and tier-symmetric — `SCENARIOS` seeds `CONTRACTS` the same way.
+ *
+ * ## The role, and why it is `observation` rather than `goal`
+ *
+ * This was seeded `role: 'goal'` first and the corpus refused it, on every cell of every case:
+ * `goal-without-rate` asks R12's question — *is there a measured across-seed pass rate beside this
+ * goal?* — and a survivor count has no such rate, because it is not a goal. R12's own words are the
+ * classification: *"a goal with no across-seed rate is a statement about the configuration, not a
+ * goal."* A survivor count is exactly that statement.
+ *
+ * So it is `role: 'observation'` with `declaredCount` and `countShown` — which is the narrowing
+ * `campaign/judge.ts#judgeStage`'s docstring already argues for its own headline, for the identical
+ * reason: *"so R13 still sees it and R12 stops being asked a question the string does not answer."*
+ * R13 is the rule that binds here and it binds hard — the estimate carries its own `n` in its own
+ * box — and `survivors.ts#survivorSentenceFor` names `examined` before it names `survivors` so the
+ * denominator arrives first. `declaredCount` is `examined`, the `k` the count is over, and never
+ * the replication count, which is the *other* denominator and is what a reader would otherwise take
+ * it for.
+ *
+ * A scenario that declares itself a diagnosis is seeded `role: 'reason'`: the sentence there is a
+ * refusal — *nothing gets through this one as it stands* — and R3's shape is that a refusal
+ * replaces the number rather than hiding it.
+ */
+const SURVIVORS: SurfaceAdapter = {
+  id: 'scenario/survivors.ts#survivorSentenceFor',
+  covers: ['scenario/survivors.ts#survivorSentenceFor', 'scenario/survivors.ts#SURVIVOR_COPY'],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    for (const [key, text] of Object.entries(SURVIVOR_COPY)) {
+      seeds.push({ field: `copy.${key}`, text, role: 'label' });
+    }
+    for (const scenario of context.survivors.scenarios) {
+      for (const step of scenario.steps) {
+        const at = `${scenario.id}.${step.stepId ?? 'base'}`;
+        const text = survivorSentenceFor(scenario, step);
+        if (scenario.diagnosis !== null) {
+          seeds.push({ field: `${at}.count`, text, role: 'reason' });
+          continue;
+        }
+        seeds.push({
+          field: `${at}.count`,
+          text,
+          role: 'observation',
+          /* The `k` the count is over, in the same sentence as the count — R13 clause one. */
+          declaredCount: step.examined,
+          countShown: text.includes(String(step.examined)),
+        });
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 /* -------------------------------------------------------------------------- *
  * The consent ask and its settings row — `docs/26` §§ 4 and 15.2
  * -------------------------------------------------------------------------- */
@@ -12597,6 +12675,15 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * verdict, so there is no wording whose fault it could take off another surface.
    */
   TELEMETRY_CONSENT,
+  /*
+   * Appended last in turn — GitHub issue #367's survivor counts. The fault-ordering rule stated at
+   * SHIFT_REPORT is not free here and the collision is named rather than waved past: this adapter
+   * seeds a count over a stated denominator on every scenario and every budget step, which is the
+   * `\d+ of \d+` shape `CAMPAIGN`'s briefing facts, `GOAL_REPORT`'s rates and `BATCH_REPORT`'s rows
+   * all draw. A slot ahead of any of those would take every rate-shaped fault off the surfaces that
+   * exist to carry them.
+   */
+  SURVIVORS,
 ]);
 
 /* -------------------------------------------------------------------------- *

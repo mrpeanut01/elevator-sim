@@ -88,7 +88,30 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * that reason on the commit that added it, which is what the ratchet's own message asks for;
      * nothing existing was raised to make room.
      */
-    ['viz', { count: 92, totalMs: 90_300_000 }],
+    /*
+     * **92 → 93, and the one is named** — GitHub issue #367's `scenario/survivorSweep.test.ts`. It
+     * is the survivor sweep: every scenario at every rung of its budget, with every configuration
+     * the rung reaches played to a verdict through the shipped sequence, which on the shipped
+     * campaign is ten scenarios × (a twelve-profile dropdown census + three rungs × twelve drawn
+     * dials), each a fifty-replication two-arm batch and a second one wherever the first met every
+     * bar. Measured 2026-09-10 at the shipped sample size on a quiet ten-core box: 932 s over 480
+     * judgements. Its annotation is three hours because the same instrument is re-run under
+     * `ELEVATOR_SIM_REGENERATE_SURVIVORS=1` to produce the pinned table, and an annotation shorter
+     * than the job it holds is an annotation that fails for a reason that is not the code. It is
+     * gated on `ELEVATOR_SIM_SURVIVORS` and registered in `deepTiers.test.ts`, so it costs the
+     * default suite nothing. Raised here with that reason on the commit that added it, which is
+     * what the ratchet's own message asks for; nothing existing was raised to make room.
+     *
+     * **It was uncounted first, and that is the more useful half of this entry.** The file's first
+     * draft closed the callback on one line, put a block comment on the next and the bare
+     * `10_800_000,` on the one after — and `annotationsIn`'s `CLOSER` matches a closing
+     * `}, <ms>);` at the **start of a line**, so the census could not see it: 441 annotations,
+     * 92 above ceiling, and this
+     * ratchet green over a three-hour bound nobody had counted. An uncounted annotation is
+     * `RISKS.md` R38 wearing a timeout, so the call was rewritten into the counted form rather than
+     * left in the blind spot. The scanner's limit is real and is not fixed here.
+     */
+    ['viz', { count: 93, totalMs: 101_100_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

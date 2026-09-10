@@ -175,6 +175,17 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'GitHub issue #234, § D520. § 6.4 measured the arm at 198 s on one worker',
     scheduled: true,
   },
+  'packages/viz/src/scenario/survivorSweep.test.ts': {
+    gates: ['ELEVATOR_SIM_SURVIVORS'],
+    reason:
+      'GitHub issue #367 and § D525 clause 3: every scenario at every rung of its budget, with ' +
+      'every configuration the rung reaches played to a verdict through the shipped sequence, and ' +
+      'the counts matched against data/scenario-survivors.json. A gate of its own rather than ' +
+      'ELEVATOR_SIM_DEEP, on this workflow’s own argument for nine jobs — a re-run after a fix ' +
+      'should not also pay for the dropdown sweep beside it. Measured 2026-09-10 at the shipped ' +
+      'sample size: 932 s over 480 judgements on a quiet ten-core box',
+    scheduled: true,
+  },
   'packages/experiments/src/fuzz/deep.test.ts': {
     gates: ['ELEVATOR_SIM_FUZZ'],
     reason:
