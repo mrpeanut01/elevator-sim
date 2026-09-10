@@ -322,4 +322,65 @@ describe.skipIf(!HAS_BROWSER)('the Everyday settings screen', () => {
     expect(await page.textContent('.everyday-settings-units')).toBe('metres');
     await page.close();
   });
+
+  /**
+   * **The report block, on the artifact a player loads** — GitHub issue **#245**.
+   *
+   * Three things no node test can vouch for, and the first is the product owner's ruling rather
+   * than a wiring:
+   *
+   * 1. **The public notice is drawn above the box**, in document order, on the shipped page. The
+   *    ruling says *plainly, and next to the box*; a model test can assert the sentence exists and
+   *    only a document can say where it is, and *above* is the half that matters — a reader who has
+   *    already typed has already decided.
+   * 2. **The press is reachable from inside the game**, through the rail's own gear row, which is
+   *    the issue's first acceptance criterion and is a claim about routes rather than about words.
+   * 3. **What the press opens carries the run.** The address is composed in the page and handed to
+   *    the browser, so the only place the whole chain — the host's seed, the view, the address — is
+   *    observable at once is here. `window.open` is replaced with a recorder rather than allowed to
+   *    open a public site from a test.
+   */
+  it('reports a problem: the notice is above the box, and the press opens the run’s own report', async () => {
+    const page = await coldLoad();
+    await openSettings(page);
+
+    /* 1 — the ruling's requirement, as a fact about the document. */
+    const noticeIsAboveTheBox = await page.evaluate(() => {
+      const notice = document.querySelector('.everyday-settings-support-public');
+      const box = document.querySelector('.everyday-settings-support-text');
+      if (notice === null || box === null) return null;
+      /* `DOCUMENT_POSITION_FOLLOWING` — the box comes after the notice. */
+      return (notice.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    });
+    expect(noticeIsAboveTheBox).toBe(true);
+    expect(await page.textContent('.everyday-settings-support-public')).toContain('posted publicly');
+
+    /* 2 — greyed with its reason drawn, not with a `title` a touch device never shows. */
+    expect(await page.$eval('.everyday-settings-support-open', (b) => (b as HTMLButtonElement).disabled)).toBe(true);
+    expect(await page.textContent('.everyday-settings-support-refusal')).toContain('Nothing is typed yet');
+
+    /* 3 — typed, offered, and the address carries this page's own crowd number. */
+    await page.evaluate(() => {
+      const opened: string[] = [];
+      (window as unknown as { __opened: string[] }).__opened = opened;
+      window.open = (url?: string | URL): null => {
+        opened.push(String(url ?? ''));
+        return null;
+      };
+    });
+    await page.fill('.everyday-settings-support-text', 'The lift went past my floor twice.');
+    expect(await page.$eval('.everyday-settings-support-open', (b) => (b as HTMLButtonElement).disabled)).toBe(false);
+    await page.click('.everyday-settings-support-open');
+
+    const opened = await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened);
+    expect(opened.length).toBe(1);
+    const address = new URL(opened[0] ?? '');
+    expect(address.origin + address.pathname).toBe('https://github.com/mrpeanut01/elevator-sim/issues/new');
+    const body = address.searchParams.get('body') ?? '';
+    expect(body).toContain('The lift went past my floor twice.');
+    /* The seed this page was loaded with, reaching the report through the host. */
+    expect(body).toContain('424242');
+    expect(body).toContain('garden-apartments');
+    await page.close();
+  });
 });

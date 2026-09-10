@@ -1179,7 +1179,7 @@ one file and is the whole of what this product persists.
 | **S10** | The rate-limit key | **SHIPS**, in memory | The caller's own text for its address, in a `FixedWindowLimiter` | Refusing a flood. **Never written** — § 0 fact 3, re-measured above |
 | **S11** | `.outbox.jsonl` | **SHIPS**, development only | Every mail the `OutboxMailer` sends, address in the clear, never swept | A developer needs to read the link they were mailed. **Unreachable in production**: `packages/server/src/bootstrap.ts:121` refuses to start when `NODE_ENV=production` and the mailer is an `OutboxMailer`, and the `Dockerfile` and `infra/azure/main.bicep` both set that variable. § 5.3 already names it |
 | **S12** | Telemetry rows | **SPECIFIED** (§ 7) | The batch envelope and its ten events, carrying `playerId`, `sessionId` and run pointers | `charter S1`–`charter S4`, and nothing else (§ 6) |
-| **S13** | Problem reports | **PROPOSED** (#245) | **Player-typed text**, plus the seed, the configuration, the build and the browser | A report the team can replay is worth more than one it cannot. **Destination: a public issue in this repository** (§ 12.1's fourth ruling) |
+| **S13** | Problem reports | **SHIPS** (#245), **and it is in no table above** | **Player-typed text**, plus the seed, the configuration, the build and the browser | A report the team can replay is worth more than one it cannot. **Destination: a public issue in this repository** (§ 12.1's fourth ruling). Listed here and marked as outside the schema on purpose: `packages/viz/src/everyday/support.ts` composes the report in the page and the **player** posts it from the repository's own form, so nothing about a report passes through this product's API and no row is written for one. § 8's *two routes, and no third* is untouched by it |
 | **S14** | Error reports | **PROPOSED** (#242) | A client or server error: message, stack, build, and whatever the runtime attaches | Nobody currently finds out when the deployed page throws |
 
 **On the player's device.** Every one of these is `window.localStorage` at the page's own origin. It
@@ -1394,6 +1394,35 @@ substance:
 **The second line is a T-1 obligation and not a courtesy**: a report that silently carries a run
 pointer is collection the player did not compose. **`LAWYER` — § 19 items 9 and 10**, on the public
 destination and on whether anything else must be said before a child can press that button (§ 17).
+
+**Both lines are drawn now — one of them verbatim — and the surface says two more things this draft
+did not ask for.** `packages/viz/src/everyday/support.ts` is the block, on the settings screen.
+
+The first line is this section's, **word for word, plus one clause**: *do not put anything about
+yourself or anyone else in the box that you would not put on a public page*. It is drawn immediately
+**above** the box rather than beside it, because a reader who has already typed has already decided.
+
+The second is reworded rather than quoted, and the rewording is the point: this draft names what is
+attached (*the seed, the building and the settings … the build and your browser version*), and the
+shipped surface **shows those lines** and says the words travel with them. A sentence describing an
+attachment the reader can see beside it would be a second answer to the same question, and the one
+that goes stale is the sentence. What it keeps is the half a list cannot carry: that the name, the
+picture and the address are not attached, and that nothing else about the reader is either.
+
+What the surface adds:
+
+- **T-3, on the surface** rather than only in a notice — the product cannot unpublish a report, and
+  the sentence says a takedown is something a person who looks after the repository does.
+- **What the press actually does.** The deployed page's own content security policy makes both
+  posting routes unavailable (`connect-src 'self'`, `form-action 'none'`), so the button opens the
+  repository's own form with the whole report already written into it and **the player posts it**.
+  That is stated before the press. It also answers **§ 19 item 10** in the direction the item leans
+  whichever way a reviewer decides it: the exact payload is on the reader's screen — twice, once
+  here and once on the form — before anything is public.
+
+**§ 19 item 9 is untouched by any of that and is still open**, which is the one to read twice: this
+section's question is whether the pre-press warning is *sufficient*, and a lane shipping the warning
+is not a lane answering it.
 
 ### 15.5 The published notice — what it must contain, not its words
 
@@ -1613,8 +1642,8 @@ Each is a claim about the tree and can be checked.
    Verified by grep on 2026-09-09.
 5. **An account requires an email address** (S1), which is the only route by which the product learns
    anything durable about a person.
-6. **A player can publish typed words** once #245 ships (S13) — to a public repository, under
-   § 15.4's warning.
+6. **A player can publish typed words** (S13, #245, shipped) — to a public repository, under
+   § 15.4's warning, which is now drawn on the screen rather than drafted here.
 7. **`display_name` is public** (S2), and a child may type their own name into it.
 
 Facts 6 and 7 are the two that carry the risk, and neither is telemetry's.

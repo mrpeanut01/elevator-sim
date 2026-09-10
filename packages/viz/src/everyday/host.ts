@@ -198,6 +198,8 @@ import type {
   WeekState,
 } from '../shift/types.js';
 import { nextDay } from '../shift/week.js';
+/* GitHub issue #245's honest half — see {@link EverydayHost.runCarriedBySelection}. */
+import { runIdentityIssues } from '../scope/runIdentity.js';
 import {
   filedDayRuns,
   watchGateAfter,
@@ -921,6 +923,27 @@ export interface EverydayHost {
     readonly playheadS: number;
     readonly open: boolean;
   };
+
+  /**
+   * Whether the run on the stage can be rebuilt from the settings that name it — GitHub issue
+   * **#245**.
+   *
+   * `scope/runIdentity.ts#runIdentityIssues`' answer and **never a second opinion**: the same
+   * predicate the leaderboard's submit gate asks, the same one behind the Engineer share link and
+   * the command line. A second implementation of *is this run reproducible* is exactly the shape
+   * `docs/16` S5 argues against, and this façade exists so a screen can reach the first one without
+   * importing across the shell boundary.
+   *
+   * **The answer crosses and the sentences do not**, which is deliberate and is argued where it is
+   * used (`everyday/support.ts`): those messages are written for the Engineer surface and name
+   * files, and `CHARTER_PROGRAMME.md` § M2's third exit criterion forbids a source filename where a
+   * player reads. `support.test.ts` measures that rather than asserting it.
+   *
+   * `true` with no run on the stage, because the question is about a run and there is none to
+   * refuse — a caller that needs *is there a run* asks {@link runState}, and one that conflated the
+   * two would report a state as unreproducible for having nothing in it.
+   */
+  runCarriedBySelection(): boolean;
 
   /**
    * The finished recording on the stage, or `undefined` before any run has landed.
@@ -1924,6 +1947,15 @@ export function createEverydayHost(
         open: hasRun && b.runIsOwn() && !dayClosed && b.playerHasChosen(),
       };
     },
+    /*
+     * GitHub issue #245. `'ranked'` because that is the strictest of the modes and the one the
+     * share link and the command line both ask for — a report that says *these settings rebuild
+     * your run* under a looser mode would be true of a submission and false of a replay, and the
+     * team replaying it is doing the second.
+     */
+    runCarriedBySelection: () =>
+      b.state().recording === undefined ||
+      runIdentityIssues(b.state(), b.resources, 'ranked').length === 0,
     startRun: () => {
       /*
        * The day is set up on the press rather than on a mount — § AB, and {@link dayPatchFor} for

@@ -1478,6 +1478,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'An address and a ceiling — **the id/key case again**, on GitHub issue #245’s report block ' +
+        '(`everyday/support.ts`). Neither is a sentence and neither is drawn anywhere. ' +
+        '`SUPPORT_REPORT_FORM` is the machine address of the repository’s own new-issue form, ' +
+        'derived only because the scanner reads two hyphen-joined words in it as a phrase, in the ' +
+        'same family as `persist/types.ts#SESSION_KEY`; the reader never sees it, they see the ' +
+        'page it opens. `SUPPORT_BROWSER_LIMIT` is the number 300, derived for a stranger reason ' +
+        'still and one worth recording rather than working around: a declaration’s span runs to the ' +
+        '**next declaration**, and `interface` and `type` are not declarations to this scanner — so ' +
+        'this constant’s span swallows the five type declarations below it, one of which is a union ' +
+        'carrying `run-partly-carried`, which reads to the two-adjacent-words test as prose. The ' +
+        'constant is therefore derived for a literal that is a member of a type rather than ' +
+        'anything a surface renders. **What a reader actually ' +
+        'meets for both is driven**: the block’s every sentence, in every state, by ' +
+        '`EVERYDAY_SUPPORT`, which also drives the report the address carries.',
+      ids: ['everyday/support.ts#SUPPORT_BROWSER_LIMIT', 'everyday/support.ts#SUPPORT_REPORT_FORM'],
+    },
+    {
+      reason:
         'The Everyday slot’s progress half — **player-facing, and not driven here**, said plainly ' +
         'in `dev/shiftRunner.ts`’s own form a few groups above. GitHub issue #224 made the solved ' +
         'fix cases and the gauntlet rating survive the tab, and gave every refusing path a ' +

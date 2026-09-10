@@ -48,8 +48,11 @@ import { recordRun } from '../record/recordRun.js';
 import { servedLeg, syntheticRecording } from '../live/synthetic.test-helper.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
+import { nextDay } from '../shift/week.js';
 import type { GoalReading } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
+/* GitHub issue #245 — the predicate the façade carries the answer of, asked directly. */
+import { runIdentityIssues } from '../scope/runIdentity.js';
 import { watchRunConfigOf } from '../watch/record.js';
 import { postedResultOf } from '../watch/reproduce.js';
 import type { PostedResult, WatchableRun, WatchRecord } from '../watch/types.js';
@@ -289,6 +292,66 @@ describe('runState — § 3.4’s latch, derived from the four grounds', () => {
     const withRun = { ...base(), recording: A_RECORDING };
     const run = createEverydayHost(harnessOf(withRun, { playheadS: 417 }).bindings).runState();
     expect(run.playheadS).toBe(417);
+  });
+});
+
+/**
+ * **`runCarriedBySelection` — GitHub issue #245's honest half.**
+ *
+ * Three cases, and the third is the one that keeps it from being a second opinion: the same state
+ * asked directly of `scope/runIdentity.ts#runIdentityIssues` and asked through the façade must
+ * agree. A façade that had drifted into recomputing the answer would pass the first two.
+ */
+describe('runCarriedBySelection — can the settings rebuild the run on the stage', () => {
+  /** A dispatcher only this browser has, which the shipped library cannot name. */
+  const savedDispatcher = (): ViewerState => ({
+    ...base(),
+    recording: A_RECORDING,
+    dispatcherId: 'a-dispatcher-only-this-browser-has',
+  });
+
+  it('answers true with no run on the stage — the question is about a run, and there is none', () => {
+    expect(createEverydayHost(harnessOf(base()).bindings).runCarriedBySelection()).toBe(true);
+  });
+
+  it('answers true for a shipped selection on day one', () => {
+    const withRun = { ...base(), recording: A_RECORDING };
+    expect(createEverydayHost(harnessOf(withRun).bindings).runCarriedBySelection()).toBe(true);
+  });
+
+  it('answers false where a selection cannot name what the run was built from', () => {
+    expect(createEverydayHost(harnessOf(savedDispatcher()).bindings).runCarriedBySelection()).toBe(
+      false,
+    );
+  });
+
+  it('is the shipped predicate’s answer and not a second opinion', () => {
+    for (const state of [{ ...base(), recording: A_RECORDING }, savedDispatcher()]) {
+      expect(createEverydayHost(harnessOf(state).bindings).runCarriedBySelection()).toBe(
+        runIdentityIssues(state, resources, 'ranked').length === 0,
+      );
+    }
+  });
+
+  /**
+   * The **mode** is pinned, not merely the predicate.
+   *
+   * A report says *these settings rebuild your run*, and the team replaying it is doing a replay
+   * rather than a submission — so the façade asks the strictest mode, the one the share link and the
+   * command line both ask. This case is a state the two modes disagree about, so a façade that had
+   * quietly loosened the mode fails here rather than passing every other case in this block.
+   */
+  it('asks the strictest mode, on a state the modes disagree about', () => {
+    /*
+     * Day two: the building has grown, and a selection carries no week. The leaderboard's mode
+     * refuses that and a shift week does not, so this is the state that tells the two apart — and
+     * it is the right answer for a report as well as the strict one, because a maintainer replaying
+     * from these settings alone would get day one's building.
+     */
+    const dayTwo = { ...base(), recording: A_RECORDING, week: nextDay(base().week) };
+    expect(runIdentityIssues(dayTwo, resources, 'shift-week').length).toBe(0);
+    expect(runIdentityIssues(dayTwo, resources, 'ranked').length).toBeGreaterThan(0);
+    expect(createEverydayHost(harnessOf(dayTwo).bindings).runCarriedBySelection()).toBe(false);
   });
 });
 
