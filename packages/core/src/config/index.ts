@@ -101,6 +101,7 @@ export {
   type ResolveBuildingOptions,
 } from './parse.js';
 export {
+  bankRangeIsFixed,
   describeServiceEvent,
   isServiceDerateEvent,
   isServiceModeEvent,

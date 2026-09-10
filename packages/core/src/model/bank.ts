@@ -182,9 +182,21 @@ export class Bank<TCar extends CarLike = ResolvedCar> {
    * already carrying somebody to a floor that has just left the range can still stop there and let
    * them off. Which is the whole of *finish the leg, then withdraw*.
    *
-   * Refuses a double-deck bank, whose deck coupling was derived from the as-built range at build
-   * time; `resolveBuilding` refuses the same entry earlier with a path, so this is the model's own
-   * guard rather than the one a reader will meet.
+   * **Refuses a double-deck bank**, whose deck coupling was derived from the as-built range at
+   * build time. The argument for refusing rather than carving out the expressible subset is
+   * `config/serviceEvent.ts#bankRangeIsFixed`, which is § D131's first model rule read as a
+   * constraint on this setter: a stop position is the lower floor of a pair, so a served-floor list
+   * on such a bank is a set of *stop positions* and cannot split one.
+   *
+   * **This throw is the last of four refusals and the one a reader is least likely to meet**
+   * (GitHub issue #477). `resolveBuilding` refuses a building's own authored entry with a path;
+   * `Simulation.#carriedEffectEvents` refuses a carried effect with a warning, so a bought
+   * `rezone-bank` aimed at such a bank leaves the run alive; and
+   * `packages/viz/src/live/interventions.ts#admitWorks` refuses the press before the money is
+   * taken. Until #477 the third and fourth did not exist and this throw *was* what a player met —
+   * as a `ModelError` out of the run, mid-day. It is kept, unmoved: a guard that no longer fires on
+   * any shipped path is what says the paths above it are complete, and softening it to a no-op here
+   * would make every one of them optional.
    */
   setServesFloors(floorIds: readonly string[]): void {
     if (this.isDoubleDeck) {

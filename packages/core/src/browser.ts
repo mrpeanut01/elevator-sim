@@ -191,6 +191,7 @@ export {
   populatedFloorIds,
   resolveBuilding,
   resolveCar,
+  bankRangeIsFixed,
   describeServiceEvent,
   isServiceDerateEvent,
   isServiceModeEvent,

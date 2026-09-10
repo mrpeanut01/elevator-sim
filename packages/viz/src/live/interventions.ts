@@ -21,9 +21,13 @@
  */
 
 import {
+  bankRangeIsFixed,
+  isServiceRangeEvent,
   RULE_ACTION_WORDS,
   type DispatcherProfile,
   type InterventionChange,
+  type ResolvedBuilding,
+  type ResolvedServiceEvent,
   type RunInterventionConfig,
 } from '@elevator-sim/core/browser';
 
@@ -396,6 +400,65 @@ export interface WorksAdmissionInput {
   readonly changeId: string;
   /** Which kind the press would record, so a tier the id does not sit in is refused by name. */
   readonly kind: 'equipment-change' | 'building-change';
+  /**
+   * **The tower the day is running on** — GitHub issue #477.
+   *
+   * Required rather than optional, and that is the decision. A purchase is admitted against what
+   * it would *do*, and a caller allowed to omit the building would be admitted without anybody
+   * having asked whether the change can land — which is how a shipped `rezone-bank` came to be
+   * offered on a bank whose range cannot move at all.
+   */
+  readonly building: ResolvedBuilding;
+  /**
+   * **What buying it would do to that tower**, at or after the press — `StageWorksOffer`'s own
+   * field, handed here so the ground below can read it. `[]` is legal and means *the stamp is the
+   * point*, exactly as it does on the record.
+   */
+  readonly serviceEvents: readonly ResolvedServiceEvent[];
+}
+
+/**
+ * Why this build cannot carry a purchase's effects, in the player's own register, or `undefined`
+ * when it can — GitHub issue **#477**.
+ *
+ * ## The one ground it has, and why it is a refusal rather than a crash
+ *
+ * A range effect aimed at a **double-deck** bank. `core`'s `Bank.setServesFloors` refuses such a
+ * bank on § D131's first model rule — the decks are bolted together and open on one interlock, so
+ * a pair of floors is a single stop position and a served-floor list cannot split one — and before
+ * #477 that refusal arrived as a `ModelError` **out of the running day**, mid-afternoon, from a
+ * `rezone-bank` row the shipped schedule offers over `building.banks[]`. `vertical-city` ships
+ * eight such cars across four pairs, so the tower it would happen on is one this project ships.
+ *
+ * The engine now warns and declines to schedule such an effect, so the day survives it. That alone
+ * would be the worse half of the bargain — a priced change that takes the money and does nothing —
+ * which is why the press is refused **here**, before anything is appended to the record. Nothing is
+ * appended, so `spentOnWorks` counts nothing: the sentence and the money move together.
+ *
+ * ## Register
+ *
+ * The bank is named by its **display name** and never its id (gameplay § 16 rule 11), falling back
+ * to the id only for a bank whose author left it unnamed — a missing name is worse read as an empty
+ * quotation than as an engine identifier. `bankRangeIsFixed` is `core`'s, so this sentence and the
+ * engine's warning cannot come to disagree about which banks they describe; only their wording
+ * differs, because only one of the two has a player reading it.
+ */
+function unbuildableReasonOf(
+  building: ResolvedBuilding,
+  changeName: string,
+  serviceEvents: readonly ResolvedServiceEvent[],
+): string | undefined {
+  for (const effect of serviceEvents) {
+    if (!isServiceRangeEvent(effect)) continue;
+    const bank = building.banks.find((candidate) => candidate.id === effect.bankId);
+    if (bank === undefined || !bankRangeIsFixed(bank)) continue;
+    return (
+      `“${changeName}” would re-zone ${bank.name ?? bank.id}, whose cars are double-deck — the two ` +
+      'decks are bolted together and open as one stop, so the pair of floors they serve cannot be ' +
+      'split and this bank keeps the range it was built with. Nothing has been bought.'
+    );
+  }
+  return undefined;
 }
 
 /**
@@ -409,19 +472,27 @@ export interface WorksAdmissionInput {
  * budget a substrate of its own rather than a second opinion about dials. What is shared is the
  * arithmetic that matters: both read every price from the schedule and neither writes one down.
  *
- * ## The three refusals, in the order they are decided
+ * ## The four refusals, in the order they are decided
  *
  * 1. **An id the schedule does not price.** Refused rather than charged nothing, because a change
  *    the ladder has never heard of is a record this build cannot re-derive a spend from — and
- *    silently free is the worst of the three answers, since it would let a stored record buy the
+ *    silently free is the worst of the answers, since it would let a stored record buy the
  *    tower for nothing. `pricing/parse.ts#priceOf` throws for the same reason; this returns the
  *    sentence instead, because the caller is a screen.
  * 2. **A change priced on a tier this kind does not record.** `equipment-change` says *this was
  *    bought on the equipment rung*, and a record claiming a 20-unit building change was bought there
  *    is a record whose spend does not reconcile. Refused by name.
- * 3. **A rung that cannot cover it beside what the day has already spent.** The sentence names the
+ * 3. **A change whose effects this tower cannot carry** — GitHub issue **#477**,
+ *    {@link unbuildableReasonOf}. Decided **before** the purse, and the order is the decision: a
+ *    change the building could never take must not be refused for money, or a player reads *save up
+ *    and try again* about something no budget will ever buy.
+ * 4. **A rung that cannot cover it beside what the day has already spent.** The sentence names the
  *    price, the budget and the amount already committed, because a refusal that says only *you
  *    cannot afford this* leaves a player unable to tell a dear change from an exhausted purse.
+ *
+ * Every one of them returns before anything is appended to the record, which is what makes
+ * {@link spentOnWorks} the honest account of a day: a refused press is a press that did not happen,
+ * so the sentence a player reads and the units they are charged move together.
  */
 export function admitWorks(input: WorksAdmissionInput): WorksAdmission {
   const { schedule, budgetUnits, changeId, kind } = input;
@@ -449,6 +520,16 @@ export function admitWorks(input: WorksAdmissionInput): WorksAdmission {
         `“${priced.name}” is priced on the ${priced.tier} rung of the ladder, and this control buys ` +
         `on the ${kind === 'equipment-change' ? 'equipment' : 'building'} rung — the day’s record ` +
         'would say it was paid for somewhere it was not',
+    };
+  }
+  const unbuildable = unbuildableReasonOf(input.building, priced.name, input.serviceEvents);
+  if (unbuildable !== undefined) {
+    return {
+      admitted: false,
+      priceUnits: priced.priceUnits,
+      spentUnits,
+      budgetUnits,
+      reason: unbuildable,
     };
   }
   const alreadyBought = input.interventions.some(

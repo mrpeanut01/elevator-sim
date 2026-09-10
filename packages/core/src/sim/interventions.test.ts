@@ -758,3 +758,98 @@ describe('the bought kinds change the future, only the future, and never the cro
     ).toBe(fingerprint(runSimulation(run('garden-apartments', 'collective', 20260811))));
   }, 60_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * A rezone the fabric cannot take — GitHub issue #477
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A bought rezone aimed at a double-deck bank does not end the run** (GitHub issue #477).
+ *
+ * `rezone-bank` is a shipped `building` row in `data/price-schedule.json` covering
+ * `building.banks[]`, and `vertical-city` ships eight double-deck shuttles across four floor
+ * pairs. `Bank.setServesFloors` refuses a double-deck bank, so before this fix the effect was
+ * scheduled, fired, and surfaced as a `ModelError` **out of `runSimulation`** — a priced change
+ * that, aimed at such a bank, ended the day.
+ *
+ * The refusal is kept and moved to where the other two carried-effect refusals live: warned by
+ * name at scheduling time, never scheduled, the building unchanged by it. Which side of § D131
+ * this lands on is argued at `Bank.setServesFloors`; what this file asserts is that the run
+ * survives and says why.
+ *
+ * A `try/catch` at the fire site is the wrong fix and is what these assertions rule out: the
+ * warning is required to exist and to name the pairing, so a silent no-op fails here.
+ */
+describe('a rezone aimed at a double-deck bank is refused, and the run survives it', () => {
+  const AT_S = 600;
+  const SEED = 20260726;
+
+  /** The `shuttle` bank's top sky-lobby pair, dropped — a whole pair, so it is not a split one. */
+  const REZONE = {
+    atS: 700,
+    bankId: 'shuttle',
+    servesFloors: ['G', '2', '26', '27', '51', '52'],
+  } as const;
+
+  const pressing = (): SimulationConfig =>
+    run('vertical-city', 'collective', SEED, {
+      interventions: [
+        {
+          atS: AT_S,
+          change: {
+            kind: 'building-change',
+            changeId: 'rezone-bank',
+            name: 'Re-zone a bank',
+            serviceEvents: [REZONE],
+          },
+        },
+      ],
+    });
+
+  it('completes rather than throwing a ModelError out of the run', () => {
+    expect(() => runSimulation(pressing())).not.toThrow();
+  }, 120_000);
+
+  it('warns by name, and names the pairing as the reason', () => {
+    const result = runSimulation(pressing());
+    const line = result.warnings.find((warning) => warning.includes('"shuttle"'));
+    expect(line).toBeDefined();
+    // The three facts a reader needs: who bought it, what it aimed at, and why it cannot land.
+    expect(line).toContain('buys building change at 600 s');
+    expect(line).toContain('double-deck');
+    expect(line).toContain('It was not scheduled and the building is unchanged by it.');
+  }, 120_000);
+
+  /**
+   * **The other feeder into `Bank.setServesFloors`, closed at the schedule rather than at one
+   * feeder.** `resolveBuilding` refuses a building's own range entry on a double-deck bank with a
+   * located `ConfigError` — but `config/types.ts#ResolvedBuilding.serviceEvents` says in terms that
+   * a `ResolvedBuilding` may be *assembled by hand* (fixtures, the fuzz generator,
+   * `experiments/validation/syntheticBuilding.ts`), and such a building skips that pass entirely.
+   * This is that case: the shipped resolved `vertical-city` with a schedule spliced onto it, which
+   * is the shape those three produce.
+   */
+  it('warns rather than throwing when the building’s own schedule carries one', () => {
+    const base = run('vertical-city', 'collective', SEED);
+    const handAssembled: SimulationConfig = {
+      ...base,
+      building: { ...base.building, serviceEvents: [REZONE] },
+    };
+    let result: SimulationResult | undefined;
+    expect(() => {
+      result = runSimulation(handAssembled);
+    }).not.toThrow();
+    const line = result?.warnings.find((warning) => warning.includes('"shuttle"'));
+    expect(line).toBeDefined();
+    expect(line).toContain('serviceEvents[0]');
+    expect(line).toContain('double-deck');
+  }, 120_000);
+
+  it('leaves the day leg for leg the day it was — the refusal is the whole effect', () => {
+    const baseline = runSimulation(run('vertical-city', 'collective', SEED));
+    const refused = runSimulation(pressing());
+    // Non-vacuity: this building has legs, so the identity below is over something.
+    expect(legsOf(baseline).length).toBeGreaterThan(0);
+    expect(JSON.stringify(legsOf(refused))).toBe(JSON.stringify(legsOf(baseline)));
+  }, 120_000);
+});
