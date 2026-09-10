@@ -48,12 +48,18 @@
  *
  * ## The other direction, which is the half that will matter later
  *
- * `gh variable delete AZURE_SWA_NAME` is a complete rollback, so **this lane can be disarmed**, and
- * on the day it is every assertion below inverts. The armed state is therefore asserted from the
- * tree rather than assumed, and the failure message says what to do: if the lane is disarmed, this
- * guard is deleted along with the corrections it holds, rather than left standing to demand that
- * documents keep asserting something that has stopped being true. A guard that outlived its subject
- * would be this file's own defect with a test as its subject.
+ * **The lane can be disarmed**, and on the day it is every assertion below inverts. The armed state
+ * is therefore asserted from the tree rather than assumed, and the failure message says what to do:
+ * if the lane is disarmed, this guard is deleted along with the corrections it holds, rather than
+ * left standing to demand that documents keep asserting something that has stopped being true. A
+ * guard that outlived its subject would be this file's own defect with a test as its subject.
+ *
+ * **This file deliberately does not name the disarm command.** An earlier draft called it the
+ * rollback, which GitHub issue #355 refuted while this branch was open: deleting the variable skips
+ * `jobs.deploy` on every future run and leaves the bytes on the site untouched, so it is the
+ * opposite of a recovery. `deployVocabulary.test.ts` is the guard for that claim and derives its
+ * own carrier set from disk over `.ts` among other suffixes, so naming the command here would make
+ * this file a carrier and its set assertion red. The revert procedure is `docs/16` § 11.
  *
  * ## The guard is itself checked
  *
@@ -242,12 +248,11 @@ describe('the static-hosting lane is armed, and the tree says so in two places',
 
     expect(
       plain(workflow),
-      'deploy-viz.yml no longer states that AZURE_SWA_NAME is set. If the lane has been DISARMED ' +
-        '(gh variable delete AZURE_SWA_NAME is the complete rollback), then the refusals this ' +
-        'file forces to be marked have become TRUE again, and the honest fix is to delete this ' +
-        'guard together with the corrections in README.md, infra/README.md and docs/16 § 0 — not ' +
-        'to keep asserting a state that has stopped holding. A guard that outlives its subject is ' +
-        'RISKS.md R44 with a test as its subject.',
+      'deploy-viz.yml no longer states that AZURE_SWA_NAME is set. If the lane has been DISARMED, ' +
+        'then the refusals this file forces to be marked have become TRUE again, and the honest ' +
+        'fix is to delete this guard together with the corrections in infra/README.md, README.md ' +
+        'and docs/16 § 0 — not to keep asserting a state that has stopped holding. A guard that ' +
+        'outlives its subject is RISKS.md R44 with a test as its subject.',
     ).toMatch(/That variable is now set/iu);
   });
 

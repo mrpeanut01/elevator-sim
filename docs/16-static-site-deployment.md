@@ -60,11 +60,20 @@ demonstrate about itself.
 The switch has not moved. Every deploying job in `.github/workflows/deploy-viz.yml` is still guarded
 by `vars.AZURE_SWA_NAME != ''`; what changed is that the variable is now set. Unarmed, the workflow
 builds the site on every push and pull request, asserts the artifact, and deploys nothing. Arming is
-`./infra/azure/swa/provision.sh`; **disarming is `gh variable delete AZURE_SWA_NAME`, and that is
-still the rollback** — instant, and it puts the workflow back to building only.
+`./infra/azure/swa/provision.sh`; **disarming is `gh variable delete AZURE_SWA_NAME`** — instant, and
+it puts the workflow back to building only.
 
-Disarming does **not** put the API back to serving its own page: `ELEVATOR_SIM_ALLOW_ORIGIN` stays
-set, and the app keeps mailing sign-in links to the static site. § 7 is the command for that half.
+**Disarming is not a rollback, and this paragraph called it one until § 11 was written.** It stops
+*future* deploys; the page a player loads is untouched by it and stays untouched. Worse, it makes a
+revert impossible rather than easier: `jobs.deploy` is gated on `vars.AZURE_SWA_NAME != ''`, so with
+the variable deleted the only job that can write to the site never runs. **§ 11 is the procedure that
+actually puts a previous build back on the live site**, and it is what GitHub issue #355's three
+dependent acceptance criteria mean by *rollback*.
+
+Disarming also does **not** put the API back to serving its own page: `ELEVATOR_SIM_ALLOW_ORIGIN`
+stays set, and the app keeps mailing sign-in links to the static site. § 7 is the command for that
+half — and note that § 7 is **tear down**, where the site stops existing, not a revert, where it
+keeps existing and stays the right destination (§ 11.4).
 
 ---
 
@@ -428,8 +437,13 @@ It was `first_time_contributors`, which is GitHub's default and is not what this
 
 ## 7. Tear down
 
+**This section is not the rollback and said it was until § 11 was written.** Tear down removes the
+site; a rollback puts an earlier build back on a site that stays. If what you want is the second one,
+stop here and read **§ 11** — running the first command below during an incident disarms the only job
+that could deploy the fix.
+
 ```sh
-gh variable delete AZURE_SWA_NAME          # instant, and the rollback on its own
+gh variable delete AZURE_SWA_NAME          # disarms future deploys; the live page is untouched
 az group delete --name elevator-sim-viz --yes --no-wait
 ```
 
@@ -526,6 +540,13 @@ run corrected both of them ([§ D308](../DECISIONS.md)):
    against Standard and says so there too.
 4. **Still no mail has ever been sent** (`infra/README.md` § 0.2). This lane moves the origin that
    mail's link is built from, so it makes that unverified path *more* load-bearing rather than less.
+5. **No build has ever been put back on the live site.** § 11 is the procedure and **every step of it
+   is in this column** — it is derived from `deploy-viz.yml`, `provision.sh`, `deploy-azure.sh` and
+   `packages/viz/src/persist/`, and from nothing observed. That is not a hedge on a written
+   procedure: GitHub issues #241 (AC2), #242 (AC4) and #243 (AC4) ask for a rehearsal specifically,
+   and § 11.5 lists the six things a rehearsal has to observe. A rehearsal needs the Static Web App,
+   its federated identity and the Container App, so nothing that can be done from a checkout closes
+   it.
 
 ---
 
@@ -559,6 +580,238 @@ night is made good.
 
 Measured on this container: one replay of the daily fixture is 1.2 to 1.6 s, so a seeding is about
 twenty seconds and the route answers synchronously.
+
+---
+
+## 11. Putting a previous build back on the live site — GitHub issue #355
+
+**This is not § 7 and it is not the disarm command.** Until this section existed, four places in this
+repository called `gh variable delete AZURE_SWA_NAME` *the rollback* — this document's § 0 and § 7,
+and `.github/workflows/deploy-viz.yml` at its header and at its arm/disarm pair. That command
+disarms **future** deploys. The page a player loads is unchanged by it, and stays unchanged. Three
+acceptance criteria ask for a rehearsed rollback (#241 AC2, #242 AC4, #243 AC4), and a rehearsal
+whose subject is the disarm command would record a recovery that recovers nothing.
+
+So there are two operations and they now have two names:
+
+| | command | what it changes | what it does not change |
+|---|---|---|---|
+| **Disarm** | `gh variable delete AZURE_SWA_NAME` | every future run: `jobs.deploy` is skipped and the workflow goes back to building only | **the bytes currently being served** |
+| **Revert** | § 11.2 below | the bytes currently being served | whether the workflow is armed |
+
+**Disarming makes a revert impossible rather than easier, and that is the sharpest reason the
+vocabulary mattered.** `jobs.deploy`'s `if:` requires `vars.AZURE_SWA_NAME != ''`. With the variable
+deleted the only job that can write to the site never runs — so the bad page stays up *and* the one
+mechanism that could replace it has been switched off. An operator who reached for "the rollback" in
+an incident would have made the incident permanent until somebody re-armed.
+
+### 11.1 What can write to the live site, read off the workflow rather than inferred
+
+One thing, and it is `jobs.deploy`'s `Upload to Static Web Apps` step:
+`Azure/static-web-apps-deploy@v1` with `action: upload`, `skip_app_build: true` and
+`app_location: dist-web` — the artifact `jobs.build` produced **in the same run**. Three properties
+of that job decide everything below:
+
+1. **It is gated on `vars.AZURE_SWA_NAME != ''`** — see above.
+2. **It runs in `viz-production` for every event that is not a `pull_request`**, and
+   `viz-production`'s deployment branch policy names exactly `main` (`provision.sh` sets it with
+   `custom_branch_policies` and reads it back, refusing to arm otherwise; § 9 records that pin as
+   verified by arming).
+3. **It uploads bytes `jobs.build` just made.** There is no promote step, no slot swap and no
+   deployment-history call anywhere in `.github/workflows/` or `infra/` — nothing in this repository
+   has ever asked Azure to re-serve a deployment it already holds, and this section does not invent
+   one. The only way the served bytes change is another upload.
+
+Put together: **a revert is a run whose build job produces the artifact you want, on a ref the
+production environment permits — and that ref is `main`.** Everything in § 11.2 follows from that
+one sentence.
+
+### 11.2 The procedure
+
+Set the two origins once. Both are read back rather than typed, so a stale hostname in this document
+cannot mislead the operator running it:
+
+```sh
+site="https://$(az staticwebapp show -n elevator-sim-viz -g elevator-sim-viz \
+  --query defaultHostname -o tsv)"
+api=$(gh variable list --json name,value -q '.[] | select(.name=="ELEVATOR_SIM_API_ORIGIN").value')
+```
+
+**Step 0 — name the build that is live and the build you want.** Both are commits, and that is
+GitHub issue #246's whole point: `deploy-viz.yml` sets `ELEVATOR_SIM_BUILD_VERSION: ${{ github.sha }}`,
+`packages/viz/vite.config.ts#buildVersion` takes its first ten characters, and every bundle carries
+it. Read what is live two ways and prefer the first, because it is the *page* rather than a record
+of what was uploaded to it:
+
+```sh
+# From the site itself: Settings → the build-information panel draws
+# `release/version.ts#buildVersionLineOf` — "Build <ten characters>."
+# From the deploy history, newest first:
+gh run list --workflow=deploy-viz.yml --branch main --limit 10 \
+  --json createdAt,headSha,conclusion,databaseId
+```
+
+Pick the target commit from that list — the newest `success` whose page was good — and keep its full
+sha. Call it `$target`.
+
+**Step 1 — decide whether the API also has to move (§ 11.4).** Do this before touching `main`, not
+after: the page and the API are two independent deploys and only one of them is in this workflow.
+
+**Step 2 — put the target tree on `main`.** `main` is the only ref the production environment
+accepts, so the revert is a revert *forward*:
+
+```sh
+git switch main && git pull --ff-only
+git revert --no-commit "$target"..main   # every commit after $target
+# or, to undo one merge and nothing else:  git revert -m 1 <merge sha>
+git commit
+git push
+```
+
+Two things about this step that will otherwise be read as failures:
+
+- **The deployed build version will name the revert commit, not `$target`.** The bytes match; the
+  name does not, because `github.sha` is the commit being built. An operator comparing the page's
+  build line against `$target` reads a correct revert as a failed one. Compare the **tree** instead,
+  over exactly the paths the artifact is built from — this must print nothing:
+
+  ```sh
+  git diff --stat "$target" HEAD -- packages data package.json package-lock.json 'tsconfig*.json'
+  ```
+
+- **The push deploys only if the revert touches one of the workflow's `paths:`** — `packages/**`,
+  `data/**`, `package.json`, `package-lock.json`, `tsconfig*.json`,
+  `.github/workflows/deploy-viz.yml`. A revert that touches none of them starts no run, and nothing
+  is wrong; step 3 is the trigger that always fires.
+
+**Step 3 — make the run happen and watch it.**
+
+```sh
+gh workflow run deploy-viz.yml --ref main
+sleep 8
+gh run watch "$(gh run list --workflow=deploy-viz.yml --branch main --limit 1 \
+  --json databaseId -q '.[0].databaseId')" --exit-status
+```
+
+`workflow_dispatch` carries **no `paths:` filter**, which is why it is the reliable trigger. It
+builds `main`'s **tip** and cannot build an arbitrary commit — which is why step 2 exists and is not
+optional. `--ref` must be `main`; see § 11.3.
+
+**Step 4 — verify what is served, not what the run said.** A green run is a report about an upload.
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n'   "$site/"                  # 200
+curl -s -o /dev/null -w '%{content_type}\n' "$site/__buildings.json" # application/json
+curl -s "$site/" | grep -o 'elevator-sim-api[^>]*'                   # names $api
+```
+
+Then load the page and read the build line on Settings. It will say the revert commit (step 2), and
+the tree comparison in step 2 is what says those bytes are `$target`'s.
+
+`./infra/azure/swa/provision.sh --deploy-now` does steps 3 and 4 in one command, refuses on any
+branch but `main`, and checks the deployed page's API tag as well as its status code. Its cost in an
+incident is that it also re-runs provisioning: idempotent, but it re-reads six repository variables
+off Azure and refuses to arm if the app is not pointed at the site, which is motion the revert does
+not need.
+
+### 11.3 The failure modes, and what each looks like from the outside
+
+| symptom | cause | what to do |
+|---|---|---|
+| The run is green in `build` and deployed nothing | The dispatch named a ref that is not `main`. `viz-production`'s branch policy refuses the deployment before the job authenticates, so `jobs.build` still runs and passes and the run is *partly* green | Dispatch on `main`. `provision.sh --deploy-now` refuses this case itself rather than letting GitHub produce it |
+| The push landed and no run appeared | The `paths:` filter (step 2) | `gh workflow run deploy-viz.yml --ref main` |
+| The run never started, or a queued one vanished | `deploy-viz.yml`'s production concurrency group is the literal string `deploy-viz-production`, so every production run shares it. `cancel-in-progress` is false for a push, so a running deploy is not cancelled — but GitHub keeps at most one **pending** run per group, so a third arrival evicts the queued one whatever the flag says (`CLAUDE.md`'s working agreements; [`RISKS.md`](../RISKS.md) R46, which measured this on `ci.yml`). **Inferred here from the group name and unobserved on this workflow** | Push nothing else to `main` while the revert deploy is in flight |
+| The page went back and every account surface dead-ends | `ELEVATOR_SIM_API_ORIGIN` is a repository variable read at **build** time, so rebuilding an old commit bakes in *today's* value, not the one that commit shipped against. Reverting the page does not revert the origin | Check `$api` before step 3. This is the failure mode of issues #21, #28, #29, #30, #32 and #34 (§ 4), and the workflow's own assertion catches only a build that disagrees with the variable, not a variable that has moved |
+| Players report their saved week is gone | The page went back past a bump in `packages/viz/src/persist/types.ts#SESSION_SCHEMA_VERSION`. An older build finds a version outside its `SESSION_SCHEMA_VERSIONS_READ`, refuses the session as *newer* (`persist/session.ts`), and `dev/main.ts` then **clears the slot** so it cannot re-fail forever | Nothing. See the warning below — this one is not recoverable |
+| The page went back and the behaviour did not | The bad change was server-side. Nothing in `.github/workflows/` deploys the API | § 11.4 |
+
+**The save-data warning is the one irreversible step in this procedure, and it deserves its own
+paragraph.** `dev/main.ts` calls `clearSession` on every restore failure that is not `absent`, so a
+player who loads a reverted build once has their week cleared — and reverting *forward* again does
+not bring it back, because the storage is already empty. Before step 2, check whether `$target`
+predates the current `SESSION_SCHEMA_VERSION`:
+
+```sh
+git diff "$target" main -- packages/viz/src/persist/types.ts | grep SESSION_SCHEMA_VERSION
+```
+
+If that prints anything, the revert costs every affected player their saved week. That is a decision
+for a human, and it is the reason this procedure does not end in a single command.
+
+### 11.4 The API side, and the thing the issue's own framing gets slightly wrong
+
+**A page revert does not move `ELEVATOR_SIM_ORIGIN` or `ELEVATOR_SIM_ALLOW_ORIGIN`, and must not.**
+Both name the *site's origin*, and a revert changes what the site serves rather than where it is. The
+sentence in § 0 that records those two staying set is about **tear down** (§ 7), where the site stops
+existing and the app goes on mailing sign-in links to it; it is not about a revert, where the site is
+still there and still the right destination. Issue #355 reads § 0 as though the two cases were one,
+and they are not.
+
+What a revert *can* need on the API side is the **image**, and nothing in `.github/workflows/`
+deploys it. That is `scripts/deploy-azure.sh`, by hand, from a checkout of the target:
+
+```sh
+git switch --detach "$target"
+./scripts/deploy-azure.sh            # what-if: prints the plan, changes nothing
+./scripts/deploy-azure.sh --apply
+```
+
+Five properties of that script decide whether this is safe, and all five are in its own header:
+
+- **It refuses a dirty tree**, because the image tag is `git rev-parse --short HEAD` and an image
+  tagged with a commit it does not contain is the only record of what is running, lying.
+- **It reads `viewerOrigin` back off the running app** rather than defaulting it. Do **not** set
+  `ELEVSIM_VIEWER_ORIGIN` during a revert: the script's own scar is a re-deploy on 2026-08-13 that
+  let the parameter default to `''`, silently converted a split deployment back to same-origin, and
+  broke every browser call while `curl` still got a 200.
+- **It rotates the database administrator password on every deploy.** By design, and safe — the
+  template resets the server's password and builds the connection string from the same parameter —
+  but it means an API revert is a real re-deploy rather than a swap.
+- **It reuses the token-signing secret**, so sign-in links already in somebody's inbox survive.
+- **It verifies `/api/boards` returns 200** before reporting success, polling that route thirty times at five-second intervals before giving up.
+
+There is a faster path and it is **deliberately not recommended**. The image for `$target` is
+probably still in the registry under its own short sha, so `az containerapp update --image` would
+move the app without a rebuild. § 3.3 refuses the same shape for `--set-env-vars` and the reason
+carries: it edits a revision the Bicep template then owns and disagrees with, and the next
+`deploy-azure.sh` run silently reverts the revert. **Nothing in this repository has run it.**
+
+**Which half goes first is not settled by anything in this tree, and saying so is the honest
+answer.** The page and the API are independent deploys with no shared gate, nothing sequences them,
+and the only ordering rule this document states — § 3's *"half-armed is the worst of the three
+states"* — is about arming rather than reverting. A rehearsal is what would settle it; see § 11.5.
+
+### 11.5 What this procedure has been through, in § 9's voice — and it is nothing
+
+**No step of § 11 has been run against production, or against anything.** It is derived from
+`.github/workflows/deploy-viz.yml`, `infra/azure/swa/provision.sh`, `scripts/deploy-azure.sh`,
+`packages/viz/src/persist/` and `packages/viz/src/release/version.ts`, read at the commit that added
+this section — and from nothing observed. Everything above is therefore in § 9's *reasoned about
+only* column, and § 9 now carries it as item 5.
+
+**#241 AC2, #242 AC4 and #243 AC4 are not met by this section existing.** They ask for a rehearsal,
+and a procedure nobody has run is a draft. What a rehearsal has to observe, and what it would
+correct if the reasoning above is wrong:
+
+1. A dispatch on a non-`main` ref really is refused at the environment rather than at the job, and
+   the run really does look partly green. This is `provision.sh`'s stated mechanism and § 9 records
+   only the branch policy's *existence* as verified.
+2. A revert-forward push really does deploy, and the tree comparison in step 2 really is empty while
+   the build line names the revert commit.
+3. The time from `git push` to the reverted page being served. Nothing in this repository has
+   measured it, and an incident procedure whose duration is unknown is a procedure nobody can plan
+   around.
+4. Whether an older page against the current API actually works — a revert puts a page in front of an
+   API that versions separately, and no test in this tree drives that pair.
+5. The save-clearing above, on a real browser with a real saved week, so the cost is known rather
+   than derived from `dev/main.ts`'s `clearSession` call on the restore path.
+6. Whether the API half is needed at all in the common case, and if both halves run, which order
+   leaves the shorter broken window.
+
+A rehearsal needs the Static Web App, its federated identity and the Container App. Nothing that can
+be done from a checkout closes these.
+
+---
 
 ## Sources
 
