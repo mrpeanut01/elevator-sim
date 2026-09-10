@@ -422,7 +422,7 @@ The browser viewer and building editor live in `packages/viz` and are dev-served
 
 **The page opens on Everyday Mode, and has since 2026-08-12** ([§ D335](DECISIONS.md),
 [§ D338](DECISIONS.md)). `packages/viz/index.html` loads `everyday/boot.ts`, which mounts a rail, a
-pinned action bar and a four-tile menu over the Engineer surface; the Engineer surface still builds
+pinned action bar and a **three-tile** menu over the Engineer surface; the Engineer surface still builds
 and starts exactly as before, because `boot.ts` imports `dev/main.ts` for its side effect. The two
 worlds co-exist and the rail's footer row is the door between them, with the way back on the
 Engineer header. The swap is not remembered: a reload lands on the Everyday main menu whichever
