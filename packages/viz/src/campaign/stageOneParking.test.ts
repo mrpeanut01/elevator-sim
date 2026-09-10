@@ -155,7 +155,10 @@ function legsOf(stage: CampaignStage, edit: EditedVector | null): string {
   const base = requireDispatcher(config, stage.dispatcher.startingProfileId);
   let profile = base;
   if (edit !== null) {
-    const resolved = resolveEditedProfile(space, base, edit);
+    const resolved = resolveEditedProfile(space, base, edit, {
+      building: requireBuilding(config, stage.building),
+      elevatorSpecs: config.elevatorSpecs,
+    });
     if (!resolved.ok) throw new Error(resolved.reason);
     profile = resolved.profile;
   }
@@ -286,7 +289,10 @@ describe('the stage has a witness, and it is admissible here', () => {
     const stage = subject();
     const edit = editOf(WITNESS, 'witness-middle-of-the-building');
     const baseline = requireDispatcher(config, stage.dispatcher.startingProfileId);
-    const resolved = resolveEditedProfile(space, baseline, edit);
+    const resolved = resolveEditedProfile(space, baseline, edit, {
+      building: requireBuilding(config, stage.building),
+      elevatorSpecs: config.elevatorSpecs,
+    });
     expect(resolved.ok, 'the witness is a point of the declared space').toBe(true);
     if (!resolved.ok) return;
 

@@ -87,9 +87,15 @@
  *
  * - **A draw that moves nothing** — every dial dead, or every drawn value equal to the one the
  *   baseline already holds. That configuration *is* the baseline, which is arm 0 of every batch.
- * - **A draw the whole-candidate check refuses** — `space.validate` speaks about a dispatcher
- *   rather than about a dial, so a vector every step accepted can still be one `core` will not
- *   build. Those are rejected and redrawn, which keeps the sample uniform over the feasible set.
+ * - **A draw the whole-candidate check refuses** — `admitEditedVector` speaks about a dispatcher
+ *   *on this building* rather than about a dial, so a vector every step accepted can still be one
+ *   `core` will not build. Those are rejected and redrawn, which keeps the sample uniform over the
+ *   feasible set. **Both halves of that check matter and only one of them used to run here**
+ *   (GitHub issue **#475**): `SearchSpace.validate` asks whether a group controller can be built,
+ *   which is building-independent, and it cannot see that `answer.maxDwellS` under an adaptive
+ *   dwell policy is bounded by a **car's** own door timings. Four vectors across the shipped
+ *   ladder were drawn, admitted, and then thrown on at run time. The building is now an argument
+ *   of {@link SampleRequest}, so the refusal happens where the draw does.
  *
  * A draw budget bounds the loop, so a rung whose feasible space is smaller than the sample asked
  * for reports a short sample rather than hanging.
@@ -126,7 +132,11 @@
  * directory publishes, so no `DECISIONS.md` number is owed for it.
  */
 
-import type { DispatcherProfile } from '@elevator-sim/core/browser';
+import type {
+  DispatcherProfile,
+  ElevatorSpecs,
+  ResolvedBuilding,
+} from '@elevator-sim/core/browser';
 import {
   policyNoiseStream,
   sampleValue,
@@ -410,11 +420,16 @@ export interface SampledSpace {
   /** Draws attempted, including every one discarded below. */
   readonly draws: number;
   /**
-   * Draws the **whole-candidate** check refused — a dispatcher `core` will not build.
+   * Draws the **whole-candidate** check refused — a dispatcher `core` will not build *here*.
    *
    * Published rather than swallowed, and it is a narrower quantity than it looks: a dial whose gate
-   * is shut is dropped rather than counted here, so this is `space.validate` speaking about the
+   * is shut is dropped rather than counted here, so this is `admitEditedVector` speaking about the
    * assembled dispatcher. See the module docstring on why the two are not the same refusal.
+   *
+   * **Two checks since GitHub issue #475, and the second is why the word *here* is in the sentence
+   * above**: `SearchSpace.validate` asks whether a group controller can be built at all, and
+   * `buildingFeasibility` asks whether {@link SampleRequest.building}'s own cars will take it.
+   * A count that moved when a scenario changed building would be this second half doing its job.
    */
   readonly refusedDraws: number;
   /** Draws that moved nothing — every dial dead, or every drawn value the one already held. */
@@ -436,6 +451,22 @@ export interface SampleRequest {
   readonly schedule: PriceSchedule;
   /** The profile a configuration is an edit of — the scenario's own baseline. */
   readonly baseline: DispatcherProfile;
+  /**
+   * The building the scenario runs on — GitHub issue **#475**.
+   *
+   * A drawn vector is admissible **on a building**, never in the abstract: `answer.maxDwellS`
+   * under an adaptive dwell policy is bounded by a car's own door timings, so the same draw is a
+   * configuration at one tower and a crash at the next. Before this field existed, this sampler
+   * asked `admitEditedVector` a building-independent question, kept **four** vectors across the
+   * shipped ladder that `core` then threw on, and `measureSurvivors.ts` had to count them out of
+   * `examined` — which put a product defect inside a difficulty measurement.
+   *
+   * Required rather than optional, and that is the whole of the fix: an optional building is a
+   * sampler that will be called without one.
+   */
+  readonly building: ResolvedBuilding;
+  /** The shipped sensor defaults the building's cars resolve against. See {@link building}. */
+  readonly elevatorSpecs: ElevatorSpecs | undefined;
   /** The rung's units. */
   readonly units: number;
   /** How many distinct feasible configurations to draw. */
@@ -463,7 +494,7 @@ export const DEFAULT_DRAW_BUDGET_MULTIPLE = 20;
  * than repair, and why the seed is a published field rather than a constant.
  */
 export function sampleReachableConfigurations(request: SampleRequest): SampledSpace {
-  const { space, schedule, baseline, units, sampleSize, seed } = request;
+  const { space, schedule, baseline, building, elevatorSpecs, units, sampleSize, seed } = request;
   const reachable = reachableChangesOf(space, schedule);
   const { bundles } = bundleSpaceOf(space, reachable, units);
   const order = tierOrderOf(schedule);
@@ -508,7 +539,7 @@ export function sampleReachableConfigurations(request: SampleRequest): SampledSp
       inertDraws += 1;
       continue;
     }
-    if (!admitEditedVector(space, baseline, moved).admissible) {
+    if (!admitEditedVector(space, baseline, moved, { building, elevatorSpecs }).admissible) {
       refusedDraws += 1;
       continue;
     }

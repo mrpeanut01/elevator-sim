@@ -485,7 +485,20 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     }
     const edit = editFor(stage);
     if (edit === undefined) return { ok: true, profile: base };
-    const resolved = resolveEditedProfile(loaded.space, base, edit);
+    /*
+     * The stage's own building goes with the vector — issue #475. `answer.maxDwellS` under an
+     * adaptive dwell policy is bounded by a car's door timings, so a gate asked without a building
+     * enables *Run* on a vector the worker then throws on, and the player meets a crash where a
+     * refusal belongs.
+     */
+    const building = resources.buildings.find((candidate) => candidate.id === stage.building);
+    if (building === undefined) {
+      return { ok: false, reason: 'this build’s data/ does not carry the building this stage runs on.' };
+    }
+    const resolved = resolveEditedProfile(loaded.space, base, edit, {
+      building,
+      elevatorSpecs: resources.elevatorSpecs,
+    });
     return resolved.ok ? { ok: true, profile: resolved.profile } : { ok: false, reason: resolved.reason };
   }
 

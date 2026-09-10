@@ -186,7 +186,15 @@ export interface PublishedSurvivorStep {
    * apart instead of quietly counting a suppressed run as an honest loss.
    */
   readonly suppressed: number;
-  /** Configurations the declared space admits and `core` refuses to build. **Not** in `examined`. */
+  /**
+   * Configurations the declared space admits and `core` refuses to build. **Not** in `examined`.
+   *
+   * Zero on all thirty shipped cells, re-measured on `4159520` after GitHub issue **#475** closed
+   * rather than inferred from the fix, and the field is kept rather than dropped for the reason
+   * `measureSurvivors.ts#UnbuildableConfiguration` gives: a category that is empty because it was
+   * fixed reads exactly like one that is empty because nobody looked, unless the count is still
+   * published.
+   */
   readonly unbuildable: number;
   /** The census half. Exact. */
   readonly dropdown: SurvivorCounts;
@@ -411,7 +419,8 @@ export const SURVIVOR_COPY = Object.freeze({
   censusNote: 'The settings you can pick by name were all tried. That half is a count, not an estimate.',
   sampleNote: 'The dials were drawn at random from what this budget buys, so that half is a sample.',
   diagnosisLead: 'Nothing gets through this one as it stands, and that is the point:',
-  unbuildableNote: 'Some settings the editor offers cannot be built at all; those were not counted either way.',
+  unbuildableNote:
+    'A setting this tower cannot be built with is not counted either way — it is neither a way through nor a failed attempt.',
 });
 
 /**

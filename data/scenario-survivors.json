@@ -4,7 +4,7 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "8939d79",
+    "tree": "4159520",
     "measuredAt": "2026-09-10",
     "masterSeed": 20260910,
     "sampleSize": 12,
@@ -423,20 +423,20 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 20,
-          "examined": 23,
+          "examined": 24,
           "survivors": 1,
           "survivorNames": [
             "fairness-first"
           ],
           "unjudged": 0,
-          "suppressed": 23,
-          "unbuildable": 1,
+          "suppressed": 24,
+          "unbuildable": 0,
           "dropdown": {
             "examined": 12,
             "survivors": 1
           },
           "dials": {
-            "examined": 11,
+            "examined": 12,
             "survivors": 0
           },
           "perTier": {
@@ -449,7 +449,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 4,
+              "examined": 5,
               "survivors": 0
             }
           },
@@ -460,8 +460,8 @@
             "seed": 2056965768,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
-            "refusedDraws": 0,
+            "draws": 14,
+            "refusedDraws": 1,
             "inertDraws": 1,
             "duplicateDraws": 0
           }
@@ -698,20 +698,20 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 23,
+          "examined": 24,
           "survivors": 1,
           "survivorNames": [
             "predictive-balanced"
           ],
           "unjudged": 0,
-          "suppressed": 23,
-          "unbuildable": 1,
+          "suppressed": 24,
+          "unbuildable": 0,
           "dropdown": {
             "examined": 12,
             "survivors": 1
           },
           "dials": {
-            "examined": 11,
+            "examined": 12,
             "survivors": 0
           },
           "perTier": {
@@ -724,7 +724,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 6,
+              "examined": 7,
               "survivors": 0
             }
           },
@@ -735,8 +735,8 @@
             "seed": 1359977640,
             "bundles": 11,
             "enumerable": false,
-            "draws": 12,
-            "refusedDraws": 0,
+            "draws": 13,
+            "refusedDraws": 1,
             "inertDraws": 0,
             "duplicateDraws": 0
           }
@@ -952,23 +952,23 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 39,
-          "examined": 23,
+          "examined": 24,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
           "suppressed": 1,
-          "unbuildable": 1,
+          "unbuildable": 0,
           "dropdown": {
             "examined": 12,
             "survivors": 0
           },
           "dials": {
-            "examined": 11,
+            "examined": 12,
             "survivors": 0
           },
           "perTier": {
             "dispatcher": {
-              "examined": 15,
+              "examined": 16,
               "survivors": 0
             },
             "unpriced": {
@@ -987,8 +987,8 @@
             "seed": 417881390,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
-            "refusedDraws": 0,
+            "draws": 14,
+            "refusedDraws": 1,
             "inertDraws": 1,
             "duplicateDraws": 0
           }
@@ -1427,18 +1427,18 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 39,
-          "examined": 23,
+          "examined": 24,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 23,
-          "unbuildable": 1,
+          "suppressed": 24,
+          "unbuildable": 0,
           "dropdown": {
             "examined": 12,
             "survivors": 0
           },
           "dials": {
-            "examined": 11,
+            "examined": 12,
             "survivors": 0
           },
           "perTier": {
@@ -1451,7 +1451,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 8,
+              "examined": 9,
               "survivors": 0
             }
           },
@@ -1462,8 +1462,8 @@
             "seed": 519516764,
             "bundles": 15,
             "enumerable": false,
-            "draws": 14,
-            "refusedDraws": 0,
+            "draws": 15,
+            "refusedDraws": 1,
             "inertDraws": 1,
             "duplicateDraws": 1
           }

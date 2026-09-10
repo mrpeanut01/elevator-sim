@@ -32,6 +32,15 @@
  * that affords them, and 360 drawn dial ones. It is very unevenly spread:
  * `stage-3-overwhelmed` alone takes 389 s, `stage-5-credentials` 189 s and `stage-1-first-call` 4 s,
  * which is why a per-scenario progress line exists at all.
+ *
+ * **Re-run on `4159520` for GitHub issue #475 at 1 900 s**, and that is two effects rather than a
+ * regression in the sweep. Most of it is the machine — that run shared a host whose load average
+ * was above 60 — and the rest is the fix doing its job: the four configurations that used to
+ * `throw` while the building was constructed cost almost nothing, and each now runs a full
+ * fifty-replication batch like any other draw. **932 s is the quiet-machine figure and is the one
+ * to plan CI against**; 1 900 s is what a contended one looks like and is recorded so the next
+ * reader does not read it as the tier having doubled.
+ *
  * A hosted four-core runner is slower again, which is why this lives behind
  * `ELEVATOR_SIM_SURVIVORS=deep` and runs on the weekly `deep-tiers.yml` schedule rather than
  * on a pull request.
@@ -171,6 +180,9 @@ export async function measurePublishedSurvivors(
       space,
       schedule,
       baseline,
+      /* The same building and specs the batch runs on — issue #475. See `MeasureSurvivorsInput`. */
+      building: resources.building,
+      elevatorSpecs: resources.elevatorSpecs,
       profiles: config.dispatcherProfiles.profiles,
       sampleSize: SURVIVOR_SAMPLE_SIZE,
       masterSeed: SURVIVOR_MASTER_SEED,
