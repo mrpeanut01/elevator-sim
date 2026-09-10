@@ -388,11 +388,18 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     /*
      * And eight after wave W: the shell's replay row left when the door started handing a past day
      * back (#177 item 1, § D517), and the designer's escalator and document rows left when the board
-     * wrote both (#177 item 5, § D518). The class-per-shaft row is the designer's one remaining.
+     * wrote both (#177 item 5, § D518). The class-per-shaft row was the designer's one remaining.
+     *
+     * **And it left too** — GitHub issue **#420**, which gave `BuildingSpec` a machine per shaft
+     * and drew the pickers over it, so the designer's register is empty and draws its own sentence
+     * instead. The assertion is flipped rather than deleted: `refusalsAreCurrent.test.ts` cannot
+     * decide in general whether a refusal names a feature that now exists, so a register row
+     * arriving back on this panel without its control has to be caught by name, here, where the
+     * panel is actually rendered.
      */
     expect(rows.length).toBeGreaterThan(6);
     expect(rows.some((row) => row.includes('escalator rows'))).toBe(false);
-    expect(rows.some((row) => row.includes('a machine class per shaft'))).toBe(true);
+    expect(rows.some((row) => row.includes('a machine class per shaft'))).toBe(false);
     /* And the other direction: the panel no longer offers either as something the build lacks. */
     expect(rows.some((row) => row.includes('credential dots'))).toBe(false);
     expect(rows.some((row) => row.includes('sky-lobby starter'))).toBe(false);

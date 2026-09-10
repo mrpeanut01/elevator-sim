@@ -33,10 +33,16 @@
  *
  * ## Three deviations from § 13, each with the constraint that forced it
  *
- * - **One machine class for the design, not one per shaft.** `BuildingSpec` carries a single
- *   `specClass`/`ratedSpeedMps`/`ratedLoadLb` triple, because that is what its cars are dealt from.
- *   Five selects that all wrote one field is § D219 exactly — a panel that binds nothing while
- *   looking right — so the class is drawn once, and {@link DESIGNER_ABSENCES} says so.
+ * - **A machine class per shaft, over a design-wide default.** It read
+ *   *"One machine class for the design, not one per shaft"* — and that **stopped being true** with
+ *   GitHub issue #420 (§ D227). The argument under it was sound about the model it described:
+ *   `BuildingSpec` carried one `specClass`/`ratedSpeedMps`/`ratedLoadLb` triple, so five selects
+ *   over it would have been § D219 exactly. The issue's answer was to build the **field** first and
+ *   the pickers second, in that order and deliberately. `BuildingSpec.machineByCar` is a sparse
+ *   per-shaft machine, `buildingFromSpec` deals every car from {@link machineAt},
+ *   {@link designerShaftRows} is what the panel draws over it, and `authoring.test.ts` requires a
+ *   shaft's own machine to change the run **on the legs**. The design's three controls are still
+ *   there and are still what an unpinned shaft follows — a default rather than the only answer.
  * - **No duty, no credential dots on the elevation.** § 13.2's grid is the Engineer building
  *   editor's surface and is not re-drawn in Casual clothes on this pass. **The credential half of
  *   that is now said on the screen's own face** rather than only here — {@link DESIGNER_COPY}'s
@@ -65,6 +71,10 @@ import type { ElevatorSpecs } from '@elevator-sim/core/browser';
 
 import {
   RATED_LOADS,
+  carLabelOf,
+  machineAt,
+  machineIsPinned,
+  machinesWithin,
   personsOf,
   riseM,
   totalCapacity,
@@ -116,6 +126,15 @@ export const DESIGNER_COPY = Object.freeze({
   withheld: '—',
   machineStepsHint: 'Rated speed and rated load are steps within the class, not free numbers.',
   /*
+   * § 13.3 per shaft — GitHub issue #420. The heading, the *follow the design* option and the hint
+   * that says what the whole block means. Written as *hang a different machine* rather than *pin*
+   * or *override* because a shaft is a hole with a lift in it, and the reader is choosing the lift.
+   */
+  shaftsEyebrow: 'EACH SHAFT',
+  shaftsFollowLabel: 'Same as the design',
+  shaftsHint:
+    'Every shaft carries the design’s machine unless you give it one of its own. A shaft with its own machine keeps it when you change the design above.',
+  /*
    * The two hints below carry what left {@link DESIGNER_ABSENCES} under GitHub issue #283. Each
    * says where a capability is authored rather than that it is missing, and each stands beside the
    * control a reader would otherwise mistake for it — which is why they are hints and not rows in
@@ -161,13 +180,29 @@ export const DESIGNER_COPY = Object.freeze({
  * zoning apart, which `CLAUDE.md` names outright as a thing never to collapse. GitHub issue #283.
  */
 export const DESIGNER_ABSENCES: readonly string[] = Object.freeze([
-  'a machine class per shaft — a design carries one class, one rated speed and one rated load for the whole building, so a picker on each shaft would be five controls writing the same setting',
   /*
    * Two rows left on the commit that built them — GitHub issue #177 item 5, § D518: the escalator
    * rows (`designerScreen.ts#drawEscalatorPanel` writes `transportModes`, and `authoring.test.ts`
    * holds that an escalator changes the run on the legs) and the folded document (the
    * specification block is now the § 13.3 disclosure, collapsed). § D227: a refusal leaves on the
    * commit that makes it false.
+   */
+  /*
+   * **And the last one left on the commit that built it** — GitHub issue #420. It read
+   * *"a machine class per shaft — a design carries one class, one rated speed and one rated load
+   * for the whole building, so a picker on each shaft would be five controls writing the same
+   * setting"*, and the second half of that sentence is why it was a refusal rather than a queue
+   * item: the control it described would have been § D219's defect, so the issue said to build the
+   * **field** first. `BuildingSpec.machineByCar` is the field, {@link designerShaftRows} and
+   * `designerScreen.ts#drawMachinePanel` are the pickers over it, and `authoring.test.ts`'s *the
+   * machines editor is not decoration* holds that moving one changes the run on the legs. Its
+   * triage row in `buildNotes.test.ts` went in the same edit, which is that file's second
+   * assertion working in the direction that bites after a lane lands.
+   *
+   * **The register is empty, and that is a state that keeps being checked rather than a rule that
+   * can be deleted.** `buildNotes.ts#REGISTER_EMPTY_LINE` is what this section draws now, on the
+   * precedent the shell's and the stage's registers set; this array stays exactly where it is,
+   * because a screen that grows an absence owes its sentence back.
    */
 ]);
 
@@ -277,6 +312,126 @@ export function withMachineClass(spec: BuildingSpec, machineClass: MachineClass)
     ratedSpeedMps: stepAtOrBelow(speedStepsFor(machineClass), spec.ratedSpeedMps),
     ratedLoadLb: stepAtOrBelow(loadStepsFor(machineClass), spec.ratedLoadLb),
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * § 10.1 per shaft — GitHub issue #420
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Hang a machine in one shaft, or take it down again.**
+ *
+ * {@link withMachineClass}'s twin, and the same snapping rule for the same reason: a shaft handed a
+ * class while holding the design's speed would hold a speed outside its own band, and that is a
+ * document `parseBuilding` refuses. Both steps come down to the nearest rung the new class has —
+ * *down* rather than up, because a shaft that quietly got faster when its machine was changed would
+ * be a control doing more than it says.
+ *
+ * `undefined` **clears** the pin rather than writing a machine that happens to equal the design's,
+ * and the difference is the whole of what {@link BuildingSpec.machineByCar} is sparse for: a
+ * cleared shaft follows the design's own controls from then on, and a shaft pinned to the design's
+ * current machine stops following them the moment the design chip moves.
+ */
+export function withShaftMachine(
+  spec: BuildingSpec,
+  car: number,
+  machineClass: MachineClass | undefined,
+): BuildingSpec {
+  const machineByCar = { ...spec.machineByCar };
+  if (machineClass === undefined) {
+    delete machineByCar[car];
+    return { ...spec, machineByCar };
+  }
+  const from = machineAt(spec, car);
+  machineByCar[car] = {
+    specClass: machineClass.id,
+    ratedSpeedMps: stepAtOrBelow(speedStepsFor(machineClass), from.ratedSpeedMps),
+    ratedLoadLb: stepAtOrBelow(loadStepsFor(machineClass), from.ratedLoadLb),
+  };
+  return { ...spec, machineByCar };
+}
+
+/** Move one pinned shaft's speed or load onto another rung. A no-op on a shaft with no pin. */
+export function withShaftStep(
+  spec: BuildingSpec,
+  car: number,
+  step: { readonly ratedSpeedMps: number } | { readonly ratedLoadLb: number },
+): BuildingSpec {
+  const pinned = spec.machineByCar[car];
+  if (pinned === undefined) return spec;
+  return { ...spec, machineByCar: { ...spec.machineByCar, [car]: { ...pinned, ...step } } };
+}
+
+/** One shaft's row in § 13.3's machine panel — what it carries, and whether that is its own. */
+export interface DesignerShaftRow {
+  /** The car index the row writes, so a caller never re-derives it from the label. */
+  readonly car: number;
+  /** `A` onward, the label the elevation draws over the shaft. */
+  readonly label: string;
+  /** The class this shaft carries, named as a player reads it. */
+  readonly className: string;
+  /** Its rated speed and load, in the reader's own units. */
+  readonly figure: string;
+  /** True where this shaft carries a machine of its own rather than the design's. */
+  readonly pinned: boolean;
+}
+
+/**
+ * **Every shaft, and the machine in it** — § 13.3's machine panel, one row per shaft.
+ *
+ * This is the model half of GitHub issue #420. `DESIGNER_ABSENCES` refused a per-shaft picker on
+ * the grounds that *"a design carries one class, one rated speed and one rated load for the whole
+ * building, so a picker on each shaft would be five controls writing the same setting"* — which was
+ * a correct reading of a model that had one machine in it, and § D219's defect said in advance.
+ * `BuildingSpec.machineByCar` is that model changed; this function is what the screen draws over
+ * it, and `authoring.test.ts` is what holds the pair to the legs.
+ *
+ * **The rows are the shafts, not the pins.** A shaft following the design gets a row saying what it
+ * carries, because a panel that listed only the pinned ones would be asking a reader to infer the
+ * default from a gap — and the design's own class chips sit directly above, so the whole panel
+ * reads as one statement about the fleet.
+ *
+ * `pinned` is a fact rather than a formatting hint: it is what the *clear* control is gated on, and
+ * it is the difference {@link withShaftMachine} refuses to blur.
+ */
+export function designerShaftRows(
+  spec: BuildingSpec,
+  classes: readonly MachineClass[],
+  units: EverydayUnits,
+): readonly DesignerShaftRow[] {
+  const rows: DesignerShaftRow[] = [];
+  for (let car = 0; car < spec.cars; car += 1) {
+    const machine = machineAt(spec, car);
+    const named = classes.find((entry) => entry.id === machine.specClass);
+    rows.push({
+      car,
+      label: carLabelOf(car),
+      className: named?.name ?? machine.specClass,
+      figure: `${speedFigure(machine.ratedSpeedMps, units)} · ${String(machine.ratedLoadLb)} lb · ${String(personsOf(machine.ratedLoadLb))} persons`,
+      pinned: machineIsPinned(spec, car),
+    });
+  }
+  return rows;
+}
+
+/**
+ * The one sentence the specification block owes a design whose shafts differ.
+ *
+ * § 13.2's rating plate quotes **one** machine, which was the whole building until a shaft could
+ * carry its own. Leaving the plate to speak for a fleet with two machines in it would be `CLAUDE.md`'s
+ * *a published number goes stale* at rating-plate scale: every figure on it would still be true of
+ * some shaft and none of them true of the building. So the plate keeps quoting the design's machine
+ * — which is what a plate is — and this line says whose figures those are and how many shafts do
+ * not carry them. `''` where every shaft follows the design, because a sentence about an exception
+ * that does not exist is one a reader learns to skip.
+ */
+export function designerShaftNote(spec: BuildingSpec): string {
+  const pinned = Object.keys(machinesWithin(spec.machineByCar, spec.cars)).length;
+  if (pinned === 0) return '';
+  return (
+    `This plate is the design’s machine. ${String(pinned)} of ${String(spec.cars)} shaft${spec.cars === 1 ? '' : 's'} ` +
+    `carr${pinned === 1 ? 'ies' : 'y'} a different one, listed with the machines above.`
+  );
 }
 
 /* -------------------------------------------------------------------------- *

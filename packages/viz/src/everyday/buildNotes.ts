@@ -328,6 +328,13 @@ export function buildNotesViewOf(): BuildNotesView {
       heading: 'The drawing board',
       note: 'Designing a building. Nothing there is scored.',
       entries: DESIGNER_ABSENCES,
+      /*
+       * **Emptied by GitHub issue #420**, which built the field first and the pickers over it —
+       * the fourth register to reach this arm. Same rule as the three above: an empty register
+       * draws the sentence rather than a heading over nothing, and the register is kept rather
+       * than deleted because a screen that grows an absence owes its sentence back.
+       */
+      ...(DESIGNER_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
     {
       heading: 'Running a tower over a season',

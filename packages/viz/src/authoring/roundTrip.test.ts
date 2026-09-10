@@ -66,10 +66,13 @@ import { recordRun } from '../record/recordRun.js';
 import {
   BLANK_SPEC,
   buildingFromSpec,
+  buildingSummary,
   specFromBuilding,
   unreachableFloors,
   validateSpec,
+  writtenMachinesOf,
   type BuildingSpec,
+  type SpecMachine,
 } from './buildingSpec.js';
 
 const BUILDINGS_DIR = join(DATA_DIR, 'buildings');
@@ -212,6 +215,101 @@ describe.each(BUILDING_IDS)('%s survives the editor round trip', (id) => {
     expect(legsOf(rebuilt), `${id}: legs`).toBe(before);
   }, 300_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * The fleet, not the fastest car — GitHub issue #420
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The headline collapse, and why the sweep above could not see it.**
+ *
+ * `specFromBuilding` quoted one car — the fastest — into the design's three hardware controls, and
+ * that was the whole reading of the fleet. The sweep above passes on `crown-hotel` and
+ * `st-jude-hospital` regardless, and passed on the tree before this file's cases existed, because
+ * the carried document is written back **verbatim** while nothing has been re-dealt: the loss is
+ * invisible for exactly as long as nobody edits.
+ *
+ * So the claim these cases make is the one the sweep cannot: that the *model* holds the fleet, and
+ * therefore that the fleet is still there once the document behind it is gone. `carried: undefined`
+ * is that state named directly — a design with no document to write back, which is what a blank
+ * tower is and what any edit to the floor vocabulary produces.
+ *
+ * **The doors deliberately do not survive it, and that is unchanged.** Both buildings' service cars
+ * are `sideOpening`; `SpecMachine` carries a class and its two steps and no control on this surface
+ * authors a door. `validateSpec` is what says so before a reader saves, and the case below asserts
+ * only what the model claims to hold.
+ */
+describe.each(['crown-hotel', 'st-jude-hospital'])(
+  '%s reads back as the fleet it is, not as its fastest car',
+  (id) => {
+    const config = configOf(id);
+    const spec = specFromBuilding(config, id);
+
+    const keyOf = (machine: SpecMachine): string =>
+      `${machine.specClass}/${String(machine.ratedSpeedMps)}/${String(machine.ratedLoadLb)}`;
+    const authoredKeys = [
+      ...new Set(
+        config.banks.flatMap((bank) =>
+          bank.cars.map(
+            (car) =>
+              `${car.spec}/${String(car.ratedSpeedMps ?? '')}/${String(car.ratedLoadLb ?? '')}`,
+          ),
+        ),
+      ),
+    ].sort();
+
+    it('pins the shafts whose machine is not the design default', () => {
+      /*
+       * Both buildings run two classes at two speeds and two loads through one bank, which is what
+       * makes them the pair: a bank-count test passes on either. The count of pins is the count of
+       * cars that differ from the fastest — one at `crown-hotel`, two at `st-jude-hospital` — and
+       * it is asserted as *more than none* rather than pinned to an integer, because the integer is
+       * a fact about `data/` that this file has no business freezing.
+       */
+      expect(Object.keys(spec.machineByCar).length, `${id}: pinned shafts`).toBeGreaterThan(0);
+      expect(
+        [...new Set(writtenMachinesOf(spec).map(keyOf))].sort(),
+        `${id}: the machines the model holds`,
+      ).toStrictEqual(authoredKeys);
+    });
+
+    it('still writes both machines once the carried document is gone', () => {
+      /*
+       * The defect, stated as a run of the code that had it: with the document dropped, every car
+       * is dealt from the design's three controls, and before `machineByCar` existed that meant
+       * every car came out as the fastest one. Compared on class, speed and load — the three fields
+       * the model claims — across the whole re-dealt fleet.
+       */
+      const dealt = buildingFromSpec({ ...spec, carried: undefined }, { specs: SPECS });
+      const dealtKeys = [
+        ...new Set(
+          dealt.banks.flatMap((bank) =>
+            bank.cars.map(
+              (car) =>
+                `${car.spec}/${String(car.ratedSpeedMps ?? '')}/${String(car.ratedLoadLb ?? '')}`,
+            ),
+          ),
+        ),
+      ].sort();
+      expect(dealtKeys, `${id}: the machines a re-deal writes`).toStrictEqual(authoredKeys);
+      /* And the document it wrote is one the loader takes. */
+      expect(() => resolvedOf(dealt), `${id}: the re-dealt document loads`).not.toThrow();
+    });
+
+    it('says how many specifications it has, counted on what it would write', () => {
+      /*
+       * `buildingSummary` reads `writtenMachinesOf` rather than the carried banks, so the sentence
+       * survives the document being dropped. Before that it counted the carried document alone,
+       * which made *"N cars at X m/s · P persons each"* the answer for every design that had no
+       * document behind it — including one with a shaft pinned to a second machine.
+       */
+      expect(buildingSummary(spec), `${id}: as read`).toContain('specifications');
+      expect(buildingSummary({ ...spec, carried: undefined }), `${id}: re-dealt`).toContain(
+        'specifications',
+      );
+    });
+  },
+);
 
 describe('what the slider model cannot hold is refused at the control', () => {
   /*

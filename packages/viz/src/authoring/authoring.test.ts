@@ -37,8 +37,10 @@ import {
   buildingFromSpec,
   canExpress,
   credentialGroupsOf,
+  designMachineOf,
   escalatorSecondsFor,
   floorIdOf,
+  machineAt,
   nextTransportModeId,
   nextZoneId,
   occupancyLine,
@@ -55,8 +57,10 @@ import {
   withTransportSeconds,
   withZoneFloor,
   withZoneGroup,
+  writtenMachinesOf,
   zoneFloorsOf,
   type BuildingSpec,
+  type SpecMachine,
 } from './buildingSpec.js';
 import {
   DEFAULT_LEVERS,
@@ -528,11 +532,17 @@ describe('the machines editor is not decoration', () => {
   const runWith = (
     machineClass: MachineClass,
     overrides: Partial<SimulationConfig> = {},
+    /**
+     * Machines hung in named shafts — GitHub issue #420's field, driven through the same shipped
+     * chain as everything else in this block rather than around it.
+     */
+    machineByCar: Readonly<Record<number, SpecMachine>> = {},
   ): string => {
     // dev/state.ts widens the file only with what the reader *saved*; a shipped class rides plain.
     const specs = machineClass.yours ? specsWithClass(SPECS, machineClass) : SPECS;
+    const drawn: BuildingSpec = { ...fit(garden, machineClass), machineByCar };
     const building = resolveBuilding(
-      parseBuilding(buildingFromSpec(fit(garden, machineClass), { specs }) as unknown),
+      parseBuilding(buildingFromSpec(drawn, { specs }) as unknown),
       specs,
     );
     return fingerprint(configFor(eta, { building, elevatorSpecs: specs, ...overrides }));
@@ -586,6 +596,99 @@ describe('the machines editor is not decoration', () => {
     expect(JSON.parse(busyControl)).not.toHaveLength(0);
     expect(runWith(smaller, BUSY)).not.toBe(busyControl);
   }, 60_000);
+
+  /* ------------------------------------------------------------------------ *
+   * A machine class per shaft — GitHub issue #420
+   * ------------------------------------------------------------------------ */
+
+  /*
+   * **The arm the register said could not exist.** `DESIGNER_ABSENCES` refused a per-shaft picker
+   * on the grounds that *"a design carries one class, one rated speed and one rated load for the
+   * whole building, so a picker on each shaft would be five controls writing the same setting"* —
+   * which is § D219's signature defect, and the argument was right about the model it described.
+   * `BuildingSpec.machineByCar` is that model changed, and these two cases are what make the
+   * change a fact rather than a field: the control has to reach the legs, and it has to reach
+   * *only* the shaft it names.
+   *
+   * The building is Garden Apartments for the reason the block's header gives — a hydraulic car
+   * reaches rated speed inside one floor at its 3.0 m pitch, so a machine change there is a
+   * measured 11 % of the round trip. Midtown Office is this repository's named speed negative
+   * control and would return a false *inert*.
+   *
+   * The pinned machine is `geared-traction` at its shipped 2.5 m/s and 2 500 lb, which is four
+   * times the hydraulic's rated speed and 900 lb more car. It is a shipped class rather than an
+   * invented one so that the document this writes is one `parseBuilding` accepts — and it does,
+   * since `runWith` parses and resolves every arm before recording it.
+   */
+  const geared: SpecMachine = {
+    specClass: 'geared-traction',
+    ratedSpeedMps: 2.5,
+    ratedLoadLb: 2500,
+  };
+
+  /*
+   * **Both shaft arms run busy, and the reason is the same one the capacity arm above documents.**
+   * At the shipped residential trickle this window carries a *single* leg, and a one-leg
+   * fingerprint is an instrument that can register a change without being able to say it measured
+   * anything. The demand is raised until both shafts are actually working, and the count is
+   * asserted so the arms cannot quietly go back to measuring one boarding.
+   *
+   * **And neither arm carries a timeout annotation, unlike the four cases above.** This project's
+   * own ceiling is `vitest.config.ts#SIMULATING_TIMEOUT_MS`, 300 s, so a `60_000` here would be a
+   * *narrowing* below it — the shape `840c3f0` deleted six of. `testCost.test.ts` censuses every
+   * annotation in the tree against the config's own table, so adding one is a cost as well as a
+   * claim, and these arms run the same two-shaft 600 s window the negative control does.
+   */
+  const SHAFT_BUSY = { demand: { arrivalRatePctPop5min: 30 } } satisfies Partial<SimulationConfig>;
+  const shaftControl = runWith(saved({}), SHAFT_BUSY);
+
+  it('a machine hung in one shaft changes the legs — GitHub issue #420', () => {
+    /*
+     * Garden Apartments has two shafts, so this is one of two rather than one of five — which is a
+     * harder case, not an easier one: half the fleet still follows the design, so a run that
+     * changed because *the whole building* had changed would be a different mechanism from the one
+     * being claimed. The next case is what tells those two apart.
+     */
+    expect(JSON.parse(shaftControl).length, 'legs recorded').toBeGreaterThan(10);
+    expect(runWith(saved({}), SHAFT_BUSY, { 0: geared })).not.toBe(shaftControl);
+  });
+
+  it('a pin that names the machine the design already has changes nothing', () => {
+    /*
+     * The negative control, and it is the half that says what the arm above measured. If the run
+     * moved merely because `machineByCar` had an entry in it — a pin taken as a signal rather than
+     * as a machine — this would move too. It must not: a shaft pinned to the design's own machine
+     * is the design's own machine.
+     *
+     * It also pins `machineAt`'s contract from the outside: the accessor answers the pin where
+     * there is one and the design where there is not, and here those are the same value.
+     */
+    const design = designMachineOf(fit(garden, saved({})));
+    expect(machineAt({ ...fit(garden, saved({})), machineByCar: { 0: design } }, 0)).toStrictEqual(
+      design,
+    );
+    expect(runWith(saved({}), SHAFT_BUSY, { 0: design })).toBe(shaftControl);
+  });
+
+  it('leaves the shaft it does not name alone, in the document it writes', () => {
+    /*
+     * The other direction, read off the document rather than off the legs: a two-shaft design with
+     * shaft A pinned must write **two different cars**, one geared and one still following the
+     * design. Asserted on `writtenMachinesOf`, which is the same reading `buildingSummary` and
+     * `validateSpec` quote, so a surface that says *"2 specifications"* and a document that carries
+     * one cannot drift apart.
+     */
+    const drawn: BuildingSpec = { ...fit(garden, saved({})), machineByCar: { 0: geared } };
+    const written = writtenMachinesOf(drawn);
+    expect(written).toHaveLength(2);
+    expect(written[0]).toStrictEqual(geared);
+    expect(written[1]).toStrictEqual(designMachineOf(drawn));
+
+    const document = buildingFromSpec(drawn, { specs: specsWithClass(SPECS, saved({})) });
+    const cars = document.banks.flatMap((bank) => bank.cars);
+    expect(cars.map((car) => car.spec)).toStrictEqual(['geared-traction', 'cls-1']);
+    expect(cars.map((car) => car.ratedSpeedMps)).toStrictEqual([2.5, drawn.ratedSpeedMps]);
+  });
 });
 
 /* ========================================================================== *

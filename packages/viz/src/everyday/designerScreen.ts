@@ -33,6 +33,8 @@ import {
   bandOf,
   carLabelOf,
   escalatorSecondsFor,
+  machineAt,
+  machinesWithin,
   nextTransportModeId,
   riseM,
   servesLobby,
@@ -52,10 +54,14 @@ import {
   designerFigures,
   designerPlateRows,
   designerReading,
+  designerShaftNote,
+  designerShaftRows,
   designerWarnings,
   loadStepsFor,
   speedStepsFor,
   withMachineClass,
+  withShaftMachine,
+  withShaftStep,
   DESIGNER_COPY as COPY,
 } from './designerModel.js';
 import { everydayProfileStore } from './profileStore.js';
@@ -366,9 +372,156 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       spec.cars,
       '',
       (next) => {
-        edit({ cars: next, bandByCar: {}, noLobby: {} });
+        /*
+         * The bands go entirely, as they always have — they are dealt from the shaft count. The
+         * machines are **narrowed** rather than cleared (GitHub issue #420): a pin on a shaft that
+         * still exists is a choice the reader made about that shaft, and dragging the slider up by
+         * one is not a reason to take it down. What cannot survive is a pin on a shaft that is
+         * gone, which is `dev/buildingEditor.ts`'s own rule about `bandByCar` — *a pin they did not
+         * place* — applied to the field beside it.
+         */
+        edit({
+          cars: next,
+          bandByCar: {},
+          noLobby: {},
+          machineByCar: machinesWithin(spec.machineByCar, next),
+        });
       },
     );
+  }
+
+  /**
+   * **§ 13.3's machine panel, per shaft** — GitHub issue #420, and the control the register refused.
+   *
+   * The refusal was right about the model it described: with one class in `BuildingSpec` these
+   * selects would have been *"five controls writing the same setting"*, which is § D219's defect.
+   * The field went in first (`BuildingSpec.machineByCar`), and this draws over it — so the select
+   * on shaft C writes shaft C and nothing else, and `authoring.test.ts` requires the run to differ
+   * on the legs when it moves.
+   *
+   * A `<select>` rather than the class chips above, and the difference is deliberate. The design's
+   * class is one choice a reader makes often and sees at a glance; a shaft's is a choice made
+   * rarely, on a list that has to fit beside every other shaft's, and a row of chips per shaft
+   * would put the class table on the screen as many times as the building has lifts. The
+   * *follow the design* option is the first entry rather than a separate clear button, because
+   * following the design is a **state** of the shaft and not the absence of one — which is exactly
+   * what {@link withShaftMachine}'s `undefined` arm means in the model.
+   *
+   * Speed and load steps are drawn only for a shaft that carries its own machine. On one that
+   * follows the design they would be a second copy of the control eleven lines up, disagreeing
+   * with it the moment either moved.
+   */
+  function drawShaftMachines(): void {
+    const block = el(doc, 'div', 'everyday-designer-shafts');
+    block.style.cssText = `display:grid;gap:10px;margin-top:15px;border-top:1px solid ${C.rule};padding-top:13px`;
+    const heading = el(doc, 'div', undefined, COPY.shaftsEyebrow);
+    heading.style.cssText = EYEBROW;
+    block.append(heading);
+
+    for (const row of designerShaftRows(spec, classes, unitsNow())) {
+      /*
+       * `everyday-designer-machine-shaft`, **not** `everyday-designer-shaft` — the service panel
+       * below already draws a row per shaft under that name, and two panels answering one selector
+       * is how a browser case ends up asserting about whichever one happens to be first in the
+       * document.
+       */
+      const shaft = el(doc, 'div', 'everyday-designer-machine-shaft');
+      shaft.style.cssText = 'display:grid;gap:5px';
+
+      const head = el(doc, 'div');
+      head.style.cssText = 'display:flex;align-items:center;gap:9px';
+      const name = el(doc, 'span', 'everyday-designer-machine-shaft-label', `Shaft ${row.label}`);
+      name.style.cssText = 'font-size:13px;font-weight:600;flex:none;min-width:58px';
+      const pick = el(doc, 'select', 'everyday-designer-machine-shaft-class');
+      /*
+       * The name the select carries into the accessibility tree, for the reason the sliders above
+       * carry theirs — `accessibilitySweep.browser.test.ts` and WCAG SC 4.1.2. The visible label is
+       * a sibling span rather than a `<label for>`, and it is the same words a sighted reader sees.
+       */
+      pick.setAttribute('aria-label', `Machine in shaft ${row.label}`);
+      pick.style.cssText = `flex:1;min-width:0;border:1.5px solid ${row.pinned ? C.ink : C.rule};background:${C.paper};color:${C.ink};border-radius:${String(R.control)}px;padding:5px 8px;font-size:12.5px`;
+      const follow = el(doc, 'option', undefined, COPY.shaftsFollowLabel);
+      follow.value = '';
+      follow.selected = !row.pinned;
+      pick.append(follow);
+      const ownClassId = machineAt(spec, row.car).specClass;
+      for (const entry of classes) {
+        const option = el(doc, 'option', undefined, entry.name);
+        option.value = entry.id;
+        option.selected = row.pinned && entry.id === ownClassId;
+        pick.append(option);
+      }
+      /*
+       * A pin naming a class this build does not have. It cannot be produced from this control —
+       * every option is one of `classes` — but a saved design can carry one, and a select that
+       * silently fell back to *Same as the design* would say the shaft follows the design while the
+       * figure beneath it said otherwise. `designerShaftRows` already answers the raw id in that
+       * case (`named?.name ?? machine.specClass`), so the option carries the same words the row
+       * does. `dev/buildingEditor.ts` refuses the design-wide case in as many words; this is that
+       * refusal's shape one shaft down.
+       */
+      if (row.pinned && pick.value === '') {
+        const unknown = el(doc, 'option', undefined, row.className);
+        unknown.value = ownClassId;
+        unknown.selected = true;
+        pick.append(unknown);
+      }
+      pick.addEventListener('change', () => {
+        spec = withShaftMachine(
+          spec,
+          row.car,
+          classes.find((entry) => entry.id === pick.value),
+        );
+        redraw();
+      });
+      head.append(name, pick);
+      shaft.append(head);
+
+      const figure = el(doc, 'div', 'everyday-designer-machine-shaft-figure', row.figure);
+      figure.style.cssText = `font:500 11.5px ${TYPE.mono};color:${row.pinned ? C.inkSoft : C.warmGrey};padding-left:67px`;
+      shaft.append(figure);
+
+      /*
+       * The two steps, for a shaft that has its own machine. `withShaftStep` is a no-op on a shaft
+       * with no pin, so these are gated here as well as guarded there — the screen does not offer a
+       * control that would write nothing, and the model does not trust it not to.
+       */
+      const ownClass = row.pinned ? classes.find((entry) => entry.id === ownClassId) : undefined;
+      if (ownClass !== undefined) {
+        const steps = el(doc, 'div');
+        steps.style.cssText = 'display:grid;gap:9px;padding-left:67px;margin-top:2px';
+        const machine = machineAt(spec, row.car);
+        stepRow(
+          steps,
+          'Rated speed',
+          speedStepsFor(ownClass),
+          machine.ratedSpeedMps,
+          (step) => speedFigure(step, unitsNow()),
+          (next) => {
+            spec = withShaftStep(spec, row.car, { ratedSpeedMps: next });
+            redraw();
+          },
+        );
+        stepRow(
+          steps,
+          'Rated load',
+          loadStepsFor(ownClass),
+          machine.ratedLoadLb,
+          (step) => `${String(step)} lb`,
+          (next) => {
+            spec = withShaftStep(spec, row.car, { ratedLoadLb: next });
+            redraw();
+          },
+        );
+        shaft.append(steps);
+      }
+      block.append(shaft);
+    }
+
+    const hint = el(doc, 'p', 'everyday-designer-shafts-hint', COPY.shaftsHint);
+    hint.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.45;margin:2px 0 0`;
+    block.append(hint);
+    machinePanel.append(block);
   }
 
   function drawMachinePanel(machineClass: MachineClass | undefined): void {
@@ -466,6 +619,15 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       });
       machinePanel.append(suggest);
     }
+
+    /*
+     * The per-shaft list goes **last**, under everything the design's own machine says about
+     * itself — the class chips, its band, its two step ladders, the ownership hint and § 10.1's
+     * automatic suggestion. Reading order is the argument: a reader meets *what this design is
+     * built with* whole, and then the exceptions to it. Above the hint it would have split the
+     * design's own controls in two with a list of shafts.
+     */
+    drawShaftMachines();
   }
 
   /**
@@ -688,6 +850,21 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     }
     plate.append(plateGrid);
     specBlock.append(plate);
+
+    /*
+     * Whose machine the plate is quoting, on a design whose shafts do not all carry the same one —
+     * GitHub issue #420. A rating plate names **one** lift, which was the whole building until a
+     * shaft could carry its own; without this line every figure on it would still be true of some
+     * shaft and none of them true of the building. Empty and undrawn where every shaft follows the
+     * design, because a sentence about an exception that does not exist is one a reader learns to
+     * skip past the ones that matter.
+     */
+    const shaftNote = designerShaftNote(spec);
+    if (shaftNote !== '') {
+      const note = el(doc, 'div', 'everyday-designer-plate-note', shaftNote);
+      note.style.cssText = `font-size:12px;color:${C.warmGrey};margin-top:8px;line-height:1.5;max-width:80ch`;
+      specBlock.append(note);
+    }
 
     const capacity = el(doc, 'div', 'everyday-designer-capacity', designerCapacityLine(spec));
     capacity.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.moss};margin-top:10px;line-height:1.5`;
