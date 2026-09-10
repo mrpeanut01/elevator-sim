@@ -103,6 +103,10 @@ const GOOD: GoalObservations = Object.freeze({
   minutePct: 91,
   peakQueue: 12,
   abandoned: 0,
+  // The overlap and the run's own horizon that § D417 binds every publisher of
+  // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+  abandonedCarried: 0,
+  horizonS: 900,
   worstWaitS: 96,
   worstWaitIsCensored: false,
   loadedDepartures: 300,
@@ -115,6 +119,10 @@ const GOOD_UNMEASURED_TRIPS: GoalObservations = Object.freeze({
   minutePct: 91,
   peakQueue: 12,
   abandoned: 0,
+  // The overlap and the run's own horizon that § D417 binds every publisher of
+  // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+  abandonedCarried: 0,
+  horizonS: 900,
   worstWaitS: 96,
   worstWaitIsCensored: false,
 });

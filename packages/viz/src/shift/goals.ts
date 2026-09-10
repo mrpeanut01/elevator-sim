@@ -61,6 +61,7 @@
 import {
   WAKE_UP_ARRIVALS,
   type DayOutcome,
+  type GoalObservationId,
   type GoalObservations,
   type GoalReading,
   type GoalState,
@@ -549,6 +550,165 @@ export function readGoals(
 ): readonly GoalReading[] {
   return goals.map((goal) => readGoal(goal, observations));
 }
+
+/* -------------------------------------------------------------------------- *
+ * The riders who left, beside the wait they flatter
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Which gradeable quantity a wait that crossed the give-up horizon can move **in the goal's own
+ * favour** — [§ D106](../../../../DECISIONS.md)'s rule at the renderer, GitHub issue **#456**.
+ *
+ * ## The rule, and what it was missing here
+ *
+ * § D106: *abandonment and stairs uptake are published beside AWT, never folded into it*, on the
+ * footing `EnergyStatistics.workPerServedLegKJ` sits beside raw `energyKJ` — *a configuration that
+ * improves its wait by serving fewer people has not improved anything*. `core` keeps it: the fifth
+ * `awtIsValid` ground suppresses a mean outright above 2 % abandonment. **This layer did not.**
+ * {@link readGoal} graded a share whose denominator is the legs that boarded, and a rider left
+ * standing leaves that denominator, so the bar could be cleared by making the building worse and
+ * the screen that graded it said nothing. `docs/14` § 5 criterion 4 called that out and
+ * `docs/14`'s own status table called it *the clause to distrust first*, and that row is rewritten
+ * on the commit this lands with ([§ D227](../../../../DECISIONS.md): a refusal leaves on the commit
+ * that makes it false).
+ *
+ * **[§ D207](../../../../DECISIONS.md)'s *Named gap: two viz surfaces do not carry the figures* is
+ * where the defect was first written down, and it is left standing rather than edited** — a dated
+ * decision is not rewritten after the fact. Two of its clauses have since stopped being true and a
+ * reader who lands there should know which. It says this module *"reads
+ * `serviceLevel.overHorizonCount`"*: it does not and no longer could — the odd-day horizon goal that
+ * did was retired when the worst-wait ceiling subsumed it, and the count a surface publishes now is
+ * `live/observations.ts`'s playhead fold. And it says *"no test fails if a renderer shows AWT
+ * without the abandonment figure"*: `shift/goalsBeside.test.ts` is that test, and the run-record
+ * disclaimer § D207 calls *a bridge, not the coupling* is no longer the only thing holding the rule
+ * up.
+ *
+ * Of the two closures issue #456 names — grade a quantity with the served population in its
+ * denominator, or draw the count beside the goal — this is the second, which is what § D106's
+ * wording asks for. Nothing is folded, weighted, or aggregated: the count travels beside the
+ * verdict and changes no verdict.
+ *
+ * ## Why a table over `GoalObservationId` rather than a list of goal ids
+ *
+ * A goal id is a bar; a `reads` is a quantity, and the flattering is a property of the quantity.
+ * The campaign's `away` bar and the daily loop's `minute` bar are two goals reading one share, and
+ * a list of goal ids would have had to name both and would have missed the third. The `Record` is
+ * **exhaustive by the type**: a new member of `GOAL_OBSERVATION_IDS` fails to compile until
+ * somebody classifies it, which is the property a hand-written list cannot have.
+ *
+ * ## Every one of the seven, with its reason — and two of them are `true`
+ *
+ * | reads | flattered | why |
+ * |---|---|---|
+ * | `minutePct` | **yes** | `servedUnderThresholdCount / boarded`. A leg that never boards is not in the denominator, so leaving *raises* the share. This is the wait statistic § D106 is about. |
+ * | `loadedDepartures` | **yes** | an `at-most` wear budget. A rider who never boards makes no trip, so the count falls and the bar gets easier. |
+ * | `carryPct` | no | `carried / arrived`, and `arrived` counts every leg from the instant its call registered. `shift/observations.ts` owns the argument: leaving moves this **down or not at all**. |
+ * | `peakQueue` | no | `VizLeg` carries no `abandonedAt`, so a rider whose wait crossed the horizon is still standing in this fold. The depth gets *worse*, never better. |
+ * | `worstWaitS` | no | the same fact, pointed the other way: an unresolved leg makes the maximum **censored**, and {@link readGoal}'s second gate reads a censored maximum as `pending`. Unjudged is not passed. |
+ * | `abandoned` | no | it *is* the count. A figure cannot be published beside itself. |
+ * | `workPerServedLegKJ` | no | § D468 and § D367: the legs delivered are the denominator, so a day that spends less by carrying fewer people **fails** the bar rather than winning it. It is the worked precedent this module is copying. |
+ *
+ * The two `true` rows are measured rather than argued — `goalsBeside.test.ts` builds one day
+ * cleared by carrying people and one cleared by leaving them standing, and requires the two
+ * screens to differ.
+ *
+ * **Recorded here rather than in `DECISIONS.md`, under [§ D405](../../../../DECISIONS.md).** It
+ * takes nothing back and moves nothing: § D106's rule is unchanged, § D417's caption rule is
+ * obeyed rather than amended, and what changes is that a surface which grades a flattered quantity
+ * now draws the count § D106 already required beside it.
+ */
+const ABANDONMENT_FLATTERS: Readonly<Record<GoalObservationId, boolean>> = Object.freeze({
+  carryPct: false,
+  minutePct: true,
+  peakQueue: false,
+  abandoned: false,
+  worstWaitS: false,
+  loadedDepartures: true,
+  workPerServedLegKJ: false,
+});
+
+/**
+ * `15-minute` for a whole-minute horizon, `900 s` for anything else. The run's own number, never a
+ * hard-coded fifteen minutes — [§ D417](../../../../DECISIONS.md).
+ *
+ * Exported and living here rather than in `shift/report.ts`, where it was written, because
+ * `report.ts` imports this module and this module may not import it. Two copies of a caption rule
+ * numbered precisely so that a fifth surface obeys it without reading the fourth surface's
+ * docstring would be that decision defeated by transcription.
+ */
+export function horizonLabelOf(horizonS: number): string {
+  const minutes = horizonS / 60;
+  return Number.isInteger(minutes) ? `${String(minutes)}-minute` : `${horizonS.toFixed(0)} s`;
+}
+
+/**
+ * The § D106 half of {@link gaveUpBesideOf}'s sentence — what the riders who were left standing did
+ * to *this* quantity, in the reader's own terms.
+ *
+ * Keyed on the same {@link GoalObservationId} and exhaustive for the same reason. The five
+ * unflattered quantities carry the empty string, and `goalsBeside.test.ts` drives one goal per id
+ * to hold the two tables in step: exactly the ids marked `true` above produce a sentence, and every
+ * sentence produced ends in a clause. A quantity that acquired a clause without acquiring a `true`
+ * would be a sentence nothing draws.
+ */
+const DENOMINATOR_CLAUSE: Readonly<Record<GoalObservationId, string>> = Object.freeze({
+  carryPct: '',
+  minutePct: 'this share is over the legs that boarded',
+  peakQueue: '',
+  abandoned: '',
+  worstWaitS: '',
+  loadedDepartures: 'a leg that never boarded made no trip',
+  workPerServedLegKJ: '',
+});
+
+/**
+ * The count of riders who waited past the give-up horizon, phrased to sit **beside** one goal —
+ * the empty string on a goal the count cannot flatter, and on a run where nobody did.
+ *
+ * ## What it says, and why every clause is load-bearing
+ *
+ * `20 of 340 waited past the 15-minute give-up horizon, none of them carried; this share is over
+ * the legs that boarded`.
+ *
+ * - **The count with its own denominator.** R13's rule — a figure never travels without the
+ *   population it was taken over — and {@link GoalObservations.arrived} is that population.
+ * - **The overlap, always** ([§ D417](../../../../DECISIONS.md)). `abandoned` counts *waits that
+ *   crossed the horizon*, whether or not a car eventually came; it is an attribute, not a fourth
+ *   disjoint outcome. On a no-patience saturated run every one of those legs can still board, so a
+ *   surface publishing the bare count invites a reader to subtract it from the people. The three
+ *   branches are the three shapes the overlap takes.
+ * - **The run's own horizon**, from {@link GoalObservations.horizonS}, for the same decision.
+ * - **The denominator clause**, which is the § D106 content rather than the § D417 content: it
+ *   names *why the count is standing here*. A reader meeting `100 %` beside `20 of 340 waited past
+ *   the horizon` can see that the hundred per cent is over the ones who boarded.
+ *
+ * ## What it deliberately does not say
+ *
+ * It does not say they *gave up and took the stairs* — `docs/19` defect 3, and
+ * `report.ts#leversFor` carries the same correction in the same words. On a run that declares no
+ * `sim.patience`, and no shipped configuration does, nobody actually left; what is true of all of
+ * them is that the wait crossed the line. It also carries no verdict, no tone and no arithmetic
+ * against the bar: {@link GoalReading.state} is the verdict and this is an observation beside it.
+ *
+ * Pure in its two arguments, so the rail, the stage strip, the report sheet and the campaign desk
+ * cannot draw four sentences about one run.
+ */
+export function gaveUpBesideOf(goal: ShiftGoal, observations: GoalObservations): string {
+  if (!ABANDONMENT_FLATTERS[goal.reads]) return '';
+  const { abandoned, abandonedCarried, arrived, horizonS } = observations;
+  if (abandoned <= 0) return '';
+  const overlap =
+    abandonedCarried === 0
+      ? 'none of them carried'
+      : abandonedCarried === abandoned
+        ? 'every one of them carried'
+        : `${String(abandonedCarried)} of them carried`;
+  return (
+    `${String(abandoned)} of ${String(arrived)} waited past the ${horizonLabelOf(horizonS)} ` +
+    `give-up horizon, ${overlap}; ${DENOMINATOR_CLAUSE[goal.reads]}`
+  );
+}
+
 
 /**
  * How full the bar is, `0`–`100` — the design's own formula (`design.html` :2387–2389).

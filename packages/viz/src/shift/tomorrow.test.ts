@@ -46,6 +46,10 @@ const CLEAN: GoalObservations = {
   minutePct: 96,
   peakQueue: 3,
   abandoned: 0,
+  // The overlap and the run's own horizon that § D417 binds every publisher of
+  // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+  abandonedCarried: 0,
+  horizonS: 900,
   worstWaitS: 45,
   worstWaitIsCensored: false,
   // Under `GOAL_BARS.energyPerLegMaxKJ`. The energy bar reads it, and a fixture that left it out
@@ -68,6 +72,10 @@ const QUIET: GoalObservations = {
   minutePct: 100,
   peakQueue: 1,
   abandoned: 0,
+  // The overlap and the run's own horizon that § D417 binds every publisher of
+  // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+  abandonedCarried: 0,
+  horizonS: 900,
   worstWaitS: 15,
   worstWaitIsCensored: false,
 };

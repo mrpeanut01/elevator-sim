@@ -84,6 +84,7 @@ import { runHorizonOf } from '../shift/dayLength.js';
 import {
   PENDING_DISPLAY,
   bestLineFor,
+  gaveUpBesideOf,
   goalsForDay,
   readGoals,
   wasDisplayOf,
@@ -686,6 +687,13 @@ export interface GoalRow {
    * cannot show two different yesterdays.
    */
   readonly was: string;
+  /**
+   * The riders whose wait crossed the give-up horizon, beside a goal their standing there could
+   * flatter — `shift/goals.ts#gaveUpBesideOf`, `''` everywhere else. § D106 at the renderer,
+   * GitHub issue #456: *a configuration that improves its wait by serving fewer people has not
+   * improved anything*, so the count stands beside the verdict and changes none of it.
+   */
+  readonly beside: string;
   readonly state: GoalReading['state'];
   readonly barPct: number;
   /** Glyph and value colour. */
@@ -710,6 +718,7 @@ export function goalRowsOf(
   readings: readonly GoalReading[],
   history: readonly DayOutcome[],
   day: number,
+  observations: GoalObservations,
 ): readonly GoalRow[] {
   return readings.map((reading) => {
     const met = reading.state === 'met';
@@ -720,6 +729,13 @@ export function goalRowsOf(
       label: reading.goal.label,
       value: reading.display,
       was: was === PENDING_DISPLAY ? PENDING_DISPLAY : `was ${was}`,
+      /*
+       * The fourth argument is here rather than on the reading because the count is a fact about
+       * the **day**, not about the verdict: `GoalReading` is persisted inside `DayOutcome` and a
+       * field derived from observations a restored outcome does not carry could never be checked
+       * against anything. Every caller of this function already holds the fold it graded with.
+       */
+      beside: gaveUpBesideOf(reading.goal, observations),
       state: reading.state,
       barPct: reading.progressPct,
       color: pending ? FAINT : met ? GOOD : CAUTION,
@@ -1279,10 +1295,17 @@ function drawShift(
     readGoals(shiftGoalsOf(state, view.resources), observations),
     week.history,
     week.day,
+    observations,
   );
   surfaces.goals(
     goals
-      .map((goal) => `${goal.label}=${goal.value}=${goal.was}=${String(goal.barPct)}`)
+      .map(
+        (goal) =>
+          // `beside` is in the key, not only in the DOM: this renderer redraws on a changed key, so
+          // a row whose only movement is the riders-who-left figure would otherwise keep the
+          // previous day's sentence on screen — the defect class this file's diffing exists inside.
+          `${goal.label}=${goal.value}=${goal.was}=${String(goal.barPct)}=${goal.beside}`,
+      )
       .join('|'),
     () =>
       goals.map((goal) =>
@@ -1308,6 +1331,23 @@ function drawShift(
                 }),
               ],
             }),
+            /*
+             * The riders who were left standing — § D106 at the renderer, GitHub issue #456.
+             *
+             * Under the claim and above the track, in the faint ink the *was* slot uses, because it
+             * is an observation about the day rather than a second verdict: it carries no glyph, no
+             * tone and no arithmetic against the bar. Absent rather than empty on the goals it
+             * cannot flatter, so no row grows a blank line about a population it does not have.
+             */
+            ...(goal.beside === ''
+              ? []
+              : [
+                  el(doc, 'span', {
+                    className: 'goal-beside',
+                    text: goal.beside,
+                    style: { color: FAINT },
+                  }),
+                ]),
             el(doc, 'span', {
               className: 'goal-track',
               children: [
@@ -1343,6 +1383,12 @@ function goalObservationsOf(
       minutePct: 100,
       peakQueue: 0,
       abandoned: 0,
+      // Nobody's wait crossed a line nobody stood at, and **there is no run whose horizon to
+      // name** — so `horizonS` is `0` rather than 900, which would be this fold asserting a run's
+      // number on behalf of a run that has not happened. It reaches no string: `gaveUpBesideOf`
+      // returns the empty string at `abandoned: 0` before it reads the horizon at all.
+      abandonedCarried: 0,
+      horizonS: 0,
       worstWaitS: 0,
       worstWaitIsCensored: false,
     };

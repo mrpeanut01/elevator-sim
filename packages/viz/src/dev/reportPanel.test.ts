@@ -921,6 +921,7 @@ describe('a week’s slots are absent, not blank, on a run that has no week', ()
         progressPct: 0,
       },
       was: PENDING_DISPLAY,
+      beside: '',
     };
     const report = reportOf(clean, 4, SINGLE);
     if (report.of !== 'single-run') throw new Error('expected a single-run sheet');
@@ -968,7 +969,7 @@ describe('the goal rows carry a second, non-colour signal — KB-15', () => {
   it('gives every state a glyph and a word, not only a colour', () => {
     const seen = new Set<string>();
     for (const state of ['met', 'missed', 'pending'] as const) {
-      const row = goalRowViewOf({ reading: reading(state), was: '—' });
+      const row = goalRowViewOf({ reading: reading(state), was: '—', beside: '' });
       expect(row.glyph).toBe(GOAL_GLYPHS[state]);
       expect(row.help.length).toBeGreaterThan(0);
       seen.add(row.colour);
@@ -979,7 +980,7 @@ describe('the goal rows carry a second, non-colour signal — KB-15', () => {
   });
 
   it('draws a pending goal as neither met nor missed', () => {
-    const row = goalRowViewOf({ reading: reading('pending'), was: '—' });
+    const row = goalRowViewOf({ reading: reading('pending'), was: '—', beside: '' });
     expect(row.background).toBe('transparent');
     expect(row.help).toContain('not graded');
     expect(row.display).toBe('—');
@@ -988,8 +989,8 @@ describe('the goal rows carry a second, non-colour signal — KB-15', () => {
   it('dresses the "was" slot as the rail does — the word only when there is a figure', () => {
     // One spelling of yesterday on both surfaces: `dev/leftRail.ts#goalRowsOf` makes the same
     // two-way choice, and a sheet that said `was —` would dress an absence as a measurement.
-    expect(goalRowViewOf({ reading: reading('met'), was: '—' }).was).toBe('—');
-    expect(goalRowViewOf({ reading: reading('met'), was: '91%' }).was).toBe('was 91%');
+    expect(goalRowViewOf({ reading: reading('met'), was: '—', beside: '' }).was).toBe('—');
+    expect(goalRowViewOf({ reading: reading('met'), was: '91%', beside: '' }).was).toBe('was 91%');
   });
 });
 

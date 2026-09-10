@@ -56,7 +56,7 @@
  * copy objects, which nothing renders.
  */
 
-import { readGoal, wasDisplayOf, PENDING_DISPLAY } from '../shift/goals.js';
+import { gaveUpBesideOf, readGoal, wasDisplayOf, PENDING_DISPLAY } from '../shift/goals.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import { shopTierPrice } from '../campaign/economy.js';
 import type { DayOutcome, GoalObservations, GoalReading, ShiftGoal } from '../shift/types.js';
@@ -293,6 +293,17 @@ export interface CampaignTestRow {
   readonly target: string;
   /** § 7's *was* — the previous day's own figure, or `—`. */
   readonly was: string;
+  /**
+   * The riders whose wait crossed the give-up horizon, beside a test their standing there could
+   * flatter — `shift/goals.ts#gaveUpBesideOf`, and `''` on every other test, on every run where
+   * nobody's did, and on a day with no run to fold. § D106 at the renderer, GitHub issue #456.
+   *
+   * **Two of these four tests carry it**, which is why the campaign is one of the surfaces the
+   * issue names rather than a bystander: `away` reads the same `minutePct` the daily loop's
+   * `minute` bar reads, and `trips` is an `at-most` wear budget a rider who never boarded never
+   * spent. Both are cleared more easily by a building that leaves people standing.
+   */
+  readonly beside: string;
   readonly tension: string;
   readonly reading: GoalReading | undefined;
 }
@@ -325,6 +336,13 @@ export function campaignTestRows(
       label: goal.label,
       target: `${String(goal.bar)}${suffix}`,
       was: wasDisplayOf(history, tower.day, goal),
+      /*
+       * `''` on a day with no fold, and that is the honest answer rather than a gap: with no
+       * observations there is no count, and inventing *nobody was left standing* about a day
+       * nobody has run is the fabricated-zero this file already refuses one field over (see
+       * {@link campaignTestGoals}'s fourth row).
+       */
+      beside: observations === undefined ? '' : gaveUpBesideOf(goal, observations),
       tension: TEST_TENSIONS[goal.id] ?? '',
       reading: observations === undefined ? undefined : readGoal(goal, observations),
     };

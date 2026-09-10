@@ -103,7 +103,7 @@ import { interventionLogOf } from '../live/interventions.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
 import { contractStatus } from './contracts.js';
-import { readGoals, wasDisplayOf } from './goals.js';
+import { gaveUpBesideOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
 import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
 import {
@@ -843,6 +843,19 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     goals: readings.map((reading) => ({
       reading,
       was: wasDisplayOf(week.history, week.day, reading.goal),
+      /*
+       * The riders who were left standing, beside the goal their standing there could flatter —
+       * § D106 at the renderer, GitHub issue #456. `''` on the four bars the count cannot move and
+       * on every run where nobody's wait crossed the line; `goals.ts#gaveUpBesideOf` owns which is
+       * which and why, and is the same expression the rail, the stage strip and the campaign desk
+       * draw, so four surfaces cannot say four things about one run.
+       *
+       * The TOOK THE STAIRS cell in the grid above is not this and does not replace it. That cell
+       * is the day's figure; this is the figure standing beside the *verdict* it flatters, which is
+       * what § D106's *beside, never folded in* asks for and what `docs/14` § 5 criterion 4 says
+       * must be **shown** rather than derivable from elsewhere on the same page.
+       */
+      beside: gaveUpBesideOf(reading.goal, observations),
     })),
     diagnosis: diagnosisFor(recording, observations, dayStartS, judgement.verdict),
     levers: leversFor(recording, observations, summary, readings),
@@ -1403,12 +1416,6 @@ function turnedAwayClause(observations: Observations): string {
     `a further ${String(turnedAway)} never waited at all — the building turned them away at a ` +
     'credential check, which is a different outcome and not a slow one'
   );
-}
-
-/** `15-minute` for a whole-minute horizon, `900 s` for anything else. The run's own number. */
-function horizonLabelOf(horizonS: number): string {
-  const minutes = horizonS / 60;
-  return Number.isInteger(minutes) ? `${String(minutes)}-minute` : `${horizonS.toFixed(0)} s`;
 }
 
 /**

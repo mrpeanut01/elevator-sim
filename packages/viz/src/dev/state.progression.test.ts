@@ -79,6 +79,10 @@ const CLEAN: GoalObservations = Object.freeze({
   minutePct: 100,
   peakQueue: 4,
   abandoned: 0,
+  // The overlap and the run's own horizon that § D417 binds every publisher of
+  // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+  abandonedCarried: 0,
+  horizonS: 900,
   worstWaitS: 40,
   worstWaitIsCensored: false,
   // Under `GOAL_BARS.energyPerLegMaxKJ`, because *every bar the day asks for* is five of them
@@ -94,6 +98,10 @@ const AWFUL: GoalObservations = Object.freeze({
   minutePct: 38,
   peakQueue: 51,
   abandoned: 7,
+  // The overlap and the run's own horizon that § D417 binds every publisher of
+  // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+  abandonedCarried: 0,
+  horizonS: 900,
   // Past every shipped ceiling, and *uncensored* — the worst sufferer boarded eventually, so the
   // maximum is exact and the goal grades `missed` rather than refusing.
   worstWaitS: 940,

@@ -344,7 +344,7 @@ export type GoalObservationId = (typeof GOAL_OBSERVATION_IDS)[number];
 /**
  * Everything a goal may read — **and structurally nothing that `awtIsValid` could suppress**.
  *
- * Nine fields: seven gradeable, and two gates. Six of the gradeable ones are a *count*, a ratio of
+ * Eleven fields: seven gradeable, and four gates. Six of the gradeable ones are a *count*, a ratio of
  * counts, or a maximum of measured durations: how many turned up, what share got carried, what
  * share was away inside a minute, how deep the worst landing got, how many gave up, how long the
  * worst-served rider stood, how many loaded departures the machines made. The seventh is a ratio of
@@ -358,6 +358,14 @@ export type GoalObservationId = (typeof GOAL_OBSERVATION_IDS)[number];
  * `live/types.ts#LiveObservations.worstWaitIsCensored`), so {@link worstWaitIsCensored} rides
  * beside it and `goals.ts#readGoal` refuses to grade the pair. It is a **gate, not a goal**: it
  * is deliberately not in {@link GOAL_OBSERVATION_IDS}, exactly as {@link arrived} is not.
+ *
+ * {@link abandonedCarried} and {@link horizonS} are the third and fourth gates and they arrived
+ * together, on GitHub issue #456. They are here for [§ D417](../../../../DECISIONS.md), which binds
+ * every surface publishing {@link abandoned} to publish the overlap and the run's own horizon
+ * beside it — and {@link abandoned} has been on this type since it was written. A goal layer that
+ * could publish the count and not the caption was structurally unable to obey a rule that names it,
+ * which is what the move fixes. Neither is in {@link GOAL_OBSERVATION_IDS}: an overlap is not a
+ * bar, and a goal that read the horizon would be grading the ruler.
  *
  * {@link loadedDepartures} carries its own refusal instead of a second field, and that is the same
  * argument in a cheaper shape: it is **optional**, and its absence *is* the gate. A recording that
@@ -380,8 +388,8 @@ export interface GoalObservations {
   /** The deepest a single landing has stacked, in people. */
   readonly peakQueue: number;
   /**
-   * Legs whose wait crossed {@link Observations.horizonS}, the run's own abandonment horizon. The
-   * handoff calls them *took the stairs*.
+   * Legs whose wait crossed {@link horizonS}, the run's own abandonment horizon. The handoff calls
+   * them *took the stairs*.
    *
    * **A wait that ended in a refusal is not one of them** — GitHub issue #288. A rider the building
    * turned away for want of a credential never boards, and while the ending rule read `boardedAt`
@@ -390,6 +398,36 @@ export interface GoalObservations {
    * `live/observations.ts#crossesHorizonAt`.
    */
   readonly abandoned: number;
+  /**
+   * Of {@link abandoned}, the legs that were nonetheless carried — the overlap between the sheet's
+   * TOOK THE STAIRS and CARRIED cells (`docs/19` defect 3).
+   *
+   * Carried so a surface can make the people-accounting total: `abandoned` is an **attribute** (a
+   * wait that crossed the horizon), not a disjoint outcome, and on a no-patience saturated run
+   * every abandoned leg can still board and land inside `carried`. A caption that treats the two
+   * cells as adding — `768 of 768 who turned up` beside `TOOK THE STAIRS 348` — cannot be
+   * totalled by a reader; the note that names this overlap can.
+   *
+   * **It moved here from {@link Observations} on GitHub issue #456, and the reason is
+   * [§ D417](../../../../DECISIONS.md).** That decision binds *every* surface that publishes
+   * `abandoned` to publish the overlap with it, against the run's own horizon. `abandoned` has
+   * always been on this type, so until the move the goal layer could publish the count and was
+   * structurally unable to publish the caption § D417 requires beside it — which is how
+   * `goals.ts#gaveUpBesideOf` came to need it. It is a **gate-shaped field, not a gradeable one**:
+   * it is deliberately not in {@link GOAL_OBSERVATION_IDS}, exactly as {@link arrived} and
+   * {@link worstWaitIsCensored} are not, so no goal can be written against it.
+   */
+  readonly abandonedCarried: number;
+  /**
+   * The abandonment horizon {@link abandoned} is drawn at, seconds — `summary.serviceLevel.horizonS`,
+   * copied and never assumed, so a caption names this run's own line rather than a hard-coded
+   * fifteen minutes.
+   *
+   * Here rather than on {@link Observations} for {@link abandonedCarried}'s reason, and it is the
+   * other half of what § D417 requires travel with the count. Gate-shaped, not gradeable: a goal
+   * reading the *horizon* would be grading the ruler.
+   */
+  readonly horizonS: number;
   /**
    * The longest wait known so far, whole seconds. `0` when nobody has arrived — never displayed
    * or compared there, because {@link arrived} is then under {@link WAKE_UP_ARRIVALS}.
@@ -469,17 +507,6 @@ export interface Observations extends GoalObservations {
   /** Legs that boarded. {@link minutePct}'s denominator, and R13's `n` for it. */
   readonly servedLegs: number;
   /**
-   * Of {@link GoalObservations.abandoned}, the legs that were nonetheless carried — the overlap
-   * between the sheet's TOOK THE STAIRS and CARRIED cells (`docs/19` defect 3).
-   *
-   * Carried so the sheet can make the people-accounting total: `abandoned` is an **attribute** (a
-   * wait that crossed the horizon), not a disjoint outcome, and on a no-patience saturated run
-   * every abandoned leg can still board and land inside `carried`. A caption that treats the two
-   * cells as adding — `768 of 768 who turned up` beside `TOOK THE STAIRS 348` — cannot be
-   * totalled by a reader; the note that names this overlap can.
-   */
-  readonly abandonedCarried: number;
-  /**
    * Legs the building **turned away for want of a credential** — § D265's fourth outcome, which is
    * neither delivered, nor waiting, nor abandoned.
    *
@@ -498,12 +525,6 @@ export interface Observations extends GoalObservations {
    * building whose riders are all correctly badged.
    */
   readonly turnedAway: number;
-  /**
-   * The abandonment horizon the {@link GoalObservations.abandoned} count is drawn at, seconds —
-   * `summary.serviceLevel.horizonS`, copied and never assumed, so the TOOK THE STAIRS caption
-   * names this run's own line rather than a hard-coded fifteen minutes.
-   */
-  readonly horizonS: number;
   /** Where the deepest queue stood. `null` when no landing ever held anybody. */
   readonly peakQueueFloorId: string | null;
   /**
@@ -611,6 +632,16 @@ export interface GoalLine {
    * was itself ungraded. Never a number invented to fill the slot.
    */
   readonly was: string;
+  /**
+   * The riders whose wait crossed the give-up horizon, beside a goal their standing there could
+   * flatter — `goals.ts#gaveUpBesideOf`, and the empty string on every other goal and every run
+   * where nobody did. [§ D106](../../../../DECISIONS.md) at the renderer, GitHub issue #456.
+   *
+   * A sibling of the reading for {@link was}'s reason and one more: it is derived from the
+   * **observations**, which a restored {@link DayOutcome} does not carry, so a persisted copy
+   * could not be recomputed and checked against anything.
+   */
+  readonly beside: string;
 }
 
 /* -------------------------------------------------------------------------- *

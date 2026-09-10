@@ -632,6 +632,22 @@ export interface EverydayHost {
    */
   goalsAt(simTimeS: number): readonly GoalReading[];
 
+  /**
+   * **The fold those goals were graded against**, at the same instant — GitHub issue **#456**.
+   *
+   * The one thing {@link goalsAt} throws away. `GoalReading` carries the verdict and the figure and
+   * not the day, so a surface holding readings alone cannot say how many riders were left standing
+   * beside the share those readings grade — which is § D106's rule (*abandonment is published
+   * beside AWT, never folded into it*) arriving at a screen with nothing to publish.
+   *
+   * The same local expression {@link goalsAt} folds, exposed rather than re-derived: a stage that
+   * called `observationsAt` for itself would be two folds of one recording at one instant, which is
+   * `shift/observations.ts`'s own stated failure mode and § D111's twice-written suppression gate.
+   *
+   * Before any run this is `NO_RUN_OBSERVATIONS`, whose `arrived: 0` sits under the wake-up gate.
+   */
+  goalFactsAt(simTimeS: number): GoalObservations;
+
   /** The last filed day's sheet, or `undefined` while no closed day's report is standing. */
   lastReport(): ShapedDayReport | undefined;
 
@@ -1534,6 +1550,13 @@ const NO_RUN_OBSERVATIONS: GoalObservations = Object.freeze({
   minutePct: 100,
   peakQueue: 0,
   abandoned: 0,
+  // Nobody's wait crossed a line nobody stood at, and **there is no run whose horizon to name** —
+  // so `horizonS` is `0` rather than 900, which would be this fold asserting a run's number on
+  // behalf of a run that has not happened. It reaches no string: `goals.ts#gaveUpBesideOf` returns
+  // the empty string at `abandoned: 0` before it reads the horizon at all. Byte-identical to
+  // `dev/leftRail.ts#goalObservationsOf`'s zero fold, which is the point of this constant.
+  abandonedCarried: 0,
+  horizonS: 0,
   worstWaitS: 0,
   worstWaitIsCensored: false,
 });
@@ -1774,14 +1797,15 @@ export function createEverydayHost(
    * drift from the first: `goalsToday` is *this, at the Engineer transport's instant*, and that is
    * one expression rather than a copy of one. GitHub issue #277.
    */
-  const goalsAt = (simTimeS: number): readonly GoalReading[] => {
+  const goalFactsAt = (simTimeS: number): GoalObservations => {
     const state = b.state();
-    const observations =
-      state.recording === undefined
-        ? NO_RUN_OBSERVATIONS
-        : shiftObservationsOf(observationsAt(state.recording, simTimeS));
-    return readGoals(goalsForDay(state.week.day, horizonOf(b)), observations);
+    return state.recording === undefined
+      ? NO_RUN_OBSERVATIONS
+      : shiftObservationsOf(observationsAt(state.recording, simTimeS));
   };
+
+  const goalsAt = (simTimeS: number): readonly GoalReading[] =>
+    readGoals(goalsForDay(b.state().week.day, horizonOf(b)), goalFactsAt(simTimeS));
 
   /**
    * Enter the spectator state if the gate passed, and hand the row back either way.
@@ -1827,6 +1851,7 @@ export function createEverydayHost(
     contract: () => contractById(b.state().week.contractId),
     calendarPeriod: () => b.state().calendar,
     goalsAt,
+    goalFactsAt,
     goalsToday: () => goalsAt(b.playheadS()),
     lastReport: () => b.state().report,
     lastOutcome: () => b.state().week.history.at(-1),
