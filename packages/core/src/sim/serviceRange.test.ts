@@ -231,17 +231,38 @@ describe('the model carries a moved range and a derated rating, and reset restor
     expect(building.bankById('express')?.rangeMoved).toBe(false);
   });
 
-  it('refuses a floor the building does not declare, and refuses a double-deck bank at the model too', () => {
-    const bank = new Bank({
+  it('refuses an empty range, and refuses a double-deck bank — the guard is on the cars, not the pairs', async () => {
+    const config = await load();
+    const paired = new Bank({
       id: 'dd',
       servesFloors: ['G', '2', '3'],
       servesFloorPairs: [['G', '2']],
       cars: [],
       carSpecs: [],
     });
-    // No car is double-deck, so the bank is not; the guard is on the bank's own flag.
-    expect(bank.isDoubleDeck).toBe(false);
-    expect(() => bank.setServesFloors([])).toThrow(/serve no floors/);
+    // No car is double-deck, so the bank is not: a pairing without a double-deck car is inert
+    // config (`parse.ts` warns `unused-floor-pairs`), and the guard reads the cars.
+    expect(paired.isDoubleDeck).toBe(false);
+    expect(() => paired.setServesFloors([])).toThrow(/serve no floors/);
+
+    /*
+     * And the double-deck refusal itself, which the title above used to claim and this file did not
+     * assert — GitHub issue #477. The throw is the last of four refusals now (config, scheduling,
+     * the press, and this), so it is the one a shipped path should never reach; it is kept, and
+     * kept asserted, because a guard nobody checks is a guard that can be softened to a no-op by
+     * accident. `bank.test.ts` owns the flag; what is asserted here is that `setServesFloors`
+     * refuses on it and says why.
+     */
+    const shuttleConfig = config.buildingsById
+      .get('vertical-city')
+      ?.banks.find((bank) => bank.id === 'shuttle');
+    if (shuttleConfig === undefined) throw new Error('vertical-city declares no shuttle bank');
+    const shuttle = Bank.fromConfig(shuttleConfig);
+    expect(shuttle.isDoubleDeck).toBe(true);
+    // A whole pair dropped — the one new range that disturbs no coupling — is refused with the
+    // rest, which is the decision `config/serviceEvent.ts#bankRangeIsFixed` argues.
+    expect(() => shuttle.setServesFloors(['G', '2', '26', '27', '51', '52'])).toThrow(/double-deck/);
+    expect(shuttle.servesFloors).toEqual(shuttle.declaredFloors);
   });
 
   it('LoadSensor.derate moves the design load, the bypass and the alarm, and reset restores the plate', () => {

@@ -1372,6 +1372,23 @@ export class Simulation {
     ]);
     const events = this.#serviceSchedule;
     for (const [index, event] of events.entries()) {
+      // **The building's own schedule reaches this loop unchecked, and `resolveBuilding` is not
+      // always the thing that built it** (GitHub issue #477). A `ResolvedBuilding` assembled by
+      // hand — fixtures, the fuzz generator, `experiments/validation/syntheticBuilding.ts`, which
+      // `config/types.ts#ResolvedBuilding.serviceEvents` names — skips the located `ConfigError`
+      // that refuses a range entry on a double-deck bank, and the entry then fired and threw a
+      // `ModelError` out of the run. Warned and skipped here, so the guard is on the *schedule*
+      // rather than on one of its two feeders.
+      //
+      // Carried effects cannot reach this branch — `#carriedEffectEvents` filtered them, naming
+      // the intervention that bought them — so this message may keep saying `serviceEvents[…]`,
+      // which is the same argument the deadline branch below it already makes.
+      if (isServiceRangeEvent(event) && this.#building.bankById(event.bankId)?.isDoubleDeck === true) {
+        this.#warnings.push(
+          `serviceEvents[${index}] would ${describeServiceEvent(event)} at ${event.atS} s, and bank "${event.bankId}" is double-deck: the two decks are bolted together and open as one stop, so each of its floor pairs is a single stop position and a served-floor list cannot split one. Its range is fixed for the run. It was not scheduled and the building is unchanged by it.`,
+        );
+        continue;
+      }
       if (event.atS > this.#deadlineS) {
         this.#deadlineTruncations += 1;
         this.#warnings.push(
@@ -1400,7 +1417,9 @@ export class Simulation {
    * differ — {@link Simulation.#carriedEffectPhrase} — because a warning that called a bought
    * rezone *an incident answer* would send a reader hunting an incident that never happened.
    *
-   * Three refusals, each on its own ground:
+   * Four refusals, each on its own ground, and the split between *warned* and *thrown* is the
+   * distinction between an effect this build cannot carry and a record this build cannot have
+   * produced:
    *
    * - **An effect before its own answer is refused loudly.** Contract § 1.4's whole mechanism is
    *   that everything before `atS` is bit-identical on re-simulation; an answer at 12:31 whose
@@ -1408,6 +1427,12 @@ export class Simulation {
    *   defect in the entry, warned by name, and never scheduled.
    * - **An effect past the drain deadline is refused loudly**, exactly as a building's own
    *   schedule entry is, and counted in the same `deadlineTruncations`.
+   * - **An effect moving the range of a double-deck bank is warned and not scheduled** (GitHub
+   *   issue #477). `Bank.setServesFloors` refuses such a bank, so before this ground existed the
+   *   effect fired and threw a `ModelError` **out of the run** — a shipped `rezone-bank` aimed at
+   *   `vertical-city`'s shuttles ended the day. It joins the two above rather than the one below
+   *   because the bank is real and the priced row is real: what this build cannot do is *express*
+   *   the change, which is the deadline branch's category and not the corrupt-record one.
    * - **An effect naming a car this run did not build throws.** The building's own schedule gets
    *   this check at config time (`resolveBuilding` raises a located `ConfigError`); an
    *   intervention's effects have no config pass, so scheduling time is their config time, and a
@@ -1466,11 +1491,18 @@ export class Simulation {
           continue;
         }
         if (isServiceRangeEvent(effect)) {
-          // A range effect names a bank and floors; the model refuses an unknown bank, an unknown
-          // floor or a double-deck bank when it fires, with the same words `resolveBuilding` uses,
-          // and a building's own schedule gets that check at config time. Kept to the two facts
-          // this method can check without the model: the bank exists and the set is non-empty.
-          if (this.#building.bankById(effect.bankId) === undefined) {
+          // A range effect names a bank and floors. Three facts are checked here — the bank exists,
+          // the set is non-empty, and the bank's range can move at all — because an intervention's
+          // effects have no config pass, where a building's own schedule gets all three.
+          //
+          // **A floor the building does not declare is deliberately still left to the model**, which
+          // throws when the event fires. That is a genuinely corrupt record rather than a change
+          // this build cannot express, and it is the unknown-bank case one field over: warning past
+          // it would be the silent no-op GitHub issue #477 names as the wrong fix. What it is not
+          // is consistent — it surfaces as a `ModelError` where its sibling is a `SimulationError`
+          // — and that is left alone rather than widened into this commit.
+          const target = this.#building.bankById(effect.bankId);
+          if (target === undefined) {
             throw new SimulationError(
               `interventions[${index}]'s ${phrase} moves the range of bank "${effect.bankId}", which this run did not build. Known banks: ${this.#building.banks.map((bank) => bank.id).join(', ')}.`,
             );
@@ -1479,6 +1511,33 @@ export class Simulation {
             throw new SimulationError(
               `interventions[${index}]'s ${phrase} would set bank "${effect.bankId}" to serve no floors, which is a car out of service wearing a different name; say that instead.`,
             );
+          }
+          // **A bank whose range is fixed for the run** (GitHub issue #477). `Bank.setServesFloors`
+          // refuses a double-deck bank — § D131's *a stop position is the lower floor of a pair*,
+          // argued at `config/serviceEvent.ts#bankRangeIsFixed` — and before this guard existed the
+          // effect was scheduled, fired, and surfaced as a `ModelError` **out of the run**: a
+          // shipped `rezone-bank` aimed at `vertical-city`'s shuttles ended the day.
+          //
+          // Read off `Bank.isDoubleDeck`, which is the flag `setServesFloors` itself refuses on, so
+          // the scheduling refusal and the fire-time one cannot come to disagree about which banks
+          // they are talking about. The config layer and the pricing layer ask the same question of
+          // resolved config instead, through `bankRangeIsFixed`.
+          //
+          // Warned rather than thrown, which puts it with the two refusals above it in this method
+          // rather than with the two below: an unknown bank and an empty set are records this build
+          // could never have produced, while this is a real bank and a real priced row carrying a
+          // change **this build cannot express**, which is the deadline branch's own category. So
+          // the run survives, the record keeps its stamp, and the building is unchanged by it.
+          //
+          // It is deliberately not a `try/catch` at the fire site: that would turn the crash into a
+          // silent no-op, and a priced change that takes the money and does nothing is worse than
+          // one that fails loudly. The money is refused a layer up, at
+          // `packages/viz/src/live/interventions.ts#admitWorks`, before anything is appended.
+          if (target.isDoubleDeck) {
+            this.#warnings.push(
+              `interventions[${index}] ${verb} at ${entry.atS} s with an effect that would ${describeServiceEvent(effect)} at ${effect.atS} s, and bank "${effect.bankId}" is double-deck: the two decks are bolted together and open as one stop, so each of its floor pairs is a single stop position and a served-floor list cannot split one. Its range is fixed for the run. It was not scheduled and the building is unchanged by it.`,
+            );
+            continue;
           }
           events.push(effect);
           continue;

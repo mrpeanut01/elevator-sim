@@ -24,11 +24,14 @@
  *    with the deviation stated in the module docstring.
  */
 
-import { describe, expect, it } from 'vitest';
+import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import type { VizRecording } from '../contract/types.js';
+import { requireBuilding } from '../fixtures.test-helper.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { WAIT_BANDS } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { syntheticRecording, servedLeg, waitingLeg } from '../live/synthetic.test-helper.js';
@@ -589,6 +592,72 @@ describe('§ 7.6 — the intervention control', () => {
     expect(handover?.refusal).toBeUndefined();
     expect(armsFor({ target: OTHER, driving: PLAIN }).rows.at(-1)?.note).toBeUndefined();
   });
+
+  /* ------------------------------------------------------------------ *
+   * The purchase rows — GitHub issues #370 and #477
+   * ------------------------------------------------------------------ */
+
+  /**
+   * **The refusal reaches the row that offers the press**, which is the half of GitHub issue #477
+   * that decides whether a player is charged. `admitWorks` decides and this assembles, so what is
+   * asserted here is the wiring: the row is still **drawn**, with the reason on it, and it carries
+   * no `note` and no bare disabled state — {@link StageInterventionRow.refusal}'s own contract, and
+   * § 7.6's fourth rule.
+   *
+   * `worksRowsOf` had no test at all before this, because `StageWorksInput` has no non-test caller
+   * yet (the scenario ladder is validated at load and read by nothing at play time, #367). That is
+   * exactly why the row is driven here rather than left until a screen supplies one: the first
+   * screen to offer a rezone is the screen that meets this defect.
+   */
+  it('draws a refused purchase row with the reason on it, rather than hiding it — #370, #477', async () => {
+    const config: LoadedConfig = await loadConfig(DATA_DIR);
+    const verticalCity = requireBuilding(config, 'vertical-city');
+    const schedule = shippedPriceSchedule();
+    const rezone = schedule.changes.find((row) => row.id === 'rezone-bank');
+    expect(rezone).toBeDefined();
+
+    const view = stageInterventionsOf({
+      interventions: [],
+      simTimeS: 0,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      works: {
+        schedule,
+        // A rung that covers it many times over, so nothing below can be about money.
+        budgetUnits: (rezone?.priceUnits ?? 0) * 10,
+        building: verticalCity,
+        offers: [
+          {
+            changeId: 'rezone-bank',
+            serviceEvents: [
+              { atS: 700, bankId: 'shuttle', servesFloors: ['G', '2', '26', '27', '51', '52'] },
+            ],
+          },
+          {
+            changeId: 'rezone-bank',
+            serviceEvents: [
+              { atS: 700, bankId: 'zone-1-local', servesFloors: ['G', '2', '3', '4'] },
+            ],
+          },
+        ],
+      },
+    });
+
+    const [shuttleRow, localRow] = view.rows.slice(-2);
+    // Drawn, not dropped: a control that vanishes teaches a player nothing about why.
+    expect(view.rows).toHaveLength(STAGE_INTERVENTIONS.length + 2);
+    // The schedule's own name, read rather than typed — a second copy here would be the second
+    // price list #366 exists to end, one field over.
+    expect(shuttleRow?.label).toContain(rezone?.name ?? '');
+    expect(shuttleRow?.label).toContain(String(rezone?.priceUnits ?? 0));
+    expect(shuttleRow?.refusal).toContain('double-deck');
+    expect(shuttleRow?.refusal).toContain('Nothing has been bought.');
+    expect(shuttleRow?.note).toBeUndefined();
+    // And the same priced change on a bank whose range can move is offered, so the refusal is
+    // about the fabric rather than about the row.
+    expect(localRow?.refusal).toBeUndefined();
+  }, 120_000);
 
   it('refuses a handover to the vector already driving, and says why', () => {
     /*

@@ -82,6 +82,7 @@
 
 import type {
   DispatcherProfile,
+  ResolvedBuilding,
   ResolvedServiceEvent,
   RunInterventionConfig,
 } from '@elevator-sim/core/browser';
@@ -938,18 +939,32 @@ export interface StageWorksOffer {
    *
    * `ResolvedServiceEvent[]`, because that is the one plain-data vocabulary the engine has for a
    * mid-run change to the fabric and `core/src/sim/types.ts` explains at length why a bought change
-   * may not invent a second. An offer whose effects this build cannot express is an offer the
-   * caller must not make — the empty list is legal and means *the stamp is the point*.
+   * may not invent a second. The empty list is legal and means *the stamp is the point*.
+   *
+   * **An offer whose effects this build cannot carry is refused rather than left to the caller's
+   * good manners** — GitHub issue **#477**. This sentence used to read *"an offer the caller must
+   * not make"*, which put a modelling rule on the honour system: a `rezone-bank` aimed at one of
+   * `vertical-city`'s double-deck banks was offered, bought, and ended the day with a `ModelError`
+   * out of the run. `live/interventions.ts#admitWorks` now decides it against
+   * {@link StageWorksInput.building}, so the row draws with the reason on it and nothing is spent.
    */
   readonly serviceEvents: readonly ResolvedServiceEvent[];
 }
 
-/** The ladder, the rung and the offers — everything the purchase rows need. */
+/** The ladder, the rung, the tower and the offers — everything the purchase rows need. */
 export interface StageWorksInput {
   /** The shipped ladder, parsed. */
   readonly schedule: PriceSchedule;
   /** The rung in force: the scenario's base plus whatever chimes have bought. */
   readonly budgetUnits: number;
+  /**
+   * **The tower the day is running on** — GitHub issue #477, and required for the reason
+   * `live/interventions.ts#WorksAdmissionInput.building` gives: an offer is admitted against what
+   * it would *do*, and a rezone aimed at a double-deck bank is a change this build cannot carry.
+   * It is the same building the offers' `serviceEvents` name their banks and floors in, so a
+   * screen that can build an offer already holds it.
+   */
+  readonly building: ResolvedBuilding;
   /** What is on offer, in the order the screen should draw it. */
   readonly offers: readonly StageWorksOffer[];
 }
@@ -1043,7 +1058,9 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
  * a bare disabled button (§ 7.6's fourth rule).
  *
  * An offer naming a change the schedule does not price is refused rather than dropped, for the same
- * reason: a control that vanishes teaches a player nothing about why.
+ * reason: a control that vanishes teaches a player nothing about why. So is an offer whose effects
+ * this build cannot carry — GitHub issue **#477**, where a `rezone-bank` aimed at a double-deck
+ * bank used to be offered, bought, and then end the day with a `ModelError` out of the run.
  */
 function worksRowsOf(input: StageInterventionInput): readonly StageInterventionRow[] {
   const { works } = input;
@@ -1062,6 +1079,8 @@ function worksRowsOf(input: StageInterventionInput): readonly StageInterventionR
       interventions: input.interventions,
       changeId: offer.changeId,
       kind: recordedAs,
+      building: works.building,
+      serviceEvents: offer.serviceEvents,
     });
     return Object.freeze({
       change: Object.freeze({

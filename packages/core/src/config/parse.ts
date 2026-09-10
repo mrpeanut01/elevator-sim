@@ -21,7 +21,7 @@
 
 import type { ZodError } from 'zod';
 
-import { isServiceDerateEvent, isServiceRangeEvent } from './serviceEvent.js';
+import { bankRangeIsFixed, isServiceDerateEvent, isServiceRangeEvent } from './serviceEvent.js';
 import { connectivityDiagnostics } from './buildingConnectivity.js';
 import { expandFloors } from './expandFloors.js';
 import { findElevatorSpec, ratedLoadKgOf, resolveCar } from './resolveCar.js';
@@ -533,7 +533,7 @@ export function resolveBuilding(
         return;
       }
       const resolvedBank = banks.find((candidate) => candidate.id === bank.id);
-      if (resolvedBank !== undefined && resolvedBank.cars.some((car) => car.doubleDeck)) {
+      if (resolvedBank !== undefined && bankRangeIsFixed(resolvedBank)) {
         addIssue(
           `${path}.bankId`,
           `service event at ${event.atS} s moves the range of bank "${bank.id}", which has double-deck cars. A double-deck bank's floor pairs are derived from its range when the run is built, so its range cannot move mid-run; author the closed floor into the bank's own servesFloors instead.`,

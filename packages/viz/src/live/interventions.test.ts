@@ -9,13 +9,16 @@
  * shape changes.
  */
 
+import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import {
   RULE_ACTION_WORDS,
   type DispatcherProfile,
+  type ResolvedBuilding,
   type RunInterventionConfig,
 } from '@elevator-sim/core/browser';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
+import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PricedChange } from '../pricing/types.js';
 
@@ -277,6 +280,24 @@ describe('switchChangesNothing', () => {
 describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', () => {
   const schedule = shippedPriceSchedule();
 
+  /*
+   * Two real towers, because the admission is now a question about a *building* as well as about a
+   * purse — GitHub issue #477. `garden-apartments` has no double-deck car anywhere, so it is the
+   * arm on which the three pricing refusals below are about money and nothing else;
+   * `vertical-city` ships eight double-deck shuttles across four floor pairs, which is the tower
+   * the defect was found on. Real buildings rather than fixtures on this file's own stated ground:
+   * a fixture tower would prove that a fixture tower is refused.
+   */
+  let config: LoadedConfig;
+  let singleDeck: ResolvedBuilding;
+  let doubleDeck: ResolvedBuilding;
+
+  beforeAll(async () => {
+    config = await loadConfig(DATA_DIR);
+    singleDeck = requireBuilding(config, 'garden-apartments');
+    doubleDeck = requireBuilding(config, 'vertical-city');
+  }, 120_000);
+
   /** The cheapest and dearest shipped changes on each of the two tiers, found rather than named. */
   const onTier = (tier: string): readonly PricedChange[] =>
     schedule.changes.filter((change) => change.tier === tier).sort((a, b) => a.priceUnits - b.priceUnits);
@@ -370,6 +391,8 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
       interventions: [],
       changeId: dear.id,
       kind: 'building-change',
+      building: singleDeck,
+      serviceEvents: [],
     });
     expect(afforded.admitted).toBe(true);
     expect(afforded.reason).toBeUndefined();
@@ -382,6 +405,8 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
       interventions: [],
       changeId: dear.id,
       kind: 'building-change',
+      building: singleDeck,
+      serviceEvents: [],
     });
     expect(refused.admitted).toBe(false);
     // The refusal names the price, the budget and what is already committed — a sentence saying
@@ -412,9 +437,9 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
 
     // A rung that covers the second change on its own and not beside the first.
     const rung = Math.max(first.priceUnits, second.priceUnits);
-    const alone = admitWorks({ schedule, budgetUnits: rung, interventions: [], changeId: second.id, kind: 'building-change' });
+    const alone = admitWorks({ schedule, budgetUnits: rung, interventions: [], changeId: second.id, kind: 'building-change', building: singleDeck, serviceEvents: [] });
     expect(alone.admitted).toBe(true);
-    const afterTheFirst = admitWorks({ schedule, budgetUnits: rung, interventions: log, changeId: second.id, kind: 'building-change' });
+    const afterTheFirst = admitWorks({ schedule, budgetUnits: rung, interventions: log, changeId: second.id, kind: 'building-change', building: singleDeck, serviceEvents: [] });
     expect(afterTheFirst.admitted).toBe(false);
     expect(afterTheFirst.spentUnits).toBe(first.priceUnits);
   });
@@ -434,6 +459,8 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
       interventions: log,
       changeId: change.id,
       kind: 'building-change',
+      building: singleDeck,
+      serviceEvents: [],
     });
     expect(again.admitted).toBe(true);
   });
@@ -446,6 +473,8 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
       interventions: [],
       changeId: building.id,
       kind: 'equipment-change',
+      building: singleDeck,
+      serviceEvents: [],
     });
     expect(wrongRung.admitted).toBe(false);
     expect(wrongRung.reason).toContain('building rung');
@@ -462,6 +491,8 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
       interventions: [],
       changeId: 'a-change-this-build-has-never-priced',
       kind: 'building-change',
+      building: singleDeck,
+      serviceEvents: [],
     });
     expect(unknown.admitted).toBe(false);
     expect(unknown.reason).toContain('a-change-this-build-has-never-priced');
@@ -495,5 +526,107 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
         },
       ]),
     ).toEqual(['06:01 · parked the cars in the lobby', '06:02 · changed the building — Re-zone a bank']);
+  });
+  /* ------------------------------------------------------------------ *
+   * A rezone the fabric cannot take — GitHub issue #477
+   * ------------------------------------------------------------------ */
+
+  /**
+   * `rezone-bank` is a shipped `building` row covering `building.banks[]`, and `vertical-city`
+   * ships eight double-deck shuttles across four floor pairs. Aimed at one of those banks the
+   * effect used to be admitted, appended, scheduled, fired, and thrown as a `ModelError` **out of
+   * the running day**. The engine now warns and declines to schedule it, which keeps the day alive;
+   * this is the other half, and it is the half that decides whether the player was charged.
+   *
+   * The boundary is checked against the value the defect really had: under the defect this
+   * admission is `true` with `reason: undefined`, so `admitted` is asserted `false` rather than
+   * merely *not truthy*, and the price is asserted **absent from the record** rather than assumed
+   * absent — a control that refused in words and appended anyway would pass a looser check.
+   */
+  const REZONE_SHUTTLE = {
+    atS: 700,
+    bankId: 'shuttle',
+    servesFloors: ['G', '2', '26', '27', '51', '52'],
+  } as const;
+
+  it('refuses a rezone aimed at a double-deck bank, and names the pairing as the reason', () => {
+    const rezone = schedule.changes.find((row) => row.id === 'rezone-bank') as PricedChange;
+    expect(rezone).toBeDefined();
+
+    const admission = admitWorks({
+      schedule,
+      // A rung that covers the change several times over, so the refusal cannot be about money.
+      budgetUnits: rezone.priceUnits * 10,
+      interventions: [],
+      changeId: rezone.id,
+      kind: 'building-change',
+      building: doubleDeck,
+      serviceEvents: [REZONE_SHUTTLE],
+    });
+
+    expect(admission.admitted).toBe(false);
+    expect(admission.reason).toContain('double-deck');
+    // The bank by its authored display name, never its id — gameplay § 16 rule 11.
+    expect(admission.reason).toContain('Double-deck sky lobby shuttle');
+    expect(admission.reason).not.toContain('shuttle"');
+    expect(admission.reason).toContain('Nothing has been bought.');
+    // Not the affordability sentence: a change the build could never carry must not be refused for
+    // money, or a player reads it as *save up and try again*.
+    expect(admission.reason).not.toContain('already spent');
+  });
+
+  it('takes no money for a refused rezone — the sentence and the spend move together', () => {
+    const rezone = schedule.changes.find((row) => row.id === 'rezone-bank') as PricedChange;
+    // Nothing is appended when the admission refuses, so the day's committed spend is what it was.
+    const before: readonly RunInterventionConfig[] = [];
+    const admission = admitWorks({
+      schedule,
+      budgetUnits: rezone.priceUnits * 10,
+      interventions: before,
+      changeId: rezone.id,
+      kind: 'building-change',
+      building: doubleDeck,
+      serviceEvents: [REZONE_SHUTTLE],
+    });
+    expect(admission.admitted).toBe(false);
+    expect(spentOnWorks(schedule, before)).toBe(0);
+    // Non-vacuity: the same change on the same rung, admitted, would have cost something — so the
+    // zero above is a refusal rather than a change the schedule prices at nothing.
+    expect(rezone.priceUnits).toBeGreaterThan(0);
+  });
+
+  it('admits the same change on a bank whose range can move — the refusal is about the fabric', () => {
+    const rezone = schedule.changes.find((row) => row.id === 'rezone-bank') as PricedChange;
+    const local = doubleDeck.banks.find((bank) => bank.id === 'zone-1-local');
+    expect(local).toBeDefined();
+    const admission = admitWorks({
+      schedule,
+      budgetUnits: rezone.priceUnits * 10,
+      interventions: [],
+      changeId: rezone.id,
+      kind: 'building-change',
+      building: doubleDeck,
+      serviceEvents: [
+        { atS: 700, bankId: 'zone-1-local', servesFloors: ['G', '2', '3', '4'] },
+      ],
+    });
+    expect(admission.admitted).toBe(true);
+    expect(admission.reason).toBeUndefined();
+  });
+
+  it('admits a purchase whose effect is its stamp alone, on the same double-deck tower', () => {
+    // `serviceEvents: []` is legal and means *the stamp is the point*. The ground must read the
+    // effects rather than the tower, or every purchase on `vertical-city` would be refused.
+    const rezone = schedule.changes.find((row) => row.id === 'rezone-bank') as PricedChange;
+    const admission = admitWorks({
+      schedule,
+      budgetUnits: rezone.priceUnits * 10,
+      interventions: [],
+      changeId: rezone.id,
+      kind: 'building-change',
+      building: doubleDeck,
+      serviceEvents: [],
+    });
+    expect(admission.admitted).toBe(true);
   });
 });
