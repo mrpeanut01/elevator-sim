@@ -29,6 +29,8 @@ import {
 import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/browser';
 
 import { restrictedFloorIds } from '../access/zoning.js';
+import { mixedFleetBanks } from '../commissioning/choices.js';
+import { CONTRACT_LADDER, contractLadderIssues } from '../shift/ladder.js';
 import { parseCampaign } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
 import { fixitContextOf, parseFixitCases } from '../fixit/parse.js';
@@ -193,6 +195,54 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
   });
   const buildings = entries.map((entry) => entry.resolved);
 
+  /*
+   * The contract ladder, cross-checked against the documents that decide whether a rung is legal —
+   * GitHub issue #382, `shift/ladder.ts`. It is validated **here** rather than at its own import
+   * because every rule it has to obey lives in a document this function has just fetched: DC-R1's
+   * *a rate stays inside its profile's declared range* needs `traffic-profiles.json`, a bank choice
+   * needs the building and `elevator-specs.json`, and the mixed-fleet refusal needs the building's
+   * authored cars. `pricing/parse.ts`'s split, and its reason.
+   *
+   * Reported as **warnings** rather than thrown, on the same footing as a building's own
+   * cross-validation two lines below: a rung that asks for a rate its profile does not declare is a
+   * content defect the reader should be told about, and refusing to boot the viewer over it would
+   * make one bad figure in `data/` cost the whole product. `shift/ladder.test.ts` is where it is a
+   * failure, and that is the gate content lands through.
+   */
+  const ladderIssues = contractLadderIssues(CONTRACT_LADDER, {
+    rateRangeFor: (buildingId) => {
+      const building = buildings.find((candidate) => candidate.id === buildingId);
+      const profile = trafficProfiles.profiles.find(
+        (candidate) => candidate.id === building?.trafficProfile,
+      );
+      if (profile === undefined) return undefined;
+      return { min: profile.arrivalRatePctPop5min.min, max: profile.arrivalRatePctPop5min.max };
+    },
+    bankIdsFor: (buildingId) =>
+      buildings.find((candidate) => candidate.id === buildingId)?.banks.map((bank) => bank.id),
+    mixedBankIdsFor: (buildingId) => {
+      const entry = entries.find((candidate) => candidate.config.id === buildingId);
+      return entry === undefined ? undefined : mixedFleetBanks(entry.config);
+    },
+    speedBandFor: (machineClassId) => {
+      const entry = elevatorSpecs.classes.find((candidate) => candidate.id === machineClassId);
+      if (entry === undefined) return undefined;
+      return { min: entry.ratedSpeedMps.min, max: entry.ratedSpeedMps.max };
+    },
+    floorProfilesFor: (buildingId) => {
+      const entry = entries.find((candidate) => candidate.config.id === buildingId);
+      if (entry === undefined) return undefined;
+      const declared = new Set<string>();
+      for (const range of entry.config.floorRanges ?? []) {
+        if (range.trafficProfile !== undefined) declared.add(range.trafficProfile);
+      }
+      for (const floor of entry.config.floors ?? []) {
+        if (floor.trafficProfile !== undefined) declared.add(floor.trafficProfile);
+      }
+      return [...declared];
+    },
+  }).map((issue) => `contract-ladder.json: ${issue}`);
+
   return {
     priceSchedule,
     elevatorSpecs,
@@ -201,7 +251,11 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
     buildings,
     entries,
     trafficProfileIds,
-    warnings: [...warnings, ...buildings.flatMap((b) => b.warnings.map((w) => w.message))],
+    warnings: [
+      ...warnings,
+      ...ladderIssues,
+      ...buildings.flatMap((b) => b.warnings.map((w) => w.message)),
+    ],
   };
 }
 

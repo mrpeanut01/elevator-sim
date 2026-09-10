@@ -1200,6 +1200,17 @@ Mean arrivals in the same cells, so the growth mechanism is visible beside the m
 | c7 | 360 | 520 | 718 | 1117 |
 | c8 | 244 | 352 | 474 | 760 |
 
+> **Status 2026-09-09: RE-MEASURED AND SUPERSEDED by § 4.7** (GitHub issue #382). The table above
+> **no longer reproduces** — re-run with the same four-goal set on `241abf7` it reads 1, 30, 13, 26,
+> 30, 3, 14 and 0 of 30, with the mean arrivals moved too, so five of its eight cells are stale. The
+> figures are left exactly as they were published, because a measurement is a record of a tree and
+> not a claim about today's; § 4.7a carries the re-measurement, the instrument that produced it and
+> the reason nobody noticed. **F3 is closed by § 4.7d** — the order is non-decreasing, measured. F4
+> is **half closed**: five of the eight contracts are inside DC-4's band against none before, and the
+> three that are not are measured envelopes rather than gaps (§ 4.7e, § 4.7f). **F1 is not closed**,
+> and § 4.7f is why: the opening building cannot be failed without deleting its dispatch decision,
+> which is § 1.6's ruling arriving as a measurement. F2, F5 and F6 are untouched and still stand.
+
 **Six findings, and the first two are what #200 and #208 are actually about.**
 
 **F1 — the opening contract is unfailable for three quarters of its length.** `garden-apartments`
@@ -1545,6 +1556,310 @@ than between days. That is § 7's **O2** arriving on a fifth goal: whether a bar
 building rather than with the day. It is reported rather than fixed, because fixing it means
 authoring a bar per contract, and § 1.4 refused exactly that for the wait bars on grounds one grading
 lane may not overturn alone.
+
+### 4.7 The contract ladder — the rebalance, measured
+
+> **Landed 2026-09-09 to [GitHub issue #382](https://github.com/mrpeanut01/elevator-sim/issues/382)**,
+> under the product owner's ruling of the same day: *change the buildings and crowds and anything
+> else that needs to be changed; rethink the entire contracts lifecycle and pre-plan the order of
+> play, difficulty, wrinkle inclusion.*
+
+§ 4.2 measured what the eight contracts added up to and found **DC-4 red on 8 of 8** and **DC-6 red
+on the shipped order**. This section is the rebuilt lifecycle and the measurement of it. **DC-6 is
+green** and **DC-4 is green on five of the eight**; the three that are not are § 4.7e and § 4.7f, and
+each is a finding with its probes attached rather than a reason to widen the band.
+
+#### 4.7a The instrument, and the first thing it found
+
+`packages/viz/src/shift/contractCurve.sweep.test.ts`, gated on `CONTRACT_CURVE_SWEEP=1`. It is
+§ 4.2's own recipe made re-runnable: each contract's building through
+`dev/state.ts#shiftRunConfigOf` — growth, commissioning, fit-out, pattern, calendar day and event,
+in the shipped order — recorded by `record/recordRun.ts` with the plan's own
+`outOfServiceCarIds`, folded by `observationsAt(recording, recording.endedAt)` and
+`shift/observations.ts`, and graded by `readGoals(goalsForDay(day, runHorizonOf(...)), …)`. A day is
+**missed** when any reading is anything but `met`, which is `week.ts#outcomeOf`'s own rule —
+*unjudged is not passed*. Seeds are `20 260 824 + 7 919 n`, § 4.2's and § 4.6's, so a cell here is
+comparable with those tables rather than merely similar to them. It compares no two configurations
+and calls neither better, so no paired interval is offered and none is required (§ 6.5).
+
+**§ 4.2's published figures no longer reproduce, and that is the first finding.** Re-measured on
+`241abf7` with the historical **four**-goal set, the day-1 miss rates read
+
+| | c1 | c2 | c3 | c4 | c5 | c6 | c7 | c8 |
+|---|---|---|---|---|---|---|---|---|
+| § 4.2, published | 0/30 | 30/30 | 7/30 | 24/30 | 30/30 | 1/30 | 9/30 | 0/30 |
+| four goals, re-measured | **1/30** | 30/30 | **13/30** | **26/30** | 30/30 | **3/30** | **14/30** | 0/30 |
+
+Five of the eight moved, and the mean arrivals moved with them (c1 41 → 36, c3 434 → 441, c7 360 →
+362), so this is the tree having moved under a figure nobody re-derived rather than a difference of
+method. It is `CLAUDE.md`'s *a published number goes stale the same way*, on the table this document
+is proudest of. **The instrument is the repair**: the figures below are pinned to a command, and the
+next reader can disagree with them by running it.
+
+#### 4.7b Before — the shipped five-goal state, measured on `241abf7`
+
+The set `goalsForDay` actually returns is **five** (§ D468's energy bar), and that is what the
+product grades, so it is what the ladder is measured against.
+
+| position | contract | building | missed | of | rate | in band |
+|---|---|---|---|---|---|---|
+| 1 | c1 | `garden-apartments` | 1 | 30 | 0.03 | no |
+| 2 | c2 | `midtown-office` | 30 | 30 | **1.00** | no |
+| 3 | c3 | `secure-tower` | 14 | 30 | 0.47 | **yes** |
+| 4 | c4 | `mixed-use-high-rise` | 30 | 30 | **1.00** | no |
+| 5 | c5 | `vertical-city` | 30 | 30 | **1.00** | no |
+| 6 | c6 | `chancery-house` | 6 | 30 | 0.20 | no |
+| 7 | c7 | `crown-hotel` | 17 | 30 | 0.57 | **yes** |
+| 8 | c8 | `st-jude-hospital` | 23 | 30 | 0.77 | no |
+
+Two were already in the band and #382 does not say so, because #382 quotes § 4.2's four-goal row.
+The other six are out, three of them at the ceiling.
+
+#### 4.7c The ladder — what a contract is made of, and where it is declared
+
+A contract used to be a building id and some prose. **Nothing declared what a scenario's difficulty
+was supposed to be**, so eight scenarios inherited eight buildings authored as *reference fixtures
+for a simulator* and the ramp was whatever those fixtures happened to add up to.
+
+`data/contract-ladder.json` is that declaration, parsed by `packages/viz/src/shift/ladder.ts`. One
+rung per contract, and every field is one of DC-R1's substrates:
+
+| field | substrate | how it reaches the run |
+|---|---|---|
+| `demand.arrivalRatePctPop5min` | **demand** | `shiftRunConfigOf` writes it where Free Play's own rate goes, under Free Play and over the profile's `typical` |
+| `fabric.occupancy` | **fabric** | `shift/growth.ts#scaledBuilding`, the same function the overnight fill runs through |
+| `fabric.banks` | **fabric** | `commissioning/building.ts#commissionedBuilding`, before the player's own choices so the player still overrides the contract |
+
+**There is no bar, no goal and no tier in the schema**, and that is the cheapest place to keep § 4.3's
+refusal: a field that does not exist cannot be authored. `goalsForDay` and `GOAL_BARS` are
+byte-identical to what they were before this work. `ladder.test.ts` reads the authored document's own
+keys and fails on a fourth kind.
+
+**Three constraints are mechanical rather than editorial**, and the third was found by measurement:
+
+1. **A rate stays inside its profile's declared range** — DC-R1's own clause, checked against the
+   loaded `data/traffic-profiles.json` rather than a transcript of it.
+2. **A bank whose shipped cars are not all the same machine may not be commissioned.** A
+   `BankChoice` collapses class, speed and load to one value each, so commissioning `crown-hotel`'s
+   or `st-jude-hospital`'s `main` would delete the thing those scenarios teach.
+   `commissioning/choices.ts#mixedFleetBanks` names them and the rung validator refuses one.
+3. **An absolute rate is refused on a building whose floors declare a profile of their own.**
+   `core`'s `traffic/generator.ts` says it plainly — *"To sweep to an arbitrary rate instead, set
+   `arrivalRatePctPop5min`, which overrides every profile"* — so one number on a mixed-use tower drags
+   its residential floors up to the office rate and out of **their** declared range. **Measured, not
+   reasoned about**: declaring `12` on `mixed-use-high-rise` moved its day-1 mean arrivals from
+   **957 to 1 332** against a profile default that is not 12 at all. `mixed-use-high-rise` and
+   `vertical-city` therefore carry no rate and move by fabric.
+
+**Why the fabric is a commissioning choice and not an edit to `data/buildings/`.** The eight
+buildings are reference fixtures before they are game levels: `benchmark/published.ts` pins measured
+intervals against `midtown-office`, and `data/reference-runs.json`, `data/proof-cases.json`,
+`data/fixit-cases.json`, `data/scenario-goals.json` and `docs/04` all name them. Adding two shafts to
+a building file to balance a scenario would move every one of those figures and leave the repository
+holding published intervals that no longer reproduce. `commissionedBuilding` moves the same fabric
+without moving the fixture, and it returns **the input object itself** when nothing differs, so a
+rung that declares nothing is the identity rather than a copy of it.
+
+**One derivation, so the card and the run cannot disagree.**
+`shift/ladder.ts#ladderTowerConfig` is what `shiftRunConfigOf` builds the run from *and* what
+`dev/scenariosPanel.ts` and `everyday/host.ts#buildingSpecLine` draw the stat line from. A card
+reading `2 cars` over a run with one is the caption defect this repository has closed a dozen times,
+and a second expression for *what does this scenario hand me* is how it arrives.
+
+#### 4.7d After — the measured ladder
+
+**Run.** `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50 CONTRACT_CURVE_OUT=<path> npx vitest run
+packages/viz/src/shift/contractCurve.sweep.test.ts`, on the branch head of #382, day 1, dispatcher
+`collective`, seeds `20 260 824 + 7 919 n`, the shipped five-goal set.
+
+| position | contract | building | what moves it | missed | of | rate | in band |
+|---|---|---|---|---|---|---|---|
+| 1 | c1 | `garden-apartments` | **nothing reaches the band** — § 4.7f | 1 | 50 | 0.02 | **no** |
+| 2 | c6 | `chancery-house` | five shafts at 3.5 m/s, let at 1.06 | 18 | 50 | **0.36** | **yes** |
+| 3 | c8 | `st-jude-hospital` | 8.5 % of population per 5 min | 20 | 50 | **0.40** | **yes** |
+| 4 | c2 | `midtown-office` | let at 0.395 | 23 | 50 | **0.46** | **yes** |
+| 5 | c7 | `crown-hotel` | nothing — already in band | 25 | 50 | **0.50** | **yes** |
+| 6 | c3 | `secure-tower` | nothing — already in band | 26 | 50 | **0.52** | **yes** |
+| 7 | c4 | `mixed-use-high-rise` | **nothing reaches the band** — § 4.7e | 50 | 50 | 1.00 | **no** |
+| 8 | c5 | `vertical-city` | **nothing reaches the band** — § 4.7e | 50 | 50 | 1.00 | **no** |
+
+**DC-6 is green on all eight**: 0.02, 0.36, 0.40, 0.46, 0.50, 0.52, 1.00, 1.00 never falls. **DC-4 is
+green on five of the eight**, against 8 of 8 red before. The three that miss are the opening
+building and the two transfer towers, and neither miss is a gap: § 4.7e and § 4.7f measure the
+envelope on each and report what closes it.
+
+**Two of the six rungs declare nothing at all**, and that is worth reading rather than skipping past:
+`secure-tower` and `crown-hotel` were **already inside the band** on the shipped five-goal set, which
+§ 4.2's four-goal table could not show and which #382 therefore does not say. Their rows exist so
+that a later change to a traffic profile's `typical` shows up as a change to a scenario.
+
+**Say what DC-6 can and cannot mean at this seed count**, because the rule's own wording says *up to
+the resolution of the sweep* and this is the first time anybody has had to cash that in. A proportion
+near a half at `n = 50` has a standard error of about **0.071**, so the five in-band steps — which
+span 0.36 to 0.52 — are **inside noise of one another**. What the sweep establishes is that the
+ladder is non-decreasing and that **no step is a cliff**; it does not establish that position 4 is
+harder than position 3. Distinguishing 0.46 from 0.40 at 95 % would need roughly 500 seeds a cell,
+which is a compute job of a different order and is not what a difficulty ramp needs. What *is*
+outside noise is the shape the ladder used to have: 1.00 at position 2 and 0.00 at position 8 are
+separated by twelve standard errors, and that is the thing #382 was filed about.
+
+**The curriculum reading of the same order, and it was not designed — it fell out.** Bank counts run
+1, 1, 1, 1, 1, 2, 3, 7: five single-bank buildings of rising subtlety, then two banks and a
+credential, then one transfer, then three. The order was fixed by the measured miss rate and the bank
+counts were read off it afterwards, which is the more interesting way round; `contracts.test.ts`
+asserts the sequence, so a future rebalance that put a three-bank tower above a one-bank one fails a
+test rather than quietly changing what the campaign teaches.
+
+The lessons in that order read: *a call, a car, a wait* → *spare cars are not a short interval* →
+*two cars in one bank can be the wrong car* → *up-peak, and the gap between demand offered and
+carried* → *demand with no dominant direction* → *zoning, and calls nobody may legally answer* →
+*transfers* → *supertall traffic*.
+
+**The ids do not move with the order.** `c1`–`c8` are names held by saved weeks, career towers,
+`data/contract-ladder.json` and this repository's own prose, and renumbering would make one id mean
+two things. What moves is the array's order, each contract's `label` (a *position*, so `c6` is now
+*Scenario 2*), and `needClean`, re-attached to the new positions as the same 1, 2, 2, 2, 3, 3, 3, 3
+ladder — the multiset is unchanged, so `contracts.test.ts`'s own assertion about it did not have to
+move.
+
+#### 4.7e The two that did not reach the band, and why that is a finding
+
+**`mixed-use-high-rise` and `vertical-city` stay at 50 of 50, and no admitted change moves them.**
+Seven configurations were measured on c4 at 30 seeds, spanning occupancy 0.5 to 2.0 and fleets of 16
+to 32 cars, and every one came back at 30 of 30:
+
+| c4 configuration | cars | queue missed | energy missed | day missed |
+|---|---|---|---|---|
+| as built | 16 | 28 | 10 | 30/30 |
+| occupancy 0.5 | 16 | 0 | 30 | 30/30 |
+| occupancy 1.15 | 18 | 22 | 30 | 30/30 |
+| occupancy 1.0 | 21 | 5 | 30 | 30/30 |
+| occupancy 1.3 | 22 | 23 | 30 | 30/30 |
+| occupancy 1.6 | 21 | 30 | 27 | 30/30 |
+| occupancy 2.0 | 32 | 30 | 30 | 30/30 |
+
+**The queue goal and the energy goal are opposed on this tower.** More cars empty the landings and
+raise the work per delivered leg; fewer cars do the reverse; and there is no fleet size at which both
+hold. `vertical-city` was probed three times and reads the same way — as built, the landing queue
+misses on 30 of 30 and the energy bar on 19; at occupancy 0.4 the energy bar misses on 30; with a
+52-car fleet at full occupancy the energy bar misses on 30 and the queue on 22.
+
+Three things follow, and none of them is *widen the band*.
+
+1. **This is § 4.6's F7 re-measured on a second axis.** F7 established that no *threshold* rescues
+   c4 — the lowest energy figure on a run that also clears the four wait goals is 81.7 kJ across 650
+   runs. This establishes that no *fabric* rescues it either. The two together are much stronger than
+   either alone, and they point at the same place.
+2. **It is the sharpest evidence yet for § 7's O2** — whether a bar should move with the **building**
+   rather than with the day. 80 kJ is derived from the pooled catalogue (§ 4.6), and work per
+   delivered leg spans a factor of 12.6 across the eight contracts, so on the two tallest towers the
+   bar is a statement about the elevation rather than about the play. **That is not authority to
+   adopt a per-building bar** — § 1.4 refused exactly that for the wait bars on grounds one lane may
+   not overturn — and it is now two independent measurements arguing for it rather than one.
+3. **No arbitrary change is shipped on those two rungs.** Both are handed **as built**, and their
+   rows in `data/contract-ladder.json` say so with the probes attached. A fabric change that bought
+   nothing would look like an answer and would have to be un-picked by whoever takes #234.
+
+#### 4.7f The opening contract cannot be made failable without deleting the dispatch decision
+
+`garden-apartments` reads **1 of 50** — and the one is a `pending` day, a seed on which fewer than
+`WAKE_UP_ARRIVALS` turned up, so the goals refuse rather than judge. It is the same cell § 4.2's F1
+found unfailable at day 1, day 5 **and** day 10, and it is not in the band.
+
+**The whole admissible envelope was measured, and none of it reaches DC-4.**
+
+| what was run | day-1 miss rate |
+|---|---|
+| as shipped (5 %, as built) | 1/50 |
+| the rate swept 3 → 17 % at the shipped fabric | 0.17, 0.10, 0.03, then **0.00 at every rate from 6 up** |
+| 7 % (the profile's declared **maximum**), let at 1.95 | **0/50** |
+| 7 %, let at 1.95, **both cars at 0.5 m/s** — the bottom of the hydraulic band | **0/50** |
+| 7 %, let at 2.0, **one** car | **0.40** at 30 seeds; **0.36** at 50 |
+
+**So one configuration reaches the band, and it is refused.** A bank with one shaft has no assignment
+to make: every shipped dispatcher produces the same run, so the opening scenario would be a day about
+lifts with the dispatching taken out — which is the subject of the whole product. DC-2's blanket form
+is withdrawn (§ 2.3) and this is not that rule coming back; it is the weaker and older claim that a
+scenario has to admit more than one answer to be a scenario at all.
+
+**Two cars is therefore the constraint, and inside it the building cannot be failed.** That is not a
+gap in this lane's search — it is § 1.6 arriving as a measurement. § D528 already ruled that *an
+opening the player cannot fail is correct* and that **what carries the first hour is volume**, and
+this table is what that ruling looks like from the sweep's side.
+
+**The volume ramp § 1.6 asks for is specified here and deliberately not shipped**, which is the one
+judgement in this section that is not forced by a measurement. 7 % on a block let at 1.95 takes day 1
+from **36 arrivals to 107** — the ramp, exactly — and it moves **no verdict**: 0.00 before and 0.00
+after. A change that alters nothing the product publishes, while re-deriving every figure this
+repository has pinned on its most-probed building (fifteen of them, across `watch/reference.ts`'s two
+posted runs, `commissioning.test.ts`'s inert-control finding, `campaign/fitOut.ts`'s thirteen-of-
+sixteen register and `shift/reportWindow.ts`'s empty-band seeds), is a change whose only support is a
+claim about how the first hour *feels*. **The owner has scheduled a playtest for exactly that class of
+claim.** So the figures are here, the rung stays the identity, and the playtest decides.
+
+#### 4.7g The wrinkle assignment — specified here, and deliberately not in the schema
+
+The owner's ruling asks which wrinkles each contract draws, and § 17's library landed hours before
+this work (`data/wrinkles.json`, `packages/viz/src/wrinkles/`). An `openingEventId` and a
+`wrinklePool` were drafted on the rung and **removed before this landed**, for the reason this
+repository has recorded eleven times: *which event is today* has exactly one answer,
+`shift/calendar.ts#scheduledEventFor`, which is pure in `(period, day, dayIdx)` and has five non-test
+callers plus every surface that captions a day. A field read by `shiftRunConfigOf` alone would build
+the run from one wrinkle while the rail, the report, the tomorrow card and `scope/runIdentity.ts`
+captioned another — [GitHub issue #135](https://github.com/mrpeanut01/elevator-sim/issues/135) is the
+four surfaces that already got that question wrong once — and a field read by nothing at all would be
+a dead seam.
+
+So the assignment is specified rather than shipped, and what it needs is one seam:
+**`scheduledEventFor` has to carry the contract.** § 17's own rotation rules are waiting on the same
+thing — `wrinkles/draw.ts` keeps *no template twice in fourteen days* and says in terms that *no
+tower twice in seven* and *the pair never inside a month* are **not implemented, because there is no
+tower draw to constrain**. A contract-scoped pool is that tower draw. The specification:
+
+| position | contract | what its pool should be drawn from | why |
+|---|---|---|---|
+| 1 | c1 `garden-apartments` | `ordinary`, `quiet-morning`, `move-in` | two hydraulic cars for a whole block: the lesson is the call and the wait, and `move-in` derating one of the two is the largest wrinkle this fabric can absorb without deleting the dispatch decision § 4.7f refuses to delete |
+| 2 | c6 `chancery-house` | `ordinary`, `all-hands`, `late-finish`, `audit-day` | the lesson is where spare cars wait, so the pool moves *when* the crowd comes and never *how many cars there are* |
+| 3 | c8 `st-jude-hospital` | `ordinary`, `shift-change`, `goods-inward`, `two-cars-down` | a shift change is the hospital's own peak, and losing two cars is what makes the bed lift's wrongness visible |
+| 4 | c2 `midtown-office` | `ordinary`, `fire-drill`, `evacuation-drill`, `shaft-out` | up-peak is the lesson; a drill is up-peak with the volume turned up, and a lost shaft is the same question with less lift |
+| 5 | c7 `crown-hotel` | `ordinary`, `conference`, `caterers`, `open-day` | two-way demand, pushed in both directions at once |
+| 6 | c3 `secure-tower` | `ordinary`, `contractors`, `lift-service`, `flu-day` | contractors and service both move a car *and* the mix, which is what a zoned building answers differently |
+| 7 | c4 `mixed-use-high-rise` | `ordinary`, `move-in`, `goods-inward`, `conference` | a sky lobby's transfers are the lesson; a wrinkle that swings the mix changes which leg is the bottleneck |
+| 8 | c5 `vertical-city` | `ordinary`, `all-hands`, `shift-change`, `two-cars-down` | at a hundred floors the interesting failure is a zone starving, which a mix swing and a lost car both produce |
+
+**None of that is authority, and the gate is the instrument that would make it one.**
+`wrinkles/gate.ts` keeps a candidate day only if **the ranking of the baseline dispatchers differs
+from the control day's and the pair whose order changed is separable by a paired-t interval on the
+candidate day**. Run at 50–200 replications per contract building, it turns the table above from a
+designer's guess into a measurement, and it will discard some of these rows — § 17's own word for a
+day that does not shuffle the ranking is *cosmetic*. The run is a study rather than a suite
+(`gate.test.ts` drives it at a small budget), and it is the first thing the follow-up lane should do.
+
+#### 4.7h Where the ninth contract goes
+
+A Burj-class building landed on 2026-09-06 (`data/buildings/burj-class-reference.json`, § D527) and
+is drafted as a contract by another lane. **It goes at position 9, after `vertical-city`**, and the
+order above is built so that it can: the ramp is non-decreasing, positions 7 and 8 are the two
+transfer towers, and bank counts run 1, 1, 1, 1, 1, 2, 3, 7 with the Burj's own fifty-seven cars
+above them.
+
+Two things that lane should know before it authors a rung. **It will meet § 4.7e**: at 165 floors the
+energy bar is a statement about the elevation, and if a Burj rung cannot reach DC-4's band it is the
+third instance of the same finding rather than a new one — which is precisely the weight O2 needs.
+And **`burj-class-reference` is a reference building with no contract today**, listed in
+`contracts.test.ts#REFERENCE_ONLY` with the argument for why; a ninth contract removes it from that
+set, which is the direction that list says it is meant to move in.
+
+#### 4.7i What this section does not settle
+
+- **The three out-of-band contracts.** The two transfer towers are #234's and § 7's O2; the opening
+  building is § 1.6's, and the playtest's.
+- **DC-5's growth half.** The rebalance moves day 1; the sweep can run days 5, 10 and 20
+  (`CONTRACT_CURVE_DAYS=1,5,10,20`) and this lane did not, because the acceptance criterion is day 1
+  and the twenty-day arc is a compute job of its own. The growth mechanism reaching the run is
+  unchanged by this work — `grownBuilding` is applied after the rung, exactly as before.
+- **The playtest.** The owner's ruling schedules one after this re-implementation, and it is what
+  should settle whether a ramp that is flat inside noise *feels* like a ramp.
 
 ---
 

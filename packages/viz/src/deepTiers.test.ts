@@ -440,6 +440,17 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'would write a figure nothing reads; it is re-run by hand when a building or a band moves',
     scheduled: false,
   },
+  'packages/viz/src/shift/contractCurve.sweep.test.ts': {
+    gates: ['CONTRACT_CURVE_SWEEP'],
+    reason:
+      'GitHub issue #382’s instrument — every contract’s day-1 miss rate against DC-4’s band and ' +
+      'DC-6’s order, eight contracts by fifty seeds, which produced docs/33 § 4.7’s table. Not ' +
+      'scheduled because it is a compute job rather than a check: the ladder it measures is pinned ' +
+      'by `shift/ladder.test.ts` on every run, which asserts the declaration and the seam, and a ' +
+      'nightly re-derivation would write a figure nothing reads. It is re-run by hand when a rung, ' +
+      'a building or a goal bar moves — which is exactly when § 4.7’s table has to be regenerated',
+    scheduled: false,
+  },
   'packages/viz/src/testCost.test.ts': {
     gates: ['TEST_COST_OUT'],
     reason:

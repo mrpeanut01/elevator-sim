@@ -1413,12 +1413,48 @@ describe.skipIf(!HAS_BROWSER)('the § 7.4 race — issue #226', () => {
      */
     const hasShape = (points: string | undefined): boolean =>
       new Set((points ?? '').split(' ').map((pair) => pair.split(',')[1])).size > 1;
+    const sampleCount = (points: string | undefined): number => (points ?? '').split(' ').length;
+
+    /*
+     * **Shape alone was the bar and it stopped being enough when the ladder let this tower** —
+     * GitHub issue #382, and the reason is the same one two paragraphs up, one building along.
+     *
+     * `data/contract-ladder.json` hands Scenario 2 a Midtown Office at **0.395** occupancy — 675
+     * tenants rather than 1 710 — because at the authored fabric the contract missed on 30 of 30
+     * seeds. That is the rebalance working. The side effect is that this case's premise weakened
+     * with it: measured on the branch that landed the ladder, at the first sample where the
+     * player's own lane had shape the strip drew **0 of 2 lanes differing** —
+     *
+     *     LANE0 you   0.0,46.0 … 12.0,45.8 12.0,43.9
+     *     LANE0 rival 0.0,46.0 … 12.0,45.8 12.0,43.9
+     *
+     * — while `serviceDiffers` two blocks above was already **true**. So the two dispatchers had
+     * genuinely done different things and the strip could not yet show it: eight samples into a
+     * four-tenths-let tower, the waiting counts coincide.
+     *
+     * **The bar is raised rather than the assertion lowered**, which is the working agreement's own
+     * rule. Two weaker fixes were tried against the tree and rejected on evidence: *at least one
+     * lane differs* does not help, because the measurement above is 0 of 2 rather than 1 of 2; and
+     * racing `mixed-use-high-rise` instead fails `crowdMatches` — a broken pairing, a worse case,
+     * and a different bug.
+     *
+     * **Twenty is measured, not chosen.** Played to twenty samples on the same walk, the strip reads
+     * `differing=2/2` and the original per-lane assertion holds at full strength.
+     *
+     * The wait is still on **the player's own series alone** — count and shape, never the two
+     * differing — so the discipline the paragraph above sets is intact: an inert control fails at
+     * `serviceDiffers` rather than timing out here.
+     */
     await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
     await page.click('.everyday-stage-play');
-    const played = await untilRace(page, (facts) => hasShape(facts.youPoints[0]), 180_000);
+    const played = await untilRace(
+      page,
+      (facts) => sampleCount(facts.youPoints[0]) >= 20 && hasShape(facts.youPoints[0]),
+      180_000,
+    );
     expect(
       played.held,
-      `no crowd ever stood in the player’s own day: ${String(played.last?.youPoints[0])}`,
+      `the player’s own day never reached twenty samples with a crowd in them: ${String(played.last?.youPoints[0])}`,
     ).toBe(true);
     const drawn = played.last;
     if (drawn === null) throw new Error('unreachable: held implies a reading');

@@ -1,0 +1,133 @@
+{
+  "$comment": "THE CONTRACT LADDER — what each scenario is made of. GitHub issue #382, docs/33-difficulty-curve.md § 4.7, and packages/viz/src/shift/ladder.ts for the schema and the argument. Every field here is one of DC-R1's substrates: the crowd (demand, bounded by the building's own traffic profile), and the tower the contract hands the player (fabric — occupancy, and commissioning choices over the banks). THERE IS DELIBERATELY NO BAR, NO GOAL AND NO TIER IN THIS FILE: docs/33 § 4.3 and CLAUDE.md both forbid buying difficulty by moving the mark, and a field that does not exist cannot be authored. Every figure below was measured rather than chosen — the run is `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50 CONTRACT_CURVE_OUT=<path> npx vitest run packages/viz/src/shift/contractCurve.sweep.test.ts` at seeds 20260824 + 7919n, day 1, dispatcher `collective`, and the table it produces is published in docs/33 § 4.7. `missRateTarget` is the DESIGN INTENT and never a measurement; three rows do not reach it and their notes say so with the probes attached. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed `data/` values: THESE FIGURES ARE AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject. The distinction that ruling asks for is drawn field by field. What is MEASURED is each row's resulting miss rate, at the run and seeds named above. What is CHOSEN is the target each row aims at and which substrate is moved to reach it — that is game feel, not a measurement, and no amount of sweeping makes it one. So a reader disagreeing with a number here is disagreeing with a judgement, not correcting an error, and the lever is one field in this file rather than anything in code.",
+  "version": 1,
+  "contracts": [
+    {
+      "contractId": "c1",
+      "buildingId": "garden-apartments",
+      "demand": {},
+      "fabric": {
+        "occupancy": 1,
+        "banks": []
+      },
+      "intent": {
+        "missRateTarget": 0.36,
+        "substrate": "demand+fabric",
+        "note": "NOT IN THE BAND, HANDED AS BUILT, AND THE REASON IS A CONFLICT RATHER THAN A GAP. The whole admissible envelope was measured and none of it reaches DC-4: 7 % is the residential profile's declared MAXIMUM, 1.95 is near this schema's own occupancy ceiling, and both cars at 0.5 m/s is the bottom of the hydraulic band — every combination of those reads 0 of 50. ONE car does reach the band, at 0.36 of 50 measured, AND IT IS REFUSED: a bank with one shaft has no assignment to make, so every shipped dispatcher produces the same run and the opening scenario would teach nothing about the thing the game is about. THE CROWD AND THE OCCUPANCY ARE ALSO NOT SHIPPED, and that is a second decision with its own reason: 7 % on a block let at 1.95 takes day 1 from 36 arrivals to 107 — which is exactly the volume ramp docs/33 § 1.6 asks the first hour to carry — and it moves NO verdict, 0.00 before and 0.00 after. A change that alters no figure the product publishes, while re-deriving every pinned figure taken on this building, is a change whose only support is a claim about how the first hour FEELS. The owner has scheduled a playtest for exactly that class of claim, so the figures are stated in docs/33 § 4.7 and the rung stays the identity until the playtest asks for them. The target is recorded so the debt stays visible."
+      }
+    },
+    {
+      "contractId": "c2",
+      "buildingId": "midtown-office",
+      "demand": {},
+      "fabric": {
+        "occupancy": 0.395,
+        "banks": []
+      },
+      "intent": {
+        "missRateTarget": 0.46,
+        "substrate": "fabric",
+        "note": "The contract this issue says a player leaves at: 30 of 30 seeds missed, under every shipped configuration. The lever is NOT the crowd and that is measured — at the shipped fabric the miss rate is 1.00 at every rate from 6 % to 17 %, and the standard-office profile's declared floor is 11 %. It is not the fleet either: six cars and then eight cars both left it at 30 of 30, and at eight the landing queue still missed on every seed. What moves it is who is in the building. The tower is let at 0.395 — 675 tenants rather than 1 710 — a twenty-floor office building four tenths let, with the arrival rate untouched at the profile's own typical. THE POPULATION IS FABRIC, NOT A BAR (docs/33 DC-R1 lists it beside floors, shafts, speed and capacity): the rate at which a tenant turns up is what CIBSE constrains, and how many tenants there are is what the elevation constrains. The search ran at 30 seeds; the published figure is 0.46 of 50, docs/33 § 4.7."
+      }
+    },
+    {
+      "contractId": "c3",
+      "buildingId": "secure-tower",
+      "demand": {
+        "arrivalRatePctPop5min": 12
+      },
+      "fabric": {
+        "occupancy": 1,
+        "banks": []
+      },
+      "intent": {
+        "missRateTarget": 0.52,
+        "substrate": "demand",
+        "note": "Already inside the band as shipped, and the rung says so rather than moving it: 0.52 of 50 seeds at the standard-office profile's own typical, with the landing queue doing the discriminating on 23 of them. The rate is written out rather than left implicit so that a later change to the profile's typical is visible here as a change to this scenario, which is the whole reason a ladder exists — and writing the profile's own number is the identity, checked on the legs by ladder.test.ts. Fabric untouched."
+      }
+    },
+    {
+      "contractId": "c4",
+      "buildingId": "mixed-use-high-rise",
+      "demand": {},
+      "fabric": {
+        "occupancy": 1,
+        "banks": []
+      },
+      "intent": {
+        "missRateTarget": 0.65,
+        "substrate": "fabric",
+        "note": "NOT IN THE BAND, AND HANDED AS BUILT BECAUSE NOTHING ADMITTED REACHES IT. Seven configurations were measured at 30 seeds and every one came back at 30 of 30: as built (queue misses 28, energy 10); occupancy 0.5 (energy 30); occupancy 1.15 with 18 cars (energy 30, queue 22); occupancy 1.0 with 21 cars (energy 30, queue 5); occupancy 1.3 with 22 cars (energy 30, queue 23); occupancy 1.6 with 21 cars (queue 30, energy 27); occupancy 2.0 with 32 cars (queue 30, energy 30). The two goals are OPPOSED on this tower: more cars empty the landings and raise the work per delivered leg, fewer cars do the reverse, and there is no fleet size at which both hold. That is docs/33 § 4.6's F7 re-measured on the fabric axis rather than on the threshold, it belongs to #234, and no arbitrary change is shipped here to look like an answer. The published figure is 1.00 of 50."
+      }
+    },
+    {
+      "contractId": "c5",
+      "buildingId": "vertical-city",
+      "demand": {},
+      "fabric": {
+        "occupancy": 1,
+        "banks": []
+      },
+      "intent": {
+        "missRateTarget": 0.65,
+        "substrate": "fabric",
+        "note": "NOT IN THE BAND, AND HANDED AS BUILT, for c4's reason measured on this tower: as built the landing queue misses on 30 of 30 and the energy bar on 19; at occupancy 0.4 the energy bar misses on 30; with a 52-car fleet at full occupancy the energy bar misses on 30 and the queue on 22. Same opposition, same conclusion. A hundred floors and three sky lobbies cost what they cost per delivered leg, and 80 kJ is a bar derived from the whole catalogue rather than from this building — docs/33 § 7's O2, which is exactly the open question this row is evidence for. The published figure is 1.00 of 50."
+      }
+    },
+    {
+      "contractId": "c6",
+      "buildingId": "chancery-house",
+      "demand": {
+        "arrivalRatePctPop5min": 16
+      },
+      "fabric": {
+        "occupancy": 1.06,
+        "banks": [
+          {
+            "bankId": "main",
+            "shafts": 5,
+            "machineClassId": "gearless-traction",
+            "ratedSpeedMps": 3.5
+          }
+        ]
+      },
+      "intent": {
+        "missRateTarget": 0.36,
+        "substrate": "fabric",
+        "note": "A day a player could not fail — 1 of 30 at four goals, 6 of 30 at five — on a building whose own card says it has more lift than it needs. The crowd is left at the prestige profile's typical, because raising it to the declared maximum of 17 % makes the day EASIER (0.07 over 30 seeds), the energy bar falling away faster than the wait bars bind. The fabric moves instead: five shafts rather than six, at 3.5 m/s rather than 5, still a gearless bank inside its declared 2.5-7.0 m/s band and still the building the card describes. Six shafts at 5 m/s measured 0.20, five at 5 m/s 0.30, four at 5 m/s 0.77 and five at 3.5 m/s 0.33; the last plus a six per cent occupancy lift measured 0.43 at 30 seeds and 0.36 of 50, docs/33 § 4.7. This is the scenario whose whole lesson is that spare cars are not a short interval, so taking one spare away is the lesson expressed as fabric — and five cars still leave the dispatcher a decision, which is what a one-car bank would not."
+      }
+    },
+    {
+      "contractId": "c7",
+      "buildingId": "crown-hotel",
+      "demand": {
+        "arrivalRatePctPop5min": 12
+      },
+      "fabric": {
+        "occupancy": 1,
+        "banks": []
+      },
+      "intent": {
+        "missRateTarget": 0.5,
+        "substrate": "demand",
+        "note": "Already inside the band as shipped, at 0.50 of 50 seeds, with the worst-wait ceiling doing the discriminating on 20 of them. Fabric untouched, and it could not be touched here anyway: the `main` bank mixes a 1.75 m/s service car with 3.0 m/s guest cars, and a BankChoice collapses class, speed and load to one value each, so commissioning it would delete the thing this scenario teaches. `commissioning/choices.ts#mixedFleetBanks` names that bank and `shift/ladder.ts` refuses a rung that commissions it."
+      }
+    },
+    {
+      "contractId": "c8",
+      "buildingId": "st-jude-hospital",
+      "demand": {
+        "arrivalRatePctPop5min": 8.5
+      },
+      "fabric": {
+        "occupancy": 1,
+        "banks": []
+      },
+      "intent": {
+        "missRateTarget": 0.4,
+        "substrate": "demand",
+        "note": "The contract that tied the opening one for the easiest day in the game: 0 of 30 at four goals. The whole move is the crowd, from the hospital profile's typical of 8 % to 8.5 %, inside its declared 6-11 % band — a hospital half a point busier. The response is steep and NOT MONOTONE, which is why the figure is half a point rather than a round one: swept at the shipped fabric the miss rate reads 1.00 at 6 %, 0.77 at 7 and at 8, 0.43 at 9, 0.13 at 10 and 0.10 at 11. The energy bar binds hardest when the building is quiet, because fewer riders share the same car travel, and it falls away as the wards fill. Fabric untouched: `main` mixes bed lifts with passenger cars and may not be commissioned, for c7's reason. The published figure is 0.40 of 50, docs/33 § 4.7."
+      }
+    }
+  ]
+}

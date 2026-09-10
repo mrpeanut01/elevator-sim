@@ -87,22 +87,37 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
     }
   });
 
-  it('teaches zoning before transfers, which is the handoff’s order and not the filesystem’s', () => {
-    // The handoff's five, in the handoff's teaching order, followed by the three that landed
-    // after it was written. The prefix is asserted separately from the tail so a change to the
-    // designed curriculum fails distinctly from a change to the extension.
-    expect(CONTRACTS.slice(0, 5).map((contract) => contract.buildingId)).toEqual([
+  it('runs one bank before two, two before a transfer, and a transfer before three', () => {
+    /*
+     * The order is `docs/33` § 4.7's, measured rather than designed by eye — GitHub issue #382. It
+     * is asserted here as a **list** because it is a curriculum and a reader of this test should be
+     * able to see it; the property that makes it a curve rather than a list is the sweep's, and the
+     * sweep is a compute job rather than a check (`shift/contractCurve.sweep.test.ts`).
+     */
+    expect(CONTRACTS.map((contract) => contract.buildingId)).toEqual([
       'garden-apartments',
+      'chancery-house',
+      'st-jude-hospital',
       'midtown-office',
+      'crown-hotel',
       'secure-tower',
       'mixed-use-high-rise',
       'vertical-city',
     ]);
-    expect(CONTRACTS.slice(5).map((contract) => contract.buildingId)).toEqual([
-      'chancery-house',
-      'crown-hotel',
-      'st-jude-hospital',
-    ]);
+  });
+
+  it('never asks a reader to run more banks than the scenario before it', () => {
+    /*
+     * The curriculum reading of the measured order, and the one thing about it a table can check
+     * without running a simulation: 1, 1, 1, 1, 1, 2, 3, 7. Five single-bank buildings of rising
+     * subtlety, then two banks and a credential, then one transfer, then three. If a rebalance ever
+     * moves a three-bank tower above a one-bank one, this fails and the curriculum claim in
+     * `contracts.ts`'s docstring has to be re-argued rather than quietly dropped.
+     */
+    const banksOf = (buildingId: string): number =>
+      config.buildingsById.get(buildingId)?.banks.length ?? 0;
+    const counts = CONTRACTS.map((contract) => banksOf(contract.buildingId));
+    expect(counts).toEqual([1, 1, 1, 1, 1, 2, 3, 7]);
   });
 
   it('asks for between one and three clean shifts, rising', () => {
@@ -115,9 +130,15 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
     }
   });
 
-  it('keeps the handoff’s own ids and labels', () => {
+  it('keeps the handoff’s own ids, and labels every contract by its position', () => {
+    /*
+     * The ids are **names** and do not move with the order (issue #382): a saved week, a career
+     * tower and `data/contract-ladder.json` all hold them, and renumbering would make one id mean
+     * two things. The labels are *positions*, so they are re-derived when the order moves — which
+     * is why the two lists below no longer read in step.
+     */
     expect(CONTRACTS.map((contract) => contract.id)).toEqual([
-      'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8',
+      'c1', 'c6', 'c8', 'c2', 'c7', 'c3', 'c4', 'c5',
     ]);
     expect(CONTRACTS.map((contract) => contract.label)).toEqual([
       'Scenario 1',

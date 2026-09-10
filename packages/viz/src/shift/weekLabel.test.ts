@@ -132,7 +132,9 @@ describe('a free play run', () => {
       { ...openWeek('c2'), day: 4, streak: 4 },
       openWeek(FREE_PLAY_CONTRACT_ID),
     );
-    expect(line).toContain('Scenario 2 is kept on day 4');
+    // `c2` is *Scenario 4* since issue #382 re-ordered the ladder by measured day-1 difficulty; a
+    // label is a position and the ids did not move.
+    expect(line).toContain('Scenario 4 is kept on day 4');
     expect(line).toContain('pick that building again and it carries on from there');
     expect(line).toContain('Your free-play run is one run and banks nothing.');
     expect(line).not.toContain('starts a new week');

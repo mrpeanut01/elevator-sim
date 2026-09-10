@@ -76,7 +76,19 @@ const config = readFileSync(VITEST_CONFIG, 'utf8');
  */
 const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly totalMs: number }> =
   new Map([
-    ['viz', { count: 91, totalMs: 75_900_000 }],
+    /*
+     * **91 → 92, and the one is named** — GitHub issue #382's
+     * `shift/contractCurve.sweep.test.ts`. It is the contract-ladder sweep: eight contracts by
+     * fifty seeds at day 1, each run built through `dev/state.ts#shiftRunConfigOf` and recorded in
+     * full, which took 396 s wall clock at the published budget on this container. Its annotation is
+     * four hours because the same instrument is run at `CONTRACT_CURVE_DAYS=1,5,10,20` and at
+     * larger seed counts by hand, and an annotation shorter than the job it holds is an annotation
+     * that fails for a reason that is not the code. It is gated on `CONTRACT_CURVE_SWEEP` and
+     * registered in `deepTiers.test.ts`, so it costs the default suite nothing. Raised here with
+     * that reason on the commit that added it, which is what the ratchet's own message asks for;
+     * nothing existing was raised to make room.
+     */
+    ['viz', { count: 92, totalMs: 90_300_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

@@ -30,6 +30,7 @@ import type { ShiftEvent } from '../shift/types.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
+import { ladderTowerConfig, rungFor } from '../shift/ladder.js';
 import { openWeek } from '../shift/week.js';
 
 import { EM_DASH, groupThousands } from './figures.js';
@@ -391,10 +392,33 @@ describe('the brief describes the building the run will use — issue #300', () 
      */
     for (const buildingId of IDS_300) {
       const state = { ...stateOn(buildingId, 1), recording: undefined };
-      const shipped = RESOURCES_300.entries.find((entry) => entry.config.id === buildingId)?.resolved;
+      const entry = RESOURCES_300.entries.find((candidate) => candidate.config.id === buildingId);
+      const shipped = entry?.resolved;
       expect(shipped, buildingId).toBeDefined();
+      /*
+       * **The tower the scenario hands over, which on all but one building is the shipped one** —
+       * GitHub issue #382. `shift/ladder.ts` lets a contract's own building at a declared occupancy,
+       * so the brief for the contract you are on owes you *that* tower and not `data/`'s: a card
+       * reading 120 people over a run with 235 is the caption defect this file exists to catch, one
+       * mechanism along. The clause #36 pinned is unchanged and is what the `rungFor` guard below
+       * keeps: a building the state's contract does not run is the shipped fabric exactly.
+       */
+      const rung = rungFor(state.week.contractId, buildingId);
+      const expected =
+        rung === undefined
+          ? shipped
+          : resolveBuilding(
+              parseBuilding(
+                ladderTowerConfig(
+                  entry?.config as never,
+                  rung.contractId,
+                  RESOURCES_300.elevatorSpecs,
+                ) as unknown,
+              ),
+              RESOURCES_300.elevatorSpecs,
+            );
       expect(factOn(state, 'People'), buildingId).toBe(
-        groupThousands(shipped?.totalPopulation ?? -1),
+        groupThousands(expected?.totalPopulation ?? -1),
       );
       expect(briefOn(state).towerName, buildingId).toBe(shipped?.name);
     }
