@@ -34,12 +34,14 @@
  */
 
 import {
+  DISPATCH_DEFAULTS,
   parseBuilding,
   resolveBuilding,
   type BuildingConfig,
   type DispatcherProfile,
   type DispatcherProfiles,
   type ElevatorSpecs,
+  type ParkingStrategy,
   type ResolvedBuilding,
   type SimulationConfig,
   type TrafficProfiles,
@@ -162,21 +164,184 @@ function applyDispatcherPatches(
   return profile;
 }
 
-/** The machinery the editor bought, as a fabric patch at § 9's step sizes. */
+/**
+ * What the editor bought, as a patch — § 9's machinery step sizes and § 10.3's parking.
+ *
+ * It is placed **last** in the patch list, so an editor control wins over a repair that set the
+ * same field. That is the right way round: a repair is an offer the case authored and the editor is
+ * the player's own hand on the same building.
+ *
+ * Zoning is not here, and cannot be: `building.banks[]` is a *replacement* array, so widening a
+ * range needs the banks the repairs left behind and the building's own floor order. It is applied
+ * in {@link configOf} against the patched document instead — {@link applyZoneOverlap}.
+ */
 function editorPatchOf(state: FixitState): FixitPatch {
-  if (state.speedSteps === 0 && state.capacitySteps === 0) return {};
-  return {
-    building: {
-      cars: [
-        {
-          carIds: ['*'],
-          set: {
-            ...(state.speedSteps === 0 ? {} : { ratedSpeedDeltaMps: 0.5 * state.speedSteps }),
+  const speed =
+    state.speedSteps === 0
+      ? {}
+      : {
+          building: {
+            cars: [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.5 * state.speedSteps } }],
           },
-        },
-      ],
-    },
-  };
+        };
+  const parking =
+    state.parkingStrategy === null
+      ? {}
+      : { dispatcher: { idle: { parkingStrategy: state.parkingStrategy } } };
+  return { ...speed, ...parking };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Section 10.3's zones and service ranges — issue #422
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The widest overlap the editor offers. Three floors either side of every boundary is already a
+ * substantial rezone on the shipped towers, and the cap is here rather than in the screen so both
+ * surfaces and the pricing agree about what the control can reach.
+ */
+export const ZONE_OVERLAP_MAX = 3;
+
+/** What the widening rule needs to know about a bank. Both callers map into this. */
+interface ZoneBank {
+  readonly servesFloors: readonly string[];
+  /** Double-deck banks are left alone — see {@link widenedRangesOf}. */
+  readonly paired: boolean;
+}
+
+/**
+ * **The one statement of what a zoning step does**, shared by the control's ceiling and by the run.
+ *
+ * Each bank's served floors form one or more contiguous runs in the building's own floor order. A
+ * step of `floors` grows **every** run by that many positions at each end, and keeps only floors
+ * **some bank already serves**. That last clause is the whole of what makes this an *overlap* rather
+ * than an invention: a bank never acquires a landing no shaft in the building opens onto, so the
+ * result is a redrawn boundary between existing zones and not a claim about steel nobody cut.
+ *
+ * Growing every run rather than only the outermost is what makes it work on a real tower. A high
+ * bank that serves the lobby and floors 12-20 spans the building end to end, so an outermost-only
+ * rule would find nowhere to grow and the control would sit dead on the case section 10.3 is most
+ * about. By runs, its 12-20 run reaches down into the gap the low bank is drowning in.
+ *
+ * **Double-deck banks are returned unchanged.** `BankConfig.servesFloorPairs` is the authored
+ * geometry and `servesFloors` is documented as its flattened union, so widening one without the
+ * other writes a building whose two statements disagree. Pairing floors is a decision about deck
+ * separation in metres, which is a designer's, not a side effect of a step on this screen.
+ */
+function widenedRangesOf(
+  floorOrder: readonly string[],
+  banks: readonly ZoneBank[],
+  floors: number,
+): readonly (readonly string[])[] {
+  const positionOf = new Map(floorOrder.map((id, index) => [id, index]));
+  const servedSomewhere = new Set(banks.flatMap((bank) => [...bank.servesFloors]));
+  return banks.map((bank) => {
+    if (floors <= 0 || bank.paired) return bank.servesFloors;
+    const own = new Set(bank.servesFloors);
+    const positions = [...own]
+      .map((id) => positionOf.get(id))
+      .filter((index): index is number => index !== undefined)
+      .sort((a, b) => a - b);
+    if (positions.length === 0) return bank.servesFloors;
+    const grown = new Set(own);
+    /* Walk the sorted positions, closing each contiguous run and growing it at both ends. */
+    let runStart = positions[0]!;
+    for (let i = 0; i <= positions.length; i += 1) {
+      const here = positions[i];
+      const previous = positions[i - 1];
+      if (here !== undefined && previous !== undefined && here === previous + 1) continue;
+      if (previous !== undefined) {
+        for (let k = 1; k <= floors; k += 1) {
+          for (const at of [runStart - k, previous + k]) {
+            const id = floorOrder[at];
+            if (id !== undefined && servedSomewhere.has(id)) grown.add(id);
+          }
+        }
+      }
+      if (here !== undefined) runStart = here;
+    }
+    /* Kept in the building's own floor order, so the same step always writes the same array. */
+    return floorOrder.filter((id) => grown.has(id));
+  });
+}
+
+/**
+ * **How far the control can actually be stepped on this building, and 0 when it cannot be.**
+ *
+ * Both fix-it surfaces draw the stepper only as far as this, and do not draw it at all at 0. That is
+ * the section D219 half a screen owes: eight of the eighteen shipped cases run a **single-bank**
+ * building, where every floor a bank could grow into it already serves, so a zoning control there
+ * would be a press that writes a field and changes nothing. A control that cannot bind is not shown
+ * claiming it can.
+ *
+ * The ceiling is the largest step that still adds a floor **the step before it did not**, so no rung
+ * of the stepper is inert either — a boundary that has already met its neighbour stops the count
+ * rather than offering two more presses that redraw the same array.
+ */
+export function zoneOverlapCeilingOf(building: ResolvedBuilding): number {
+  const floorOrder = building.floors.map((floor) => floor.id);
+  const banks: readonly ZoneBank[] = building.banks.map((bank) => ({
+    servesFloors: bank.servesFloors,
+    paired: bank.servesFloorPairs !== undefined,
+  }));
+  const signature = (floors: number): string =>
+    JSON.stringify(widenedRangesOf(floorOrder, banks, floors));
+  let previous = signature(0);
+  let ceiling = 0;
+  for (let floors = 1; floors <= ZONE_OVERLAP_MAX; floors += 1) {
+    const next = signature(floors);
+    if (next === previous) break;
+    ceiling = floors;
+    previous = next;
+  }
+  return ceiling;
+}
+
+/**
+ * **Where this case's idle cars already wait** — what `FixitState.parkingStrategy: null` means, read
+ * off the run rather than guessed.
+ *
+ * It is a fact about the **case**, not about the profile: two shipped cases patch
+ * `idle.parkingStrategy` in their as-built delta and a third parks at a fixed floor, so the standing
+ * order the player is editing against is the profile *after* the as-built patch. Taking it from the
+ * as-built `SimulationConfig` — the object both surfaces already build — is the only reading that
+ * cannot drift from what actually runs.
+ *
+ * Both surfaces use it to leave that strategy **out of the select**, because offering it would be a
+ * press that writes the value the run already carries. Measured: on `zoning-starves-the-top` the
+ * standing order is `stay`, and selecting `stay` moves not one leg.
+ */
+export function standingParkingOf(asBuilt: SimulationConfig): ParkingStrategy {
+  return asBuilt.dispatcherProfile.idle?.parkingStrategy ?? DISPATCH_DEFAULTS.parkingStrategy;
+}
+
+/**
+ * Apply the editor's zoning step to a patched document.
+ *
+ * The floor order is the **authored building's resolved** one rather than the document's own array:
+ * a document may write floors as ranges, and `BuildingPatch` has no floors field at all, so no patch
+ * can add, remove or reorder a floor. The order is therefore invariant across every patch a case can
+ * carry, and taking it from the resolution the loader already produced costs nothing.
+ */
+function applyZoneOverlap(
+  doc: MutableBuildingDocument,
+  floorOrder: readonly string[],
+  floors: number,
+): void {
+  if (floors <= 0) return;
+  const banks = doc.banks ?? [];
+  if (banks.length === 0) return;
+  const widened = widenedRangesOf(
+    floorOrder,
+    banks.map((bank) => ({
+      servesFloors: (bank['servesFloors'] as string[] | undefined) ?? [],
+      paired: bank['servesFloorPairs'] !== undefined,
+    })),
+    floors,
+  );
+  banks.forEach((bank, index) => {
+    bank['servesFloors'] = [...(widened[index] ?? [])];
+  });
 }
 
 /**
@@ -234,20 +399,32 @@ export function fixitRunPlanOf(
     .filter((repair) => state.selectedRepairIds.includes(repair.id))
     .map((repair) => repair.patch);
   return {
-    asBuilt: configOf(entry, [entry.asBuilt.patch], 0, resources),
+    asBuilt: configOf(entry, [entry.asBuilt.patch], NO_EDITOR, resources),
     asRepaired: configOf(
       entry,
       [entry.asBuilt.patch, ...repairPatches, editorPatchOf(state)],
-      state.capacitySteps,
+      { capacitySteps: state.capacitySteps, zoneOverlapFloors: state.zoneOverlapFloors },
       resources,
     ),
   };
 }
 
+/**
+ * The editor's two fabric selections — the pair that cannot travel as a {@link FixitPatch}, because
+ * one edits every car's plated load and the other replaces an array it must first read.
+ */
+interface EditorFabric {
+  readonly capacitySteps: number;
+  readonly zoneOverlapFloors: number;
+}
+
+/** The as-built side buys nothing, and says so by name rather than by two zeroes at a call site. */
+const NO_EDITOR: EditorFabric = Object.freeze({ capacitySteps: 0, zoneOverlapFloors: 0 });
+
 function configOf(
   entry: FixitCase,
   patches: readonly FixitPatch[],
-  capacitySteps: number,
+  editor: EditorFabric,
   resources: FixitResources,
 ): SimulationConfig {
   const authored = resources.entries.find((candidate) => candidate.resolved.id === entry.buildingId);
@@ -265,7 +442,16 @@ function configOf(
   for (const patch of patches) {
     if (patch.building !== undefined) applyBuildingPatch(doc, patch.building);
   }
-  applyCapacitySteps(doc, capacitySteps);
+  applyCapacitySteps(doc, editor.capacitySteps);
+  /*
+   * After the repairs, deliberately: a rezone the player draws in the editor overlaps whatever
+   * boundaries the selected repairs left, not the ones the case shipped with.
+   */
+  applyZoneOverlap(
+    doc,
+    authored.resolved.floors.map((floor) => floor.id),
+    editor.zoneOverlapFloors,
+  );
   // The same door a shipped file enters by — parse, then resolve against the loaded specs.
   const file = `${entry.buildingId}.json`;
   const building: ResolvedBuilding = resolveBuilding(

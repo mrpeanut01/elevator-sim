@@ -29,15 +29,35 @@
  * inside the Everyday shell and the handoff is canonical for what that screen looks like. Each
  * reads its own product's tokens; neither hardcodes a palette of its own.
  *
- * ## The § 10.3 subset drawn, and why it is a subset
+ * ## The § 10.3 subset drawn, and why it is still a subset — narrowed by GitHub issue #422
  *
  * § 10.1 item 6 asks for the full building editor — elevation grid, zones, shafts, parking,
- * who-drives. The fixit machinery prices **none of those**: `FixitState` carries repairs, extras
- * and the two § 9-priced machinery steps, and a control that writes no field of the state it
- * claims to edit is this repository's signature defect (§ D219 — *move the control and require
- * the run to change*). So the editor drawn here is exactly the subset the engine prices: the two
- * machinery steppers with the running total and `fixit/engine.ts#budgetNoteOf`'s note. The rest
- * of § 10.3 is content for the lane that gives the engine those seams, not for a screen to mime.
+ * who-drives. **Zones and parking are now drawn**, because the engine now prices them:
+ * `FixitState.zoneOverlapFloors` writes `building.banks[]` at the schedule's `rezone-bank`, and
+ * `FixitState.parkingStrategy` writes `dispatcher.idle.parkingStrategy` at `idle-parking`. Both are
+ * proved on the legs in `fixit/cases.test.ts` — every rung of the stepper and every strategy the
+ * select offers — which is the only thing that makes drawing them different from miming them.
+ *
+ * **What is still refused, and why each one is refused for its own reason.** A control that writes
+ * no field of the state it claims to edit is this repository's signature defect (§ D219 — *move the
+ * control and require the run to change*), and these three would each be one:
+ *
+ * - **The elevation grid.** No field of `FixitPatch` adds, removes or moves a floor: `BuildingPatch`
+ *   carries populations, banks, cars and added cars, and nothing else. A grid drawn over that would
+ *   edit a document the run never reads.
+ * - **Shafts.** A new shaft is `building.addCars[]` and *is* priced (`new-car`, 34 u) — but it is
+ *   already sold as each case's fourth repair, at a price no shipped budget can take. A second
+ *   control for the same purchase would be one act at two places, which is what #366 abolished.
+ * - **Who-drives — per-shaft duty, the goods car, the bed car, the one out of service.** There is no
+ *   `duty` field to write. `CarConfig` carries `mode`, which is not the same concept, and
+ *   `everyday/designerModel.ts` names the same absence from the other side, so it is one missing
+ *   concept two screens want rather than a gap in this one.
+ *
+ * **And zoning is drawn only where it can bind.** Eight of the eighteen shipped cases run a
+ * single-bank building, where every floor a bank could grow into it already serves;
+ * `fixit/run.ts#zoneOverlapCeilingOf` reports 0 there and the row is not drawn at all. A refusal
+ * that survives what it refuses is the defect class this file states against itself below, so it
+ * says the ceiling rather than the control.
  *
  * ## The runs are on a worker — GitHub issue #165
  *
@@ -97,12 +117,16 @@ import {
   fixedBadgeAfter,
   repairRowOf,
   budgetNoteOf,
+  parkingPriceUnits,
+  setParkingStrategy,
   spendOf,
   standingExtrasFrom,
   stepCapacity,
   stepSpeed,
+  stepZoneOverlap,
   toggleExtra,
   toggleRepair,
+  zonePriceUnits,
   type FixitOutcome,
 } from '../fixit/engine.js';
 import {
@@ -111,8 +135,15 @@ import {
   figureValuesOf,
   fixitRunPlanOf,
   measuredOf,
+  standingParkingOf,
+  zoneOverlapCeilingOf,
 } from '../fixit/run.js';
-import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
+import type {
+  EditorParkingStrategy,
+  FixitCase,
+  FixitCases,
+  FixitState,
+} from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { mountAsBuiltStage, type AsBuiltStage } from './asBuiltStage.js';
@@ -126,9 +157,12 @@ import {
   fixitBarModel,
   fixitCaseRailModel,
   fixitMachineryRows,
+  fixitParkingRow,
   fixitRepairStateLine,
   fixitSpendSummary,
+  fixitZoneRow,
   type FixitSpendSummary,
+  type FixitZoneRow,
 } from './fixitScreenModel.js';
 import { solvedCaseSetOf } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
@@ -819,8 +853,8 @@ function mountFixit(
     }
     main.append(grid);
 
-    /* -- 6. the § 10.3 subset the engine prices: the two machinery steppers -- */
-    main.append(machinesCard(entry, session, summary));
+    /* -- 6. the § 10.3 subset the engine prices: machinery, zones and parking -- */
+    main.append(machinesCard(loadedFixit, entry, session, summary));
 
     /* -- 7. the result, once run (§ 10.4) -- */
     if (session.outcome !== undefined) main.append(outcomeCard(session.outcome));
@@ -909,6 +943,7 @@ function mountFixit(
   }
 
   function machinesCard(
+    loadedFixit: LoadedFixit,
     entry: FixitCase,
     session: CaseSession,
     summary: FixitSpendSummary,
@@ -1020,6 +1055,17 @@ function mountFixit(
       line.append(minus, plus, label, readout, priced);
       body.append(line);
     }
+
+    /* § 10.3's zones and parking — GitHub issue #422, on the same card and the same budget. */
+    const fabric = editorFabricOf(loadedFixit, entry);
+    const zone = fixitZoneRow(
+      session.state,
+      fabric.ceiling,
+      affordabilityOf(entry, session.state, zonePriceUnits(scheduleNow()), scheduleNow()).selectable,
+      zonePriceUnits(scheduleNow()),
+    );
+    if (zone !== null) body.append(zoneLine(entry, session, zone, fabric.ceiling));
+    body.append(parkingLine(entry, session, fabric.standing));
     card.append(body);
 
     const note = el(doc, 'div', 'everyday-fixit-budget-note', budgetNoteOf(entry, spendOf(entry, session.state, scheduleNow())));
@@ -1033,6 +1079,138 @@ function mountFixit(
     ].join(';');
     card.append(note);
     return card;
+  }
+
+  /**
+   * **What this case's fabric allows**, computed once per case rather than once per render.
+   *
+   * Both answers come off the as-built `SimulationConfig` — the zoning ceiling from its resolved
+   * building, the standing parking rule from its dispatcher profile — so this screen holds no second
+   * opinion about either, exactly as it holds none about a price or an affordability. Memoised
+   * because building that config parses and resolves the whole tower and `render()` runs on every
+   * press; keyed by case id, and a case's fabric cannot change inside a session because the as-built
+   * patch is authored.
+   */
+  const fabricByCase = new Map<string, { readonly ceiling: number; readonly standing: string }>();
+  function editorFabricOf(
+    loadedFixit: LoadedFixit,
+    entry: FixitCase,
+  ): { readonly ceiling: number; readonly standing: string } {
+    const cached = fabricByCase.get(entry.id);
+    if (cached !== undefined) return cached;
+    const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), loadedFixit.resources).asBuilt;
+    const fabric = {
+      ceiling: zoneOverlapCeilingOf(asBuilt.building),
+      standing: standingParkingOf(asBuilt),
+    };
+    fabricByCase.set(entry.id, fabric);
+    return fabric;
+  }
+
+  /**
+   * § 10.3's zoning stepper — issue **#422**, drawn on `fixitScreenModel.ts#fixitZoneRow`'s words.
+   *
+   * The `+` button's `title` is the row's **own** refusal rather than a constant, which is the whole
+   * point of `FixitZoneRow.stepUpRefusal` being a string and not a boolean: at the building's ceiling
+   * with budget in hand, *the repair budget will not stretch* would be false. `docs/20` defect 8 is
+   * that mistake made once already, and GitHub issue #262's sweep is why a grey button says why.
+   */
+  function zoneLine(
+    entry: FixitCase,
+    session: CaseSession,
+    row: FixitZoneRow,
+    ceiling: number,
+  ): HTMLElement {
+    const line = el(doc, 'div', 'everyday-fixit-stepper everyday-fixit-stepper-zones');
+    line.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    const minus = el(doc, 'button', 'everyday-fixit-step-down', '−');
+    const plus = el(doc, 'button', 'everyday-fixit-step-up', '+');
+    for (const [button, enabled, label, why] of [
+      [minus, row.canStepDown, COPY.stepDown, COPY.nothingToReturn],
+      [plus, row.stepUpRefusal === undefined, COPY.stepUp, row.stepUpRefusal ?? ''],
+    ] as const) {
+      button.type = 'button';
+      button.setAttribute('aria-label', `${row.label} — ${label}`);
+      button.disabled = !enabled;
+      if (!enabled && why !== '') button.title = why;
+      button.style.cssText = [
+        'width:26px',
+        'height:24px',
+        'padding:0',
+        `border:1px solid ${C.rule}`,
+        `border-radius:${String(R.control)}px`,
+        `background:${C.paper}`,
+        `color:${enabled ? C.ink : C.faint}`,
+        `cursor:${enabled ? 'pointer' : 'not-allowed'}`,
+        'font-size:14px',
+        'line-height:1',
+      ].join(';');
+    }
+    for (const [button, delta] of [
+      [minus, -1],
+      [plus, 1],
+    ] as const) {
+      button.addEventListener('click', () => {
+        if (running) return;
+        session.state = stepZoneOverlap(entry, session.state, delta, ceiling, scheduleNow());
+        everydayTelemetry().record({ name: 'change_made', controlKey: 'fixit-zones', screenKey: 'fixit' });
+        render();
+      });
+    }
+    const label = el(doc, 'span', undefined, row.label);
+    label.style.cssText = 'font-size:13px;font-weight:600';
+    const readout = el(doc, 'span', 'everyday-fixit-readout', row.readout);
+    readout.style.cssText = MONO(12, C.terracotta);
+    const priced = el(doc, 'span', undefined, row.priced);
+    priced.style.cssText = `margin-left:auto;${MONO(10, C.label)}`;
+    line.append(minus, plus, label, readout, priced);
+    return line;
+  }
+
+  /**
+   * § 10.3's parking select — issue **#422**.
+   *
+   * A `<select>` rather than the steppers' `+`/`−`, because the five strategies are not a ladder and
+   * a stepper over them would imply an ordering the engine does not have. The options are
+   * `fixitScreenModel.ts#fixitParkingRow`'s, which is where the strategy the case already runs is
+   * dropped — offering it would be a press that writes the value the run already carries.
+   */
+  function parkingLine(entry: FixitCase, session: CaseSession, standing: string): HTMLElement {
+    const row = fixitParkingRow(session.state, standing, parkingPriceUnits(scheduleNow()));
+    const line = el(doc, 'div', 'everyday-fixit-parking');
+    line.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    const select = el(doc, 'select', 'everyday-fixit-parking-select') as HTMLSelectElement;
+    select.setAttribute('aria-label', row.label);
+    select.disabled = running;
+    select.style.cssText = [
+      `border:1px solid ${C.rule}`,
+      `border-radius:${String(R.control)}px`,
+      `background:${C.paper}`,
+      `color:${C.ink}`,
+      'font-size:12.5px',
+      'padding:3px 6px',
+      `cursor:${running ? 'not-allowed' : 'pointer'}`,
+    ].join(';');
+    for (const option of row.options) {
+      const node = doc.createElement('option');
+      node.value = option.value ?? '';
+      node.textContent = option.label;
+      node.selected = option.selected;
+      select.append(node);
+    }
+    select.addEventListener('change', () => {
+      if (running) return;
+      const picked = select.value === '' ? null : (select.value as EditorParkingStrategy);
+      session.state = setParkingStrategy(entry, session.state, picked, scheduleNow());
+      everydayTelemetry().record({ name: 'change_made', controlKey: 'fixit-parking', screenKey: 'fixit' });
+      render();
+    });
+    const label = el(doc, 'span', undefined, row.label);
+    label.style.cssText = 'font-size:13px;font-weight:600';
+    const priced = el(doc, 'span', undefined, row.priced);
+    priced.style.cssText = `margin-left:auto;${MONO(10, C.label)}`;
+    line.append(select, label, priced);
+    return line;
   }
 
   /** § 10.4's result card — head, body, the three measured rows, the basis line. All engine. */

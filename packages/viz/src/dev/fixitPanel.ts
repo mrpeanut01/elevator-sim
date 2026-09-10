@@ -46,15 +46,28 @@ import {
   emptyFixitState,
   fixedBadgeAfter,
   repairRowOf,
+  parkingPriceUnits,
+  setParkingStrategy,
   spendOf,
   stepCapacity,
   stepSpeed,
+  stepZoneOverlap,
+  zonePriceUnits,
   toggleExtra,
   toggleRepair,
   type FixitOutcome,
 } from '../fixit/engine.js';
-import { FIXIT_RUN_SWITCHES, assertPairMatchesRepairs, figureValuesOf, fixitRunPlanOf, measuredOf } from '../fixit/run.js';
-import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
+import {
+  FIXIT_RUN_SWITCHES,
+  assertPairMatchesRepairs,
+  figureValuesOf,
+  fixitRunPlanOf,
+  measuredOf,
+  standingParkingOf,
+  zoneOverlapCeilingOf,
+} from '../fixit/run.js';
+import { EDITOR_PARKING_STRATEGIES } from '../fixit/types.js';
+import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
 
@@ -383,6 +396,8 @@ function scheduleNow(): PriceSchedule {
         el(doc, 'h2', { text: 'Machinery, priced against the same budget', style: h2Style() }),
         stepperRow(entry, session, 'speed'),
         stepperRow(entry, session, 'capacity'),
+        zoneRow(entry, session),
+        parkingRow(entry, session),
         el(doc, 'p', {
           text: `${String(spend.totalUnits)} of ${String(entry.budgetUnits)} u committed, ${String(spend.machineryUnits)} u of it machinery — ${budgetNoteOf(entry, spend)}`,
           style: { color: MUTED },
@@ -550,6 +565,130 @@ function scheduleNow(): PriceSchedule {
         minus,
         plus,
         el(doc, 'span', { text: `${label}${canBuy ? '' : ' — at the budget'}`, style: { color: MUTED } }),
+      ],
+    });
+  }
+
+  /**
+   * **What this case's fabric allows**, computed once per case rather than per render.
+   *
+   * Both answers are derived from the as-built `SimulationConfig` — the zoning ceiling from its
+   * resolved building, the standing parking rule from its dispatcher profile — so neither is a
+   * second opinion this file holds about a run. Memoised because building that config parses and
+   * resolves the whole tower, and `render()` runs on every press.
+   */
+  const fabricByCase = new Map<string, { readonly ceiling: number; readonly standing: string }>();
+  function editorFabricOf(entry: FixitCase): { readonly ceiling: number; readonly standing: string } {
+    const cached = fabricByCase.get(entry.id);
+    if (cached !== undefined) return cached;
+    const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), host.resources).asBuilt;
+    const fabric = {
+      ceiling: zoneOverlapCeilingOf(asBuilt.building),
+      standing: standingParkingOf(asBuilt),
+    };
+    fabricByCase.set(entry.id, fabric);
+    return fabric;
+  }
+
+  /**
+   * § 10.3's zones and service ranges — GitHub issue **#422**.
+   *
+   * `null` on a building whose banks cannot overlap, which is every single-bank tower: eight of the
+   * eighteen shipped cases draw no row here at all, because a stepper that writes a field and moves
+   * no leg is § D219's defect and a dev surface is not exempt from it.
+   *
+   * **The `+` refusal is one of two sentences and never one of one.** At the building's ceiling with
+   * budget still in hand, *at the budget* would be false — and a reader chasing the wrong refusal is
+   * the whole reason `docs/20` defect 8 exists.
+   */
+  function zoneRow(entry: FixitCase, session: CaseSession): HTMLElement | null {
+    const { ceiling } = editorFabricOf(entry);
+    if (ceiling <= 0) return null;
+    const floors = session.state.zoneOverlapFloors;
+    const price = zonePriceUnits(scheduleNow());
+    const canBuy = affordabilityOf(entry, session.state, price, scheduleNow()).selectable;
+    const atCeiling = floors >= ceiling;
+    const atBudget = floors === 0 && !canBuy;
+    const minus = el(doc, 'button', { text: '−', style: buttonStyle(false) });
+    const plus = el(doc, 'button', { text: '+', style: buttonStyle(false) });
+    minus.disabled = floors === 0;
+    plus.disabled = atCeiling || atBudget;
+    if (atCeiling) plus.title = 'the banks already reach as far into each other as this building lets them';
+    else if (atBudget) plus.title = 'at the budget';
+    minus.addEventListener('click', () => {
+      session.state = stepZoneOverlap(entry, session.state, -1, ceiling, scheduleNow());
+      render();
+    });
+    plus.addEventListener('click', () => {
+      session.state = stepZoneOverlap(entry, session.state, 1, ceiling, scheduleNow());
+      render();
+    });
+    const suffix = atCeiling ? ' — as far as this building goes' : atBudget ? ' — at the budget' : '';
+    return el(doc, 'div', {
+      style: { display: 'flex', 'align-items': 'center', gap: '0.5rem', 'margin-bottom': '0.5rem' },
+      children: [
+        minus,
+        plus,
+        el(doc, 'span', {
+          text:
+            `Bank overlap · ${String(price)} u once, whatever it moves · ` +
+            `${floors === 0 ? 'the boundaries as drawn' : `+${String(floors)} ${floors === 1 ? 'floor' : 'floors'} each side`}${suffix}`,
+          style: { color: MUTED },
+        }),
+      ],
+    });
+  }
+
+  /**
+   * § 10.3's parking — GitHub issue **#422**. Free (`idle-parking` is 0 u), and free is not inert:
+   * every option below writes `dispatcher.idle.parkingStrategy` and moves the legs.
+   *
+   * **The strategy the case already runs is left out**, which is what `standing` is for — offering
+   * it would be a press that writes the value the run already carries. The first option is the
+   * absence rather than a fourth strategy.
+   */
+  function parkingRow(entry: FixitCase, session: CaseSession): HTMLElement {
+    const { standing } = editorFabricOf(entry);
+    const price = parkingPriceUnits(scheduleNow());
+    const select = el(doc, 'select', { style: { padding: '0.2rem' } }) as HTMLSelectElement;
+    select.setAttribute('aria-label', 'Where idle cars wait');
+    const choices: readonly (readonly [string, string])[] = [
+      ['', 'as the standing order has it'],
+      ...EDITOR_PARKING_STRATEGIES.filter((strategy) => strategy !== standing).map(
+        (strategy) =>
+          [
+            strategy,
+            strategy === 'lobby'
+              ? 'back down at the lobby'
+              : strategy === 'stay'
+                ? 'where each one last stopped'
+                : 'in the middle of its own zone',
+          ] as const,
+      ),
+    ];
+    for (const [value, label] of choices) {
+      const option = doc.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      option.selected = value === (session.state.parkingStrategy ?? '');
+      select.append(option);
+    }
+    select.addEventListener('change', () => {
+      const picked = select.value === '' ? null : (select.value as EditorParkingStrategy);
+      session.state = setParkingStrategy(entry, session.state, picked, scheduleNow());
+      render();
+    });
+    return el(doc, 'div', {
+      style: { display: 'flex', 'align-items': 'center', gap: '0.5rem', 'margin-bottom': '0.5rem' },
+      children: [
+        select,
+        el(doc, 'span', {
+          text:
+            price === 0
+              ? 'Where idle cars wait · no charge — telling a controller where to send an empty car costs nothing'
+              : `Where idle cars wait · ${String(price)} u`,
+          style: { color: MUTED },
+        }),
       ],
     });
   }

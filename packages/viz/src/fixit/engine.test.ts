@@ -9,6 +9,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { PARKING_STRATEGIES } from '@elevator-sim/core/browser';
+
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import {
@@ -24,8 +26,13 @@ import {
   fixedBadgeAfter,
   repairRowOf,
   spendOf,
+  editorPathsOf,
+  parkingPriceUnits,
+  setParkingStrategy,
   stepCapacity,
   stepSpeed,
+  stepZoneOverlap,
+  zonePriceUnits,
   toggleExtra,
   toggleRepair,
   type FixitMeasurement,
@@ -34,6 +41,7 @@ import {
   repairChangesTheCrowd,
   selectionKeepsTheCrowd,
 } from './engine.js';
+import { EDITOR_PARKING_STRATEGIES } from './types.js';
 import type { FixitCase, FixitState } from './types.js';
 
 const PATCH = { dispatcher: { idle: { parkingStrategy: 'stay' } } };
@@ -436,5 +444,137 @@ describe('the FIXED badge follows the latest run — docs/20 defect 16', () => {
     );
     expect(panel).toContain('session.fixed = fixedBadgeAfter(outcome);');
     expect(panel).not.toContain("if (outcome.kind === 'fixed') session.fixed = true;");
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Section 10.3's zones and parking — issue #422
+ * -------------------------------------------------------------------------- */
+
+describe("the editor's zoning and parking are priced by the rows a repair already pays", () => {
+  /**
+   * **The whole design in one assertion.** `pricing/schedule.test.ts` refuses a second row covering
+   * a field already claimed, so an editor control that writes `building.banks[]` cannot have a price
+   * of its own — it pays `rezone-bank`, the row twelve shipped repairs buy. This is that constraint
+   * read forwards: the paths the editor names are the paths the schedule already prices.
+   */
+  it('names only paths the shipped schedule already covers', () => {
+    const schedule = shippedPriceSchedule();
+    const paths = editorPathsOf({
+      ...emptyFixitState(),
+      zoneOverlapFloors: 2,
+      parkingStrategy: 'lobby',
+    });
+    expect(paths).toEqual(['building.banks[]', 'dispatcher.idle.parkingStrategy']);
+    expect(zonePriceUnits(schedule)).toBe(6);
+    expect(parkingPriceUnits(schedule)).toBe(0);
+    /* And nothing is named while nothing is selected, or an untouched editor would be billed. */
+    expect(editorPathsOf(emptyFixitState())).toEqual([]);
+  });
+
+  /**
+   * A rezone is charged **once**, which is the schedule's own finding rather than this reducer's
+   * preference: *"twelve fix repairs buy it between 0 and 12 units with no rule relating the price
+   * to how much is rezoned"*. So the second floor of overlap is free and the first is not.
+   *
+   * **Where the *once* is actually enforced was found by watching this fail, and it is not where it
+   * looks.** The first positive control run against it pushed `building.banks[]` onto
+   * `editorPathsOf`'s list once per floor — and the test **stayed green**, because
+   * `pricing/repairPrice.ts#changesAtPaths` keys its results by change id and a duplicated path
+   * collapses. That dedupe is the same rule that stops a patch trimming both dwells paying for the
+   * doors twice, and the editor inherits it by going through the same function rather than counting
+   * units of its own. The control that does fire multiplies the summed price, which is the shape a
+   * real per-floor defect would take.
+   */
+  it('charges the rezone once however many floors it moves', () => {
+    const schedule = shippedPriceSchedule();
+    const one = spendOf(CASE, { ...emptyFixitState(), zoneOverlapFloors: 1 }, schedule);
+    const three = spendOf(CASE, { ...emptyFixitState(), zoneOverlapFloors: 3 }, schedule);
+    expect(one.totalUnits).toBe(6);
+    expect(three.totalUnits).toBe(6);
+  });
+
+  /**
+   * **Neither setting is machinery**, and `budgetNoteOf` is the reason it matters. § 10.4's spent row
+   * asks how much of the order was steel; a redrawn boundary and a parking rule are neither, so a
+   * player who bought only those must not be told they are buying machinery. `docs/20` defect 8 read
+   * the other way round.
+   */
+  it('keeps a rezone and a parking rule out of the machinery split', () => {
+    const schedule = shippedPriceSchedule();
+    const settings = spendOf(
+      CASE,
+      { ...emptyFixitState(), zoneOverlapFloors: 1, parkingStrategy: 'lobby' },
+      schedule,
+    );
+    expect(settings.editorUnits).toBe(6);
+    expect(settings.machineryUnits).toBe(0);
+    expect(budgetNoteOf(CASE, settings)).toContain('committed budget is committed');
+    expect(budgetNoteOf(CASE, settings)).not.toContain('buying machinery');
+
+    /* The machinery arm is unmoved: a speed step still reads as steel beside a free parking rule. */
+    const withSteel = spendOf(
+      CASE,
+      { ...emptyFixitState(), speedSteps: 1, parkingStrategy: 'lobby' },
+      schedule,
+    );
+    expect(withSteel.machineryUnits).toBe(10);
+    expect(budgetNoteOf(CASE, withSteel)).toContain('buying machinery');
+  });
+
+  it('steps the overlap up to the building ceiling and no further, and back down again', () => {
+    const schedule = shippedPriceSchedule();
+    let state = emptyFixitState();
+    state = stepZoneOverlap(CASE, state, 1, 2, schedule);
+    expect(state.zoneOverlapFloors).toBe(1);
+    state = stepZoneOverlap(CASE, state, 1, 2, schedule);
+    expect(state.zoneOverlapFloors).toBe(2);
+    /* The building's ceiling, not the budget's: 6 of 12 u committed and the press is still refused. */
+    expect(spendOf(CASE, state, schedule).totalUnits).toBe(6);
+    expect(stepZoneOverlap(CASE, state, 1, 2, schedule)).toBe(state);
+    state = stepZoneOverlap(CASE, state, -1, 2, schedule);
+    expect(state.zoneOverlapFloors).toBe(1);
+    state = stepZoneOverlap(CASE, state, -1, 2, schedule);
+    expect(state.zoneOverlapFloors).toBe(0);
+    expect(stepZoneOverlap(CASE, state, -1, 2, schedule)).toBe(state);
+    /* A ceiling of zero refuses the first press outright — the single-bank buildings' answer. */
+    const untouched = emptyFixitState();
+    expect(stepZoneOverlap(CASE, untouched, 1, 0, schedule)).toBe(untouched);
+  });
+
+  it('refuses the first floor of overlap when the budget cannot take the rezone', () => {
+    const schedule = shippedPriceSchedule();
+    /* One speed step is 10 of this case's 12 u, so the 6 u rezone no longer fits. */
+    const spent = stepSpeed(CASE, emptyFixitState(), 1, schedule);
+    expect(spendOf(CASE, spent, schedule).totalUnits).toBe(10);
+    expect(affordabilityOf(CASE, spent, zonePriceUnits(schedule), schedule)).toEqual({
+      selectable: false,
+      shortByUnits: 4,
+    });
+    expect(stepZoneOverlap(CASE, spent, 1, 3, schedule)).toBe(spent);
+  });
+
+  it('sets and clears the parking strategy, and treats null as leaving it alone', () => {
+    const schedule = shippedPriceSchedule();
+    const empty = emptyFixitState();
+    expect(empty.parkingStrategy).toBeNull();
+    const parked = setParkingStrategy(CASE, empty, 'lobby', schedule);
+    expect(parked.parkingStrategy).toBe('lobby');
+    /* Free, so nothing else about the order moves. */
+    expect(spendOf(CASE, parked, schedule).totalUnits).toBe(0);
+    expect(setParkingStrategy(CASE, parked, 'lobby', schedule)).toBe(parked);
+    expect(setParkingStrategy(CASE, parked, null, schedule).parkingStrategy).toBeNull();
+  });
+
+  /**
+   * The offered subset is a **subset**, checked against core's own vocabulary rather than against a
+   * copy of it. A strategy that left `PARKING_STRATEGIES` would otherwise go on being written into a
+   * config the schema refuses, and the first sign would be a run that throws on a player's press.
+   */
+  it('offers only strategies the core still declares', () => {
+    for (const strategy of EDITOR_PARKING_STRATEGIES) {
+      expect(PARKING_STRATEGIES as readonly string[]).toContain(strategy);
+    }
+    expect(EDITOR_PARKING_STRATEGIES.length).toBeLessThan(PARKING_STRATEGIES.length);
   });
 });

@@ -188,6 +188,10 @@ export const CONTROL_KEYS = [
   'fixit-speed',
   /** The car-capacity stepper. */
   'fixit-capacity',
+  /** The bank-overlap stepper — § 10.3's zones and service ranges, issue #422. */
+  'fixit-zones',
+  /** The idle-parking select — § 10.3's parking, issue #422. */
+  'fixit-parking',
 ] as const;
 export type TelemetryControlKey = (typeof CONTROL_KEYS)[number];
 

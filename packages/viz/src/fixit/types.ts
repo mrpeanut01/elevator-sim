@@ -182,6 +182,28 @@ export interface FixitExtra {
   readonly line: string;
 }
 
+/**
+ * **The parking strategies the fix-it editor offers**, a deliberate subset of core's
+ * `PARKING_STRATEGIES` — GitHub issue **#422**.
+ *
+ * Two of the five are left out, and each for a reason a player would otherwise meet as a dead
+ * control:
+ *
+ * - `fixed-floor` parks at `idle.parkingFloorIndex`, and this editor draws no floor control. Offered
+ *   without one it would be a setting whose meaning the player cannot state, landing on whatever the
+ *   standing order happens to carry — and on a shaft that does not serve that index the stage
+ *   answers `no-target` and nothing moves at all.
+ * - `predicted-demand` needs a forecast. Without Phase 5's learned one the stage reports
+ *   `no-forecast` rather than guessing, so the option would be a press that changes no leg — which
+ *   is § D219's defect wearing a select's clothes.
+ *
+ * Both belong to the lane that builds the floor control and the forecast, not to this one. The
+ * subset is asserted against core's own vocabulary in `engine.test.ts`, so a strategy that leaves
+ * `PARKING_STRATEGIES` cannot go on shipping from here.
+ */
+export const EDITOR_PARKING_STRATEGIES = ['stay', 'lobby', 'zone-center'] as const;
+export type EditorParkingStrategy = (typeof EDITOR_PARKING_STRATEGIES)[number];
+
 /** What the player has selected on a case. The pure model the panel renders. */
 export interface FixitState {
   readonly selectedRepairIds: readonly string[];
@@ -190,4 +212,25 @@ export interface FixitState {
   readonly speedSteps: number;
   /** Machinery bought in the editor: +2-place steps, priced by the contract. */
   readonly capacitySteps: number;
+  /**
+   * § 10.3's **zones and service ranges**, as one number: how many floors of overlap every bank
+   * gains at each edge of the range it already serves. `0` leaves the ranges as the building draws
+   * them.
+   *
+   * A widened range is a `banks` replacement, so this is `building.banks[]` and the schedule's
+   * `rezone-bank` row prices it — the same row, at the same price, a repair that rezones pays.
+   * Flat rather than per floor, which is the schedule's own finding: *"twelve fix repairs buy it
+   * between 0 and 12 units with no rule relating the price to how much is rezoned"*.
+   */
+  readonly zoneOverlapFloors: number;
+  /**
+   * § 10.3's **parking**: where an idle car waits. `null` leaves the standing order's own choice
+   * alone, which is what a case opens on — `emptyFixitState` cannot know a profile's value and a
+   * default that guessed one would edit the building by being drawn.
+   *
+   * Writes `dispatcher.idle.parkingStrategy`, priced by the schedule's `idle-parking` row, which is
+   * 0 u in every shipped list. Free is not the same as inert: `cases.test.ts` requires each offered
+   * strategy to move the legs.
+   */
+  readonly parkingStrategy: EditorParkingStrategy | null;
 }
